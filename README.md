@@ -5,7 +5,7 @@
 [![Build Status][1]][2]
 
 ## Overview
-Heptio Ark is a one-stop shop for managing disaster recovery, specifically for your [Kubernetes][14] cluster resources. It provides a simple, configurable, and operationally robust way to back up and restore your applications and persistent volumes from a series of checkpoints. This allows you to better automate in the following scenarios:
+Heptio Ark is a utility for managing disaster recovery, specifically for your [Kubernetes][14] cluster resources and persistent volumes. It provides a simple, configurable, and operationally robust way to back up and restore applications and PVs from a series of checkpoints. This allows you to better automate in the following scenarios:
 
 * **Disaster recovery** with reduced TTR (time to respond), in the case of:
     * Infrastructure loss
