@@ -1,0 +1,160 @@
+# Copyright 2017 Heptio Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: backups.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: backups
+    kind: Backup
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: schedules.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: schedules
+    kind: Schedule
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: restores.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: restores
+    kind: Restore
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: configs.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: configs
+    kind: Config
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: heptio-ark
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ark
+  namespace: heptio-ark
+  labels:
+    component: ark
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: ark
+  labels:
+    component: ark
+rules:
+  - apiGroups:
+      - "*"
+    verbs:
+      - list
+      - watch
+      - create
+    resources:
+      - "*"
+  - apiGroups:
+      - apiextensions.k8s.io
+    verbs:
+      - create
+    resources:
+      - customresourcedefinitions
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: ark
+  labels:
+    component: ark
+subjects:
+  - kind: ServiceAccount
+    namespace: heptio-ark
+    name: ark
+roleRef:
+  kind: ClusterRole
+  name: ark
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  namespace: heptio-ark
+  name: ark
+  labels:
+    component: ark
+rules:
+  - apiGroups:
+      - ark.heptio.com
+    verbs:
+      - "*"
+    resources:
+      - "*"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  namespace: heptio-ark
+  name: ark
+  labels:
+    component: ark
+subjects:
+  - kind: ServiceAccount
+    namespace: heptio-ark
+    name: ark
+roleRef:
+  kind: Role
+  name: ark
+  apiGroup: rbac.authorization.k8s.io

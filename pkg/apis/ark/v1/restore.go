@@ -1,0 +1,120 @@
+/*
+Copyright 2017 Heptio Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package v1
+
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+// RestoreSpec defines the specification for an Ark restore.
+type RestoreSpec struct {
+	// BackupName is the unique name of the Ark backup to restore
+	// from.
+	BackupName string `json:"backupName"`
+
+	// Namespaces is a slice of namespaces in the Ark backup to restore.
+	Namespaces []string `json:"namespaces"`
+
+	// NamespaceMapping is a map of source namespace names
+	// to target namespace names to restore into. Any source
+	// namespaces not included in the map will be restored into
+	// namespaces of the same name.
+	NamespaceMapping map[string]string `json:"namespaceMapping"`
+
+	// LabelSelector is a metav1.LabelSelector to filter with
+	// when restoring individual objects from the backup. If empty
+	// or nil, all objects are included. Optional.
+	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
+
+	// RestorePVs is a bool defining whether to restore all included
+	// PVs from snapshot (via the cloudprovider). Default false.
+	RestorePVs bool `json:"restorePVs"`
+}
+
+// RestorePhase is a string representation of the lifecycle phase
+// of an Ark restore
+type RestorePhase string
+
+const (
+	// RestorePhaseNew means the restore has been created but not
+	// yet processed by the RestoreController
+	RestorePhaseNew RestorePhase = "New"
+
+	// RestorePhaseFailedValidation means the restore has failed
+	// the controller's validations and therefore will not run.
+	RestorePhaseFailedValidation RestorePhase = "FailedValidation"
+
+	// RestorePhaseInProgress means the restore is currently executing.
+	RestorePhaseInProgress RestorePhase = "InProgress"
+
+	// RestorePhaseCompleted means the restore has finished executing.
+	// Any relevant warnings or errors will be captured in the Status.
+	RestorePhaseCompleted RestorePhase = "Completed"
+)
+
+// RestoreStatus captures the current status of an Ark restore
+type RestoreStatus struct {
+	// Phase is the current state of the Restore
+	Phase RestorePhase `json:"phase"`
+
+	// ValidationErrors is a slice of all validation errors (if
+	// applicable)
+	ValidationErrors []string `json:"validationErrors"`
+
+	// Warnings is a collection of all warning messages that were
+	// generated during execution of the restore
+	Warnings RestoreResult `json:"warnings"`
+
+	// Errors is a collection of all error messages that were
+	// generated during execution of the restore
+	Errors RestoreResult `json:"errors"`
+}
+
+// RestoreResult is a collection of messages that were generated
+// during execution of a restore. This will typically store either
+// warning or error messages.
+type RestoreResult struct {
+	// Ark is a slice of messages related to the operation of Ark
+	// itself (for example, messages related to connecting to the
+	// cloud, reading a backup file, etc.)
+	Ark []string `json:"ark"`
+
+	// Cluster is a slice of messages related to restoring cluster-
+	// scoped resources.
+	Cluster []string `json:"cluster"`
+
+	// Namespaces is a map of namespace name to slice of messages
+	// related to restoring namespace-scoped resources.
+	Namespaces map[string][]string `json:"namespaces"`
+}
+
+// +genclient=true
+
+// Restore is an Ark resource that represents the application of
+// resources from an Ark backup to a target Kubernetes cluster.
+type Restore struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata"`
+
+	Spec   RestoreSpec   `json:"spec"`
+	Status RestoreStatus `json:"status,omitempty"`
+}
+
+// RestoreList is a list of Restores.
+type RestoreList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []Restore `json:"items"`
+}
