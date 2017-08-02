@@ -45,7 +45,6 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	"github.com/heptio/ark/pkg/restore/restorers"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -419,12 +418,8 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 			continue
 		}
 
-		hasControllerOwner, err := hasControllerOwner(obj.UnstructuredContent())
-		if err != nil {
-			addToResult(&errors, namespace, fmt.Errorf("error check for controller owner for %q: %v", fullPath, err))
-			continue
-		}
-		if hasControllerOwner {
+		if hasControllerOwner(obj.GetOwnerReferences()) {
+			glog.V(4).Infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
 			continue
 		}
 
@@ -488,33 +483,13 @@ func addLabel(obj *unstructured.Unstructured, key string, val string) {
 // hasControllerOwner returns whether or not an object has a controller
 // owner ref. Used to identify whether or not an object should be explicitly
 // recreated during a restore.
-func hasControllerOwner(objData map[string]interface{}) (bool, error) {
-	meta, err := collections.GetMap(objData, "metadata")
-	if err != nil {
-		return false, err
-	}
-
-	ownerRefsObj, found := meta["ownerReferences"]
-	if !found {
-		return false, nil
-	}
-
-	ownerRefs, ok := ownerRefsObj.([]interface{})
-	if !ok {
-		return false, fmt.Errorf("Unexpected type %T", ownerRefsObj)
-	}
-
-	for _, refObj := range ownerRefs {
-		ownerRef, ok := refObj.(map[string]interface{})
-		if !ok {
-			return false, fmt.Errorf("Unexpected type %T", refObj)
-		}
-		if _, exists := ownerRef["controller"]; exists {
-			return true, nil
+func hasControllerOwner(refs []metav1.OwnerReference) bool {
+	for _, ref := range refs {
+		if ref.Controller != nil && *ref.Controller {
+			return true
 		}
 	}
-
-	return false, nil
+	return false
 }
 
 // unmarshal reads the specified file, unmarshals the JSON contained within it

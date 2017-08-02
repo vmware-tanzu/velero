@@ -380,6 +380,69 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 	}
 }
 
+func TestHasControllerOwner(t *testing.T) {
+	tests := []struct {
+		name        string
+		object      map[string]interface{}
+		expectOwner bool
+	}{
+		{
+			name:   "missing metadata",
+			object: map[string]interface{}{},
+		},
+		{
+			name: "missing ownerReferences",
+			object: map[string]interface{}{
+				"metadata": map[string]interface{}{},
+			},
+			expectOwner: false,
+		},
+		{
+			name: "have ownerReferences, no controller fields",
+			object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"ownerReferences": []interface{}{
+						map[string]interface{}{"foo": "bar"},
+					},
+				},
+			},
+			expectOwner: false,
+		},
+		{
+			name: "have ownerReferences, controller=false",
+			object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"ownerReferences": []interface{}{
+						map[string]interface{}{"controller": false},
+					},
+				},
+			},
+			expectOwner: false,
+		},
+		{
+			name: "have ownerReferences, controller=true",
+			object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"ownerReferences": []interface{}{
+						map[string]interface{}{"controller": false},
+						map[string]interface{}{"controller": false},
+						map[string]interface{}{"controller": true},
+					},
+				},
+			},
+			expectOwner: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u := &unstructured.Unstructured{Object: test.object}
+			hasOwner := hasControllerOwner(u.GetOwnerReferences())
+			assert.Equal(t, test.expectOwner, hasOwner)
+		})
+	}
+}
+
 func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
 	res := make([]unstructured.Unstructured, 0, len(objs))
 
