@@ -290,7 +290,7 @@ Start the sample nginx app:
 ```
 kubectl apply -f examples/nginx-app/base.yaml
 ```
-Now create a backup with PV snapshotting:
+Now create a backup:
 ```
 ark backup create nginx-backup --selector app=nginx
 ```
