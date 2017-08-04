@@ -332,9 +332,11 @@ Simulate a disaster:
 kubectl delete namespaces nginx-example
 kubectl delete pv $nginx_pv_name
 ```
+Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Delete", the above commands should trigger your cloud provider to delete the disk backing the PV. The deletion process is asynchronous so this may take some time. **Before continuing to the next step, check your cloud provider (via dashboard or CLI) to confirm that the disk no longer exists.**
+
 Now restore your lost resources:
 ```
-ark restore create nginx-backup
+ark restore create nginx-backup --restore-volumes
 ```
 
 [0]: /README.md#quickstart
@@ -356,3 +358,4 @@ ark restore create nginx-backup
 [16]: https://cloud.google.com/compute/docs/gcloud-compute
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/azure/storage/storage-azure-cli
+[19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
