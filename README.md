@@ -166,6 +166,8 @@ If you encounter any problems that the documentation does not address, [file an 
 
 Thanks for taking the time to join our community and start contributing!
 
+Feedback and discussion is available on [the mailing list][24].
+
 #### Before you start
 
 * Please familiarize yourself with the [Code of Conduct][8] before contributing.
@@ -204,3 +206,4 @@ See [the list of releases][6] to find out about feature changes.
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
 [23]: /docs/cloud-provider-specifics.md
+[24]: http://j.hept.io/ark-list
