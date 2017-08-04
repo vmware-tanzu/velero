@@ -9,7 +9,7 @@ The Ark client provides a CLI that allows you to initiate ad-hoc backups, schedu
 While it is possible to build and run the `ark` executable yourself, it is recommended to use the containerized version. Use the alias described in the quickstart:
 
 ```
-alias ark='docker run --rm -v $(dirname $KUBECONFIG):/kubeconfig -e KUBECONFIG=/kubeconfig/$(basename $KUBECONFIG) gcr.io/heptio-images/ark:latest'
+alias ark='docker run --rm -u $(id -u) -v $(dirname $KUBECONFIG):/kubeconfig -e KUBECONFIG=/kubeconfig/$(basename $KUBECONFIG) gcr.io/heptio-images/ark:latest'
 ```
 
 Assuming that your `KUBECONFIG` variable is set, this alias takes care of specifying the appropriate Kubernetes cluster credentials for you.
