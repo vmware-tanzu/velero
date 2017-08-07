@@ -1076,6 +1076,21 @@
 			"Rev": "df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc"
 		},
 		{
+			"ImportPath": "k8s.io/client-go/plugin/pkg/client/auth/azure",
+			"Comment": "v4.0.0-beta.0",
+			"Rev": "df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/plugin/pkg/client/auth/gcp",
+			"Comment": "v4.0.0-beta.0",
+			"Rev": "df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc"
+		},
+		{
+			"ImportPath": "k8s.io/client-go/plugin/pkg/client/auth/oidc",
+			"Comment": "v4.0.0-beta.0",
+			"Rev": "df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc"
+		},
+		{
 			"ImportPath": "k8s.io/client-go/rest",
 			"Comment": "v4.0.0-beta.0",
 			"Rev": "df46f7f13b3da19b90b8b4f0d18b8adc6fbf28dc"
