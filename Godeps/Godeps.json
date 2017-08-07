@@ -565,26 +565,6 @@
 			"Rev": "53feefa2559fb8dfa8d81baad31be332c97d6c77"
 		},
 		{
-			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions",
-			"Rev": "5fa44608f6b9b2180a2fd1ecb52e651fd0397794"
-		},
-		{
-			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-			"Rev": "5fa44608f6b9b2180a2fd1ecb52e651fd0397794"
-		},
-		{
-			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset",
-			"Rev": "5fa44608f6b9b2180a2fd1ecb52e651fd0397794"
-		},
-		{
-			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme",
-			"Rev": "5fa44608f6b9b2180a2fd1ecb52e651fd0397794"
-		},
-		{
-			"ImportPath": "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1",
-			"Rev": "5fa44608f6b9b2180a2fd1ecb52e651fd0397794"
-		},
-		{
 			"ImportPath": "k8s.io/apimachinery/pkg/api/equality",
 			"Rev": "abe34e4f5b4413c282a83011892cbeea5b32223b"
 		},
