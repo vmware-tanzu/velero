@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// httpCode is a helper that returns HTTP code of the response. It returns -1 and
-// an error if building a new request fails.
-func httpCode(handler http.HandlerFunc, method, url string, values url.Values) (int, error) {
+// httpCode is a helper that returns HTTP code of the response. It returns -1
+// if building a new request fails.
+func httpCode(handler http.HandlerFunc, method, url string, values url.Values) int {
 	w := httptest.NewRecorder()
 	req, err := http.NewRequest(method, url+"?"+values.Encode(), nil)
 	if err != nil {
-		return -1, err
+		return -1
 	}
 	handler(w, req)
-	return w.Code, nil
+	return w.Code
 }
 
 // HTTPSuccess asserts that a specified handler returns a success status code.
@@ -26,18 +26,11 @@ func httpCode(handler http.HandlerFunc, method, url string, values url.Values) (
 //
 // Returns whether the assertion was successful (true) or not (false).
 func HTTPSuccess(t TestingT, handler http.HandlerFunc, method, url string, values url.Values) bool {
-	code, err := httpCode(handler, method, url, values)
-	if err != nil {
-		Fail(t, fmt.Sprintf("Failed to build test request, got error: %s", err))
+	code := httpCode(handler, method, url, values)
+	if code == -1 {
 		return false
 	}
-
-	isSuccessCode := code >= http.StatusOK && code <= http.StatusPartialContent
-	if !isSuccessCode {
-		Fail(t, fmt.Sprintf("Expected HTTP success status code for %q but received %d", url+"?"+values.Encode(), code))
-	}
-
-	return isSuccessCode
+	return code >= http.StatusOK && code <= http.StatusPartialContent
 }
 
 // HTTPRedirect asserts that a specified handler returns a redirect status code.
@@ -46,18 +39,11 @@ func HTTPSuccess(t TestingT, handler http.HandlerFunc, method, url string, value
 //
 // Returns whether the assertion was successful (true) or not (false).
 func HTTPRedirect(t TestingT, handler http.HandlerFunc, method, url string, values url.Values) bool {
-	code, err := httpCode(handler, method, url, values)
-	if err != nil {
-		Fail(t, fmt.Sprintf("Failed to build test request, got error: %s", err))
+	code := httpCode(handler, method, url, values)
+	if code == -1 {
 		return false
 	}
-
-	isRedirectCode := code >= http.StatusMultipleChoices && code <= http.StatusTemporaryRedirect
-	if !isRedirectCode {
-		Fail(t, fmt.Sprintf("Expected HTTP redirect status code for %q but received %d", url+"?"+values.Encode(), code))
-	}
-
-	return isRedirectCode
+	return code >= http.StatusMultipleChoices && code <= http.StatusTemporaryRedirect
 }
 
 // HTTPError asserts that a specified handler returns an error status code.
@@ -66,18 +52,11 @@ func HTTPRedirect(t TestingT, handler http.HandlerFunc, method, url string, valu
 //
 // Returns whether the assertion was successful (true) or not (false).
 func HTTPError(t TestingT, handler http.HandlerFunc, method, url string, values url.Values) bool {
-	code, err := httpCode(handler, method, url, values)
-	if err != nil {
-		Fail(t, fmt.Sprintf("Failed to build test request, got error: %s", err))
+	code := httpCode(handler, method, url, values)
+	if code == -1 {
 		return false
 	}
-
-	isErrorCode := code >= http.StatusBadRequest
-	if !isErrorCode {
-		Fail(t, fmt.Sprintf("Expected HTTP error status code for %q but received %d", url+"?"+values.Encode(), code))
-	}
-
-	return isErrorCode
+	return code >= http.StatusBadRequest
 }
 
 // HTTPBody is a helper that returns HTTP body of the response. It returns
@@ -120,8 +99,59 @@ func HTTPBodyNotContains(t TestingT, handler http.HandlerFunc, method, url strin
 
 	contains := strings.Contains(body, fmt.Sprint(str))
 	if contains {
-		Fail(t, fmt.Sprintf("Expected response body for \"%s\" to NOT contain \"%s\" but found \"%s\"", url+"?"+values.Encode(), str, body))
+		Fail(t, "Expected response body for %s to NOT contain \"%s\" but found \"%s\"", url+"?"+values.Encode(), str, body)
 	}
 
 	return !contains
+}
+
+//
+// Assertions Wrappers
+//
+
+// HTTPSuccess asserts that a specified handler returns a success status code.
+//
+//  assert.HTTPSuccess(myHandler, "POST", "http://www.google.com", nil)
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPSuccess(handler http.HandlerFunc, method, url string, values url.Values) bool {
+	return HTTPSuccess(a.t, handler, method, url, values)
+}
+
+// HTTPRedirect asserts that a specified handler returns a redirect status code.
+//
+//  assert.HTTPRedirect(myHandler, "GET", "/a/b/c", url.Values{"a": []string{"b", "c"}}
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPRedirect(handler http.HandlerFunc, method, url string, values url.Values) bool {
+	return HTTPRedirect(a.t, handler, method, url, values)
+}
+
+// HTTPError asserts that a specified handler returns an error status code.
+//
+//  assert.HTTPError(myHandler, "POST", "/a/b/c", url.Values{"a": []string{"b", "c"}}
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPError(handler http.HandlerFunc, method, url string, values url.Values) bool {
+	return HTTPError(a.t, handler, method, url, values)
+}
+
+// HTTPBodyContains asserts that a specified handler returns a
+// body that contains a string.
+//
+//  assert.HTTPBodyContains(t, myHandler, "www.google.com", nil, "I'm Feeling Lucky")
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPBodyContains(handler http.HandlerFunc, method, url string, values url.Values, str interface{}) bool {
+	return HTTPBodyContains(a.t, handler, method, url, values, str)
+}
+
+// HTTPBodyNotContains asserts that a specified handler returns a
+// body that does not contain a string.
+//
+//  assert.HTTPBodyNotContains(t, myHandler, "www.google.com", nil, "I'm Feeling Lucky")
+//
+// Returns whether the assertion was successful (true) or not (false).
+func (a *Assertions) HTTPBodyNotContains(handler http.HandlerFunc, method, url string, values url.Values, str interface{}) bool {
+	return HTTPBodyNotContains(a.t, handler, method, url, values, str)
 }

@@ -210,8 +210,7 @@
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
-			"Comment": "v1.1.0-6-gadab964",
-			"Rev": "adab96458c51a58dc1783b3335dcce5461522e75"
+			"Rev": "5215b55f46b2b919f50a1df0eaa5886afe4e3b3d"
 		},
 		{
 			"ImportPath": "github.com/dgrijalva/jwt-go",
@@ -411,18 +410,18 @@
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/assert",
-			"Comment": "v1.1.4-70-g05e8a0e",
-			"Rev": "05e8a0eda380579888eb53c394909df027f06991"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/mock",
-			"Comment": "v1.1.4-70-g05e8a0e",
-			"Rev": "05e8a0eda380579888eb53c394909df027f06991"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/stretchr/testify/require",
-			"Comment": "v1.1.4-70-g05e8a0e",
-			"Rev": "05e8a0eda380579888eb53c394909df027f06991"
+			"Comment": "v1.0-88-ge3a8ff8",
+			"Rev": "e3a8ff8ce36581f87a15341206f205b1da467059"
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",

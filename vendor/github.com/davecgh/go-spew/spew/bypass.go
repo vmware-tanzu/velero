@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 Dave Collins <dave@davec.name>
+// Copyright (c) 2015 Dave Collins <dave@davec.name>
 //
 // Permission to use, copy, modify, and distribute this software for any
 // purpose with or without fee is hereby granted, provided that the above
@@ -13,10 +13,9 @@
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 // NOTE: Due to the following build constraints, this file will only be compiled
-// when the code is not running on Google App Engine, compiled by GopherJS, and
-// "-tags safe" is not added to the go build command line.  The "disableunsafe"
-// tag is deprecated and thus should not be used.
-// +build !js,!appengine,!safe,!disableunsafe
+// when the code is not running on Google App Engine and "-tags disableunsafe"
+// is not added to the go build command line.
+// +build !appengine,!disableunsafe
 
 package spew
 
@@ -41,9 +40,9 @@ var (
 	// after commit 82f48826c6c7 which changed the format again to mirror
 	// the original format.  Code in the init function updates these offsets
 	// as necessary.
-	offsetPtr    = ptrSize
+	offsetPtr    = uintptr(ptrSize)
 	offsetScalar = uintptr(0)
-	offsetFlag   = ptrSize * 2
+	offsetFlag   = uintptr(ptrSize * 2)
 
 	// flagKindWidth and flagKindShift indicate various bits that the
 	// reflect package uses internally to track kind information.
@@ -58,7 +57,7 @@ var (
 	// changed their positions.  Code in the init function updates these
 	// flags as necessary.
 	flagKindWidth = uintptr(5)
-	flagKindShift = flagKindWidth - 1
+	flagKindShift = uintptr(flagKindWidth - 1)
 	flagRO        = uintptr(1 << 0)
 	flagIndir     = uintptr(1 << 1)
 )
