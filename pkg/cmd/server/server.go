@@ -29,7 +29,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
-	apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -79,7 +78,6 @@ func NewCommand() *cobra.Command {
 
 type server struct {
 	kubeClient            kubernetes.Interface
-	apiExtensionsClient   apiextensionsclient.Interface
 	arkClient             clientset.Interface
 	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
@@ -101,11 +99,6 @@ func newServer(kubeconfig string) (*server, error) {
 		return nil, err
 	}
 
-	apiExtensionsClient, err := apiextensionsclient.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	arkClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, err
@@ -115,9 +108,8 @@ func newServer(kubeconfig string) (*server, error) {
 
 	s := &server{
 		kubeClient:            kubeClient,
-		apiExtensionsClient:   apiExtensionsClient,
 		arkClient:             arkClient,
-		discoveryClient:       apiExtensionsClient.Discovery(),
+		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
 		sharedInformerFactory: informers.NewSharedInformerFactory(arkClient, 0),
 		ctx:        ctx,
