@@ -138,7 +138,7 @@ func TestProcessSchedule(t *testing.T) {
 			)
 			if test.fakeClockTime != "" {
 				testTime, err = time.Parse("2006-01-02 15:04:05", test.fakeClockTime)
-				require.NoErrorf(t, err, "unable to parse test.fakeClockTime: %v", err)
+				require.NoError(t, err, "unable to parse test.fakeClockTime: %v", err)
 			}
 			c.clock = clock.NewFakeClock(testTime)
 
@@ -161,7 +161,7 @@ func TestProcessSchedule(t *testing.T) {
 			key := test.scheduleKey
 			if key == "" && test.schedule != nil {
 				key, err = cache.MetaNamespaceKeyFunc(test.schedule)
-				require.NoErrorf(t, err, "error getting key from test.schedule: %v", err)
+				require.NoError(t, err, "error getting key from test.schedule: %v", err)
 			}
 
 			err = c.processSchedule(key)
@@ -246,13 +246,13 @@ func TestGetNextRunTime(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cronSchedule, err := cron.Parse(test.schedule.Spec.Schedule)
-			require.NoErrorf(t, err, "unable to parse test.schedule.Spec.Schedule: %v", err)
+			require.NoError(t, err, "unable to parse test.schedule.Spec.Schedule: %v", err)
 
 			testClock := clock.NewFakeClock(time.Now())
 
 			if test.lastRanOffset != "" {
 				offsetDuration, err := time.ParseDuration(test.lastRanOffset)
-				require.NoErrorf(t, err, "unable to parse test.lastRanOffset: %v", err)
+				require.NoError(t, err, "unable to parse test.lastRanOffset: %v", err)
 
 				test.schedule.Status.LastBackup = metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
 			}
@@ -360,7 +360,7 @@ func TestGetBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			testTime, err := time.Parse("2006-01-02 15:04:05", test.testClockTime)
-			require.NoErrorf(t, err, "unable to parse test.testClockTime: %v", err)
+			require.NoError(t, err, "unable to parse test.testClockTime: %v", err)
 
 			backup := getBackup(test.schedule, clock.NewFakeClock(testTime).Now())
 

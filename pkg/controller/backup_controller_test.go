@@ -207,7 +207,7 @@ func TestProcessBackup(t *testing.T) {
 				require.Error(t, err, "processBackup should error")
 				return
 			}
-			require.NoErrorf(t, err, "processBackup unexpected error: %v", err)
+			require.NoError(t, err, "processBackup unexpected error: %v", err)
 
 			if !test.expectBackup {
 				assert.Empty(t, backupper.Calls)
