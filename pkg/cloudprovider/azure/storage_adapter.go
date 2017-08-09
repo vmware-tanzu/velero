@@ -17,12 +17,14 @@ limitations under the License.
 package azure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
+	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
 
@@ -77,6 +79,31 @@ func NewStorageAdapter(location string, apiTimeout time.Duration) (cloudprovider
 
 	if apiTimeout == 0 {
 		apiTimeout = time.Minute
+	}
+
+	// validate the location
+	groupClient := subscriptions.NewGroupClient()
+	groupClient.Authorizer = spt
+
+	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
+	if err != nil {
+		return nil, err
+	}
+
+	if locs.Value == nil {
+		return nil, errors.New("no locations returned from Azure API")
+	}
+
+	locationExists := false
+	for _, loc := range *locs.Value {
+		if (loc.Name != nil && *loc.Name == location) || (loc.DisplayName != nil && *loc.DisplayName == location) {
+			locationExists = true
+			break
+		}
+	}
+
+	if !locationExists {
+		return nil, fmt.Errorf("location %q not found", location)
 	}
 
 	return &storageAdapter{

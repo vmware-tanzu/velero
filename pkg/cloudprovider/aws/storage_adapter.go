@@ -17,6 +17,8 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -42,9 +44,22 @@ func NewStorageAdapter(config *aws.Config, availabilityZone string) (cloudprovid
 		return nil, err
 	}
 
+	// validate the availabilityZone
+	var (
+		ec2Client = ec2.New(sess)
+		azReq     = &ec2.DescribeAvailabilityZonesInput{ZoneNames: []*string{&availabilityZone}}
+	)
+	res, err := ec2Client.DescribeAvailabilityZones(azReq)
+	if err != nil {
+		return nil, err
+	}
+	if len(res.AvailabilityZones) == 0 {
+		return nil, fmt.Errorf("availability zone %q not found", availabilityZone)
+	}
+
 	return &storageAdapter{
 		blockStorage: &blockStorageAdapter{
-			ec2: ec2.New(sess),
+			ec2: ec2Client,
 			az:  availabilityZone,
 		},
 		objectStorage: &objectStorageAdapter{
