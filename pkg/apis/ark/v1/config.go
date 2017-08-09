@@ -98,6 +98,7 @@ type AWSConfig struct {
 	DisableSSL       bool   `json:"disableSSL"`
 	S3ForcePathStyle bool   `json:"s3ForcePathStyle"`
 	S3Url            string `json:"s3Url"`
+	KMSKeyID         string `json:"kmsKeyId"`
 }
 
 // GCPConfig is configuration information for connecting to GCP.

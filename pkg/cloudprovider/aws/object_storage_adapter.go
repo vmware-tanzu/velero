@@ -19,6 +19,7 @@ package aws
 import (
 	"io"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -27,7 +28,8 @@ import (
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 
 type objectStorageAdapter struct {
-	s3 *s3.S3
+	s3       *s3.S3
+	kmsKeyID string
 }
 
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
@@ -35,6 +37,12 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 		Bucket: &bucket,
 		Key:    &key,
 		Body:   body,
+	}
+
+	// if kmsKeyID is not empty, enable "aws:kms" encryption
+	if op.kmsKeyID != "" {
+		req.ServerSideEncryption = aws.String("aws:kms")
+		req.SSEKMSKeyId = &op.kmsKeyID
 	}
 
 	_, err := op.s3.PutObject(req)
