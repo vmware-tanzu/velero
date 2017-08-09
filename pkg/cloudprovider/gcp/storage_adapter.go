@@ -51,9 +51,7 @@ func NewStorageAdapter(project string, zone string) (cloudprovider.StorageAdapte
 
 	return &storageAdapter{
 		objectStorage: &objectStorageAdapter{
-			gcs:     gcs,
-			project: project,
-			zone:    zone,
+			gcs: gcs,
 		},
 		blockStorage: &blockStorageAdapter{
 			gce:     gce,
