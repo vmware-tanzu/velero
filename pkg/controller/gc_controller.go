@@ -108,26 +108,36 @@ func (c *gcController) cleanBackups() {
 	// storage should happen first because otherwise there's a possibility the backup sync
 	// controller would re-create the API object after deletion.
 	for _, backup := range backups {
-		if backup.Status.Expiration.Time.Before(now) {
-			glog.Infof("Removing backup %s/%s", backup.Namespace, backup.Name)
-			if err := c.backupService.DeleteBackup(c.bucket, backup.Name); err != nil {
-				glog.Errorf("error deleting backup %s/%s: %v", backup.Namespace, backup.Name, err)
-			}
-
-			for _, volumeBackup := range backup.Status.VolumeBackups {
-				glog.Infof("Removing snapshot %s associated with backup %s/%s", volumeBackup.SnapshotID, backup.Namespace, backup.Name)
-				if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
-					glog.Errorf("error deleting snapshot %v: %v", volumeBackup.SnapshotID, err)
-				}
-			}
-
-			glog.Infof("Removing backup API object %s/%s", backup.Namespace, backup.Name)
-			if err := c.client.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
-				glog.Errorf("error deleting backup API object %s/%s: %v", backup.Namespace, backup.Name, err)
-			}
-		} else {
+		if !backup.Status.Expiration.Time.Before(now) {
 			glog.Infof("Backup %s/%s has not expired yet, skipping", backup.Namespace, backup.Name)
+			continue
 		}
+
+		// if the backup includes snapshots but we don't currently have a PVProvider, we don't
+		// want to orphan the snapshots so skip garbage-collection entirely.
+		if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
+			glog.Warningf("Cannot garbage-collect backup %s/%s because backup includes snapshots and server is not configured with PersistentVolumeProvider",
+				backup.Namespace, backup.Name)
+			continue
+		}
+
+		glog.Infof("Removing backup %s/%s", backup.Namespace, backup.Name)
+		if err := c.backupService.DeleteBackup(c.bucket, backup.Name); err != nil {
+			glog.Errorf("error deleting backup %s/%s: %v", backup.Namespace, backup.Name, err)
+		}
+
+		for _, volumeBackup := range backup.Status.VolumeBackups {
+			glog.Infof("Removing snapshot %s associated with backup %s/%s", volumeBackup.SnapshotID, backup.Namespace, backup.Name)
+			if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
+				glog.Errorf("error deleting snapshot %v: %v", volumeBackup.SnapshotID, err)
+			}
+		}
+
+		glog.Infof("Removing backup API object %s/%s", backup.Namespace, backup.Name)
+		if err := c.client.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
+			glog.Errorf("error deleting backup API object %s/%s: %v", backup.Namespace, backup.Name, err)
+		}
+
 	}
 
 	// also GC any Backup API objects without files in object storage

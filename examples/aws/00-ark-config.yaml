@@ -26,7 +26,6 @@ backupStorageProvider:
   bucket: <YOUR_BUCKET>
   aws:
     region: <YOUR_REGION>
-    availabilityZone: <YOUR_AVAILABILITY_ZONE>
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m

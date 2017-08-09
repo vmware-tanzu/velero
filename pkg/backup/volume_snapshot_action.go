@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -38,11 +39,15 @@ type volumeSnapshotAction struct {
 
 var _ Action = &volumeSnapshotAction{}
 
-func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) Action {
+func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Action, error) {
+	if snapshotService == nil {
+		return nil, errors.New("snapshotService cannot be nil")
+	}
+
 	return &volumeSnapshotAction{
 		snapshotService: snapshotService,
 		clock:           clock.RealClock{},
-	}
+	}, nil
 }
 
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided

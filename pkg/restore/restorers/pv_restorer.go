@@ -57,6 +57,10 @@ func (sr *persistentVolumeRestorer) Prepare(obj runtime.Unstructured, restore *a
 	delete(spec, "storageClassName")
 
 	if restore.Spec.RestorePVs {
+		if sr.snapshotService == nil {
+			return nil, errors.New("PV restorer is not configured for PV snapshot restores")
+		}
+
 		volumeID, err := sr.restoreVolume(obj.UnstructuredContent(), restore, backup)
 		if err != nil {
 			return nil, err

@@ -155,7 +155,10 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			}
 
 			snapshotService := &FakeSnapshotService{SnapshottableVolumes: test.volumeInfo}
-			action := NewVolumeSnapshotAction(snapshotService).(*volumeSnapshotAction)
+
+			vsa, _ := NewVolumeSnapshotAction(snapshotService)
+			action := vsa.(*volumeSnapshotAction)
+
 			fakeClock := clock.NewFakeClock(time.Now())
 			action.clock = fakeClock
 

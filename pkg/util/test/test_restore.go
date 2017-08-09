@@ -60,3 +60,8 @@ func (r *TestRestore) WithErrors(e api.RestoreResult) *TestRestore {
 	r.Status.Errors = e
 	return r
 }
+
+func (r *TestRestore) WithRestorePVs(value bool) *TestRestore {
+	r.Spec.RestorePVs = value
+	return r
+}

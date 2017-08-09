@@ -24,9 +24,7 @@ persistentVolumeProvider:
     apiTimeout: <YOUR_TIMEOUT>
 backupStorageProvider:
   bucket: <YOUR_BUCKET>
-  azure:
-    location: <YOUR_LOCATION>
-    apiTimeout: <YOUR_TIMEOUT>
+  azure: {}
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m

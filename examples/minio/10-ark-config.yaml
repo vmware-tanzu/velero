@@ -18,17 +18,10 @@ kind: Config
 metadata:
   namespace: heptio-ark
   name: default
-persistentVolumeProvider:
-  aws:
-    region: minio
-    availabilityZone: minio
-    s3ForcePathStyle: true
-    s3Url: http://minio:9000
 backupStorageProvider:
   bucket: ark
   aws:
     region: minio
-    availabilityZone: minio
     s3ForcePathStyle: true
     s3Url: http://minio:9000
 backupSyncPeriod: 1m

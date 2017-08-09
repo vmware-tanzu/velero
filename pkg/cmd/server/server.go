@@ -251,8 +251,13 @@ func (s *server) initBackupService(config *api.Config) error {
 }
 
 func (s *server) initSnapshotService(config *api.Config) error {
+	if config.PersistentVolumeProvider == nil {
+		glog.Infof("PersistentVolumeProvider config not provided, skipping SnapshotService creation")
+		return nil
+	}
+
 	glog.Infof("Configuring cloud provider for snapshot service")
-	cloud, err := initCloud(config.PersistentVolumeProvider, "persistentVolumeProvider")
+	cloud, err := initCloud(*config.PersistentVolumeProvider, "persistentVolumeProvider")
 	if err != nil {
 		return err
 	}
@@ -408,6 +413,7 @@ func (s *server) runControllers(config *api.Config) error {
 			backupper,
 			s.backupService,
 			config.BackupStorageProvider.Bucket,
+			s.snapshotService != nil,
 		)
 		wg.Add(1)
 		go func() {
@@ -461,6 +467,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.snapshotService != nil,
 	)
 	wg.Add(1)
 	go func() {
@@ -490,7 +497,12 @@ func newBackupper(
 	actions := map[string]backup.Action{}
 
 	if snapshotService != nil {
-		actions["persistentvolumes"] = backup.NewVolumeSnapshotAction(snapshotService)
+		action, err := backup.NewVolumeSnapshotAction(snapshotService)
+		if err != nil {
+			return nil, err
+		}
+
+		actions["persistentvolumes"] = action
 	}
 
 	return backup.NewKubernetesBackupper(
