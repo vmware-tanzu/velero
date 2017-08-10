@@ -272,6 +272,55 @@ func TestGetNextRunTime(t *testing.T) {
 	}
 }
 
+func TestParseCronSchedule(t *testing.T) {
+	// From https://github.com/heptio/ark/issues/30, where we originally were using cron.Parse(),
+	// which treats the first field as seconds, and not minutes. We want to use cron.ParseStandard()
+	// instead, which has the first field as minutes.
+
+	now := time.Date(2017, 8, 10, 12, 27, 0, 0, time.UTC)
+
+	// Start with a Schedule with:
+	// - schedule: once a day at 9am
+	// - last backup: 2017-08-10 12:27:00 (just happened)
+	s := &api.Schedule{
+		Spec: api.ScheduleSpec{
+			Schedule: "0 9 * * *",
+		},
+		Status: api.ScheduleStatus{
+			LastBackup: metav1.NewTime(now),
+		},
+	}
+
+	c, errs := parseCronSchedule(s)
+	require.Empty(t, errs)
+
+	// make sure we're not due and next backup is tomorrow at 9am
+	due, next := getNextRunTime(s, c, now)
+	assert.False(t, due)
+	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
+
+	// advance the clock a couple of hours and make sure nothing has changed
+	now = now.Add(2 * time.Hour)
+	due, next = getNextRunTime(s, c, now)
+	assert.False(t, due)
+	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
+
+	// advance clock to 1 minute after due time, make sure due=true
+	now = time.Date(2017, 8, 11, 9, 1, 0, 0, time.UTC)
+	due, next = getNextRunTime(s, c, now)
+	assert.True(t, due)
+	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
+
+	// record backup time
+	s.Status.LastBackup = metav1.NewTime(now)
+
+	// advance clock 1 minute, make sure we're not due and next backup is tomorrow at 9am
+	now = time.Date(2017, 8, 11, 9, 2, 0, 0, time.UTC)
+	due, next = getNextRunTime(s, c, now)
+	assert.False(t, due)
+	assert.Equal(t, time.Date(2017, 8, 12, 9, 0, 0, 0, time.UTC), next)
+}
+
 func TestGetBackup(t *testing.T) {
 	tests := []struct {
 		name           string

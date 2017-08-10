@@ -300,7 +300,7 @@ func parseCronSchedule(itm *api.Schedule) (cron.Schedule, []string) {
 			}
 		}()
 
-		if res, err := cron.Parse(itm.Spec.Schedule); err != nil {
+		if res, err := cron.ParseStandard(itm.Spec.Schedule); err != nil {
 			glog.V(4).Infof("error parsing schedule %v/%v, cron schedule=%v: %v", itm.Namespace, itm.Name, itm.Spec.Schedule, err)
 			validationErrors = append(validationErrors, fmt.Sprintf("invalid schedule: %v", err))
 		} else {

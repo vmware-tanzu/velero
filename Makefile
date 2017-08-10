@@ -15,7 +15,7 @@
 # project related vars
 ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT = ark
-VERSION ?= v0.3.2
+VERSION ?= v0.3.3
 GOTARGET = github.com/heptio/$(PROJECT)
 OUTPUT_DIR = $(ROOT_DIR)/_output
 BIN_DIR = $(OUTPUT_DIR)/bin
