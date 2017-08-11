@@ -210,6 +210,15 @@ func (kr *kubernetesRestorer) restoreFromDir(
 
 	// namespace-scoped
 	namespacesPath := path.Join(dir, api.NamespaceScopedDir)
+	exists, err = kr.fileSystem.DirExists(namespacesPath)
+	if err != nil {
+		addArkError(&errors, err)
+		return warnings, errors
+	}
+	if !exists {
+		return warnings, errors
+	}
+
 	nses, err := kr.fileSystem.ReadDir(namespacesPath)
 	if err != nil {
 		addArkError(&errors, err)
