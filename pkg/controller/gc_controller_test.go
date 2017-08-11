@@ -545,8 +545,8 @@ func (s *fakeBackupService) GetBackup(bucket, name string) (*api.Backup, error) 
 	return nil, errors.New("backup not found")
 }
 
-func (bs *fakeBackupService) UploadBackup(bucket, name string, metadata, backup io.ReadSeeker) error {
-	args := bs.Called(bucket, name, metadata, backup)
+func (bs *fakeBackupService) UploadBackup(bucket, name string, metadata, backup, log io.ReadSeeker) error {
+	args := bs.Called(bucket, name, metadata, backup, log)
 	return args.Error(0)
 }
 

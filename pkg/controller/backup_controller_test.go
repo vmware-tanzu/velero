@@ -40,8 +40,8 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(backup *v1.Backup, data io.Writer) error {
-	args := b.Called(backup, data)
+func (b *fakeBackupper) Backup(backup *v1.Backup, data, log io.Writer) error {
+	args := b.Called(backup, data, log)
 	return args.Error(0)
 }
 
@@ -200,9 +200,9 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
 				backup.Status.Version = 1
-				backupper.On("Backup", backup, mock.Anything).Return(nil)
+				backupper.On("Backup", backup, mock.Anything, mock.Anything).Return(nil)
 
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything).Return(nil)
+				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
 			// this is necessary so the Update() call returns the appropriate object

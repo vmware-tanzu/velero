@@ -43,6 +43,7 @@ func TestUploadBackup(t *testing.T) {
 		backupName      string
 		metadata        io.ReadSeeker
 		backup          io.ReadSeeker
+		log             io.ReadSeeker
 		objectStoreErrs map[string]map[string]interface{}
 		expectedErr     bool
 		expectedRes     map[string][]byte
@@ -54,10 +55,12 @@ func TestUploadBackup(t *testing.T) {
 			backupName:   "test-backup",
 			metadata:     newStringReadSeeker("foo"),
 			backup:       newStringReadSeeker("bar"),
+			log:          newStringReadSeeker("baz"),
 			expectedErr:  false,
 			expectedRes: map[string][]byte{
 				"test-backup/ark-backup.json":    []byte("foo"),
 				"test-backup/test-backup.tar.gz": []byte("bar"),
+				"test-backup/test-backup.log.gz": []byte("baz"),
 			},
 		},
 		{
@@ -68,12 +71,13 @@ func TestUploadBackup(t *testing.T) {
 			expectedErr:  true,
 		},
 		{
-			name:         "error on metadata upload does not upload data",
+			name:         "error on metadata upload does not upload data or log",
 			bucket:       "test-bucket",
 			bucketExists: true,
 			backupName:   "test-backup",
 			metadata:     newStringReadSeeker("foo"),
 			backup:       newStringReadSeeker("bar"),
+			log:          newStringReadSeeker("baz"),
 			objectStoreErrs: map[string]map[string]interface{}{
 				"putobject": map[string]interface{}{
 					"test-bucket||test-backup/ark-backup.json": true,
@@ -89,6 +93,7 @@ func TestUploadBackup(t *testing.T) {
 			backupName:   "test-backup",
 			metadata:     newStringReadSeeker("foo"),
 			backup:       newStringReadSeeker("bar"),
+			log:          newStringReadSeeker("baz"),
 			objectStoreErrs: map[string]map[string]interface{}{
 				"putobject": map[string]interface{}{
 					"test-bucket||test-backup/test-backup.tar.gz": true,
@@ -96,6 +101,25 @@ func TestUploadBackup(t *testing.T) {
 			},
 			expectedErr: true,
 			expectedRes: make(map[string][]byte),
+		},
+		{
+			name:         "error on log upload is ok",
+			bucket:       "test-bucket",
+			bucketExists: true,
+			backupName:   "test-backup",
+			metadata:     newStringReadSeeker("foo"),
+			backup:       newStringReadSeeker("bar"),
+			log:          newStringReadSeeker("baz"),
+			objectStoreErrs: map[string]map[string]interface{}{
+				"putobject": map[string]interface{}{
+					"test-bucket||test-backup/test-backup.log.gz": true,
+				},
+			},
+			expectedErr: false,
+			expectedRes: map[string][]byte{
+				"test-backup/ark-backup.json":    []byte("foo"),
+				"test-backup/test-backup.tar.gz": []byte("bar"),
+			},
 		},
 	}
 
@@ -111,7 +135,7 @@ func TestUploadBackup(t *testing.T) {
 
 			backupService := NewBackupService(objStore)
 
-			err := backupService.UploadBackup(test.bucket, test.backupName, test.metadata, test.backup)
+			err := backupService.UploadBackup(test.bucket, test.backupName, test.metadata, test.backup, test.log)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 

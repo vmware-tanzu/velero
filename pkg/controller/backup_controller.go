@@ -312,21 +312,36 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	if err != nil {
 		return err
 	}
+
+	logFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		return err
+	}
+
 	defer func() {
 		var errs []error
 		errs = append(errs, err)
 
-		if closeErr := backupFile.Close(); closeErr != nil {
-			errs = append(errs, closeErr)
+		if err := backupFile.Close(); err != nil {
+			errs = append(errs, err)
 		}
 
-		if removeErr := os.Remove(backupFile.Name()); removeErr != nil {
-			errs = append(errs, removeErr)
+		if err := os.Remove(backupFile.Name()); err != nil {
+			errs = append(errs, err)
 		}
+
+		if err := logFile.Close(); err != nil {
+			errs = append(errs, err)
+		}
+
+		if err := os.Remove(logFile.Name()); err != nil {
+			errs = append(errs, err)
+		}
+
 		err = kuberrs.NewAggregate(errs)
 	}()
 
-	if err := controller.backupper.Backup(backup, backupFile); err != nil {
+	if err := controller.backupper.Backup(backup, backupFile, logFile); err != nil {
 		return err
 	}
 
@@ -340,11 +355,13 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return err
 	}
 
-	// re-set the file offset to 0 for reading
-	_, err = backupFile.Seek(0, 0)
-	if err != nil {
+	// re-set the files' offset to 0 for reading
+	if _, err = backupFile.Seek(0, 0); err != nil {
+		return err
+	}
+	if _, err = logFile.Seek(0, 0); err != nil {
 		return err
 	}
 
-	return controller.backupService.UploadBackup(bucket, backup.Name, bytes.NewReader(buf.Bytes()), backupFile)
+	return controller.backupService.UploadBackup(bucket, backup.Name, bytes.NewReader(buf.Bytes()), backupFile, logFile)
 }

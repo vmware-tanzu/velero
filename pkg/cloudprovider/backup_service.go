@@ -38,7 +38,7 @@ type BackupService interface {
 	// UploadBackup uploads the specified Ark backup of a set of Kubernetes API objects, whose manifests are
 	// stored in the specified file, into object storage in an Ark bucket, tagged with Ark metadata. Returns
 	// an error if a problem is encountered accessing the file or performing the upload via the cloud API.
-	UploadBackup(bucket, name string, metadata, backup io.ReadSeeker) error
+	UploadBackup(bucket, name string, metadata, backup, log io.ReadSeeker) error
 
 	// DownloadBackup downloads an Ark backup with the specified object key from object storage via the cloud API.
 	// It returns the snapshot metadata and data (separately), or an error if a problem is encountered
@@ -62,8 +62,9 @@ type BackupGetter interface {
 }
 
 const (
-	metadataFileFormatString string = "%s/ark-backup.json"
-	backupFileFormatString   string = "%s/%s.tar.gz"
+	metadataFileFormatString = "%s/ark-backup.json"
+	backupFileFormatString   = "%s/%s.tar.gz"
+	logFileFormatString      = "%s/%s.log.gz"
 )
 
 type backupService struct {
@@ -82,19 +83,28 @@ func NewBackupService(objectStorage ObjectStorageAdapter) BackupService {
 	}
 }
 
-func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup io.ReadSeeker) error {
+func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.ReadSeeker) error {
 	// upload metadata file
 	metadataKey := fmt.Sprintf(metadataFileFormatString, backupName)
 	if err := br.objectStorage.PutObject(bucket, metadataKey, metadata); err != nil {
+		// failure to upload metadata file is a hard-stop
 		return err
 	}
 
 	// upload tar file
-	if err := br.objectStorage.PutObject(bucket, fmt.Sprintf(backupFileFormatString, backupName, backupName), backup); err != nil {
+	backupKey := fmt.Sprintf(backupFileFormatString, backupName, backupName)
+	if err := br.objectStorage.PutObject(bucket, backupKey, backup); err != nil {
 		// try to delete the metadata file since the data upload failed
 		deleteErr := br.objectStorage.DeleteObject(bucket, metadataKey)
 
 		return errors.NewAggregate([]error{err, deleteErr})
+	}
+
+	// uploading log file is best-effort; if it fails, we log the error but call the overall upload a
+	// success
+	logKey := fmt.Sprintf(logFileFormatString, backupName, backupName)
+	if err := br.objectStorage.PutObject(bucket, logKey, log); err != nil {
+		glog.Errorf("error uploading %s/%s: %v", bucket, logKey, err)
 	}
 
 	return nil
