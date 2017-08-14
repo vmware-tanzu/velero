@@ -29,7 +29,7 @@ import (
 )
 
 func TestPVRestorerPrepare(t *testing.T) {
-	iops := 1000
+	iops := int64(1000)
 
 	tests := []struct {
 		name        string

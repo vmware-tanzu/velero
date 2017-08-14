@@ -111,7 +111,7 @@ type VolumeBackupInfo struct {
 
 	// Iops is the optional value of provisioned IOPS for the
 	// disk/volume in the cloud provider API.
-	Iops *int `json:"iops"`
+	Iops *int64 `json:"iops,omitempty"`
 }
 
 // +genclient=true

@@ -44,11 +44,11 @@ type ObjectStorageAdapter interface {
 type BlockStorageAdapter interface {
 	// CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
-	CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int) (volumeID string, err error)
+	CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (volumeID string, err error)
 
 	// GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 	// volume.
-	GetVolumeInfo(volumeID string) (string, *int, error)
+	GetVolumeInfo(volumeID string) (string, *int64, error)
 
 	// IsVolumeReady returns whether the specified volume is ready to be used.
 	IsVolumeReady(volumeID string) (ready bool, err error)

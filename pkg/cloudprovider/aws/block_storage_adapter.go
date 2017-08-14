@@ -21,6 +21,8 @@ import (
 
 	"github.com/aws/aws-sdk-go/service/ec2"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
@@ -31,15 +33,20 @@ type blockStorageAdapter struct {
 	az  string
 }
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int) (volumeID string, err error) {
+// iopsVolumeTypes is a set of AWS EBS volume types for which IOPS should
+// be captured during snapshot and provided when creating a new volume
+// from snapshot.
+var iopsVolumeTypes = sets.NewString("io1")
+
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (volumeID string, err error) {
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &op.az,
 		VolumeType:       &volumeType,
 	}
 
-	if iops != nil {
-		req.SetIops(int64(*iops))
+	if iopsVolumeTypes.Has(volumeType) && iops != nil {
+		req.Iops = iops
 	}
 
 	res, err := op.ec2.CreateVolume(req)
@@ -50,7 +57,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	return *res.VolumeId, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, error) {
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -68,18 +75,18 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, err
 
 	var (
 		volumeType string
-		iops       int
+		iops       *int64
 	)
 
 	if vol.VolumeType != nil {
 		volumeType = *vol.VolumeType
 	}
 
-	if vol.Iops != nil {
-		iops = int(*vol.Iops)
+	if iopsVolumeTypes.Has(volumeType) && vol.Iops != nil {
+		iops = vol.Iops
 	}
 
-	return volumeType, &iops, nil
+	return volumeType, iops, nil
 }
 
 func (op *blockStorageAdapter) IsVolumeReady(volumeID string) (ready bool, err error) {
