@@ -19,10 +19,12 @@ package aws
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/golang/glog"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -130,4 +132,14 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	_, err := op.s3.DeleteObject(req)
 
 	return err
+}
+
+func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	glog.V(4).Infof("CreateSignedURL: bucket=%s, key=%s, ttl=%d", bucket, key, ttl)
+	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+
+	return req.Presign(ttl)
 }

@@ -16,7 +16,10 @@ limitations under the License.
 
 package cloudprovider
 
-import "io"
+import (
+	"io"
+	"time"
+)
 
 // ObjectStorageAdapter exposes basic object-storage operations required
 // by Ark.
@@ -37,6 +40,9 @@ type ObjectStorageAdapter interface {
 	// DeleteObject removes object with the specified key from the given
 	// bucket.
 	DeleteObject(bucket string, key string) error
+
+	// CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
+	CreateSignedURL(bucket, key string, ttl time.Duration) (string, error)
 }
 
 // BlockStorageAdapter exposes basic block-storage operations required

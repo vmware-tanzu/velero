@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -464,4 +465,8 @@ func (os *fakeObjectStorage) DeleteObject(bucket string, key string) error {
 	delete(os.storage[bucket], key)
 
 	return nil
+}
+
+func (os *fakeObjectStorage) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	panic("not implemented")
 }

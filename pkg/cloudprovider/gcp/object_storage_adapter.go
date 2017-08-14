@@ -17,23 +17,29 @@ limitations under the License.
 package gcp
 
 import (
+	"errors"
 	"io"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	// TODO switch to using newstorage
+	newstorage "cloud.google.com/go/storage"
 	storage "google.golang.org/api/storage/v1"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
 type objectStorageAdapter struct {
-	gcs *storage.Service
+	gcs            *storage.Service
+	googleAccessID string
+	privateKey     []byte
 }
 
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 
-func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
+func NewObjectStorageAdapter(googleAccessID string, privateKey []byte) (cloudprovider.ObjectStorageAdapter, error) {
 	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
 	if err != nil {
 		return nil, err
@@ -45,7 +51,9 @@ func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
 	}
 
 	return &objectStorageAdapter{
-		gcs: gcs,
+		gcs:            gcs,
+		googleAccessID: googleAccessID,
+		privateKey:     privateKey,
 	}, nil
 }
 
@@ -86,4 +94,20 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	return op.gcs.Objects.Delete(bucket, key).Do()
+}
+
+func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	if op.googleAccessID == "" {
+		return "", errors.New("unable to create a pre-signed URL - make sure GOOGLE_APPLICATION_CREDENTIALS points to a valid GCE service account file (missing email address)")
+	}
+	if len(op.privateKey) == 0 {
+		return "", errors.New("unable to create a pre-signed URL - make sure GOOGLE_APPLICATION_CREDENTIALS points to a valid GCE service account file (missing private key)")
+	}
+
+	return newstorage.SignedURL(bucket, key, &newstorage.SignedURLOptions{
+		GoogleAccessID: op.googleAccessID,
+		PrivateKey:     op.privateKey,
+		Method:         "GET",
+		Expires:        time.Now().Add(ttl),
+	})
 }

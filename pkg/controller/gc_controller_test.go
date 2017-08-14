@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -516,6 +517,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	assert.Equal(0, len(snapshotService.SnapshotsTaken), "snapshots should have been garbage-collected.")
 }
 
+// TODO remove this and use util/test mock instead
 type fakeBackupService struct {
 	backupMetadataByBucket map[string][]*api.Backup
 	backupsByBucket        map[string][]*api.Backup
@@ -552,6 +554,10 @@ func (bs *fakeBackupService) UploadBackup(bucket, name string, metadata, backup,
 
 func (s *fakeBackupService) DownloadBackup(bucket, name string) (io.ReadCloser, error) {
 	return ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil
+}
+
+func (s *fakeBackupService) DownloadBackupLogs(bucket, name string) (io.ReadCloser, error) {
+	return ioutil.NopCloser(bytes.NewReader([]byte("hello world in a log"))), nil
 }
 
 func (s *fakeBackupService) DeleteBackupMetadataFile(bucket, backupName string) error {
@@ -598,4 +604,8 @@ func (s *fakeBackupService) DeleteBackupFile(bucket, backupName string) error {
 	s.backupsByBucket[bucket] = append(s.backupsByBucket[bucket][0:deleteIdx], s.backupsByBucket[bucket][deleteIdx+1:]...)
 
 	return nil
+}
+
+func (s *fakeBackupService) CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error) {
+	return fmt.Sprintf("http://some.server/%s/%s/%d", bucket, backupName, ttl), nil
 }

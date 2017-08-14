@@ -19,9 +19,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"reflect"
 	"sync"
 	"time"
+
+	"golang.org/x/oauth2/google"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -305,7 +309,27 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string)
 			cloudConfig.AWS.KMSKeyID,
 			cloudConfig.AWS.S3ForcePathStyle)
 	case cloudConfig.GCP != nil:
-		objectStorage, err = gcp.NewObjectStorageAdapter()
+		var email string
+		var privateKey []byte
+
+		credentialsFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
+		if credentialsFile != "" {
+			// Get the email and private key from the credentials file so we can pre-sign download URLs
+			creds, err := ioutil.ReadFile(credentialsFile)
+			if err != nil {
+				return nil, err
+			}
+			jwtConfig, err := google.JWTConfigFromJSON(creds)
+			if err != nil {
+				return nil, err
+			}
+			email = jwtConfig.Email
+			privateKey = jwtConfig.PrivateKey
+		} else {
+			glog.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
+		}
+
+		objectStorage, err = gcp.NewObjectStorageAdapter(email, privateKey)
 	case cloudConfig.Azure != nil:
 		objectStorage, err = azure.NewObjectStorageAdapter()
 	}
@@ -462,6 +486,19 @@ func (s *server) runControllers(config *api.Config) error {
 	wg.Add(1)
 	go func() {
 		restoreController.Run(ctx, 1)
+		wg.Done()
+	}()
+
+	downloadRequestController := controller.NewDownloadRequestController(
+		s.arkClient.ArkV1(),
+		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.backupService,
+		config.BackupStorageProvider.Bucket,
+	)
+	wg.Add(1)
+	go func() {
+		downloadRequestController.Run(ctx, 1)
 		wg.Done()
 	}()
 
