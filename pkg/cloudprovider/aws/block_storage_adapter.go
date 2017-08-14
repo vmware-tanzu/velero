@@ -38,7 +38,7 @@ type blockStorageAdapter struct {
 // from snapshot.
 var iopsVolumeTypes = sets.NewString("io1")
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int) (volumeID string, err error) {
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (volumeID string, err error) {
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &op.az,
@@ -46,7 +46,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	}
 
 	if iopsVolumeTypes.Has(volumeType) && iops != nil {
-		req.SetIops(int64(*iops))
+		req.Iops = iops
 	}
 
 	res, err := op.ec2.CreateVolume(req)
@@ -57,7 +57,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	return *res.VolumeId, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, error) {
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -75,7 +75,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, err
 
 	var (
 		volumeType string
-		iops       *int
+		iops       *int64
 	)
 
 	if vol.VolumeType != nil {
@@ -83,8 +83,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, err
 	}
 
 	if iopsVolumeTypes.Has(volumeType) && vol.Iops != nil {
-		iopsVal := int(*vol.Iops)
-		iops = &iopsVal
+		iops = vol.Iops
 	}
 
 	return volumeType, iops, nil

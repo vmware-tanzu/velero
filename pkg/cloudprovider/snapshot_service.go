@@ -37,14 +37,14 @@ type SnapshotService interface {
 	// CreateVolumeFromSnapshot triggers a restore operation to create a new cloud volume from the specified
 	// snapshot and volume characteristics. Returns the cloud volume ID, or an error if a problem is
 	// encountered triggering the restore via the cloud API.
-	CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int) (string, error)
+	CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (string, error)
 
 	// DeleteSnapshot triggers a deletion of the specified Ark snapshot via the cloud API. It returns an
 	// error if a problem is encountered triggering the deletion via the cloud API.
 	DeleteSnapshot(snapshotID string) error
 
 	// GetVolumeInfo gets the type and IOPS (if applicable) from the cloud API.
-	GetVolumeInfo(volumeID string) (string, *int, error)
+	GetVolumeInfo(volumeID string) (string, *int64, error)
 }
 
 const (
@@ -67,7 +67,7 @@ func NewSnapshotService(blockStorage BlockStorageAdapter) SnapshotService {
 	}
 }
 
-func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeType string, iops *int) (string, error) {
+func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeType string, iops *int64) (string, error) {
 	volumeID, err := sr.blockStorage.CreateVolumeFromSnapshot(snapshotID, volumeType, iops)
 	if err != nil {
 		return "", err
@@ -116,6 +116,6 @@ func (sr *snapshotService) DeleteSnapshot(snapshotID string) error {
 	return sr.blockStorage.DeleteSnapshot(snapshotID)
 }
 
-func (sr *snapshotService) GetVolumeInfo(volumeID string) (string, *int, error) {
+func (sr *snapshotService) GetVolumeInfo(volumeID string) (string, *int64, error) {
 	return sr.blockStorage.GetVolumeInfo(volumeID)
 }

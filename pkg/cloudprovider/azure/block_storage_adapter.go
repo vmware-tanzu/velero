@@ -39,7 +39,7 @@ type blockStorageAdapter struct {
 
 var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int) (string, error) {
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (string, error) {
 	fullSnapshotName := getFullSnapshotName(op.subscription, op.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
@@ -68,7 +68,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	return diskName, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int, error) {
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
 		return "", nil, err
