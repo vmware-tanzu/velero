@@ -17,6 +17,8 @@ limitations under the License.
 package gcp
 
 import (
+	"fmt"
+
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v0.beta"
@@ -44,6 +46,16 @@ func NewStorageAdapter(project string, zone string) (cloudprovider.StorageAdapte
 		return nil, err
 	}
 
+	// validate project & zone
+	res, err := gce.Zones.Get(project, zone).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("zone %q not found for project %q", project, zone)
+	}
+
 	gcs, err := storage.New(client)
 	if err != nil {
 		return nil, err
@@ -51,9 +63,7 @@ func NewStorageAdapter(project string, zone string) (cloudprovider.StorageAdapte
 
 	return &storageAdapter{
 		objectStorage: &objectStorageAdapter{
-			gcs:     gcs,
-			project: project,
-			zone:    zone,
+			gcs: gcs,
 		},
 		blockStorage: &blockStorageAdapter{
 			gce:     gce,

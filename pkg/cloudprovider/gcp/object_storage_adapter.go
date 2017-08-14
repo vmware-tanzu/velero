@@ -26,9 +26,7 @@ import (
 )
 
 type objectStorageAdapter struct {
-	project string
-	zone    string
-	gcs     *storage.Service
+	gcs *storage.Service
 }
 
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}

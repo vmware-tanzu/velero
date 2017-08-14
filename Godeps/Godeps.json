@@ -30,6 +30,11 @@
 			"Rev": "97210cf08b64533d54deb68ac5ca6bd9b8138ebb"
 		},
 		{
+			"ImportPath": "github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions",
+			"Comment": "v10.0.2-beta-2-g97210cf",
+			"Rev": "97210cf08b64533d54deb68ac5ca6bd9b8138ebb"
+		},
+		{
 			"ImportPath": "github.com/Azure/azure-sdk-for-go/storage",
 			"Comment": "v10.0.2-beta-2-g97210cf",
 			"Rev": "97210cf08b64533d54deb68ac5ca6bd9b8138ebb"
