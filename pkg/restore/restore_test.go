@@ -92,6 +92,13 @@ func TestRestoreMethod(t *testing.T) {
 			expectedReadDirs: []string{"bak/cluster", "bak/namespaces"},
 		},
 		{
+			name:             "namespaces dir is not read & does not error if it does not exist",
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster"),
+			baseDir:          "bak",
+			restore:          &api.Restore{Spec: api.RestoreSpec{}},
+			expectedReadDirs: []string{"bak/cluster"},
+		},
+		{
 			name:             "namespacesToRestore having * restores all namespaces",
 			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
 			baseDir:          "bak",
