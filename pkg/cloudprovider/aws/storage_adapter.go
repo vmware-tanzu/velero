@@ -32,7 +32,7 @@ type storageAdapter struct {
 
 var _ cloudprovider.StorageAdapter = &storageAdapter{}
 
-func NewStorageAdapter(config *aws.Config, availabilityZone string) (cloudprovider.StorageAdapter, error) {
+func NewStorageAdapter(config *aws.Config, availabilityZone string, kmsKeyID string) (cloudprovider.StorageAdapter, error) {
 	sess, err := session.NewSession(config)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,8 @@ func NewStorageAdapter(config *aws.Config, availabilityZone string) (cloudprovid
 			az:  availabilityZone,
 		},
 		objectStorage: &objectStorageAdapter{
-			s3: s3.New(sess),
+			s3:       s3.New(sess),
+			kmsKeyID: kmsKeyID,
 		},
 	}, nil
 }

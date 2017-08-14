@@ -324,7 +324,7 @@ func getAWSCloudProvider(cloudConfig api.CloudProviderConfig) (cloudprovider.Sto
 		)
 	}
 
-	return arkaws.NewStorageAdapter(awsConfig, cloudConfig.AWS.AvailabilityZone)
+	return arkaws.NewStorageAdapter(awsConfig, cloudConfig.AWS.AvailabilityZone, cloudConfig.AWS.KMSKeyID)
 }
 
 func getGCPCloudProvider(cloudConfig api.CloudProviderConfig) (cloudprovider.StorageAdapter, error) {

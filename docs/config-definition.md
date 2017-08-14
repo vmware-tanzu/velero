@@ -70,6 +70,7 @@ The configurable parameters are as follows:
 | `disableSSL` | bool | `false` | Set this to `true` if you are using Minio (or another local, S3-compatible storage service) and your deployment is not secured. |
 | `s3ForcePathStyle` | bool | `false` | Set this to `true` if you are using a local storage service like Minio. |
 | `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local sotrage services like Minio.|
+| `kmsKeyID` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f"<br><br>Specify an [AWS KMS key][12] id to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
 
 ### GCP
 | Key | Type | Default | Meaning |
@@ -95,3 +96,5 @@ The configurable parameters are as follows:
 [9]: #main-config-parameters
 [10]: #overview
 [11]: #example
+[12]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+
