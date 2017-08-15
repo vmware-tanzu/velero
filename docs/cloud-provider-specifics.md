@@ -1,5 +1,7 @@
 # Cloud Provider Specifics
 
+> NOTE: Documentation may change between releases. See the [Changelog][20] for links to previous versions of this repository and its docs.
+
 While the [Quickstart][0] uses a local storage service to quickly set up Heptio Ark as a demonstration, this document details additional configurations that are required when integrating with the cloud providers below:
 
 * [Setup][12]
@@ -359,3 +361,4 @@ ark restore create nginx-backup --restore-volumes
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/azure/storage/storage-azure-cli
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
+[20]: /CHANGELOG.md
