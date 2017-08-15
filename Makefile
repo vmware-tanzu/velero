@@ -79,9 +79,11 @@ cbuild:
 
 container: cbuild
 	$(DOCKER) build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
+	$(DOCKER) build -f Dockerfile.arm -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT)-arm:$(VERSION) .
 
 container-local: $(BINARIES)
 	$(DOCKER) build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
+	$(DOCKER) build -f Dockerfile.arm -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT)-arm:$(VERSION) .
 
 push:
 	docker -- push $(REGISTRY)/$(PROJECT):$(VERSION)
