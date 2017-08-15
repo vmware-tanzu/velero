@@ -1,6 +1,8 @@
 # Cloud Provider Specifics
 
 > NOTE: Documentation may change between releases. See the [Changelog][20] for links to previous versions of this repository and its docs.
+>
+> To ensure that you are working off a specific release, `git checkout <VERSION_TAG>` where `<VERSION_TAG>` is the appropriate tag for the Ark version you wish to use (e.g. "v0.3.3"). You should `git checkout master` only if you're planning on [building the Ark image from scratch][21].
 
 While the [Quickstart][0] uses a local storage service to quickly set up Heptio Ark as a demonstration, this document details additional configurations that are required when integrating with the cloud providers below:
 
@@ -362,3 +364,4 @@ ark restore create nginx-backup --restore-volumes
 [18]: https://docs.microsoft.com/en-us/azure/storage/storage-azure-cli
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
+[21]: /docs/build-from-scratch.md
