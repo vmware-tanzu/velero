@@ -66,6 +66,7 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:            flag.NewMap(),
 		NamespaceMappings: flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
+		RestoreVolumes:    true,
 	}
 }
 

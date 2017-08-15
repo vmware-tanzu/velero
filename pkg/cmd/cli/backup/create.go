@@ -70,6 +70,7 @@ func NewCreateOptions() *CreateOptions {
 		TTL:               24 * time.Hour,
 		IncludeNamespaces: flag.NewStringArray("*"),
 		Labels:            flag.NewMap(),
+		SnapshotVolumes:   true,
 	}
 }
 
