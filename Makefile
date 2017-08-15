@@ -42,7 +42,13 @@ local: $(BINARIES)
 
 $(BINARIES):
 	mkdir -p $(BIN_DIR)
-	$(BUILDCMD) -o $(BIN_DIR)/$@ $(GOTARGET)/cmd/$@
+
+	mkdir -p $(BIN_DIR)/amd64
+	GOOS=linux $(BUILDCMD) -o $(BIN_DIR)/amd64/$@ $(GOTARGET)/cmd/$@
+	mkdir -p $(BIN_DIR)/darwin
+	GOOS=darwin $(BUILDCMD) -o $(BIN_DIR)/darwin/$@ $(GOTARGET)/cmd/$@
+	mkdir -p $(BIN_DIR)/arm
+	GOARM=7 GOARCH=arm $(BUILDCMD) -o $(BIN_DIR)/arm/$@ $(GOTARGET)/cmd/$@
 
 test:
 ifneq ($(SKIP_TESTS), 1)

@@ -18,7 +18,7 @@ MAINTAINER Andy Goldstein "andy@heptio.com"
 RUN apk add --no-cache ca-certificates && \
     adduser -S -D -H -u 1000 ark
 
-ADD _output/bin/ark /ark
+ADD _output/bin/amd64/ark /ark
 
 USER ark
 ENTRYPOINT ["/ark"]
