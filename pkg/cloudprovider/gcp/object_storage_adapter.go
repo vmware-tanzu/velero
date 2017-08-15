@@ -20,6 +20,8 @@ import (
 	"io"
 	"strings"
 
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	storage "google.golang.org/api/storage/v1"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -30,6 +32,22 @@ type objectStorageAdapter struct {
 }
 
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
+
+func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
+	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
+	if err != nil {
+		return nil, err
+	}
+
+	gcs, err := storage.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	return &objectStorageAdapter{
+		gcs: gcs,
+	}, nil
+}
 
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
 	obj := &storage.Object{

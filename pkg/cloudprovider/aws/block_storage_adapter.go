@@ -17,8 +17,11 @@ limitations under the License.
 package aws
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,6 +34,53 @@ var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 type blockStorageAdapter struct {
 	ec2 *ec2.EC2
 	az  string
+}
+
+func getSession(config *aws.Config) (*session.Session, error) {
+	sess, err := session.NewSession(config)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := sess.Config.Credentials.Get(); err != nil {
+		return nil, err
+	}
+
+	return sess, nil
+}
+
+func NewBlockStorageAdapter(region, availabilityZone string) (cloudprovider.BlockStorageAdapter, error) {
+	if region == "" {
+		return nil, errors.New("missing region in aws configuration in config file")
+	}
+	if availabilityZone == "" {
+		return nil, errors.New("missing availabilityZone in aws configuration in config file")
+	}
+
+	awsConfig := aws.NewConfig().WithRegion(region)
+
+	sess, err := getSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate the availabilityZone
+	var (
+		ec2Client = ec2.New(sess)
+		azReq     = &ec2.DescribeAvailabilityZonesInput{ZoneNames: []*string{&availabilityZone}}
+	)
+	res, err := ec2Client.DescribeAvailabilityZones(azReq)
+	if err != nil {
+		return nil, err
+	}
+	if len(res.AvailabilityZones) == 0 {
+		return nil, fmt.Errorf("availability zone %q not found", availabilityZone)
+	}
+
+	return &blockStorageAdapter{
+		ec2: ec2Client,
+		az:  availabilityZone,
+	}, nil
 }
 
 // iopsVolumeTypes is a set of AWS EBS volume types for which IOPS should

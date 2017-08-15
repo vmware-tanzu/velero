@@ -20,17 +20,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
-	azure "github.com/Azure/azure-sdk-for-go/arm/disk"
+	"github.com/Azure/azure-sdk-for-go/arm/disk"
+	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
+	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/satori/uuid"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
 type blockStorageAdapter struct {
-	disks         *azure.DisksClient
-	snaps         *azure.SnapshotsClient
+	disks         *disk.DisksClient
+	snaps         *disk.SnapshotsClient
 	subscription  string
 	resourceGroup string
 	location      string
@@ -39,19 +43,104 @@ type blockStorageAdapter struct {
 
 var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
+const (
+	azureClientIDKey         string = "AZURE_CLIENT_ID"
+	azureClientSecretKey     string = "AZURE_CLIENT_SECRET"
+	azureSubscriptionIDKey   string = "AZURE_SUBSCRIPTION_ID"
+	azureTenantIDKey         string = "AZURE_TENANT_ID"
+	azureStorageAccountIDKey string = "AZURE_STORAGE_ACCOUNT_ID"
+	azureStorageKeyKey       string = "AZURE_STORAGE_KEY"
+	azureResourceGroupKey    string = "AZURE_RESOURCE_GROUP"
+)
+
+func getConfig() map[string]string {
+	cfg := map[string]string{
+		azureClientIDKey:         "",
+		azureClientSecretKey:     "",
+		azureSubscriptionIDKey:   "",
+		azureTenantIDKey:         "",
+		azureStorageAccountIDKey: "",
+		azureStorageKeyKey:       "",
+		azureResourceGroupKey:    "",
+	}
+
+	for key := range cfg {
+		cfg[key] = os.Getenv(key)
+	}
+
+	return cfg
+}
+
+func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudprovider.BlockStorageAdapter, error) {
+	if location == "" {
+		return nil, errors.New("missing location in azure configuration in config file")
+	}
+
+	if apiTimeout == 0 {
+		apiTimeout = time.Minute
+	}
+
+	cfg := getConfig()
+
+	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("error creating new service principal: %v", err)
+	}
+
+	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
+	snapsClient := disk.NewSnapshotsClient(cfg[azureSubscriptionIDKey])
+
+	disksClient.Authorizer = spt
+	snapsClient.Authorizer = spt
+
+	// validate the location
+	groupClient := subscriptions.NewGroupClient()
+	groupClient.Authorizer = spt
+
+	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
+	if err != nil {
+		return nil, err
+	}
+
+	if locs.Value == nil {
+		return nil, errors.New("no locations returned from Azure API")
+	}
+
+	locationExists := false
+	for _, loc := range *locs.Value {
+		if (loc.Name != nil && *loc.Name == location) || (loc.DisplayName != nil && *loc.DisplayName == location) {
+			locationExists = true
+			break
+		}
+	}
+
+	if !locationExists {
+		return nil, fmt.Errorf("location %q not found", location)
+	}
+
+	return &blockStorageAdapter{
+		disks:         &disksClient,
+		snaps:         &snapsClient,
+		subscription:  cfg[azureSubscriptionIDKey],
+		resourceGroup: cfg[azureResourceGroupKey],
+		location:      location,
+		apiTimeout:    apiTimeout,
+	}, nil
+}
+
 func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (string, error) {
 	fullSnapshotName := getFullSnapshotName(op.subscription, op.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
-	disk := azure.Model{
+	disk := disk.Model{
 		Name:     &diskName,
 		Location: &op.location,
-		Properties: &azure.Properties{
-			CreationData: &azure.CreationData{
-				CreateOption:     azure.Copy,
+		Properties: &disk.Properties{
+			CreationData: &disk.CreationData{
+				CreateOption:     disk.Copy,
 				SourceResourceID: &fullSnapshotName,
 			},
-			AccountType: azure.StorageAccountTypes(volumeType),
+			AccountType: disk.StorageAccountTypes(volumeType),
 		},
 	}
 
@@ -136,11 +225,11 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]s
 		snapshotName = volumeID[0:80-len(suffix)] + suffix
 	}
 
-	snap := azure.Snapshot{
+	snap := disk.Snapshot{
 		Name: &snapshotName,
-		Properties: &azure.Properties{
-			CreationData: &azure.CreationData{
-				CreateOption:     azure.Copy,
+		Properties: &disk.Properties{
+			CreationData: &disk.CreationData{
+				CreateOption:     disk.Copy,
 				SourceResourceID: &fullDiskName,
 			},
 		},

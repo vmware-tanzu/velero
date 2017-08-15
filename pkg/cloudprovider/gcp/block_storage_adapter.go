@@ -17,10 +17,14 @@ limitations under the License.
 package gcp
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v0.beta"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -35,6 +39,41 @@ type blockStorageAdapter struct {
 }
 
 var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
+
+func NewBlockStorageAdapter(project, zone string) (cloudprovider.BlockStorageAdapter, error) {
+	if project == "" {
+		return nil, errors.New("missing project in gcp configuration in config file")
+	}
+	if zone == "" {
+		return nil, errors.New("missing zone in gcp configuration in config file")
+	}
+
+	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+	if err != nil {
+		return nil, err
+	}
+
+	gce, err := compute.New(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate project & zone
+	res, err := gce.Zones.Get(project, zone).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	if res == nil {
+		return nil, fmt.Errorf("zone %q not found for project %q", project, zone)
+	}
+
+	return &blockStorageAdapter{
+		gce:     gce,
+		project: project,
+		zone:    zone,
+	}, nil
+}
 
 func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID string, volumeType string, iops *int64) (volumeID string, err error) {
 	res, err := op.gce.Snapshots.Get(op.project, snapshotID).Do()
