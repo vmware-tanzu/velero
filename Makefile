@@ -23,7 +23,7 @@ BIN_DIR = $(OUTPUT_DIR)/bin
 # docker related vars
 DOCKER ?= docker
 REGISTRY ?= gcr.io/heptio-images
-BUILD_IMAGE ?= $(REGISTRY)/golang:1.8-alpine3.6
+BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.8-alpine3.6
 # go build -i installs compiled packages so they can be reused later.
 # This speeds up recompiles.
 BUILDCMD = go build -i -v -ldflags "-X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION) -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT)"
