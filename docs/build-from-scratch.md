@@ -21,7 +21,9 @@ The files are installed in `$GOPATH/src/github.com/heptio/ark`.
 
 ## 2. Build
 
-Set the `$REGISTRY` environment variable (used in the `Makefile`) if you want to push the Heptio Ark images to your own registry. This allows any node in your cluster to pull your locally built image.
+### Using your own registry
+
+If you want to push the Heptio Ark images to your own registry, set the `$REGISTRY` environment variable (used in the `Makefile`). This allows any node in your cluster to pull your locally built image.
 
 `$PROJECT` and `$VERSION` environment variables are also specified in the `Makefile`, and can be similarly modified as desired.
 
@@ -31,6 +33,12 @@ sudo make all
 ```
 
 To push your image to a registry, use `make push`.
+
+### Keeping the Heptio registry tag
+
+If you don't wish to push your image to your own registry (not changing `$REGISTRY`), but simply want to build it locally with the Heptio tag, *you need to modify the deployment file that are using.* This is either `examples/azure/00-ark-deployment.yaml` if you're using Azure, or `examples/common/10-deployment.yaml` for all other cloud providers.
+
+Because the existing deployment files reference `gcr.io/heptio-images/ark:latest`, and Kubernetes handles the `latest` tag with the `imagePullPolicy` of "Always", your Ark deployment will pull from the Heptio image registry instead of using the local image. In order to use your local image, you'll need to specify a `$VERSION` tag (consistent with the value in the `Makefile`). If your `$VERSION` is "v0.3.3", for example, you need to set `spec.template.spec.containers[*].image` in your deployment file to be `gcr.io/heptio0images/ark:v0.3.3`.
 
 ## 3. Run
 When running Heptio Ark, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
