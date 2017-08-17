@@ -35,7 +35,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
 1. *(Cluster 1)* Assuming you haven't already been checkpointing your data with the Ark `schedule` operation, you need to first back up your entire cluster (replacing `<BACKUP-NAME>` as desired):
 
    ```
-   ark backup create <BACKUP-NAME> --snapshot-volumes
+   ark backup create <BACKUP-NAME>
    ```
    The default TTL is 24 hours; you can use the `--ttl` flag to change this as necessary.
 
@@ -45,7 +45,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
 
 4. *(Cluster 2)* Once you have confirmed that the right Backup (`<BACKUP-NAME>`) is now present, you can restore everything with:
 ```
-ark restore create <BACKUP-NAME> --restore-volumes
+ark restore create <BACKUP-NAME>
 ```
 
 [0]: #disaster-recovery

@@ -144,7 +144,7 @@ As mentioned before, Ark runs in two different modes:
 
 * **Ark server**: Runs all of the Ark controllers. Each controller watches its respective custom resource for API operations, performs validation, and handles the majority of the cloud API logic (e.g. interfacing with object storage and persistent volumes).
 
-Looking at a specific example--an `ark backup create test-backup --snapshot-volumes` command triggers the following operations:
+Looking at a specific example--an `ark backup create test-backup` command triggers the following operations:
 
 ![19]
 
@@ -156,7 +156,7 @@ Looking at a specific example--an `ark backup create test-backup --snapshot-volu
 
 4. Once the data has been aggregated, the `BackupController` makes a call to the object storage service (e.g. Amazon S3) to upload the backup file.
 
-5. If the `--snapshot-volumes` flag is specified, Ark also makes disk snapshots of any persistent volumes, using the appropriate cloud service API.
+5. By default, Ark also makes disk snapshots of any persistent volumes, using the appropriate cloud service API. (This can be disabled via the option `--snapshot-volumes=false`)
 
 ## Further documentation
 
