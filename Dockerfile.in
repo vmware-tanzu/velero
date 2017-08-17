@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM multiarch/alpine:armhf-v3.6
+FROM ARG_FROM
 MAINTAINER Andy Goldstein "andy@heptio.com"
 
 RUN apk add --no-cache ca-certificates && \
     adduser -S -D -H -u 1000 ark
 
-ADD _output/bin/arm/ark /ark
+ADD _output/ARG_ARCH/ARG_BIN /ARG_BIN
 
 USER ark
 ENTRYPOINT ["/ark"]

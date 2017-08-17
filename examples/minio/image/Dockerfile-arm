@@ -1,0 +1,9 @@
+FROM resin/armhf-alpine:3.5
+
+RUN \
+    apk add --no-cache ca-certificates && \
+    apk add --no-cache --virtual .build-deps curl && \
+    curl https://dl.minio.io/client/mc/release/linux-arm/mc > /usr/bin/mc && \
+    chmod +x /usr/bin/mc && apk del .build-deps
+    
+ENTRYPOINT ["mc"]

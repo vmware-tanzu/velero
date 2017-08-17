@@ -7,6 +7,7 @@
 _obj
 _test
 _output
+.go
 
 # Architecture specific extensions/prefixes
 *.[568vq]
@@ -17,6 +18,10 @@ _output
 _cgo_defun.c
 _cgo_gotypes.go
 _cgo_export.*
+
+.push-*
+.container-*
+.dockerfile-*
 
 _testmain.go
 
