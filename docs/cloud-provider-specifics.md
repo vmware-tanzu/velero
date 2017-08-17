@@ -213,7 +213,7 @@ To integrate Heptio Ark with Azure, you should follow the instructions below to 
 
     ```
     az login --service-principal \
-        --username http://heptio-ark-test \
+        --username http://heptio-ark \
         --password $AZURE_CLIENT_SECRET \
         --tenant $AZURE_TENANT_ID
     ```
