@@ -13,6 +13,9 @@
 //
 //
 
+// Blackfriday markdown processor.
+//
+// Translates plain text with simple formatting rules into HTML or LaTeX.
 package blackfriday
 
 import (
@@ -43,7 +46,6 @@ const (
 	EXTENSION_AUTO_HEADER_IDS                        // Create the header ID from the text
 	EXTENSION_BACKSLASH_LINE_BREAK                   // translate trailing backslashes into line breaks
 	EXTENSION_DEFINITION_LISTS                       // render definition lists
-	EXTENSION_JOIN_LINES                             // delete newline and join lines
 
 	commonHtmlFlags = 0 |
 		HTML_USE_XHTML |
@@ -218,8 +220,7 @@ type parser struct {
 	// Footnotes need to be ordered as well as available to quickly check for
 	// presence. If a ref is also a footnote, it's stored both in refs and here
 	// in notes. Slice is nil if footnotes not enabled.
-	notes       []*reference
-	notesRecord map[string]struct{}
+	notes []*reference
 }
 
 func (p *parser) getRef(refid string) (ref *reference, found bool) {
@@ -240,11 +241,6 @@ func (p *parser) getRef(refid string) (ref *reference, found bool) {
 	// refs are case insensitive
 	ref, found = p.refs[strings.ToLower(refid)]
 	return ref, found
-}
-
-func (p *parser) isFootnote(ref *reference) bool {
-	_, ok := p.notesRecord[string(ref.link)]
-	return ok
 }
 
 //
@@ -382,7 +378,6 @@ func MarkdownOptions(input []byte, renderer Renderer, opts Options) []byte {
 
 	if extensions&EXTENSION_FOOTNOTES != 0 {
 		p.notes = make([]*reference, 0)
-		p.notesRecord = make(map[string]struct{})
 	}
 
 	first := firstPass(p, input)

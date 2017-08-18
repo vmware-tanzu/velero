@@ -3,7 +3,7 @@ package helpers
 import (
 	"encoding/json"
 	"fmt"
-
+	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 )
 
@@ -20,12 +20,12 @@ func ToJSON(v interface{}) (string, error) {
 
 // NewServicePrincipalTokenFromCredentials creates a new ServicePrincipalToken using values of the
 // passed credentials map.
-func NewServicePrincipalTokenFromCredentials(c map[string]string, scope string) (*azure.ServicePrincipalToken, error) {
-	oauthConfig, err := azure.PublicCloud.OAuthConfigForTenant(c["AZURE_TENANT_ID"])
+func NewServicePrincipalTokenFromCredentials(c map[string]string, scope string) (*adal.ServicePrincipalToken, error) {
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, c["AZURE_TENANT_ID"])
 	if err != nil {
 		panic(err)
 	}
-	return azure.NewServicePrincipalToken(*oauthConfig, c["AZURE_CLIENT_ID"], c["AZURE_CLIENT_SECRET"], scope)
+	return adal.NewServicePrincipalToken(*oauthConfig, c["AZURE_CLIENT_ID"], c["AZURE_CLIENT_SECRET"], scope)
 }
 
 func ensureValueStrings(mapOfInterface map[string]interface{}) map[string]string {
