@@ -19,11 +19,12 @@ package restorers
 import (
 	"testing"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/stretchr/testify/assert"
+	testutil "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestHandles(t *testing.T) {
@@ -36,19 +37,19 @@ func TestHandles(t *testing.T) {
 		{
 			name:    "restorable NS",
 			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
-			restore: newTestRestore().WithRestorableNamespace("ns-1").Restore,
+			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-1").Restore,
 			expect:  true,
 		},
 		{
 			name:    "non-restorable NS",
 			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
-			restore: newTestRestore().WithRestorableNamespace("ns-2").Restore,
+			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-2").Restore,
 			expect:  false,
 		},
 		{
 			name:    "namespace obj doesn't have name",
 			obj:     NewTestUnstructured().WithMetadata().Unstructured,
-			restore: newTestRestore().WithRestorableNamespace("ns-1").Restore,
+			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-1").Restore,
 			expect:  false,
 		},
 	}
@@ -72,27 +73,27 @@ func TestPrepare(t *testing.T) {
 		{
 			name:        "standard non-mapped namespace",
 			obj:         NewTestUnstructured().WithStatus().WithName("ns-1").Unstructured,
-			restore:     newTestRestore().Restore,
+			restore:     testutil.NewDefaultTestRestore().Restore,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("ns-1").Unstructured,
 		},
 		{
 			name:        "standard mapped namespace",
 			obj:         NewTestUnstructured().WithStatus().WithName("ns-1").Unstructured,
-			restore:     newTestRestore().WithMappedNamespace("ns-1", "ns-2").Restore,
+			restore:     testutil.NewDefaultTestRestore().WithMappedNamespace("ns-1", "ns-2").Restore,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("ns-2").Unstructured,
 		},
 		{
 			name:        "object without name results in error",
 			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
-			restore:     newTestRestore().Restore,
+			restore:     testutil.NewDefaultTestRestore().Restore,
 			expectedErr: true,
 		},
 		{
 			name:        "annotations are kept",
 			obj:         NewTestUnstructured().WithName("ns-1").WithAnnotations().Unstructured,
-			restore:     newTestRestore().Restore,
+			restore:     testutil.NewDefaultTestRestore().Restore,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("ns-1").WithAnnotations().Unstructured,
 		},
@@ -102,44 +103,11 @@ func TestPrepare(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			restorer := NewNamespaceRestorer()
 
-			res, err := restorer.Prepare(test.obj, test.restore, nil)
+			res, _, err := restorer.Prepare(test.obj, test.restore, nil)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)
 			}
 		})
 	}
-}
-
-type testRestore struct {
-	*api.Restore
-}
-
-func newTestRestore() *testRestore {
-	return &testRestore{
-		Restore: &api.Restore{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: api.DefaultNamespace,
-			},
-			Spec: api.RestoreSpec{},
-		},
-	}
-}
-
-func (r *testRestore) WithRestorableNamespace(namespace string) *testRestore {
-	r.Spec.Namespaces = append(r.Spec.Namespaces, namespace)
-	return r
-}
-
-func (r *testRestore) WithMappedNamespace(from string, to string) *testRestore {
-	if r.Spec.NamespaceMapping == nil {
-		r.Spec.NamespaceMapping = make(map[string]string)
-	}
-	r.Spec.NamespaceMapping[from] = to
-	return r
-}
-
-func (r *testRestore) WithRestorePVs(restorePVs bool) *testRestore {
-	r.Spec.RestorePVs = restorePVs
-	return r
 }

@@ -243,7 +243,7 @@ func TestProcessBackup(t *testing.T) {
 						WithExcludedResources(test.expectedExcludes...).
 						WithIncludedNamespaces(expectedNSes...).
 						WithTTL(test.backup.Spec.TTL.Duration).
-						WithSnapshotVolumes(test.backup.Spec.SnapshotVolumes).
+						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).
 						WithVersion(1).
 						Backup,
@@ -259,7 +259,7 @@ func TestProcessBackup(t *testing.T) {
 						WithExcludedResources(test.expectedExcludes...).
 						WithIncludedNamespaces(expectedNSes...).
 						WithTTL(test.backup.Spec.TTL.Duration).
-						WithSnapshotVolumes(test.backup.Spec.SnapshotVolumes).
+						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).
 						WithVersion(1).
 						Backup,

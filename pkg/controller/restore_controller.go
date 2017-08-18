@@ -42,12 +42,12 @@ import (
 )
 
 type restoreController struct {
-	restoreClient         arkv1client.RestoresGetter
-	backupClient          arkv1client.BackupsGetter
-	restorer              restore.Restorer
-	backupService         cloudprovider.BackupService
-	bucket                string
-	allowSnapshotRestores bool
+	restoreClient    arkv1client.RestoresGetter
+	backupClient     arkv1client.BackupsGetter
+	restorer         restore.Restorer
+	backupService    cloudprovider.BackupService
+	bucket           string
+	pvProviderExists bool
 
 	backupLister        listers.BackupLister
 	backupListerSynced  cache.InformerSynced
@@ -65,20 +65,20 @@ func NewRestoreController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	backupInformer informers.BackupInformer,
-	allowSnapshotRestores bool,
+	pvProviderExists bool,
 ) Interface {
 	c := &restoreController{
-		restoreClient:         restoreClient,
-		backupClient:          backupClient,
-		restorer:              restorer,
-		backupService:         backupService,
-		bucket:                bucket,
-		allowSnapshotRestores: allowSnapshotRestores,
-		backupLister:          backupInformer.Lister(),
-		backupListerSynced:    backupInformer.Informer().HasSynced,
-		restoreLister:         restoreInformer.Lister(),
-		restoreListerSynced:   restoreInformer.Informer().HasSynced,
-		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
+		restoreClient:       restoreClient,
+		backupClient:        backupClient,
+		restorer:            restorer,
+		backupService:       backupService,
+		bucket:              bucket,
+		pvProviderExists:    pvProviderExists,
+		backupLister:        backupInformer.Lister(),
+		backupListerSynced:  backupInformer.Informer().HasSynced,
+		restoreLister:       restoreInformer.Lister(),
+		restoreListerSynced: restoreInformer.Informer().HasSynced,
+		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 	}
 
 	c.syncHandler = c.processRestore
@@ -278,7 +278,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
 	}
 
-	if !controller.allowSnapshotRestores && itm.Spec.RestorePVs {
+	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {
 		validationErrors = append(validationErrors, "Server is not configured for PV snapshot restores")
 	}
 

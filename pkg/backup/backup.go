@@ -364,7 +364,10 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 
 	if action != nil {
 		glog.V(4).Infof("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
-		action.Execute(item, ctx.backup)
+
+		if err := action.Execute(item, ctx.backup); err != nil {
+			return err
+		}
 	}
 
 	glog.V(2).Infof("Backing up resource=%s, ns=%s, name=%s", groupResource, namespace, name)

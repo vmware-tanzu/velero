@@ -14,14 +14,14 @@ ark restore create BACKUP
 ### Options
 
 ```
-      --label-columns stringArray            a comma-separated list of labels to be displayed as columns
-      --labels mapStringString               labels to apply to the restore
-      --namespace-mappings mapStringString   namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...
-      --namespaces stringArray               comma-separated list of namespaces to restore
-  -o, --output string                        Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
-      --restore-volumes                      whether to restore volumes from snapshots (default true)
-  -l, --selector labelSelector               only restore resources matching this label selector (default <none>)
-      --show-labels                          show labels in the last column
+      --label-columns stringArray             a comma-separated list of labels to be displayed as columns
+      --labels mapStringString                labels to apply to the restore
+      --namespace-mappings mapStringString    namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...
+      --namespaces stringArray                comma-separated list of namespaces to restore
+  -o, --output string                         Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
+      --restore-volumes optionalBool[=true]   whether to restore volumes from snapshots
+  -l, --selector labelSelector                only restore resources matching this label selector (default <none>)
+      --show-labels                           show labels in the last column
 ```
 
 ### Options inherited from parent commands

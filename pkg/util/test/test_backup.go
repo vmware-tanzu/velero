@@ -106,6 +106,11 @@ func (b *TestBackup) WithSnapshot(pv string, snapshot string) *TestBackup {
 }
 
 func (b *TestBackup) WithSnapshotVolumes(value bool) *TestBackup {
+	b.Spec.SnapshotVolumes = &value
+	return b
+}
+
+func (b *TestBackup) WithSnapshotVolumesPointer(value *bool) *TestBackup {
 	b.Spec.SnapshotVolumes = value
 	return b
 }

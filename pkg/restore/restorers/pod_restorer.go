@@ -43,17 +43,17 @@ var (
 	defaultTokenRegex = regexp.MustCompile("default-token-.*")
 )
 
-func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	glog.V(4).Infof("resetting metadata and status")
 	_, err := resetMetadataAndStatus(obj, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	glog.V(4).Infof("getting spec")
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	glog.V(4).Infof("deleting spec.NodeName")
@@ -79,7 +79,7 @@ func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	glog.V(4).Infof("setting spec.volumes")
@@ -114,10 +114,10 @@ func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return obj, nil
+	return obj, nil, nil
 }
 
 func (nsr *podRestorer) Wait() bool {

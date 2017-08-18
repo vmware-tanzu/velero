@@ -29,8 +29,8 @@ type ResourceRestorer interface {
 	// Handles returns true if the Restorer should restore this object.
 	Handles(obj runtime.Unstructured, restore *api.Restore) bool
 
-	// Prepare gets an item ready to be restored
-	Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error)
+	// Prepare gets an item ready to be restored.
+	Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (res runtime.Unstructured, warning error, err error)
 
 	// Wait returns true if restoration should wait for all of this restorer's resources to be ready before moving on to the next restorer.
 	Wait() bool
@@ -66,8 +66,10 @@ func (br *basicRestorer) Handles(obj runtime.Unstructured, restore *api.Restore)
 	return true
 }
 
-func (br *basicRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
-	return resetMetadataAndStatus(obj, br.saveAnnotations)
+func (br *basicRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
+	obj, err := resetMetadataAndStatus(obj, br.saveAnnotations)
+
+	return obj, err, nil
 }
 
 func (br *basicRestorer) Wait() bool {

@@ -55,7 +55,7 @@ func NewCreateCommand(f client.Factory) *cobra.Command {
 
 type CreateOptions struct {
 	BackupName        string
-	RestoreVolumes    bool
+	RestoreVolumes    flag.OptionalBool
 	Labels            flag.Map
 	Namespaces        flag.StringArray
 	NamespaceMappings flag.Map
@@ -66,16 +66,19 @@ func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:            flag.NewMap(),
 		NamespaceMappings: flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
-		RestoreVolumes:    true,
+		RestoreVolumes:    flag.NewOptionalBool(nil),
 	}
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.RestoreVolumes, "restore-volumes", o.RestoreVolumes, "whether to restore volumes from snapshots")
 	flags.Var(&o.Labels, "labels", "labels to apply to the restore")
 	flags.Var(&o.Namespaces, "namespaces", "comma-separated list of namespaces to restore")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
 	flags.VarP(&o.Selector, "selector", "l", "only restore resources matching this label selector")
+	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "whether to restore volumes from snapshots")
+	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
+	// like a normal bool flag
+	f.NoOptDefVal = "true"
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
@@ -112,7 +115,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Namespaces:       o.Namespaces,
 			NamespaceMapping: o.NamespaceMappings.Data(),
 			LabelSelector:    o.Selector.LabelSelector,
-			RestorePVs:       o.RestoreVolumes,
+			RestorePVs:       o.RestoreVolumes.Value,
 		},
 	}
 

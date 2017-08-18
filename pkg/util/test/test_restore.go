@@ -41,6 +41,10 @@ func NewTestRestore(ns, name string, phase api.RestorePhase) *TestRestore {
 	}
 }
 
+func NewDefaultTestRestore() *TestRestore {
+	return NewTestRestore(api.DefaultNamespace, "", api.RestorePhase(""))
+}
+
 func (r *TestRestore) WithRestorableNamespace(name string) *TestRestore {
 	r.Spec.Namespaces = append(r.Spec.Namespaces, name)
 	return r
@@ -62,6 +66,14 @@ func (r *TestRestore) WithErrors(e api.RestoreResult) *TestRestore {
 }
 
 func (r *TestRestore) WithRestorePVs(value bool) *TestRestore {
-	r.Spec.RestorePVs = value
+	r.Spec.RestorePVs = &value
+	return r
+}
+
+func (r *TestRestore) WithMappedNamespace(from string, to string) *TestRestore {
+	if r.Spec.NamespaceMapping == nil {
+		r.Spec.NamespaceMapping = make(map[string]string)
+	}
+	r.Spec.NamespaceMapping[from] = to
 	return r
 }

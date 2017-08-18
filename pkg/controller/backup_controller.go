@@ -49,10 +49,10 @@ import (
 const backupVersion = 1
 
 type backupController struct {
-	backupper      backup.Backupper
-	backupService  cloudprovider.BackupService
-	bucket         string
-	allowSnapshots bool
+	backupper        backup.Backupper
+	backupService    cloudprovider.BackupService
+	bucket           string
+	pvProviderExists bool
 
 	lister       listers.BackupLister
 	listerSynced cache.InformerSynced
@@ -69,13 +69,13 @@ func NewBackupController(
 	backupper backup.Backupper,
 	backupService cloudprovider.BackupService,
 	bucket string,
-	allowSnapshots bool,
+	pvProviderExists bool,
 ) Interface {
 	c := &backupController{
-		backupper:      backupper,
-		backupService:  backupService,
-		bucket:         bucket,
-		allowSnapshots: allowSnapshots,
+		backupper:        backupper,
+		backupService:    backupService,
+		bucket:           bucket,
+		pvProviderExists: pvProviderExists,
 
 		lister:       backupInformer.Lister(),
 		listerSynced: backupInformer.Informer().HasSynced,
@@ -300,7 +300,7 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
-	if !controller.allowSnapshots && itm.Spec.SnapshotVolumes {
+	if !controller.pvProviderExists && itm.Spec.SnapshotVolumes != nil && *itm.Spec.SnapshotVolumes {
 		validationErrors = append(validationErrors, "Server is not configured for PV snapshots")
 	}
 

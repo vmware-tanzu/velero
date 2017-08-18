@@ -41,10 +41,10 @@ type BackupSpec struct {
 	// or nil, all objects are included. Optional.
 	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
 
-	// SnapshotVolumes is a bool which specifies whether to take
-	// cloud snapshots of any PV's referenced in the set of objects
-	// included in the Backup.
-	SnapshotVolumes bool `json:"snapshotVolumes"`
+	// SnapshotVolumes specifies whether to take cloud snapshots
+	// of any PV's referenced in the set of objects included
+	// in the Backup.
+	SnapshotVolumes *bool `json:"snapshotVolumes"`
 
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.

@@ -128,7 +128,7 @@ func TestJobRestorerPrepare(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			restorer := NewJobRestorer()
 
-			res, err := restorer.Prepare(test.obj, nil, nil)
+			res, _, err := restorer.Prepare(test.obj, nil, nil)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)

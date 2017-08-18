@@ -34,14 +34,15 @@ func TestVolumeSnapshotAction(t *testing.T) {
 	iops := int64(1000)
 
 	tests := []struct {
-		name                  string
-		snapshotEnabled       bool
-		pv                    string
-		ttl                   time.Duration
-		expectError           bool
-		expectedVolumeID      string
-		existingVolumeBackups map[string]*v1.VolumeBackupInfo
-		volumeInfo            map[string]v1.VolumeBackupInfo
+		name                   string
+		snapshotEnabled        bool
+		pv                     string
+		ttl                    time.Duration
+		expectError            bool
+		expectedVolumeID       string
+		expectedSnapshotsTaken int
+		existingVolumeBackups  map[string]*v1.VolumeBackupInfo
+		volumeInfo             map[string]v1.VolumeBackupInfo
 	}{
 		{
 			name:            "snapshot disabled",
@@ -55,10 +56,10 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectError:     true,
 		},
 		{
-			name:            "can't find volume id - spec but no volume source defined",
+			name:            "unsupported PV source type",
 			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {}}`,
-			expectError:     true,
+			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"unsupportedPVSource": {}}}`,
+			expectError:     false,
 		},
 		{
 			name:            "can't find volume id - aws but no volume id",
@@ -73,56 +74,73 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectError:     true,
 		},
 		{
-			name:             "aws - simple volume id",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
-			expectError:      false,
-			expectedVolumeID: "vol-abc123",
-			ttl:              5 * time.Minute,
+			name:                   "aws - simple volume id",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "vol-abc123",
+			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
-			name:             "aws - simple volume id with provisioned IOPS",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
-			expectError:      false,
-			expectedVolumeID: "vol-abc123",
-			ttl:              5 * time.Minute,
+			name:                   "aws - simple volume id with provisioned IOPS",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "vol-abc123",
+			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": v1.VolumeBackupInfo{Type: "io1", Iops: &iops, SnapshotID: "snap-1"},
 			},
 		},
 		{
-			name:             "aws - dynamically provisioned volume id",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-west-2a/vol-abc123"}}}`,
-			expectError:      false,
-			expectedVolumeID: "vol-abc123",
-			ttl:              5 * time.Minute,
+			name:                   "aws - dynamically provisioned volume id",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-west-2a/vol-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "vol-abc123",
+			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
-			name:             "gce",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectError:      false,
-			expectedVolumeID: "pd-abc123",
-			ttl:              5 * time.Minute,
+			name:                   "gce",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "pd-abc123",
+			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
 				"pd-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
-			name:             "preexisting volume backup info in backup status",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectError:      false,
-			expectedVolumeID: "pd-abc123",
-			ttl:              5 * time.Minute,
+			name:                   "azure",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"azureDisk": {"diskName": "foo-disk"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "foo-disk",
+			ttl:                    5 * time.Minute,
+			volumeInfo: map[string]v1.VolumeBackupInfo{
+				"foo-disk": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+			},
+		},
+		{
+			name:                   "preexisting volume backup info in backup status",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "pd-abc123",
+			ttl:                    5 * time.Minute,
 			existingVolumeBackups: map[string]*v1.VolumeBackupInfo{
 				"anotherpv": &v1.VolumeBackupInfo{SnapshotID: "anothersnap"},
 			},
@@ -146,7 +164,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 					Name:      "mybackup",
 				},
 				Spec: v1.BackupSpec{
-					SnapshotVolumes: test.snapshotEnabled,
+					SnapshotVolumes: &test.snapshotEnabled,
 					TTL:             metav1.Duration{Duration: test.ttl},
 				},
 				Status: v1.BackupStatus{
@@ -188,20 +206,22 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			}
 
 			// we should have one snapshot taken exactly
-			require.Equal(t, 1, snapshotService.SnapshotsTaken.Len())
+			require.Equal(t, test.expectedSnapshotsTaken, snapshotService.SnapshotsTaken.Len())
 
-			// the snapshotID should be the one in the entry in snapshotService.SnapshottableVolumes
-			// for the volume we ran the test for
-			snapshotID, _ := snapshotService.SnapshotsTaken.PopAny()
+			if test.expectedSnapshotsTaken > 0 {
+				// the snapshotID should be the one in the entry in snapshotService.SnapshottableVolumes
+				// for the volume we ran the test for
+				snapshotID, _ := snapshotService.SnapshotsTaken.PopAny()
 
-			expectedVolumeBackups["mypv"] = &v1.VolumeBackupInfo{
-				SnapshotID: snapshotID,
-				Type:       test.volumeInfo[test.expectedVolumeID].Type,
-				Iops:       test.volumeInfo[test.expectedVolumeID].Iops,
-			}
+				expectedVolumeBackups["mypv"] = &v1.VolumeBackupInfo{
+					SnapshotID: snapshotID,
+					Type:       test.volumeInfo[test.expectedVolumeID].Type,
+					Iops:       test.volumeInfo[test.expectedVolumeID].Iops,
+				}
 
-			if e, a := expectedVolumeBackups, backup.Status.VolumeBackups; !reflect.DeepEqual(e, a) {
-				t.Errorf("backup.status.VolumeBackups: expected %v, got %v", e, a)
+				if e, a := expectedVolumeBackups, backup.Status.VolumeBackups; !reflect.DeepEqual(e, a) {
+					t.Errorf("backup.status.VolumeBackups: expected %v, got %v", e, a)
+				}
 			}
 		})
 	}

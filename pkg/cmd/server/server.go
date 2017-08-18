@@ -250,7 +250,7 @@ func (s *server) initBackupService(config *api.Config) error {
 
 func (s *server) initSnapshotService(config *api.Config) error {
 	if config.PersistentVolumeProvider == nil {
-		glog.Infof("PersistentVolumeProvider config not provided, skipping SnapshotService creation")
+		glog.Infof("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
 		return nil
 	}
 

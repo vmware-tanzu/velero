@@ -607,10 +607,10 @@ func newFakeCustomRestorer() *fakeCustomRestorer {
 	}
 }
 
-func (r *fakeCustomRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (r *fakeCustomRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if _, found := metadata["labels"]; !found {
