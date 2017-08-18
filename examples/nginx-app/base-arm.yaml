@@ -13,37 +13,44 @@
 # limitations under the License.
 
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nginx-example
+  labels:
+    app: nginx
+
+---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark
-  name: ark
+  name: nginx-deployment
+  namespace: nginx-example
 spec:
-  replicas: 1
+  replicas: 2
   template:
     metadata:
       labels:
-        component: ark
+        app: nginx
     spec:
-      restartPolicy: Always
-      serviceAccountName: ark
       containers:
-        - name: ark
-          image: gcr.io/heptio-images/ark-amd64:latest
-          command:
-            - /ark
-          args:
-            - server
-            - --logtostderr
-            - --v
-            - "4"
-          volumeMounts:
-            - name: cloud-credentials
-              mountPath: /credentials
-          env:
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: /credentials/cloud
-      volumes:
-        - name: cloud-credentials
-          secret:
-            secretName: cloud-credentials
+      - image: alexellis2/nginx-arm
+        name: nginx
+        ports:
+        - containerPort: 80
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: nginx
+  name: my-nginx
+  namespace: nginx-example
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
