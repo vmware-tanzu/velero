@@ -21,6 +21,8 @@ The files are installed in `$GOPATH/src/github.com/heptio/ark`.
 
 ## 2. Build
 
+You can build your Ark image locally on the machine where you run your cluster, or you can push it to a private registry. This section covers both workflows.
+
 Set the `$REGISTRY` environment variable (used in the `Makefile`) if you want to push the Heptio Ark images to your own registry. This allows any node in your cluster to pull your locally built image.
 
 `$PROJECT` and `$VERSION` environment variables are also specified in the `Makefile`, and can be similarly modified as desired.
@@ -33,6 +35,9 @@ sudo make all
 To push your image to a registry, use `make push`.
 
 ## 3. Run
+
+### Considerations
+
 When running Heptio Ark, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
 * Appropriate RBAC permissions in the cluster
   * *Read access* for all data from the source cluster and namespaces
@@ -43,6 +48,14 @@ When running Heptio Ark, you will need to account for the following (all of whic
 * A [Config object][8] definition for the Ark server
 
 See [Cloud Provider Specifics][9] for a more detailed guide.
+
+### Specifying your image
+
+Once your Ark deployment is up and running, **you need to replace the Heptio-provided Ark image with the specific one that you built.** You can do so with the following command:
+```
+kubectl set image deployment/ark ark=$REGISTRY/$PROJECT:$VERSION
+```
+where `$REGISTRY`, `$PROJECT`, and `$VERSION` match what you used in the [build step][3].
 
 [0]: ../README.md
 [1]: #0-prerequisites

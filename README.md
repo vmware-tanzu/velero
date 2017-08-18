@@ -45,6 +45,10 @@ Clone or fork the Heptio Ark repo:
 git clone git@github.com:heptio/ark.git
 ```
 
+> NOTE: Documentation may change between releases. See the [Changelog][20] for links to previous versions of this repository and its docs.
+>
+> To ensure that you are working off a specific release, `git checkout <VERSION_TAG>` where `<VERSION_TAG>` is the appropriate tag for the Ark version you wish to use (e.g. "v0.3.3"). You should `git checkout master` only if you're planning on [building the Ark image from scratch][7].
+
 ### 2. Setup
 
 There are two types of Ark instances that work in tandem:
