@@ -43,7 +43,7 @@ import (
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup data to the
 	// given writers.
-	Backup(backup *api.Backup, data io.Writer) error
+	Backup(backup *Options, data io.Writer) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -60,7 +60,11 @@ var _ Backupper = &kubernetesBackupper{}
 type Action interface {
 	// Execute is invoked on an item being backed up. If an error is returned, the Backup is marked as
 	// failed.
-	Execute(item map[string]interface{}, backup *api.Backup) error
+	Execute(item map[string]interface{}, options *Options) (*ActionResult, error)
+}
+
+type ActionResult struct {
+	BackupInfo map[string]*api.VolumeBackupInfo
 }
 
 // NewKubernetesBackupper creates a new kubernetesBackupper.
@@ -142,10 +146,8 @@ func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExclu
 }
 
 type backupContext struct {
-	backup                    *api.Backup
-	w                         tarWriter
-	namespaceIncludesExcludes *collections.IncludesExcludes
-	resourceIncludesExcludes  *collections.IncludesExcludes
+	backup *Options
+	w      tarWriter
 	// deploymentsBackedUp marks whether we've seen and are backing up the deployments resource, from
 	// either the apps or extensions api groups. We only want to back them up once, from whichever api
 	// group we see first.
@@ -158,7 +160,7 @@ type backupContext struct {
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to data. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(backup *api.Backup, data io.Writer) error {
+func (kb *kubernetesBackupper) Backup(backup *Options, data io.Writer) error {
 	gzw := gzip.NewWriter(data)
 	defer gzw.Close()
 
@@ -170,8 +172,6 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, data io.Writer) error 
 	ctx := &backupContext{
 		backup: backup,
 		w:      tw,
-		namespaceIncludesExcludes: getNamespaceIncludesExcludes(backup),
-		resourceIncludesExcludes:  getResourceIncludesExcludes(kb.discoveryHelper.Mapper(), backup),
 	}
 
 	for _, group := range kb.discoveryHelper.Resources() {
@@ -227,7 +227,7 @@ func (kb *kubernetesBackupper) backupResource(
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
 	grString := gr.String()
 
-	if !ctx.resourceIncludesExcludes.ShouldInclude(grString) {
+	if !ctx.backup.Resources.ShouldInclude(grString) {
 		glog.V(2).Infof("Not including resource %s\n", grString)
 		return nil
 	}
@@ -264,7 +264,7 @@ func (kb *kubernetesBackupper) backupResource(
 
 	var namespacesToList []string
 	if resource.Namespaced {
-		namespacesToList = getNamespacesToList(ctx.namespaceIncludesExcludes)
+		namespacesToList = getNamespacesToList(ctx.backup.Namespaces)
 	} else {
 		namespacesToList = []string{""}
 	}
@@ -274,11 +274,7 @@ func (kb *kubernetesBackupper) backupResource(
 			return err
 		}
 
-		labelSelector := ""
-		if ctx.backup.Spec.LabelSelector != nil {
-			labelSelector = metav1.FormatLabelSelector(ctx.backup.Spec.LabelSelector)
-		}
-		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
+		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: ctx.backup.LabelSelector})
 		if err != nil {
 			return err
 		}
@@ -356,7 +352,7 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 
 	namespace, err := collections.GetString(metadata, "namespace")
 	if err == nil {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+		if !ctx.backup.Namespaces.ShouldInclude(namespace) {
 			glog.V(2).Infof("Excluding item %s because namespace %s is excluded\n", name, namespace)
 			return nil
 		}
@@ -364,7 +360,14 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 
 	if action != nil {
 		glog.V(4).Infof("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
-		action.Execute(item, ctx.backup)
+
+		// TODO need to decide how this works. Before, we were passing a ref to Backup into the action
+		// so it could arbitrarily update fields. Now, we're not. What type do we actually want to return?
+		// How does it get passed back up the stack?
+		_, err := action.Execute(item, ctx.backup)
+		if err != nil {
+			return err
+		}
 	}
 
 	glog.V(2).Infof("Backing up resource=%s, ns=%s, name=%s", groupResource, namespace, name)
