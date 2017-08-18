@@ -6,6 +6,7 @@ While the [README][0] pulls from the Heptio image registry, you can also build y
 * [1. Download][2]
 * [2. Build][3]
 * [3. Run][7]
+* [4. Vendoring dependencies][10]
 
 ## 0. Prerequisites
 
@@ -57,6 +58,9 @@ kubectl set image deployment/ark ark=$REGISTRY/$PROJECT:$VERSION
 ```
 where `$REGISTRY`, `$PROJECT`, and `$VERSION` match what you used in the [build step][3].
 
+## 4. Vendoring dependencies
+If you need to add or update the vendored dependencies, please see [Vendoring dependencies][11].
+
 [0]: ../README.md
 [1]: #0-prerequisites
 [2]: #1-download
@@ -67,3 +71,5 @@ where `$REGISTRY`, `$PROJECT`, and `$VERSION` match what you used in the [build 
 [7]: #3-run
 [8]: reference.md#ark-config-definition
 [9]: cloud-provider-specifics.md
+[10]: #4-vendoring-dependencies
+[11]: vendoring-dependencies.md
