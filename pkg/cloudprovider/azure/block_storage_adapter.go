@@ -26,6 +26,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
 	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/satori/uuid"
 
@@ -90,12 +91,13 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
 	snapsClient := disk.NewSnapshotsClient(cfg[azureSubscriptionIDKey])
 
-	disksClient.Authorizer = spt
-	snapsClient.Authorizer = spt
+	authorizer := autorest.NewBearerAuthorizer(spt)
+	disksClient.Authorizer = authorizer
+	snapsClient.Authorizer = authorizer
 
 	// validate the location
 	groupClient := subscriptions.NewGroupClient()
-	groupClient.Authorizer = spt
+	groupClient.Authorizer = authorizer
 
 	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
 	if err != nil {
