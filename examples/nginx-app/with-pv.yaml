@@ -62,8 +62,6 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
-      nodeSelector:
-        app: nginx
 
 ---
 apiVersion: v1
