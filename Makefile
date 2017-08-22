@@ -38,6 +38,23 @@ SKIP_TESTS ?=
 # what we're building
 BINARIES = ark
 
+# compiling jsonnet into YAML files
+EXAMPLE_FILES = $(wildcard examples/ksonnet/*.jsonnet)
+EXAMPLE_OUTPUT = $(patsubst examples/ksonnet/%.jsonnet,examples/yaml/generated/%.yaml,$(EXAMPLE_FILES))
+KSONNET_BUILD_IMAGE = ksonnet/ksonnet-lib:beta.2
+
+WORKDIR ?= /ark
+
+ENV_PREFIX = HEPTIO_ARK
+COLLECT_ENV = env | grep $(ENV_PREFIX)
+ENV_FLAGS = $(shell $(COLLECT_ENV) | sed "s/$(ENV_PREFIX)_/-V /")
+KUBECFG_CMD = $(DOCKER) run \
+  -v $(ROOT_DIR):$(WORKDIR) \
+	--workdir $(WORKDIR) \
+	--rm \
+	$(KSONNET_BUILD_IMAGE) \
+	kubecfg show $(ENV_FLAGS) -o yaml -J $(WORKDIR) -o yaml $< > $@
+
 local: $(BINARIES)
 
 $(BINARIES):
@@ -85,3 +102,15 @@ push:
 clean:
 	rm -rf $(OUTPUT_DIR)
 	$(DOCKER) rmi $(REGISTRY)/$(PROJECT):latest $(REGISTRY)/$(PROJECT):$(VERSION) 2>/dev/null || :
+	find $(ROOT_DIR)/examples/yaml/generated/ -name '*.yaml' -o -name '*.txt' -delete
+
+generate-examples: $(EXAMPLE_OUTPUT)
+
+examples/yaml/generated/%.yaml: examples/ksonnet/%.jsonnet record-env latest-ksonnet-image
+	$(KUBECFG_CMD)
+
+record-env:
+	$(COLLECT_ENV) > $(ROOT_DIR)/examples/yaml/generated/env.txt
+
+latest-ksonnet-image:
+	$(DOCKER) pull $(KSONNET_BUILD_IMAGE)

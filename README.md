@@ -58,16 +58,15 @@ There are two types of Ark instances that work in tandem:
 To get the server started on your cluster (as well as the local storage service), execute the following commands in Ark's root directory:
 
 ```
-kubectl apply -f examples/common/00-prereqs.yaml
-kubectl apply -f examples/minio/
-kubectl apply -f examples/common/10-deployment.yaml
+kubectl apply -f examples/yaml/quickstart/00-prereqs.yaml
+kubectl apply -f examples/yaml/quickstart/10-ark.yaml
 ```
 
 *NOTE: If you encounter an error related to Config creation, wait for a minute and run the command again. (The Config CRD does not always finish registering in time.)*
 
 Now deploy the example nginx app:
 ```
-kubectl apply -f examples/nginx-app/base.yaml
+kubectl apply -f examples/yaml/quickstart/20-nginx-example.yaml
 ```
 
 Check to see that both the Ark and nginx deployments have been successfully created:
@@ -124,14 +123,12 @@ ark restore get <RESTORE NAME> -o yaml
 ```
 See the [debugging documentation][18] for more details.
 
-*NOTE*: In the example files, the `storage` volume is defined via `hostPath` for better visibility. If you're curious to see the [structure of the backup files][13] firsthand, you can find the compressed results in `/tmp/minio/ark/nginx-backup`.
+*NOTE*: In the example files, the `storage` volume is defined via `hostPath` for better visibility. If you're curious to see the [structure of the backup files][13] firsthand, you can find the compressed results in `/tmp/minio/ark/nginx-backup`, on the node that Ark ran on.
 
 ### 4. Tear Down
 Using the following command, you can remove all Kubernetes objects associated with this example:
 ```
-kubectl delete -f examples/common/
-kubectl delete -f examples/minio/
-kubectl delete -f examples/nginx-app/base.yaml
+kubectl delete -f examples/yaml/quickstart/
 ```
 
 ## Architecture
