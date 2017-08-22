@@ -408,6 +408,7 @@ func (s *server) runControllers(config *api.Config) error {
 			backupper,
 			s.backupService,
 			config.BackupStorageProvider.Bucket,
+			discoveryHelper.Mapper(),
 		)
 		wg.Add(1)
 		go func() {
