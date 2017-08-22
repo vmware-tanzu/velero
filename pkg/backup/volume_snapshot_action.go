@@ -48,11 +48,11 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) Acti
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *api.Backup) error {
-	backupName := fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)
-	if !backup.Spec.SnapshotVolumes {
+func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, options *Options) (*ActionResult, error) {
+	backupName := fmt.Sprintf("%s/%s", options.Namespace, options.Name)
+	if !options.SnapshotVolumes {
 		glog.V(2).Infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
-		return nil
+		return nil, nil
 	}
 
 	metadata := volume["metadata"].(map[string]interface{})
@@ -60,36 +60,32 @@ func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *ap
 
 	volumeID := getVolumeID(volume)
 	if volumeID == "" {
-		return fmt.Errorf("unable to determine volume ID for backup %q, PersistentVolume %q", backupName, name)
+		return nil, fmt.Errorf("unable to determine volume ID for backup %q, PersistentVolume %q", backupName, name)
 	}
 
-	expiration := a.clock.Now().Add(backup.Spec.TTL.Duration)
-
-	glog.Infof("Backup %q: snapshotting PersistenVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
+	glog.Infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q", backupName, name, volumeID)
 
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID)
 	if err != nil {
 		glog.V(4).Infof("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
-		return err
+		return nil, err
 	}
 
 	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID)
 	if err != nil {
 		glog.V(4).Infof("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
-		return err
+		return nil, err
 	}
 
-	if backup.Status.VolumeBackups == nil {
-		backup.Status.VolumeBackups = make(map[string]*api.VolumeBackupInfo)
-	}
-
-	backup.Status.VolumeBackups[name] = &api.VolumeBackupInfo{
-		SnapshotID: snapshotID,
-		Type:       volumeType,
-		Iops:       iops,
-	}
-
-	return nil
+	return &ActionResult{
+		BackupInfo: map[string]*api.VolumeBackupInfo{
+			name: &api.VolumeBackupInfo{
+				SnapshotID: snapshotID,
+				Type:       volumeType,
+				Iops:       iops,
+			},
+		},
+	}, nil
 }
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")

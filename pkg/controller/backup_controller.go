@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
@@ -36,8 +37,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
+	backuppkg "github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/generated/clientset/scheme"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
@@ -49,9 +51,10 @@ import (
 const backupVersion = 1
 
 type backupController struct {
-	backupper     backup.Backupper
+	backupper     backuppkg.Backupper
 	backupService cloudprovider.BackupService
 	bucket        string
+	mapper        meta.RESTMapper
 
 	lister       listers.BackupLister
 	listerSynced cache.InformerSynced
@@ -65,14 +68,16 @@ type backupController struct {
 func NewBackupController(
 	backupInformer informers.BackupInformer,
 	client arkv1client.BackupsGetter,
-	backupper backup.Backupper,
+	backupper backuppkg.Backupper,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	mapper meta.RESTMapper,
 ) Interface {
 	c := &backupController{
 		backupper:     backupper,
 		backupService: backupService,
 		bucket:        bucket,
+		mapper:        mapper,
 
 		lister:       backupInformer.Lister(),
 		listerSynced: backupInformer.Informer().HasSynced,
@@ -238,8 +243,11 @@ func (controller *backupController) processBackup(key string) error {
 		backup.Status.Expiration = metav1.NewTime(controller.clock.Now().Add(backup.Spec.TTL.Duration))
 	}
 
+	// resolve resource includes/excludes
+	resolvedResources := getResourceIncludesExcludes(controller.mapper, backup.Spec.IncludedResources, backup.Spec.ExcludedResources)
+
 	// validation
-	if backup.Status.ValidationErrors = controller.getValidationErrors(backup); len(backup.Status.ValidationErrors) > 0 {
+	if backup.Status.ValidationErrors = controller.getValidationErrors(backup, resolvedResources); len(backup.Status.ValidationErrors) > 0 {
 		backup.Status.Phase = api.BackupPhaseFailedValidation
 	} else {
 		backup.Status.Phase = api.BackupPhaseInProgress
@@ -257,9 +265,23 @@ func (controller *backupController) processBackup(key string) error {
 		return nil
 	}
 
+	labelSelector := ""
+	if backup.Spec.LabelSelector != nil {
+		labelSelector = metav1.FormatLabelSelector(backup.Spec.LabelSelector)
+	}
+
+	options := &backuppkg.Options{
+		Namespace:       backup.Namespace,
+		Name:            backup.Name,
+		Namespaces:      collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...),
+		Resources:       resolvedResources,
+		LabelSelector:   labelSelector,
+		SnapshotVolumes: backup.Spec.SnapshotVolumes,
+	}
+
 	glog.V(4).Infof("running backup for %s", key)
 	// execution & upload of backup
-	if err := controller.runBackup(backup, controller.bucket); err != nil {
+	if err := controller.runBackup(backup, options, controller.bucket); err != nil {
 		glog.V(4).Infof("backup %s failed: %v", key, err)
 		backup.Status.Phase = api.BackupPhaseFailed
 	}
@@ -270,6 +292,35 @@ func (controller *backupController) processBackup(key string) error {
 	}
 
 	return nil
+}
+
+// getResourceIncludesExcludes takes the lists of resources to include and exclude from the
+// backup, uses the RESTMapper to resolve them to fully-qualified group-resource names, and returns
+// an IncludesExcludes list.
+func getResourceIncludesExcludes(mapper meta.RESTMapper, includedResources, excludedResources []string) *collections.IncludesExcludes {
+	resources := collections.NewIncludesExcludes()
+
+	resolve := func(list []string, addFunc func(...string) *collections.IncludesExcludes) {
+		for _, resource := range list {
+			if resource == "*" {
+				addFunc(resource)
+				continue
+			}
+
+			gr, err := discovery.ResolveGroupResource(mapper, resource)
+			if err != nil {
+				glog.Errorf("unable to include resource %q in backup: %v", resource, err)
+				continue
+			}
+
+			addFunc(gr.String())
+		}
+	}
+
+	resolve(includedResources, resources.Includes)
+	resolve(excludedResources, resources.Excludes)
+
+	return resources
 }
 
 func cloneBackup(in interface{}) (*api.Backup, error) {
@@ -286,10 +337,10 @@ func cloneBackup(in interface{}) (*api.Backup, error) {
 	return out, nil
 }
 
-func (controller *backupController) getValidationErrors(itm *api.Backup) []string {
+func (controller *backupController) getValidationErrors(itm *api.Backup, resolvedResources *collections.IncludesExcludes) []string {
 	var validationErrors []string
 
-	for err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedResources, itm.Spec.ExcludedResources) {
+	for err := range collections.ValidateIncludesExcludes(resolvedResources.GetIncludes(), resolvedResources.GetExcludes()) {
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
@@ -300,11 +351,12 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 	return validationErrors
 }
 
-func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
+func (controller *backupController) runBackup(backup *api.Backup, options *backuppkg.Options, bucket string) error {
 	backupFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		var errs []error
 		errs = append(errs, err)
@@ -319,13 +371,13 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		err = kuberrs.NewAggregate(errs)
 	}()
 
-	if err := controller.backupper.Backup(backup, backupFile); err != nil {
+	if err := controller.backupper.Backup(options, backupFile); err != nil {
 		return err
 	}
 
 	// note: updating this here so the uploaded JSON shows "completed". If
 	// the upload fails, we'll alter the phase in the calling func.
-	glog.V(4).Infof("backup %s/%s completed", backup.Namespace, backup.Name)
+	glog.V(4).Infof("backup %s/%s completed", options.Namespace, options.Name)
 	backup.Status.Phase = api.BackupPhaseCompleted
 
 	buf := new(bytes.Buffer)

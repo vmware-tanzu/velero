@@ -139,3 +139,13 @@ func (h *helper) Resources() []*metav1.APIResourceList {
 	defer h.lock.RUnlock()
 	return h.resources
 }
+
+// ResolveGroupResource uses the RESTMapper to resolve resource to a fully-qualified
+// schema.GroupResource. If the RESTMapper is unable to do so, an error is returned instead.
+func ResolveGroupResource(mapper meta.RESTMapper, resource string) (schema.GroupResource, error) {
+	gvr, err := mapper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
+	if err != nil {
+		return schema.GroupResource{}, err
+	}
+	return gvr.GroupResource(), nil
+}
