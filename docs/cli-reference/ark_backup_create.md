@@ -23,7 +23,7 @@ ark backup create NAME
   -o, --output string                    Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
   -l, --selector labelSelector           only back up resources matching this label selector (default <none>)
       --show-labels                      show labels in the last column
-      --snapshot-volumes                 take snapshots of PersistentVolumes as part of the backup
+      --snapshot-volumes                 take snapshots of PersistentVolumes as part of the backup (default true)
       --ttl duration                     how long before the backup can be garbage collected (default 24h0m0s)
 ```
 

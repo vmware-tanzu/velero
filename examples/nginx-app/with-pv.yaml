@@ -43,7 +43,7 @@ metadata:
   name: nginx-deployment
   namespace: nginx-example
 spec:
-  replicas: 2
+  replicas: 1
   template:
     metadata:
       labels:
@@ -62,8 +62,6 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
-      nodeSelector:
-        app: nginx
 
 ---
 apiVersion: v1

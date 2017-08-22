@@ -24,7 +24,7 @@ ark schedule create NAME
       --schedule string                  a cron expression specifying a recurring schedule for this backup to run
   -l, --selector labelSelector           only back up resources matching this label selector (default <none>)
       --show-labels                      show labels in the last column
-      --snapshot-volumes                 take snapshots of PersistentVolumes as part of the backup
+      --snapshot-volumes                 take snapshots of PersistentVolumes as part of the backup (default true)
       --ttl duration                     how long before the backup can be garbage collected (default 24h0m0s)
 ```
 

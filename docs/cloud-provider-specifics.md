@@ -311,12 +311,6 @@ ark restore create nginx-backup
 
 > NOTE: For Azure, your Kubernetes cluster needs to be version 1.7.2+ in order to support PV snapshotting of its managed disks.
 
-Label a node so that all nginx pods end up on the same machine (avoiding PV binding issues):
-```
-nginx_node_name=$(kubectl get nodes -o jsonpath='{.items[0].metadata.name}')
-kubectl label nodes $nginx_node_name app=nginx
-```
-
 Start the sample nginx app:
 ```
 kubectl apply -f examples/nginx-app/with-pv.yaml
@@ -329,7 +323,7 @@ kubectl label pv $nginx_pv_name app=nginx
 ```
 Now create a backup with PV snapshotting:
 ```
-ark backup create nginx-backup --selector app=nginx --snapshot-volumes
+ark backup create nginx-backup --selector app=nginx
 ```
 Simulate a disaster:
 ```
@@ -340,7 +334,7 @@ Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Del
 
 Now restore your lost resources:
 ```
-ark restore create nginx-backup --restore-volumes
+ark restore create nginx-backup
 ```
 
 [0]: /README.md#quickstart
@@ -365,3 +359,4 @@ ark restore create nginx-backup --restore-volumes
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
+
