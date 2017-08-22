@@ -31,7 +31,7 @@ import (
 
 func NewCommand(name string) *cobra.Command {
 	c := &cobra.Command{
-		Use: name,
+		Use:   name,
 		Short: "Back up and restore Kubernetes cluster resources.",
 		Long: `Heptio Ark is a tool for managing disaster recovery, specifically for
 Kubernetes cluster resources. It provides a simple, configurable,
@@ -52,6 +52,11 @@ associated data.`,
 
 	// add the glog flags
 	c.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+
+	// TODO: switch to a different logging library.
+	// Work around https://github.com/golang/glog/pull/13.
+	// See also https://github.com/kubernetes/kubernetes/issues/17162
+	flag.CommandLine.Parse([]string{})
 
 	return c
 }
