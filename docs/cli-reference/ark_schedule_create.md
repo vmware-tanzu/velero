@@ -8,7 +8,7 @@ Create a schedule
 Create a schedule
 
 ```
-ark schedule create NAME
+ark schedule create NAME [flags]
 ```
 
 ### Options
@@ -16,6 +16,7 @@ ark schedule create NAME
 ```
       --exclude-namespaces stringArray         namespaces to exclude from the backup
       --exclude-resources stringArray          resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io
+  -h, --help                                   help for create
       --include-namespaces stringArray         namespaces to include in the backup (use '*' for all namespaces) (default *)
       --include-resources stringArray          resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)
       --label-columns stringArray              a comma-separated list of labels to be displayed as columns

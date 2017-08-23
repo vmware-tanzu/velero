@@ -8,7 +8,13 @@ Delete a schedule
 Delete a schedule
 
 ```
-ark schedule delete NAME
+ark schedule delete NAME [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands

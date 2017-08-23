@@ -8,7 +8,13 @@ Print the ark version and associated image
 Print the ark version and associated image
 
 ```
-ark version
+ark version [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for version
 ```
 
 ### Options inherited from parent commands

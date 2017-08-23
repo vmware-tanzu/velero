@@ -11,6 +11,7 @@ type ArkV1Interface interface {
 	RESTClient() rest.Interface
 	BackupsGetter
 	ConfigsGetter
+	DownloadRequestsGetter
 	RestoresGetter
 	SchedulesGetter
 }
@@ -26,6 +27,10 @@ func (c *ArkV1Client) Backups(namespace string) BackupInterface {
 
 func (c *ArkV1Client) Configs(namespace string) ConfigInterface {
 	return newConfigs(c, namespace)
+}
+
+func (c *ArkV1Client) DownloadRequests(namespace string) DownloadRequestInterface {
+	return newDownloadRequests(c, namespace)
 }
 
 func (c *ArkV1Client) Restores(namespace string) RestoreInterface {

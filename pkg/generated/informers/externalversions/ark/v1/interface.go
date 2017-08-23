@@ -12,6 +12,8 @@ type Interface interface {
 	Backups() BackupInformer
 	// Configs returns a ConfigInformer.
 	Configs() ConfigInformer
+	// DownloadRequests returns a DownloadRequestInformer.
+	DownloadRequests() DownloadRequestInformer
 	// Restores returns a RestoreInformer.
 	Restores() RestoreInformer
 	// Schedules returns a ScheduleInformer.
@@ -35,6 +37,11 @@ func (v *version) Backups() BackupInformer {
 // Configs returns a ConfigInformer.
 func (v *version) Configs() ConfigInformer {
 	return &configInformer{factory: v.SharedInformerFactory}
+}
+
+// DownloadRequests returns a DownloadRequestInformer.
+func (v *version) DownloadRequests() DownloadRequestInformer {
+	return &downloadRequestInformer{factory: v.SharedInformerFactory}
 }
 
 // Restores returns a RestoreInformer.

@@ -18,6 +18,14 @@ type ConfigListerExpansion interface{}
 // ConfigNamespaceLister.
 type ConfigNamespaceListerExpansion interface{}
 
+// DownloadRequestListerExpansion allows custom methods to be added to
+// DownloadRequestLister.
+type DownloadRequestListerExpansion interface{}
+
+// DownloadRequestNamespaceListerExpansion allows custom methods to be added to
+// DownloadRequestNamespaceLister.
+type DownloadRequestNamespaceListerExpansion interface{}
+
 // RestoreListerExpansion allows custom methods to be added to
 // RestoreLister.
 type RestoreListerExpansion interface{}

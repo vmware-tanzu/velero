@@ -7,6 +7,12 @@ Work with restores
 
 Work with restores
 
+### Options
+
+```
+  -h, --help   help for restore
+```
+
 ### Options inherited from parent commands
 
 ```

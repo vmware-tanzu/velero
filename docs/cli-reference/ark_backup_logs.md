@@ -1,20 +1,21 @@
-## ark restore delete
+## ark backup logs
 
-Delete a restore
+Get backup logs
 
 ### Synopsis
 
 
-Delete a restore
+Get backup logs
 
 ```
-ark restore delete NAME [flags]
+ark backup logs BACKUP [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for delete
+  -h, --help               help for logs
+      --timeout duration   how long to wait to receive logs (default 1m0s)
 ```
 
 ### Options inherited from parent commands
@@ -31,5 +32,5 @@ ark restore delete NAME [flags]
 ```
 
 ### SEE ALSO
-* [ark restore](ark_restore.md)	 - Work with restores
+* [ark backup](ark_backup.md)	 - Work with backups
 
