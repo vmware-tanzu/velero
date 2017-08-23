@@ -15,9 +15,9 @@ While the [Quickstart][0] uses a local storage service to quickly set up Heptio 
   * [Basic example (no PVs)][10]
   * [Snapshot example (with PVs)][11]
 
-### AWS
+## AWS
 
-#### IAM user creation
+### IAM user creation
 
 To integrate Heptio Ark with AWS, you should follow the instructions below to create an Ark-specific [IAM user][14].
 
@@ -61,13 +61,14 @@ To integrate Heptio Ark with AWS, you should follow the instructions below to cr
     ```
 5. Using the output from the previous command, create an Ark-specific credentials file (`credentials-ark`) in your local directory that looks like the following:
 
+   **(Replace bracketed placeholders)**
     ```
     [default]
     aws_access_key_id=<AWS_ACCESS_KEY_ID>
     aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
     ```
 
-#### Generate YAML
+### Generate YAML
 
 In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
@@ -77,12 +78,16 @@ export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | s
 export HEPTIO_ARK_CLOUD_PROVIDER=aws
 ```
 
-You'll also need to set some info specific to AWS. For details on any particular variable, see the [Config definition][6]. Otherwise, run the following in your terminal, replacing bracketed placeholders as necessary:
+You'll also need to set some info specific to AWS. For details on any particular variable, see the [Config definition][6]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_S3_BUCKET>
 export HEPTIO_ARK_AWS_REGION=<YOUR_REGION>
 ```
 (Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_PV_ENABLED=1
 export HEPTIO_ARK_AWS_AVAILABILITY_ZONE=<YOUR_AVAILABILITY_ZONE>
@@ -94,7 +99,7 @@ make generate-examples
 ```
 You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
 
-#### Credentials and configuration
+### Credentials and configuration
 
 In the Ark root directory, run the following to first set up namespaces:
 ```
@@ -109,9 +114,9 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-### GCP
+## GCP
 
-#### Service account creation
+### Service account creation
 
 To integrate Heptio Ark with GCP, you should follow the instructions below to create an Ark-specific [Service Account][15].
 
@@ -155,7 +160,7 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
         --iam-account $SERVICE_ACCOUNT_EMAIL
     ```
 
-#### Generate YAML
+### Generate YAML
 
 In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
@@ -165,11 +170,15 @@ export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | s
 export HEPTIO_ARK_CLOUD_PROVIDER=gcp
 ```
 
-You'll also need to set some info specific to GCP. For details on any particular variable, see the [Config definition][7]. Otherwise, run the following in your terminal, replacing bracketed placeholders as necessary:
+You'll also need to set some info specific to GCP. For details on any particular variable, see the [Config definition][7]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_BUCKET>
 ```
 (Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_PV_ENABLED=1
 export HEPTIO_ARK_GCP_PROJECT=<YOUR_PROJECT>
@@ -182,7 +191,7 @@ make generate-examples
 ```
 You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
 
-#### Credentials and configuration
+### Credentials and configuration
 
 In the Ark root directory, run the following to first set up namespaces:
 ```
@@ -197,9 +206,9 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-### Azure
+## Azure
 
-#### Service principal creation
+### Service principal creation
 To integrate Heptio Ark with Azure, you should follow the instructions below to create an Ark-specific [service principal][17].
 
 1. If you do not have the `az` Azure CLI 2.0 locally installed, follow the [user guide][18] to set it up. Once done, run:
@@ -259,7 +268,7 @@ To integrate Heptio Ark with Azure, you should follow the instructions below to 
     ```
     Set `$AZURE_STORAGE_KEY` to any one of the `value`s returned.
 
-#### Generate YAML
+### Generate YAML
 
 In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
@@ -269,11 +278,15 @@ export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | s
 export HEPTIO_ARK_CLOUD_PROVIDER=azure
 ```
 
-You'll also need to set some info specific to Azure. For details on any particular variable, see the [Config definition][8]. Otherwise, run the following in your terminal, replacing bracketed placeholders as necessary:
+You'll also need to set some info specific to Azure. For details on any particular variable, see the [Config definition][8]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_BUCKET>
 ```
 (Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
 ```
 export HEPTIO_ARK_PV_ENABLED=1
 export HEPTIO_ARK_AZURE_LOCATION=<YOUR_LOCATION>
@@ -286,7 +299,7 @@ make generate-examples
 ```
 You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
 
-#### Credentials and configuration
+### Credentials and configuration
 
 In the Ark root directory, run the following to first set up namespaces:
 ```
