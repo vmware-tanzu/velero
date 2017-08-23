@@ -17,8 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"errors"
 	"fmt"
-	"regexp"
 
 	"github.com/golang/glog"
 
@@ -26,7 +26,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 // volumeSnapshotAction is a struct that knows how to take snapshots of PersistentVolumes
@@ -38,11 +38,15 @@ type volumeSnapshotAction struct {
 
 var _ Action = &volumeSnapshotAction{}
 
-func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) Action {
+func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Action, error) {
+	if snapshotService == nil {
+		return nil, errors.New("snapshotService cannot be nil")
+	}
+
 	return &volumeSnapshotAction{
 		snapshotService: snapshotService,
 		clock:           clock.RealClock{},
-	}
+	}, nil
 }
 
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
@@ -50,7 +54,7 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) Acti
 // disk type and IOPS (if applicable) to be able to restore to current state later.
 func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *api.Backup) error {
 	backupName := fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)
-	if !backup.Spec.SnapshotVolumes {
+	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
 		glog.V(2).Infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
 		return nil
 	}
@@ -58,14 +62,20 @@ func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *ap
 	metadata := volume["metadata"].(map[string]interface{})
 	name := metadata["name"].(string)
 
-	volumeID := getVolumeID(volume)
+	volumeID, err := kubeutil.GetVolumeID(volume)
+	// non-nil error means it's a supported PV source but volume ID can't be found
+	if err != nil {
+		return fmt.Errorf("error getting volume ID for backup %q, PersistentVolume %q: %v", backupName, name, err)
+	}
+	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {
-		return fmt.Errorf("unable to determine volume ID for backup %q, PersistentVolume %q", backupName, name)
+		glog.V(2).Infof("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
+		return nil
 	}
 
 	expiration := a.clock.Now().Add(backup.Spec.TTL.Duration)
 
-	glog.Infof("Backup %q: snapshotting PersistenVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
+	glog.Infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
 
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID)
 	if err != nil {
@@ -90,39 +100,4 @@ func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *ap
 	}
 
 	return nil
-}
-
-var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
-
-func getVolumeID(pv map[string]interface{}) string {
-	spec, err := collections.GetMap(pv, "spec")
-	if err != nil {
-		return ""
-	}
-
-	if aws, err := collections.GetMap(spec, "awsElasticBlockStore"); err == nil {
-		volumeID, err := collections.GetString(aws, "volumeID")
-		if err != nil {
-			return ""
-		}
-		return ebsVolumeIDRegex.FindString(volumeID)
-	}
-
-	if gce, err := collections.GetMap(spec, "gcePersistentDisk"); err == nil {
-		volumeID, err := collections.GetString(gce, "pdName")
-		if err != nil {
-			return ""
-		}
-		return volumeID
-	}
-
-	if gce, err := collections.GetMap(spec, "azureDisk"); err == nil {
-		volumeID, err := collections.GetString(gce, "diskName")
-		if err != nil {
-			return ""
-		}
-		return volumeID
-	}
-
-	return ""
 }

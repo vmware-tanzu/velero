@@ -54,6 +54,7 @@ func TestProcessBackup(t *testing.T) {
 		expectedExcludes []string
 		backup           *TestBackup
 		expectBackup     bool
+		allowSnapshots   bool
 	}{
 		{
 			name:        "bad key",
@@ -129,6 +130,20 @@ func TestProcessBackup(t *testing.T) {
 			expectedIncludes: []string{"*"},
 			expectBackup:     true,
 		},
+		{
+			name:         "backup with SnapshotVolumes when allowSnapshots=false fails validation",
+			key:          "heptio-ark/backup1",
+			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			expectBackup: false,
+		},
+		{
+			name:             "backup with SnapshotVolumes when allowSnapshots=true gets executed",
+			key:              "heptio-ark/backup1",
+			backup:           NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			allowSnapshots:   true,
+			expectedIncludes: []string{"*"},
+			expectBackup:     true,
+		},
 	}
 
 	// flag.Set("logtostderr", "true")
@@ -150,6 +165,7 @@ func TestProcessBackup(t *testing.T) {
 				backupper,
 				cloudBackups,
 				"bucket",
+				test.allowSnapshots,
 			).(*backupController)
 			c.clock = clock.NewFakeClock(time.Now())
 
@@ -180,6 +196,7 @@ func TestProcessBackup(t *testing.T) {
 				}
 
 				backup.Spec.IncludedNamespaces = expectedNSes
+				backup.Spec.SnapshotVolumes = test.backup.Spec.SnapshotVolumes
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
 				backup.Status.Version = 1
@@ -226,6 +243,7 @@ func TestProcessBackup(t *testing.T) {
 						WithExcludedResources(test.expectedExcludes...).
 						WithIncludedNamespaces(expectedNSes...).
 						WithTTL(test.backup.Spec.TTL.Duration).
+						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).
 						WithVersion(1).
 						Backup,
@@ -241,6 +259,7 @@ func TestProcessBackup(t *testing.T) {
 						WithExcludedResources(test.expectedExcludes...).
 						WithIncludedNamespaces(expectedNSes...).
 						WithTTL(test.backup.Spec.TTL.Duration).
+						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).
 						WithVersion(1).
 						Backup,

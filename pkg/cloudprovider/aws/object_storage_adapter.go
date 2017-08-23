@@ -17,9 +17,11 @@ limitations under the License.
 package aws
 
 import (
+	"errors"
 	"io"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -30,6 +32,40 @@ var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 type objectStorageAdapter struct {
 	s3       *s3.S3
 	kmsKeyID string
+}
+
+func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStorageAdapter, error) {
+	if region == "" {
+		return nil, errors.New("missing region in aws configuration in config file")
+	}
+
+	awsConfig := aws.NewConfig().
+		WithRegion(region).
+		WithS3ForcePathStyle(s3ForcePathStyle)
+
+	if s3URL != "" {
+		awsConfig = awsConfig.WithEndpointResolver(
+			endpoints.ResolverFunc(func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+				if service == endpoints.S3ServiceID {
+					return endpoints.ResolvedEndpoint{
+						URL: s3URL,
+					}, nil
+				}
+
+				return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
+			}),
+		)
+	}
+
+	sess, err := getSession(awsConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return &objectStorageAdapter{
+		s3:       s3.New(sess),
+		kmsKeyID: kmsKeyID,
+	}, nil
 }
 
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {

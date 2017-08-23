@@ -46,27 +46,27 @@ func (nsr *namespaceRestorer) Handles(obj runtime.Unstructured, restore *api.Res
 	return false
 }
 
-func (nsr *namespaceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (nsr *namespaceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	updated, err := resetMetadataAndStatus(obj, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	currentName, err := collections.GetString(obj.UnstructuredContent(), "metadata.name")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if newName, mapped := restore.Spec.NamespaceMapping[currentName]; mapped {
 		metadata["name"] = newName
 	}
 
-	return updated, nil
+	return updated, nil, nil
 }
 
 func (nsr *namespaceRestorer) Wait() bool {

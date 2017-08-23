@@ -63,10 +63,3 @@ type BlockStorageAdapter interface {
 	// DeleteSnapshot deletes the specified volume snapshot.
 	DeleteSnapshot(snapshotID string) error
 }
-
-// StorageAdapter exposes object- and block-storage interfaces and associated methods
-// for a given storage provider.
-type StorageAdapter interface {
-	ObjectStorage() ObjectStorageAdapter
-	BlockStorage() BlockStorageAdapter
-}

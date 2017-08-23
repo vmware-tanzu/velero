@@ -18,14 +18,11 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 
@@ -242,112 +239,108 @@ func (s *server) watchConfig(config *api.Config) {
 
 func (s *server) initBackupService(config *api.Config) error {
 	glog.Infof("Configuring cloud provider for backup service")
-	cloud, err := initCloud(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider")
+	objectStorage, err := getObjectStorageProvider(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider")
 	if err != nil {
 		return err
 	}
-	s.backupService = cloudprovider.NewBackupService(cloud.ObjectStorage())
+
+	s.backupService = cloudprovider.NewBackupService(objectStorage)
 	return nil
 }
 
 func (s *server) initSnapshotService(config *api.Config) error {
+	if config.PersistentVolumeProvider == nil {
+		glog.Infof("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
+		return nil
+	}
+
 	glog.Infof("Configuring cloud provider for snapshot service")
-	cloud, err := initCloud(config.PersistentVolumeProvider, "persistentVolumeProvider")
+	blockStorage, err := getBlockStorageProvider(*config.PersistentVolumeProvider, "persistentVolumeProvider")
 	if err != nil {
 		return err
 	}
-	s.snapshotService = cloudprovider.NewSnapshotService(cloud.BlockStorage())
+	s.snapshotService = cloudprovider.NewSnapshotService(blockStorage)
 	return nil
 }
 
-func initCloud(config api.CloudProviderConfig, field string) (cloudprovider.StorageAdapter, error) {
+func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
+	found := false
+
+	if cloudConfig.AWS != nil {
+		found = true
+	}
+
+	if cloudConfig.GCP != nil {
+		if found {
+			return false
+		}
+		found = true
+	}
+
+	if cloudConfig.Azure != nil {
+		if found {
+			return false
+		}
+		found = true
+	}
+
+	return found
+}
+
+func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.ObjectStorageAdapter, error) {
 	var (
-		cloud cloudprovider.StorageAdapter
-		err   error
+		objectStorage cloudprovider.ObjectStorageAdapter
+		err           error
 	)
 
-	if config.AWS != nil {
-		cloud, err = getAWSCloudProvider(config)
+	if !hasOneCloudProvider(cloudConfig) {
+		return nil, fmt.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
 	}
 
-	if config.GCP != nil {
-		if cloud != nil {
-			return nil, fmt.Errorf("you may only specify one of aws, gcp, or azure for %s", field)
-		}
-		cloud, err = getGCPCloudProvider(config)
-	}
-
-	if config.Azure != nil {
-		if cloud != nil {
-			return nil, fmt.Errorf("you may only specify one of aws, gcp, or azure for %s", field)
-		}
-		cloud, err = getAzureCloudProvider(config)
+	switch {
+	case cloudConfig.AWS != nil:
+		objectStorage, err = arkaws.NewObjectStorageAdapter(
+			cloudConfig.AWS.Region,
+			cloudConfig.AWS.S3Url,
+			cloudConfig.AWS.KMSKeyID,
+			cloudConfig.AWS.S3ForcePathStyle)
+	case cloudConfig.GCP != nil:
+		objectStorage, err = gcp.NewObjectStorageAdapter()
+	case cloudConfig.Azure != nil:
+		objectStorage, err = azure.NewObjectStorageAdapter()
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	if cloud == nil {
-		return nil, fmt.Errorf("you must specify one of aws, gcp, or azure for %s", field)
-	}
-
-	return cloud, err
+	return objectStorage, nil
 }
 
-func getAWSCloudProvider(cloudConfig api.CloudProviderConfig) (cloudprovider.StorageAdapter, error) {
-	if cloudConfig.AWS == nil {
-		return nil, errors.New("missing aws configuration in config file")
-	}
-	if cloudConfig.AWS.Region == "" {
-		return nil, errors.New("missing region in aws configuration in config file")
-	}
-	if cloudConfig.AWS.AvailabilityZone == "" {
-		return nil, errors.New("missing availabilityZone in aws configuration in config file")
+func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.BlockStorageAdapter, error) {
+	var (
+		blockStorage cloudprovider.BlockStorageAdapter
+		err          error
+	)
+
+	if !hasOneCloudProvider(cloudConfig) {
+		return nil, fmt.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
 	}
 
-	awsConfig := aws.NewConfig().
-		WithRegion(cloudConfig.AWS.Region).
-		WithS3ForcePathStyle(cloudConfig.AWS.S3ForcePathStyle)
-
-	if cloudConfig.AWS.S3Url != "" {
-		awsConfig = awsConfig.WithEndpointResolver(
-			endpoints.ResolverFunc(func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-				if service == endpoints.S3ServiceID {
-					return endpoints.ResolvedEndpoint{
-						URL: cloudConfig.AWS.S3Url,
-					}, nil
-				}
-
-				return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
-			}),
-		)
+	switch {
+	case cloudConfig.AWS != nil:
+		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region, cloudConfig.AWS.AvailabilityZone)
+	case cloudConfig.GCP != nil:
+		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project, cloudConfig.GCP.Zone)
+	case cloudConfig.Azure != nil:
+		blockStorage, err = azure.NewBlockStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
 	}
 
-	return arkaws.NewStorageAdapter(awsConfig, cloudConfig.AWS.AvailabilityZone, cloudConfig.AWS.KMSKeyID)
-}
+	if err != nil {
+		return nil, err
+	}
 
-func getGCPCloudProvider(cloudConfig api.CloudProviderConfig) (cloudprovider.StorageAdapter, error) {
-	if cloudConfig.GCP == nil {
-		return nil, errors.New("missing gcp configuration in config file")
-	}
-	if cloudConfig.GCP.Project == "" {
-		return nil, errors.New("missing project in gcp configuration in config file")
-	}
-	if cloudConfig.GCP.Zone == "" {
-		return nil, errors.New("missing zone in gcp configuration in config file")
-	}
-	return gcp.NewStorageAdapter(cloudConfig.GCP.Project, cloudConfig.GCP.Zone)
-}
-
-func getAzureCloudProvider(cloudConfig api.CloudProviderConfig) (cloudprovider.StorageAdapter, error) {
-	if cloudConfig.Azure == nil {
-		return nil, errors.New("missing azure configuration in config file")
-	}
-	if cloudConfig.Azure.Location == "" {
-		return nil, errors.New("missing location in azure configuration in config file")
-	}
-	return azure.NewStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
+	return blockStorage, nil
 }
 
 func durationMin(a, b time.Duration) time.Duration {
@@ -408,6 +401,7 @@ func (s *server) runControllers(config *api.Config) error {
 			backupper,
 			s.backupService,
 			config.BackupStorageProvider.Bucket,
+			s.snapshotService != nil,
 		)
 		wg.Add(1)
 		go func() {
@@ -461,6 +455,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.snapshotService != nil,
 	)
 	wg.Add(1)
 	go func() {
@@ -490,7 +485,12 @@ func newBackupper(
 	actions := map[string]backup.Action{}
 
 	if snapshotService != nil {
-		actions["persistentvolumes"] = backup.NewVolumeSnapshotAction(snapshotService)
+		action, err := backup.NewVolumeSnapshotAction(snapshotService)
+		if err != nil {
+			return nil, err
+		}
+
+		actions["persistentvolumes"] = action
 	}
 
 	return backup.NewKubernetesBackupper(

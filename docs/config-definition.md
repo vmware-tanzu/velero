@@ -25,17 +25,12 @@ metadata:
   name: default
 persistentVolumeProvider:
   aws:
-    region: minio
-    availabilityZone: minio
-    s3ForcePathStyle: true
-    s3Url: http://minio:9000
+    region: us-west-2
+    availabilityZone: us-west-2a
 backupStorageProvider:
   bucket: ark
   aws:
-    region: minio
-    availabilityZone: minio
-    s3ForcePathStyle: true
-    s3Url: http://minio:9000
+    region: us-west-2
 backupSyncPeriod: 60m
 gcSyncPeriod: 60m
 scheduleSyncPeriod: 1m
@@ -50,7 +45,7 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `persistentVolumeProvider` | CloudProviderConfig<br><br>(Supported key values are `aws`, `gcp`, and `azure`, but only one can be present. See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs.) | Required Field | The specification for whichever cloud provider the cluster is using for persistent volumes (to be snapshotted).<br><br> *NOTE*: For Azure, your Kubernetes cluster needs to be version 1.7.2+ in order to support PV snapshotting of its managed disks. |
+| `persistentVolumeProvider` | CloudProviderConfig<br><br>(Supported key values are `aws`, `gcp`, and `azure`, but only one can be present. See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs.) | None (Optional) | The specification for whichever cloud provider the cluster is using for persistent volumes (to be snapshotted), if any.<br><br>If not specified, Backups and Restores requesting PV snapshots & restores, respectively, are considered invalid. <br><br> *NOTE*: For Azure, your Kubernetes cluster needs to be version 1.7.2+ in order to support PV snapshotting of its managed disks. |
 | `backupStorageProvider`/(inline) | CloudProviderConfig<br><br>(Supported key values are `aws`, `gcp`, and `azure`, but only one can be present. See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs.) | Required Field | The specification for whichever cloud provider will be used to actually store the backups. |
 | `backupStorageProvider/bucket` | String | Required Field | The storage bucket where backups are to be uploaded. |
 | `backupSyncPeriod` | metav1.Duration | 60m0s | How frequently Ark queries the object storage to make sure that the appropriate Backup resources have been created for existing backup files. |
@@ -63,22 +58,44 @@ The configurable parameters are as follows:
 
 **(Or other S3-compatible storage)**
 
+#### backupStorageProvider
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `region` | string | Required Field | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list. |
+| `disableSSL` | bool | `false` | Set this to `true` if you are using Minio (or another local, S3-compatible storage service) and your deployment is not secured. |
+| `s3ForcePathStyle` | bool | `false` | Set this to `true` if you are using a local storage service like Minio. |
+| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local storage services like Minio.|
+| `kmsKeyID` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f"<br><br>Specify an [AWS KMS key][12] id to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
+
+#### persistentVolumeProvider (AWS Only)
+
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `region` | string | Required Field | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list. |
 | `availabilityZone` | string | Required Field | *Example*: "us-east-1a"<br><br>See [AWS documentation][4] for details. |
-| `disableSSL` | bool | `false` | Set this to `true` if you are using Minio (or another local, S3-compatible storage service) and your deployment is not secured. |
-| `s3ForcePathStyle` | bool | `false` | Set this to `true` if you are using a local storage service like Minio. |
-| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local sotrage services like Minio.|
-| `kmsKeyID` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f"<br><br>Specify an [AWS KMS key][12] id to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
 
 ### GCP
+
+#### backupStorageProvider
+
+No parameters required; specify an empty object per [example file][13].
+
+#### persistentVolumeProvider
+
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `project` | string | Required Field | *Example*: "project-example-3jsn23"<br><br> See the [Project ID documentation][5] for details. |
 | `zone` | string | Required Field | *Example*: "us-central1-a"<br><br>See [GCP documentation][6] for the full list. |
 
 ### Azure
+
+#### backupStorageProvider
+
+No parameters required; specify an empty object per [example file][14].
+
+#### persistentVolumeProvider
+
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `location` | string | Required Field | *Example*: "Canada East"<br><br>See [the list of available locations][7] (note that this particular page refers to them as "Regions"). |
@@ -97,4 +114,6 @@ The configurable parameters are as follows:
 [10]: #overview
 [11]: #example
 [12]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+[13]: ../examples/gcp/00-ark-config.yaml
+[14]: ../examples/azure/10-ark-config.yaml
 

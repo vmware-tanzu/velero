@@ -35,21 +35,21 @@ func (sr *serviceRestorer) Handles(obj runtime.Unstructured, restore *api.Restor
 	return true
 }
 
-func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	if _, err := resetMetadataAndStatus(obj, true); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	delete(spec, "clusterIP")
 
 	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	for _, port := range ports {
@@ -57,7 +57,7 @@ func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restor
 		delete(p, "nodePort")
 	}
 
-	return obj, nil
+	return obj, nil, nil
 }
 
 func (sr *serviceRestorer) Wait() bool {

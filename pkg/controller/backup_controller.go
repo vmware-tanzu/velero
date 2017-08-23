@@ -49,9 +49,10 @@ import (
 const backupVersion = 1
 
 type backupController struct {
-	backupper     backup.Backupper
-	backupService cloudprovider.BackupService
-	bucket        string
+	backupper        backup.Backupper
+	backupService    cloudprovider.BackupService
+	bucket           string
+	pvProviderExists bool
 
 	lister       listers.BackupLister
 	listerSynced cache.InformerSynced
@@ -68,11 +69,13 @@ func NewBackupController(
 	backupper backup.Backupper,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	pvProviderExists bool,
 ) Interface {
 	c := &backupController{
-		backupper:     backupper,
-		backupService: backupService,
-		bucket:        bucket,
+		backupper:        backupper,
+		backupService:    backupService,
+		bucket:           bucket,
+		pvProviderExists: pvProviderExists,
 
 		lister:       backupInformer.Lister(),
 		listerSynced: backupInformer.Informer().HasSynced,
@@ -295,6 +298,10 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 
 	for err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+	}
+
+	if !controller.pvProviderExists && itm.Spec.SnapshotVolumes != nil && *itm.Spec.SnapshotVolumes {
+		validationErrors = append(validationErrors, "Server is not configured for PV snapshots")
 	}
 
 	return validationErrors

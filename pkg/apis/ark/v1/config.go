@@ -35,8 +35,8 @@ type Config struct {
 	metav1.ObjectMeta `json:"metadata"`
 
 	// PersistentVolumeProvider is the configuration information for the cloud where
-	// the cluster is running and has PersistentVolumes to snapshot or restore.
-	PersistentVolumeProvider CloudProviderConfig `json:"persistentVolumeProvider"`
+	// the cluster is running and has PersistentVolumes to snapshot or restore. Optional.
+	PersistentVolumeProvider *CloudProviderConfig `json:"persistentVolumeProvider"`
 
 	// BackupStorageProvider is the configuration information for the cloud where
 	// Ark backups are stored in object storage. This may be a different cloud than

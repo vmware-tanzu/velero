@@ -31,16 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	. "github.com/heptio/ark/pkg/util/test"
 )
 
 type gcTest struct {
-	name      string
-	bucket    string
-	backups   map[string][]*api.Backup
-	snapshots sets.String
+	name               string
+	bucket             string
+	backups            map[string][]*api.Backup
+	snapshots          sets.String
+	nilSnapshotService bool
 
 	expectedBackupsRemaining   map[string]sets.String
 	expectedSnapshotsRemaining sets.String
@@ -149,11 +151,38 @@ func TestGarbageCollect(t *testing.T) {
 			expectedBackupsRemaining:   make(map[string]sets.String),
 			expectedSnapshotsRemaining: sets.NewString("snapshot-3", "snapshot-4"),
 		},
+		gcTest{
+			name:   "no snapshot service only GC's backups without snapshots",
+			bucket: "bucket-1",
+			backups: map[string][]*api.Backup{
+				"bucket-1": []*api.Backup{
+					NewTestBackup().WithName("backup-1").
+						WithExpiration(fakeClock.Now().Add(-1*time.Second)).
+						WithSnapshot("pv-1", "snapshot-1").
+						WithSnapshot("pv-2", "snapshot-2").
+						Backup,
+					NewTestBackup().WithName("backup-2").
+						WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
+						Backup,
+				},
+			},
+			snapshots:          sets.NewString("snapshot-1", "snapshot-2"),
+			nilSnapshotService: true,
+			expectedBackupsRemaining: map[string]sets.String{
+				"bucket-1": sets.NewString("backup-1"),
+			},
+		},
 	}
 
 	for _, test := range tests {
-		backupService := &fakeBackupService{}
-		snapshotService := &FakeSnapshotService{}
+		var (
+			backupService   = &fakeBackupService{}
+			snapshotService *FakeSnapshotService
+		)
+
+		if !test.nilSnapshotService {
+			snapshotService = &FakeSnapshotService{SnapshotsTaken: test.snapshots}
+		}
 
 		t.Run(test.name, func(t *testing.T) {
 			backupService.backupsByBucket = make(map[string][]*api.Backup)
@@ -167,16 +196,19 @@ func TestGarbageCollect(t *testing.T) {
 				backupService.backupsByBucket[bucket] = data
 			}
 
-			snapshotService.SnapshotsTaken = test.snapshots
-
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				snapSvc         cloudprovider.SnapshotService
 			)
+
+			if snapshotService != nil {
+				snapSvc = snapshotService
+			}
 
 			controller := NewGCController(
 				backupService,
-				snapshotService,
+				snapSvc,
 				test.bucket,
 				1*time.Millisecond,
 				sharedInformers.Ark().V1().Backups(),
@@ -202,7 +234,9 @@ func TestGarbageCollect(t *testing.T) {
 				assert.Equal(t, test.expectedBackupsRemaining[bucket], backupNames)
 			}
 
-			assert.Equal(t, test.expectedSnapshotsRemaining, snapshotService.SnapshotsTaken)
+			if !test.nilSnapshotService {
+				assert.Equal(t, test.expectedSnapshotsRemaining, snapshotService.SnapshotsTaken)
+			}
 		})
 	}
 }

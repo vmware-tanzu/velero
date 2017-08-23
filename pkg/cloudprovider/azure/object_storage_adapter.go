@@ -34,6 +34,21 @@ type objectStorageAdapter struct {
 
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 
+func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
+	cfg := getConfig()
+
+	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
+	if err != nil {
+		return nil, err
+	}
+
+	blobClient := storageClient.GetBlobService()
+
+	return &objectStorageAdapter{
+		blobClient: &blobClient,
+	}, nil
+}
+
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
 	container, err := getContainerReference(op.blobClient, bucket)
 	if err != nil {

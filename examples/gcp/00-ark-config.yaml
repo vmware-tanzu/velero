@@ -24,9 +24,7 @@ persistentVolumeProvider:
     zone: <YOUR_ZONE>
 backupStorageProvider:
   bucket: <YOUR_BUCKET>
-  gcp:
-    project: <YOUR_PROJECT>
-    zone: <YOUR_ZONE>
+  gcp: {}
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m

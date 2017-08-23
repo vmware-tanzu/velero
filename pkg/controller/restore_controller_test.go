@@ -42,6 +42,7 @@ func TestProcessRestore(t *testing.T) {
 		restore                *api.Restore
 		backup                 *api.Backup
 		restorerError          error
+		allowRestoreSnapshots  bool
 		expectedErr            bool
 		expectedRestoreUpdates []*api.Restore
 		expectedRestorerCall   *api.Restore
@@ -137,6 +138,28 @@ func TestProcessRestore(t *testing.T) {
 			},
 			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("*").Restore,
 		},
+		{
+			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
+			restore:               NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			backup:                NewTestBackup().WithName("backup-1").Backup,
+			allowRestoreSnapshots: true,
+			expectedErr:           false,
+			expectedRestoreUpdates: []*api.Restore{
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			},
+			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+		},
+		{
+			name:        "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			backup:      NewTestBackup().WithName("backup-1").Backup,
+			expectedErr: false,
+			expectedRestoreUpdates: []*api.Restore{
+				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).
+					WithValidationError("Server is not configured for PV snapshot restores").Restore,
+			},
+		},
 	}
 
 	// flag.Set("logtostderr", "true")
@@ -160,6 +183,7 @@ func TestProcessRestore(t *testing.T) {
 				backupSvc,
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
+				test.allowRestoreSnapshots,
 			).(*restoreController)
 
 			if test.restore != nil {

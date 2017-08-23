@@ -432,7 +432,10 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 			continue
 		}
 
-		preparedObj, err := restorer.Prepare(obj, restore, backup)
+		preparedObj, warning, err := restorer.Prepare(obj, restore, backup)
+		if warning != nil {
+			addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, warning))
+		}
 		if err != nil {
 			addToResult(&errors, namespace, fmt.Errorf("error preparing %s: %v", fullPath, err))
 			continue

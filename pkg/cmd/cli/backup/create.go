@@ -56,7 +56,7 @@ func NewCreateCommand(f client.Factory) *cobra.Command {
 type CreateOptions struct {
 	Name              string
 	TTL               time.Duration
-	SnapshotVolumes   bool
+	SnapshotVolumes   flag.OptionalBool
 	IncludeNamespaces flag.StringArray
 	ExcludeNamespaces flag.StringArray
 	IncludeResources  flag.StringArray
@@ -70,19 +70,22 @@ func NewCreateOptions() *CreateOptions {
 		TTL:               24 * time.Hour,
 		IncludeNamespaces: flag.NewStringArray("*"),
 		Labels:            flag.NewMap(),
-		SnapshotVolumes:   true,
+		SnapshotVolumes:   flag.NewOptionalBool(nil),
 	}
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.TTL, "ttl", o.TTL, "how long before the backup can be garbage collected")
-	flags.BoolVar(&o.SnapshotVolumes, "snapshot-volumes", o.SnapshotVolumes, "take snapshots of PersistentVolumes as part of the backup")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the backup (use '*' for all namespaces)")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the backup")
 	flags.Var(&o.IncludeResources, "include-resources", "resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
+	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
+	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
+	// like a normal bool flag
+	f.NoOptDefVal = "true"
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
@@ -120,7 +123,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			IncludedResources:  o.IncludeResources,
 			ExcludedResources:  o.ExcludeResources,
 			LabelSelector:      o.Selector.LabelSelector,
-			SnapshotVolumes:    o.SnapshotVolumes,
+			SnapshotVolumes:    o.SnapshotVolumes.Value,
 			TTL:                metav1.Duration{Duration: o.TTL},
 		},
 	}

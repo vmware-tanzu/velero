@@ -38,9 +38,9 @@ type RestoreSpec struct {
 	// or nil, all objects are included. Optional.
 	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
 
-	// RestorePVs is a bool defining whether to restore all included
-	// PVs from snapshot (via the cloudprovider). Default false.
-	RestorePVs bool `json:"restorePVs"`
+	// RestorePVs specifies whether to restore all included
+	// PVs from snapshot (via the cloudprovider).
+	RestorePVs *bool `json:"restorePVs"`
 }
 
 // RestorePhase is a string representation of the lifecycle phase

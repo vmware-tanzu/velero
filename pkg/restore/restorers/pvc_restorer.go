@@ -35,8 +35,10 @@ func (sr *persistentVolumeClaimRestorer) Handles(obj runtime.Unstructured, resto
 	return true
 }
 
-func (sr *persistentVolumeClaimRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
-	return resetMetadataAndStatus(obj, true)
+func (sr *persistentVolumeClaimRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
+	res, err := resetMetadataAndStatus(obj, true)
+
+	return res, nil, err
 }
 
 func (sr *persistentVolumeClaimRestorer) Wait() bool {

@@ -37,11 +37,11 @@ func (r *jobRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bo
 	return true
 }
 
-func (r *jobRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (r *jobRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	glog.V(4).Infof("resetting metadata and status")
 	_, err := resetMetadataAndStatus(obj, true)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	glog.V(4).Infof("getting spec.selector.matchLabels")
@@ -59,7 +59,7 @@ func (r *jobRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, ba
 		delete(templateLabels, "controller-uid")
 	}
 
-	return obj, nil
+	return obj, nil, nil
 }
 
 func (r *jobRestorer) Wait() bool {

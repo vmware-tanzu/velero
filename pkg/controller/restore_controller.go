@@ -42,11 +42,12 @@ import (
 )
 
 type restoreController struct {
-	restoreClient arkv1client.RestoresGetter
-	backupClient  arkv1client.BackupsGetter
-	restorer      restore.Restorer
-	backupService cloudprovider.BackupService
-	bucket        string
+	restoreClient    arkv1client.RestoresGetter
+	backupClient     arkv1client.BackupsGetter
+	restorer         restore.Restorer
+	backupService    cloudprovider.BackupService
+	bucket           string
+	pvProviderExists bool
 
 	backupLister        listers.BackupLister
 	backupListerSynced  cache.InformerSynced
@@ -64,6 +65,7 @@ func NewRestoreController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	backupInformer informers.BackupInformer,
+	pvProviderExists bool,
 ) Interface {
 	c := &restoreController{
 		restoreClient:       restoreClient,
@@ -71,6 +73,7 @@ func NewRestoreController(
 		restorer:            restorer,
 		backupService:       backupService,
 		bucket:              bucket,
+		pvProviderExists:    pvProviderExists,
 		backupLister:        backupInformer.Lister(),
 		backupListerSynced:  backupInformer.Informer().HasSynced,
 		restoreLister:       restoreInformer.Lister(),
@@ -273,6 +276,10 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	}
+
+	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {
+		validationErrors = append(validationErrors, "Server is not configured for PV snapshot restores")
 	}
 
 	return validationErrors

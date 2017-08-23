@@ -25,6 +25,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/util/collections"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 type persistentVolumeRestorer struct {
@@ -43,31 +44,79 @@ func (sr *persistentVolumeRestorer) Handles(obj runtime.Unstructured, restore *a
 	return true
 }
 
-func (sr *persistentVolumeRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error) {
+func (sr *persistentVolumeRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
 	if _, err := resetMetadataAndStatus(obj, false); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	delete(spec, "claimRef")
 	delete(spec, "storageClassName")
 
-	if restore.Spec.RestorePVs {
-		volumeID, err := sr.restoreVolume(obj.UnstructuredContent(), restore, backup)
-		if err != nil {
-			return nil, err
+	pvName, err := collections.GetString(obj.UnstructuredContent(), "metadata.name")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// if it's an unsupported volume type for snapshot restores, we're done
+	if sourceType, _ := kubeutil.GetPVSource(spec); sourceType == "" {
+		return obj, nil, nil
+	}
+
+	restoreFromSnapshot := false
+
+	if restore.Spec.RestorePVs != nil && *restore.Spec.RestorePVs {
+		// when RestorePVs = yes, it's an error if we don't have a snapshot service
+		if sr.snapshotService == nil {
+			return nil, nil, errors.New("PV restorer is not configured for PV snapshot restores")
 		}
 
-		if err := setVolumeID(spec, volumeID); err != nil {
-			return nil, err
+		// if there are no snapshots in the backup, return without error
+		if backup.Status.VolumeBackups == nil {
+			return obj, nil, nil
+		}
+
+		// if there are snapshots, and this is a supported PV type, but there's no
+		// snapshot for this PV, it's an error
+		if backup.Status.VolumeBackups[pvName] == nil {
+			return nil, nil, fmt.Errorf("no snapshot found to restore volume %s from", pvName)
+		}
+
+		restoreFromSnapshot = true
+	}
+	if restore.Spec.RestorePVs == nil && sr.snapshotService != nil {
+		// when RestorePVs = Auto, don't error if the backup doesn't have snapshots
+		if backup.Status.VolumeBackups == nil || backup.Status.VolumeBackups[pvName] == nil {
+			return obj, nil, nil
+		}
+
+		restoreFromSnapshot = true
+	}
+
+	if restoreFromSnapshot {
+		backupInfo := backup.Status.VolumeBackups[pvName]
+
+		volumeID, err := sr.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.Iops)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := kubeutil.SetVolumeID(spec, volumeID); err != nil {
+			return nil, nil, err
 		}
 	}
 
-	return obj, nil
+	var warning error
+
+	if sr.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
+		warning = errors.New("unable to restore PV snapshots: Ark server is not configured with a PersistentVolumeProvider")
+	}
+
+	return obj, warning, nil
 }
 
 func (sr *persistentVolumeRestorer) Wait() bool {
@@ -78,40 +127,4 @@ func (sr *persistentVolumeRestorer) Ready(obj runtime.Unstructured) bool {
 	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
 
 	return err == nil && phase == "Available"
-}
-
-func setVolumeID(spec map[string]interface{}, volumeID string) error {
-	if pvSource, found := spec["awsElasticBlockStore"]; found {
-		pvSourceObj := pvSource.(map[string]interface{})
-		pvSourceObj["volumeID"] = volumeID
-		return nil
-	} else if pvSource, found := spec["gcePersistentDisk"]; found {
-		pvSourceObj := pvSource.(map[string]interface{})
-		pvSourceObj["pdName"] = volumeID
-		return nil
-	} else if pvSource, found := spec["azureDisk"]; found {
-		pvSourceObj := pvSource.(map[string]interface{})
-		pvSourceObj["diskName"] = volumeID
-		return nil
-	}
-
-	return errors.New("persistent volume source is not compatible")
-}
-
-func (sr *persistentVolumeRestorer) restoreVolume(item map[string]interface{}, restore *api.Restore, backup *api.Backup) (string, error) {
-	pvName, err := collections.GetString(item, "metadata.name")
-	if err != nil {
-		return "", err
-	}
-
-	if backup.Status.VolumeBackups == nil {
-		return "", fmt.Errorf("VolumeBackups map not found for persistent volume %s", pvName)
-	}
-
-	backupInfo, found := backup.Status.VolumeBackups[pvName]
-	if !found {
-		return "", fmt.Errorf("BackupInfo not found for PersistentVolume %s", pvName)
-	}
-
-	return sr.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.Iops)
 }
