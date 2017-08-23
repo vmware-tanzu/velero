@@ -61,10 +61,10 @@ ifneq ($(SKIP_TESTS), 1)
 endif
 
 update:
-	${ROOT_DIR}/hack/update-generated-docs.sh
 	${ROOT_DIR}/hack/update-generated-clientsets.sh
 	${ROOT_DIR}/hack/update-generated-listers.sh
 	${ROOT_DIR}/hack/update-generated-informers.sh
+	${ROOT_DIR}/hack/update-generated-docs.sh
 
 all: cbuild container
 
