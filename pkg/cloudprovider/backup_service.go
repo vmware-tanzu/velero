@@ -53,7 +53,7 @@ type BackupService interface {
 
 	// CreateBackupLogSignedURL creates a pre-signed URL that can be used to download a backup's log
 	// file from object storage. The URL expires after ttl.
-	CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error)
+	CreateBackupSignedURL(backupType api.DownloadTargetKind, bucket, backupName string, ttl time.Duration) (string, error)
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -72,7 +72,7 @@ func getMetadataKey(backup string) string {
 	return fmt.Sprintf(metadataFileFormatString, backup)
 }
 
-func getBackupKey(backup string) string {
+func getBackupContentsKey(backup string) string {
 	return fmt.Sprintf(backupFileFormatString, backup, backup)
 }
 
@@ -105,7 +105,7 @@ func (br *backupService) UploadBackup(bucket, backupName string, metadata, backu
 	}
 
 	// upload tar file
-	if err := br.objectStorage.PutObject(bucket, getBackupKey(backupName), backup); err != nil {
+	if err := br.objectStorage.PutObject(bucket, getBackupContentsKey(backupName), backup); err != nil {
 		// try to delete the metadata file since the data upload failed
 		deleteErr := br.objectStorage.DeleteObject(bucket, metadataKey)
 
@@ -123,7 +123,7 @@ func (br *backupService) UploadBackup(bucket, backupName string, metadata, backu
 }
 
 func (br *backupService) DownloadBackup(bucket, backupName string) (io.ReadCloser, error) {
-	return br.objectStorage.GetObject(bucket, getBackupKey(backupName))
+	return br.objectStorage.GetObject(bucket, getBackupContentsKey(backupName))
 }
 
 func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
@@ -194,8 +194,15 @@ func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
 	return errors.NewAggregate(errs)
 }
 
-func (br *backupService) CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error) {
-	return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(backupName), ttl)
+func (br *backupService) CreateBackupSignedURL(backupType api.DownloadTargetKind, bucket, backupName string, ttl time.Duration) (string, error) {
+	switch backupType {
+	case api.DownloadTargetKindBackupContents:
+		return br.objectStorage.CreateSignedURL(bucket, getBackupContentsKey(backupName), ttl)
+	case api.DownloadTargetKindBackupLog:
+		return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(backupName), ttl)
+	default:
+		return "", fmt.Errorf("unsupported download target kind %q", backupType)
+	}
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

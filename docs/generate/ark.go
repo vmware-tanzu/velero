@@ -18,17 +18,17 @@ package main
 
 import (
 	"log"
-  "os"
+	"os"
 
-	"github.com/spf13/cobra/doc"
 	"github.com/heptio/ark/pkg/cmd/ark"
+	"github.com/spf13/cobra/doc"
 )
 
 func main() {
-  cmdName := os.Args[1]
+	cmdName := os.Args[1]
 	outputDir := os.Args[2]
 
-  cmd := ark.NewCommand(cmdName)
+	cmd := ark.NewCommand(cmdName)
 	// Remove auto-generated timestamps
 	cmd.DisableAutoGenTag = true
 

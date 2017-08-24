@@ -29,7 +29,7 @@ func NewCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print the ark version and associated image",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println(buildinfo.Version)
+			fmt.Printf("Version: [%s] - [%s]\n", buildinfo.Version, buildinfo.GitSHA)
 			fmt.Println("Configured docker image:", buildinfo.DockerImage)
 		},
 	}

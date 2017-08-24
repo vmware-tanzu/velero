@@ -19,6 +19,11 @@ VERSION ?= v0.3.3
 GOTARGET = github.com/heptio/$(PROJECT)
 OUTPUT_DIR = $(ROOT_DIR)/_output
 BIN_DIR = $(OUTPUT_DIR)/bin
+GIT_SHA=$(shell git rev-parse --short HEAD)
+GIT_DIRTY=$(shell git status --porcelain $(ROOT_DIR) 2> /dev/null)
+ifneq ($(GIT_DIRTY),)
+	GIT_SHA := $(GIT_SHA)-dirty
+endif
 
 # docker related vars
 DOCKER ?= docker
@@ -26,7 +31,7 @@ REGISTRY ?= gcr.io/heptio-images
 BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.8-alpine3.6
 # go build -i installs compiled packages so they can be reused later.
 # This speeds up recompiles.
-BUILDCMD = go build -i -v -ldflags "-X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION) -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT)"
+BUILDCMD = go build -i -v -ldflags "-X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION) -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT) -X $(GOTARGET)/pkg/buildinfo.GitSHA=$(GIT_SHA)"
 BUILDMNT = /go/src/$(GOTARGET)
 EXTRA_MNTS ?=
 
@@ -44,6 +49,10 @@ $(BINARIES):
 	mkdir -p $(BIN_DIR)
 	$(BUILDCMD) -o $(BIN_DIR)/$@ $(GOTARGET)/cmd/$@
 
+fmt:
+	gofmt -w=true $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./pkg/generated/*")
+	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./pkg/generated/*")
+
 test:
 ifneq ($(SKIP_TESTS), 1)
 # go test -i installs compiled packages so they can be reused later
@@ -60,7 +69,7 @@ ifneq ($(SKIP_TESTS), 1)
 	${ROOT_DIR}/hack/verify-generated-informers.sh
 endif
 
-update:
+update: fmt
 	${ROOT_DIR}/hack/update-generated-clientsets.sh
 	${ROOT_DIR}/hack/update-generated-listers.sh
 	${ROOT_DIR}/hack/update-generated-informers.sh
@@ -80,7 +89,7 @@ container-local: $(BINARIES)
 push:
 	docker -- push $(REGISTRY)/$(PROJECT):$(VERSION)
 
-.PHONY: all local container cbuild push test verify update $(BINARIES)
+.PHONY: all local container cbuild push test verify update fmt $(BINARIES)
 
 clean:
 	rm -rf $(OUTPUT_DIR)

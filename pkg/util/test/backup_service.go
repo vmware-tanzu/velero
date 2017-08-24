@@ -28,7 +28,7 @@ type BackupService struct {
 }
 
 // CreateBackupLogSignedURL provides a mock function with given fields: bucket, backupName, ttl
-func (_m *BackupService) CreateBackupLogSignedURL(bucket string, backupName string, ttl time.Duration) (string, error) {
+func (_m *BackupService) CreateBackupSignedURL(backupType v1.DownloadTargetKind, bucket string, backupName string, ttl time.Duration) (string, error) {
 	ret := _m.Called(bucket, backupName, ttl)
 
 	var r0 string
