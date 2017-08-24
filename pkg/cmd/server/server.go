@@ -620,6 +620,7 @@ func newBackupper(
 		}
 
 		actions["persistentvolumes"] = action
+		actions["persistentvolumeclaims"] = backup.NewBackupPVAction()
 	}
 
 	return backup.NewKubernetesBackupper(

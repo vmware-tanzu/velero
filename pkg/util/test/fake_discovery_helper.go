@@ -17,31 +17,96 @@ limitations under the License.
 package test
 
 import (
+	"errors"
+	"fmt"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type FakeDiscoveryHelper struct {
-	ResourceList []*metav1.APIResourceList
-	RESTMapper   meta.RESTMapper
+	ResourceList       []*metav1.APIResourceList
+	Mapper             meta.RESTMapper
+	AutoReturnResource bool
 }
 
-func (dh *FakeDiscoveryHelper) Mapper() meta.RESTMapper {
-	return dh.RESTMapper
+func NewFakeDiscoveryHelper(autoReturnResource bool, resources map[schema.GroupVersionResource]schema.GroupVersionResource) *FakeDiscoveryHelper {
+	helper := &FakeDiscoveryHelper{
+		AutoReturnResource: autoReturnResource,
+		Mapper: &FakeMapper{
+			Resources: resources,
+		},
+	}
+
+	if resources == nil {
+		return helper
+	}
+
+	apiResourceMap := make(map[string][]metav1.APIResource)
+
+	for _, gvr := range resources {
+		var gvString string
+		if gvr.Version != "" && gvr.Group != "" {
+			gvString = fmt.Sprintf("%s/%s", gvr.Group, gvr.Version)
+		} else {
+			gvString = fmt.Sprintf("%s%s", gvr.Group, gvr.Version)
+		}
+
+		apiResourceMap[gvString] = append(apiResourceMap[gvString], metav1.APIResource{Name: gvr.Resource})
+	}
+
+	for group, resources := range apiResourceMap {
+		helper.ResourceList = append(helper.ResourceList, &metav1.APIResourceList{GroupVersion: group, APIResources: resources})
+	}
+
+	return helper
 }
 
 func (dh *FakeDiscoveryHelper) Resources() []*metav1.APIResourceList {
 	return dh.ResourceList
 }
+
 func (dh *FakeDiscoveryHelper) Refresh() error {
 	return nil
 }
 
-func (dh *FakeDiscoveryHelper) ResolveGroupResource(resource string) (schema.GroupResource, error) {
-	gvr, err := dh.RESTMapper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
-	if err != nil {
-		return schema.GroupResource{}, err
+func (dh *FakeDiscoveryHelper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error) {
+	if dh.AutoReturnResource {
+		return schema.GroupVersionResource{
+				Group:    input.Group,
+				Version:  input.Version,
+				Resource: input.Resource,
+			},
+			metav1.APIResource{
+				Name: input.Resource,
+			},
+			nil
 	}
-	return gvr.GroupResource(), nil
+
+	gvr, err := dh.Mapper.ResourceFor(input)
+	if err != nil {
+		return schema.GroupVersionResource{}, metav1.APIResource{}, err
+	}
+
+	var gvString string
+	if gvr.Version != "" && gvr.Group != "" {
+		gvString = fmt.Sprintf("%s/%s", gvr.Group, gvr.Version)
+	} else {
+		gvString = gvr.Version + gvr.Group
+	}
+
+	for _, gr := range dh.ResourceList {
+		if gr.GroupVersion != gvString {
+			continue
+		}
+
+		for _, resource := range gr.APIResources {
+			if resource.Name == gvr.Resource {
+				return gvr, resource, nil
+			}
+		}
+	}
+
+	return schema.GroupVersionResource{}, metav1.APIResource{}, errors.New("APIResource not found")
 }

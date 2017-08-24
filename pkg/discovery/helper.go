@@ -35,31 +35,28 @@ import (
 // Helper exposes functions for interacting with the Kubernetes discovery
 // API.
 type Helper interface {
-	// Mapper gets a RESTMapper for the current set of resources retrieved
-	// from discovery.
-	Mapper() meta.RESTMapper
-
 	// Resources gets the current set of resources retrieved from discovery
 	// that are backuppable by Ark.
 	Resources() []*metav1.APIResourceList
 
+	// ResourceFor gets a fully-resolved GroupVersionResource and an
+	// APIResource for the provided partially-specified GroupVersionResource.
+	ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error)
+
 	// Refresh pulls an updated set of Ark-backuppable resources from the
 	// discovery API.
 	Refresh() error
-
-	// ResolveGroupResource uses the RESTMapper to resolve resource to a fully-qualified
-	// schema.GroupResource. If the RESTMapper is unable to do so, an error is returned instead.
-	ResolveGroupResource(resource string) (schema.GroupResource, error)
 }
 
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
 	logger          *logrus.Logger
 
-	// lock guards mapper and resources
-	lock      sync.RWMutex
-	mapper    meta.RESTMapper
-	resources []*metav1.APIResourceList
+	// lock guards mapper, resources and resourcesMap
+	lock         sync.RWMutex
+	mapper       meta.RESTMapper
+	resources    []*metav1.APIResourceList
+	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
 }
 
 var _ Helper = &helper{}
@@ -72,6 +69,23 @@ func NewHelper(discoveryClient discovery.DiscoveryInterface, logger *logrus.Logg
 		return nil, err
 	}
 	return h, nil
+}
+
+func (h *helper) ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error) {
+	h.lock.RLock()
+	defer h.lock.RUnlock()
+
+	gvr, err := h.mapper.ResourceFor(input)
+	if err != nil {
+		return schema.GroupVersionResource{}, metav1.APIResource{}, err
+	}
+
+	apiResource, found := h.resourcesMap[gvr]
+	if !found {
+		return schema.GroupVersionResource{}, metav1.APIResource{}, errors.Errorf("APIResource not found for GroupVersionResource %s", gvr)
+	}
+
+	return gvr, apiResource, nil
 }
 
 func (h *helper) Refresh() error {
@@ -106,6 +120,19 @@ func (h *helper) Refresh() error {
 
 	sortResources(h.resources)
 
+	h.resourcesMap = make(map[schema.GroupVersionResource]metav1.APIResource)
+	for _, resourceGroup := range h.resources {
+		gv, err := schema.ParseGroupVersion(resourceGroup.GroupVersion)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse GroupVersion %s", resourceGroup.GroupVersion)
+		}
+
+		for _, resource := range resourceGroup.APIResources {
+			gvr := gv.WithResource(resource.Name)
+			h.resourcesMap[gvr] = resource
+		}
+	}
+
 	return nil
 }
 
@@ -135,22 +162,8 @@ func sortResources(resources []*metav1.APIResourceList) {
 	})
 }
 
-func (h *helper) Mapper() meta.RESTMapper {
-	h.lock.RLock()
-	defer h.lock.RUnlock()
-	return h.mapper
-}
-
 func (h *helper) Resources() []*metav1.APIResourceList {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	return h.resources
-}
-
-func (h *helper) ResolveGroupResource(resource string) (schema.GroupResource, error) {
-	gvr, err := h.mapper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
-	if err != nil {
-		return schema.GroupResource{}, err
-	}
-	return gvr.GroupResource(), nil
 }
