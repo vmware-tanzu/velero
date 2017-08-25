@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/glog"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -46,6 +47,9 @@ type BackupService interface {
 
 	// DeleteBackup deletes the backup content in object storage for the given api.Backup.
 	DeleteBackup(bucket, backupName string) error
+
+	// GetBackup gets the specified api.Backup from the given bucket in object storage.
+	GetBackup(bucket, name string) (*api.Backup, error)
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -61,6 +65,7 @@ const (
 
 type backupService struct {
 	objectStorage ObjectStorageAdapter
+	decoder       runtime.Decoder
 }
 
 var _ BackupService = &backupService{}
@@ -70,6 +75,7 @@ var _ BackupGetter = &backupService{}
 func NewBackupService(objectStorage ObjectStorageAdapter) BackupService {
 	return &backupService{
 		objectStorage: objectStorage,
+		decoder:       scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
 	}
 }
 
@@ -106,44 +112,43 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 
 	output := make([]*api.Backup, 0, len(prefixes))
 
-	decoder := scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion)
-
 	for _, backupDir := range prefixes {
-		err := func() error {
-			key := fmt.Sprintf(metadataFileFormatString, backupDir)
-
-			res, err := br.objectStorage.GetObject(bucket, key)
-			if err != nil {
-				return err
-			}
-			defer res.Close()
-
-			data, err := ioutil.ReadAll(res)
-			if err != nil {
-				return err
-			}
-
-			obj, _, err := decoder.Decode(data, nil, nil)
-			if err != nil {
-				return err
-			}
-
-			backup, ok := obj.(*api.Backup)
-			if !ok {
-				return fmt.Errorf("unexpected type for %s/%s: %T", bucket, key, obj)
-			}
-
-			output = append(output, backup)
-
-			return nil
-		}()
-
+		backup, err := br.GetBackup(bucket, backupDir)
 		if err != nil {
 			return nil, err
 		}
+
+		output = append(output, backup)
 	}
 
 	return output, nil
+}
+
+func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
+	key := fmt.Sprintf(metadataFileFormatString, name)
+
+	res, err := br.objectStorage.GetObject(bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	data, err := ioutil.ReadAll(res)
+	if err != nil {
+		return nil, err
+	}
+
+	obj, _, err := br.decoder.Decode(data, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	backup, ok := obj.(*api.Backup)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type for %s/%s: %T", bucket, key, obj)
+	}
+
+	return backup, nil
 }
 
 func (br *backupService) DeleteBackup(bucket, backupName string) error {

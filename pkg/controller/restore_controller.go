@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -285,8 +286,38 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 	return validationErrors
 }
 
+func (controller *restoreController) fetchBackup(bucket, name string) (*api.Backup, error) {
+	backup, err := controller.backupLister.Backups(api.DefaultNamespace).Get(name)
+	if err == nil {
+		return backup, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	glog.V(4).Infof("Backup %q not found in backupLister, checking object storage directly.", name)
+	backup, err = controller.backupService.GetBackup(bucket, name)
+	if err != nil {
+		glog.V(4).Infof("Backup %q not found in object storage.", name)
+		return nil, err
+	}
+
+	// ResourceVersion needs to be cleared in order to create the object in the API
+	backup.ResourceVersion = ""
+
+	created, createErr := controller.backupClient.Backups(api.DefaultNamespace).Create(backup)
+	if createErr != nil {
+		glog.Errorf("Unable to create API object for backup %q: %v", name, createErr)
+	} else {
+		backup = created
+	}
+
+	return backup, nil
+}
+
 func (controller *restoreController) runRestore(restore *api.Restore, bucket string) (warnings, errors api.RestoreResult) {
-	backup, err := controller.backupLister.Backups(api.DefaultNamespace).Get(restore.Spec.BackupName)
+	backup, err := controller.fetchBackup(bucket, restore.Spec.BackupName)
 	if err != nil {
 		glog.Errorf("error getting backup: %v", err)
 		errors.Cluster = append(errors.Ark, err.Error())

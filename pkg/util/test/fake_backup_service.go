@@ -55,3 +55,17 @@ func (f *FakeBackupService) DeleteBackup(bucket, backupName string) error {
 	args := f.Called(bucket, backupName)
 	return args.Error(0)
 }
+
+func (f *FakeBackupService) GetBackup(bucket, name string) (*v1.Backup, error) {
+	var (
+		args   = f.Called(bucket, name)
+		b      = args.Get(0)
+		backup *v1.Backup
+	)
+
+	if b != nil {
+		backup = b.(*v1.Backup)
+	}
+
+	return backup, args.Error(1)
+}
