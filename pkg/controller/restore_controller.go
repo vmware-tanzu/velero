@@ -224,10 +224,17 @@ func (controller *restoreController) processRestore(key string) error {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
-	}
 
-	if len(restore.Spec.Namespaces) == 0 {
-		restore.Spec.Namespaces = []string{"*"}
+		if len(restore.Spec.Namespaces) != 0 {
+			glog.V(4).Info("the restore.Spec.Namespaces field has been deprecated. Please use the IncludedNamespaces and ExcludedNamespaces feature instead")
+
+			restore.Spec.IncludedNamespaces = restore.Spec.Namespaces
+			restore.Spec.Namespaces = nil
+		}
+
+		if len(restore.Spec.IncludedNamespaces) == 0 {
+			restore.Spec.IncludedNamespaces = []string{"*"}
+		}
 	}
 
 	// update status
@@ -276,6 +283,10 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	}
+
+	if len(itm.Spec.Namespaces) > 0 && len(itm.Spec.IncludedNamespaces) > 0 {
+		validationErrors = append(validationErrors, "Namespace and ItemNamespaces can not both be defined on the backup spec.")
 	}
 
 	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {

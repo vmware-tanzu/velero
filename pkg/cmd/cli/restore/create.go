@@ -57,7 +57,8 @@ type CreateOptions struct {
 	BackupName        string
 	RestoreVolumes    flag.OptionalBool
 	Labels            flag.Map
-	Namespaces        flag.StringArray
+	IncludeNamespaces flag.StringArray
+	ExcludeNamespaces flag.StringArray
 	NamespaceMappings flag.Map
 	Selector          flag.LabelSelector
 }
@@ -65,15 +66,17 @@ type CreateOptions struct {
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
 		Labels:            flag.NewMap(),
+		IncludeNamespaces: flag.NewStringArray("*"),
 		NamespaceMappings: flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
 		RestoreVolumes:    flag.NewOptionalBool(nil),
 	}
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.Var(&o.Labels, "labels", "labels to apply to the restore")
-	flags.Var(&o.Namespaces, "namespaces", "comma-separated list of namespaces to restore")
+	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the backup (use '*' for all namespaces)")
+	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the backup")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
+	flags.Var(&o.Labels, "labels", "labels to apply to the restore")
 	flags.VarP(&o.Selector, "selector", "l", "only restore resources matching this label selector")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "whether to restore volumes from snapshots")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
@@ -111,11 +114,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Labels:    o.Labels.Data(),
 		},
 		Spec: api.RestoreSpec{
-			BackupName:       o.BackupName,
-			Namespaces:       o.Namespaces,
-			NamespaceMapping: o.NamespaceMappings.Data(),
-			LabelSelector:    o.Selector.LabelSelector,
-			RestorePVs:       o.RestoreVolumes.Value,
+			BackupName:         o.BackupName,
+			IncludedNamespaces: o.IncludeNamespaces,
+			ExcludedNamespaces: o.ExcludeNamespaces,
+			NamespaceMapping:   o.NamespaceMappings.Data(),
+			LabelSelector:      o.Selector.LabelSelector,
+			RestorePVs:         o.RestoreVolumes.Value,
 		},
 	}
 

@@ -46,6 +46,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // Restorer knows how to restore a backup.
@@ -225,18 +226,18 @@ func (kr *kubernetesRestorer) restoreFromDir(
 		return warnings, errors
 	}
 
-	namespacesToRestore := sets.NewString(restore.Spec.Namespaces...)
+	namespaceFilter := collections.NewIncludesExcludes().Includes(restore.Spec.IncludedNamespaces...).Excludes(restore.Spec.ExcludedNamespaces...)
 	for _, ns := range nses {
 		if !ns.IsDir() {
 			continue
 		}
-
 		nsPath := path.Join(namespacesPath, ns.Name())
 
-		if !namespacesToRestore.Has("*") && !namespacesToRestore.Has(ns.Name()) {
+		if !namespaceFilter.ShouldInclude(ns.Name()) {
 			glog.Infof("Skipping namespace %s", ns.Name())
 			continue
 		}
+
 		w, e := kr.restoreNamespace(restore, ns.Name(), nsPath, prioritizedResources, selector, backup)
 		merge(&warnings, &w)
 		merge(&errors, &e)
@@ -453,7 +454,7 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 		// add an ark-restore label to each resource for easy ID
 		addLabel(unstructuredObj, api.RestoreLabelKey, restore.Name)
 
-		glog.Infof("Restoring item %v", unstructuredObj.GetName())
+		glog.Infof("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
 		_, err = resourceClient.Create(unstructuredObj)
 		if apierrors.IsAlreadyExists(err) {
 			addToResult(&warnings, namespace, err)

@@ -102,15 +102,36 @@ func TestRestoreMethod(t *testing.T) {
 			name:             "namespacesToRestore having * restores all namespaces",
 			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
 			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{Namespaces: []string{"*"}}},
+			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"},
 		},
 		{
 			name:             "namespacesToRestore properly filters",
 			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
 			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{Namespaces: []string{"b", "c"}}},
+			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
 			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
+		},
+		{
+			name:             "namespacesToRestore properly filters with inclusion filter",
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			baseDir:          "bak",
+			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
+			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
+		},
+		{
+			name:             "namespacesToRestore properly filters with exclusion filter",
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			baseDir:          "bak",
+			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
+			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
+		},
+		{
+			name:             "namespacesToRestore properly filters with inclusion & exclusion filters",
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			baseDir:          "bak",
+			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"a", "b", "c"}, ExcludedNamespaces: []string{"b"}}},
+			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/a", "bak/namespaces/c"},
 		},
 	}
 

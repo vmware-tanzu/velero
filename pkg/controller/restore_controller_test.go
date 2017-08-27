@@ -73,24 +73,37 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:        "new restore with empty backup name fails validation",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithRestorableNamespace("ns-1").Restore,
+			name:        "restore with both namespaces and includedNamespaces fails validation",
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithNamespace("ns-1").WithIncludedNamespace("another-1").Restore,
+			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).
-					WithRestorableNamespace("ns-1").
+					WithBackup("backup-1").
+					WithNamespace("ns-1").
+					WithIncludedNamespace("another-1").
+					WithValidationError("Namespace and ItemNamespaces can not both be defined on the backup spec.").Restore,
+			},
+		},
+		{
+			name:        "new restore with empty backup name fails validation",
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithIncludedNamespace("ns-1").Restore,
+			expectedErr: false,
+			expectedRestoreUpdates: []*api.Restore{
+				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).
+					WithIncludedNamespace("ns-1").
 					WithValidationError("BackupName must be non-empty and correspond to the name of a backup in object storage.").Restore,
 			},
 		},
 		{
 			name:        "restore with non-existent backup name fails",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).
 					WithBackup("backup-1").
-					WithRestorableNamespace("ns-1").
+					WithIncludedNamespace("ns-1").
 					WithErrors(api.RestoreResult{
 						Cluster: []string{"backup.ark.heptio.com \"backup-1\" not found"},
 					}).
@@ -99,33 +112,33 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:          "restorer throwing an error causes the restore to fail",
-			restore:       NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+			restore:       NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			backup:        NewTestBackup().WithName("backup-1").Backup,
 			restorerError: errors.New("blarg"),
 			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).
 					WithBackup("backup-1").
-					WithRestorableNamespace("ns-1").
+					WithIncludedNamespace("ns-1").
 					WithErrors(api.RestoreResult{
 						Namespaces: map[string][]string{
 							"ns-1": {"blarg"},
 						},
 					}).Restore,
 			},
-			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 		},
 		{
 			name:        "valid restore gets executed",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
-				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			},
-			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").Restore,
+			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 		},
 		{
 			name:        "restore with no restorable namespaces gets defaulted to *",
@@ -133,30 +146,30 @@ func TestProcessRestore(t *testing.T) {
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("*").Restore,
-				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithRestorableNamespace("*").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("*").Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithIncludedNamespace("*").Restore,
 			},
-			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("*").Restore,
+			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("*").Restore,
 		},
 		{
 			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
-			restore:               NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			restore:               NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
 			backup:                NewTestBackup().WithName("backup-1").Backup,
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
-				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
+				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
 			},
-			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
 		},
 		{
 			name:        "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).Restore,
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).WithBackup("backup-1").WithRestorableNamespace("ns-1").WithRestorePVs(true).
+				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).
 					WithValidationError("Server is not configured for PV snapshot restores").Restore,
 			},
 		},
