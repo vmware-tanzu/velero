@@ -166,15 +166,16 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 		req.Filters = append(req.Filters, filter)
 	}
 
-	res, err := op.ec2.DescribeSnapshots(req)
+	var ret []string
+	err := op.ec2.DescribeSnapshotsPages(req, func (res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
+		for _, snapshot := range res.Snapshots {
+			ret = append(ret, *snapshot.SnapshotId)
+		}
+
+		return !lastPage
+	})
 	if err != nil {
 		return nil, err
-	}
-
-	var ret []string
-
-	for _, snapshot := range res.Snapshots {
-		ret = append(ret, *snapshot.SnapshotId)
 	}
 
 	return ret, nil
