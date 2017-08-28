@@ -24,8 +24,11 @@ import (
 // Config returns a *rest.Config, using either the kubeconfig (if specified) or an in-cluster
 // configuration.
 func Config(kubeconfig string) (*rest.Config, error) {
-	if len(kubeconfig) > 0 {
-		return clientcmd.BuildConfigFromFlags("", kubeconfig)
+	loader := clientcmd.NewDefaultClientConfigLoadingRules()
+	loader.ExplicitPath = kubeconfig
+	clientConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", loader.Load)
+	if err != nil {
+		return nil, err
 	}
-	return rest.InClusterConfig()
+	return clientConfig, nil
 }
