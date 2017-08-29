@@ -428,6 +428,8 @@ func (s *server) runControllers(config *api.Config) error {
 			config.GCSyncPeriod.Duration,
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
+			s.sharedInformerFactory.Ark().V1().Restores(),
+			s.arkClient.ArkV1(),
 		)
 		wg.Add(1)
 		go func() {

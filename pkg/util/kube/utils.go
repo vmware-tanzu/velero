@@ -18,14 +18,26 @@ package kube
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
 	"github.com/heptio/ark/pkg/util/collections"
 )
+
+// NamespaceAndName returns a string in the format <namespace>/<name>
+func NamespaceAndName(metaAccessor metav1.ObjectMetaAccessor) string {
+	objMeta := metaAccessor.GetObjectMeta()
+	if objMeta == nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
+}
 
 // EnsureNamespaceExists attempts to create the provided Kubernetes namespace. It returns two values:
 // a bool indicating whether or not the namespace was created, and an error if the create failed

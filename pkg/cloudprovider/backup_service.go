@@ -45,8 +45,11 @@ type BackupService interface {
 	// downloading or reading the file from the cloud API.
 	DownloadBackup(bucket, name string) (io.ReadCloser, error)
 
-	// DeleteBackup deletes the backup content in object storage for the given api.Backup.
-	DeleteBackup(bucket, backupName string) error
+	// DeleteBackup deletes the backup content in object storage for the given backup.
+	DeleteBackupFile(bucket, backupName string) error
+
+	// DeleteBackup deletes the backup metadata file in object storage for the given backup.
+	DeleteBackupMetadataFile(bucket, backupName string) error
 
 	// GetBackup gets the specified api.Backup from the given bucket in object storage.
 	GetBackup(bucket, name string) (*api.Backup, error)
@@ -152,22 +155,16 @@ func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
 	return backup, nil
 }
 
-func (br *backupService) DeleteBackup(bucket, backupName string) error {
-	var errs []error
-
+func (br *backupService) DeleteBackupFile(bucket, backupName string) error {
 	key := fmt.Sprintf(backupFileFormatString, backupName, backupName)
 	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
-		errs = append(errs, err)
-	}
+	return br.objectStorage.DeleteObject(bucket, key)
+}
 
-	key = fmt.Sprintf(metadataFileFormatString, backupName)
+func (br *backupService) DeleteBackupMetadataFile(bucket, backupName string) error {
+	key := fmt.Sprintf(metadataFileFormatString, backupName)
 	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
-		errs = append(errs, err)
-	}
-
-	return errors.NewAggregate(errs)
+	return br.objectStorage.DeleteObject(bucket, key)
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

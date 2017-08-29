@@ -178,8 +178,7 @@ func TestDownloadBackup(t *testing.T) {
 	}
 }
 
-func TestDeleteBackup(t *testing.T) {
-
+func TestDeleteBackupFile(t *testing.T) {
 	tests := []struct {
 		name        string
 		bucket      string
@@ -194,33 +193,18 @@ func TestDeleteBackup(t *testing.T) {
 			backupName: "bak",
 			storage: map[string]map[string][]byte{
 				"test-bucket": map[string][]byte{
-					"bak/bak.tar.gz":      nil,
-					"bak/ark-backup.json": nil,
+					"bak/bak.tar.gz": nil,
 				},
 			},
 			expectedErr: false,
 			expectedRes: make(map[string][]byte),
 		},
 		{
-			name:       "failed delete of backup doesn't prevent metadata delete but returns error",
+			name:       "failed delete of backup returns error",
 			bucket:     "test-bucket",
 			backupName: "bak",
 			storage: map[string]map[string][]byte{
-				"test-bucket": map[string][]byte{
-					"bak/ark-backup.json": nil,
-				},
-			},
-			expectedErr: true,
-			expectedRes: make(map[string][]byte),
-		},
-		{
-			name:       "failed delete of metadata returns error",
-			bucket:     "test-bucket",
-			backupName: "bak",
-			storage: map[string]map[string][]byte{
-				"test-bucket": map[string][]byte{
-					"bak/bak.tar.gz": nil,
-				},
+				"test-bucket": map[string][]byte{},
 			},
 			expectedErr: true,
 			expectedRes: make(map[string][]byte),
@@ -232,7 +216,54 @@ func TestDeleteBackup(t *testing.T) {
 			objStore := &fakeObjectStorage{storage: test.storage}
 			backupService := NewBackupService(objStore)
 
-			res := backupService.DeleteBackup(test.bucket, test.backupName)
+			res := backupService.DeleteBackupFile(test.bucket, test.backupName)
+
+			assert.Equal(t, test.expectedErr, res != nil, "got error %v", res)
+
+			assert.Equal(t, test.expectedRes, objStore.storage[test.bucket])
+		})
+	}
+}
+
+func TestDeleteBackupMetadataFile(t *testing.T) {
+	tests := []struct {
+		name        string
+		bucket      string
+		backupName  string
+		storage     map[string]map[string][]byte
+		expectedErr bool
+		expectedRes map[string][]byte
+	}{
+		{
+			name:       "normal case",
+			bucket:     "test-bucket",
+			backupName: "bak",
+			storage: map[string]map[string][]byte{
+				"test-bucket": map[string][]byte{
+					"bak/ark-backup.json": nil,
+				},
+			},
+			expectedErr: false,
+			expectedRes: make(map[string][]byte),
+		},
+		{
+			name:       "failed delete of file returns error",
+			bucket:     "test-bucket",
+			backupName: "bak",
+			storage: map[string]map[string][]byte{
+				"test-bucket": map[string][]byte{},
+			},
+			expectedErr: true,
+			expectedRes: make(map[string][]byte),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			objStore := &fakeObjectStorage{storage: test.storage}
+			backupService := NewBackupService(objStore)
+
+			res := backupService.DeleteBackupMetadataFile(test.bucket, test.backupName)
 
 			assert.Equal(t, test.expectedErr, res != nil, "got error %v", res)
 
