@@ -39,6 +39,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type restoreController struct {
@@ -286,7 +287,11 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 	}
 
 	if len(itm.Spec.Namespaces) > 0 && len(itm.Spec.IncludedNamespaces) > 0 {
-		validationErrors = append(validationErrors, "Namespace and ItemNamespaces can not both be defined on the backup spec.")
+		validationErrors = append(validationErrors, "Namespaces and IncludedNamespaces can not both be defined on the backup spec.")
+	}
+
+	for err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
 	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {

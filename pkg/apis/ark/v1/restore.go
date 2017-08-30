@@ -34,7 +34,7 @@ type RestoreSpec struct {
 	IncludedNamespaces []string `json:"includedNamespaces"`
 
 	// ExcludedNamespaces contains a list of namespaces that are not
-	// included in the backup.
+	// included in the restore.
 	ExcludedNamespaces []string `json:"excludedNamespaces"`
 
 	// NamespaceMapping is a map of source namespace names
