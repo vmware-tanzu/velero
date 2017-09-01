@@ -24,6 +24,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -40,39 +41,71 @@ import (
 )
 
 func TestPrioritizeResources(t *testing.T) {
-	mapper := &FakeMapper{AutoReturnResource: true}
-	priorities := []string{"namespaces", "configmaps", "pods"}
-	resources := []*metav1.APIResourceList{
+	tests := []struct {
+		name         string
+		apiResources map[string][]string
+		priorities   []string
+		includes     []string
+		excludes     []string
+		expected     []string
+	}{
 		{
-			GroupVersion: "v1",
-			APIResources: []metav1.APIResource{
-				{Name: "aaa"},
-				{Name: "bbb"},
-				{Name: "configmaps"},
-				{Name: "ddd"},
-				{Name: "namespaces"},
-				{Name: "ooo"},
-				{Name: "pods"},
-				{Name: "sss"},
+			name: "priorities & ordering are correctly applied",
+			apiResources: map[string][]string{
+				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
 			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"*"},
+			expected:   []string{"namespaces", "configmaps", "pods", "aaa", "bbb", "ddd", "ooo", "sss"},
+		},
+		{
+			name: "includes are correctly applied",
+			apiResources: map[string][]string{
+				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"namespaces", "aaa", "sss"},
+			expected:   []string{"namespaces", "aaa", "sss"},
+		},
+		{
+			name: "excludes are correctly applied",
+			apiResources: map[string][]string{
+				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"*"},
+			excludes:   []string{"ooo", "pods"},
+			expected:   []string{"namespaces", "configmaps", "aaa", "bbb", "ddd", "sss"},
 		},
 	}
 
-	result, err := prioritizeResources(mapper, priorities, resources)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			helper := &FakeDiscoveryHelper{RESTMapper: &FakeMapper{AutoReturnResource: true}}
 
-	expected := []string{"namespaces", "configmaps", "pods", "aaa", "bbb", "ddd", "ooo", "sss"}
-	for i := range result {
-		if len(expected) < i+1 {
-			t.Errorf("result is too small: %v", result)
-			break
-		}
+			for gv, resources := range test.apiResources {
+				resourceList := &metav1.APIResourceList{GroupVersion: gv}
+				for _, resource := range resources {
+					resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: resource})
+				}
+				helper.ResourceList = append(helper.ResourceList, resourceList)
+			}
 
-		if e, a := expected[i], result[i].Resource; e != a {
-			t.Errorf("index %d, expected %s, got %s", i, e, a)
-		}
+			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
+
+			result, err := prioritizeResources(helper, test.priorities, includesExcludes)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			require.Equal(t, len(test.expected), len(result))
+
+			for i := range result {
+				if e, a := test.expected[i], result[i].Resource; e != a {
+					t.Errorf("index %d, expected %s, got %s", i, e, a)
+				}
+			}
+		})
 	}
 }
 
