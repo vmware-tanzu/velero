@@ -115,7 +115,8 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	for _, backupDir := range prefixes {
 		backup, err := br.GetBackup(bucket, backupDir)
 		if err != nil {
-			return nil, err
+			glog.Errorf("Error reading backup directory %s: %v", backupDir, err)
+			continue
 		}
 
 		output = append(output, backup)
