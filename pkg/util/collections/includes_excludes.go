@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -103,4 +105,35 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 	}
 
 	return errs
+}
+
+func GenerateIncludesExcludes(includes []string, excludes []string, mapFunc func(string) (string, error)) *IncludesExcludes {
+	res := NewIncludesExcludes()
+
+	for _, item := range includes {
+		if item == "*" {
+			res.Includes(item)
+			return res
+		}
+
+		key, err := mapFunc(item)
+		if err != nil {
+			glog.Errorf("unable to include item %q: %v", item, err)
+			continue
+		}
+
+		res.Includes(key)
+	}
+
+	for _, item := range excludes {
+		key, err := mapFunc(item)
+		if err != nil {
+			glog.Errorf("unable to exclude item %q: %v", item, err)
+			continue
+		}
+
+		res.Excludes(key)
+	}
+
+	return res
 }
