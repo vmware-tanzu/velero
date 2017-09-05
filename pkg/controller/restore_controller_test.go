@@ -35,6 +35,71 @@ import (
 	. "github.com/heptio/ark/pkg/util/test"
 )
 
+func TestFetchRestore(t *testing.T) {
+	tests := []struct {
+		name             string
+		backupName       string
+		informerBackups  []*api.Backup
+		backupSvcBackups map[string][]*api.Backup
+		expectedRes      *api.Backup
+		expectedErr      bool
+	}{
+		{
+			name:            "lister has backup",
+			backupName:      "backup-1",
+			informerBackups: []*api.Backup{NewTestBackup().WithName("backup-1").Backup},
+			expectedRes:     NewTestBackup().WithName("backup-1").Backup,
+		},
+		{
+			name:       "backupSvc has backup",
+			backupName: "backup-1",
+			backupSvcBackups: map[string][]*api.Backup{
+				"bucket": []*api.Backup{NewTestBackup().WithName("backup-1").Backup},
+			},
+			expectedRes: NewTestBackup().WithName("backup-1").Backup,
+		},
+		{
+			name:        "no backup",
+			backupName:  "backup-1",
+			expectedErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				client          = fake.NewSimpleClientset()
+				restorer        = &fakeRestorer{}
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				backupSvc       = &fakeBackupService{}
+			)
+
+			c := NewRestoreController(
+				sharedInformers.Ark().V1().Restores(),
+				client.ArkV1(),
+				client.ArkV1(),
+				restorer,
+				backupSvc,
+				"bucket",
+				sharedInformers.Ark().V1().Backups(),
+				false,
+			).(*restoreController)
+
+			for _, itm := range test.informerBackups {
+				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(itm)
+			}
+
+			backupSvc.backupsByBucket = test.backupSvcBackups
+
+			backup, err := c.fetchBackup("bucket", test.backupName)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, backup)
+			}
+		})
+	}
+}
+
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -92,7 +157,9 @@ func TestProcessRestore(t *testing.T) {
 					WithBackup("backup-1").
 					WithRestorableNamespace("ns-1").
 					WithErrors(api.RestoreResult{
-						Cluster: []string{"backup.ark.heptio.com \"backup-1\" not found"},
+						// TODO this is the error msg returned by the fakeBackupService. When we switch to a mock obj,
+						// this will likely need to change.
+						Cluster: []string{"bucket not found"},
 					}).
 					Restore,
 			},

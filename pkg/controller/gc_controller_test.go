@@ -319,6 +319,21 @@ func (s *fakeBackupService) GetAllBackups(bucket string) ([]*api.Backup, error) 
 	return backups, nil
 }
 
+func (s *fakeBackupService) GetBackup(bucket, name string) (*api.Backup, error) {
+	backups, err := s.GetAllBackups(bucket)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, itm := range backups {
+		if itm.Name == name {
+			return itm, nil
+		}
+	}
+
+	return nil, errors.New("backup not found")
+}
+
 func (bs *fakeBackupService) UploadBackup(bucket, name string, metadata, backup io.ReadSeeker) error {
 	args := bs.Called(bucket, name, metadata, backup)
 	return args.Error(0)
