@@ -14,8 +14,8 @@ ark restore create BACKUP
 ### Options
 
 ```
-      --exclude-namespaces stringArray        namespaces to exclude from the backup
-      --include-namespaces stringArray        namespaces to include in the backup (use '*' for all namespaces) (default *)
+      --exclude-namespaces stringArray        namespaces to exclude from the restore
+      --include-namespaces stringArray        namespaces to include in the restore (use '*' for all namespaces) (default *)
       --label-columns stringArray             a comma-separated list of labels to be displayed as columns
       --labels mapStringString                labels to apply to the restore
       --namespace-mappings mapStringString    namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...
