@@ -271,7 +271,7 @@ func TestGetAllBackups(t *testing.T) {
 			},
 		},
 		{
-			name:   "decode error returns nil/error",
+			name:   "backup that can't be decoded is ignored",
 			bucket: "test-bucket",
 			storage: map[string]map[string][]byte{
 				"test-bucket": map[string][]byte{
@@ -279,7 +279,12 @@ func TestGetAllBackups(t *testing.T) {
 					"backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
 				},
 			},
-			expectedErr: true,
+			expectedRes: []*api.Backup{
+				&api.Backup{
+					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
+					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
+				},
+			},
 		},
 	}
 
