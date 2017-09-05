@@ -106,15 +106,16 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 		Delimiter: &delimiter,
 	}
 
-	res, err := op.s3.ListObjectsV2(req)
+	var ret []string
+	err := op.s3.ListObjectsV2Pages(req, func(res *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, prefix := range res.CommonPrefixes {
+			ret = append(ret, *prefix.Prefix)
+		}
+		return !lastPage
+	})
+
 	if err != nil {
 		return nil, err
-	}
-
-	ret := make([]string, 0, len(res.CommonPrefixes))
-
-	for _, prefix := range res.CommonPrefixes {
-		ret = append(ret, *prefix.Prefix)
 	}
 
 	return ret, nil
