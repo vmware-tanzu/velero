@@ -45,12 +45,6 @@ func NewDefaultTestRestore() *TestRestore {
 	return NewTestRestore(api.DefaultNamespace, "", api.RestorePhase(""))
 }
 
-
-func (r *TestRestore) WithNamespace(name string) *TestRestore {
-	r.Spec.Namespaces = append(r.Spec.Namespaces, name)
-	return r
-}
-
 func (r *TestRestore) WithIncludedNamespace(name string) *TestRestore {
 	r.Spec.IncludedNamespaces = append(r.Spec.IncludedNamespaces, name)
 	return r

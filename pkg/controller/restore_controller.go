@@ -220,22 +220,15 @@ func (controller *restoreController) processRestore(key string) error {
 		return err
 	}
 
+	if len(restore.Spec.IncludedNamespaces) == 0 {
+		restore.Spec.IncludedNamespaces = []string{"*"}
+	}
+
 	// validation
 	if restore.Status.ValidationErrors = controller.getValidationErrors(restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
-
-		if len(restore.Spec.Namespaces) != 0 {
-			glog.V(4).Info("the restore.Spec.Namespaces field has been deprecated. Please use the IncludedNamespaces and ExcludedNamespaces feature instead")
-
-			restore.Spec.IncludedNamespaces = restore.Spec.Namespaces
-			restore.Spec.Namespaces = nil
-		}
-
-		if len(restore.Spec.IncludedNamespaces) == 0 {
-			restore.Spec.IncludedNamespaces = []string{"*"}
-		}
 	}
 
 	// update status
@@ -286,11 +279,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
 	}
 
-	if len(itm.Spec.Namespaces) > 0 && len(itm.Spec.IncludedNamespaces) > 0 {
-		validationErrors = append(validationErrors, "Namespaces and IncludedNamespaces can not both be defined on the backup spec.")
-	}
-
-	for err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
+	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 

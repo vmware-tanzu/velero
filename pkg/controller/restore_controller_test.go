@@ -73,16 +73,16 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:        "restore with both namespaces and includedNamespaces fails validation",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithNamespace("ns-1").WithIncludedNamespace("another-1").Restore,
+			name:        "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
+			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("another-1").WithExcludedNamespace("another-1").Restore,
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).
 					WithBackup("backup-1").
-					WithNamespace("ns-1").
 					WithIncludedNamespace("another-1").
-					WithValidationError("Namespace and ItemNamespaces can not both be defined on the backup spec.").Restore,
+					WithExcludedNamespace("another-1").
+					WithValidationError("Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: another-1").Restore,
 			},
 		},
 		{
