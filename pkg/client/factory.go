@@ -17,8 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"os"
-
 	"github.com/spf13/pflag"
 
 	"github.com/heptio/ark/pkg/generated/clientset"
@@ -53,13 +51,7 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (f *factory) Client() (clientset.Interface, error) {
-	kubeconfig := f.kubeconfig
-	if kubeconfig == "" {
-		// if the command line flag was not specified, try the environment variable
-		kubeconfig = os.Getenv("KUBECONFIG")
-	}
-
-	clientConfig, err := Config(kubeconfig)
+	clientConfig, err := Config(f.kubeconfig)
 	if err != nil {
 		return nil, err
 	}
