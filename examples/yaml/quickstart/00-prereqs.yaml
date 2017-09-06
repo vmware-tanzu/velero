@@ -13,19 +13,17 @@
 # limitations under the License.
 
 ---
-apiVersion: ark.heptio.com/v1
-kind: Config
+apiVersion: v1
+kind: Namespace
 metadata:
+  labels:
+    component: ark
+  name: heptio-ark
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    component: ark
+  name: ark
   namespace: heptio-ark
-  name: default
-persistentVolumeProvider:
-  gcp:
-    project: <YOUR_PROJECT>
-    zone: <YOUR_ZONE>
-backupStorageProvider:
-  bucket: <YOUR_BUCKET>
-  gcp: {}
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
-restoreOnlyMode: false

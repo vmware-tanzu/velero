@@ -1,0 +1,279 @@
+# Copyright 2017 Heptio Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  labels:
+    component: ark
+  name: ark
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - list
+  - watch
+  - create
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    component: ark
+  name: ark
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ark
+subjects:
+- kind: ServiceAccount
+  name: ark
+  namespace: heptio-ark
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  labels:
+    component: ark
+  name: ark
+rules:
+- apiGroups:
+  - ark.heptio.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  labels:
+    component: ark
+  name: ark
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ark
+subjects:
+- kind: ServiceAccount
+  name: ark
+  namespace: heptio-ark
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    component: ark
+  name: backups.ark.heptio.com
+spec:
+  group: ark.heptio.com
+  names:
+    kind: Backup
+    plural: backups
+  scope: Namespaced
+  version: v1
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    component: ark
+  name: schedules.ark.heptio.com
+spec:
+  group: ark.heptio.com
+  names:
+    kind: Schedule
+    plural: schedules
+  scope: Namespaced
+  version: v1
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    component: ark
+  name: restores.ark.heptio.com
+spec:
+  group: ark.heptio.com
+  names:
+    kind: Restore
+    plural: restores
+  scope: Namespaced
+  version: v1
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    component: ark
+  name: configs.ark.heptio.com
+spec:
+  group: ark.heptio.com
+  names:
+    kind: Config
+    plural: configs
+  scope: Namespaced
+  version: v1
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    component: minio
+  name: minio
+  namespace: heptio-ark
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        component: minio
+    spec:
+      containers:
+      - args:
+        - server
+        - /storage
+        env:
+        - name: MINIO_ACCESS_KEY
+          value: minio
+        - name: MINIO_SECRET_KEY
+          value: minio123
+        image: minio/minio:latest
+        imagePullPolicy: IfNotPresent
+        name: minio
+        ports:
+        - containerPort: 9000
+        volumeMounts:
+        - mountPath: /storage
+          name: storage
+          readOnly: false
+      volumes:
+      - hostPath:
+          path: /tmp/minio
+        name: storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: minio
+  name: minio
+  namespace: heptio-ark
+spec:
+  ports:
+  - port: 9000
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    component: minio
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    component: minio
+  name: cloud-credentials
+  namespace: heptio-ark
+stringData:
+  cloud: |
+    [default]
+    aws_access_key_id = minio
+    aws_secret_access_key = minio123
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    component: minio
+  name: minio-setup
+  namespace: heptio-ark
+spec:
+  template:
+    spec:
+      containers:
+      - command:
+        - /bin/sh
+        - -c
+        - mc config host add ark http://minio:9000 minio minio123 && mc mb -p ark/ark
+        image: minio/mc:latest
+        imagePullPolicy: IfNotPresent
+        name: mc
+      restartPolicy: OnFailure
+---
+apiVersion: ark.heptio.com/v1
+backupStorageProvider:
+  bucket: ""
+  minio:
+    availabilityZone: minio
+    region: minio
+    s3ForcePathStyle: true
+    s3Url: http://minio:9000
+backupSyncPeriod: 30m
+gcSyncPeriod: 30m
+kind: Config
+metadata:
+  labels:
+    component: ark
+  name: default
+  namespace: heptio-ark
+restoreOnlyMode: "false"
+scheduleSyncPeriod: 1m
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    component: ark
+  name: ark
+  namespace: heptio-ark
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: ark
+    spec:
+      containers:
+      - args:
+        - server
+        - --logtostderr
+        - --v
+        - "4"
+        command:
+        - ark
+        env:
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /credentials/cloud
+        image: gcr.io/heptio-images/ark:latest
+        name: ark
+        volumeMounts:
+        - mountPath: /credentials
+          name: cloud-credentials
+          readOnly: false
+      volumes:
+      - name: cloud-credentials
+        secret:
+          secretName: cloud-credentials

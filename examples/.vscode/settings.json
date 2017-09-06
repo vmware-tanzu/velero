@@ -1,0 +1,5 @@
+// Place your settings in this file to overwrite the default settings
+{
+    "jsonnet.libPaths": ["/Users/jyao/heptio/ksonnet-lib"],
+    "editor.tabSize": 2
+}

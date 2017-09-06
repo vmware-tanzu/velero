@@ -15,11 +15,9 @@ While the [Quickstart][0] uses a local storage service to quickly set up Heptio 
   * [Basic example (no PVs)][10]
   * [Snapshot example (with PVs)][11]
 
+## AWS
 
-## Setup
-### AWS
-
-#### IAM user creation
+### IAM user creation
 
 To integrate Heptio Ark with AWS, you should follow the instructions below to create an Ark-specific [IAM user][14].
 
@@ -63,21 +61,52 @@ To integrate Heptio Ark with AWS, you should follow the instructions below to cr
     ```
 5. Using the output from the previous command, create an Ark-specific credentials file (`credentials-ark`) in your local directory that looks like the following:
 
+   **(Replace bracketed placeholders)**
     ```
     [default]
     aws_access_key_id=<AWS_ACCESS_KEY_ID>
     aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
     ```
 
+### Generate YAML
 
-#### Credentials and configuration
-
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
+In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
-kubectl apply -f examples/common/00-prereqs.yaml
+export HEPTIO_ARK_RBAC_ENABLED=$(kubectl api-versions | grep -c rbac.authorization.k8s.io/v1beta1)
+export HEPTIO_ARK_PV_ENABLED=0
+export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | sed -n 's/.*v\([0-9]*.[0-9]*\).*/\1/p')
+export HEPTIO_ARK_CLOUD_PROVIDER=aws
 ```
 
-Create a Secret, running this command in the local directory of the credentials file you just created:
+You'll also need to set some info specific to AWS. For details on any particular variable, see the [Config definition][6]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_S3_BUCKET>
+export HEPTIO_ARK_AWS_REGION=<YOUR_REGION>
+```
+(Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_PV_ENABLED=1
+export HEPTIO_ARK_AWS_AVAILABILITY_ZONE=<YOUR_AVAILABILITY_ZONE>
+```
+
+Now generate your complete set of YAML manifests, by running the following in Ark's root directory:
+```
+make generate-examples
+```
+You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
+
+### Credentials and configuration
+
+In the Ark root directory, run the following to first set up namespaces:
+```
+kubectl apply -f examples/yaml/generated/00-prereqs.yaml
+```
+
+Create a Secret, making sure to run this command in the *directory where you previously created your credentials file*:
 
 ```
 kubectl create secret generic cloud-credentials \
@@ -85,26 +114,9 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-Now that you have your IAM user credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
+## GCP
 
-* In file `examples/aws/00-ark-config.yaml`:
-
-  * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>`, and `<YOUR_AVAILABILITY_ZONE>`. See the [Config definition][6] for details.
-
-
-* In file `examples/common/10-deployment.yaml`:
-
-  * Make sure that `spec.template.spec.containers[*].env.name` is "AWS_SHARED_CREDENTIALS_FILE".
-
-
-* (Optional) If you are running the Nginx example, in file `examples/nginx-app/with-pv.yaml`:
-
-    * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
-
-
-### GCP
-
-#### Service account creation
+### Service account creation
 
 To integrate Heptio Ark with GCP, you should follow the instructions below to create an Ark-specific [Service Account][15].
 
@@ -148,14 +160,45 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
         --iam-account $SERVICE_ACCOUNT_EMAIL
     ```
 
-#### Credentials and configuration
+### Generate YAML
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
+In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
-kubectl apply -f examples/common/00-prereqs.yaml
+export HEPTIO_ARK_RBAC_ENABLED=$(kubectl api-versions | grep -c rbac.authorization.k8s.io/v1beta1)
+export HEPTIO_ARK_PV_ENABLED=0
+export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | sed -n 's/.*v\([0-9]*.[0-9]*\).*/\1/p')
+export HEPTIO_ARK_CLOUD_PROVIDER=gcp
 ```
 
-Create a Secret, running this command in the local directory of the credentials file you just created:
+You'll also need to set some info specific to GCP. For details on any particular variable, see the [Config definition][7]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_BUCKET>
+```
+(Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_PV_ENABLED=1
+export HEPTIO_ARK_GCP_PROJECT=<YOUR_PROJECT>
+export HEPTIO_ARK_GCP_ZONE=<YOUR_ZONE>
+```
+
+Now generate your complete set of YAML manifests, by running the following in Ark's root directory:
+```
+make generate-examples
+```
+You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
+
+### Credentials and configuration
+
+In the Ark root directory, run the following to first set up namespaces:
+```
+kubectl apply -f examples/yaml/generated/00-prereqs.yaml
+```
+
+Create a Secret, making sure to run this command in the *directory where you previously created your credentials file*:
 
 ```
 kubectl create secret generic cloud-credentials \
@@ -163,25 +206,9 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-Now that you have your Google Cloud credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
+## Azure
 
-* In file `examples/gcp/00-ark-config.yaml`:
-
-  * Replace `<YOUR_BUCKET>`, `<YOUR_PROJECT>` and `<YOUR_ZONE>`. See the [Config definition][7] for details.
-
-
-* In file `examples/common/10-deployment.yaml`:
-
-  * Change `spec.template.spec.containers[*].env.name` to "GOOGLE_APPLICATION_CREDENTIALS".
-
-
-* (Optional) If you are running the Nginx example, in file `examples/nginx-app/with-pv.yaml`:
-
-    * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
-
-### Azure
-
-#### Service principal creation
+### Service principal creation
 To integrate Heptio Ark with Azure, you should follow the instructions below to create an Ark-specific [service principal][17].
 
 1. If you do not have the `az` Azure CLI 2.0 locally installed, follow the [user guide][18] to set it up. Once done, run:
@@ -241,14 +268,45 @@ To integrate Heptio Ark with Azure, you should follow the instructions below to 
     ```
     Set `$AZURE_STORAGE_KEY` to any one of the `value`s returned.
 
-#### Credentials and configuration
+### Generate YAML
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
+In order to generate YAML manifests specific to your setup, you need to set the following environment variables:
 ```
-kubectl apply -f examples/common/00-prereqs.yaml
+export HEPTIO_ARK_RBAC_ENABLED=$(kubectl api-versions | grep -c rbac.authorization.k8s.io/v1beta1)
+export HEPTIO_ARK_PV_ENABLED=0
+export HEPTIO_ARK_K8S_VERSION=$(kubectl version --short=true | grep "Server" | sed -n 's/.*v\([0-9]*.[0-9]*\).*/\1/p')
+export HEPTIO_ARK_CLOUD_PROVIDER=azure
 ```
 
-Now you need to create a Secret that contains all the seven environment variables you just set. The command looks like the following:
+You'll also need to set some info specific to Azure. For details on any particular variable, see the [Config definition][8]. Otherwise, run the following in your terminal:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_BUCKET=<YOUR_PREEXISTING_BUCKET>
+```
+(Optional) To support PV snapshots, set the following as well:
+
+**(Replace bracketed placeholders)**
+```
+export HEPTIO_ARK_PV_ENABLED=1
+export HEPTIO_ARK_AZURE_LOCATION=<YOUR_LOCATION>
+export HEPTIO_ARK_AZURE_TIMEOUT=<YOUR_TIMEOUT>
+```
+
+Now generate your complete set of YAML manifests, by running the following in Ark's root directory:
+```
+make generate-examples
+```
+You should see your files in `examples/yaml/generated`--the `*.yaml` files are your Kubernetes manifests, and `env.txt` is a copy of the environment variables used during generation.
+
+### Credentials and configuration
+
+In the Ark root directory, run the following to first set up namespaces:
+```
+kubectl apply -f examples/yaml/generated/00-prereqs.yaml
+```
+
+Now you need to create a Secret that contains all the seven environment variables you previously set. The command looks like the following:
 ```
 kubectl create secret generic cloud-credentials \
     --namespace heptio-ark \
@@ -261,38 +319,22 @@ kubectl create secret generic cloud-credentials \
     --from-literal AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
 ```
 
-Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
-
-* In file `examples/azure/10-ark-config.yaml`:
-
-  * Replace `<YOUR_BUCKET>`, `<YOUR_LOCATION>`, and `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
-
-
 ## Run
 
 ### Ark server
 
-Make sure that you have run `kubectl apply -f examples/common/00-prereqs.yaml` first (this command is incorporated in the previous setup instructions because it creates the necessary namespaces).
+Make sure that you have run `kubectl apply -f examples/yaml/generated/00-prereqs.yaml` first (this command is incorporated in the previous setup instructions because it creates the necessary namespaces).
 
-* **AWS and GCP**
-
-  Start the Ark server itself, using the Config from the appropriate cloud-provider-specific directory:
-  ```
-  kubectl apply -f examples/common/10-deployment.yaml
-  kubectl apply -f examples/<CLOUD-PROVIDER>/
-  ```
-* **Azure**
-
-  Because Azure loads its credentials differently (from environment variables rather than a file), you need to instead run:
-  ```
-  kubectl apply -f examples/azure/
-  ```
+Now start the Ark server itself:
+```
+kubectl apply -f examples/yaml/generated/10-ark.yaml
+```
 
 ### Basic example (No PVs)
 
 Start the sample nginx app:
 ```
-kubectl apply -f examples/nginx-app/base.yaml
+kubectl apply -f examples/yaml/generated/20-nginx-example.yaml
 ```
 Now create a backup:
 ```
@@ -313,7 +355,7 @@ ark restore create nginx-backup
 
 Start the sample nginx app:
 ```
-kubectl apply -f examples/nginx-app/with-pv.yaml
+kubectl apply -f examples/yaml/generated/20-nginx-example.yaml
 ```
 
 Because Kubernetes does not automatically transfer labels from PVCs to dynamically generated PVs, you need to do so manually:
@@ -321,6 +363,7 @@ Because Kubernetes does not automatically transfer labels from PVCs to dynamical
 nginx_pv_name=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="nginx-logs")].metadata.name}')
 kubectl label pv $nginx_pv_name app=nginx
 ```
+
 Now create a backup with PV snapshotting:
 ```
 ark backup create nginx-backup --selector app=nginx
@@ -359,4 +402,3 @@ ark restore create nginx-backup
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
-

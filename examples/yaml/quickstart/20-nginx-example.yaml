@@ -16,30 +16,15 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    app: nginx
   name: nginx-example
-  labels:
-    app: nginx
-
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: nginx-logs
-  namespace: nginx-example
-  labels:
-    app: nginx
-spec:
-  storageClassName: <YOUR_STORAGE_CLASS_NAME>
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 50Mi
-
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
+  labels:
+    app: nginx
   name: nginx-deployment
   namespace: nginx-example
 spec:
@@ -49,20 +34,11 @@ spec:
       labels:
         app: nginx
     spec:
-      volumes:
-        - name: nginx-logs
-          persistentVolumeClaim:
-           claimName: nginx-logs
       containers:
       - image: nginx:1.7.9
         name: nginx
         ports:
         - containerPort: 80
-        volumeMounts:
-          - mountPath: "/var/log/nginx"
-            name: nginx-logs
-            readOnly: false
-
 ---
 apiVersion: v1
 kind: Service

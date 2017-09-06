@@ -12,31 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
----
-apiVersion: apps/v1beta1
-kind: Deployment
-metadata:
-  namespace: heptio-ark
-  name: ark
-spec:
-  replicas: 1
-  template:
-    metadata:
-      labels:
-        component: ark
-    spec:
-      restartPolicy: Always
-      serviceAccountName: ark
-      containers:
-        - name: ark
-          image: gcr.io/heptio-images/ark:latest
-          command:
-            - /ark
-          args:
-            - server
-            - --logtostderr
-            - --v
-            - "4"
-          envFrom:
-            - secretRef:
-                name: cloud-credentials
+{
+  metadata: {
+    namespace: "heptio-ark",
+    labels: {component: "ark"},
+  },
+  name: "default", // do not change
+  spec: {
+    backupSyncPeriod: "30m",
+    gcSyncPeriod: "30m",
+    scheduleSyncPeriod: "1m",
+    restoreOnlyMode: "false",
+  },
+}

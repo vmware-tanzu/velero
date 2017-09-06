@@ -12,21 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
----
-apiVersion: ark.heptio.com/v1
-kind: Config
-metadata:
-  namespace: heptio-ark
-  name: default
-persistentVolumeProvider:
-  aws:
-    region: <YOUR_REGION>
-    availabilityZone: <YOUR_AVAILABILITY_ZONE>
-backupStorageProvider:
-  bucket: <YOUR_BUCKET>
-  aws:
-    region: <YOUR_REGION>
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
-restoreOnlyMode: false
+local arkConf = import "examples/ksonnet/conf/ark.jsonnet";
+local arkLib = import "examples/ksonnet/components/ark.jsonnet";
+
+arkLib.prereqs(arkConf)
