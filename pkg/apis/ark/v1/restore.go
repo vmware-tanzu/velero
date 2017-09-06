@@ -24,8 +24,13 @@ type RestoreSpec struct {
 	// from.
 	BackupName string `json:"backupName"`
 
-	// Namespaces is a slice of namespaces in the Ark backup to restore.
-	Namespaces []string `json:"namespaces"`
+	// IncludedNamespaces is a slice of namespace names to include objects
+	// from. If empty, all namespaces are included.
+	IncludedNamespaces []string `json:"includedNamespaces"`
+
+	// ExcludedNamespaces contains a list of namespaces that are not
+	// included in the restore.
+	ExcludedNamespaces []string `json:"excludedNamespaces"`
 
 	// NamespaceMapping is a map of source namespace names
 	// to target namespace names to restore into. Any source

@@ -37,19 +37,31 @@ func TestHandles(t *testing.T) {
 		{
 			name:    "restorable NS",
 			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
-			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-1").Restore,
+			restore: testutil.NewDefaultTestRestore().WithIncludedNamespace("ns-1").Restore,
+			expect:  true,
+		},
+		{
+			name:    "restorable NS via wildcard",
+			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
+			restore: testutil.NewDefaultTestRestore().WithIncludedNamespace("*").Restore,
 			expect:  true,
 		},
 		{
 			name:    "non-restorable NS",
 			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
-			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-2").Restore,
+			restore: testutil.NewDefaultTestRestore().WithIncludedNamespace("ns-2").Restore,
+			expect:  false,
+		},
+		{
+			name:    "namespace is explicitly excluded",
+			obj:     NewTestUnstructured().WithName("ns-1").Unstructured,
+			restore: testutil.NewDefaultTestRestore().WithIncludedNamespace("*").WithExcludedNamespace("ns-1").Restore,
 			expect:  false,
 		},
 		{
 			name:    "namespace obj doesn't have name",
 			obj:     NewTestUnstructured().WithMetadata().Unstructured,
-			restore: testutil.NewDefaultTestRestore().WithRestorableNamespace("ns-1").Restore,
+			restore: testutil.NewDefaultTestRestore().WithIncludedNamespace("ns-1").Restore,
 			expect:  false,
 		},
 	}

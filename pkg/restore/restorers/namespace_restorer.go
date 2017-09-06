@@ -37,13 +37,10 @@ func (nsr *namespaceRestorer) Handles(obj runtime.Unstructured, restore *api.Res
 		return false
 	}
 
-	for _, restorableNS := range restore.Spec.Namespaces {
-		if restorableNS == nsName {
-			return true
-		}
-	}
-
-	return false
+	return collections.NewIncludesExcludes().
+		Includes(restore.Spec.IncludedNamespaces...).
+		Excludes(restore.Spec.ExcludedNamespaces...).
+		ShouldInclude(nsName)
 }
 
 func (nsr *namespaceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {

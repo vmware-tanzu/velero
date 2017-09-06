@@ -40,6 +40,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type restoreController struct {
@@ -220,15 +221,15 @@ func (controller *restoreController) processRestore(key string) error {
 		return err
 	}
 
+	if len(restore.Spec.IncludedNamespaces) == 0 {
+		restore.Spec.IncludedNamespaces = []string{"*"}
+	}
+
 	// validation
 	if restore.Status.ValidationErrors = controller.getValidationErrors(restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
-	}
-
-	if len(restore.Spec.Namespaces) == 0 {
-		restore.Spec.Namespaces = []string{"*"}
 	}
 
 	// update status
@@ -277,6 +278,10 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	}
+
+	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
 	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {
