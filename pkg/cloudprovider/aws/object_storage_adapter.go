@@ -109,9 +109,30 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(res *s3.ListObjectsV2Output, lastPage bool) bool {
-		for _, prefix := range res.CommonPrefixes {
+	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, prefix := range page.CommonPrefixes {
 			ret = append(ret, *prefix.Prefix)
+		}
+		return !lastPage
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+	req := &s3.ListObjectsV2Input{
+		Bucket: &bucket,
+		Prefix: &prefix,
+	}
+
+	var ret []string
+	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, obj := range page.Contents {
+			ret = append(ret, *obj.Key)
 		}
 		return !lastPage
 	})

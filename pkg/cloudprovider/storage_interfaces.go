@@ -37,6 +37,9 @@ type ObjectStorageAdapter interface {
 	// hierarchy in object storage).
 	ListCommonPrefixes(bucket string, delimiter string) ([]string, error)
 
+	// ListObjects gets a list of all objects in bucket that have the same prefix.
+	ListObjects(bucket, prefix string) ([]string, error)
+
 	// DeleteObject removes object with the specified key from the given
 	// bucket.
 	DeleteObject(bucket string, key string) error

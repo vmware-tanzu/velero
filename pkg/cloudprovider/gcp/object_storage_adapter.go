@@ -92,6 +92,20 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	return ret, nil
 }
 
+func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+	res, err := op.gcs.Objects.List(bucket).Prefix(prefix).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make([]string, 0, len(res.Items))
+	for _, item := range res.Items {
+		ret = append(ret, item.Name)
+	}
+
+	return ret, nil
+}
+
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	return op.gcs.Objects.Delete(bucket, key).Do()
 }
