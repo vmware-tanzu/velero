@@ -29,22 +29,27 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // gcController removes expired backup content from object storage.
 type gcController struct {
-	backupService   cloudprovider.BackupService
-	snapshotService cloudprovider.SnapshotService
-	bucket          string
-	syncPeriod      time.Duration
-	clock           clock.Clock
-	lister          listers.BackupLister
-	listerSynced    cache.InformerSynced
-	client          arkv1client.BackupsGetter
+	backupService       cloudprovider.BackupService
+	snapshotService     cloudprovider.SnapshotService
+	bucket              string
+	syncPeriod          time.Duration
+	clock               clock.Clock
+	backupLister        listers.BackupLister
+	backupListerSynced  cache.InformerSynced
+	backupClient        arkv1client.BackupsGetter
+	restoreLister       listers.RestoreLister
+	restoreListerSynced cache.InformerSynced
+	restoreClient       arkv1client.RestoresGetter
 }
 
 // NewGCController constructs a new gcController.
@@ -54,7 +59,9 @@ func NewGCController(
 	bucket string,
 	syncPeriod time.Duration,
 	backupInformer informers.BackupInformer,
-	client arkv1client.BackupsGetter,
+	backupClient arkv1client.BackupsGetter,
+	restoreInformer informers.RestoreInformer,
+	restoreClient arkv1client.RestoresGetter,
 ) Interface {
 	if syncPeriod < time.Minute {
 		glog.Infof("GC sync period %v is too short. Setting to 1 minute", syncPeriod)
@@ -62,14 +69,17 @@ func NewGCController(
 	}
 
 	return &gcController{
-		backupService:   backupService,
-		snapshotService: snapshotService,
-		bucket:          bucket,
-		syncPeriod:      syncPeriod,
-		clock:           clock.RealClock{},
-		lister:          backupInformer.Lister(),
-		listerSynced:    backupInformer.Informer().HasSynced,
-		client:          client,
+		backupService:       backupService,
+		snapshotService:     snapshotService,
+		bucket:              bucket,
+		syncPeriod:          syncPeriod,
+		clock:               clock.RealClock{},
+		backupLister:        backupInformer.Lister(),
+		backupListerSynced:  backupInformer.Informer().HasSynced,
+		backupClient:        backupClient,
+		restoreLister:       restoreInformer.Lister(),
+		restoreListerSynced: restoreInformer.Informer().HasSynced,
+		restoreClient:       restoreClient,
 	}
 }
 
@@ -80,7 +90,7 @@ var _ Interface = &gcController{}
 // ctx.Done() channel.
 func (c *gcController) Run(ctx context.Context, workers int) error {
 	glog.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.listerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.backupListerSynced, c.restoreListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
 	glog.Info("Caches are synced")
@@ -90,70 +100,111 @@ func (c *gcController) Run(ctx context.Context, workers int) error {
 }
 
 func (c *gcController) run() {
-	c.cleanBackups()
+	c.processBackups()
 }
 
-// cleanBackups deletes expired backups.
-func (c *gcController) cleanBackups() {
-	backups, err := c.backupService.GetAllBackups(c.bucket)
-	if err != nil {
-		glog.Errorf("error getting all backups: %v", err)
+// garbageCollectBackup removes an expired backup by deleting any associated backup files (if
+// deleteBackupFile = true), volume snapshots, restore API objects, and the backup API object
+// itself.
+func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile bool) {
+	// if the backup includes snapshots but we don't currently have a PVProvider, we don't
+	// want to orphan the snapshots so skip garbage-collection entirely.
+	if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
+		glog.Warningf("Cannot garbage-collect backup %s because backup includes snapshots and server is not configured with PersistentVolumeProvider",
+			kube.NamespaceAndName(backup))
 		return
 	}
 
+	// The GC process is primarily intended to delete expired cloud resources (file in object
+	// storage, snapshots). If we fail to delete any of these, we don't delete the Backup API
+	// object or metadata file in object storage so that we don't orphan the cloud resources.
+	deletionFailure := false
+
+	for _, volumeBackup := range backup.Status.VolumeBackups {
+		glog.Infof("Removing snapshot %s associated with backup %s", volumeBackup.SnapshotID, kube.NamespaceAndName(backup))
+		if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
+			glog.Errorf("error deleting snapshot %v: %v", volumeBackup.SnapshotID, err)
+			deletionFailure = true
+		}
+	}
+
+	// If applicable, delete backup & metadata file from object storage *before* deleting the API object
+	// because otherwise the backup sync controller could re-sync the backup from object storage.
+	if deleteBackupFile {
+		glog.Infof("Removing backup %s", kube.NamespaceAndName(backup))
+		if err := c.backupService.DeleteBackupFile(c.bucket, backup.Name); err != nil {
+			glog.Errorf("error deleting backup %s: %v", kube.NamespaceAndName(backup), err)
+			deletionFailure = true
+		}
+
+		if deletionFailure {
+			glog.Warningf("Backup %s will not be deleted due to errors deleting related object storage files(s) and/or volume snapshots", kube.NamespaceAndName(backup))
+		} else {
+			if err := c.backupService.DeleteBackupMetadataFile(c.bucket, backup.Name); err != nil {
+				glog.Errorf("error deleting backup metadata file for %s: %v", kube.NamespaceAndName(backup), err)
+				deletionFailure = true
+			}
+		}
+	}
+
+	glog.Infof("Getting restore API objects referencing backup %s", kube.NamespaceAndName(backup))
+	if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
+		glog.Errorf("error getting restore API objects: %v", err)
+	} else {
+		for _, restore := range restores {
+			if restore.Spec.BackupName == backup.Name {
+				glog.Infof("Removing restore API object %s of backup %s", kube.NamespaceAndName(restore), kube.NamespaceAndName(backup))
+				if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
+					glog.Errorf("error deleting restore API object %s: %v", kube.NamespaceAndName(restore), err)
+				}
+			}
+		}
+	}
+
+	if deletionFailure {
+		glog.Warningf("Backup %s will not be deleted due to errors deleting related object storage files(s) and/or volume snapshots", kube.NamespaceAndName(backup))
+		return
+	}
+
+	glog.Infof("Removing backup API object %s", kube.NamespaceAndName(backup))
+	if err := c.backupClient.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
+		glog.Errorf("error deleting backup API object %s: %v", kube.NamespaceAndName(backup), err)
+	}
+}
+
+// garbageCollectBackups checks backups for expiration and triggers garbage-collection for the expired
+// ones.
+func (c *gcController) garbageCollectBackups(backups []*api.Backup, expiration time.Time, deleteBackupFiles bool) {
+	for _, backup := range backups {
+		if backup.Status.Expiration.Time.After(expiration) {
+			glog.Infof("Backup %s has not expired yet, skipping", kube.NamespaceAndName(backup))
+			continue
+		}
+
+		c.garbageCollectBackup(backup, deleteBackupFiles)
+	}
+}
+
+// processBackups gets backups from object storage and the API and submits
+// them for garbage-collection.
+func (c *gcController) processBackups() {
 	now := c.clock.Now()
 	glog.Infof("garbage-collecting backups that have expired as of %v", now)
 
-	// GC backup files and associated snapshots/API objects. Note that deletion from object
-	// storage should happen first because otherwise there's a possibility the backup sync
-	// controller would re-create the API object after deletion.
-	for _, backup := range backups {
-		if !backup.Status.Expiration.Time.Before(now) {
-			glog.Infof("Backup %s/%s has not expired yet, skipping", backup.Namespace, backup.Name)
-			continue
-		}
-
-		// if the backup includes snapshots but we don't currently have a PVProvider, we don't
-		// want to orphan the snapshots so skip garbage-collection entirely.
-		if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
-			glog.Warningf("Cannot garbage-collect backup %s/%s because backup includes snapshots and server is not configured with PersistentVolumeProvider",
-				backup.Namespace, backup.Name)
-			continue
-		}
-
-		glog.Infof("Removing backup %s/%s", backup.Namespace, backup.Name)
-		if err := c.backupService.DeleteBackup(c.bucket, backup.Name); err != nil {
-			glog.Errorf("error deleting backup %s/%s: %v", backup.Namespace, backup.Name, err)
-		}
-
-		for _, volumeBackup := range backup.Status.VolumeBackups {
-			glog.Infof("Removing snapshot %s associated with backup %s/%s", volumeBackup.SnapshotID, backup.Namespace, backup.Name)
-			if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
-				glog.Errorf("error deleting snapshot %v: %v", volumeBackup.SnapshotID, err)
-			}
-		}
-
-		glog.Infof("Removing backup API object %s/%s", backup.Namespace, backup.Name)
-		if err := c.client.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
-			glog.Errorf("error deleting backup API object %s/%s: %v", backup.Namespace, backup.Name, err)
-		}
-
+	// GC backups in object storage. We do this in addition
+	// to GC'ing API objects to prevent orphan backup files.
+	backups, err := c.backupService.GetAllBackups(c.bucket)
+	if err != nil {
+		glog.Errorf("error getting all backups from object storage: %v", err)
+		return
 	}
+	c.garbageCollectBackups(backups, now, true)
 
-	// also GC any Backup API objects without files in object storage
-	apiBackups, err := c.lister.List(labels.NewSelector())
+	// GC backups without files in object storage
+	apiBackups, err := c.backupLister.List(labels.Everything())
 	if err != nil {
 		glog.Errorf("error getting all backup API objects: %v", err)
+		return
 	}
-
-	for _, backup := range apiBackups {
-		if backup.Status.Expiration.Time.Before(now) {
-			glog.Infof("Removing backup API object %s/%s", backup.Namespace, backup.Name)
-			if err := c.client.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
-				glog.Errorf("error deleting backup API object %s/%s: %v", backup.Namespace, backup.Name, err)
-			}
-		} else {
-			glog.Infof("Backup %s/%s has not expired yet, skipping", backup.Namespace, backup.Name)
-		}
-	}
+	c.garbageCollectBackups(apiBackups, now, false)
 }

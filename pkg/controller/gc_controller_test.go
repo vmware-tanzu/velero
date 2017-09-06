@@ -27,8 +27,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	core "k8s.io/client-go/testing"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -186,6 +188,7 @@ func TestGarbageCollect(t *testing.T) {
 
 		t.Run(test.name, func(t *testing.T) {
 			backupService.backupsByBucket = make(map[string][]*api.Backup)
+			backupService.backupMetadataByBucket = make(map[string][]*api.Backup)
 
 			for bucket, backups := range test.backups {
 				data := make([]*api.Backup, 0, len(backups))
@@ -194,6 +197,7 @@ func TestGarbageCollect(t *testing.T) {
 				}
 
 				backupService.backupsByBucket[bucket] = data
+				backupService.backupMetadataByBucket[bucket] = data
 			}
 
 			var (
@@ -213,10 +217,12 @@ func TestGarbageCollect(t *testing.T) {
 				1*time.Millisecond,
 				sharedInformers.Ark().V1().Backups(),
 				client.ArkV1(),
+				sharedInformers.Ark().V1().Restores(),
+				client.ArkV1(),
 			).(*gcController)
 			controller.clock = fakeClock
 
-			controller.cleanBackups()
+			controller.processBackups()
 
 			// verify every bucket has the backups we expect
 			for bucket, backups := range backupService.backupsByBucket {
@@ -237,6 +243,208 @@ func TestGarbageCollect(t *testing.T) {
 			if !test.nilSnapshotService {
 				assert.Equal(t, test.expectedSnapshotsRemaining, snapshotService.SnapshotsTaken)
 			}
+		})
+	}
+}
+
+func TestGarbageCollectBackup(t *testing.T) {
+	tests := []struct {
+		name                   string
+		backup                 *api.Backup
+		deleteBackupFile       bool
+		snapshots              sets.String
+		backupFiles            sets.String
+		backupMetadataFiles    sets.String
+		restores               []*api.Restore
+		expectedRestoreDeletes []string
+		expectedBackupDelete   string
+		expectedSnapshots      sets.String
+		expectedBackupFiles    sets.String
+		expectedMetadataFiles  sets.String
+	}{
+		{
+			name: "failed snapshot deletion shouldn't delete backup metadata file",
+			backup: NewTestBackup().WithName("backup-1").
+				WithSnapshot("pv-1", "snapshot-1").
+				WithSnapshot("pv-2", "snapshot-2").
+				Backup,
+			deleteBackupFile:      true,
+			snapshots:             sets.NewString("snapshot-1"),
+			backupFiles:           sets.NewString("backup-1"),
+			backupMetadataFiles:   sets.NewString("backup-1"),
+			restores:              nil,
+			expectedBackupDelete:  "",
+			expectedSnapshots:     sets.NewString(),
+			expectedBackupFiles:   sets.NewString(),
+			expectedMetadataFiles: sets.NewString("backup-1"),
+		},
+		{
+			name: "failed backup file deletion shouldn't delete backup metadata file",
+			backup: NewTestBackup().WithName("backup-1").
+				WithSnapshot("pv-1", "snapshot-1").
+				WithSnapshot("pv-2", "snapshot-2").
+				Backup,
+			deleteBackupFile:      true,
+			snapshots:             sets.NewString("snapshot-1", "snapshot-2"),
+			backupFiles:           sets.NewString("doesn't-match-backup-name"),
+			backupMetadataFiles:   sets.NewString("backup-1"),
+			restores:              nil,
+			expectedBackupDelete:  "",
+			expectedSnapshots:     sets.NewString(),
+			expectedBackupFiles:   sets.NewString("doesn't-match-backup-name"),
+			expectedMetadataFiles: sets.NewString("backup-1"),
+		},
+		{
+			name: "missing backup metadata file still deletes snapshots & backup file",
+			backup: NewTestBackup().WithName("backup-1").
+				WithSnapshot("pv-1", "snapshot-1").
+				WithSnapshot("pv-2", "snapshot-2").
+				Backup,
+			deleteBackupFile:      true,
+			snapshots:             sets.NewString("snapshot-1", "snapshot-2"),
+			backupFiles:           sets.NewString("backup-1"),
+			backupMetadataFiles:   sets.NewString("doesn't-match-backup-name"),
+			restores:              nil,
+			expectedBackupDelete:  "",
+			expectedSnapshots:     sets.NewString(),
+			expectedBackupFiles:   sets.NewString(),
+			expectedMetadataFiles: sets.NewString("doesn't-match-backup-name"),
+		},
+		{
+			name: "deleteBackupFile=false shouldn't error if no backup file exists",
+			backup: NewTestBackup().WithName("backup-1").
+				WithSnapshot("pv-1", "snapshot-1").
+				WithSnapshot("pv-2", "snapshot-2").
+				Backup,
+			deleteBackupFile:      false,
+			snapshots:             sets.NewString("snapshot-1", "snapshot-2"),
+			backupFiles:           sets.NewString("non-matching-backup"),
+			backupMetadataFiles:   sets.NewString("non-matching-backup"),
+			restores:              nil,
+			expectedBackupDelete:  "backup-1",
+			expectedSnapshots:     sets.NewString(),
+			expectedBackupFiles:   sets.NewString("non-matching-backup"),
+			expectedMetadataFiles: sets.NewString("non-matching-backup"),
+		},
+		{
+			name: "deleteBackupFile=false should error if snapshot delete fails",
+			backup: NewTestBackup().WithName("backup-1").
+				WithSnapshot("pv-1", "snapshot-1").
+				WithSnapshot("pv-2", "snapshot-2").
+				Backup,
+			deleteBackupFile:      false,
+			snapshots:             sets.NewString("snapshot-1"),
+			backupFiles:           sets.NewString("non-matching-backup"),
+			backupMetadataFiles:   sets.NewString("non-matching-backup"),
+			restores:              nil,
+			expectedBackupDelete:  "",
+			expectedSnapshots:     sets.NewString(),
+			expectedBackupFiles:   sets.NewString("non-matching-backup"),
+			expectedMetadataFiles: sets.NewString("non-matching-backup"),
+		},
+		{
+			name:                "related restores should be deleted",
+			backup:              NewTestBackup().WithName("backup-1").Backup,
+			deleteBackupFile:    false,
+			snapshots:           sets.NewString(),
+			backupFiles:         sets.NewString("non-matching-backup"),
+			backupMetadataFiles: sets.NewString("non-matching-backup"),
+			restores: []*api.Restore{
+				NewTestRestore(api.DefaultNamespace, "restore-1", api.RestorePhaseCompleted).WithBackup("backup-1").Restore,
+				NewTestRestore(api.DefaultNamespace, "restore-2", api.RestorePhaseCompleted).WithBackup("backup-2").Restore,
+			},
+			expectedRestoreDeletes: []string{"restore-1"},
+			expectedBackupDelete:   "backup-1",
+			expectedSnapshots:      sets.NewString(),
+			expectedBackupFiles:    sets.NewString("non-matching-backup"),
+			expectedMetadataFiles:  sets.NewString("non-matching-backup"),
+		},
+	}
+
+	for _, test := range tests {
+		var ()
+
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				backupService = &fakeBackupService{
+					backupsByBucket:        make(map[string][]*api.Backup),
+					backupMetadataByBucket: make(map[string][]*api.Backup),
+				}
+				snapshotService = &FakeSnapshotService{SnapshotsTaken: test.snapshots}
+				client          = fake.NewSimpleClientset()
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				controller      = NewGCController(
+					backupService,
+					snapshotService,
+					"bucket-1",
+					1*time.Millisecond,
+					sharedInformers.Ark().V1().Backups(),
+					client.ArkV1(),
+					sharedInformers.Ark().V1().Restores(),
+					client.ArkV1(),
+				).(*gcController)
+			)
+
+			for file := range test.backupFiles {
+				backup := &api.Backup{ObjectMeta: metav1.ObjectMeta{Name: file}}
+				backupService.backupsByBucket["bucket-1"] = append(backupService.backupsByBucket["bucket-1"], backup)
+			}
+			for file := range test.backupMetadataFiles {
+				backup := &api.Backup{ObjectMeta: metav1.ObjectMeta{Name: file}}
+				backupService.backupMetadataByBucket["bucket-1"] = append(backupService.backupMetadataByBucket["bucket-1"], backup)
+			}
+
+			sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup)
+			for _, restore := range test.restores {
+				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore)
+			}
+
+			// METHOD UNDER TEST
+			controller.garbageCollectBackup(test.backup, test.deleteBackupFile)
+
+			// VERIFY:
+
+			// remaining snapshots
+			assert.Equal(t, test.expectedSnapshots, snapshotService.SnapshotsTaken)
+
+			// remaining object storage backup files
+			expectedBackups := make([]*api.Backup, 0)
+			for file := range test.expectedBackupFiles {
+				backup := &api.Backup{ObjectMeta: metav1.ObjectMeta{Name: file}}
+				expectedBackups = append(expectedBackups, backup)
+			}
+			assert.Equal(t, expectedBackups, backupService.backupsByBucket["bucket-1"])
+
+			// remaining object storage backup metadata files
+			expectedBackups = make([]*api.Backup, 0)
+			for file := range test.expectedMetadataFiles {
+				backup := &api.Backup{ObjectMeta: metav1.ObjectMeta{Name: file}}
+				expectedBackups = append(expectedBackups, backup)
+			}
+			assert.Equal(t, expectedBackups, backupService.backupMetadataByBucket["bucket-1"])
+
+			expectedActions := make([]core.Action, 0)
+			// Restore client deletes
+			for _, restore := range test.expectedRestoreDeletes {
+				action := core.NewDeleteAction(
+					api.SchemeGroupVersion.WithResource("restores"),
+					api.DefaultNamespace,
+					restore,
+				)
+				expectedActions = append(expectedActions, action)
+			}
+
+			// Backup client deletes
+			if test.expectedBackupDelete != "" {
+				action := core.NewDeleteAction(
+					api.SchemeGroupVersion.WithResource("backups"),
+					api.DefaultNamespace,
+					test.expectedBackupDelete,
+				)
+				expectedActions = append(expectedActions, action)
+			}
+
+			assert.Equal(t, expectedActions, client.Actions())
 		})
 	}
 }
@@ -289,25 +497,28 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 		1*time.Millisecond,
 		sharedInformers.Ark().V1().Backups(),
 		client.ArkV1(),
+		sharedInformers.Ark().V1().Restores(),
+		client.ArkV1(),
 	).(*gcController)
 	controller.clock = fakeClock
 
 	// PASS 1
-	controller.cleanBackups()
+	controller.processBackups()
 
 	assert.Equal(scenario.backups, backupService.backupsByBucket, "backups should not be garbage-collected yet.")
 	assert.Equal(scenario.snapshots, snapshotService.SnapshotsTaken, "snapshots should not be garbage-collected yet.")
 
 	// PASS 2
 	fakeClock.Step(1 * time.Minute)
-	controller.cleanBackups()
+	controller.processBackups()
 
 	assert.Equal(0, len(backupService.backupsByBucket[scenario.bucket]), "backups should have been garbage-collected.")
 	assert.Equal(0, len(snapshotService.SnapshotsTaken), "snapshots should have been garbage-collected.")
 }
 
 type fakeBackupService struct {
-	backupsByBucket map[string][]*api.Backup
+	backupMetadataByBucket map[string][]*api.Backup
+	backupsByBucket        map[string][]*api.Backup
 	mock.Mock
 }
 
@@ -343,7 +554,30 @@ func (s *fakeBackupService) DownloadBackup(bucket, name string) (io.ReadCloser, 
 	return ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil
 }
 
-func (s *fakeBackupService) DeleteBackup(bucket, backupName string) error {
+func (s *fakeBackupService) DeleteBackupMetadataFile(bucket, backupName string) error {
+	backups, found := s.backupMetadataByBucket[bucket]
+	if !found {
+		return errors.New("bucket not found")
+	}
+
+	deleteIdx := -1
+	for i, backup := range backups {
+		if backup.Name == backupName {
+			deleteIdx = i
+			break
+		}
+	}
+
+	if deleteIdx == -1 {
+		return errors.New("backup not found")
+	}
+
+	s.backupMetadataByBucket[bucket] = append(s.backupMetadataByBucket[bucket][0:deleteIdx], s.backupMetadataByBucket[bucket][deleteIdx+1:]...)
+
+	return nil
+}
+
+func (s *fakeBackupService) DeleteBackupFile(bucket, backupName string) error {
 	backups, err := s.GetAllBackups(bucket)
 	if err != nil {
 		return err
