@@ -104,9 +104,9 @@ func (c *gcController) run() {
 }
 
 // garbageCollectBackup removes an expired backup by deleting any associated backup files (if
-// deleteBackupFile = true), volume snapshots, restore API objects, and the backup API object
+// deleteBackupFiles = true), volume snapshots, restore API objects, and the backup API object
 // itself.
-func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile bool) {
+func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFiles bool) {
 	// if the backup includes snapshots but we don't currently have a PVProvider, we don't
 	// want to orphan the snapshots so skip garbage-collection entirely.
 	if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
@@ -128,22 +128,13 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 		}
 	}
 
-	// If applicable, delete backup & metadata file from object storage *before* deleting the API object
+	// If applicable, delete everything in the backup dir in object storage *before* deleting the API object
 	// because otherwise the backup sync controller could re-sync the backup from object storage.
-	if deleteBackupFile {
-		glog.Infof("Removing backup %s", kube.NamespaceAndName(backup))
-		if err := c.backupService.DeleteBackupFile(c.bucket, backup.Name); err != nil {
+	if deleteBackupFiles {
+		glog.Infof("Removing backup %s from object storage", kube.NamespaceAndName(backup))
+		if err := c.backupService.DeleteBackupDir(c.bucket, backup.Name); err != nil {
 			glog.Errorf("error deleting backup %s: %v", kube.NamespaceAndName(backup), err)
 			deletionFailure = true
-		}
-
-		if deletionFailure {
-			glog.Warningf("Backup %s will not be deleted due to errors deleting related object storage files(s) and/or volume snapshots", kube.NamespaceAndName(backup))
-		} else {
-			if err := c.backupService.DeleteBackupMetadataFile(c.bucket, backup.Name); err != nil {
-				glog.Errorf("error deleting backup metadata file for %s: %v", kube.NamespaceAndName(backup), err)
-				deletionFailure = true
-			}
 		}
 	}
 

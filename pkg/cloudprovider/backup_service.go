@@ -45,11 +45,8 @@ type BackupService interface {
 	// downloading or reading the file from the cloud API.
 	DownloadBackup(bucket, name string) (io.ReadCloser, error)
 
-	// DeleteBackup deletes the backup content in object storage for the given backup.
-	DeleteBackupFile(bucket, backupName string) error
-
-	// DeleteBackup deletes the backup metadata file in object storage for the given backup.
-	DeleteBackupMetadataFile(bucket, backupName string) error
+	// DeleteBackupDir deletes all files in object storage for the given backup.
+	DeleteBackupDir(bucket, backupName string) error
 
 	// GetBackup gets the specified api.Backup from the given bucket in object storage.
 	GetBackup(bucket, name string) (*api.Backup, error)
@@ -180,16 +177,22 @@ func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
 	return backup, nil
 }
 
-func (br *backupService) DeleteBackupFile(bucket, backupName string) error {
-	key := getBackupKey(backupName)
-	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	return br.objectStorage.DeleteObject(bucket, key)
-}
+func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
+	objects, err := br.objectStorage.ListObjects(bucket, backupName+"/")
+	if err != nil {
+		return err
+	}
 
-func (br *backupService) DeleteBackupMetadataFile(bucket, backupName string) error {
-	key := getMetadataKey(backupName)
-	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	return br.objectStorage.DeleteObject(bucket, key)
+	var errs []error
+	for _, key := range objects {
+		glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
+		fmt.Printf("Trying to delete bucket=%s, key=%s\n", bucket, key)
+		if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.NewAggregate(errs)
 }
 
 func (br *backupService) CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error) {

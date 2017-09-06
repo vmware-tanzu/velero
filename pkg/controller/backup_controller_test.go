@@ -155,7 +155,7 @@ func TestProcessBackup(t *testing.T) {
 
 			backupper := &fakeBackupper{}
 
-			cloudBackups := &fakeBackupService{}
+			cloudBackups := &BackupService{}
 
 			sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
