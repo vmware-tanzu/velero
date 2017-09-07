@@ -50,7 +50,7 @@ type fakeAction struct {
 
 var _ Action = &fakeAction{}
 
-func (a *fakeAction) Execute(item map[string]interface{}, backup *v1.Backup) error {
+func (a *fakeAction) Execute(ctx ActionContext, item map[string]interface{}, backup *v1.Backup) error {
 	metadata, err := collections.GetMap(item, "metadata")
 	if err != nil {
 		return err
@@ -186,7 +186,7 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 
 			b := new(bytes.Buffer)
 			ctx := &backupContext{
-				logger: b,
+				logger: &logger{w: b},
 			}
 
 			actual := ctx.getResourceIncludesExcludes(mapper, test.includes, test.excludes)
@@ -781,7 +781,7 @@ func TestBackupResource(t *testing.T) {
 				namespaceIncludesExcludes: test.namespaceIncludesExcludes,
 				deploymentsBackedUp:       test.deploymentsBackedUp,
 				networkPoliciesBackedUp:   test.networkPoliciesBackedUp,
-				logger:                    new(bytes.Buffer),
+				logger:                    &logger{w: new(bytes.Buffer)},
 			}
 
 			group := &metav1.APIResourceList{
@@ -1009,7 +1009,7 @@ func TestBackupItem(t *testing.T) {
 				backup: backup,
 				namespaceIncludesExcludes: namespaces,
 				w:      w,
-				logger: new(bytes.Buffer),
+				logger: &logger{w: new(bytes.Buffer)},
 			}
 			b := &realItemBackupper{}
 			err = b.backupItem(ctx, item, "resource.group", actionParam)

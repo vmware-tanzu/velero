@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"bytes"
 	"reflect"
 	"testing"
 	"time"
@@ -185,7 +186,8 @@ func TestVolumeSnapshotAction(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = action.Execute(pv, backup)
+			actionCtx := ActionContext{logger: &logger{w: new(bytes.Buffer)}}
+			err = action.Execute(actionCtx, pv, backup)
 			gotErr := err != nil
 
 			if e, a := test.expectError, gotErr; e != a {

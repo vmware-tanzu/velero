@@ -20,8 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/glog"
-
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -52,10 +50,10 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Act
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *api.Backup) error {
+func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]interface{}, backup *api.Backup) error {
 	backupName := fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
-		glog.V(2).Infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
+		ctx.log("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
 		return nil
 	}
 
@@ -69,23 +67,23 @@ func (a *volumeSnapshotAction) Execute(volume map[string]interface{}, backup *ap
 	}
 	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {
-		glog.V(2).Infof("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
+		ctx.log("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
 		return nil
 	}
 
 	expiration := a.clock.Now().Add(backup.Spec.TTL.Duration)
 
-	glog.Infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
+	ctx.log("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
 
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID)
 	if err != nil {
-		glog.V(4).Infof("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
+		ctx.log("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 
 	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID)
 	if err != nil {
-		glog.V(4).Infof("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
+		ctx.log("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 

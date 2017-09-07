@@ -54,11 +54,20 @@ type kubernetesBackupper struct {
 
 var _ Backupper = &kubernetesBackupper{}
 
+// ActionContext contains contextual information for actions.
+type ActionContext struct {
+	logger *logger
+}
+
+func (ac ActionContext) log(msg string, args ...interface{}) {
+	ac.logger.log(msg, args...)
+}
+
 // Action is an actor that performs an operation on an individual item being backed up.
 type Action interface {
 	// Execute is invoked on an item being backed up. If an error is returned, the Backup is marked as
 	// failed.
-	Execute(item map[string]interface{}, backup *api.Backup) error
+	Execute(ctx ActionContext, item map[string]interface{}, backup *api.Backup) error
 }
 
 // NewKubernetesBackupper creates a new kubernetesBackupper.
@@ -144,10 +153,20 @@ func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExclu
 	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
 }
 
+type logger struct {
+	w io.Writer
+}
+
+func (l *logger) log(msg string, args ...interface{}) {
+	// TODO use a real logger that supports writing to files
+	now := time.Now().Format(time.RFC3339)
+	fmt.Fprintf(l.w, now+" "+msg+"\n", args...)
+}
+
 type backupContext struct {
 	backup                    *api.Backup
 	w                         tarWriter
-	logger                    io.Writer
+	logger                    *logger
 	namespaceIncludesExcludes *collections.IncludesExcludes
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	// deploymentsBackedUp marks whether we've seen and are backing up the deployments resource, from
@@ -161,9 +180,7 @@ type backupContext struct {
 }
 
 func (ctx *backupContext) log(msg string, args ...interface{}) {
-	// TODO use a real logger that supports writing to files
-	now := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(ctx.logger, now+" "+msg+"\n", args...)
+	ctx.logger.log(msg, args...)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
@@ -183,7 +200,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, data, log io.Writer) e
 	ctx := &backupContext{
 		backup: backup,
 		w:      tw,
-		logger: gzippedLog,
+		logger: &logger{w: gzippedLog},
 		namespaceIncludesExcludes: getNamespaceIncludesExcludes(backup),
 	}
 
@@ -389,7 +406,8 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 	if action != nil {
 		ctx.log("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
 
-		if err := action.Execute(item, ctx.backup); err != nil {
+		actionCtx := ActionContext{logger: ctx.logger}
+		if err := action.Execute(actionCtx, item, ctx.backup); err != nil {
 			return err
 		}
 	}
