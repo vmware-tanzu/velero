@@ -64,8 +64,8 @@ type BackupGetter interface {
 
 const (
 	metadataFileFormatString = "%s/ark-backup.json"
-	backupFileFormatString   = "%s/%s.tar.gz"
-	logFileFormatString      = "%s/%s.log.gz"
+	backupFileFormatString   = "%s/%s-data.tar.gz"
+	logFileFormatString      = "%s/%s-logs.gz"
 )
 
 func getMetadataKey(backup string) string {
@@ -186,7 +186,6 @@ func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
 	var errs []error
 	for _, key := range objects {
 		glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-		fmt.Printf("Trying to delete bucket=%s, key=%s\n", bucket, key)
 		if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
 			errs = append(errs, err)
 		}

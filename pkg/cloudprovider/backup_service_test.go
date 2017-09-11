@@ -88,10 +88,10 @@ func TestUploadBackup(t *testing.T) {
 				objStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
 			}
 			if test.backup != nil {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
+				objStore.On("PutObject", bucket, backupName+"/"+backupName+"-data.tar.gz", test.backup).Return(test.backupError)
 			}
 			if test.log != nil {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+".log.gz", test.log).Return(test.logError)
+				objStore.On("PutObject", bucket, backupName+"/"+backupName+"-logs.gz", test.log).Return(test.logError)
 			}
 			if test.expectMetadataDelete {
 				objStore.On("DeleteObject", bucket, backupName+"/ark-backup.json").Return(nil)
@@ -116,7 +116,7 @@ func TestDownloadBackup(t *testing.T) {
 	o := &testutil.ObjectStorageAdapter{}
 	bucket := "b"
 	backup := "bak"
-	o.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
+	o.On("GetObject", bucket, backup+"/"+backup+"-data.tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
 	s := NewBackupService(o)
 	rc, err := s.DownloadBackup(bucket, backup)
 	require.NoError(t, err)
