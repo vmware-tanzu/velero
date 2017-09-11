@@ -39,9 +39,9 @@ import (
 
 // Backupper performs backups.
 type Backupper interface {
-	// Backup takes a backup using the specification in the api.Backup and writes backup data to the
-	// given writers.
-	Backup(backup *api.Backup, data, log io.Writer) error
+	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
+	// to the given writers.
+	Backup(backup *api.Backup, backupFile, logFile io.Writer) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -184,15 +184,15 @@ func (ctx *backupContext) log(msg string, args ...interface{}) {
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
-// written to data. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(backup *api.Backup, data, log io.Writer) error {
-	gzippedData := gzip.NewWriter(data)
+// written to backupFile. The finalized api.Backup is written to metadata.
+func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io.Writer) error {
+	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
 	tw := tar.NewWriter(gzippedData)
 	defer tw.Close()
 
-	gzippedLog := gzip.NewWriter(log)
+	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
 	var errs []error
