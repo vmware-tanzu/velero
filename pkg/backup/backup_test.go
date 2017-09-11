@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"sort"
 	"testing"
@@ -50,7 +51,7 @@ type fakeAction struct {
 
 var _ Action = &fakeAction{}
 
-func (a *fakeAction) Execute(item map[string]interface{}, backup *v1.Backup) error {
+func (a *fakeAction) Execute(ctx ActionContext, item map[string]interface{}, backup *v1.Backup) error {
 	metadata, err := collections.GetMap(item, "metadata")
 	if err != nil {
 		return err
@@ -164,6 +165,13 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 			expectedIncludes: []string{"foodies.somegroup", "fields.somegroup"},
 			expectedExcludes: []string{"barnacles.anothergroup", "bazaars.anothergroup"},
 		},
+		{
+			name:             "some unresolvable",
+			includes:         []string{"foo", "fie", "bad1"},
+			excludes:         []string{"bar", "baz", "bad2"},
+			expectedIncludes: []string{"foodies.somegroup", "fields.somegroup"},
+			expectedExcludes: []string{"barnacles.anothergroup", "bazaars.anothergroup"},
+		},
 	}
 
 	for _, test := range tests {
@@ -177,14 +185,12 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 				},
 			}
 
-			backup := &v1.Backup{
-				Spec: v1.BackupSpec{
-					IncludedResources: test.includes,
-					ExcludedResources: test.excludes,
-				},
+			b := new(bytes.Buffer)
+			ctx := &backupContext{
+				logger: &logger{w: b},
 			}
 
-			actual := getResourceIncludesExcludes(mapper, backup)
+			actual := ctx.getResourceIncludesExcludes(mapper, test.includes, test.excludes)
 
 			sort.Strings(test.expectedIncludes)
 			actualIncludes := actual.GetIncludes()
@@ -439,7 +445,7 @@ func TestBackupMethod(t *testing.T) {
 	require.NoError(t, err)
 
 	output := new(bytes.Buffer)
-	err = backupper.Backup(backup, output)
+	err = backupper.Backup(backup, output, ioutil.Discard)
 	require.NoError(t, err)
 
 	expectedFiles := sets.NewString(
@@ -775,6 +781,7 @@ func TestBackupResource(t *testing.T) {
 				namespaceIncludesExcludes: test.namespaceIncludesExcludes,
 				deploymentsBackedUp:       test.deploymentsBackedUp,
 				networkPoliciesBackedUp:   test.networkPoliciesBackedUp,
+				logger:                    &logger{w: new(bytes.Buffer)},
 			}
 
 			group := &metav1.APIResourceList{
@@ -1001,7 +1008,8 @@ func TestBackupItem(t *testing.T) {
 			ctx := &backupContext{
 				backup: backup,
 				namespaceIncludesExcludes: namespaces,
-				w: w,
+				w:      w,
+				logger: &logger{w: new(bytes.Buffer)},
 			}
 			b := &realItemBackupper{}
 			err = b.backupItem(ctx, item, "resource.group", actionParam)

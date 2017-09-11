@@ -7,6 +7,12 @@ Work with schedules
 
 Work with schedules
 
+### Options
+
+```
+  -h, --help   help for schedule
+```
+
 ### Options inherited from parent commands
 
 ```

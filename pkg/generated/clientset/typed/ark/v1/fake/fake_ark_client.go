@@ -18,6 +18,10 @@ func (c *FakeArkV1) Configs(namespace string) v1.ConfigInterface {
 	return &FakeConfigs{c, namespace}
 }
 
+func (c *FakeArkV1) DownloadRequests(namespace string) v1.DownloadRequestInterface {
+	return &FakeDownloadRequests{c, namespace}
+}
+
 func (c *FakeArkV1) Restores(namespace string) v1.RestoreInterface {
 	return &FakeRestores{c, namespace}
 }

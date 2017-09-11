@@ -8,7 +8,13 @@ Delete a restore
 Delete a restore
 
 ```
-ark restore delete NAME
+ark restore delete NAME [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands

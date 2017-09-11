@@ -38,21 +38,22 @@ type BackupService interface {
 	// UploadBackup uploads the specified Ark backup of a set of Kubernetes API objects, whose manifests are
 	// stored in the specified file, into object storage in an Ark bucket, tagged with Ark metadata. Returns
 	// an error if a problem is encountered accessing the file or performing the upload via the cloud API.
-	UploadBackup(bucket, name string, metadata, backup io.ReadSeeker) error
+	UploadBackup(bucket, name string, metadata, backup, log io.ReadSeeker) error
 
 	// DownloadBackup downloads an Ark backup with the specified object key from object storage via the cloud API.
 	// It returns the snapshot metadata and data (separately), or an error if a problem is encountered
 	// downloading or reading the file from the cloud API.
 	DownloadBackup(bucket, name string) (io.ReadCloser, error)
 
-	// DeleteBackup deletes the backup content in object storage for the given backup.
-	DeleteBackupFile(bucket, backupName string) error
-
-	// DeleteBackup deletes the backup metadata file in object storage for the given backup.
-	DeleteBackupMetadataFile(bucket, backupName string) error
+	// DeleteBackupDir deletes all files in object storage for the given backup.
+	DeleteBackupDir(bucket, backupName string) error
 
 	// GetBackup gets the specified api.Backup from the given bucket in object storage.
 	GetBackup(bucket, name string) (*api.Backup, error)
+
+	// CreateBackupLogSignedURL creates a pre-signed URL that can be used to download a backup's log
+	// file from object storage. The URL expires after ttl.
+	CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error)
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -62,9 +63,22 @@ type BackupGetter interface {
 }
 
 const (
-	metadataFileFormatString string = "%s/ark-backup.json"
-	backupFileFormatString   string = "%s/%s.tar.gz"
+	metadataFileFormatString = "%s/ark-backup.json"
+	backupFileFormatString   = "%s/%s-data.tar.gz"
+	logFileFormatString      = "%s/%s-logs.gz"
 )
+
+func getMetadataKey(backup string) string {
+	return fmt.Sprintf(metadataFileFormatString, backup)
+}
+
+func getBackupKey(backup string) string {
+	return fmt.Sprintf(backupFileFormatString, backup, backup)
+}
+
+func getBackupLogKey(backup string) string {
+	return fmt.Sprintf(logFileFormatString, backup, backup)
+}
 
 type backupService struct {
 	objectStorage ObjectStorageAdapter
@@ -82,26 +96,34 @@ func NewBackupService(objectStorage ObjectStorageAdapter) BackupService {
 	}
 }
 
-func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup io.ReadSeeker) error {
+func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.ReadSeeker) error {
 	// upload metadata file
-	metadataKey := fmt.Sprintf(metadataFileFormatString, backupName)
+	metadataKey := getMetadataKey(backupName)
 	if err := br.objectStorage.PutObject(bucket, metadataKey, metadata); err != nil {
+		// failure to upload metadata file is a hard-stop
 		return err
 	}
 
 	// upload tar file
-	if err := br.objectStorage.PutObject(bucket, fmt.Sprintf(backupFileFormatString, backupName, backupName), backup); err != nil {
+	if err := br.objectStorage.PutObject(bucket, getBackupKey(backupName), backup); err != nil {
 		// try to delete the metadata file since the data upload failed
 		deleteErr := br.objectStorage.DeleteObject(bucket, metadataKey)
 
 		return errors.NewAggregate([]error{err, deleteErr})
 	}
 
+	// uploading log file is best-effort; if it fails, we log the error but call the overall upload a
+	// success
+	logKey := getBackupLogKey(backupName)
+	if err := br.objectStorage.PutObject(bucket, logKey, log); err != nil {
+		glog.Errorf("error uploading %s/%s: %v", bucket, logKey, err)
+	}
+
 	return nil
 }
 
 func (br *backupService) DownloadBackup(bucket, backupName string) (io.ReadCloser, error) {
-	return br.objectStorage.GetObject(bucket, fmt.Sprintf(backupFileFormatString, backupName, backupName))
+	return br.objectStorage.GetObject(bucket, getBackupKey(backupName))
 }
 
 func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
@@ -155,16 +177,25 @@ func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
 	return backup, nil
 }
 
-func (br *backupService) DeleteBackupFile(bucket, backupName string) error {
-	key := fmt.Sprintf(backupFileFormatString, backupName, backupName)
-	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	return br.objectStorage.DeleteObject(bucket, key)
+func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
+	objects, err := br.objectStorage.ListObjects(bucket, backupName+"/")
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, key := range objects {
+		glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
+		if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.NewAggregate(errs)
 }
 
-func (br *backupService) DeleteBackupMetadataFile(bucket, backupName string) error {
-	key := fmt.Sprintf(metadataFileFormatString, backupName)
-	glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
-	return br.objectStorage.DeleteObject(bucket, key)
+func (br *backupService) CreateBackupLogSignedURL(bucket, backupName string, ttl time.Duration) (string, error) {
+	return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(backupName), ttl)
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

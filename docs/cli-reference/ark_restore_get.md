@@ -8,12 +8,13 @@ get restores
 get restores
 
 ```
-ark restore get
+ark restore get [flags]
 ```
 
 ### Options
 
 ```
+  -h, --help                        help for get
       --label-columns stringArray   a comma-separated list of labels to be displayed as columns
   -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
   -l, --selector string             only show items matching this label selector

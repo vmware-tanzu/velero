@@ -19,10 +19,12 @@ package aws
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/golang/glog"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -107,9 +109,30 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(res *s3.ListObjectsV2Output, lastPage bool) bool {
-		for _, prefix := range res.CommonPrefixes {
+	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, prefix := range page.CommonPrefixes {
 			ret = append(ret, *prefix.Prefix)
+		}
+		return !lastPage
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+	req := &s3.ListObjectsV2Input{
+		Bucket: &bucket,
+		Prefix: &prefix,
+	}
+
+	var ret []string
+	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+		for _, obj := range page.Contents {
+			ret = append(ret, *obj.Key)
 		}
 		return !lastPage
 	})
@@ -130,4 +153,14 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	_, err := op.s3.DeleteObject(req)
 
 	return err
+}
+
+func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	glog.V(4).Infof("CreateSignedURL: bucket=%s, key=%s, ttl=%d", bucket, key, ttl)
+	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+
+	return req.Presign(ttl)
 }

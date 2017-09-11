@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/storage"
 
@@ -120,6 +121,29 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	return ret, nil
 }
 
+func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+	container, err := getContainerReference(op.blobClient, bucket)
+	if err != nil {
+		return nil, err
+	}
+
+	params := storage.ListBlobsParameters{
+		Prefix: prefix,
+	}
+
+	res, err := container.ListBlobs(params)
+	if err != nil {
+		return nil, err
+	}
+
+	ret := make([]string, 0, len(res.Blobs))
+	for _, blob := range res.Blobs {
+		ret = append(ret, blob.Name)
+	}
+
+	return ret, nil
+}
+
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	container, err := getContainerReference(op.blobClient, bucket)
 	if err != nil {
@@ -132,6 +156,22 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	}
 
 	return blob.Delete(nil)
+}
+
+const sasURIReadPermission = "r"
+
+func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	container, err := getContainerReference(op.blobClient, bucket)
+	if err != nil {
+		return "", err
+	}
+
+	blob, err := getBlobReference(container, key)
+	if err != nil {
+		return "", err
+	}
+
+	return blob.GetSASURI(time.Now().Add(ttl), sasURIReadPermission)
 }
 
 func getContainerReference(blobClient *storage.BlobStorageClient, bucket string) (*storage.Container, error) {

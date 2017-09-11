@@ -17,8 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,14 +38,15 @@ import (
 	. "github.com/heptio/ark/pkg/util/test"
 )
 
-func TestFetchRestore(t *testing.T) {
+func TestFetchBackup(t *testing.T) {
 	tests := []struct {
-		name             string
-		backupName       string
-		informerBackups  []*api.Backup
-		backupSvcBackups map[string][]*api.Backup
-		expectedRes      *api.Backup
-		expectedErr      bool
+		name                string
+		backupName          string
+		informerBackups     []*api.Backup
+		backupServiceBackup *api.Backup
+		backupServiceError  error
+		expectedRes         *api.Backup
+		expectedErr         bool
 	}{
 		{
 			name:            "lister has backup",
@@ -51,17 +55,16 @@ func TestFetchRestore(t *testing.T) {
 			expectedRes:     NewTestBackup().WithName("backup-1").Backup,
 		},
 		{
-			name:       "backupSvc has backup",
-			backupName: "backup-1",
-			backupSvcBackups: map[string][]*api.Backup{
-				"bucket": []*api.Backup{NewTestBackup().WithName("backup-1").Backup},
-			},
-			expectedRes: NewTestBackup().WithName("backup-1").Backup,
+			name:                "backupSvc has backup",
+			backupName:          "backup-1",
+			backupServiceBackup: NewTestBackup().WithName("backup-1").Backup,
+			expectedRes:         NewTestBackup().WithName("backup-1").Backup,
 		},
 		{
-			name:        "no backup",
-			backupName:  "backup-1",
-			expectedErr: true,
+			name:               "no backup",
+			backupName:         "backup-1",
+			backupServiceError: errors.New("no backup here"),
+			expectedErr:        true,
 		},
 	}
 
@@ -71,7 +74,7 @@ func TestFetchRestore(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &fakeBackupService{}
+				backupSvc       = &BackupService{}
 			)
 
 			c := NewRestoreController(
@@ -89,28 +92,34 @@ func TestFetchRestore(t *testing.T) {
 				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(itm)
 			}
 
-			backupSvc.backupsByBucket = test.backupSvcBackups
+			if test.backupServiceBackup != nil || test.backupServiceError != nil {
+				backupSvc.On("GetBackup", "bucket", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
+			}
 
 			backup, err := c.fetchBackup("bucket", test.backupName)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, backup)
 			}
+
+			backupSvc.AssertExpectations(t)
 		})
 	}
 }
 
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
-		name                   string
-		restoreKey             string
-		restore                *api.Restore
-		backup                 *api.Backup
-		restorerError          error
-		allowRestoreSnapshots  bool
-		expectedErr            bool
-		expectedRestoreUpdates []*api.Restore
-		expectedRestorerCall   *api.Restore
+		name                        string
+		restoreKey                  string
+		restore                     *api.Restore
+		backup                      *api.Backup
+		restorerError               error
+		allowRestoreSnapshots       bool
+		expectedErr                 bool
+		expectedRestoreUpdates      []*api.Restore
+		expectedRestorerCall        *api.Restore
+		backupServiceGetBackupError error
+		expectRestore               bool
 	}{
 		{
 			name:        "invalid key returns error",
@@ -161,18 +170,17 @@ func TestProcessRestore(t *testing.T) {
 			},
 		},
 		{
-			name:        "restore with non-existent backup name fails",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
-			expectedErr: false,
+			name:                        "restore with non-existent backup name fails",
+			restore:                     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+			expectedErr:                 false,
+			backupServiceGetBackupError: errors.New("no backup here"),
 			expectedRestoreUpdates: []*api.Restore{
 				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).
 					WithBackup("backup-1").
 					WithIncludedNamespace("ns-1").
 					WithErrors(api.RestoreResult{
-						// TODO this is the error msg returned by the fakeBackupService. When we switch to a mock obj,
-						// this will likely need to change.
-						Cluster: []string{"bucket not found"},
+						Cluster: []string{"no backup here"},
 					}).
 					Restore,
 			},
@@ -181,6 +189,7 @@ func TestProcessRestore(t *testing.T) {
 			name:          "restorer throwing an error causes the restore to fail",
 			restore:       NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			backup:        NewTestBackup().WithName("backup-1").Backup,
+			expectRestore: true,
 			restorerError: errors.New("blarg"),
 			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
@@ -197,10 +206,11 @@ func TestProcessRestore(t *testing.T) {
 			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 		},
 		{
-			name:        "valid restore gets executed",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
+			name:          "valid restore gets executed",
+			restore:       NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+			backup:        NewTestBackup().WithName("backup-1").Backup,
+			expectRestore: true,
+			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
@@ -208,10 +218,11 @@ func TestProcessRestore(t *testing.T) {
 			expectedRestorerCall: NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 		},
 		{
-			name:        "restore with no restorable namespaces gets defaulted to *",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
+			name:          "restore with no restorable namespaces gets defaulted to *",
+			restore:       NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").Restore,
+			backup:        NewTestBackup().WithName("backup-1").Backup,
+			expectRestore: true,
+			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewTestRestore("foo", "bar", api.RestorePhaseInProgress).WithBackup("backup-1").WithIncludedNamespace("*").Restore,
 				NewTestRestore("foo", "bar", api.RestorePhaseCompleted).WithBackup("backup-1").WithIncludedNamespace("*").Restore,
@@ -222,6 +233,7 @@ func TestProcessRestore(t *testing.T) {
 			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
 			restore:               NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").WithRestorePVs(true).Restore,
 			backup:                NewTestBackup().WithName("backup-1").Backup,
+			expectRestore:         true,
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
 			expectedRestoreUpdates: []*api.Restore{
@@ -242,17 +254,14 @@ func TestProcessRestore(t *testing.T) {
 		},
 	}
 
-	// flag.Set("logtostderr", "true")
-	// flag.Set("v", "4")
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
+			fmt.Println(test.name)
 			var (
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &fakeBackupService{}
+				backupSvc       = &BackupService{}
 			)
 
 			c := NewRestoreController(
@@ -290,7 +299,11 @@ func TestProcessRestore(t *testing.T) {
 			if test.restorerError != nil {
 				errors.Namespaces = map[string][]string{"ns-1": {test.restorerError.Error()}}
 			}
-			restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+			if test.expectRestore {
+				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
+				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
+				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+			}
 
 			var (
 				key = test.restoreKey
@@ -303,7 +316,13 @@ func TestProcessRestore(t *testing.T) {
 				}
 			}
 
+			if test.backupServiceGetBackupError != nil {
+				backupSvc.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
+			}
+
 			err = c.processRestore(key)
+			backupSvc.AssertExpectations(t)
+			restorer.AssertExpectations(t)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 
