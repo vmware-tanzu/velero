@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"sort"
 	"testing"
@@ -444,8 +445,7 @@ func TestBackupMethod(t *testing.T) {
 	require.NoError(t, err)
 
 	output := new(bytes.Buffer)
-	log := new(bytes.Buffer)
-	err = backupper.Backup(backup, output, log)
+	err = backupper.Backup(backup, output, ioutil.Discard)
 	require.NoError(t, err)
 
 	expectedFiles := sets.NewString(
