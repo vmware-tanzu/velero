@@ -1,11 +1,11 @@
 ## ark restore get
 
-get restores
+Get restores
 
 ### Synopsis
 
 
-get restores
+Get restores
 
 ```
 ark restore get [flags]

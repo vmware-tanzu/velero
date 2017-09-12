@@ -14,33 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package get
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	"github.com/heptio/ark/pkg/cmd/cli/restore"
+	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "backup",
-		Short: "Work with backups",
-		Long:  "Work with backups",
+		Use:   "get",
+		Short: "Get ark resources",
+		Long:  "Get ark resources",
 	}
 
+	backupCommand := backup.NewGetCommand(f, "backups")
+	backupCommand.Aliases = []string{"backup"}
+
+	scheduleCommand := schedule.NewGetCommand(f, "schedules")
+	scheduleCommand.Aliases = []string{"schedule"}
+
+	restoreCommand := restore.NewGetCommand(f, "restores")
+	restoreCommand.Aliases = []string{"restore"}
+
 	c.AddCommand(
-		NewCreateCommand(f, "create"),
-		NewGetCommand(f, "get"),
-		NewLogsCommand(f),
-		NewDownloadCommand(f),
-
-		// Will implement describe later
-		// NewDescribeCommand(f),
-
-		// If you delete a backup and it still exists in object storage, the backup sync controller will
-		// recreate it. Until we have a good UX around this, we're disabling the delete command.
-		// NewDeleteCommand(f),
+		backupCommand,
+		scheduleCommand,
+		restoreCommand,
 	)
 
 	return c
