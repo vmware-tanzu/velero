@@ -32,6 +32,14 @@ type RestoreSpec struct {
 	// included in the restore.
 	ExcludedNamespaces []string `json:"excludedNamespaces"`
 
+	// IncludedResources is a slice of resource names to include
+	// in the restore. If empty, all resources in the backup are included.
+	IncludedResources []string `json:"includedResources"`
+
+	// ExcludedResources is a slice of resource names that are not
+	// included in the restore.
+	ExcludedResources []string `json:"excludedResources"`
+
 	// NamespaceMapping is a map of source namespace names
 	// to target namespace names to restore into. Any source
 	// namespaces not included in the map will be restored into

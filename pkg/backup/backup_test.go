@@ -104,16 +104,18 @@ func TestResolveActions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mapper := &FakeMapper{
-				Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-					schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-					schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-					schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-					schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+			dh := &FakeDiscoveryHelper{
+				RESTMapper: &FakeMapper{
+					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
+						schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
+						schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
+						schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
+						schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+					},
 				},
 			}
 
-			actual, err := resolveActions(mapper, test.input)
+			actual, err := resolveActions(dh, test.input)
 			gotError := err != nil
 
 			if e, a := test.expectError, gotError; e != a {
@@ -176,12 +178,14 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mapper := &FakeMapper{
-				Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-					schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-					schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-					schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-					schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+			dh := &FakeDiscoveryHelper{
+				RESTMapper: &FakeMapper{
+					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
+						schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
+						schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
+						schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
+						schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+					},
 				},
 			}
 
@@ -190,7 +194,7 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 				logger: &logger{w: b},
 			}
 
-			actual := ctx.getResourceIncludesExcludes(mapper, test.includes, test.excludes)
+			actual := ctx.getResourceIncludesExcludes(dh, test.includes, test.excludes)
 
 			sort.Strings(test.expectedIncludes)
 			actualIncludes := actual.GetIncludes()
@@ -234,23 +238,6 @@ func TestGetNamespaceIncludesExcludes(t *testing.T) {
 	if e, a := backup.Spec.ExcludedNamespaces, actualExcludes; !reflect.DeepEqual(e, a) {
 		t.Errorf("excludes: expected %v, got %v", e, a)
 	}
-}
-
-type fakeDiscoveryHelper struct {
-	resources []*metav1.APIResourceList
-	mapper    meta.RESTMapper
-}
-
-func (dh *fakeDiscoveryHelper) Resources() []*metav1.APIResourceList {
-	return dh.resources
-}
-
-func (dh *fakeDiscoveryHelper) Mapper() meta.RESTMapper {
-	return dh.mapper
-}
-
-func (dh *fakeDiscoveryHelper) Refresh() error {
-	return nil
 }
 
 func TestBackupMethod(t *testing.T) {
@@ -303,15 +290,15 @@ func TestBackupMethod(t *testing.T) {
 		ShortNames:   []string{"csr"},
 	}
 
-	discoveryHelper := &fakeDiscoveryHelper{
-		mapper: &FakeMapper{
+	discoveryHelper := &FakeDiscoveryHelper{
+		RESTMapper: &FakeMapper{
 			Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
 				schema.GroupVersionResource{Resource: "cm"}:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
 				schema.GroupVersionResource{Resource: "csr"}:   schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
 				schema.GroupVersionResource{Resource: "roles"}: schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"},
 			},
 		},
-		resources: []*metav1.APIResourceList{
+		ResourceList: []*metav1.APIResourceList{
 			{
 				GroupVersion: "v1",
 				APIResources: []metav1.APIResource{configMapsResource, podsResource},
@@ -829,8 +816,8 @@ func TestBackupResource(t *testing.T) {
 				}
 			}
 
-			discoveryHelper := &fakeDiscoveryHelper{
-				mapper: &FakeMapper{
+			discoveryHelper := &FakeDiscoveryHelper{
+				RESTMapper: &FakeMapper{
 					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
 						schema.GroupVersionResource{Resource: "certificatesigningrequests"}: schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
 						schema.GroupVersionResource{Resource: "other"}:                      schema.GroupVersionResource{Group: "somegroup", Version: "someversion", Resource: "otherthings"},

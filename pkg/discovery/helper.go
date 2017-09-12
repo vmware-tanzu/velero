@@ -44,6 +44,10 @@ type Helper interface {
 	// Refresh pulls an updated set of Ark-backuppable resources from the
 	// discovery API.
 	Refresh() error
+
+	// ResolveGroupResource uses the RESTMapper to resolve resource to a fully-qualified
+	// schema.GroupResource. If the RESTMapper is unable to do so, an error is returned instead.
+	ResolveGroupResource(resource string) (schema.GroupResource, error)
 }
 
 type helper struct {
@@ -138,4 +142,12 @@ func (h *helper) Resources() []*metav1.APIResourceList {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	return h.resources
+}
+
+func (h *helper) ResolveGroupResource(resource string) (schema.GroupResource, error) {
+	gvr, err := h.mapper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
+	if err != nil {
+		return schema.GroupResource{}, err
+	}
+	return gvr.GroupResource(), nil
 }

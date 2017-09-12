@@ -82,3 +82,13 @@ func (r *TestRestore) WithMappedNamespace(from string, to string) *TestRestore {
 	r.Spec.NamespaceMapping[from] = to
 	return r
 }
+
+func (r *TestRestore) WithIncludedResource(resource string) *TestRestore {
+	r.Spec.IncludedResources = append(r.Spec.IncludedResources, resource)
+	return r
+}
+
+func (r *TestRestore) WithExcludedResource(resource string) *TestRestore {
+	r.Spec.ExcludedResources = append(r.Spec.ExcludedResources, resource)
+	return r
+}

@@ -221,8 +221,12 @@ func (controller *restoreController) processRestore(key string) error {
 		return err
 	}
 
+	// defaulting
 	if len(restore.Spec.IncludedNamespaces) == 0 {
 		restore.Spec.IncludedNamespaces = []string{"*"}
+	}
+	if len(restore.Spec.IncludedResources) == 0 {
+		restore.Spec.IncludedResources = []string{"*"}
 	}
 
 	// validation
@@ -282,6 +286,10 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+	}
+
+	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedResources, itm.Spec.ExcludedResources) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
 	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {

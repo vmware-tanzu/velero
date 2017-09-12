@@ -76,7 +76,7 @@ func NewKubernetesBackupper(
 	dynamicFactory client.DynamicFactory,
 	actions map[string]Action,
 ) (Backupper, error) {
-	resolvedActions, err := resolveActions(discoveryHelper.Mapper(), actions)
+	resolvedActions, err := resolveActions(discoveryHelper, actions)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +91,11 @@ func NewKubernetesBackupper(
 
 // resolveActions resolves the string-based map of group-resources to actions and returns a map of
 // schema.GroupResources to actions.
-func resolveActions(mapper meta.RESTMapper, actions map[string]Action) (map[schema.GroupResource]Action, error) {
+func resolveActions(helper discovery.Helper, actions map[string]Action) (map[schema.GroupResource]Action, error) {
 	ret := make(map[schema.GroupResource]Action)
 
 	for resource, action := range actions {
-		gr, err := resolveGroupResource(mapper, resource)
+		gr, err := helper.ResolveGroupResource(resource)
 		if err != nil {
 			return nil, err
 		}
@@ -105,46 +105,22 @@ func resolveActions(mapper meta.RESTMapper, actions map[string]Action) (map[sche
 	return ret, nil
 }
 
-// resolveResources uses the RESTMapper to resolve resources to their fully-qualified group-resource
-// names. fn is invoked for each resolved resource. resolveResources returns a list of any resources that failed to resolve.
-func (ctx *backupContext) resolveResources(mapper meta.RESTMapper, resources []string, allowAll bool, fn func(string)) {
-	for _, resource := range resources {
-		if allowAll && resource == "*" {
-			fn("*")
-			return
-		}
-		gr, err := resolveGroupResource(mapper, resource)
-		if err != nil {
-			ctx.log("Unable to resolve resource %q: %v", resource, err)
-			continue
-		}
-		fn(gr.String())
-	}
-}
+// getResourceIncludesExcludes takes the lists of resources to include and exclude from the
+// backup, uses the discovery helper to resolve them to fully-qualified group-resource names, and returns
+// an IncludesExcludes list.
+func (ctx *backupContext) getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *collections.IncludesExcludes {
+	return collections.GenerateIncludesExcludes(
+		includes,
+		excludes,
+		func(item string) (string, error) {
+			gr, err := helper.ResolveGroupResource(item)
+			if err != nil {
+				return "", err
+			}
 
-// getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
-// RESTMapper to resolve them to fully-qualified group-resource names, and returns an
-// IncludesExcludes list.
-func (ctx *backupContext) getResourceIncludesExcludes(mapper meta.RESTMapper, includes, excludes []string) *collections.IncludesExcludes {
-	resources := collections.NewIncludesExcludes()
-
-	ctx.resolveResources(mapper, includes, true, func(s string) { resources.Includes(s) })
-	ctx.resolveResources(mapper, excludes, false, func(s string) { resources.Excludes(s) })
-
-	ctx.log("Including resources: %v", strings.Join(resources.GetIncludes(), ", "))
-	ctx.log("Excluding resources: %v", strings.Join(resources.GetExcludes(), ", "))
-
-	return resources
-}
-
-// resolveGroupResource uses the RESTMapper to resolve resource to a fully-qualified
-// schema.GroupResource. If the RESTMapper is unable to do so, an error is returned instead.
-func resolveGroupResource(mapper meta.RESTMapper, resource string) (schema.GroupResource, error) {
-	gvr, err := mapper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
-	if err != nil {
-		return schema.GroupResource{}, err
-	}
-	return gvr.GroupResource(), nil
+			return gr.String(), nil
+		},
+	)
 }
 
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
@@ -206,7 +182,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 
 	ctx.log("Starting backup")
 
-	ctx.resourceIncludesExcludes = ctx.getResourceIncludesExcludes(kb.discoveryHelper.Mapper(), backup.Spec.IncludedResources, backup.Spec.ExcludedResources)
+	ctx.resourceIncludesExcludes = ctx.getResourceIncludesExcludes(kb.discoveryHelper, backup.Spec.IncludedResources, backup.Spec.ExcludedResources)
 
 	for _, group := range kb.discoveryHelper.Resources() {
 		ctx.log("Processing group %s", group.GroupVersion)

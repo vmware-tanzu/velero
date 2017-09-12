@@ -59,6 +59,8 @@ type CreateOptions struct {
 	Labels            flag.Map
 	IncludeNamespaces flag.StringArray
 	ExcludeNamespaces flag.StringArray
+	IncludeResources  flag.StringArray
+	ExcludeResources  flag.StringArray
 	NamespaceMappings flag.Map
 	Selector          flag.LabelSelector
 }
@@ -77,6 +79,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the restore")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
 	flags.Var(&o.Labels, "labels", "labels to apply to the restore")
+	flags.Var(&o.IncludeResources, "include-resources", "resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)")
+	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io")
 	flags.VarP(&o.Selector, "selector", "l", "only restore resources matching this label selector")
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "whether to restore volumes from snapshots")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
@@ -117,6 +121,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			BackupName:         o.BackupName,
 			IncludedNamespaces: o.IncludeNamespaces,
 			ExcludedNamespaces: o.ExcludeNamespaces,
+			IncludedResources:  o.IncludeResources,
+			ExcludedResources:  o.ExcludeResources,
 			NamespaceMapping:   o.NamespaceMappings.Data(),
 			LabelSelector:      o.Selector.LabelSelector,
 			RestorePVs:         o.RestoreVolumes.Value,

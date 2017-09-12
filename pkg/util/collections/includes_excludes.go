@@ -20,6 +20,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/golang/glog"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -74,6 +76,8 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 	return ie.includes.Has("*") || ie.includes.Has(s)
 }
 
+// ValidateIncludesExcludes checks provided lists of included and excluded
+// items to ensure they are a valid set of IncludesExcludes data.
 func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 	// TODO we should not allow an IncludesExcludes object to be created that
 	// does not meet these criteria. Do a more significant refactoring to embed
@@ -98,9 +102,44 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 
 	for _, itm := range excludes.List() {
 		if includes.Has(itm) {
-			errs = append(errs, errors.New(fmt.Sprintf("excludes list cannot contain an item in the includes list: %v", itm)))
+			errs = append(errs, fmt.Errorf("excludes list cannot contain an item in the includes list: %v", itm))
 		}
 	}
 
 	return errs
+}
+
+// GenerateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
+// include/exclude slices, applying the specified mapping function to each item in them,
+// and adding the output of the function to the new struct. If the mapping function returns
+// an error for an item, it is omitted from the result.
+func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) (string, error)) *IncludesExcludes {
+	res := NewIncludesExcludes()
+
+	for _, item := range includes {
+		if item == "*" {
+			res.Includes(item)
+			continue
+		}
+
+		key, err := mapFunc(item)
+		if err != nil {
+			glog.Errorf("unable to include item %q: %v", item, err)
+			continue
+		}
+
+		res.Includes(key)
+	}
+
+	for _, item := range excludes {
+		key, err := mapFunc(item)
+		if err != nil {
+			glog.Errorf("unable to exclude item %q: %v", item, err)
+			continue
+		}
+
+		res.Excludes(key)
+	}
+
+	return res
 }

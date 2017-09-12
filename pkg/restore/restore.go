@@ -30,7 +30,6 @@ import (
 	"github.com/golang/glog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,8 +44,8 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	"github.com/heptio/ark/pkg/restore/restorers"
-	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // Restorer knows how to restore a backup.
@@ -75,7 +74,7 @@ type kubernetesRestorer struct {
 // prioritizeResources takes a list of pre-prioritized resources and a full list of resources to restore,
 // and returns an ordered list of GroupResource-resolved resources in the order that they should be
 // restored.
-func prioritizeResources(mapper meta.RESTMapper, priorities []string, resources []*metav1.APIResourceList) ([]schema.GroupResource, error) {
+func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes) ([]schema.GroupResource, error) {
 	var ret []schema.GroupResource
 
 	// set keeps track of resolved GroupResource names
@@ -83,19 +82,23 @@ func prioritizeResources(mapper meta.RESTMapper, priorities []string, resources 
 
 	// start by resolving priorities into GroupResources and adding them to ret
 	for _, r := range priorities {
-		gr := schema.ParseGroupResource(r)
-		gvr, err := mapper.ResourceFor(gr.WithVersion(""))
+		gr, err := helper.ResolveGroupResource(r)
 		if err != nil {
 			return nil, err
 		}
-		gr = gvr.GroupResource()
+
+		if !includedResources.ShouldInclude(gr.String()) {
+			glog.Infof("Not including resource %v", gr)
+			continue
+		}
+
 		ret = append(ret, gr)
 		set.Insert(gr.String())
 	}
 
 	// go through everything we got from discovery and add anything not in "set" to byName
 	var byName []schema.GroupResource
-	for _, resourceGroup := range resources {
+	for _, resourceGroup := range helper.Resources() {
 		// will be something like storage.k8s.io/v1
 		groupVersion, err := schema.ParseGroupVersion(resourceGroup.GroupVersion)
 		if err != nil {
@@ -104,6 +107,12 @@ func prioritizeResources(mapper meta.RESTMapper, priorities []string, resources 
 
 		for _, resource := range resourceGroup.APIResources {
 			gr := groupVersion.WithResource(resource.Name).GroupResource()
+
+			if !includedResources.ShouldInclude(gr.String()) {
+				glog.Infof("Not including resource %v", gr)
+				continue
+			}
+
 			if !set.Has(gr.String()) {
 				byName = append(byName, gr)
 			}
@@ -131,14 +140,13 @@ func NewKubernetesRestorer(
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
 ) (Restorer, error) {
-	mapper := discoveryHelper.Mapper()
 	r := make(map[schema.GroupResource]restorers.ResourceRestorer)
 	for gr, restorer := range customRestorers {
-		gvr, err := mapper.ResourceFor(schema.ParseGroupResource(gr).WithVersion(""))
+		resolved, err := discoveryHelper.ResolveGroupResource(gr)
 		if err != nil {
 			return nil, err
 		}
-		r[gvr.GroupResource()] = restorer
+		r[resolved] = restorer
 	}
 
 	return &kubernetesRestorer{
@@ -171,7 +179,21 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
 
-	prioritizedResources, err := prioritizeResources(kr.discoveryHelper.Mapper(), kr.resourcePriorities, kr.discoveryHelper.Resources())
+	// get resource includes-excludes
+	resourceIncludesExcludes := collections.GenerateIncludesExcludes(
+		restore.Spec.IncludedResources,
+		restore.Spec.ExcludedResources,
+		func(item string) (string, error) {
+			gr, err := kr.discoveryHelper.ResolveGroupResource(item)
+			if err != nil {
+				return "", err
+			}
+
+			return gr.String(), nil
+		},
+	)
+
+	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes)
 	if err != nil {
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
@@ -389,7 +411,7 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 		if restorer == nil {
 			// initialize client & restorer for this Resource. we need
 			// metadata from an object to do this.
-			glog.Infof("Getting client for %s", obj.GroupVersionKind().String())
+			glog.Infof("Getting client for %v", obj.GroupVersionKind())
 
 			resource := metav1.APIResource{
 				Namespaced: len(namespace) > 0,
@@ -399,22 +421,22 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 			var err error
 			resourceClient, err = kr.dynamicFactory.ClientForGroupVersionKind(obj.GroupVersionKind(), resource, namespace)
 			if err != nil {
-				addArkError(&errors, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, groupResource.String(), err))
+				addArkError(&errors, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, groupResource, err))
 				return warnings, errors
 			}
 
 			restorer = kr.restorers[groupResource]
 			if restorer == nil {
-				glog.Infof("Using default restorer for %s", groupResource.String())
+				glog.Infof("Using default restorer for %v", groupResource)
 				restorer = restorers.NewBasicRestorer(true)
 			} else {
-				glog.Infof("Using custom restorer for %s", groupResource.String())
+				glog.Infof("Using custom restorer for %v", groupResource)
 			}
 
 			if restorer.Wait() {
 				itmWatch, err := resourceClient.Watch(metav1.ListOptions{})
 				if err != nil {
-					addArkError(&errors, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, groupResource.String(), err))
+					addArkError(&errors, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, groupResource, err))
 					return warnings, errors
 				}
 				watchChan := itmWatch.ResultChan()
@@ -473,7 +495,7 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 
 	if waiter != nil {
 		if err := waiter.Wait(); err != nil {
-			addArkError(&errors, fmt.Errorf("error waiting for all %s resources to be created in namespace %s: %v", groupResource.String(), namespace, err))
+			addArkError(&errors, fmt.Errorf("error waiting for all %v resources to be created in namespace %s: %v", groupResource, namespace, err))
 		}
 	}
 
