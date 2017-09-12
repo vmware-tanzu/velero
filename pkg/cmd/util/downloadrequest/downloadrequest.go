@@ -124,12 +124,17 @@ Loop:
 		return fmt.Errorf("request failed: %v", string(body))
 	}
 
-	gzipReader, err := gzip.NewReader(resp.Body)
-	if err != nil {
-		return err
+	reader := resp.Body
+	if kind != v1.DownloadTargetKindBackupContents {
+		// need to decompress logs
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return err
+		}
+		defer gzipReader.Close()
+		reader = gzipReader
 	}
-	defer gzipReader.Close()
 
-	_, err = io.Copy(w, gzipReader)
+	_, err = io.Copy(w, reader)
 	return err
 }
