@@ -451,22 +451,22 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 			var err error
 			resourceClient, err = ctx.dynamicFactory.ClientForGroupVersionKind(obj.GroupVersionKind(), resource, namespace)
 			if err != nil {
-				addArkError(&errors, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, groupResource, err))
+				addArkError(&errors, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
 				return warnings, errors
 			}
 
 			restorer = ctx.restorers[groupResource]
 			if restorer == nil {
-				ctx.log("Using default restorer for %v", groupResource)
+				ctx.log("Using default restorer for %v", &groupResource)
 				restorer = restorers.NewBasicRestorer(true)
 			} else {
-				ctx.log("Using custom restorer for %v", groupResource)
+				ctx.log("Using custom restorer for %v", &groupResource)
 			}
 
 			if restorer.Wait() {
 				itmWatch, err := resourceClient.Watch(metav1.ListOptions{})
 				if err != nil {
-					addArkError(&errors, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, groupResource, err))
+					addArkError(&errors, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
 					return warnings, errors
 				}
 				watchChan := itmWatch.ResultChan()
@@ -525,7 +525,7 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 
 	if waiter != nil {
 		if err := waiter.Wait(); err != nil {
-			addArkError(&errors, fmt.Errorf("error waiting for all %v resources to be created in namespace %s: %v", groupResource, namespace, err))
+			addArkError(&errors, fmt.Errorf("error waiting for all %v resources to be created in namespace %s: %v", &groupResource, namespace, err))
 		}
 	}
 
