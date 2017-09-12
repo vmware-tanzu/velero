@@ -1,16 +1,23 @@
-## ark backup
+## ark backup download
 
-Work with backups
+Download a backup
 
 ### Synopsis
 
 
-Work with backups
+Download a backup
+
+```
+ark backup download NAME [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for backup
+      --force               forces the download and will overwrite file if it exists already
+  -h, --help                help for download
+      --output-dir string   directory to download backup to. (Default cwd)
+      --timeout duration    maximum time to wait to process download request (default 1m0s)
 ```
 
 ### Options inherited from parent commands
@@ -27,9 +34,5 @@ Work with backups
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark backup create](ark_backup_create.md)	 - Create a backup
-* [ark backup download](ark_backup_download.md)	 - Download a backup
-* [ark backup get](ark_backup_get.md)	 - Get backups
-* [ark backup logs](ark_backup_logs.md)	 - Get backup logs
+* [ark backup](ark_backup.md)	 - Work with backups
 

@@ -28,7 +28,8 @@ type DownloadRequestSpec struct {
 type DownloadTargetKind string
 
 const (
-	DownloadTargetKindBackupLog DownloadTargetKind = "BackupLog"
+	DownloadTargetKindBackupLog      DownloadTargetKind = "BackupLog"
+	DownloadTargetKindBackupContents DownloadTargetKind = "BackupContents"
 )
 
 // DownloadTarget is the specification for what kind of file to download, and the name of the

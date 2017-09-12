@@ -216,13 +216,13 @@ const signedURLTTL = 10 * time.Minute
 // Processed, and persists the changes to storage.
 func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest) error {
 	switch downloadRequest.Spec.Target.Kind {
-	case v1.DownloadTargetKindBackupLog:
+	case v1.DownloadTargetKindBackupLog, v1.DownloadTargetKindBackupContents:
 		update, err := cloneDownloadRequest(downloadRequest)
 		if err != nil {
 			return err
 		}
 
-		update.Status.DownloadURL, err = c.backupService.CreateBackupLogSignedURL(c.bucket, update.Spec.Target.Name, signedURLTTL)
+		update.Status.DownloadURL, err = c.backupService.CreateBackupSignedURL(downloadRequest.Spec.Target.Kind, c.bucket, update.Spec.Target.Name, signedURLTTL)
 		if err != nil {
 			return err
 		}
@@ -233,8 +233,8 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		_, err = c.downloadRequestClient.DownloadRequests(update.Namespace).Update(update)
 		return err
 	}
-
 	return fmt.Errorf("unsupported download target kind %q", downloadRequest.Spec.Target.Kind)
+
 }
 
 // deleteIfExpired deletes downloadRequest if it has expired.
