@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,7 +51,7 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 
 type DownloadOptions struct {
 	Name         string
-	Path         string
+	Output       string
 	Force        bool
 	Timeout      time.Duration
 	writeOptions int
@@ -64,7 +64,7 @@ func NewDownloadOptions() *DownloadOptions {
 }
 
 func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.Path, "output-dir", "", "directory to download backup to. (Default cwd)")
+	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
 	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
 }
@@ -74,24 +74,25 @@ func (o *DownloadOptions) Validate(c *cobra.Command, args []string) error {
 		return errors.New("backup name is required")
 	}
 
-	o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_EXCL
-	if o.Force {
-		o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_TRUNC
-	}
-
-	if o.Path == "" {
-		path, err := os.Getwd()
-		if err != nil {
-			return errors.New("an issue occurred attempting to determine the current working directory.")
-		}
-		o.Path = path
-	}
-
 	return nil
 }
 
 func (o *DownloadOptions) Complete(args []string) error {
 	o.Name = args[0]
+
+	o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_EXCL
+	if o.Force {
+		o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+	}
+
+	if o.Output == "" {
+		path, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("error getting current directory: %v", err)
+		}
+		o.Output = filepath.Join(path, fmt.Sprintf("%s-data.tar.gz", o.Name))
+	}
+
 	return nil
 }
 
@@ -99,7 +100,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	arkClient, err := f.Client()
 	cmd.CheckError(err)
 
-	backupDest, err := os.OpenFile(path.Join(o.Path, fmt.Sprintf("%s-data.tar.gz", o.Name)), o.writeOptions, 0600)
+	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
 	if err != nil {
 		return err
 	}
