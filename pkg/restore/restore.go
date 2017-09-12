@@ -26,8 +26,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-
-	"github.com/golang/glog"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +37,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
+	"github.com/golang/glog"
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -51,7 +51,7 @@ import (
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader) (api.RestoreResult, api.RestoreResult)
+	Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer) (api.RestoreResult, api.RestoreResult)
 }
 
 var _ Restorer = &kubernetesRestorer{}
@@ -164,7 +164,7 @@ func NewKubernetesRestorer(
 // Restore executes a restore into the target Kubernetes cluster according to the restore spec
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
-func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader) (api.RestoreResult, api.RestoreResult) {
+func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer) (api.RestoreResult, api.RestoreResult) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -198,42 +198,85 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
 
-	dir, err := kr.unzipAndExtractBackup(backupReader)
+	gzippedLog := gzip.NewWriter(logFile)
+	defer gzippedLog.Close()
+
+	ctx := &context{
+		backup:               backup,
+		backupReader:         backupReader,
+		restore:              restore,
+		prioritizedResources: prioritizedResources,
+		selector:             selector,
+		logger:               &logger{w: gzippedLog},
+		dynamicFactory:       kr.dynamicFactory,
+		fileSystem:           kr.fileSystem,
+		namespaceClient:      kr.namespaceClient,
+		restorers:            kr.restorers,
+	}
+
+	return ctx.execute()
+}
+
+type logger struct {
+	w io.Writer
+}
+
+func (l *logger) log(msg string, args ...interface{}) {
+	// TODO use a real logger that supports writing to files
+	now := time.Now().Format(time.RFC3339)
+	fmt.Fprintf(l.w, now+" "+msg+"\n", args...)
+}
+
+type context struct {
+	backup               *api.Backup
+	backupReader         io.Reader
+	restore              *api.Restore
+	prioritizedResources []schema.GroupResource
+	selector             labels.Selector
+	logger               *logger
+	dynamicFactory       client.DynamicFactory
+	fileSystem           FileSystem
+	namespaceClient      corev1.NamespaceInterface
+	restorers            map[schema.GroupResource]restorers.ResourceRestorer
+}
+
+func (ctx *context) log(msg string, args ...interface{}) {
+	ctx.logger.log(msg, args...)
+}
+
+func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
+	ctx.log("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
+
+	dir, err := ctx.unzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
-		glog.Errorf("error unzipping and extracting: %v", err)
+		ctx.log("error unzipping and extracting: %v", err)
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
-	defer kr.fileSystem.RemoveAll(dir)
+	defer ctx.fileSystem.RemoveAll(dir)
 
-	return kr.restoreFromDir(dir, restore, backup, prioritizedResources, selector)
+	return ctx.restoreFromDir(dir)
 }
 
 // restoreFromDir executes a restore based on backup data contained within a local
 // directory.
-func (kr *kubernetesRestorer) restoreFromDir(
-	dir string,
-	restore *api.Restore,
-	backup *api.Backup,
-	prioritizedResources []schema.GroupResource,
-	selector labels.Selector,
-) (api.RestoreResult, api.RestoreResult) {
+func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errors := api.RestoreResult{}, api.RestoreResult{}
 
 	// cluster-scoped
 	clusterPath := path.Join(dir, api.ClusterScopedDir)
-	exists, err := kr.fileSystem.DirExists(clusterPath)
+	exists, err := ctx.fileSystem.DirExists(clusterPath)
 	if err != nil {
 		errors.Cluster = []string{err.Error()}
 	}
 	if exists {
-		w, e := kr.restoreNamespace(restore, "", clusterPath, prioritizedResources, selector, backup)
+		w, e := ctx.restoreNamespace("", clusterPath)
 		merge(&warnings, &w)
 		merge(&errors, &e)
 	}
 
 	// namespace-scoped
 	namespacesPath := path.Join(dir, api.NamespaceScopedDir)
-	exists, err = kr.fileSystem.DirExists(namespacesPath)
+	exists, err = ctx.fileSystem.DirExists(namespacesPath)
 	if err != nil {
 		addArkError(&errors, err)
 		return warnings, errors
@@ -242,13 +285,13 @@ func (kr *kubernetesRestorer) restoreFromDir(
 		return warnings, errors
 	}
 
-	nses, err := kr.fileSystem.ReadDir(namespacesPath)
+	nses, err := ctx.fileSystem.ReadDir(namespacesPath)
 	if err != nil {
 		addArkError(&errors, err)
 		return warnings, errors
 	}
 
-	namespaceFilter := collections.NewIncludesExcludes().Includes(restore.Spec.IncludedNamespaces...).Excludes(restore.Spec.ExcludedNamespaces...)
+	namespaceFilter := collections.NewIncludesExcludes().Includes(ctx.restore.Spec.IncludedNamespaces...).Excludes(ctx.restore.Spec.ExcludedNamespaces...)
 	for _, ns := range nses {
 		if !ns.IsDir() {
 			continue
@@ -256,11 +299,11 @@ func (kr *kubernetesRestorer) restoreFromDir(
 		nsPath := path.Join(namespacesPath, ns.Name())
 
 		if !namespaceFilter.ShouldInclude(ns.Name()) {
-			glog.Infof("Skipping namespace %s", ns.Name())
+			ctx.log("Skipping namespace %s", ns.Name())
 			continue
 		}
 
-		w, e := kr.restoreNamespace(restore, ns.Name(), nsPath, prioritizedResources, selector, backup)
+		w, e := ctx.restoreNamespace(ns.Name(), nsPath)
 		merge(&warnings, &w)
 		merge(&errors, &e)
 	}
@@ -302,23 +345,16 @@ func addToResult(r *api.RestoreResult, ns string, e error) {
 
 // restoreNamespace restores the resources from a specified namespace directory in the backup,
 // or from the cluster-scoped directory if no namespace is specified.
-func (kr *kubernetesRestorer) restoreNamespace(
-	restore *api.Restore,
-	nsName string,
-	nsPath string,
-	prioritizedResources []schema.GroupResource,
-	labelSelector labels.Selector,
-	backup *api.Backup,
-) (api.RestoreResult, api.RestoreResult) {
+func (ctx *context) restoreNamespace(nsName, nsPath string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errors := api.RestoreResult{}, api.RestoreResult{}
 
 	if nsName == "" {
-		glog.Info("Restoring cluster-scoped resources")
+		ctx.log("Restoring cluster-scoped resources")
 	} else {
-		glog.Infof("Restoring namespace %s", nsName)
+		ctx.log("Restoring namespace %s", nsName)
 	}
 
-	resourceDirs, err := kr.fileSystem.ReadDir(nsPath)
+	resourceDirs, err := ctx.fileSystem.ReadDir(nsPath)
 	if err != nil {
 		addToResult(&errors, nsName, err)
 		return warnings, errors
@@ -333,7 +369,7 @@ func (kr *kubernetesRestorer) restoreNamespace(
 
 	if nsName != "" {
 		// fetch mapped NS name
-		if target, ok := restore.Spec.NamespaceMapping[nsName]; ok {
+		if target, ok := ctx.restore.Spec.NamespaceMapping[nsName]; ok {
 			nsName = target
 		}
 
@@ -344,13 +380,13 @@ func (kr *kubernetesRestorer) restoreNamespace(
 			},
 		}
 
-		if _, err := kube.EnsureNamespaceExists(ns, kr.namespaceClient); err != nil {
+		if _, err := kube.EnsureNamespaceExists(ns, ctx.namespaceClient); err != nil {
 			addArkError(&errors, err)
 			return warnings, errors
 		}
 	}
 
-	for _, resource := range prioritizedResources {
+	for _, resource := range ctx.prioritizedResources {
 		rscDir := resourceDirsMap[resource.String()]
 		if rscDir == nil {
 			continue
@@ -358,7 +394,7 @@ func (kr *kubernetesRestorer) restoreNamespace(
 
 		resourcePath := path.Join(nsPath, rscDir.Name())
 
-		w, e := kr.restoreResourceForNamespace(nsName, resourcePath, labelSelector, restore, backup)
+		w, e := ctx.restoreResourceForNamespace(nsName, resourcePath)
 		merge(&warnings, &w)
 		merge(&errors, &e)
 	}
@@ -368,19 +404,13 @@ func (kr *kubernetesRestorer) restoreNamespace(
 
 // restoreResourceForNamespace restores the specified resource type for the specified
 // namespace (or blank for cluster-scoped resources).
-func (kr *kubernetesRestorer) restoreResourceForNamespace(
-	namespace string,
-	resourcePath string,
-	labelSelector labels.Selector,
-	restore *api.Restore,
-	backup *api.Backup,
-) (api.RestoreResult, api.RestoreResult) {
+func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errors := api.RestoreResult{}, api.RestoreResult{}
 	resource := path.Base(resourcePath)
 
-	glog.Infof("Restoring resource %v into namespace %v\n", resource, namespace)
+	ctx.log("Restoring resource %v into namespace %v", resource, namespace)
 
-	files, err := kr.fileSystem.ReadDir(resourcePath)
+	files, err := ctx.fileSystem.ReadDir(resourcePath)
 	if err != nil {
 		addToResult(&errors, namespace, fmt.Errorf("error reading %q resource directory: %v", resource, err))
 		return warnings, errors
@@ -398,20 +428,20 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 
 	for _, file := range files {
 		fullPath := filepath.Join(resourcePath, file.Name())
-		obj, err := kr.unmarshal(fullPath)
+		obj, err := ctx.unmarshal(fullPath)
 		if err != nil {
 			addToResult(&errors, namespace, fmt.Errorf("error decoding %q: %v", fullPath, err))
 			continue
 		}
 
-		if !labelSelector.Matches(labels.Set(obj.GetLabels())) {
+		if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
 			continue
 		}
 
 		if restorer == nil {
 			// initialize client & restorer for this Resource. we need
 			// metadata from an object to do this.
-			glog.Infof("Getting client for %v", obj.GroupVersionKind())
+			ctx.log("Getting client for %v", obj.GroupVersionKind())
 
 			resource := metav1.APIResource{
 				Namespaced: len(namespace) > 0,
@@ -419,18 +449,18 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 			}
 
 			var err error
-			resourceClient, err = kr.dynamicFactory.ClientForGroupVersionKind(obj.GroupVersionKind(), resource, namespace)
+			resourceClient, err = ctx.dynamicFactory.ClientForGroupVersionKind(obj.GroupVersionKind(), resource, namespace)
 			if err != nil {
 				addArkError(&errors, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, groupResource, err))
 				return warnings, errors
 			}
 
-			restorer = kr.restorers[groupResource]
+			restorer = ctx.restorers[groupResource]
 			if restorer == nil {
-				glog.Infof("Using default restorer for %v", groupResource)
+				ctx.log("Using default restorer for %v", groupResource)
 				restorer = restorers.NewBasicRestorer(true)
 			} else {
-				glog.Infof("Using custom restorer for %v", groupResource)
+				ctx.log("Using custom restorer for %v", groupResource)
 			}
 
 			if restorer.Wait() {
@@ -446,16 +476,16 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 			}
 		}
 
-		if !restorer.Handles(obj, restore) {
+		if !restorer.Handles(obj, ctx.restore) {
 			continue
 		}
 
 		if hasControllerOwner(obj.GetOwnerReferences()) {
-			glog.V(4).Infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
+			ctx.log("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
 			continue
 		}
 
-		preparedObj, warning, err := restorer.Prepare(obj, restore, backup)
+		preparedObj, warning, err := restorer.Prepare(obj, ctx.restore, ctx.backup)
 		if warning != nil {
 			addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, warning))
 		}
@@ -474,16 +504,16 @@ func (kr *kubernetesRestorer) restoreResourceForNamespace(
 		unstructuredObj.SetNamespace(namespace)
 
 		// add an ark-restore label to each resource for easy ID
-		addLabel(unstructuredObj, api.RestoreLabelKey, restore.Name)
+		addLabel(unstructuredObj, api.RestoreLabelKey, ctx.restore.Name)
 
-		glog.Infof("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
+		ctx.log("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
 		_, err = resourceClient.Create(unstructuredObj)
 		if apierrors.IsAlreadyExists(err) {
 			addToResult(&warnings, namespace, err)
 			continue
 		}
 		if err != nil {
-			glog.Errorf("error restoring %s: %v", unstructuredObj.GetName(), err)
+			ctx.log("error restoring %s: %v", unstructuredObj.GetName(), err)
 			addToResult(&errors, namespace, fmt.Errorf("error restoring %s: %v", fullPath, err))
 			continue
 		}
@@ -529,10 +559,10 @@ func hasControllerOwner(refs []metav1.OwnerReference) bool {
 
 // unmarshal reads the specified file, unmarshals the JSON contained within it
 // and returns an Unstructured object.
-func (kr *kubernetesRestorer) unmarshal(filePath string) (*unstructured.Unstructured, error) {
+func (ctx *context) unmarshal(filePath string) (*unstructured.Unstructured, error) {
 	var obj unstructured.Unstructured
 
-	bytes, err := kr.fileSystem.ReadFile(filePath)
+	bytes, err := ctx.fileSystem.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -546,23 +576,23 @@ func (kr *kubernetesRestorer) unmarshal(filePath string) (*unstructured.Unstruct
 }
 
 // unzipAndExtractBackup extracts a reader on a gzipped tarball to a local temp directory
-func (kr *kubernetesRestorer) unzipAndExtractBackup(src io.Reader) (string, error) {
+func (ctx *context) unzipAndExtractBackup(src io.Reader) (string, error) {
 	gzr, err := gzip.NewReader(src)
 	if err != nil {
-		glog.Errorf("error creating gzip reader: %v", err)
+		ctx.log("error creating gzip reader: %v", err)
 		return "", err
 	}
 	defer gzr.Close()
 
-	return kr.readBackup(tar.NewReader(gzr))
+	return ctx.readBackup(tar.NewReader(gzr))
 }
 
 // readBackup extracts a tar reader to a local directory/file tree within a
 // temp directory.
-func (kr *kubernetesRestorer) readBackup(tarRdr *tar.Reader) (string, error) {
-	dir, err := kr.fileSystem.TempDir("", "")
+func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
+	dir, err := ctx.fileSystem.TempDir("", "")
 	if err != nil {
-		glog.Errorf("error creating temp dir: %v", err)
+		ctx.log("error creating temp dir: %v", err)
 		return "", err
 	}
 
@@ -570,11 +600,10 @@ func (kr *kubernetesRestorer) readBackup(tarRdr *tar.Reader) (string, error) {
 		header, err := tarRdr.Next()
 
 		if err == io.EOF {
-			glog.Infof("end of tar")
 			break
 		}
 		if err != nil {
-			glog.Errorf("error reading tar: %v", err)
+			ctx.log("error reading tar: %v", err)
 			return "", err
 		}
 
@@ -582,29 +611,29 @@ func (kr *kubernetesRestorer) readBackup(tarRdr *tar.Reader) (string, error) {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			err := kr.fileSystem.MkdirAll(target, header.FileInfo().Mode())
+			err := ctx.fileSystem.MkdirAll(target, header.FileInfo().Mode())
 			if err != nil {
-				glog.Errorf("mkdirall error: %v", err)
+				ctx.log("mkdirall error: %v", err)
 				return "", err
 			}
 
 		case tar.TypeReg:
 			// make sure we have the directory created
-			err := kr.fileSystem.MkdirAll(path.Dir(target), header.FileInfo().Mode())
+			err := ctx.fileSystem.MkdirAll(path.Dir(target), header.FileInfo().Mode())
 			if err != nil {
-				glog.Errorf("mkdirall error: %v", err)
+				ctx.log("mkdirall error: %v", err)
 				return "", err
 			}
 
 			// create the file
-			file, err := kr.fileSystem.Create(target)
+			file, err := ctx.fileSystem.Create(target)
 			if err != nil {
 				return "", err
 			}
 			defer file.Close()
 
 			if _, err := io.Copy(file, tarRdr); err != nil {
-				glog.Errorf("error copying: %v", err)
+				ctx.log("error copying: %v", err)
 				return "", err
 			}
 		}

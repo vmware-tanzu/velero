@@ -19,6 +19,7 @@ package restore
 import (
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -170,18 +171,14 @@ func TestRestoreMethod(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			restorer := &kubernetesRestorer{
-				discoveryHelper:    nil,
-				dynamicFactory:     nil,
-				restorers:          nil,
-				backupService:      nil,
-				backupClient:       nil,
-				namespaceClient:    &fakeNamespaceClient{},
-				resourcePriorities: nil,
-				fileSystem:         test.fileSystem,
+			ctx := &context{
+				restore:         test.restore,
+				namespaceClient: &fakeNamespaceClient{},
+				fileSystem:      test.fileSystem,
+				logger:          &logger{w: ioutil.Discard},
 			}
 
-			warnings, errors := restorer.restoreFromDir(test.baseDir, test.restore, nil, nil, nil)
+			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)
@@ -266,18 +263,15 @@ func TestRestoreNamespace(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			restorer := &kubernetesRestorer{
-				discoveryHelper:    nil,
-				dynamicFactory:     nil,
-				restorers:          nil,
-				backupService:      nil,
-				backupClient:       nil,
-				namespaceClient:    &fakeNamespaceClient{},
-				resourcePriorities: nil,
-				fileSystem:         test.fileSystem,
+			ctx := &context{
+				restore:              test.restore,
+				namespaceClient:      &fakeNamespaceClient{},
+				fileSystem:           test.fileSystem,
+				prioritizedResources: test.prioritizedResources,
+				logger:               &logger{w: ioutil.Discard},
 			}
 
-			warnings, errors := restorer.restoreNamespace(test.restore, test.namespace, test.path, test.prioritizedResources, nil, nil)
+			warnings, errors := ctx.restoreNamespace(test.namespace, test.path)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)
@@ -410,28 +404,22 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
 			dynamicFactory.On("ClientForGroupVersionKind", gvk, resource, test.namespace).Return(resourceClient, nil)
 
-			restorer := &kubernetesRestorer{
-				discoveryHelper:    nil,
-				dynamicFactory:     dynamicFactory,
-				restorers:          test.restorers,
-				backupService:      nil,
-				backupClient:       nil,
-				namespaceClient:    nil,
-				resourcePriorities: nil,
-				fileSystem:         test.fileSystem,
-			}
-
-			var (
-				restore = &api.Restore{
+			ctx := &context{
+				dynamicFactory: dynamicFactory,
+				restorers:      test.restorers,
+				fileSystem:     test.fileSystem,
+				selector:       test.labelSelector,
+				restore: &api.Restore{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: api.DefaultNamespace,
 						Name:      "my-restore",
 					},
-				}
-				backup = &api.Backup{}
-			)
+				},
+				backup: &api.Backup{},
+				logger: &logger{w: ioutil.Discard},
+			}
 
-			warnings, errors := restorer.restoreResourceForNamespace(test.namespace, test.resourcePath, test.labelSelector, restore, backup)
+			warnings, errors := ctx.restoreResourceForNamespace(test.namespace, test.resourcePath)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)

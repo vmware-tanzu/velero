@@ -46,8 +46,6 @@ type downloadRequestController struct {
 	downloadRequestClient       arkv1client.DownloadRequestsGetter
 	downloadRequestLister       listers.DownloadRequestLister
 	downloadRequestListerSynced cache.InformerSynced
-	backupLister                listers.BackupLister
-	backupListerSynced          cache.InformerSynced
 
 	backupService cloudprovider.BackupService
 	bucket        string
@@ -62,7 +60,6 @@ type downloadRequestController struct {
 func NewDownloadRequestController(
 	downloadRequestClient arkv1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
-	backupInformer informers.BackupInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
 ) Interface {
@@ -70,13 +67,11 @@ func NewDownloadRequestController(
 		downloadRequestClient:       downloadRequestClient,
 		downloadRequestLister:       downloadRequestInformer.Lister(),
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
-		backupLister:                backupInformer.Lister(),
-		backupListerSynced:          backupInformer.Informer().HasSynced,
 
 		backupService: backupService,
 		bucket:        bucket,
 
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
 
 		clock: &clock.RealClock{},
 	}
@@ -122,7 +117,7 @@ func (c *downloadRequestController) Run(ctx context.Context, numWorkers int) err
 	defer glog.Infof("Shutting down DownloadRequestController")
 
 	glog.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced, c.backupListerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
 	glog.Info("Caches are synced")
@@ -215,25 +210,21 @@ const signedURLTTL = 10 * time.Minute
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
 func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest) error {
-	switch downloadRequest.Spec.Target.Kind {
-	case v1.DownloadTargetKindBackupLog, v1.DownloadTargetKindBackupContents:
-		update, err := cloneDownloadRequest(downloadRequest)
-		if err != nil {
-			return err
-		}
-
-		update.Status.DownloadURL, err = c.backupService.CreateBackupSignedURL(downloadRequest.Spec.Target.Kind, c.bucket, update.Spec.Target.Name, signedURLTTL)
-		if err != nil {
-			return err
-		}
-
-		update.Status.Phase = v1.DownloadRequestPhaseProcessed
-		update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(signedURLTTL))
-
-		_, err = c.downloadRequestClient.DownloadRequests(update.Namespace).Update(update)
+	update, err := cloneDownloadRequest(downloadRequest)
+	if err != nil {
 		return err
 	}
-	return fmt.Errorf("unsupported download target kind %q", downloadRequest.Spec.Target.Kind)
+
+	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, signedURLTTL)
+	if err != nil {
+		return err
+	}
+
+	update.Status.Phase = v1.DownloadRequestPhaseProcessed
+	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(signedURLTTL))
+
+	_, err = c.downloadRequestClient.DownloadRequests(update.Namespace).Update(update)
+	return err
 
 }
 
