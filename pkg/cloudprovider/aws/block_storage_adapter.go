@@ -167,7 +167,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	}
 
 	var ret []string
-	err := op.ec2.DescribeSnapshotsPages(req, func (res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
+	err := op.ec2.DescribeSnapshotsPages(req, func(res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
 		for _, snapshot := range res.Snapshots {
 			ret = append(ret, *snapshot.SnapshotId)
 		}
