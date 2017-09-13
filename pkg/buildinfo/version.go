@@ -14,17 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package buildinfo holds build-time information like the sonobuoy version.
+// Package buildinfo holds build-time information like the ark version.
 // This is a separate package so that other packages can import it without
 // worrying about introducing circular dependencies.
 package buildinfo
 
-// Version is the current version of Ark, set by the go linker's -X flag at build time.
-var Version string
+var (
+	// Version is the current version of Ark, set by the go linker's -X flag at build time.
+	Version string
 
-// DockerImage is the full path to the docker image for this build, for example
-// gcr.io/heptio-images/ark.
-var DockerImage string
+	// DockerImage is the full path to the docker image for this build, for example
+	// gcr.io/heptio-images/ark.
+	DockerImage string
 
-// GitSHA is the actual commit that is being built, set by the go linker's -X flag at build time.
-var GitSHA string
+	// GitSHA is the actual commit that is being built, set by the go linker's -X flag at build time.
+	GitSHA string
+
+	// GitTreeState indicates if the git tree is clean or dirty, set by the go linker's -X flag at build
+	// time.
+	GitTreeState string
+)
