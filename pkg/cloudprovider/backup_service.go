@@ -68,8 +68,8 @@ type BackupGetter interface {
 
 const (
 	metadataFileFormatString   = "%s/ark-backup.json"
-	backupFileFormatString     = "%s/%s-data.tar.gz"
-	backukpLogFileFormatString = "%s/%s-logs.gz"
+	backupFileFormatString     = "%s/%s.tar.gz"
+	backupLogFileFormatString  = "%s/%s-logs.gz"
 	restoreLogFileFormatString = "%s/restore-%s-logs.gz"
 )
 
@@ -82,7 +82,7 @@ func getBackupContentsKey(backup string) string {
 }
 
 func getBackupLogKey(backup string) string {
-	return fmt.Sprintf(backukpLogFileFormatString, backup, backup)
+	return fmt.Sprintf(backupLogFileFormatString, backup, backup)
 }
 
 func getRestoreLogKey(backup, restore string) string {
