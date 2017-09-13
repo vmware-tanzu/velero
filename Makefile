@@ -21,17 +21,23 @@ OUTPUT_DIR = $(ROOT_DIR)/_output
 BIN_DIR = $(OUTPUT_DIR)/bin
 GIT_SHA=$(shell git rev-parse --short HEAD)
 GIT_DIRTY=$(shell git status --porcelain $(ROOT_DIR) 2> /dev/null)
-ifneq ($(GIT_DIRTY),)
-	GIT_SHA := $(GIT_SHA)-dirty
+ifeq ($(GIT_DIRTY),)
+	GIT_TREE_STATE := clean
+else
+	GIT_TREE_STATE := dirty
 endif
 
 # docker related vars
 DOCKER ?= docker
 REGISTRY ?= gcr.io/heptio-images
 BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.8-alpine3.6
+LDFLAGS := -X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION)
+LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT)
+LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitSHA=$(GIT_SHA)
+LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitTreeState=$(GIT_TREE_STATE)
 # go build -i installs compiled packages so they can be reused later.
 # This speeds up recompiles.
-BUILDCMD = go build -i -v -ldflags "-X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION) -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT) -X $(GOTARGET)/pkg/buildinfo.GitSHA=$(GIT_SHA)"
+BUILDCMD = go build -i -v -ldflags "$(LDFLAGS)"
 BUILDMNT = /go/src/$(GOTARGET)
 EXTRA_MNTS ?=
 
