@@ -211,7 +211,11 @@ func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket strin
 		return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(target.Name), ttl)
 	case api.DownloadTargetKindRestoreLog:
 		// restore name is formatted as <backup name>-<timestamp>
-		backup := strings.Split(target.Name, "-")[0]
+		i := strings.LastIndex(target.Name, "-")
+		if i < 0 {
+			i = len(target.Name)
+		}
+		backup := target.Name[0:i]
 		return br.objectStorage.CreateSignedURL(bucket, getRestoreLogKey(backup, target.Name), ttl)
 	default:
 		return "", fmt.Errorf("unsupported download target kind %q", target.Kind)
