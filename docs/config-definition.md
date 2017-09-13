@@ -99,7 +99,7 @@ No parameters required; specify an empty object per [example file][14].
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `location` | string | Required Field | *Example*: "Canada East"<br><br>See [the list of available locations][7] (note that this particular page refers to them as "Regions"). |
-| `apiTimeout` | metav1.Duration | 1m0s | How long to wait for an API Azure request to complete before timeout. |
+| `apiTimeout` | metav1.Duration | 2m0s | How long to wait for an Azure API request to complete before timeout. |
 
 [0]: #aws
 [1]: #gcp
