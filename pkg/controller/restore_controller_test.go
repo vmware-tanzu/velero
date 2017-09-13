@@ -19,7 +19,6 @@ package controller
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"testing"
@@ -119,6 +118,7 @@ func TestProcessRestore(t *testing.T) {
 		expectedRestoreUpdates      []*api.Restore
 		expectedRestorerCall        *api.Restore
 		backupServiceGetBackupError error
+		uploadLogError              error
 	}{
 		{
 			name:        "invalid key returns error",
@@ -187,7 +187,7 @@ func TestProcessRestore(t *testing.T) {
 				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
 				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseCompleted).
 					WithErrors(api.RestoreResult{
-						Cluster: []string{"no backup here"},
+						Ark: []string{"no backup here"},
 					}).
 					Restore,
 			},
@@ -260,13 +260,15 @@ func TestProcessRestore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fmt.Println(test.name)
-			var (
-				client          = fake.NewSimpleClientset()
-				restorer        = &fakeRestorer{}
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &BackupService{}
-			)
+			client := fake.NewSimpleClientset()
+
+			restorer := &fakeRestorer{}
+			defer restorer.AssertExpectations(t)
+
+			sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+			backupSvc := &BackupService{}
+			defer backupSvc.AssertExpectations(t)
 
 			c := NewRestoreController(
 				sharedInformers.Ark().V1().Restores(),
@@ -303,10 +305,14 @@ func TestProcessRestore(t *testing.T) {
 			if test.restorerError != nil {
 				errors.Namespaces = map[string][]string{"ns-1": {test.restorerError.Error()}}
 			}
+			if test.uploadLogError != nil {
+				errors.Ark = append(errors.Ark, "error uploading log file to object storage: "+test.uploadLogError.Error())
+			}
 			if test.expectedRestorerCall != nil {
 				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
 				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
-				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+				backupSvc.On("UploadRestoreLog", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
 			}
 
 			var (
@@ -379,8 +385,8 @@ type fakeRestorer struct {
 	calledWithArg api.Restore
 }
 
-func (r *fakeRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader) (api.RestoreResult, api.RestoreResult) {
-	res := r.Called(restore, backup, backupReader)
+func (r *fakeRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logger io.Writer) (api.RestoreResult, api.RestoreResult) {
+	res := r.Called(restore, backup, backupReader, logger)
 
 	r.calledWithArg = *restore
 

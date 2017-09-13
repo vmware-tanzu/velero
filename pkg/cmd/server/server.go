@@ -492,7 +492,6 @@ func (s *server) runControllers(config *api.Config) error {
 	downloadRequestController := controller.NewDownloadRequestController(
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
-		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
 	)

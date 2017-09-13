@@ -1,16 +1,21 @@
-## ark restore
+## ark restore logs
 
-Work with restores
+Get restore logs
 
 ### Synopsis
 
 
-Work with restores
+Get restore logs
+
+```
+ark restore logs RESTORE [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for restore
+  -h, --help               help for logs
+      --timeout duration   how long to wait to receive logs (default 1m0s)
 ```
 
 ### Options inherited from parent commands
@@ -27,9 +32,5 @@ Work with restores
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark restore create](ark_restore_create.md)	 - Create a restore
-* [ark restore delete](ark_restore_delete.md)	 - Delete a restore
-* [ark restore get](ark_restore_get.md)	 - get restores
-* [ark restore logs](ark_restore_logs.md)	 - Get restore logs
+* [ark restore](ark_restore.md)	 - Work with restores
 

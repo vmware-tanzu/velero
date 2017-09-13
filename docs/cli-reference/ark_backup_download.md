@@ -14,10 +14,10 @@ ark backup download NAME [flags]
 ### Options
 
 ```
-      --force               forces the download and will overwrite file if it exists already
-  -h, --help                help for download
-      --output-dir string   directory to download backup to. (Default cwd)
-      --timeout duration    maximum time to wait to process download request (default 1m0s)
+      --force              forces the download and will overwrite file if it exists already
+  -h, --help               help for download
+  -o, --output string      path to output file. Defaults to <NAME>-data.tar.gz in the current directory
+      --timeout duration   maximum time to wait to process download request (default 1m0s)
 ```
 
 ### Options inherited from parent commands

@@ -27,20 +27,20 @@ type BackupService struct {
 	mock.Mock
 }
 
-// CreateBackupLogSignedURL provides a mock function with given fields: bucket, backupName, ttl
-func (_m *BackupService) CreateBackupSignedURL(backupType v1.DownloadTargetKind, bucket string, backupName string, ttl time.Duration) (string, error) {
-	ret := _m.Called(bucket, backupName, ttl)
+// CreateSignedURL provides a mock function with given fields: target, bucket, ttl
+func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket string, ttl time.Duration) (string, error) {
+	ret := _m.Called(target, bucket, ttl)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string, string, time.Duration) string); ok {
-		r0 = rf(bucket, backupName, ttl)
+	if rf, ok := ret.Get(0).(func(v1.DownloadTarget, string, time.Duration) string); ok {
+		r0 = rf(target, bucket, ttl)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string, time.Duration) error); ok {
-		r1 = rf(bucket, backupName, ttl)
+	if rf, ok := ret.Get(1).(func(v1.DownloadTarget, string, time.Duration) error); ok {
+		r1 = rf(target, bucket, ttl)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -138,6 +138,20 @@ func (_m *BackupService) UploadBackup(bucket string, name string, metadata io.Re
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, io.ReadSeeker, io.ReadSeeker, io.ReadSeeker) error); ok {
 		r0 = rf(bucket, name, metadata, backup, log)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadRestoreLog provides a mock function with given fields: bucket, backup, restore, log
+func (_m *BackupService) UploadRestoreLog(bucket string, backup string, restore string, log io.ReadSeeker) error {
+	ret := _m.Called(bucket, backup, restore, log)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, io.ReadSeeker) error); ok {
+		r0 = rf(bucket, backup, restore, log)
 	} else {
 		r0 = ret.Error(0)
 	}

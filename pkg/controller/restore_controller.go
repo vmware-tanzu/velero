@@ -333,28 +333,57 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	backup, err := controller.fetchBackup(bucket, restore.Spec.BackupName)
 	if err != nil {
 		glog.Errorf("error getting backup: %v", err)
-		errors.Cluster = append(errors.Ark, err.Error())
+		errors.Ark = append(errors.Ark, err.Error())
 		return
 	}
 
 	tmpFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket)
 	if err != nil {
 		glog.Errorf("error downloading backup: %v", err)
-		errors.Cluster = append(errors.Ark, err.Error())
+		errors.Ark = append(errors.Ark, err.Error())
+		return
+	}
+
+	logFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		glog.Errorf("error creating log temp file: %v", err)
+		errors.Ark = append(errors.Ark, err.Error())
 		return
 	}
 
 	defer func() {
 		if err := tmpFile.Close(); err != nil {
-			errors.Cluster = append(errors.Ark, err.Error())
+			glog.Errorf("error closing %q: %v", tmpFile.Name(), err)
 		}
 
 		if err := os.Remove(tmpFile.Name()); err != nil {
-			errors.Cluster = append(errors.Ark, err.Error())
+			glog.Errorf("error removing %q: %v", tmpFile.Name(), err)
+		}
+
+		if err := logFile.Close(); err != nil {
+			glog.Errorf("error closing %q: %v", logFile.Name(), err)
+		}
+
+		if err := os.Remove(logFile.Name()); err != nil {
+			glog.Errorf("error removing %q: %v", logFile.Name(), err)
 		}
 	}()
 
-	return controller.restorer.Restore(restore, backup, tmpFile)
+	warnings, errors = controller.restorer.Restore(restore, backup, tmpFile, logFile)
+
+	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
+
+	// Reset the offset to 0 for reading
+	if _, err = logFile.Seek(0, 0); err != nil {
+		errors.Ark = append(errors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
+		return
+	}
+
+	if err := controller.backupService.UploadRestoreLog(bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
+		errors.Ark = append(errors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
+	}
+
+	return
 }
 
 func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string) (*os.File, error) {
