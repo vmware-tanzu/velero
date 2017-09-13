@@ -187,8 +187,8 @@ Feedback and discussion is available on [the mailing list][24].
 See [the list of releases][6] to find out about feature changes.
 
 [0]: https://github.com/heptio
-[1]: https://jenkins.i.heptio.com/buildStatus/icon?job=ark-prbuilder
-[2]: https://jenkins.i.heptio.com/job/ark-prbuilder/
+[1]: https://jenkins.i.heptio.com/buildStatus/icon?job=ark-master
+[2]: https://jenkins.i.heptio.com/job/ark-master/
 [3]: /docs
 [4]: https://github.com/heptio/ark/issues
 [5]: /CONTRIBUTING.md
