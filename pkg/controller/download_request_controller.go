@@ -18,18 +18,16 @@ package controller
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -40,20 +38,19 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type downloadRequestController struct {
 	downloadRequestClient       arkv1client.DownloadRequestsGetter
 	downloadRequestLister       listers.DownloadRequestLister
 	downloadRequestListerSynced cache.InformerSynced
-
-	backupService cloudprovider.BackupService
-	bucket        string
-
-	syncHandler func(key string) error
-	queue       workqueue.RateLimitingInterface
-
-	clock clock.Clock
+	backupService               cloudprovider.BackupService
+	bucket                      string
+	syncHandler                 func(key string) error
+	queue                       workqueue.RateLimitingInterface
+	clock                       clock.Clock
+	logger                      *logrus.Logger
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -62,18 +59,17 @@ func NewDownloadRequestController(
 	downloadRequestInformer informers.DownloadRequestInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	logger *logrus.Logger,
 ) Interface {
 	c := &downloadRequestController{
 		downloadRequestClient:       downloadRequestClient,
 		downloadRequestLister:       downloadRequestInformer.Lister(),
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
-
-		backupService: backupService,
-		bucket:        bucket,
-
-		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
-
-		clock: &clock.RealClock{},
+		backupService:               backupService,
+		bucket:                      bucket,
+		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
+		clock:                       &clock.RealClock{},
+		logger:                      logger,
 	}
 
 	c.syncHandler = c.processDownloadRequest
@@ -83,7 +79,10 @@ func NewDownloadRequestController(
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err != nil {
-					runtime.HandleError(fmt.Errorf("error creating queue key for %#v: %v", obj, err))
+					downloadRequest := obj.(*v1.DownloadRequest)
+					c.logger.WithError(errors.WithStack(err)).
+						WithField("downloadRequest", downloadRequest.Name).
+						Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -101,7 +100,7 @@ func (c *downloadRequestController) Run(ctx context.Context, numWorkers int) err
 	var wg sync.WaitGroup
 
 	defer func() {
-		glog.Infof("Waiting for workers to finish their work")
+		c.logger.Info("Waiting for workers to finish their work")
 
 		c.queue.ShutDown()
 
@@ -110,17 +109,17 @@ func (c *downloadRequestController) Run(ctx context.Context, numWorkers int) err
 		// we want to shut down the queue via defer and not at the end of the body.
 		wg.Wait()
 
-		glog.Infof("All workers have finished")
+		c.logger.Info("All workers have finished")
 	}()
 
-	glog.Info("Starting DownloadRequestController")
-	defer glog.Infof("Shutting down DownloadRequestController")
+	c.logger.Info("Starting DownloadRequestController")
+	defer c.logger.Info("Shutting down DownloadRequestController")
 
-	glog.Info("Waiting for caches to sync")
+	c.logger.Info("Waiting for caches to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
-	glog.Info("Caches are synced")
+	c.logger.Info("Caches are synced")
 
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
@@ -167,7 +166,8 @@ func (c *downloadRequestController) processNextWorkItem() bool {
 		return true
 	}
 
-	glog.Errorf("syncHandler error: %v", err)
+	c.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
+
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	c.queue.AddRateLimited(key)
@@ -178,21 +178,21 @@ func (c *downloadRequestController) processNextWorkItem() bool {
 // processDownloadRequest is the default per-item sync handler. It generates a pre-signed URL for
 // a new DownloadRequest or deletes the DownloadRequest if it has expired.
 func (c *downloadRequestController) processDownloadRequest(key string) error {
-	glog.V(4).Infof("processDownloadRequest for key %q", key)
+	logContext := c.logger.WithField("key", key)
+
+	logContext.Debug("Running processDownloadRequest")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		glog.V(4).Infof("error splitting key %q: %v", key, err)
-		return err
+		return errors.Wrap(err, "error splitting queue key")
 	}
 
 	downloadRequest, err := c.downloadRequestLister.DownloadRequests(ns).Get(name)
 	if apierrors.IsNotFound(err) {
-		glog.V(4).Infof("unable to find DownloadRequest %q", key)
+		logContext.Debug("Unable to find DownloadRequest")
 		return nil
 	}
 	if err != nil {
-		glog.V(4).Infof("error getting DownloadRequest %q: %v", key, err)
-		return err
+		return errors.Wrap(err, "error getting DownloadRequest")
 	}
 
 	switch downloadRequest.Status.Phase {
@@ -224,20 +224,20 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(signedURLTTL))
 
 	_, err = c.downloadRequestClient.DownloadRequests(update.Namespace).Update(update)
-	return err
-
+	return errors.WithStack(err)
 }
 
 // deleteIfExpired deletes downloadRequest if it has expired.
 func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
-	glog.V(4).Infof("checking for expiration of %s/%s", downloadRequest.Namespace, downloadRequest.Name)
+	logContext := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
+	logContext.Info("checking for expiration of DownloadRequest")
 	if downloadRequest.Status.Expiration.Time.Before(c.clock.Now()) {
-		glog.V(4).Infof("%s/%s has not expired", downloadRequest.Namespace, downloadRequest.Name)
+		logContext.Debug("DownloadRequest has not expired")
 		return nil
 	}
 
-	glog.V(4).Infof("%s/%s has expired - deleting", downloadRequest.Namespace, downloadRequest.Name)
-	return c.downloadRequestClient.DownloadRequests(downloadRequest.Namespace).Delete(downloadRequest.Name, nil)
+	logContext.Debug("DownloadRequest has expired - deleting")
+	return errors.WithStack(c.downloadRequestClient.DownloadRequests(downloadRequest.Namespace).Delete(downloadRequest.Name, nil))
 }
 
 // resync requeues all the DownloadRequests in the lister's cache. This is mostly to handle deleting
@@ -245,14 +245,14 @@ func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.Download
 func (c *downloadRequestController) resync() {
 	list, err := c.downloadRequestLister.List(labels.Everything())
 	if err != nil {
-		runtime.HandleError(fmt.Errorf("error listing download requests: %v", err))
+		c.logger.WithError(errors.WithStack(err)).Error("error listing download requests")
 		return
 	}
 
 	for _, dr := range list {
 		key, err := cache.MetaNamespaceKeyFunc(dr)
 		if err != nil {
-			runtime.HandleError(fmt.Errorf("error generating key for download request %#v: %v", dr, err))
+			c.logger.WithError(errors.WithStack(err)).WithField("downloadRequest", dr.Name).Error("error generating key for download request")
 			continue
 		}
 
@@ -264,12 +264,12 @@ func (c *downloadRequestController) resync() {
 func cloneDownloadRequest(in *v1.DownloadRequest) (*v1.DownloadRequest, error) {
 	clone, err := scheme.Scheme.DeepCopy(in)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error deep-copying DownloadRequest")
 	}
 
 	out, ok := clone.(*v1.DownloadRequest)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type: %T", clone)
+		return nil, errors.Errorf("unexpected type: %T", clone)
 	}
 
 	return out, nil

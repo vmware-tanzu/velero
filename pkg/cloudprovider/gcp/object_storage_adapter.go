@@ -17,11 +17,11 @@ limitations under the License.
 package gcp
 
 import (
-	"errors"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	// TODO switch to using newstorage
@@ -42,12 +42,12 @@ var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 func NewObjectStorageAdapter(googleAccessID string, privateKey []byte) (cloudprovider.ObjectStorageAdapter, error) {
 	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	gcs, err := storage.New(client)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return &objectStorageAdapter{
@@ -64,13 +64,13 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 
 	_, err := op.gcs.Objects.Insert(bucket, obj).Media(body).Do()
 
-	return err
+	return errors.WithStack(err)
 }
 
 func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	res, err := op.gcs.Objects.Get(bucket, key).Download()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return res.Body, nil
@@ -79,7 +79,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
 	res, err := op.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// GCP returns prefixes inclusive of the last delimiter. We need to strip
@@ -95,7 +95,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
 	res, err := op.gcs.Objects.List(bucket).Prefix(prefix).Do()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	ret := make([]string, 0, len(res.Items))
@@ -107,7 +107,7 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 }
 
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
-	return op.gcs.Objects.Delete(bucket, key).Do()
+	return errors.Wrapf(op.gcs.Objects.Delete(bucket, key).Do(), "error deleting object %s", key)
 }
 
 func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {

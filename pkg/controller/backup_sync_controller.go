@@ -20,13 +20,15 @@ import (
 	"context"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type backupSyncController struct {
@@ -34,11 +36,18 @@ type backupSyncController struct {
 	backupService cloudprovider.BackupService
 	bucket        string
 	syncPeriod    time.Duration
+	logger        *logrus.Logger
 }
 
-func NewBackupSyncController(client arkv1client.BackupsGetter, backupService cloudprovider.BackupService, bucket string, syncPeriod time.Duration) Interface {
+func NewBackupSyncController(
+	client arkv1client.BackupsGetter,
+	backupService cloudprovider.BackupService,
+	bucket string,
+	syncPeriod time.Duration,
+	logger *logrus.Logger,
+) Interface {
 	if syncPeriod < time.Minute {
-		glog.Infof("Backup sync period %v is too short. Setting to 1 minute", syncPeriod)
+		logger.Infof("Provided backup sync period %v is too short. Setting to 1 minute", syncPeriod)
 		syncPeriod = time.Minute
 	}
 	return &backupSyncController{
@@ -46,6 +55,7 @@ func NewBackupSyncController(client arkv1client.BackupsGetter, backupService clo
 		backupService: backupService,
 		bucket:        bucket,
 		syncPeriod:    syncPeriod,
+		logger:        logger,
 	}
 }
 
@@ -53,25 +63,27 @@ func NewBackupSyncController(client arkv1client.BackupsGetter, backupService clo
 // sync process according to the controller's syncPeriod. It will return when it
 // receives on the ctx.Done() channel.
 func (c *backupSyncController) Run(ctx context.Context, workers int) error {
-	glog.Info("Running backup sync controller")
+	c.logger.Info("Running backup sync controller")
 	wait.Until(c.run, c.syncPeriod, ctx.Done())
 	return nil
 }
 
 func (c *backupSyncController) run() {
-	glog.Info("Syncing backups from object storage")
+	c.logger.Info("Syncing backups from object storage")
 	backups, err := c.backupService.GetAllBackups(c.bucket)
 	if err != nil {
-		glog.Errorf("error listing backups: %v", err)
+		c.logger.WithError(err).Error("error listing backups")
 		return
 	}
-	glog.Infof("Found %d backups", len(backups))
+	c.logger.WithField("backupCount", len(backups)).Info("Got backups from object storage")
 
 	for _, cloudBackup := range backups {
-		glog.Infof("Syncing backup %s/%s", cloudBackup.Namespace, cloudBackup.Name)
+		logContext := c.logger.WithField("backup", kube.NamespaceAndName(cloudBackup))
+		logContext.Info("Syncing backup")
+
 		cloudBackup.ResourceVersion = ""
-		if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !errors.IsAlreadyExists(err) {
-			glog.Errorf("error syncing backup %s/%s from object storage: %v", cloudBackup.Namespace, cloudBackup.Name, err)
+		if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !kuberrs.IsAlreadyExists(err) {
+			logContext.WithError(errors.WithStack(err)).Error("Error syncing backup from object storage")
 		}
 	}
 }

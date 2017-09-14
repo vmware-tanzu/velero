@@ -17,10 +17,12 @@ limitations under the License.
 package collections
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 )
 
 func TestShouldInclude(t *testing.T) {
@@ -126,7 +128,11 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			res := ValidateIncludesExcludes(test.includes, test.excludes)
 
-			assert.Equal(t, test.expected, res)
+			require.Equal(t, len(test.expected), len(res))
+
+			for i := 0; i < len(test.expected); i++ {
+				assert.Equal(t, test.expected[i].Error(), res[i].Error())
+			}
 		})
 	}
 }

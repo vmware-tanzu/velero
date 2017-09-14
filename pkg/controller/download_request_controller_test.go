@@ -20,6 +20,10 @@ import (
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
@@ -28,8 +32,6 @@ import (
 	"github.com/heptio/ark/pkg/generated/clientset/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/util/test"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestProcessDownloadRequest(t *testing.T) {
@@ -50,7 +52,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:          "bad key format",
 			key:           "a/b/c",
-			expectedError: `unexpected key format: "a/b/c"`,
+			expectedError: `error splitting queue key: unexpected key format: "a/b/c"`,
 		},
 		{
 			name:          "backup log request with phase '' gets a url",
@@ -92,10 +94,13 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-			sharedInformers := informers.NewSharedInformerFactory(client, 0)
-			downloadRequestsInformer := sharedInformers.Ark().V1().DownloadRequests()
-			backupService := &test.BackupService{}
+			var (
+				client                   = fake.NewSimpleClientset()
+				sharedInformers          = informers.NewSharedInformerFactory(client, 0)
+				downloadRequestsInformer = sharedInformers.Ark().V1().DownloadRequests()
+				backupService            = &test.BackupService{}
+				logger, _                = testlogger.NewNullLogger()
+			)
 			defer backupService.AssertExpectations(t)
 
 			c := NewDownloadRequestController(
@@ -103,6 +108,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 				downloadRequestsInformer,
 				backupService,
 				"bucket",
+				logger,
 			).(*downloadRequestController)
 
 			if tc.expectedPhase == v1.DownloadRequestPhaseProcessed {

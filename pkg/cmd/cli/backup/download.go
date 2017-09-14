@@ -17,12 +17,12 @@ limitations under the License.
 package backup
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -88,7 +88,7 @@ func (o *DownloadOptions) Complete(args []string) error {
 	if o.Output == "" {
 		path, err := os.Getwd()
 		if err != nil {
-			return fmt.Errorf("error getting current directory: %v", err)
+			return errors.Wrapf(err, "error getting current directory")
 		}
 		o.Output = filepath.Join(path, fmt.Sprintf("%s-data.tar.gz", o.Name))
 	}

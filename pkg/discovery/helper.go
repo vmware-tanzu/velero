@@ -21,6 +21,8 @@ import (
 	"sync"
 
 	kcmdutil "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,6 +54,7 @@ type Helper interface {
 
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
+	logger          *logrus.Logger
 
 	// lock guards mapper and resources
 	lock      sync.RWMutex
@@ -61,7 +64,7 @@ type helper struct {
 
 var _ Helper = &helper{}
 
-func NewHelper(discoveryClient discovery.DiscoveryInterface) (Helper, error) {
+func NewHelper(discoveryClient discovery.DiscoveryInterface, logger *logrus.Logger) (Helper, error) {
 	h := &helper{
 		discoveryClient: discoveryClient,
 	}
@@ -77,18 +80,18 @@ func (h *helper) Refresh() error {
 
 	groupResources, err := discovery.GetAPIGroupResources(h.discoveryClient)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	mapper := discovery.NewRESTMapper(groupResources, dynamic.VersionInterfaces)
-	shortcutExpander, err := kcmdutil.NewShortcutExpander(mapper, h.discoveryClient)
+	shortcutExpander, err := kcmdutil.NewShortcutExpander(mapper, h.discoveryClient, h.logger)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	h.mapper = shortcutExpander
 
 	preferredResources, err := h.discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	h.resources = discovery.FilteredBy(

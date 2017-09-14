@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -26,7 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -41,22 +41,23 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 type restoreController struct {
-	restoreClient    arkv1client.RestoresGetter
-	backupClient     arkv1client.BackupsGetter
-	restorer         restore.Restorer
-	backupService    cloudprovider.BackupService
-	bucket           string
-	pvProviderExists bool
-
+	restoreClient       arkv1client.RestoresGetter
+	backupClient        arkv1client.BackupsGetter
+	restorer            restore.Restorer
+	backupService       cloudprovider.BackupService
+	bucket              string
+	pvProviderExists    bool
 	backupLister        listers.BackupLister
 	backupListerSynced  cache.InformerSynced
 	restoreLister       listers.RestoreLister
 	restoreListerSynced cache.InformerSynced
 	syncHandler         func(restoreName string) error
 	queue               workqueue.RateLimitingInterface
+	logger              *logrus.Logger
 }
 
 func NewRestoreController(
@@ -68,6 +69,7 @@ func NewRestoreController(
 	bucket string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
+	logger *logrus.Logger,
 ) Interface {
 	c := &restoreController{
 		restoreClient:       restoreClient,
@@ -81,6 +83,7 @@ func NewRestoreController(
 		restoreLister:       restoreInformer.Lister(),
 		restoreListerSynced: restoreInformer.Informer().HasSynced,
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
+		logger:              logger,
 	}
 
 	c.syncHandler = c.processRestore
@@ -94,13 +97,16 @@ func NewRestoreController(
 				case "", api.RestorePhaseNew:
 					// only process new restores
 				default:
-					glog.V(4).Infof("Restore %s/%s has phase %s - skipping", restore.Namespace, restore.Name, restore.Status.Phase)
+					c.logger.WithFields(logrus.Fields{
+						"restore": kubeutil.NamespaceAndName(restore),
+						"phase":   restore.Status.Phase,
+					}).Debug("Restore is not new, skipping")
 					return
 				}
 
 				key, err := cache.MetaNamespaceKeyFunc(restore)
 				if err != nil {
-					glog.Errorf("error creating queue key for %#v: %v", restore, err)
+					c.logger.WithError(errors.WithStack(err)).WithField("restore", restore).Error("Error creating queue key, item not added to queue")
 					return
 				}
 				c.queue.Add(key)
@@ -118,7 +124,7 @@ func (controller *restoreController) Run(ctx context.Context, numWorkers int) er
 	var wg sync.WaitGroup
 
 	defer func() {
-		glog.Infof("Waiting for workers to finish their work")
+		controller.logger.Info("Waiting for workers to finish their work")
 
 		controller.queue.ShutDown()
 
@@ -127,17 +133,17 @@ func (controller *restoreController) Run(ctx context.Context, numWorkers int) er
 		// we want to shut down the queue via defer and not at the end of the body.
 		wg.Wait()
 
-		glog.Infof("All workers have finished")
+		controller.logger.Info("All workers have finished")
 	}()
 
-	glog.Info("Starting RestoreController")
-	defer glog.Info("Shutting down RestoreController")
+	controller.logger.Info("Starting RestoreController")
+	defer controller.logger.Info("Shutting down RestoreController")
 
-	glog.Info("Waiting for caches to sync")
+	controller.logger.Info("Waiting for caches to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), controller.backupListerSynced, controller.restoreListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
-	glog.Info("Caches are synced")
+	controller.logger.Info("Caches are synced")
 
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
@@ -176,7 +182,7 @@ func (controller *restoreController) processNextWorkItem() bool {
 		return true
 	}
 
-	glog.Errorf("syncHandler error: %v", err)
+	controller.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
 	// we had an error processing the item so add it back
 	// into the queue for re-processing with rate-limiting
 	controller.queue.AddRateLimited(key)
@@ -185,18 +191,18 @@ func (controller *restoreController) processNextWorkItem() bool {
 }
 
 func (controller *restoreController) processRestore(key string) error {
-	glog.V(4).Infof("processRestore for key %q", key)
+	logContext := controller.logger.WithField("key", key)
+
+	logContext.Debug("Running processRestore")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		glog.V(4).Infof("error splitting key %q: %v", key, err)
-		return err
+		return errors.Wrap(err, "error splitting queue key")
 	}
 
-	glog.V(4).Infof("Getting restore %s", key)
+	logContext.Debug("Getting Restore")
 	restore, err := controller.restoreLister.Restores(ns).Get(name)
 	if err != nil {
-		glog.V(4).Infof("error getting restore %s: %v", key, err)
-		return err
+		return errors.Wrap(err, "error getting Restore")
 	}
 
 	// TODO I think this is now unnecessary. We only initially place
@@ -213,11 +219,10 @@ func (controller *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	glog.V(4).Infof("Cloning restore %s", key)
+	logContext.Debug("Cloning Restore")
 	// don't modify items in the cache
 	restore, err = cloneRestore(restore)
 	if err != nil {
-		glog.V(4).Infof("error cloning restore %s: %v", key, err)
 		return err
 	}
 
@@ -239,8 +244,7 @@ func (controller *restoreController) processRestore(key string) error {
 	// update status
 	updatedRestore, err := controller.restoreClient.Restores(ns).Update(restore)
 	if err != nil {
-		glog.V(4).Infof("error updating status to %s: %v", restore.Status.Phase, err)
-		return err
+		return errors.Wrapf(err, "error updating Restore phase to %s", restore.Status.Phase)
 	}
 	restore = updatedRestore
 
@@ -248,16 +252,16 @@ func (controller *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	glog.V(4).Infof("running restore for %s", key)
+	logContext.Debug("Running restore")
 	// execution & upload of restore
 	restore.Status.Warnings, restore.Status.Errors = controller.runRestore(restore, controller.bucket)
 
-	glog.V(4).Infof("restore %s completed", key)
+	logContext.Debug("restore completed")
 	restore.Status.Phase = api.RestorePhaseCompleted
 
-	glog.V(4).Infof("updating restore %s final status", key)
+	logContext.Debug("Updating Restore final status")
 	if _, err = controller.restoreClient.Restores(ns).Update(restore); err != nil {
-		glog.V(4).Infof("error updating restore %s final status: %v", key, err)
+		logContext.WithError(errors.WithStack(err)).Info("Error updating Restore final status")
 	}
 
 	return nil
@@ -266,12 +270,12 @@ func (controller *restoreController) processRestore(key string) error {
 func cloneRestore(in interface{}) (*api.Restore, error) {
 	clone, err := scheme.Scheme.DeepCopy(in)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error deep-copying Restore")
 	}
 
 	out, ok := clone.(*api.Restore)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type: %T", clone)
+		return nil, errors.Errorf("unexpected type: %T", clone)
 	}
 
 	return out, nil
@@ -306,13 +310,14 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	}
 
 	if !apierrors.IsNotFound(err) {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
-	glog.V(4).Infof("Backup %q not found in backupLister, checking object storage directly.", name)
+	logContext := controller.logger.WithField("backupName", name)
+
+	logContext.Debug("Backup not found in backupLister, checking object storage directly")
 	backup, err = controller.backupService.GetBackup(bucket, name)
 	if err != nil {
-		glog.V(4).Infof("Backup %q not found in object storage.", name)
 		return nil, err
 	}
 
@@ -321,7 +326,7 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 
 	created, createErr := controller.backupClient.Backups(api.DefaultNamespace).Create(backup)
 	if createErr != nil {
-		glog.Errorf("Unable to create API object for backup %q: %v", name, createErr)
+		logContext.WithError(errors.WithStack(createErr)).Error("Unable to create API object for Backup")
 	} else {
 		backup = created
 	}
@@ -329,64 +334,66 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	return backup, nil
 }
 
-func (controller *restoreController) runRestore(restore *api.Restore, bucket string) (warnings, errors api.RestoreResult) {
+func (controller *restoreController) runRestore(restore *api.Restore, bucket string) (warnings, restoreErrors api.RestoreResult) {
+	logContext := controller.logger.WithField("restore", kubeutil.NamespaceAndName(restore))
+
 	backup, err := controller.fetchBackup(bucket, restore.Spec.BackupName)
 	if err != nil {
-		glog.Errorf("error getting backup: %v", err)
-		errors.Ark = append(errors.Ark, err.Error())
+		logContext.WithError(err).WithField("backup", restore.Spec.BackupName).Error("Error getting backup")
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
 
-	tmpFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket)
+	tmpFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket, controller.logger)
 	if err != nil {
-		glog.Errorf("error downloading backup: %v", err)
-		errors.Ark = append(errors.Ark, err.Error())
+		logContext.WithError(err).WithField("backup", restore.Spec.BackupName).Error("Error downloading backup")
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		glog.Errorf("error creating log temp file: %v", err)
-		errors.Ark = append(errors.Ark, err.Error())
+		logContext.WithError(errors.WithStack(err)).Error("Error creating log temp file")
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
 
 	defer func() {
 		if err := tmpFile.Close(); err != nil {
-			glog.Errorf("error closing %q: %v", tmpFile.Name(), err)
+			logContext.WithError(errors.WithStack(err)).WithField("file", tmpFile.Name()).Error("Error closing file")
 		}
 
 		if err := os.Remove(tmpFile.Name()); err != nil {
-			glog.Errorf("error removing %q: %v", tmpFile.Name(), err)
+			logContext.WithError(errors.WithStack(err)).WithField("file", tmpFile.Name()).Error("Error removing file")
 		}
 
 		if err := logFile.Close(); err != nil {
-			glog.Errorf("error closing %q: %v", logFile.Name(), err)
+			logContext.WithError(errors.WithStack(err)).WithField("file", logFile.Name()).Error("Error closing file")
 		}
 
 		if err := os.Remove(logFile.Name()); err != nil {
-			glog.Errorf("error removing %q: %v", logFile.Name(), err)
+			logContext.WithError(errors.WithStack(err)).WithField("file", logFile.Name()).Error("Error removing file")
 		}
 	}()
 
-	warnings, errors = controller.restorer.Restore(restore, backup, tmpFile, logFile)
+	warnings, restoreErrors = controller.restorer.Restore(restore, backup, tmpFile, logFile)
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
 
 	// Reset the offset to 0 for reading
 	if _, err = logFile.Seek(0, 0); err != nil {
-		errors.Ark = append(errors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
+		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
 		return
 	}
 
 	if err := controller.backupService.UploadRestoreLog(bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
-		errors.Ark = append(errors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
+		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
 	}
 
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string) (*os.File, error) {
+func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger *logrus.Logger) (*os.File, error) {
 	readCloser, err := backupService.DownloadBackup(bucket, backupName)
 	if err != nil {
 		return nil, err
@@ -395,18 +402,23 @@ func downloadToTempFile(backupName string, backupService cloudprovider.BackupSer
 
 	file, err := ioutil.TempFile("", backupName)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error creating Backup temp file")
 	}
 
 	n, err := io.Copy(file, readCloser)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error copying Backup to temp file")
 	}
-	glog.V(4).Infof("copied %d bytes", n)
+
+	logContext := logger.WithField("backup", backupName)
+
+	logContext.WithFields(logrus.Fields{
+		"fileName": file.Name(),
+		"bytes":    n,
+	}).Debug("Copied Backup to file")
 
 	if _, err := file.Seek(0, 0); err != nil {
-		glog.V(4).Infof("error seeking: %v", err)
-		return nil, err
+		return nil, errors.Wrap(err, "error resetting Backup file offset")
 	}
 
 	return file, nil

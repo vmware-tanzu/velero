@@ -24,10 +24,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/errors"
+	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/scheme"
@@ -92,16 +93,18 @@ func getRestoreLogKey(backup, restore string) string {
 type backupService struct {
 	objectStorage ObjectStorageAdapter
 	decoder       runtime.Decoder
+	logger        *logrus.Logger
 }
 
 var _ BackupService = &backupService{}
 var _ BackupGetter = &backupService{}
 
 // NewBackupService creates a backup service using the provided object storage adapter
-func NewBackupService(objectStorage ObjectStorageAdapter) BackupService {
+func NewBackupService(objectStorage ObjectStorageAdapter, logger *logrus.Logger) BackupService {
 	return &backupService{
 		objectStorage: objectStorage,
 		decoder:       scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
+		logger:        logger,
 	}
 }
 
@@ -118,14 +121,17 @@ func (br *backupService) UploadBackup(bucket, backupName string, metadata, backu
 		// try to delete the metadata file since the data upload failed
 		deleteErr := br.objectStorage.DeleteObject(bucket, metadataKey)
 
-		return errors.NewAggregate([]error{err, deleteErr})
+		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
 	// uploading log file is best-effort; if it fails, we log the error but call the overall upload a
 	// success
 	logKey := getBackupLogKey(backupName)
 	if err := br.objectStorage.PutObject(bucket, logKey, log); err != nil {
-		glog.Errorf("error uploading %s/%s: %v", bucket, logKey, err)
+		br.logger.WithError(err).WithFields(logrus.Fields{
+			"bucket": bucket,
+			"key":    logKey,
+		}).Error("Error uploading log file")
 	}
 
 	return nil
@@ -149,7 +155,7 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	for _, backupDir := range prefixes {
 		backup, err := br.GetBackup(bucket, backupDir)
 		if err != nil {
-			glog.Errorf("Error reading backup directory %s: %v", backupDir, err)
+			br.logger.WithError(err).WithField("dir", backupDir).Error("Error reading backup directory")
 			continue
 		}
 
@@ -170,17 +176,17 @@ func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
 
 	data, err := ioutil.ReadAll(res)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	obj, _, err := br.decoder.Decode(data, nil, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	backup, ok := obj.(*api.Backup)
 	if !ok {
-		return nil, fmt.Errorf("unexpected type for %s/%s: %T", bucket, key, obj)
+		return nil, errors.Errorf("unexpected type for %s/%s: %T", bucket, key, obj)
 	}
 
 	return backup, nil
@@ -194,13 +200,16 @@ func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
 
 	var errs []error
 	for _, key := range objects {
-		glog.V(4).Infof("Trying to delete bucket=%s, key=%s", bucket, key)
+		br.logger.WithFields(logrus.Fields{
+			"bucket": bucket,
+			"key":    key,
+		}).Debug("Trying to delete object")
 		if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	return errors.NewAggregate(errs)
+	return errors.WithStack(kerrors.NewAggregate(errs))
 }
 
 func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket string, ttl time.Duration) (string, error) {
@@ -218,7 +227,7 @@ func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket strin
 		backup := target.Name[0:i]
 		return br.objectStorage.CreateSignedURL(bucket, getRestoreLogKey(backup, target.Name), ttl)
 	default:
-		return "", fmt.Errorf("unsupported download target kind %q", target.Kind)
+		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
 }
 
@@ -235,10 +244,15 @@ type cachedBackupService struct {
 
 // NewBackupServiceWithCachedBackupGetter returns a BackupService that uses a cache for
 // GetAllBackups().
-func NewBackupServiceWithCachedBackupGetter(ctx context.Context, delegate BackupService, resyncPeriod time.Duration) BackupService {
+func NewBackupServiceWithCachedBackupGetter(
+	ctx context.Context,
+	delegate BackupService,
+	resyncPeriod time.Duration,
+	logger *logrus.Logger,
+) BackupService {
 	return &cachedBackupService{
 		BackupService: delegate,
-		cache:         NewBackupCache(ctx, delegate, resyncPeriod),
+		cache:         NewBackupCache(ctx, delegate, resyncPeriod, logger),
 	}
 }
 

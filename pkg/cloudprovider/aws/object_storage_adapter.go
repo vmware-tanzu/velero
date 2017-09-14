@@ -17,14 +17,13 @@ limitations under the License.
 package aws
 
 import (
-	"errors"
 	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -85,7 +84,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 
 	_, err := op.s3.PutObject(req)
 
-	return err
+	return errors.Wrapf(err, "error putting object %s", key)
 }
 
 func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
@@ -96,7 +95,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 
 	res, err := op.s3.GetObject(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error getting object %s", key)
 	}
 
 	return res.Body, nil
@@ -117,7 +116,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return ret, nil
@@ -138,7 +137,7 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return ret, nil
@@ -152,11 +151,10 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 
 	_, err := op.s3.DeleteObject(req)
 
-	return err
+	return errors.Wrapf(err, "error deleting object %s", key)
 }
 
 func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	glog.V(4).Infof("CreateSignedURL: bucket=%s, key=%s, ttl=%d", bucket, key, ttl)
 	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

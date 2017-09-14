@@ -17,9 +17,9 @@ limitations under the License.
 package restore
 
 import (
-	"errors"
-	"fmt"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -69,7 +69,7 @@ func (rw *resourceWaiter) Wait() error {
 		case event := <-rw.watchChan:
 			obj, ok := event.Object.(*unstructured.Unstructured)
 			if !ok {
-				return fmt.Errorf("Unexpected type %T", event.Object)
+				return errors.Errorf("Unexpected type %T", event.Object)
 			}
 
 			if event.Type == watch.Added || event.Type == watch.Modified {

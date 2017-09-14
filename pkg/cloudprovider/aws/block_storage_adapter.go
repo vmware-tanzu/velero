@@ -17,12 +17,10 @@ limitations under the License.
 package aws
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -39,11 +37,11 @@ type blockStorageAdapter struct {
 func getSession(config *aws.Config) (*session.Session, error) {
 	sess, err := session.NewSession(config)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if _, err := sess.Config.Credentials.Get(); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return sess, nil
@@ -71,10 +69,10 @@ func NewBlockStorageAdapter(region, availabilityZone string) (cloudprovider.Bloc
 	)
 	res, err := ec2Client.DescribeAvailabilityZones(azReq)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	if len(res.AvailabilityZones) == 0 {
-		return nil, fmt.Errorf("availability zone %q not found", availabilityZone)
+		return nil, errors.Errorf("availability zone %q not found", availabilityZone)
 	}
 
 	return &blockStorageAdapter{
@@ -101,7 +99,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 
 	res, err := op.ec2.CreateVolume(req)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return *res.VolumeId, nil
@@ -114,11 +112,11 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, e
 
 	res, err := op.ec2.DescribeVolumes(req)
 	if err != nil {
-		return "", nil, err
+		return "", nil, errors.WithStack(err)
 	}
 
 	if len(res.Volumes) != 1 {
-		return "", nil, fmt.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
+		return "", nil, errors.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
 	}
 
 	vol := res.Volumes[0]
@@ -146,10 +144,10 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID string) (ready bool, err e
 
 	res, err := op.ec2.DescribeVolumes(req)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 	if len(res.Volumes) != 1 {
-		return false, fmt.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
+		return false, errors.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
 	}
 
 	return *res.Volumes[0].State == ec2.VolumeStateAvailable, nil
@@ -175,7 +173,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 		return !lastPage
 	})
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return ret, nil
@@ -188,7 +186,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]s
 
 	res, err := op.ec2.CreateSnapshot(req)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	tagsReq := &ec2.CreateTagsInput{}
@@ -208,7 +206,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]s
 
 	_, err = op.ec2.CreateTags(tagsReq)
 
-	return *res.SnapshotId, err
+	return *res.SnapshotId, errors.WithStack(err)
 }
 
 func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
@@ -218,5 +216,5 @@ func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
 
 	_, err := op.ec2.DeleteSnapshot(req)
 
-	return err
+	return errors.WithStack(err)
 }
