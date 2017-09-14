@@ -78,7 +78,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 	}
 
 	if apiTimeout == 0 {
-		apiTimeout = time.Minute
+		apiTimeout = 2 * time.Minute
 	}
 
 	cfg := getConfig()
