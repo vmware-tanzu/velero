@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,13 +104,26 @@ func GetPVSource(spec map[string]interface{}) (string, map[string]interface{}) {
 }
 
 // SetVolumeID looks for a supported PV source within the provided PV spec data.
-// If sets the appropriate ID field within the source if found, and returns an
+// If sets the appropriate ID field(s) within the source if found, and returns an
 // error if a supported PV source is not found.
 func SetVolumeID(spec map[string]interface{}, volumeID string) error {
 	sourceType, source := GetPVSource(spec)
-
 	if sourceType == "" {
 		return errors.New("persistent volume source is not compatible")
+	}
+
+	// for azureDisk, we need to do a find-replace within the diskURI (if it exists)
+	// to switch the old disk name with the new.
+	if sourceType == "azureDisk" {
+		uri, err := collections.GetString(source, "diskURI")
+		if err == nil {
+			priorVolumeID, err := collections.GetString(source, supportedVolumeTypes["azureDisk"])
+			if err != nil {
+				return err
+			}
+
+			source["diskURI"] = strings.Replace(uri, priorVolumeID, volumeID, -1)
+		}
 	}
 
 	source[supportedVolumeTypes[sourceType]] = volumeID
