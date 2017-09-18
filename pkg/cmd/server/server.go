@@ -57,7 +57,7 @@ import (
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
-func NewCommand(baseName string) *cobra.Command {
+func NewCommand() *cobra.Command {
 	var kubeconfig string
 
 	var command = &cobra.Command{
@@ -65,7 +65,7 @@ func NewCommand(baseName string) *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			s, err := newServer(kubeconfig, baseName+"-server")
+			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())

@@ -39,15 +39,16 @@ func Config(kubeconfig, baseName string) (*rest.Config, error) {
 	clientConfig.UserAgent = buildUserAgent(
 		baseName,
 		buildinfo.Version,
+		buildinfo.FormattedGitSHA(),
 		runtime.GOOS,
 		runtime.GOARCH,
-		buildinfo.GitSHA)
+	)
 
 	return clientConfig, nil
 }
 
 // buildUserAgent builds a User-Agent string from given args.
-func buildUserAgent(command, version, os, arch, commit string) string {
+func buildUserAgent(command, version, formattedSha, os, arch string) string {
 	return fmt.Sprintf(
-		"%s/%s (%s/%s) %s", command, version, os, arch, commit)
+		"%s/%s (%s/%s) %s", command, version, os, arch, formattedSha)
 }

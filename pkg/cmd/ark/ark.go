@@ -46,7 +46,7 @@ associated data.`,
 		backup.NewCommand(f),
 		schedule.NewCommand(f),
 		restore.NewCommand(f),
-		server.NewCommand(name),
+		server.NewCommand(),
 		version.NewCommand(),
 	)
 
