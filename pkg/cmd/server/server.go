@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -125,13 +126,21 @@ func (s *server) run() error {
 		return err
 	}
 
-	config, err := s.loadConfig()
+	originalConfig, err := s.loadConfig()
 	if err != nil {
 		return err
 	}
+
+	// watchConfig needs to examine the unmodified original config, so we keep that around as a
+	// separate object, and instead apply defaults to a clone.
+	copy, err := scheme.Scheme.DeepCopy(originalConfig)
+	if err != nil {
+		return err
+	}
+	config := copy.(*api.Config)
 	applyConfigDefaults(config)
 
-	s.watchConfig(config)
+	s.watchConfig(originalConfig)
 
 	if err := s.initBackupService(config); err != nil {
 		return err
@@ -227,10 +236,23 @@ func (s *server) watchConfig(config *api.Config) {
 	s.sharedInformerFactory.Ark().V1().Configs().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			updated := newObj.(*api.Config)
+			glog.V(4).Infof("received updated config: %q", kube.NamespaceAndName(updated))
 
 			if updated.Name != config.Name {
 				glog.V(5).Infof("config watch channel received other config %q", updated.Name)
 				return
+			}
+
+			// Objects retrieved via Get() don't have their Kind or APIVersion set. Objects retrieved via
+			// Watch(), including those from shared informer event handlers, DO have their Kind and
+			// APIVersion set. To prevent the DeepEqual() call below from considering Kind or APIVersion
+			// as the source of a change, set config.Kind and config.APIVersion to match the values from
+			// the updated Config.
+			if config.Kind != updated.Kind {
+				config.Kind = updated.Kind
+			}
+			if config.APIVersion != updated.APIVersion {
+				config.APIVersion = updated.APIVersion
 			}
 
 			if !reflect.DeepEqual(config, updated) {
