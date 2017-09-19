@@ -65,7 +65,7 @@ func NewCommand() *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			s, err := newServer(kubeconfig)
+			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -89,8 +89,8 @@ type server struct {
 	cancelFunc            context.CancelFunc
 }
 
-func newServer(kubeconfig string) (*server, error) {
-	clientConfig, err := client.Config(kubeconfig)
+func newServer(kubeconfig, baseName string) (*server, error) {
+	clientConfig, err := client.Config(kubeconfig, baseName)
 	if err != nil {
 		return nil, err
 	}

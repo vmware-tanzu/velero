@@ -19,6 +19,8 @@ limitations under the License.
 // worrying about introducing circular dependencies.
 package buildinfo
 
+import "fmt"
+
 var (
 	// Version is the current version of Ark, set by the go linker's -X flag at build time.
 	Version string
@@ -34,3 +36,11 @@ var (
 	// time.
 	GitTreeState string
 )
+
+// FormattedGitSHA renders the Git SHA with an indicator of the tree state.
+func FormattedGitSHA() string {
+	if GitTreeState != "clean" {
+		return fmt.Sprintf("%s-%s", GitSHA, GitTreeState)
+	}
+	return GitSHA
+}

@@ -34,12 +34,14 @@ type Factory interface {
 type factory struct {
 	flags      *pflag.FlagSet
 	kubeconfig string
+	baseName   string
 }
 
 // NewFactory returns a Factory.
-func NewFactory() Factory {
+func NewFactory(baseName string) Factory {
 	f := &factory{
-		flags: pflag.NewFlagSet("", pflag.ContinueOnError),
+		flags:    pflag.NewFlagSet("", pflag.ContinueOnError),
+		baseName: baseName,
 	}
 	f.flags.StringVar(&f.kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 
@@ -51,7 +53,7 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (f *factory) Client() (clientset.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig)
+	clientConfig, err := Config(f.kubeconfig, f.baseName)
 	if err != nil {
 		return nil, err
 	}

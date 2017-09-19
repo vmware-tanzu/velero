@@ -17,18 +17,38 @@ limitations under the License.
 package client
 
 import (
+	"fmt"
+	"runtime"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+
+	"github.com/heptio/ark/pkg/buildinfo"
 )
 
 // Config returns a *rest.Config, using either the kubeconfig (if specified) or an in-cluster
 // configuration.
-func Config(kubeconfig string) (*rest.Config, error) {
+func Config(kubeconfig, baseName string) (*rest.Config, error) {
 	loader := clientcmd.NewDefaultClientConfigLoadingRules()
 	loader.ExplicitPath = kubeconfig
 	clientConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", loader.Load)
 	if err != nil {
 		return nil, err
 	}
+
+	clientConfig.UserAgent = buildUserAgent(
+		baseName,
+		buildinfo.Version,
+		buildinfo.FormattedGitSHA(),
+		runtime.GOOS,
+		runtime.GOARCH,
+	)
+
 	return clientConfig, nil
+}
+
+// buildUserAgent builds a User-Agent string from given args.
+func buildUserAgent(command, version, formattedSha, os, arch string) string {
+	return fmt.Sprintf(
+		"%s/%s (%s/%s) %s", command, version, os, arch, formattedSha)
 }

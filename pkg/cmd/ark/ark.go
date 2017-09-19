@@ -39,7 +39,7 @@ and operationally robust way to back up your application state and
 associated data.`,
 	}
 
-	f := client.NewFactory()
+	f := client.NewFactory(name)
 	f.BindFlags(c.PersistentFlags())
 
 	c.AddCommand(
