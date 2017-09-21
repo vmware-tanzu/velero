@@ -164,7 +164,7 @@ Looking at a specific example--an `ark backup create test-backup` command trigge
 
 ## Troubleshooting
 
-If you encounter any problems that the documentation does not address, [file an issue][4].  
+If you encounter any problems that the documentation does not address, [file an issue][4] or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
 
 ## Contributing
 
@@ -211,3 +211,4 @@ See [the list of releases][6] to find out about feature changes.
 [22]: https://github.com/coreos/etcd
 [23]: /docs/cloud-provider-specifics.md
 [24]: http://j.hept.io/ark-list
+[25]: http://slack.kubernetes.io/
