@@ -32,19 +32,19 @@ type SnapshotService interface {
 	// CreateSnapshot triggers a snapshot for the specified cloud volume and tags it with metadata.
 	// it returns the cloud snapshot ID, or an error if a problem is encountered triggering the snapshot via
 	// the cloud API.
-	CreateSnapshot(volumeID string) (string, error)
+	CreateSnapshot(volumeID, volumeAZ string) (string, error)
 
 	// CreateVolumeFromSnapshot triggers a restore operation to create a new cloud volume from the specified
 	// snapshot and volume characteristics. Returns the cloud volume ID, or an error if a problem is
 	// encountered triggering the restore via the cloud API.
-	CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (string, error)
+	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error)
 
 	// DeleteSnapshot triggers a deletion of the specified Ark snapshot via the cloud API. It returns an
 	// error if a problem is encountered triggering the deletion via the cloud API.
 	DeleteSnapshot(snapshotID string) error
 
 	// GetVolumeInfo gets the type and IOPS (if applicable) from the cloud API.
-	GetVolumeInfo(volumeID string) (string, *int64, error)
+	GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error)
 }
 
 const (
@@ -67,8 +67,8 @@ func NewSnapshotService(blockStorage BlockStorageAdapter) SnapshotService {
 	}
 }
 
-func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeType string, iops *int64) (string, error) {
-	volumeID, err := sr.blockStorage.CreateVolumeFromSnapshot(snapshotID, volumeType, iops)
+func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeType string, volumeAZ string, iops *int64) (string, error) {
+	volumeID, err := sr.blockStorage.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +84,7 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 		case <-timeout.C:
 			return "", fmt.Errorf("timeout reached waiting for volume %v to be ready", volumeID)
 		case <-ticker.C:
-			if ready, err := sr.blockStorage.IsVolumeReady(volumeID); err == nil && ready {
+			if ready, err := sr.blockStorage.IsVolumeReady(volumeID, volumeAZ); err == nil && ready {
 				return volumeID, nil
 			}
 		}
@@ -104,18 +104,18 @@ func (sr *snapshotService) GetAllSnapshots() ([]string, error) {
 	return res, nil
 }
 
-func (sr *snapshotService) CreateSnapshot(volumeID string) (string, error) {
+func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, error) {
 	tags := map[string]string{
 		snapshotTagKey: snapshotTagVal,
 	}
 
-	return sr.blockStorage.CreateSnapshot(volumeID, tags)
+	return sr.blockStorage.CreateSnapshot(volumeID, volumeAZ, tags)
 }
 
 func (sr *snapshotService) DeleteSnapshot(snapshotID string) error {
 	return sr.blockStorage.DeleteSnapshot(snapshotID)
 }
 
-func (sr *snapshotService) GetVolumeInfo(volumeID string) (string, *int64, error) {
-	return sr.blockStorage.GetVolumeInfo(volumeID)
+func (sr *snapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	return sr.blockStorage.GetVolumeInfo(volumeID, volumeAZ)
 }

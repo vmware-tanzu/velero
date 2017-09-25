@@ -130,7 +130,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 	}, nil
 }
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (string, error) {
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	fullSnapshotName := getFullSnapshotName(op.subscription, op.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
@@ -159,7 +159,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	return diskName, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
 		return "", nil, err
@@ -168,7 +168,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, e
 	return string(res.AccountType), nil, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID string) (ready bool, err error) {
+func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
 		return false, err
@@ -215,7 +215,7 @@ Snapshot:
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]string) (string, error) {
+func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	fullDiskName := getFullDiskName(op.subscription, op.resourceGroup, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string

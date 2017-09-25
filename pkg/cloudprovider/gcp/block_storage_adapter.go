@@ -35,17 +35,13 @@ import (
 type blockStorageAdapter struct {
 	gce     *compute.Service
 	project string
-	zone    string
 }
 
 var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
-func NewBlockStorageAdapter(project, zone string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStorageAdapter(project string) (cloudprovider.BlockStorageAdapter, error) {
 	if project == "" {
 		return nil, errors.New("missing project in gcp configuration in config file")
-	}
-	if zone == "" {
-		return nil, errors.New("missing zone in gcp configuration in config file")
 	}
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
@@ -58,24 +54,23 @@ func NewBlockStorageAdapter(project, zone string) (cloudprovider.BlockStorageAda
 		return nil, err
 	}
 
-	// validate project & zone
-	res, err := gce.Zones.Get(project, zone).Do()
+	// validate project
+	res, err := gce.Projects.Get(project).Do()
 	if err != nil {
 		return nil, err
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("zone %q not found for project %q", project, zone)
+		return nil, fmt.Errorf("error getting project %q", project)
 	}
 
 	return &blockStorageAdapter{
 		gce:     gce,
 		project: project,
-		zone:    zone,
 	}, nil
 }
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID string, volumeType string, iops *int64) (volumeID string, err error) {
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	res, err := op.gce.Snapshots.Get(op.project, snapshotID).Do()
 	if err != nil {
 		return "", err
@@ -87,15 +82,15 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID string, volum
 		Type:           volumeType,
 	}
 
-	if _, err = op.gce.Disks.Insert(op.project, op.zone, disk).Do(); err != nil {
+	if _, err = op.gce.Disks.Insert(op.project, volumeAZ, disk).Do(); err != nil {
 		return "", err
 	}
 
 	return disk.Name, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
-	res, err := op.gce.Disks.Get(op.project, op.zone, volumeID).Do()
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	res, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", nil, err
 	}
@@ -103,8 +98,8 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, e
 	return res.Type, nil, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID string) (ready bool, err error) {
-	disk, err := op.gce.Disks.Get(op.project, op.zone, volumeID).Do()
+func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+	disk, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return false, err
 	}
@@ -140,7 +135,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]string) (string, error) {
+func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// snapshot names must adhere to RFC1035 and be 1-63 characters
 	// long
 	var snapshotName string
@@ -156,7 +151,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]s
 		Name: snapshotName,
 	}
 
-	_, err := op.gce.Disks.CreateSnapshot(op.project, op.zone, volumeID, &gceSnap).Do()
+	_, err := op.gce.Disks.CreateSnapshot(op.project, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", err
 	}

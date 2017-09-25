@@ -21,7 +21,6 @@ metadata:
 persistentVolumeProvider:
   gcp:
     project: <YOUR_PROJECT>
-    zone: <YOUR_ZONE>
 backupStorageProvider:
   bucket: <YOUR_BUCKET>
   gcp: {}

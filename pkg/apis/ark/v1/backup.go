@@ -109,6 +109,10 @@ type VolumeBackupInfo struct {
 	// API.
 	Type string `json:"type"`
 
+	// AvailabilityZone is the where the volume is provisioned
+	// in the cloud provider.
+	AvailabilityZone string `json:"availabilityZone,omitempty"`
+
 	// Iops is the optional value of provisioned IOPS for the
 	// disk/volume in the cloud provider API.
 	Iops *int64 `json:"iops,omitempty"`

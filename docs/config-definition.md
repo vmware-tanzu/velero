@@ -1,9 +1,9 @@
 # Ark Config definition
 
-* [Overview][10]
-* [Example][11]
-* [Parameter Reference][8]
-  * [Main config][9]
+* [Overview][8]
+* [Example][9]
+* [Parameter Reference][6]
+  * [Main config][7]
   * [AWS][0]
   * [GCP][1]
   * [Azure][2]
@@ -26,7 +26,6 @@ metadata:
 persistentVolumeProvider:
   aws:
     region: us-west-2
-    availabilityZone: us-west-2a
 backupStorageProvider:
   bucket: ark
   aws:
@@ -65,55 +64,51 @@ The configurable parameters are as follows:
 | `region` | string | Required Field | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list. |
 | `disableSSL` | bool | `false` | Set this to `true` if you are using Minio (or another local, S3-compatible storage service) and your deployment is not secured. |
 | `s3ForcePathStyle` | bool | `false` | Set this to `true` if you are using a local storage service like Minio. |
-| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, `availabilityZone`, and `bucket`. This field is primarily for local storage services like Minio.|
-| `kmsKeyID` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f"<br><br>Specify an [AWS KMS key][12] id to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
+| `s3Url` | string | Required field for non-AWS-hosted storage| *Example*: http://minio:9000<br><br>You can specify the AWS S3 URL here for explicitness, but Ark can already generate it from `region`, and `bucket`. This field is primarily for local storage services like Minio.|
+| `kmsKeyID` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f"<br><br>Specify an [AWS KMS key][10] id to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
 
 #### persistentVolumeProvider (AWS Only)
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `region` | string | Required Field | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list. |
-| `availabilityZone` | string | Required Field | *Example*: "us-east-1a"<br><br>See [AWS documentation][4] for details. |
 
 ### GCP
 
 #### backupStorageProvider
 
-No parameters required; specify an empty object per [example file][13].
+No parameters required; specify an empty object per [example file][11].
 
 #### persistentVolumeProvider
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `project` | string | Required Field | *Example*: "project-example-3jsn23"<br><br> See the [Project ID documentation][5] for details. |
-| `zone` | string | Required Field | *Example*: "us-central1-a"<br><br>See [GCP documentation][6] for the full list. |
+| `project` | string | Required Field | *Example*: "project-example-3jsn23"<br><br> See the [Project ID documentation][4] for details. |
 
 ### Azure
 
 #### backupStorageProvider
 
-No parameters required; specify an empty object per [example file][14].
+No parameters required; specify an empty object per [example file][12].
 
 #### persistentVolumeProvider
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `location` | string | Required Field | *Example*: "Canada East"<br><br>See [the list of available locations][7] (note that this particular page refers to them as "Regions"). |
+| `location` | string | Required Field | *Example*: "Canada East"<br><br>See [the list of available locations][5] (note that this particular page refers to them as "Regions"). |
 | `apiTimeout` | metav1.Duration | 2m0s | How long to wait for an Azure API request to complete before timeout. |
 
 [0]: #aws
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
-[4]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-availability-zones
-[5]: https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects
-[6]: https://cloud.google.com/compute/docs/regions-zones/regions-zones
-[7]: https://azure.microsoft.com/en-us/regions/
-[8]: #parameter-reference
-[9]: #main-config-parameters
-[10]: #overview
-[11]: #example
-[12]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
-[13]: ../examples/gcp/00-ark-config.yaml
-[14]: ../examples/azure/10-ark-config.yaml
+[4]: https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects
+[5]: https://azure.microsoft.com/en-us/regions/
+[6]: #parameter-reference
+[7]: #main-config-parameters
+[8]: #overview
+[9]: #example
+[10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
+[11]: ../examples/gcp/00-ark-config.yaml
+[12]: ../examples/azure/10-ark-config.yaml
 

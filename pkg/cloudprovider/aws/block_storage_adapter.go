@@ -33,7 +33,6 @@ var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
 type blockStorageAdapter struct {
 	ec2 *ec2.EC2
-	az  string
 }
 
 func getSession(config *aws.Config) (*session.Session, error) {
@@ -49,12 +48,9 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStorageAdapter(region, availabilityZone string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStorageAdapter(region string) (cloudprovider.BlockStorageAdapter, error) {
 	if region == "" {
 		return nil, errors.New("missing region in aws configuration in config file")
-	}
-	if availabilityZone == "" {
-		return nil, errors.New("missing availabilityZone in aws configuration in config file")
 	}
 
 	awsConfig := aws.NewConfig().WithRegion(region)
@@ -64,22 +60,8 @@ func NewBlockStorageAdapter(region, availabilityZone string) (cloudprovider.Bloc
 		return nil, err
 	}
 
-	// validate the availabilityZone
-	var (
-		ec2Client = ec2.New(sess)
-		azReq     = &ec2.DescribeAvailabilityZonesInput{ZoneNames: []*string{&availabilityZone}}
-	)
-	res, err := ec2Client.DescribeAvailabilityZones(azReq)
-	if err != nil {
-		return nil, err
-	}
-	if len(res.AvailabilityZones) == 0 {
-		return nil, fmt.Errorf("availability zone %q not found", availabilityZone)
-	}
-
 	return &blockStorageAdapter{
-		ec2: ec2Client,
-		az:  availabilityZone,
+		ec2: ec2.New(sess),
 	}, nil
 }
 
@@ -88,10 +70,10 @@ func NewBlockStorageAdapter(region, availabilityZone string) (cloudprovider.Bloc
 // from snapshot.
 var iopsVolumeTypes = sets.NewString("io1")
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType string, iops *int64) (volumeID string, err error) {
+func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
-		AvailabilityZone: &op.az,
+		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
 	}
 
@@ -107,7 +89,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType s
 	return *res.VolumeId, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, error) {
+func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -139,7 +121,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID string) (string, *int64, e
 	return volumeType, iops, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID string) (ready bool, err error) {
+func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -181,7 +163,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID string, tags map[string]string) (string, error) {
+func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &ec2.CreateSnapshotInput{
 		VolumeId: &volumeID,
 	}

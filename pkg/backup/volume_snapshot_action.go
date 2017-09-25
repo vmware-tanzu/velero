@@ -24,6 +24,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -59,6 +60,17 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 
 	metadata := volume["metadata"].(map[string]interface{})
 	name := metadata["name"].(string)
+	var pvfailureDomainZone string
+	labelsMap, err := collections.GetMap(metadata, "labels")
+	if err == nil {
+		if labelsMap["failure-domain.beta.kubernetes.io/zone"] != nil {
+			pvfailureDomainZone = labelsMap["failure-domain.beta.kubernetes.io/zone"].(string)
+		} else {
+			ctx.log("error getting 'failure-domain.beta.kubernetes.io/zone' label on PersistentVolume %q for backup %q.\n", name, backupName)
+		}
+	} else {
+		ctx.log("error getting labels on PersistentVolume %q for backup %q. ", name, backupName)
+	}
 
 	volumeID, err := kubeutil.GetVolumeID(volume)
 	// non-nil error means it's a supported PV source but volume ID can't be found
@@ -75,13 +87,13 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 
 	ctx.log("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
 
-	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID)
+	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvfailureDomainZone)
 	if err != nil {
 		ctx.log("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 
-	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID)
+	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID, pvfailureDomainZone)
 	if err != nil {
 		ctx.log("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
@@ -92,9 +104,10 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 	}
 
 	backup.Status.VolumeBackups[name] = &api.VolumeBackupInfo{
-		SnapshotID: snapshotID,
-		Type:       volumeType,
-		Iops:       iops,
+		SnapshotID:       snapshotID,
+		Type:             volumeType,
+		Iops:             iops,
+		AvailabilityZone: pvfailureDomainZone,
 	}
 
 	return nil

@@ -21,7 +21,6 @@ metadata:
 persistentVolumeProvider:
   aws:
     region: <YOUR_REGION>
-    availabilityZone: <YOUR_AVAILABILITY_ZONE>
 backupStorageProvider:
   bucket: <YOUR_BUCKET>
   aws:
