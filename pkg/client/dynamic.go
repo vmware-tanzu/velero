@@ -30,12 +30,9 @@ import (
 // DynamicFactory contains methods for retrieving dynamic clients for GroupVersionResources and
 // GroupVersionKinds.
 type DynamicFactory interface {
-	// ClientForGroupVersionResource returns a Dynamic client for the given Group and Version
-	// (specified in gvr) and Resource (specified in resource) for the given namespace.
-	ClientForGroupVersionResource(gvr schema.GroupVersionResource, resource metav1.APIResource, namespace string) (Dynamic, error)
-	// ClientForGroupVersionKind returns a Dynamic client for the given Group and Version
-	// (specified in gvk) and Resource (specified in resource) for the given namespace.
-	ClientForGroupVersionKind(gvk schema.GroupVersionKind, resource metav1.APIResource, namespace string) (Dynamic, error)
+	// ClientForGroupVersionResource returns a Dynamic client for the given group/version
+	// and resource for the given namespace.
+	ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (Dynamic, error)
 }
 
 // dynamicFactory implements DynamicFactory.
@@ -43,17 +40,17 @@ type dynamicFactory struct {
 	clientPool dynamic.ClientPool
 }
 
-var _ DynamicFactory = &dynamicFactory{}
-
 // NewDynamicFactory returns a new ClientPool-based dynamic factory.
 func NewDynamicFactory(clientPool dynamic.ClientPool) DynamicFactory {
 	return &dynamicFactory{clientPool: clientPool}
 }
 
-func (f *dynamicFactory) ClientForGroupVersionResource(gvr schema.GroupVersionResource, resource metav1.APIResource, namespace string) (Dynamic, error) {
-	dynamicClient, err := f.clientPool.ClientForGroupVersionResource(gvr)
+func (f *dynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (Dynamic, error) {
+	// client-go doesn't actually use the kind when getting the dynamic client from the client pool;
+	// it only needs the group and version.
+	dynamicClient, err := f.clientPool.ClientForGroupVersionKind(gv.WithKind(""))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting client for GroupVersionResource %s", gvr)
+		return nil, errors.Wrapf(err, "error getting client for GroupVersion %s, Resource %s", gv.String, resource.String())
 	}
 
 	return &dynamicResourceClient{
@@ -61,27 +58,36 @@ func (f *dynamicFactory) ClientForGroupVersionResource(gvr schema.GroupVersionRe
 	}, nil
 }
 
-func (f *dynamicFactory) ClientForGroupVersionKind(gvk schema.GroupVersionKind, resource metav1.APIResource, namespace string) (Dynamic, error) {
-	dynamicClient, err := f.clientPool.ClientForGroupVersionKind(gvk)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error getting client for GroupVersionKind %s", gvk)
-	}
+// Creator creates an object.
+type Creator interface {
+	// Create creates an object.
+	Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
+}
 
-	return &dynamicResourceClient{
-		resourceClient: dynamicClient.Resource(&resource, namespace),
-	}, nil
+// Lister lists objects.
+type Lister interface {
+	// List lists all the objects of a given resource.
+	List(metav1.ListOptions) (runtime.Object, error)
+}
+
+// Watcher watches objects.
+type Watcher interface {
+	// Watch watches for changes to objects of a given resource.
+	Watch(metav1.ListOptions) (watch.Interface, error)
+}
+
+// Getter gets an object.
+type Getter interface {
+	// Get fetches an object by name.
+	Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error)
 }
 
 // Dynamic contains client methods that Ark needs for backing up and restoring resources.
 type Dynamic interface {
-	// Create creates an object.
-	Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error)
-	// List lists all the objects of a given resource.
-	List(metav1.ListOptions) (runtime.Object, error)
-	// Watch watches for changes to objects of a given resource.
-	Watch(metav1.ListOptions) (watch.Interface, error)
-	// Get fetches an object by name.
-	Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error)
+	Creator
+	Lister
+	Watcher
+	Getter
 }
 
 // dynamicResourceClient implements Dynamic.

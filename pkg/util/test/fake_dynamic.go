@@ -34,13 +34,8 @@ type FakeDynamicFactory struct {
 
 var _ client.DynamicFactory = &FakeDynamicFactory{}
 
-func (df *FakeDynamicFactory) ClientForGroupVersionResource(gvr schema.GroupVersionResource, resource metav1.APIResource, namespace string) (client.Dynamic, error) {
-	args := df.Called(gvr, resource, namespace)
-	return args.Get(0).(client.Dynamic), args.Error(1)
-}
-
-func (df *FakeDynamicFactory) ClientForGroupVersionKind(gvk schema.GroupVersionKind, resource metav1.APIResource, namespace string) (client.Dynamic, error) {
-	args := df.Called(gvk, resource, namespace)
+func (df *FakeDynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (client.Dynamic, error) {
+	args := df.Called(gv, resource, namespace)
 	return args.Get(0).(client.Dynamic), args.Error(1)
 }
 

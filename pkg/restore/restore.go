@@ -442,7 +442,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 
 			var err error
-			resourceClient, err = ctx.dynamicFactory.ClientForGroupVersionKind(obj.GroupVersionKind(), resource, namespace)
+			resourceClient, err = ctx.dynamicFactory.ClientForGroupVersionResource(obj.GroupVersionKind().GroupVersion(), resource, namespace)
 			if err != nil {
 				addArkError(&errs, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
 				return warnings, errs

@@ -229,16 +229,6 @@ func (controller *backupController) processBackup(key string) error {
 	// set backup version
 	backup.Status.Version = backupVersion
 
-	// included resources defaulting
-	if len(backup.Spec.IncludedResources) == 0 {
-		backup.Spec.IncludedResources = []string{"*"}
-	}
-
-	// included namespace defaulting
-	if len(backup.Spec.IncludedNamespaces) == 0 {
-		backup.Spec.IncludedNamespaces = []string{"*"}
-	}
-
 	// calculate expiration
 	if backup.Spec.TTL.Duration > 0 {
 		backup.Status.Expiration = metav1.NewTime(controller.clock.Now().Add(backup.Spec.TTL.Duration))
