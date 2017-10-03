@@ -56,6 +56,7 @@ import (
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 func NewCommand() *cobra.Command {
@@ -66,10 +67,11 @@ func NewCommand() *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			var (
-				logger = logrus.New()
-				s, err = newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
-			)
+			logger := logrus.New()
+			logger.Hooks.Add(&logging.ErrorLocationHook{})
+
+			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
+
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
