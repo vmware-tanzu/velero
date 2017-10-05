@@ -22,6 +22,8 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,6 +50,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
 	"github.com/heptio/ark/pkg/cmd"
+	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/generated/clientset"
@@ -60,15 +63,30 @@ import (
 )
 
 func NewCommand() *cobra.Command {
-	var kubeconfig string
+	var (
+		kubeconfig      string
+		sortedLogLevels = getSortedLogLevels()
+		logLevelFlag    = flag.NewEnum(logrus.InfoLevel.String(), sortedLogLevels...)
+	)
 
 	var command = &cobra.Command{
 		Use:   "server",
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			logger := logrus.New()
-			logger.Hooks.Add(&logging.ErrorLocationHook{})
+			logLevel := logrus.InfoLevel
+
+			if parsed, err := logrus.ParseLevel(logLevelFlag.String()); err == nil {
+				logLevel = parsed
+			} else {
+				// This should theoretically never happen assuming the enum flag
+				// is constructed correctly because the enum flag will not allow
+				//  an invalid value to be set.
+				logrus.Errorf("log-level flag has invalid value %s", strings.ToUpper(logLevelFlag.String()))
+			}
+			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
+
+			logger := newLogger(logLevel, &logging.ErrorLocationHook{})
 
 			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
 
@@ -78,9 +96,41 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
+	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(sortedLogLevels, ", ")))
 	command.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 
 	return command
+}
+
+func newLogger(level logrus.Level, hooks ...logrus.Hook) *logrus.Logger {
+	logger := logrus.New()
+	logger.Level = level
+
+	for _, hook := range hooks {
+		logger.Hooks.Add(hook)
+	}
+
+	return logger
+}
+
+// getSortedLogLevels returns a string slice containing all of the valid logrus
+// log levels (based on logrus.AllLevels), sorted in ascending order of severity.
+func getSortedLogLevels() []string {
+	var (
+		sortedLogLevels  = make([]logrus.Level, len(logrus.AllLevels))
+		logLevelsStrings []string
+	)
+
+	copy(sortedLogLevels, logrus.AllLevels)
+
+	// logrus.Panic has the lowest value, so the compare function uses ">"
+	sort.Slice(sortedLogLevels, func(i, j int) bool { return sortedLogLevels[i] > sortedLogLevels[j] })
+
+	for _, level := range sortedLogLevels {
+		logLevelsStrings = append(logLevelsStrings, level.String())
+	}
+
+	return logLevelsStrings
 }
 
 type server struct {
