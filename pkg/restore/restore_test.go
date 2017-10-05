@@ -19,11 +19,11 @@ package restore
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/sirupsen/logrus/hooks/test"
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -174,11 +174,13 @@ func TestRestoreMethod(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &context{
 				restore:         test.restore,
 				namespaceClient: &fakeNamespaceClient{},
 				fileSystem:      test.fileSystem,
-				logger:          &logger{w: ioutil.Discard},
+				logger:          log,
 			}
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
@@ -266,12 +268,14 @@ func TestRestoreNamespace(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &context{
 				restore:              test.restore,
 				namespaceClient:      &fakeNamespaceClient{},
 				fileSystem:           test.fileSystem,
 				prioritizedResources: test.prioritizedResources,
-				logger:               &logger{w: ioutil.Discard},
+				logger:               log,
 			}
 
 			warnings, errors := ctx.restoreNamespace(test.namespace, test.path)
@@ -407,6 +411,8 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
 			dynamicFactory.On("ClientForGroupVersionKind", gvk, resource, test.namespace).Return(resourceClient, nil)
 
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
 				restorers:      test.restorers,
@@ -419,7 +425,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				logger: &logger{w: ioutil.Discard},
+				logger: log,
 			}
 
 			warnings, errors := ctx.restoreResourceForNamespace(test.namespace, test.resourcePath)

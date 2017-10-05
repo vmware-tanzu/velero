@@ -20,12 +20,12 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,11 +58,11 @@ var _ Backupper = &kubernetesBackupper{}
 
 // ActionContext contains contextual information for actions.
 type ActionContext struct {
-	logger *logger
+	logger *logrus.Logger
 }
 
-func (ac ActionContext) log(msg string, args ...interface{}) {
-	ac.logger.log(msg, args...)
+func (ac ActionContext) infof(msg string, args ...interface{}) {
+	ac.logger.Infof(msg, args...)
 }
 
 // Action is an actor that performs an operation on an individual item being backed up.
@@ -117,7 +117,7 @@ func (ctx *backupContext) getResourceIncludesExcludes(helper discovery.Helper, i
 		func(item string) string {
 			gr, err := helper.ResolveGroupResource(item)
 			if err != nil {
-				ctx.log("Unable to resolve resource %q: %v", item, err)
+				ctx.infof("Unable to resolve resource %q: %v", item, err)
 				return ""
 			}
 
@@ -132,20 +132,10 @@ func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExclu
 	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
 }
 
-type logger struct {
-	w io.Writer
-}
-
-func (l *logger) log(msg string, args ...interface{}) {
-	// TODO use a real logger that supports writing to files
-	now := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(l.w, now+" "+msg+"\n", args...)
-}
-
 type backupContext struct {
 	backup                    *api.Backup
 	w                         tarWriter
-	logger                    *logger
+	logger                    *logrus.Logger
 	namespaceIncludesExcludes *collections.IncludesExcludes
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	// deploymentsBackedUp marks whether we've seen and are backing up the deployments resource, from
@@ -158,8 +148,8 @@ type backupContext struct {
 	networkPoliciesBackedUp bool
 }
 
-func (ctx *backupContext) log(msg string, args ...interface{}) {
-	ctx.logger.log(msg, args...)
+func (ctx *backupContext) infof(msg string, args ...interface{}) {
+	ctx.logger.Infof(msg, args...)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
@@ -176,19 +166,22 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 
 	var errs []error
 
+	log := logrus.New()
+	log.Out = gzippedLog
+
 	ctx := &backupContext{
 		backup: backup,
 		w:      tw,
-		logger: &logger{w: gzippedLog},
+		logger: log,
 		namespaceIncludesExcludes: getNamespaceIncludesExcludes(backup),
 	}
 
-	ctx.log("Starting backup")
+	ctx.infof("Starting backup")
 
 	ctx.resourceIncludesExcludes = ctx.getResourceIncludesExcludes(kb.discoveryHelper, backup.Spec.IncludedResources, backup.Spec.ExcludedResources)
 
 	for _, group := range kb.discoveryHelper.Resources() {
-		ctx.log("Processing group %s", group.GroupVersion)
+		ctx.infof("Processing group %s", group.GroupVersion)
 		if err := kb.backupGroup(ctx, group); err != nil {
 			errs = append(errs, err)
 		}
@@ -196,9 +189,9 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 
 	err := kuberrs.NewAggregate(errs)
 	if err == nil {
-		ctx.log("Backup completed successfully")
+		ctx.infof("Backup completed successfully")
 	} else {
-		ctx.log("Backup completed with errors: %v", err)
+		ctx.infof("Backup completed with errors: %v", err)
 	}
 
 	return err
@@ -215,7 +208,7 @@ func (kb *kubernetesBackupper) backupGroup(ctx *backupContext, group *metav1.API
 	var errs []error
 
 	for _, resource := range group.APIResources {
-		ctx.log("Processing resource %s/%s", group.GroupVersion, resource.Name)
+		ctx.infof("Processing resource %s/%s", group.GroupVersion, resource.Name)
 		if err := kb.backupResource(ctx, group, resource); err != nil {
 			errs = append(errs, err)
 		}
@@ -248,7 +241,7 @@ func (kb *kubernetesBackupper) backupResource(
 	grString := gr.String()
 
 	if !ctx.resourceIncludesExcludes.ShouldInclude(grString) {
-		ctx.log("Resource %s is excluded", grString)
+		ctx.infof("Resource %s is excluded", grString)
 		return nil
 	}
 
@@ -260,7 +253,7 @@ func (kb *kubernetesBackupper) backupResource(
 			} else {
 				other = appsDeploymentsResource
 			}
-			ctx.log("Skipping resource %q because it's a duplicate of %q", grString, other)
+			ctx.infof("Skipping resource %q because it's a duplicate of %q", grString, other)
 			return nil
 		}
 
@@ -275,7 +268,7 @@ func (kb *kubernetesBackupper) backupResource(
 			} else {
 				other = networkingNetworkPoliciesResource
 			}
-			ctx.log("Skipping resource %q because it's a duplicate of %q", grString, other)
+			ctx.infof("Skipping resource %q because it's a duplicate of %q", grString, other)
 			return nil
 		}
 
@@ -377,13 +370,13 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 	namespace, err := collections.GetString(metadata, "namespace")
 	if err == nil {
 		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			ctx.log("Excluding item %s because namespace %s is excluded", name, namespace)
+			ctx.infof("Excluding item %s because namespace %s is excluded", name, namespace)
 			return nil
 		}
 	}
 
 	if action != nil {
-		ctx.log("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
+		ctx.infof("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
 
 		actionCtx := ActionContext{logger: ctx.logger}
 		if err := action.Execute(actionCtx, item, ctx.backup); err != nil {
@@ -391,7 +384,7 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 		}
 	}
 
-	ctx.log("Backing up resource=%s, ns=%s, name=%s", groupResource, namespace, name)
+	ctx.infof("Backing up resource=%s, ns=%s, name=%s", groupResource, namespace, name)
 
 	var filePath string
 	if namespace != "" {

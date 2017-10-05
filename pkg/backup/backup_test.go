@@ -29,6 +29,11 @@ import (
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -39,9 +44,6 @@ import (
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
 	. "github.com/heptio/ark/pkg/util/test"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 type fakeAction struct {
@@ -189,9 +191,10 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 				},
 			}
 
-			b := new(bytes.Buffer)
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &backupContext{
-				logger: &logger{w: b},
+				logger: log,
 			}
 
 			actual := ctx.getResourceIncludesExcludes(dh, test.includes, test.excludes)
@@ -758,6 +761,9 @@ func TestBackupResource(t *testing.T) {
 				require.NoError(t, err)
 				labelSelector = s
 			}
+
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &backupContext{
 				backup: &v1.Backup{
 					Spec: v1.BackupSpec{
@@ -768,7 +774,7 @@ func TestBackupResource(t *testing.T) {
 				namespaceIncludesExcludes: test.namespaceIncludesExcludes,
 				deploymentsBackedUp:       test.deploymentsBackedUp,
 				networkPoliciesBackedUp:   test.networkPoliciesBackedUp,
-				logger:                    &logger{w: new(bytes.Buffer)},
+				logger:                    log,
 			}
 
 			group := &metav1.APIResourceList{
@@ -992,11 +998,14 @@ func TestBackupItem(t *testing.T) {
 				actionParam = action
 				backup = &v1.Backup{}
 			}
+
+			log, _ := testlogger.NewNullLogger()
+
 			ctx := &backupContext{
 				backup: backup,
 				namespaceIncludesExcludes: namespaces,
 				w:      w,
-				logger: &logger{w: new(bytes.Buffer)},
+				logger: log,
 			}
 			b := &realItemBackupper{}
 			err = b.backupItem(ctx, item, "resource.group", actionParam)
