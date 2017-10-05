@@ -86,7 +86,7 @@ func NewCommand() *cobra.Command {
 			}
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := newLogger(logLevel, &logging.ErrorLocationHook{})
+			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
 
 			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
 
