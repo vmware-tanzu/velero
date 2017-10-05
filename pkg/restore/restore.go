@@ -28,6 +28,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,7 +39,6 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
 
-	"github.com/golang/glog"
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -69,12 +70,13 @@ type kubernetesRestorer struct {
 	namespaceClient    corev1.NamespaceInterface
 	resourcePriorities []string
 	fileSystem         FileSystem
+	logger             *logrus.Logger
 }
 
 // prioritizeResources takes a list of pre-prioritized resources and a full list of resources to restore,
 // and returns an ordered list of GroupResource-resolved resources in the order that they should be
 // restored.
-func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes) ([]schema.GroupResource, error) {
+func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger *logrus.Logger) ([]schema.GroupResource, error) {
 	var ret []schema.GroupResource
 
 	// set keeps track of resolved GroupResource names
@@ -88,7 +90,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 		}
 
 		if !includedResources.ShouldInclude(gr.String()) {
-			glog.Infof("Not including resource %v", gr)
+			logger.WithField("groupResource", gr).Info("Not including resource")
 			continue
 		}
 
@@ -109,7 +111,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 			gr := groupVersion.WithResource(resource.Name).GroupResource()
 
 			if !includedResources.ShouldInclude(gr.String()) {
-				glog.Infof("Not including resource %v", gr)
+				logger.WithField("groupResource", gr).Info("Not including resource")
 				continue
 			}
 
@@ -139,6 +141,7 @@ func NewKubernetesRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
+	logger *logrus.Logger,
 ) (Restorer, error) {
 	r := make(map[schema.GroupResource]restorers.ResourceRestorer)
 	for gr, restorer := range customRestorers {
@@ -158,6 +161,7 @@ func NewKubernetesRestorer(
 		namespaceClient:    namespaceClient,
 		resourcePriorities: resourcePriorities,
 		fileSystem:         &osFileSystem{},
+		logger:             logger,
 	}, nil
 }
 
@@ -183,17 +187,18 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	resourceIncludesExcludes := collections.GenerateIncludesExcludes(
 		restore.Spec.IncludedResources,
 		restore.Spec.ExcludedResources,
-		func(item string) (string, error) {
+		func(item string) string {
 			gr, err := kr.discoveryHelper.ResolveGroupResource(item)
 			if err != nil {
-				return "", err
+				kr.logger.WithError(err).WithField("resource", item).Error("Unable to resolve resource")
+				return ""
 			}
 
-			return gr.String(), nil
+			return gr.String()
 		},
 	)
 
-	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes)
+	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, kr.logger)
 	if err != nil {
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}

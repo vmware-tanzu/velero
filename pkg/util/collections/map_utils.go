@@ -17,9 +17,9 @@ limitations under the License.
 package collections
 
 import (
-	"errors"
-	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // GetValue returns the object at root[path], where path is a dot separated string.
@@ -33,7 +33,7 @@ func GetValue(root map[string]interface{}, path string) (interface{}, error) {
 
 	obj, found := root[pathParts[0]]
 	if !found {
-		return "", fmt.Errorf("key %v not found", pathParts[0])
+		return "", errors.Errorf("key %v not found", pathParts[0])
 	}
 
 	if len(pathParts) == 1 {
@@ -42,7 +42,7 @@ func GetValue(root map[string]interface{}, path string) (interface{}, error) {
 
 	subMap, ok := obj.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("value at key %v is not a map[string]interface{}", key)
+		return "", errors.Errorf("value at key %v is not a map[string]interface{}", key)
 	}
 
 	return GetValue(subMap, strings.Join(pathParts[1:], "."))
@@ -57,7 +57,7 @@ func GetString(root map[string]interface{}, path string) (string, error) {
 
 	str, ok := obj.(string)
 	if !ok {
-		return "", fmt.Errorf("value at path %v is not a string", path)
+		return "", errors.Errorf("value at path %v is not a string", path)
 	}
 
 	return str, nil
@@ -72,7 +72,7 @@ func GetMap(root map[string]interface{}, path string) (map[string]interface{}, e
 
 	ret, ok := obj.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("value at path %v is not a map[string]interface{}", path)
+		return nil, errors.Errorf("value at path %v is not a map[string]interface{}", path)
 	}
 
 	return ret, nil
@@ -87,7 +87,7 @@ func GetSlice(root map[string]interface{}, path string) ([]interface{}, error) {
 
 	ret, ok := obj.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("value at path %v is not a []interface{}", path)
+		return nil, errors.Errorf("value at path %v is not a []interface{}", path)
 	}
 
 	return ret, nil
@@ -103,7 +103,7 @@ func ForEach(root map[string]interface{}, path string, fn func(obj map[string]in
 	for i := range s {
 		obj, ok := s[i].(map[string]interface{})
 		if !ok {
-			return fmt.Errorf("unable to convert %s[%d] to an object", path, i)
+			return errors.Errorf("unable to convert %s[%d] to an object", path, i)
 		}
 		if err := fn(obj); err != nil {
 			return err

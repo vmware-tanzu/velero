@@ -19,6 +19,7 @@ package restorers
 import (
 	"testing"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -96,7 +97,10 @@ func TestPodRestorerPrepare(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			restorer := NewPodRestorer()
+			var (
+				logger, _ = testlogger.NewNullLogger()
+				restorer  = NewPodRestorer(logger)
+			)
 
 			res, _, err := restorer.Prepare(test.obj, nil, nil)
 

@@ -17,10 +17,10 @@ limitations under the License.
 package restore
 
 import (
-	"errors"
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"

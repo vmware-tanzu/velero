@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -146,18 +147,15 @@ func TestProcessBackup(t *testing.T) {
 		},
 	}
 
-	// flag.Set("logtostderr", "true")
-	// flag.Set("v", "4")
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
-
-			backupper := &fakeBackupper{}
-
-			cloudBackups := &BackupService{}
-
-			sharedInformers := informers.NewSharedInformerFactory(client, 0)
+			var (
+				client          = fake.NewSimpleClientset()
+				backupper       = &fakeBackupper{}
+				cloudBackups    = &BackupService{}
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger, _       = testlogger.NewNullLogger()
+			)
 
 			c := NewBackupController(
 				sharedInformers.Ark().V1().Backups(),
@@ -166,6 +164,7 @@ func TestProcessBackup(t *testing.T) {
 				cloudBackups,
 				"bucket",
 				test.allowSnapshots,
+				logger,
 			).(*backupController)
 			c.clock = clock.NewFakeClock(time.Now())
 

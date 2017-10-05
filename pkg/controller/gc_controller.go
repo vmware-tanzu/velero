@@ -18,10 +18,10 @@ package controller
 
 import (
 	"context"
-	"errors"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -50,6 +50,7 @@ type gcController struct {
 	restoreLister       listers.RestoreLister
 	restoreListerSynced cache.InformerSynced
 	restoreClient       arkv1client.RestoresGetter
+	logger              *logrus.Logger
 }
 
 // NewGCController constructs a new gcController.
@@ -62,9 +63,10 @@ func NewGCController(
 	backupClient arkv1client.BackupsGetter,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
+	logger *logrus.Logger,
 ) Interface {
 	if syncPeriod < time.Minute {
-		glog.Infof("GC sync period %v is too short. Setting to 1 minute", syncPeriod)
+		logger.WithField("syncPeriod", syncPeriod).Info("Provided GC sync period is too short. Setting to 1 minute")
 		syncPeriod = time.Minute
 	}
 
@@ -80,6 +82,7 @@ func NewGCController(
 		restoreLister:       restoreInformer.Lister(),
 		restoreListerSynced: restoreInformer.Informer().HasSynced,
 		restoreClient:       restoreClient,
+		logger:              logger,
 	}
 }
 
@@ -89,11 +92,11 @@ var _ Interface = &gcController{}
 // from object/block storage and the Ark API. It will return when it receives on the
 // ctx.Done() channel.
 func (c *gcController) Run(ctx context.Context, workers int) error {
-	glog.Info("Waiting for caches to sync")
+	c.logger.Info("Waiting for caches to sync")
 	if !cache.WaitForCacheSync(ctx.Done(), c.backupListerSynced, c.restoreListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
-	glog.Info("Caches are synced")
+	c.logger.Info("Caches are synced")
 
 	wait.Until(c.run, c.syncPeriod, ctx.Done())
 	return nil
@@ -107,11 +110,12 @@ func (c *gcController) run() {
 // deleteBackupFiles = true), volume snapshots, restore API objects, and the backup API object
 // itself.
 func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFiles bool) {
+	logContext := c.logger.WithField("backup", kube.NamespaceAndName(backup))
+
 	// if the backup includes snapshots but we don't currently have a PVProvider, we don't
 	// want to orphan the snapshots so skip garbage-collection entirely.
 	if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
-		glog.Warningf("Cannot garbage-collect backup %s because backup includes snapshots and server is not configured with PersistentVolumeProvider",
-			kube.NamespaceAndName(backup))
+		logContext.Warning("Cannot garbage-collect backup because backup includes snapshots and server is not configured with PersistentVolumeProvider")
 		return
 	}
 
@@ -121,9 +125,9 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 	deletionFailure := false
 
 	for _, volumeBackup := range backup.Status.VolumeBackups {
-		glog.Infof("Removing snapshot %s associated with backup %s", volumeBackup.SnapshotID, kube.NamespaceAndName(backup))
+		logContext.WithField("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
 		if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
-			glog.Errorf("error deleting snapshot %v: %v", volumeBackup.SnapshotID, err)
+			logContext.WithError(err).WithField("snapshotID", volumeBackup.SnapshotID).Error("Error deleting snapshot")
 			deletionFailure = true
 		}
 	}
@@ -131,35 +135,36 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 	// If applicable, delete everything in the backup dir in object storage *before* deleting the API object
 	// because otherwise the backup sync controller could re-sync the backup from object storage.
 	if deleteBackupFiles {
-		glog.Infof("Removing backup %s from object storage", kube.NamespaceAndName(backup))
+		logContext.Info("Removing backup from object storage")
 		if err := c.backupService.DeleteBackupDir(c.bucket, backup.Name); err != nil {
-			glog.Errorf("error deleting backup %s: %v", kube.NamespaceAndName(backup), err)
+			logContext.WithError(err).Error("Error deleting backup")
 			deletionFailure = true
 		}
 	}
 
-	glog.Infof("Getting restore API objects referencing backup %s", kube.NamespaceAndName(backup))
+	logContext.Info("Getting restore API objects referencing backup")
 	if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
-		glog.Errorf("error getting restore API objects: %v", err)
+		logContext.WithError(errors.WithStack(err)).Error("Error getting Restore API objects")
 	} else {
 		for _, restore := range restores {
 			if restore.Spec.BackupName == backup.Name {
-				glog.Infof("Removing restore API object %s of backup %s", kube.NamespaceAndName(restore), kube.NamespaceAndName(backup))
+				logContext.WithField("restore", kube.NamespaceAndName(restore)).Info("Removing Restore API object referencing Backup")
 				if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
-					glog.Errorf("error deleting restore API object %s: %v", kube.NamespaceAndName(restore), err)
+					logContext.WithError(errors.WithStack(err)).WithField("restore", kube.NamespaceAndName(restore)).
+						Error("Error deleting Restore API object")
 				}
 			}
 		}
 	}
 
 	if deletionFailure {
-		glog.Warningf("Backup %s will not be deleted due to errors deleting related object storage files(s) and/or volume snapshots", kube.NamespaceAndName(backup))
+		logContext.Warning("Backup will not be deleted due to errors deleting related object storage files(s) and/or volume snapshots")
 		return
 	}
 
-	glog.Infof("Removing backup API object %s", kube.NamespaceAndName(backup))
+	logContext.Info("Removing Backup API object")
 	if err := c.backupClient.Backups(backup.Namespace).Delete(backup.Name, &metav1.DeleteOptions{}); err != nil {
-		glog.Errorf("error deleting backup API object %s: %v", kube.NamespaceAndName(backup), err)
+		logContext.WithError(errors.WithStack(err)).Error("Error deleting Backup API object")
 	}
 }
 
@@ -168,7 +173,7 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 func (c *gcController) garbageCollectBackups(backups []*api.Backup, expiration time.Time, deleteBackupFiles bool) {
 	for _, backup := range backups {
 		if backup.Status.Expiration.Time.After(expiration) {
-			glog.Infof("Backup %s has not expired yet, skipping", kube.NamespaceAndName(backup))
+			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Info("Backup has not expired yet, skipping")
 			continue
 		}
 
@@ -180,13 +185,13 @@ func (c *gcController) garbageCollectBackups(backups []*api.Backup, expiration t
 // them for garbage-collection.
 func (c *gcController) processBackups() {
 	now := c.clock.Now()
-	glog.Infof("garbage-collecting backups that have expired as of %v", now)
+	c.logger.WithField("now", now).Info("Garbage-collecting backups that have expired as of now")
 
 	// GC backups in object storage. We do this in addition
 	// to GC'ing API objects to prevent orphan backup files.
 	backups, err := c.backupService.GetAllBackups(c.bucket)
 	if err != nil {
-		glog.Errorf("error getting all backups from object storage: %v", err)
+		c.logger.WithError(err).Error("Error getting all backups from object storage")
 		return
 	}
 	c.garbageCollectBackups(backups, now, true)
@@ -194,7 +199,7 @@ func (c *gcController) processBackups() {
 	// GC backups without files in object storage
 	apiBackups, err := c.backupLister.List(labels.Everything())
 	if err != nil {
-		glog.Errorf("error getting all backup API objects: %v", err)
+		c.logger.WithError(errors.WithStack(err)).Error("Error getting all Backup API objects")
 		return
 	}
 	c.garbageCollectBackups(apiBackups, now, false)

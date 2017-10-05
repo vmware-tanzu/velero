@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -151,6 +152,7 @@ func TestGarbageCollect(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				snapSvc         cloudprovider.SnapshotService
 				bucket          = "bucket"
+				logger, _       = testlogger.NewNullLogger()
 			)
 
 			if snapshotService != nil {
@@ -166,6 +168,7 @@ func TestGarbageCollect(t *testing.T) {
 				client.ArkV1(),
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(),
+				logger,
 			).(*gcController)
 			controller.clock = fakeClock
 
@@ -234,6 +237,7 @@ func TestGarbageCollectBackup(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				bucket          = "bucket-1"
+				logger, _       = testlogger.NewNullLogger()
 				controller      = NewGCController(
 					backupService,
 					snapshotService,
@@ -243,6 +247,7 @@ func TestGarbageCollectBackup(t *testing.T) {
 					client.ArkV1(),
 					sharedInformers.Ark().V1().Restores(),
 					client.ArkV1(),
+					logger,
 				).(*gcController)
 			)
 
@@ -316,6 +321,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	var (
 		client          = fake.NewSimpleClientset()
 		sharedInformers = informers.NewSharedInformerFactory(client, 0)
+		logger, _       = testlogger.NewNullLogger()
 	)
 
 	controller := NewGCController(
@@ -327,6 +333,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 		client.ArkV1(),
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(),
+		logger,
 	).(*gcController)
 	controller.clock = fakeClock
 

@@ -17,6 +17,8 @@ limitations under the License.
 package client
 
 import (
+	"github.com/pkg/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -51,7 +53,7 @@ func NewDynamicFactory(clientPool dynamic.ClientPool) DynamicFactory {
 func (f *dynamicFactory) ClientForGroupVersionResource(gvr schema.GroupVersionResource, resource metav1.APIResource, namespace string) (Dynamic, error) {
 	dynamicClient, err := f.clientPool.ClientForGroupVersionResource(gvr)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error getting client for GroupVersionResource %s", gvr)
 	}
 
 	return &dynamicResourceClient{
@@ -62,7 +64,7 @@ func (f *dynamicFactory) ClientForGroupVersionResource(gvr schema.GroupVersionRe
 func (f *dynamicFactory) ClientForGroupVersionKind(gvk schema.GroupVersionKind, resource metav1.APIResource, namespace string) (Dynamic, error) {
 	dynamicClient, err := f.clientPool.ClientForGroupVersionKind(gvk)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "error getting client for GroupVersionKind %s", gvk)
 	}
 
 	return &dynamicResourceClient{

@@ -23,6 +23,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -80,6 +81,8 @@ func TestPrioritizeResources(t *testing.T) {
 		},
 	}
 
+	logger, _ := test.NewNullLogger()
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			helper := &FakeDiscoveryHelper{RESTMapper: &FakeMapper{AutoReturnResource: true}}
@@ -94,7 +97,7 @@ func TestPrioritizeResources(t *testing.T) {
 
 			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
 
-			result, err := prioritizeResources(helper, test.priorities, includesExcludes)
+			result, err := prioritizeResources(helper, test.priorities, includesExcludes, logger)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

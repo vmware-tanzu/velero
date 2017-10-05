@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -85,7 +86,7 @@ func validateOutputFlag(cmd *cobra.Command) error {
 	switch output {
 	case "", "table", "json", "yaml":
 	default:
-		return fmt.Errorf("invalid output format %q - valid values are 'table', 'json', and 'yaml'", output)
+		return errors.Errorf("invalid output format %q - valid values are 'table', 'json', and 'yaml'", output)
 	}
 	return nil
 }
@@ -105,7 +106,7 @@ func PrintWithFormat(c *cobra.Command, obj runtime.Object) (bool, error) {
 		return printEncoded(obj, format)
 	}
 
-	return false, fmt.Errorf("unsupported output format %q; valid values are 'table', 'json', and 'yaml'", format)
+	return false, errors.Errorf("unsupported output format %q; valid values are 'table', 'json', and 'yaml'", format)
 }
 
 func printEncoded(obj runtime.Object, format string) (bool, error) {

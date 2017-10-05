@@ -17,10 +17,11 @@ limitations under the License.
 package kube
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +51,7 @@ func EnsureNamespaceExists(namespace *v1.Namespace, client corev1.NamespaceInter
 	} else if apierrors.IsAlreadyExists(err) {
 		return false, nil
 	} else {
-		return false, err
+		return false, errors.Wrapf(err, "error creating namespace %s", namespace.Name)
 	}
 }
 

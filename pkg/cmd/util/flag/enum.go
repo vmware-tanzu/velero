@@ -17,7 +17,7 @@ limitations under the License.
 package flag
 
 import (
-	"fmt"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -51,7 +51,7 @@ func (e *Enum) String() string {
 // is not an allowed value.
 func (e *Enum) Set(s string) error {
 	if !e.allowedValues.Has(s) {
-		return fmt.Errorf("invalid value: %q", s)
+		return errors.Errorf("invalid value: %q", s)
 	}
 
 	e.value = s

@@ -19,6 +19,8 @@ package flag
 import (
 	"fmt"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 // Map is a Cobra-compatible wrapper for defining a flag containing
@@ -73,7 +75,7 @@ func (m *Map) Set(s string) error {
 	for _, part := range strings.Split(s, m.entryDelimiter) {
 		kvs := strings.SplitN(part, m.keyValueDelimiter, 2)
 		if len(kvs) != 2 {
-			return fmt.Errorf("error parsing %q", part)
+			return errors.Errorf("error parsing %q", part)
 		}
 		m.data[kvs[0]] = kvs[1]
 	}

@@ -27,6 +27,7 @@ import (
 	"time"
 
 	testutil "github.com/heptio/ark/pkg/util/test"
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -80,10 +81,12 @@ func TestUploadBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objStore := &testutil.ObjectStorageAdapter{}
-
-			bucket := "test-bucket"
-			backupName := "test-backup"
+			var (
+				objStore   = &testutil.ObjectStorageAdapter{}
+				bucket     = "test-bucket"
+				backupName = "test-backup"
+				logger, _  = testlogger.NewNullLogger()
+			)
 
 			if test.metadata != nil {
 				objStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
@@ -98,7 +101,7 @@ func TestUploadBackup(t *testing.T) {
 				objStore.On("DeleteObject", bucket, backupName+"/ark-backup.json").Return(nil)
 			}
 
-			backupService := NewBackupService(objStore)
+			backupService := NewBackupService(objStore, logger)
 
 			err := backupService.UploadBackup(bucket, backupName, test.metadata, test.backup, test.log)
 
@@ -114,11 +117,15 @@ func TestUploadBackup(t *testing.T) {
 }
 
 func TestDownloadBackup(t *testing.T) {
-	o := &testutil.ObjectStorageAdapter{}
-	bucket := "b"
-	backup := "bak"
+	var (
+		o         = &testutil.ObjectStorageAdapter{}
+		bucket    = "b"
+		backup    = "bak"
+		logger, _ = testlogger.NewNullLogger()
+	)
 	o.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
-	s := NewBackupService(o)
+
+	s := NewBackupService(o, logger)
 	rc, err := s.DownloadBackup(bucket, backup)
 	require.NoError(t, err)
 	require.NotNil(t, rc)
@@ -147,11 +154,14 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			bucket := "bucket"
-			backup := "bak"
-			objects := []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
+			var (
+				bucket    = "bucket"
+				backup    = "bak"
+				objects   = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
+				objStore  = &testutil.ObjectStorageAdapter{}
+				logger, _ = testlogger.NewNullLogger()
+			)
 
-			objStore := &testutil.ObjectStorageAdapter{}
 			objStore.On("ListObjects", bucket, backup+"/").Return(objects, test.listObjectsError)
 			for i, o := range objects {
 				var err error
@@ -162,7 +172,7 @@ func TestDeleteBackup(t *testing.T) {
 				objStore.On("DeleteObject", bucket, o).Return(err)
 			}
 
-			backupService := NewBackupService(objStore)
+			backupService := NewBackupService(objStore, logger)
 
 			err := backupService.DeleteBackupDir(bucket, backup)
 
@@ -218,14 +228,17 @@ func TestGetAllBackups(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			bucket := "bucket"
+			var (
+				bucket    = "bucket"
+				objStore  = &testutil.ObjectStorageAdapter{}
+				logger, _ = testlogger.NewNullLogger()
+			)
 
-			objStore := &testutil.ObjectStorageAdapter{}
 			objStore.On("ListCommonPrefixes", bucket, "/").Return([]string{"backup-1", "backup-2"}, nil)
 			objStore.On("GetObject", bucket, "backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
 			objStore.On("GetObject", bucket, "backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
 
-			backupService := NewBackupService(objStore)
+			backupService := NewBackupService(objStore, logger)
 
 			res, err := backupService.GetAllBackups(bucket)
 
@@ -295,8 +308,11 @@ func TestCreateSignedURL(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objectStorage := &testutil.ObjectStorageAdapter{}
-			backupService := NewBackupService(objectStorage)
+			var (
+				objectStorage = &testutil.ObjectStorageAdapter{}
+				logger, _     = testlogger.NewNullLogger()
+				backupService = NewBackupService(objectStorage, logger)
+			)
 
 			target := api.DownloadTarget{
 				Kind: test.targetKind,

@@ -17,8 +17,7 @@ limitations under the License.
 package restorers
 
 import (
-	"errors"
-	"fmt"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -83,7 +82,7 @@ func (sr *persistentVolumeRestorer) Prepare(obj runtime.Unstructured, restore *a
 		// if there are snapshots, and this is a supported PV type, but there's no
 		// snapshot for this PV, it's an error
 		if backup.Status.VolumeBackups[pvName] == nil {
-			return nil, nil, fmt.Errorf("no snapshot found to restore volume %s from", pvName)
+			return nil, nil, errors.Errorf("no snapshot found to restore volume %s from", pvName)
 		}
 
 		restoreFromSnapshot = true

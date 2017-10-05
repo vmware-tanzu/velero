@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,13 +114,14 @@ func (ctx *backupContext) getResourceIncludesExcludes(helper discovery.Helper, i
 	return collections.GenerateIncludesExcludes(
 		includes,
 		excludes,
-		func(item string) (string, error) {
+		func(item string) string {
 			gr, err := helper.ResolveGroupResource(item)
 			if err != nil {
-				return "", err
+				ctx.log("Unable to resolve resource %q: %v", item, err)
+				return ""
 			}
 
-			return gr.String(), nil
+			return gr.String()
 		},
 	)
 }
@@ -238,7 +241,7 @@ func (kb *kubernetesBackupper) backupResource(
 
 	gv, err := schema.ParseGroupVersion(group.GroupVersion)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "error parsing GroupVersion %s", group.GroupVersion)
 	}
 	gvr := schema.GroupVersionResource{Group: gv.Group, Version: gv.Version}
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
@@ -297,13 +300,13 @@ func (kb *kubernetesBackupper) backupResource(
 		}
 		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		// do the backup
 		items, err := meta.ExtractList(unstructuredList)
 		if err != nil {
-			return err
+			return errors.WithStack(err)
 		}
 
 		action := kb.actions[gr]
@@ -311,7 +314,7 @@ func (kb *kubernetesBackupper) backupResource(
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
-				errs = append(errs, fmt.Errorf("unexpected type %T", item))
+				errs = append(errs, errors.Errorf("unexpected type %T", item))
 				continue
 			}
 
@@ -399,7 +402,7 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 
 	itemBytes, err := json.Marshal(item)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	hdr := &tar.Header{
@@ -411,11 +414,11 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 	}
 
 	if err := ctx.w.WriteHeader(hdr); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	if _, err := ctx.w.Write(itemBytes); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	return nil
