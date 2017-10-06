@@ -259,6 +259,18 @@ func TestProcessRestore(t *testing.T) {
 					Restore,
 			},
 		},
+		{
+			name:        "restoration of nodes is not supported",
+			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
+			backup:      NewTestBackup().WithName("backup-1").Backup,
+			expectedErr: false,
+			expectedRestoreUpdates: []*api.Restore{
+				NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseFailedValidation).
+					WithValidationError("nodes are a non-restorable resource").
+					WithValidationError("Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: nodes").
+					Restore,
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -380,6 +392,10 @@ func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.R
 
 	if includeResource != "" {
 		restore = restore.WithIncludedResource(includeResource)
+	}
+
+	for _, n := range nonRestorableResources {
+		restore.WithExcludedResource(n)
 	}
 
 	return restore

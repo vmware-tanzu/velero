@@ -29,6 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -43,6 +44,10 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
+
+// nonRestorableResources is a blacklist for the restoration process. Any resources
+// included here are explicitly excluded from the restoration process.
+var nonRestorableResources = []string{"nodes"}
 
 type restoreController struct {
 	restoreClient       arkv1client.RestoresGetter
@@ -234,6 +239,13 @@ func (controller *restoreController) processRestore(key string) error {
 		restore.Spec.IncludedResources = []string{"*"}
 	}
 
+	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
+	for _, nonrestorable := range nonRestorableResources {
+		if !excludedResources.Has(nonrestorable) {
+			restore.Spec.ExcludedResources = append(restore.Spec.ExcludedResources, nonrestorable)
+		}
+	}
+
 	// validation
 	if restore.Status.ValidationErrors = controller.getValidationErrors(restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
@@ -286,6 +298,13 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	}
+
+	includedResources := sets.NewString(itm.Spec.IncludedResources...)
+	for _, nonRestorableResource := range nonRestorableResources {
+		if includedResources.Has(nonRestorableResource) {
+			validationErrors = append(validationErrors, fmt.Sprintf("%v are a non-restorable resource", nonRestorableResource))
+		}
 	}
 
 	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
