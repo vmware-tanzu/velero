@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -74,6 +75,7 @@ func TestFetchBackup(t *testing.T) {
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				backupSvc       = &BackupService{}
+				logger, _       = testlogger.NewNullLogger()
 			)
 
 			c := NewRestoreController(
@@ -85,6 +87,7 @@ func TestFetchBackup(t *testing.T) {
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				false,
+				logger,
 			).(*restoreController)
 
 			for _, itm := range test.informerBackups {
@@ -260,14 +263,15 @@ func TestProcessRestore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			client := fake.NewSimpleClientset()
+			var (
+				client          = fake.NewSimpleClientset()
+				restorer        = &fakeRestorer{}
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				backupSvc       = &BackupService{}
+				logger, _       = testlogger.NewNullLogger()
+			)
 
-			restorer := &fakeRestorer{}
 			defer restorer.AssertExpectations(t)
-
-			sharedInformers := informers.NewSharedInformerFactory(client, 0)
-
-			backupSvc := &BackupService{}
 			defer backupSvc.AssertExpectations(t)
 
 			c := NewRestoreController(
@@ -279,6 +283,7 @@ func TestProcessRestore(t *testing.T) {
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				test.allowRestoreSnapshots,
+				logger,
 			).(*restoreController)
 
 			if test.restore != nil {

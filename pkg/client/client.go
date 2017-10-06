@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"runtime"
 
+	"github.com/pkg/errors"
+
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -33,7 +35,7 @@ func Config(kubeconfig, baseName string) (*rest.Config, error) {
 	loader.ExplicitPath = kubeconfig
 	clientConfig, err := clientcmd.BuildConfigFromKubeconfigGetter("", loader.Load)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	clientConfig.UserAgent = buildUserAgent(

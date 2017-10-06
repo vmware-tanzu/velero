@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -29,12 +30,15 @@ import (
 )
 
 func TestNewBackupCache(t *testing.T) {
-	delegate := &test.FakeBackupService{}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	var (
+		delegate    = &test.FakeBackupService{}
+		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+		logger, _   = testlogger.NewNullLogger()
+	)
 	defer cancel()
 
-	c := NewBackupCache(ctx, delegate, 100*time.Millisecond)
+	c := NewBackupCache(ctx, delegate, 100*time.Millisecond, logger)
 
 	// nothing in cache, live lookup
 	bucket1 := []*v1.Backup{
@@ -99,7 +103,10 @@ func TestNewBackupCache(t *testing.T) {
 }
 
 func TestBackupCacheRefresh(t *testing.T) {
-	delegate := &test.FakeBackupService{}
+	var (
+		delegate  = &test.FakeBackupService{}
+		logger, _ = testlogger.NewNullLogger()
+	)
 
 	c := &backupCache{
 		delegate: delegate,
@@ -107,6 +114,7 @@ func TestBackupCacheRefresh(t *testing.T) {
 			"bucket1": {},
 			"bucket2": {},
 		},
+		logger: logger,
 	}
 
 	bucket1 := []*v1.Backup{
@@ -127,12 +135,14 @@ func TestBackupCacheRefresh(t *testing.T) {
 }
 
 func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
-	delegate := &test.FakeBackupService{}
-
-	bucket1 := []*v1.Backup{
-		test.NewTestBackup().WithName("backup1").Backup,
-		test.NewTestBackup().WithName("backup2").Backup,
-	}
+	var (
+		delegate  = &test.FakeBackupService{}
+		logger, _ = testlogger.NewNullLogger()
+		bucket1   = []*v1.Backup{
+			test.NewTestBackup().WithName("backup1").Backup,
+			test.NewTestBackup().WithName("backup2").Backup,
+		}
+	)
 
 	c := &backupCache{
 		delegate: delegate,
@@ -141,6 +151,7 @@ func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 				backups: bucket1,
 			},
 		},
+		logger: logger,
 	}
 
 	bucket2 := []*v1.Backup{

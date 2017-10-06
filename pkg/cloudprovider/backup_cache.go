@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 
@@ -41,15 +41,17 @@ type backupCache struct {
 	// This doesn't really need to be a map right now, but if we ever move to supporting multiple
 	// buckets, this will be ready for it.
 	buckets map[string]*backupCacheBucket
+	logger  *logrus.Logger
 }
 
 var _ BackupGetter = &backupCache{}
 
 // NewBackupCache returns a new backup cache that refreshes from delegate every resyncPeriod.
-func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration) BackupGetter {
+func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger *logrus.Logger) BackupGetter {
 	c := &backupCache{
 		delegate: delegate,
 		buckets:  make(map[string]*backupCacheBucket),
+		logger:   logger,
 	}
 
 	// Start the goroutine to refresh all buckets every resyncPeriod. This stops when ctx.Done() is
@@ -64,10 +66,10 @@ func (c *backupCache) refresh() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	glog.V(4).Infof("refreshing all cached backup lists from object storage")
+	c.logger.Debug("refreshing all cached backup lists from object storage")
 
 	for bucketName, bucket := range c.buckets {
-		glog.V(4).Infof("refreshing bucket %q", bucketName)
+		c.logger.WithField("bucket", bucketName).Debug("Refreshing bucket")
 		bucket.backups, bucket.error = c.delegate.GetAllBackups(bucketName)
 	}
 }
@@ -76,12 +78,15 @@ func (c *backupCache) GetAllBackups(bucketName string) ([]*v1.Backup, error) {
 	c.lock.RLock()
 	bucket, found := c.buckets[bucketName]
 	c.lock.RUnlock()
+
+	logContext := c.logger.WithField("bucket", bucketName)
+
 	if found {
-		glog.V(4).Infof("returning cached backup list for bucket %q", bucketName)
+		logContext.Debug("Returning cached backup list")
 		return bucket.backups, bucket.error
 	}
 
-	glog.V(4).Infof("bucket %q is not in cache - doing a live lookup", bucketName)
+	logContext.Debug("Bucket is not in cache - doing a live lookup")
 
 	backups, err := c.delegate.GetAllBackups(bucketName)
 	c.lock.Lock()

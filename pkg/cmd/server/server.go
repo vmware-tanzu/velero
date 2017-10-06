@@ -25,10 +25,10 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/oauth2/google"
-
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"golang.org/x/oauth2/google"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +56,7 @@ import (
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 func NewCommand() *cobra.Command {
@@ -66,7 +67,11 @@ func NewCommand() *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+			logger := logrus.New()
+			logger.Hooks.Add(&logging.ErrorLocationHook{})
+
+			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
+
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -88,9 +93,10 @@ type server struct {
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
+	logger                *logrus.Logger
 }
 
-func newServer(kubeconfig, baseName string) (*server, error) {
+func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config(kubeconfig, baseName)
 	if err != nil {
 		return nil, err
@@ -98,12 +104,12 @@ func newServer(kubeconfig, baseName string) (*server, error) {
 
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	arkClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
@@ -116,6 +122,7 @@ func newServer(kubeconfig, baseName string) (*server, error) {
 		sharedInformerFactory: informers.NewSharedInformerFactory(arkClient, 0),
 		ctx:        ctx,
 		cancelFunc: cancelFunc,
+		logger:     logger,
 	}
 
 	return s, nil
@@ -135,10 +142,10 @@ func (s *server) run() error {
 	// separate object, and instead apply defaults to a clone.
 	copy, err := scheme.Scheme.DeepCopy(originalConfig)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	config := copy.(*api.Config)
-	applyConfigDefaults(config)
+	applyConfigDefaults(config, s.logger)
 
 	s.watchConfig(originalConfig)
 
@@ -158,7 +165,9 @@ func (s *server) run() error {
 }
 
 func (s *server) ensureArkNamespace() error {
-	glog.Infof("Ensuring %s namespace exists for backups", api.DefaultNamespace)
+	logContext := s.logger.WithField("namespace", api.DefaultNamespace)
+
+	logContext.Info("Ensuring namespace exists for backups")
 	defaultNamespace := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: api.DefaultNamespace,
@@ -166,16 +175,16 @@ func (s *server) ensureArkNamespace() error {
 	}
 
 	if created, err := kube.EnsureNamespaceExists(&defaultNamespace, s.kubeClient.CoreV1().Namespaces()); created {
-		glog.Infof("Namespace created")
+		logContext.Info("Namespace created")
 	} else if err != nil {
 		return err
 	}
-	glog.Infof("Namespace already exists")
+	logContext.Info("Namespace already exists")
 	return nil
 }
 
 func (s *server) loadConfig() (*api.Config, error) {
-	glog.Infof("Retrieving Ark configuration")
+	s.logger.Info("Retrieving Ark configuration")
 	var (
 		config *api.Config
 		err    error
@@ -186,12 +195,14 @@ func (s *server) loadConfig() (*api.Config, error) {
 			break
 		}
 		if !apierrors.IsNotFound(err) {
-			glog.Errorf("error retrieving configuration: %v", err)
+			s.logger.WithError(err).Error("Error retrieving configuration")
+		} else {
+			s.logger.Info("Configuration not found")
 		}
-		glog.Infof("Will attempt to retrieve configuration again in 5 seconds")
+		s.logger.Info("Will attempt to retrieve configuration again in 5 seconds")
 		time.Sleep(5 * time.Second)
 	}
-	glog.Infof("Successfully retrieved Ark configuration")
+	s.logger.Info("Successfully retrieved Ark configuration")
 	return config, nil
 }
 
@@ -209,7 +220,7 @@ var defaultResourcePriorities = []string{
 	"configmaps",
 }
 
-func applyConfigDefaults(c *api.Config) {
+func applyConfigDefaults(c *api.Config, logger *logrus.Logger) {
 	if c.GCSyncPeriod.Duration == 0 {
 		c.GCSyncPeriod.Duration = defaultGCSyncPeriod
 	}
@@ -224,9 +235,9 @@ func applyConfigDefaults(c *api.Config) {
 
 	if len(c.ResourcePriorities) == 0 {
 		c.ResourcePriorities = defaultResourcePriorities
-		glog.Infof("Using default resource priorities: %v", c.ResourcePriorities)
+		logger.WithField("priorities", c.ResourcePriorities).Info("Using default resource priorities")
 	} else {
-		glog.Infof("Using resource priorities from config: %v", c.ResourcePriorities)
+		logger.WithField("priorities", c.ResourcePriorities).Info("Using resource priorities from config")
 	}
 }
 
@@ -236,10 +247,10 @@ func (s *server) watchConfig(config *api.Config) {
 	s.sharedInformerFactory.Ark().V1().Configs().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			updated := newObj.(*api.Config)
-			glog.V(4).Infof("received updated config: %q", kube.NamespaceAndName(updated))
+			s.logger.WithField("name", kube.NamespaceAndName(updated)).Debug("received updated config")
 
 			if updated.Name != config.Name {
-				glog.V(5).Infof("config watch channel received other config %q", updated.Name)
+				s.logger.WithField("name", updated.Name).Debug("Config watch channel received other config")
 				return
 			}
 
@@ -256,7 +267,7 @@ func (s *server) watchConfig(config *api.Config) {
 			}
 
 			if !reflect.DeepEqual(config, updated) {
-				glog.Infof("Detected a config change. Gracefully shutting down")
+				s.logger.Info("Detected a config change. Gracefully shutting down")
 				s.cancelFunc()
 			}
 		},
@@ -264,23 +275,23 @@ func (s *server) watchConfig(config *api.Config) {
 }
 
 func (s *server) initBackupService(config *api.Config) error {
-	glog.Infof("Configuring cloud provider for backup service")
-	objectStorage, err := getObjectStorageProvider(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider")
+	s.logger.Info("Configuring cloud provider for backup service")
+	objectStorage, err := getObjectStorageProvider(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider", s.logger)
 	if err != nil {
 		return err
 	}
 
-	s.backupService = cloudprovider.NewBackupService(objectStorage)
+	s.backupService = cloudprovider.NewBackupService(objectStorage, s.logger)
 	return nil
 }
 
 func (s *server) initSnapshotService(config *api.Config) error {
 	if config.PersistentVolumeProvider == nil {
-		glog.Infof("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
+		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
 		return nil
 	}
 
-	glog.Infof("Configuring cloud provider for snapshot service")
+	s.logger.Info("Configuring cloud provider for snapshot service")
 	blockStorage, err := getBlockStorageProvider(*config.PersistentVolumeProvider, "persistentVolumeProvider")
 	if err != nil {
 		return err
@@ -313,14 +324,14 @@ func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
 	return found
 }
 
-func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.ObjectStorageAdapter, error) {
+func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
 	var (
 		objectStorage cloudprovider.ObjectStorageAdapter
 		err           error
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
-		return nil, fmt.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
 	}
 
 	switch {
@@ -339,16 +350,16 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string)
 			// Get the email and private key from the credentials file so we can pre-sign download URLs
 			creds, err := ioutil.ReadFile(credentialsFile)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			jwtConfig, err := google.JWTConfigFromJSON(creds)
 			if err != nil {
-				return nil, err
+				return nil, errors.WithStack(err)
 			}
 			email = jwtConfig.Email
 			privateKey = jwtConfig.PrivateKey
 		} else {
-			glog.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
+			logger.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
 		}
 
 		objectStorage, err = gcp.NewObjectStorageAdapter(email, privateKey)
@@ -370,7 +381,7 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
-		return nil, fmt.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
 	}
 
 	switch {
@@ -397,17 +408,18 @@ func durationMin(a, b time.Duration) time.Duration {
 }
 
 func (s *server) runControllers(config *api.Config) error {
-	glog.Infof("Starting controllers")
+	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
 	var wg sync.WaitGroup
 
 	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
-	glog.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
+	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
 	s.backupService = cloudprovider.NewBackupServiceWithCachedBackupGetter(
 		ctx,
 		s.backupService,
 		cloudBackupCacheResyncPeriod,
+		s.logger,
 	)
 
 	backupSyncController := controller.NewBackupSyncController(
@@ -415,6 +427,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
 		config.BackupSyncPeriod.Duration,
+		s.logger,
 	)
 	wg.Add(1)
 	go func() {
@@ -422,14 +435,14 @@ func (s *server) runControllers(config *api.Config) error {
 		wg.Done()
 	}()
 
-	discoveryHelper, err := arkdiscovery.NewHelper(s.discoveryClient)
+	discoveryHelper, err := arkdiscovery.NewHelper(s.discoveryClient, s.logger)
 	if err != nil {
 		return err
 	}
 	go wait.Until(
 		func() {
 			if err := discoveryHelper.Refresh(); err != nil {
-				glog.Errorf("error refreshing discovery: %v", err)
+				s.logger.WithError(err).Error("Error refreshing discovery")
 			}
 		},
 		5*time.Minute,
@@ -437,7 +450,7 @@ func (s *server) runControllers(config *api.Config) error {
 	)
 
 	if config.RestoreOnlyMode {
-		glog.Infof("Restore only mode - not starting the backup, schedule or GC controllers")
+		s.logger.Info("Restore only mode - not starting the backup, schedule or GC controllers")
 	} else {
 		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService)
 		cmd.CheckError(err)
@@ -448,6 +461,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.backupService,
 			config.BackupStorageProvider.Bucket,
 			s.snapshotService != nil,
+			s.logger,
 		)
 		wg.Add(1)
 		go func() {
@@ -460,6 +474,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(),
 			s.sharedInformerFactory.Ark().V1().Schedules(),
 			config.ScheduleSyncPeriod.Duration,
+			s.logger,
 		)
 		wg.Add(1)
 		go func() {
@@ -476,6 +491,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(),
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(),
+			s.logger,
 		)
 		wg.Add(1)
 		go func() {
@@ -492,6 +508,7 @@ func (s *server) runControllers(config *api.Config) error {
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
 		s.kubeClient,
+		s.logger,
 	)
 	cmd.CheckError(err)
 
@@ -504,6 +521,7 @@ func (s *server) runControllers(config *api.Config) error {
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
+		s.logger,
 	)
 	wg.Add(1)
 	go func() {
@@ -516,6 +534,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
+		s.logger,
 	)
 	wg.Add(1)
 	go func() {
@@ -526,11 +545,11 @@ func (s *server) runControllers(config *api.Config) error {
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 
-	glog.Infof("Server started successfully")
+	s.logger.Info("Server started successfully")
 
 	<-ctx.Done()
 
-	glog.Info("Waiting for all controllers to shut down gracefully")
+	s.logger.Info("Waiting for all controllers to shut down gracefully")
 	wg.Wait()
 
 	return nil
@@ -568,14 +587,15 @@ func newRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	kubeClient kubernetes.Interface,
+	logger *logrus.Logger,
 ) (restore.Restorer, error) {
 	restorers := map[string]restorers.ResourceRestorer{
 		"persistentvolumes":      restorers.NewPersistentVolumeRestorer(snapshotService),
 		"persistentvolumeclaims": restorers.NewPersistentVolumeClaimRestorer(),
 		"services":               restorers.NewServiceRestorer(),
 		"namespaces":             restorers.NewNamespaceRestorer(),
-		"pods":                   restorers.NewPodRestorer(),
-		"jobs":                   restorers.NewJobRestorer(),
+		"pods":                   restorers.NewPodRestorer(logger),
+		"jobs":                   restorers.NewJobRestorer(logger),
 	}
 
 	return restore.NewKubernetesRestorer(
@@ -586,5 +606,6 @@ func newRestorer(
 		resourcePriorities,
 		backupClient,
 		kubeClient.CoreV1().Namespaces(),
+		logger,
 	)
 }

@@ -18,7 +18,6 @@ package azure
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -28,6 +27,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -85,7 +85,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 
 	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
-		return nil, fmt.Errorf("error creating new service principal: %v", err)
+		return nil, errors.Wrap(err, "error creating new service principal token")
 	}
 
 	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
@@ -101,7 +101,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 
 	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if locs.Value == nil {
@@ -117,7 +117,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 	}
 
 	if !locationExists {
-		return nil, fmt.Errorf("location %q not found", location)
+		return nil, errors.Errorf("location %q not found", location)
 	}
 
 	return &blockStorageAdapter{
@@ -154,7 +154,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	err := <-errChan
 
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	return diskName, nil
 }
@@ -162,7 +162,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
-		return "", nil, err
+		return "", nil, errors.WithStack(err)
 	}
 
 	return string(res.AccountType), nil, nil
@@ -171,7 +171,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	if res.ProvisioningState == nil {
@@ -184,7 +184,7 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready b
 func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	res, err := op.snaps.ListByResourceGroup(op.resourceGroup)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if res.Value == nil {
@@ -252,7 +252,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 	err := <-errChan
 
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return snapshotName, nil
@@ -266,7 +266,7 @@ func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
 
 	err := <-errChan
 
-	return err
+	return errors.WithStack(err)
 }
 
 func getFullDiskName(subscription string, resourceGroup string, diskName string) string {

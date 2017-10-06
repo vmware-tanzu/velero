@@ -17,12 +17,12 @@ limitations under the License.
 package azure
 
 import (
-	"fmt"
 	"io"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/pkg/errors"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -40,7 +40,7 @@ func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
 
 	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	blobClient := storageClient.GetBlobService()
@@ -65,16 +65,16 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 	// length here is ugly. refactor to make this better.
 	len, err := body.Seek(0, io.SeekEnd)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	blob.Properties.ContentLength = len
 
 	if _, err := body.Seek(0, 0); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
-	return blob.CreateBlockBlobFromReader(body, nil)
+	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
 func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
@@ -90,7 +90,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 
 	res, err := blob.Get(nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	return res, nil
@@ -108,7 +108,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 
 	res, err := container.ListBlobs(params)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// Azure returns prefixes inclusive of the last delimiter. We need to strip
@@ -133,7 +133,7 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 
 	res, err := container.ListBlobs(params)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	ret := make([]string, 0, len(res.Blobs))
@@ -155,7 +155,7 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 		return err
 	}
 
-	return blob.Delete(nil)
+	return errors.WithStack(blob.Delete(nil))
 }
 
 const sasURIReadPermission = "r"
@@ -177,7 +177,7 @@ func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Dur
 func getContainerReference(blobClient *storage.BlobStorageClient, bucket string) (*storage.Container, error) {
 	container := blobClient.GetContainerReference(bucket)
 	if container == nil {
-		return nil, fmt.Errorf("unable to get container reference for bucket %v", bucket)
+		return nil, errors.Errorf("unable to get container reference for bucket %v", bucket)
 	}
 
 	return container, nil
@@ -186,7 +186,7 @@ func getContainerReference(blobClient *storage.BlobStorageClient, bucket string)
 func getBlobReference(container *storage.Container, key string) (*storage.Blob, error) {
 	blob := container.GetBlobReference(key)
 	if blob == nil {
-		return nil, fmt.Errorf("unable to get blob reference for key %v", key)
+		return nil, errors.Errorf("unable to get blob reference for key %v", key)
 	}
 
 	return blob, nil

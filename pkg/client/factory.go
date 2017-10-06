@@ -17,6 +17,7 @@ limitations under the License.
 package client
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
 	"github.com/heptio/ark/pkg/generated/clientset"
@@ -60,7 +61,7 @@ func (f *factory) Client() (clientset.Interface, error) {
 
 	arkClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 	return arkClient, nil
 }

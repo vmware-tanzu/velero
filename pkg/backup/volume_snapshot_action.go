@@ -17,8 +17,9 @@ limitations under the License.
 package backup
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/clock"
 
@@ -75,7 +76,7 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 	volumeID, err := kubeutil.GetVolumeID(volume)
 	// non-nil error means it's a supported PV source but volume ID can't be found
 	if err != nil {
-		return fmt.Errorf("error getting volume ID for backup %q, PersistentVolume %q: %v", backupName, name, err)
+		return errors.Wrapf(err, "error getting volume ID for backup %q, PersistentVolume %q", backupName, name)
 	}
 	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {

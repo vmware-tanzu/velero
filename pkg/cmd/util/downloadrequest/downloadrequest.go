@@ -18,12 +18,13 @@ package downloadrequest
 
 import (
 	"compress/gzip"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/pkg/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -48,7 +49,7 @@ func Stream(client arkclientv1.DownloadRequestsGetter, name string, kind v1.Down
 
 	req, err := client.DownloadRequests(v1.DefaultNamespace).Create(req)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer client.DownloadRequests(v1.DefaultNamespace).Delete(req.Name, nil)
 
@@ -59,7 +60,7 @@ func Stream(client arkclientv1.DownloadRequestsGetter, name string, kind v1.Down
 	}
 	watcher, err := client.DownloadRequests(v1.DefaultNamespace).Watch(listOptions)
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 	defer watcher.Stop()
 
@@ -74,7 +75,7 @@ Loop:
 		case e := <-watcher.ResultChan():
 			updated, ok := e.Object.(*v1.DownloadRequest)
 			if !ok {
-				return fmt.Errorf("unexpected type %T", e.Object)
+				return errors.Errorf("unexpected type %T", e.Object)
 			}
 
 			if updated.Name != req.Name {
@@ -118,10 +119,10 @@ Loop:
 	if resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("request failed; unable to decode response body: %v", err)
+			return errors.Wrapf(err, "request failed; unable to decode response body")
 		}
 
-		return fmt.Errorf("request failed: %v", string(body))
+		return errors.Errorf("request failed: %v", string(body))
 	}
 
 	reader := resp.Body

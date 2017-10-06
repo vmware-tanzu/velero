@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	core "k8s.io/client-go/testing"
@@ -55,14 +56,18 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			bs := &BackupService{}
-			client := fake.NewSimpleClientset()
+			var (
+				bs        = &BackupService{}
+				client    = fake.NewSimpleClientset()
+				logger, _ = testlogger.NewNullLogger()
+			)
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
 				bs,
 				"bucket",
 				time.Duration(0),
+				logger,
 			).(*backupSyncController)
 
 			bs.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)

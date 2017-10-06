@@ -19,7 +19,7 @@ package restorers
 import (
 	"regexp"
 
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -27,12 +27,16 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
-type podRestorer struct{}
+type podRestorer struct {
+	logger *logrus.Logger
+}
 
 var _ ResourceRestorer = &podRestorer{}
 
-func NewPodRestorer() ResourceRestorer {
-	return &podRestorer{}
+func NewPodRestorer(logger *logrus.Logger) ResourceRestorer {
+	return &podRestorer{
+		logger: logger,
+	}
 }
 
 func (nsr *podRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bool {
@@ -43,37 +47,36 @@ var (
 	defaultTokenRegex = regexp.MustCompile("default-token-.*")
 )
 
-func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
-	glog.V(4).Infof("resetting metadata and status")
+func (r *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
+	r.logger.Debug("resetting metadata and status")
 	_, err := resetMetadataAndStatus(obj, true)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	glog.V(4).Infof("getting spec")
+	r.logger.Debug("getting spec")
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
 		return nil, nil, err
 	}
 
-	glog.V(4).Infof("deleting spec.NodeName")
+	r.logger.Debug("deleting spec.NodeName")
 	delete(spec, "nodeName")
 
 	newVolumes := make([]interface{}, 0)
-	glog.V(4).Infof("iterating over volumes")
+	r.logger.Debug("iterating over volumes")
 	err = collections.ForEach(spec, "volumes", func(volume map[string]interface{}) error {
 		name, err := collections.GetString(volume, "name")
 		if err != nil {
 			return err
 		}
 
-		glog.V(4).Infof("checking volume with name %q", name)
-
+		r.logger.WithField("volumeName", name).Debug("Checking volume")
 		if !defaultTokenRegex.MatchString(name) {
-			glog.V(4).Infof("preserving volume")
+			r.logger.WithField("volumeName", name).Debug("Preserving volume")
 			newVolumes = append(newVolumes, volume)
 		} else {
-			glog.V(4).Infof("excluding volume")
+			r.logger.WithField("volumeName", name).Debug("Excluding volume")
 		}
 
 		return nil
@@ -82,10 +85,10 @@ func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, 
 		return nil, nil, err
 	}
 
-	glog.V(4).Infof("setting spec.volumes")
+	r.logger.Debug("Setting spec.volumes")
 	spec["volumes"] = newVolumes
 
-	glog.V(4).Infof("iterating over containers")
+	r.logger.Debug("iterating over containers")
 	err = collections.ForEach(spec, "containers", func(container map[string]interface{}) error {
 		var newVolumeMounts []interface{}
 		err := collections.ForEach(container, "volumeMounts", func(volumeMount map[string]interface{}) error {
@@ -94,13 +97,12 @@ func (nsr *podRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, 
 				return err
 			}
 
-			glog.V(4).Infof("checking volumeMount with name %q", name)
-
+			r.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
 			if !defaultTokenRegex.MatchString(name) {
-				glog.V(4).Infof("preserving volumeMount")
+				r.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
 				newVolumeMounts = append(newVolumeMounts, volumeMount)
 			} else {
-				glog.V(4).Infof("excluding volumeMount")
+				r.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
 			}
 
 			return nil

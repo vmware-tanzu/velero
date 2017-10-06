@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -123,6 +124,7 @@ func TestProcessSchedule(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger, _       = testlogger.NewNullLogger()
 			)
 
 			c := NewScheduleController(
@@ -130,6 +132,7 @@ func TestProcessSchedule(t *testing.T) {
 				client.ArkV1(),
 				sharedInformers.Ark().V1().Schedules(),
 				time.Duration(0),
+				logger,
 			)
 
 			var (
@@ -291,7 +294,9 @@ func TestParseCronSchedule(t *testing.T) {
 		},
 	}
 
-	c, errs := parseCronSchedule(s)
+	logger, _ := testlogger.NewNullLogger()
+
+	c, errs := parseCronSchedule(s, logger)
 	require.Empty(t, errs)
 
 	// make sure we're not due and next backup is tomorrow at 9am

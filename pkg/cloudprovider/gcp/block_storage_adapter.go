@@ -17,11 +17,10 @@ limitations under the License.
 package gcp
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -46,22 +45,22 @@ func NewBlockStorageAdapter(project string) (cloudprovider.BlockStorageAdapter, 
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	gce, err := compute.New(client)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	// validate project
 	res, err := gce.Projects.Get(project).Do()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	if res == nil {
-		return nil, fmt.Errorf("error getting project %q", project)
+		return nil, errors.Errorf("error getting project %q", project)
 	}
 
 	return &blockStorageAdapter{
@@ -73,7 +72,7 @@ func NewBlockStorageAdapter(project string) (cloudprovider.BlockStorageAdapter, 
 func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	res, err := op.gce.Snapshots.Get(op.project, snapshotID).Do()
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	disk := &compute.Disk{
@@ -83,7 +82,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	}
 
 	if _, err = op.gce.Disks.Insert(op.project, volumeAZ, disk).Do(); err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return disk.Name, nil
@@ -92,7 +91,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
-		return "", nil, err
+		return "", nil, errors.WithStack(err)
 	}
 
 	return res.Type, nil, nil
@@ -101,7 +100,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	disk, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
-		return false, err
+		return false, errors.WithStack(err)
 	}
 
 	// TODO can we consider a disk ready while it's in the RESTORING state?
@@ -124,7 +123,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 
 	res, err := op.gce.Snapshots.List(op.project).Filter(filter).Do()
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	ret := make([]string, 0, len(res.Items))
@@ -153,7 +152,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 
 	_, err := op.gce.Disks.CreateSnapshot(op.project, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	// the snapshot is not immediately available after creation for putting labels
@@ -165,7 +164,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 		}
 		return false, nil
 	}); pollErr != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	labels := &compute.GlobalSetLabelsRequest{
@@ -175,7 +174,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 
 	_, err = op.gce.Snapshots.SetLabels(op.project, gceSnap.Name, labels).Do()
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	return gceSnap.Name, nil
@@ -184,5 +183,5 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
 	_, err := op.gce.Snapshots.Delete(op.project, snapshotID).Do()
 
-	return err
+	return errors.WithStack(err)
 }

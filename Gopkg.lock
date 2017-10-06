@@ -224,6 +224,12 @@
   revision = "d0303fe809921458f417bcf828397a65db30a7e4"
 
 [[projects]]
+  name = "github.com/pkg/errors"
+  packages = ["."]
+  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
+  version = "v0.8.0"
+
+[[projects]]
   name = "github.com/pmezard/go-difflib"
   packages = ["difflib"]
   revision = "792786c7400a136282c1664665ae0a8db921c6c2"
@@ -256,6 +262,12 @@
   name = "github.com/shurcooL/sanitized_anchor_name"
   packages = ["."]
   revision = "541ff5ee47f1dddf6a5281af78307d921524bcb5"
+
+[[projects]]
+  name = "github.com/sirupsen/logrus"
+  packages = [".","hooks/test"]
+  revision = "f006c2ac4710855cf0f916dd6b77acf6b048dc6e"
+  version = "v1.0.3"
 
 [[projects]]
   branch = "master"
@@ -391,6 +403,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1739acba4589d0e177479f7cad479483b6951d15483af6b8c72028a8ec4b275e"
+  inputs-digest = "3585b76a035a388e1521b936d43a60ef22024b9508c48a089334c6693eaaf559"
   solver-name = "gps-cdcl"
   solver-version = 1

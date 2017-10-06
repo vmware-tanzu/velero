@@ -17,10 +17,7 @@ limitations under the License.
 package collections
 
 import (
-	"errors"
-	"fmt"
-
-	"github.com/golang/glog"
+	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -102,7 +99,7 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 
 	for _, itm := range excludes.List() {
 		if includes.Has(itm) {
-			errs = append(errs, fmt.Errorf("excludes list cannot contain an item in the includes list: %v", itm))
+			errs = append(errs, errors.Errorf("excludes list cannot contain an item in the includes list: %v", itm))
 		}
 	}
 
@@ -113,7 +110,7 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 // include/exclude slices, applying the specified mapping function to each item in them,
 // and adding the output of the function to the new struct. If the mapping function returns
 // an error for an item, it is omitted from the result.
-func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) (string, error)) *IncludesExcludes {
+func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) string) *IncludesExcludes {
 	res := NewIncludesExcludes()
 
 	for _, item := range includes {
@@ -122,22 +119,18 @@ func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) 
 			continue
 		}
 
-		key, err := mapFunc(item)
-		if err != nil {
-			glog.Errorf("unable to include item %q: %v", item, err)
+		key := mapFunc(item)
+		if key == "" {
 			continue
 		}
-
 		res.Includes(key)
 	}
 
 	for _, item := range excludes {
-		key, err := mapFunc(item)
-		if err != nil {
-			glog.Errorf("unable to exclude item %q: %v", item, err)
+		key := mapFunc(item)
+		if key == "" {
 			continue
 		}
-
 		res.Excludes(key)
 	}
 

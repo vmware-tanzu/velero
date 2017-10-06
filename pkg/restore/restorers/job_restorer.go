@@ -17,7 +17,7 @@ limitations under the License.
 package restorers
 
 import (
-	"github.com/golang/glog"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -25,12 +25,16 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
-type jobRestorer struct{}
+type jobRestorer struct {
+	logger *logrus.Logger
+}
 
 var _ ResourceRestorer = &jobRestorer{}
 
-func NewJobRestorer() ResourceRestorer {
-	return &jobRestorer{}
+func NewJobRestorer(logger *logrus.Logger) ResourceRestorer {
+	return &jobRestorer{
+		logger: logger,
+	}
 }
 
 func (r *jobRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bool {
@@ -38,25 +42,25 @@ func (r *jobRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bo
 }
 
 func (r *jobRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
-	glog.V(4).Infof("resetting metadata and status")
+	r.logger.Debug("resetting metadata and status")
 	_, err := resetMetadataAndStatus(obj, true)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	glog.V(4).Infof("getting spec.selector.matchLabels")
-	matchLabels, err := collections.GetMap(obj.UnstructuredContent(), "spec.selector.matchLabels")
-	if err != nil {
-		glog.V(4).Infof("unable to get spec.selector.matchLabels: %v", err)
-	} else {
-		delete(matchLabels, "controller-uid")
+	fieldDeletions := map[string]string{
+		"spec.selector.matchLabels":     "controller-uid",
+		"spec.template.metadata.labels": "controller-uid",
 	}
 
-	templateLabels, err := collections.GetMap(obj.UnstructuredContent(), "spec.template.metadata.labels")
-	if err != nil {
-		glog.V(4).Infof("unable to get spec.template.metadata.labels: %v", err)
-	} else {
-		delete(templateLabels, "controller-uid")
+	for k, v := range fieldDeletions {
+		r.logger.Debugf("Getting %s", k)
+		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
+		if err != nil {
+			r.logger.WithError(err).Debugf("Unable to get %s", k)
+		} else {
+			delete(labels, v)
+		}
 	}
 
 	return obj, nil, nil

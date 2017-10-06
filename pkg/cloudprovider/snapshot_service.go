@@ -17,8 +17,9 @@ limitations under the License.
 package cloudprovider
 
 import (
-	"fmt"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // SnapshotService exposes Ark-specific operations for snapshotting and restoring block
@@ -82,7 +83,7 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 	for {
 		select {
 		case <-timeout.C:
-			return "", fmt.Errorf("timeout reached waiting for volume %v to be ready", volumeID)
+			return "", errors.Errorf("timeout reached waiting for volume %v to be ready", volumeID)
 		case <-ticker.C:
 			if ready, err := sr.blockStorage.IsVolumeReady(volumeID, volumeAZ); err == nil && ready {
 				return volumeID, nil
