@@ -89,7 +89,7 @@ Now that you have your IAM user credentials stored in a Secret, you need to repl
 
 * In file `examples/aws/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>`, and `<YOUR_AVAILABILITY_ZONE>`. See the [Config definition][6] for details.
+  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>`. See the [Config definition][6] for details.
 
 
 * In file `examples/common/10-deployment.yaml`:
@@ -167,7 +167,7 @@ Now that you have your Google Cloud credentials stored in a Secret, you need to 
 
 * In file `examples/gcp/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>`, `<YOUR_PROJECT>` and `<YOUR_ZONE>`. See the [Config definition][7] for details.
+  * Replace `<YOUR_BUCKET>` and `<YOUR_PROJECT>`. See the [Config definition][7] for details.
 
 
 * In file `examples/common/10-deployment.yaml`:

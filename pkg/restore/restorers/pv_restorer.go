@@ -99,7 +99,7 @@ func (sr *persistentVolumeRestorer) Prepare(obj runtime.Unstructured, restore *a
 	if restoreFromSnapshot {
 		backupInfo := backup.Status.VolumeBackups[pvName]
 
-		volumeID, err := sr.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.Iops)
+		volumeID, err := sr.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
 		if err != nil {
 			return nil, nil, err
 		}

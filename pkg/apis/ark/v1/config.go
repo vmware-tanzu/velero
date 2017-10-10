@@ -94,7 +94,6 @@ type ObjectStorageProviderConfig struct {
 // AWSConfig is configuration information for connecting to AWS.
 type AWSConfig struct {
 	Region           string `json:"region"`
-	AvailabilityZone string `json:"availabilityZone"`
 	DisableSSL       bool   `json:"disableSSL"`
 	S3ForcePathStyle bool   `json:"s3ForcePathStyle"`
 	S3Url            string `json:"s3Url"`
@@ -104,7 +103,6 @@ type AWSConfig struct {
 // GCPConfig is configuration information for connecting to GCP.
 type GCPConfig struct {
 	Project string `json:"project"`
-	Zone    string `json:"zone"`
 }
 
 // AzureConfig is configuration information for connecting to Azure.

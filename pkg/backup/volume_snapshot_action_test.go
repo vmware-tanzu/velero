@@ -77,49 +77,49 @@ func TestVolumeSnapshotAction(t *testing.T) {
 		{
 			name:                   "aws - simple volume id",
 			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:            false,
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
 		{
 			name:                   "aws - simple volume id with provisioned IOPS",
 			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "vol-abc123"}}}`,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:            false,
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "io1", Iops: &iops, SnapshotID: "snap-1"},
+				"vol-abc123": v1.VolumeBackupInfo{Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
 		{
 			name:                   "aws - dynamically provisioned volume id",
 			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-west-2a/vol-abc123"}}}`,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-west-2a"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-west-2a/vol-abc123"}}}`,
 			expectError:            false,
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-west-2a"},
 			},
 		},
 		{
 			name:                   "gce",
 			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "gcp-zone2"}}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
 			expectError:            false,
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "pd-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"pd-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"pd-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "gcp-zone2"},
 			},
 		},
 		{
@@ -154,6 +154,18 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			snapshotEnabled: true,
 			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
 			expectError:     true,
+		},
+		{
+			name:                   "PV with label metadata but no failureDomainZone",
+			snapshotEnabled:        true,
+			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/region": "us-east-1"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
+			expectError:            false,
+			expectedSnapshotsTaken: 1,
+			expectedVolumeID:       "vol-abc123",
+			ttl:                    5 * time.Minute,
+			volumeInfo: map[string]v1.VolumeBackupInfo{
+				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+			},
 		},
 	}
 
@@ -216,9 +228,10 @@ func TestVolumeSnapshotAction(t *testing.T) {
 				snapshotID, _ := snapshotService.SnapshotsTaken.PopAny()
 
 				expectedVolumeBackups["mypv"] = &v1.VolumeBackupInfo{
-					SnapshotID: snapshotID,
-					Type:       test.volumeInfo[test.expectedVolumeID].Type,
-					Iops:       test.volumeInfo[test.expectedVolumeID].Iops,
+					SnapshotID:       snapshotID,
+					Type:             test.volumeInfo[test.expectedVolumeID].Type,
+					Iops:             test.volumeInfo[test.expectedVolumeID].Iops,
+					AvailabilityZone: test.volumeInfo[test.expectedVolumeID].AvailabilityZone,
 				}
 
 				if e, a := expectedVolumeBackups, backup.Status.VolumeBackups; !reflect.DeepEqual(e, a) {

@@ -386,9 +386,9 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 
 	switch {
 	case cloudConfig.AWS != nil:
-		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region, cloudConfig.AWS.AvailabilityZone)
+		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region)
 	case cloudConfig.GCP != nil:
-		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project, cloudConfig.GCP.Zone)
+		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project)
 	case cloudConfig.Azure != nil:
 		blockStorage, err = azure.NewBlockStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
 	}
