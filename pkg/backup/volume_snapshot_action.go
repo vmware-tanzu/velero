@@ -59,7 +59,7 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Act
 func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]interface{}, backup *api.Backup) error {
 	backupName := fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
-		ctx.log("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
+		ctx.infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
 		return nil
 	}
 
@@ -68,12 +68,12 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 	var pvFailureDomainZone string
 
 	if labelsMap, err := collections.GetMap(metadata, "labels"); err != nil {
-		ctx.log("error getting labels on PersistentVolume %q for backup %q: %v", name, backupName, err)
+		ctx.infof("error getting labels on PersistentVolume %q for backup %q: %v", name, backupName, err)
 	} else {
 		if labelsMap[zoneLabel] != nil {
 			pvFailureDomainZone = labelsMap[zoneLabel].(string)
 		} else {
-			ctx.log("label %q is not present on PersistentVolume %q for backup %q.", zoneLabel, name, backupName)
+			ctx.infof("label %q is not present on PersistentVolume %q for backup %q.", zoneLabel, name, backupName)
 		}
 	}
 
@@ -84,23 +84,23 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 	}
 	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {
-		ctx.log("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
+		ctx.infof("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
 		return nil
 	}
 
 	expiration := a.clock.Now().Add(backup.Spec.TTL.Duration)
 
-	ctx.log("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
+	ctx.infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
 
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
 	if err != nil {
-		ctx.log("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
+		ctx.infof("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 
 	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID, pvFailureDomainZone)
 	if err != nil {
-		ctx.log("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
+		ctx.infof("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 

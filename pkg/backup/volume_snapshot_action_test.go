@@ -17,11 +17,11 @@ limitations under the License.
 package backup
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
 	"time"
 
+	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -198,7 +198,9 @@ func TestVolumeSnapshotAction(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			actionCtx := ActionContext{logger: &logger{w: new(bytes.Buffer)}}
+			log, _ := testlogger.NewNullLogger()
+
+			actionCtx := ActionContext{logger: log}
 			err = action.Execute(actionCtx, pv, backup)
 			gotErr := err != nil
 

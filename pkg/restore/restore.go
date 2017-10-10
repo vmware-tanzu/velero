@@ -26,7 +26,6 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"time"
 
 	"github.com/sirupsen/logrus"
 
@@ -206,13 +205,16 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
+	log := logrus.New()
+	log.Out = gzippedLog
+
 	ctx := &context{
 		backup:               backup,
 		backupReader:         backupReader,
 		restore:              restore,
 		prioritizedResources: prioritizedResources,
 		selector:             selector,
-		logger:               &logger{w: gzippedLog},
+		logger:               log,
 		dynamicFactory:       kr.dynamicFactory,
 		fileSystem:           kr.fileSystem,
 		namespaceClient:      kr.namespaceClient,
@@ -222,39 +224,29 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	return ctx.execute()
 }
 
-type logger struct {
-	w io.Writer
-}
-
-func (l *logger) log(msg string, args ...interface{}) {
-	// TODO use a real logger that supports writing to files
-	now := time.Now().Format(time.RFC3339)
-	fmt.Fprintf(l.w, now+" "+msg+"\n", args...)
-}
-
 type context struct {
 	backup               *api.Backup
 	backupReader         io.Reader
 	restore              *api.Restore
 	prioritizedResources []schema.GroupResource
 	selector             labels.Selector
-	logger               *logger
+	logger               *logrus.Logger
 	dynamicFactory       client.DynamicFactory
 	fileSystem           FileSystem
 	namespaceClient      corev1.NamespaceInterface
 	restorers            map[schema.GroupResource]restorers.ResourceRestorer
 }
 
-func (ctx *context) log(msg string, args ...interface{}) {
-	ctx.logger.log(msg, args...)
+func (ctx *context) infof(msg string, args ...interface{}) {
+	ctx.logger.Infof(msg, args...)
 }
 
 func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
-	ctx.log("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
+	ctx.infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
 	dir, err := ctx.unzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
-		ctx.log("error unzipping and extracting: %v", err)
+		ctx.infof("error unzipping and extracting: %v", err)
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
 	defer ctx.fileSystem.RemoveAll(dir)
@@ -304,7 +296,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 		nsPath := path.Join(namespacesPath, ns.Name())
 
 		if !namespaceFilter.ShouldInclude(ns.Name()) {
-			ctx.log("Skipping namespace %s", ns.Name())
+			ctx.infof("Skipping namespace %s", ns.Name())
 			continue
 		}
 
@@ -354,9 +346,9 @@ func (ctx *context) restoreNamespace(nsName, nsPath string) (api.RestoreResult, 
 	warnings, errors := api.RestoreResult{}, api.RestoreResult{}
 
 	if nsName == "" {
-		ctx.log("Restoring cluster-scoped resources")
+		ctx.infof("Restoring cluster-scoped resources")
 	} else {
-		ctx.log("Restoring namespace %s", nsName)
+		ctx.infof("Restoring namespace %s", nsName)
 	}
 
 	resourceDirs, err := ctx.fileSystem.ReadDir(nsPath)
@@ -413,7 +405,7 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 	warnings, errors := api.RestoreResult{}, api.RestoreResult{}
 	resource := path.Base(resourcePath)
 
-	ctx.log("Restoring resource %v into namespace %v", resource, namespace)
+	ctx.infof("Restoring resource %v into namespace %v", resource, namespace)
 
 	files, err := ctx.fileSystem.ReadDir(resourcePath)
 	if err != nil {
@@ -446,7 +438,7 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 		if restorer == nil {
 			// initialize client & restorer for this Resource. we need
 			// metadata from an object to do this.
-			ctx.log("Getting client for %v", obj.GroupVersionKind())
+			ctx.infof("Getting client for %v", obj.GroupVersionKind())
 
 			resource := metav1.APIResource{
 				Namespaced: len(namespace) > 0,
@@ -462,10 +454,10 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 
 			restorer = ctx.restorers[groupResource]
 			if restorer == nil {
-				ctx.log("Using default restorer for %v", &groupResource)
+				ctx.infof("Using default restorer for %v", &groupResource)
 				restorer = restorers.NewBasicRestorer(true)
 			} else {
-				ctx.log("Using custom restorer for %v", &groupResource)
+				ctx.infof("Using custom restorer for %v", &groupResource)
 			}
 
 			if restorer.Wait() {
@@ -486,7 +478,7 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 		}
 
 		if hasControllerOwner(obj.GetOwnerReferences()) {
-			ctx.log("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
+			ctx.infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
 			continue
 		}
 
@@ -511,14 +503,14 @@ func (ctx *context) restoreResourceForNamespace(namespace string, resourcePath s
 		// add an ark-restore label to each resource for easy ID
 		addLabel(unstructuredObj, api.RestoreLabelKey, ctx.restore.Name)
 
-		ctx.log("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
+		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
 		_, err = resourceClient.Create(unstructuredObj)
 		if apierrors.IsAlreadyExists(err) {
 			addToResult(&warnings, namespace, err)
 			continue
 		}
 		if err != nil {
-			ctx.log("error restoring %s: %v", unstructuredObj.GetName(), err)
+			ctx.infof("error restoring %s: %v", unstructuredObj.GetName(), err)
 			addToResult(&errors, namespace, fmt.Errorf("error restoring %s: %v", fullPath, err))
 			continue
 		}
@@ -584,7 +576,7 @@ func (ctx *context) unmarshal(filePath string) (*unstructured.Unstructured, erro
 func (ctx *context) unzipAndExtractBackup(src io.Reader) (string, error) {
 	gzr, err := gzip.NewReader(src)
 	if err != nil {
-		ctx.log("error creating gzip reader: %v", err)
+		ctx.infof("error creating gzip reader: %v", err)
 		return "", err
 	}
 	defer gzr.Close()
@@ -597,7 +589,7 @@ func (ctx *context) unzipAndExtractBackup(src io.Reader) (string, error) {
 func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
 	dir, err := ctx.fileSystem.TempDir("", "")
 	if err != nil {
-		ctx.log("error creating temp dir: %v", err)
+		ctx.infof("error creating temp dir: %v", err)
 		return "", err
 	}
 
@@ -608,7 +600,7 @@ func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
 			break
 		}
 		if err != nil {
-			ctx.log("error reading tar: %v", err)
+			ctx.infof("error reading tar: %v", err)
 			return "", err
 		}
 
@@ -618,7 +610,7 @@ func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
 		case tar.TypeDir:
 			err := ctx.fileSystem.MkdirAll(target, header.FileInfo().Mode())
 			if err != nil {
-				ctx.log("mkdirall error: %v", err)
+				ctx.infof("mkdirall error: %v", err)
 				return "", err
 			}
 
@@ -626,7 +618,7 @@ func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
 			// make sure we have the directory created
 			err := ctx.fileSystem.MkdirAll(path.Dir(target), header.FileInfo().Mode())
 			if err != nil {
-				ctx.log("mkdirall error: %v", err)
+				ctx.infof("mkdirall error: %v", err)
 				return "", err
 			}
 
@@ -638,7 +630,7 @@ func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
 			defer file.Close()
 
 			if _, err := io.Copy(file, tarRdr); err != nil {
-				ctx.log("error copying: %v", err)
+				ctx.infof("error copying: %v", err)
 				return "", err
 			}
 		}
