@@ -439,14 +439,14 @@ func TestBackupMethod(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedFiles := sets.NewString(
-		"namespaces/a/configmaps/configMap1.json",
-		"namespaces/b/configmaps/configMap2.json",
-		"namespaces/a/roles.rbac.authorization.k8s.io/role1.json",
+		"resources/configmaps/namespaces/a/configMap1.json",
+		"resources/configmaps/namespaces/b/configMap2.json",
+		"resources/roles.rbac.authorization.k8s.io/namespaces/a/role1.json",
 		// CSRs are not expected because they're unrelated cluster-scoped resources
 	)
 
 	expectedData := map[string]string{
-		"namespaces/a/configmaps/configMap1.json": `
+		"resources/configmaps/namespaces/a/configMap1.json": `
 			{
 				"apiVersion": "v1",
 				"kind": "ConfigMap",
@@ -458,7 +458,7 @@ func TestBackupMethod(t *testing.T) {
 					"a": "b"
 				}
 			}`,
-		"namespaces/b/configmaps/configMap2.json": `
+		"resources/configmaps/namespaces/b/configMap2.json": `
 			{
 				"apiVersion": "v1",
 				"kind": "ConfigMap",
@@ -471,7 +471,7 @@ func TestBackupMethod(t *testing.T) {
 				}
 			}
 		`,
-		"namespaces/a/roles.rbac.authorization.k8s.io/role1.json": `
+		"resources/roles.rbac.authorization.k8s.io/namespaces/a/role1.json": `
 			{
 				"apiVersion": "rbac.authorization.k8s.io/v1beta1",
 				"kind": "Role",
@@ -1114,7 +1114,7 @@ func TestBackupItem(t *testing.T) {
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("foo"),
 			expectError:               false,
 			expectExcluded:            false,
-			expectedTarHeaderName:     "namespaces/foo/resource.group/bar.json",
+			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
 		},
 		{
 			name: "* namespace include",
@@ -1122,21 +1122,21 @@ func TestBackupItem(t *testing.T) {
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			expectError:               false,
 			expectExcluded:            false,
-			expectedTarHeaderName:     "namespaces/foo/resource.group/bar.json",
+			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
 		},
 		{
 			name:                  "cluster-scoped",
 			item:                  `{"metadata":{"name":"bar"}}`,
 			expectError:           false,
 			expectExcluded:        false,
-			expectedTarHeaderName: "cluster/resource.group/bar.json",
+			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
 		},
 		{
 			name:                  "make sure status is deleted",
 			item:                  `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
 			expectError:           false,
 			expectExcluded:        false,
-			expectedTarHeaderName: "cluster/resource.group/bar.json",
+			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
 		},
 		{
 			name:                "tar header write error",
@@ -1156,7 +1156,7 @@ func TestBackupItem(t *testing.T) {
 			item:                  `{"metadata":{"name":"bar"}}`,
 			expectError:           false,
 			expectExcluded:        false,
-			expectedTarHeaderName: "cluster/resource.group/bar.json",
+			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
 			customAction:          true,
 			expectedActionID:      "bar",
 		},
@@ -1166,7 +1166,7 @@ func TestBackupItem(t *testing.T) {
 			item:                  `{"metadata":{"namespace": "myns", "name":"bar"}}`,
 			expectError:           false,
 			expectExcluded:        false,
-			expectedTarHeaderName: "namespaces/myns/resource.group/bar.json",
+			expectedTarHeaderName: "resources/resource.group/namespaces/myns/bar.json",
 			customAction:          true,
 			expectedActionID:      "myns/bar",
 		},

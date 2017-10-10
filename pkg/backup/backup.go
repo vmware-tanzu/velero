@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -473,9 +474,9 @@ func (ib *realItemBackupper) backupItem(ctx *backupContext, item map[string]inte
 
 	var filePath string
 	if namespace != "" {
-		filePath = strings.Join([]string{api.NamespaceScopedDir, namespace, groupResource.String(), name + ".json"}, "/")
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
 	} else {
-		filePath = strings.Join([]string{api.ClusterScopedDir, groupResource.String(), name + ".json"}, "/")
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
 	}
 
 	itemBytes, err := json.Marshal(item)

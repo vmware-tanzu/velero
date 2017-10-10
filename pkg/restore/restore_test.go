@@ -116,62 +116,58 @@ func TestPrioritizeResources(t *testing.T) {
 	}
 }
 
-func TestRestoreMethod(t *testing.T) {
+func TestRestoreNamespaceFiltering(t *testing.T) {
 	tests := []struct {
-		name             string
-		fileSystem       *fakeFileSystem
-		baseDir          string
-		restore          *api.Restore
-		expectedReadDirs []string
+		name                 string
+		fileSystem           *fakeFileSystem
+		baseDir              string
+		restore              *api.Restore
+		expectedReadDirs     []string
+		prioritizedResources []schema.GroupResource
 	}{
 		{
-			name:             "cluster comes before namespaced",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces"},
-		},
-		{
-			name:             "namespaces dir is not read & does not error if it does not exist",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{}},
-			expectedReadDirs: []string{"bak/cluster"},
-		},
-		{
 			name:             "namespacesToRestore having * restores all namespaces",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
+			prioritizedResources: []schema.GroupResource{
+				schema.GroupResource{Resource: "nodes"},
+				schema.GroupResource{Resource: "secrets"},
+			},
 		},
 		{
 			name:             "namespacesToRestore properly filters",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
-		},
-		{
-			name:             "namespacesToRestore properly filters with inclusion filter",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
+			prioritizedResources: []schema.GroupResource{
+				schema.GroupResource{Resource: "nodes"},
+				schema.GroupResource{Resource: "secrets"},
+			},
 		},
 		{
 			name:             "namespacesToRestore properly filters with exclusion filter",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/b", "bak/namespaces/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
+			prioritizedResources: []schema.GroupResource{
+				schema.GroupResource{Resource: "nodes"},
+				schema.GroupResource{Resource: "secrets"},
+			},
 		},
 		{
 			name:             "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/cluster", "bak/namespaces/a", "bak/namespaces/b", "bak/namespaces/c"),
+			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"a", "b", "c"}, ExcludedNamespaces: []string{"b"}}},
-			expectedReadDirs: []string{"bak/cluster", "bak/namespaces", "bak/namespaces/a", "bak/namespaces/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/c"},
+			prioritizedResources: []schema.GroupResource{
+				schema.GroupResource{Resource: "nodes"},
+				schema.GroupResource{Resource: "secrets"},
+			},
 		},
 	}
 
@@ -180,10 +176,11 @@ func TestRestoreMethod(t *testing.T) {
 			log, _ := testlogger.NewNullLogger()
 
 			ctx := &context{
-				restore:         test.restore,
-				namespaceClient: &fakeNamespaceClient{},
-				fileSystem:      test.fileSystem,
-				logger:          log,
+				restore:              test.restore,
+				namespaceClient:      &fakeNamespaceClient{},
+				fileSystem:           test.fileSystem,
+				logger:               log,
+				prioritizedResources: test.prioritizedResources,
 			}
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
@@ -199,62 +196,59 @@ func TestRestoreMethod(t *testing.T) {
 	}
 }
 
-func TestRestoreNamespace(t *testing.T) {
+func TestRestorePriority(t *testing.T) {
 	tests := []struct {
 		name                 string
 		fileSystem           *fakeFileSystem
 		restore              *api.Restore
-		namespace            string
-		path                 string
+		baseDir              string
 		prioritizedResources []schema.GroupResource
 		expectedErrors       api.RestoreResult
 		expectedReadDirs     []string
 	}{
 		{
 			name:       "cluster test",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/cluster/a").WithDirectory("bak/cluster/c"),
-			namespace:  "",
-			path:       "bak/cluster",
+			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			baseDir:    "bak",
+			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			prioritizedResources: []schema.GroupResource{
 				schema.GroupResource{Resource: "a"},
 				schema.GroupResource{Resource: "b"},
 				schema.GroupResource{Resource: "c"},
 			},
-			expectedReadDirs: []string{"bak/cluster", "bak/cluster/a", "bak/cluster/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/a/cluster", "bak/resources/c/cluster"},
 		},
 		{
 			name:       "resource priorities are applied",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/cluster/a").WithDirectory("bak/cluster/c"),
-			namespace:  "",
-			path:       "bak/cluster",
+			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
+			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
 				schema.GroupResource{Resource: "c"},
 				schema.GroupResource{Resource: "b"},
 				schema.GroupResource{Resource: "a"},
 			},
-			expectedReadDirs: []string{"bak/cluster", "bak/cluster/c", "bak/cluster/a"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/c/cluster", "bak/resources/a/cluster"},
 		},
 		{
 			name:       "basic namespace",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/namespaces/ns-1/a").WithDirectory("bak/namespaces/ns-1/c"),
-			restore:    &api.Restore{Spec: api.RestoreSpec{NamespaceMapping: make(map[string]string)}},
-			namespace:  "ns-1",
-			path:       "bak/namespaces/ns-1",
+			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
+			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
+			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
 				schema.GroupResource{Resource: "a"},
 				schema.GroupResource{Resource: "b"},
 				schema.GroupResource{Resource: "c"},
 			},
-			expectedReadDirs: []string{"bak/namespaces/ns-1", "bak/namespaces/ns-1/a", "bak/namespaces/ns-1/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
 		},
 		{
 			name: "error in a single resource doesn't terminate restore immediately, but is returned",
 			fileSystem: newFakeFileSystem().
-				WithFile("bak/namespaces/ns-1/a/invalid-json.json", []byte("invalid json")).
-				WithDirectory("bak/namespaces/ns-1/c"),
-			restore:   &api.Restore{Spec: api.RestoreSpec{NamespaceMapping: make(map[string]string)}},
-			namespace: "ns-1",
-			path:      "bak/namespaces/ns-1",
+				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
+				WithDirectory("bak/resources/c/namespaces/ns-1"),
+			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
+			baseDir: "bak",
 			prioritizedResources: []schema.GroupResource{
 				schema.GroupResource{Resource: "a"},
 				schema.GroupResource{Resource: "b"},
@@ -262,10 +256,10 @@ func TestRestoreNamespace(t *testing.T) {
 			},
 			expectedErrors: api.RestoreResult{
 				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"bak/namespaces/ns-1/a/invalid-json.json\": invalid character 'i' looking for beginning of value"},
+					"ns-1": {"error decoding \"bak/resources/a/namespaces/ns-1/invalid-json.json\": invalid character 'i' looking for beginning of value"},
 				},
 			},
-			expectedReadDirs: []string{"bak/namespaces/ns-1", "bak/namespaces/ns-1/a", "bak/namespaces/ns-1/c"},
+			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
 		},
 	}
 
@@ -281,7 +275,7 @@ func TestRestoreNamespace(t *testing.T) {
 				logger:               log,
 			}
 
-			warnings, errors := ctx.restoreNamespace(test.namespace, test.path)
+			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)
@@ -431,7 +425,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				logger: log,
 			}
 
-			warnings, errors := ctx.restoreResourceForNamespace(test.namespace, test.resourcePath)
+			warnings, errors := ctx.restoreResource("configmaps", test.namespace, test.resourcePath)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)
