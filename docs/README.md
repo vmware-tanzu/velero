@@ -6,6 +6,7 @@
 * [Build from scratch][0]
 * [Cloud provider specifics][9]
 * [Debugging restores][4]
+* [FAQ][10]
 
 ## Reference
 * [CLI reference][2]
@@ -27,3 +28,4 @@
 [7]: use-cases.md#disaster-recovery
 [8]: use-cases.md#cluster-migration
 [9]: cloud-provider-specifics.md
+[10]: faq.md
