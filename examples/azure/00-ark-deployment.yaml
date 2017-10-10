@@ -34,9 +34,6 @@ spec:
             - /ark
           args:
             - server
-            - --logtostderr
-            - --v
-            - "4"
           envFrom:
             - secretRef:
                 name: cloud-credentials

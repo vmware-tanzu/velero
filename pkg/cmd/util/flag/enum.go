@@ -31,12 +31,12 @@ type Enum struct {
 }
 
 // NewEnum returns a new enum flag with the specified list
-// of allowed values. The first value specified is used
-// as the default.
-func NewEnum(allowedValues ...string) Enum {
-	return Enum{
+// of allowed values, and the specified default value if
+// none is set.
+func NewEnum(defaultValue string, allowedValues ...string) *Enum {
+	return &Enum{
 		allowedValues: sets.NewString(allowedValues...),
-		value:         allowedValues[0],
+		value:         defaultValue,
 	}
 }
 
@@ -61,5 +61,8 @@ func (e *Enum) Set(s string) error {
 // Type returns a string representation of the
 // Enum type.
 func (e *Enum) Type() string {
-	return "enum"
+	// we don't want the help text to display anything regarding
+	// the type because the usage text for the flag should capture
+	// the possible options.
+	return ""
 }

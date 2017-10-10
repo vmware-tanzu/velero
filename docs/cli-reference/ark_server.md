@@ -14,7 +14,8 @@ ark server [flags]
 ### Options
 
 ```
-  -h, --help   help for server
+  -h, --help        help for server
+      --log-level   the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
 ```
 
 ### Options inherited from parent commands
