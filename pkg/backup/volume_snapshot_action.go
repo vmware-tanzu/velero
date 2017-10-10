@@ -29,6 +29,10 @@ import (
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
+// zoneLabel is the label that stores availability-zone info
+// on PVs
+const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
+
 // volumeSnapshotAction is a struct that knows how to take snapshots of PersistentVolumes
 // that are backed by compatible cloud volumes.
 type volumeSnapshotAction struct {
@@ -61,16 +65,16 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 
 	metadata := volume["metadata"].(map[string]interface{})
 	name := metadata["name"].(string)
-	var pvfailureDomainZone string
-	labelsMap, err := collections.GetMap(metadata, "labels")
-	if err == nil {
-		if labelsMap["failure-domain.beta.kubernetes.io/zone"] != nil {
-			pvfailureDomainZone = labelsMap["failure-domain.beta.kubernetes.io/zone"].(string)
-		} else {
-			ctx.log("error getting 'failure-domain.beta.kubernetes.io/zone' label on PersistentVolume %q for backup %q.\n", name, backupName)
-		}
+	var pvFailureDomainZone string
+
+	if labelsMap, err := collections.GetMap(metadata, "labels"); err != nil {
+		ctx.log("error getting labels on PersistentVolume %q for backup %q: %v", name, backupName, err)
 	} else {
-		ctx.log("error getting labels on PersistentVolume %q for backup %q. ", name, backupName)
+		if labelsMap[zoneLabel] != nil {
+			pvFailureDomainZone = labelsMap[zoneLabel].(string)
+		} else {
+			ctx.log("label %q is not present on PersistentVolume %q for backup %q.", zoneLabel, name, backupName)
+		}
 	}
 
 	volumeID, err := kubeutil.GetVolumeID(volume)
@@ -88,13 +92,13 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 
 	ctx.log("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
 
-	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvfailureDomainZone)
+	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
 	if err != nil {
 		ctx.log("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
 	}
 
-	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID, pvfailureDomainZone)
+	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID, pvFailureDomainZone)
 	if err != nil {
 		ctx.log("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
 		return err
@@ -108,7 +112,7 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 		SnapshotID:       snapshotID,
 		Type:             volumeType,
 		Iops:             iops,
-		AvailabilityZone: pvfailureDomainZone,
+		AvailabilityZone: pvFailureDomainZone,
 	}
 
 	return nil
