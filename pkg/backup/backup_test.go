@@ -609,6 +609,114 @@ func TestBackupResource(t *testing.T) {
 			expectedNetworkPoliciesBackedUp: true,
 		},
 		{
+			name: "should include deployments.extensions if we haven't seen deployments.apps",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "extensions",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "extensions/v1beta1",
+			resourceName:              "deployments",
+			resourceNamespaced:        true,
+			deploymentsBackedUp:       false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "extensions/v1beta1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:    []string{""},
+			expectedDeploymentsBackedUp: true,
+		},
+		{
+			name: "should include deployments.apps if we haven't seen deployments.extensions",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "apps",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "apps/v1beta1",
+			resourceName:              "deployments",
+			resourceNamespaced:        true,
+			deploymentsBackedUp:       false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "apps/v1beta1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:    []string{""},
+			expectedDeploymentsBackedUp: true,
+		},
+		{
+			name: "should include networkpolicies.extensions if we haven't seen networkpolicies.networking.k8s.io",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "extensions",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "extensions/v1beta1",
+			resourceName:              "networkpolicies",
+			resourceNamespaced:        true,
+			networkPoliciesBackedUp:   false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "extensions/v1beta1",
+			"kind": "NetworkPolicyList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:        []string{""},
+			expectedNetworkPoliciesBackedUp: true,
+		},
+		{
+			name: "should include networkpolicies.networking.k8s.io if we haven't seen networkpolicies.extensions",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "networking.k8s.io",
+			resourceVersion:           "v1",
+			resourceGV:                "networking.k8s.io/v1",
+			resourceName:              "networkpolicies",
+			resourceNamespaced:        true,
+			networkPoliciesBackedUp:   false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind": "NetworkPolicyList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:        []string{""},
+			expectedNetworkPoliciesBackedUp: true,
+		},
+		{
 			name: "list per namespace when not including *",
 			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 			resourceGroup:             "apps",
