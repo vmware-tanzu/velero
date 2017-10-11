@@ -73,6 +73,12 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 	return ie.includes.Has("*") || ie.includes.Has(s)
 }
 
+// IncludeEverything returns true if the Includes list is '*'
+// and the Excludes list is empty, or false otherwise.
+func (ie *IncludesExcludes) IncludeEverything() bool {
+	return ie.excludes.Len() == 0 && ie.includes.Len() == 1 && ie.includes.Has("*")
+}
+
 // ValidateIncludesExcludes checks provided lists of included and excluded
 // items to ensure they are a valid set of IncludesExcludes data.
 func ValidateIncludesExcludes(includesList, excludesList []string) []error {
@@ -109,7 +115,7 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 // GenerateIncludesExcludes constructs an IncludesExcludes struct by taking the provided
 // include/exclude slices, applying the specified mapping function to each item in them,
 // and adding the output of the function to the new struct. If the mapping function returns
-// an error for an item, it is omitted from the result.
+// an empty string for an item, it is omitted from the result.
 func GenerateIncludesExcludes(includes, excludes []string, mapFunc func(string) string) *IncludesExcludes {
 	res := NewIncludesExcludes()
 

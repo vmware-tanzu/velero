@@ -14,19 +14,20 @@ ark schedule create NAME [flags]
 ### Options
 
 ```
-      --exclude-namespaces stringArray         namespaces to exclude from the backup
-      --exclude-resources stringArray          resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io
-  -h, --help                                   help for create
-      --include-namespaces stringArray         namespaces to include in the backup (use '*' for all namespaces) (default *)
-      --include-resources stringArray          resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)
-      --label-columns stringArray              a comma-separated list of labels to be displayed as columns
-      --labels mapStringString                 labels to apply to the backup
-  -o, --output string                          Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
-      --schedule string                        a cron expression specifying a recurring schedule for this backup to run
-  -l, --selector labelSelector                 only back up resources matching this label selector (default <none>)
-      --show-labels                            show labels in the last column
-      --snapshot-volumes optionalBool[=true]   take snapshots of PersistentVolumes as part of the backup
-      --ttl duration                           how long before the backup can be garbage collected (default 24h0m0s)
+      --exclude-namespaces stringArray                  namespaces to exclude from the backup
+      --exclude-resources stringArray                   resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io
+  -h, --help                                            help for create
+      --include-cluster-resources optionalBool[=true]   include cluster-scoped resources in the backup
+      --include-namespaces stringArray                  namespaces to include in the backup (use '*' for all namespaces) (default *)
+      --include-resources stringArray                   resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)
+      --label-columns stringArray                       a comma-separated list of labels to be displayed as columns
+      --labels mapStringString                          labels to apply to the backup
+  -o, --output string                                   Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
+      --schedule string                                 a cron expression specifying a recurring schedule for this backup to run
+  -l, --selector labelSelector                          only back up resources matching this label selector (default <none>)
+      --show-labels                                     show labels in the last column
+      --snapshot-volumes optionalBool[=true]            take snapshots of PersistentVolumes as part of the backup
+      --ttl duration                                    how long before the backup can be garbage collected (default 24h0m0s)
 ```
 
 ### Options inherited from parent commands

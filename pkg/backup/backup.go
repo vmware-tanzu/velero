@@ -289,6 +289,26 @@ func (kb *kubernetesBackupper) backupResource(
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
 	grString := gr.String()
 
+	switch {
+	case ctx.backup.Spec.IncludeClusterResources == nil:
+		// when IncludeClusterResources == nil (auto), only directly
+		// back up cluster-scoped resources if we're doing a full-cluster
+		// (all namespaces) backup. Note that in the case of a subset of
+		// namespaces being backed up, some related cluster-scoped resources
+		// may still be backed up if triggered by a custom action (e.g. PVC->PV).
+		if !resource.Namespaced && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+			ctx.infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the backup", grString)
+			return nil
+		}
+	case *ctx.backup.Spec.IncludeClusterResources == false:
+		if !resource.Namespaced {
+			ctx.infof("Skipping resource %s because it's cluster-scoped", grString)
+			return nil
+		}
+	case *ctx.backup.Spec.IncludeClusterResources == true:
+		// include the resource, no action required
+	}
+
 	if !ctx.resourceIncludesExcludes.ShouldInclude(grString) {
 		ctx.infof("Resource %s is excluded", grString)
 		return nil
@@ -411,11 +431,14 @@ func (ib *realItemBackupper) backupItem(ctx *backupContext, item map[string]inte
 
 	namespace, err := collections.GetString(item, "metadata.namespace")
 	// a non-nil error is assumed to be due to a cluster-scoped item
-	if err == nil {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
-			ctx.infof("Excluding item %s because namespace %s is excluded", name, namespace)
-			return nil
-		}
+	if err == nil && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+		ctx.infof("Excluding item %s because namespace %s is excluded", name, namespace)
+		return nil
+	}
+
+	if namespace == "" && ctx.backup.Spec.IncludeClusterResources != nil && *ctx.backup.Spec.IncludeClusterResources == false {
+		ctx.infof("Excluding item %s because resource %s is cluster-scoped and IncludeClusterResources is false", name, groupResource.String())
+		return nil
 	}
 
 	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
