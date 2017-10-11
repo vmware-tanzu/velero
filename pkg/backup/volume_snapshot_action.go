@@ -17,8 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -56,8 +54,12 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Act
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]interface{}, backup *api.Backup) error {
-	backupName := fmt.Sprintf("%s/%s", backup.Namespace, backup.Name)
+func (a *volumeSnapshotAction) Execute(ctx *backupContext, volume map[string]interface{}, backupper itemBackupper) error {
+	var (
+		backup     = ctx.backup
+		backupName = kubeutil.NamespaceAndName(backup)
+	)
+
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
 		ctx.infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
 		return nil
@@ -88,10 +90,7 @@ func (a *volumeSnapshotAction) Execute(ctx ActionContext, volume map[string]inte
 		return nil
 	}
 
-	expiration := a.clock.Now().Add(backup.Spec.TTL.Duration)
-
-	ctx.infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q, expiration %v", backupName, name, volumeID, expiration)
-
+	ctx.infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q", backupName, name, volumeID)
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
 	if err != nil {
 		ctx.infof("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)

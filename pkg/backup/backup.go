@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"time"
@@ -69,7 +70,17 @@ func (ac ActionContext) infof(msg string, args ...interface{}) {
 type Action interface {
 	// Execute is invoked on an item being backed up. If an error is returned, the Backup is marked as
 	// failed.
-	Execute(ctx ActionContext, item map[string]interface{}, backup *api.Backup) error
+	Execute(ctx *backupContext, item map[string]interface{}, backupper itemBackupper) error
+}
+
+type itemKey struct {
+	resource  string
+	namespace string
+	name      string
+}
+
+func (i *itemKey) String() string {
+	return fmt.Sprintf("resource=%s,namespace=%s,name=%s", i.resource, i.namespace, i.name)
 }
 
 // NewKubernetesBackupper creates a new kubernetesBackupper.
@@ -97,33 +108,39 @@ func resolveActions(helper discovery.Helper, actions map[string]Action) (map[sch
 	ret := make(map[schema.GroupResource]Action)
 
 	for resource, action := range actions {
-		gr, err := helper.ResolveGroupResource(resource)
+		gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}
-		ret[gr] = action
+		ret[gvr.GroupResource()] = action
 	}
 
 	return ret, nil
 }
 
-// getResourceIncludesExcludes takes the lists of resources to include and exclude from the
-// backup, uses the discovery helper to resolve them to fully-qualified group-resource names, and returns
-// an IncludesExcludes list.
+// getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
+// discovery helper to resolve them to fully-qualified group-resource names, and returns an
+// IncludesExcludes list.
 func (ctx *backupContext) getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *collections.IncludesExcludes {
-	return collections.GenerateIncludesExcludes(
+	resources := collections.GenerateIncludesExcludes(
 		includes,
 		excludes,
 		func(item string) string {
-			gr, err := helper.ResolveGroupResource(item)
+			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
 			if err != nil {
 				ctx.infof("Unable to resolve resource %q: %v", item, err)
 				return ""
 			}
 
+			gr := gvr.GroupResource()
 			return gr.String()
 		},
 	)
+
+	ctx.infof("Including resources: %v", strings.Join(resources.GetIncludes(), ", "))
+	ctx.infof("Excluding resources: %v", strings.Join(resources.GetExcludes(), ", "))
+
+	return resources
 }
 
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
@@ -146,6 +163,15 @@ type backupContext struct {
 	// resource, from either the networking.k8s.io or extensions api groups. We only want to back them
 	// up once, from whichever api group we see first.
 	networkPoliciesBackedUp bool
+
+	actions map[schema.GroupResource]Action
+
+	// backedUpItems keeps track of items that have been backed up already.
+	backedUpItems map[itemKey]struct{}
+
+	dynamicFactory client.DynamicFactory
+
+	discoveryHelper discovery.Helper
 }
 
 func (ctx *backupContext) infof(msg string, args ...interface{}) {
@@ -174,6 +200,10 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		w:      tw,
 		logger: log,
 		namespaceIncludesExcludes: getNamespaceIncludesExcludes(backup),
+		backedUpItems:             make(map[itemKey]struct{}),
+		actions:                   kb.actions,
+		dynamicFactory:            kb.dynamicFactory,
+		discoveryHelper:           kb.discoveryHelper,
 	}
 
 	ctx.infof("Starting backup")
@@ -205,13 +235,32 @@ type tarWriter interface {
 
 // backupGroup backs up a single API group.
 func (kb *kubernetesBackupper) backupGroup(ctx *backupContext, group *metav1.APIResourceList) error {
-	var errs []error
+	var (
+		errs []error
+		pv   *metav1.APIResource
+	)
 
-	for _, resource := range group.APIResources {
+	processResource := func(resource metav1.APIResource) {
 		ctx.infof("Processing resource %s/%s", group.GroupVersion, resource.Name)
 		if err := kb.backupResource(ctx, group, resource); err != nil {
 			errs = append(errs, err)
 		}
+	}
+
+	for _, resource := range group.APIResources {
+		// do PVs last because if we're also backing up PVCs, we want to backup
+		// PVs within the scope of the PVCs (within the PVC action) to allow
+		// for hooks to run
+		if strings.ToLower(resource.Name) == "persistentvolumes" && strings.ToLower(group.GroupVersion) == "v1" {
+			pvResource := resource
+			pv = &pvResource
+			continue
+		}
+		processResource(resource)
+	}
+
+	if pv != nil {
+		processResource(*pv)
 	}
 
 	return kuberrs.NewAggregate(errs)
@@ -245,34 +294,37 @@ func (kb *kubernetesBackupper) backupResource(
 		return nil
 	}
 
-	if grString == appsDeploymentsResource || grString == extensionsDeploymentsResource {
-		if ctx.deploymentsBackedUp {
-			var other string
-			if grString == appsDeploymentsResource {
-				other = extensionsDeploymentsResource
-			} else {
-				other = appsDeploymentsResource
-			}
-			ctx.infof("Skipping resource %q because it's a duplicate of %q", grString, other)
-			return nil
+	shouldBackup := func(gr, gr1, gr2 string, backedUp *bool) bool {
+		// if it's neither of the specified dupe group-resources, back it up
+		if gr != gr1 && gr != gr2 {
+			return true
 		}
 
-		ctx.deploymentsBackedUp = true
+		// if it hasn't been backed up yet, back it up
+		if !*backedUp {
+			*backedUp = true
+			return true
+		}
+
+		// else, don't back it up, and log why
+		var other string
+		switch gr {
+		case gr1:
+			other = gr2
+		case gr2:
+			other = gr1
+		}
+
+		ctx.infof("Skipping resource %q because it's a duplicate of %q", gr, other)
+		return false
 	}
 
-	if grString == networkingNetworkPoliciesResource || grString == extensionsNetworkPoliciesResource {
-		if ctx.networkPoliciesBackedUp {
-			var other string
-			if grString == networkingNetworkPoliciesResource {
-				other = extensionsNetworkPoliciesResource
-			} else {
-				other = networkingNetworkPoliciesResource
-			}
-			ctx.infof("Skipping resource %q because it's a duplicate of %q", grString, other)
-			return nil
-		}
+	if !shouldBackup(grString, appsDeploymentsResource, extensionsDeploymentsResource, &ctx.deploymentsBackedUp) {
+		return nil
+	}
 
-		ctx.networkPoliciesBackedUp = true
+	if !shouldBackup(grString, networkingNetworkPoliciesResource, extensionsNetworkPoliciesResource, &ctx.networkPoliciesBackedUp) {
+		return nil
 	}
 
 	var namespacesToList []string
@@ -302,8 +354,6 @@ func (kb *kubernetesBackupper) backupResource(
 			return errors.WithStack(err)
 		}
 
-		action := kb.actions[gr]
-
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
@@ -313,7 +363,7 @@ func (kb *kubernetesBackupper) backupResource(
 
 			obj := unstructured.UnstructuredContent()
 
-			if err := kb.itemBackupper.backupItem(ctx, obj, grString, action); err != nil {
+			if err := kb.itemBackupper.backupItem(ctx, obj, gr); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -346,28 +396,21 @@ func getNamespacesToList(ie *collections.IncludesExcludes) []string {
 }
 
 type itemBackupper interface {
-	backupItem(ctx *backupContext, item map[string]interface{}, groupResource string, action Action) error
+	backupItem(ctx *backupContext, item map[string]interface{}, groupResource schema.GroupResource) error
 }
 
 type realItemBackupper struct{}
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
-func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interface{}, groupResource string, action Action) error {
-	// Never save status
-	delete(item, "status")
-
-	metadata, err := collections.GetMap(item, "metadata")
+func (ib *realItemBackupper) backupItem(ctx *backupContext, item map[string]interface{}, groupResource schema.GroupResource) error {
+	name, err := collections.GetString(item, "metadata.name")
 	if err != nil {
 		return err
 	}
 
-	name, err := collections.GetString(metadata, "name")
-	if err != nil {
-		return err
-	}
-
-	namespace, err := collections.GetString(metadata, "namespace")
+	namespace, err := collections.GetString(item, "metadata.namespace")
+	// a non-nil error is assumed to be due to a cluster-scoped item
 	if err == nil {
 		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
 			ctx.infof("Excluding item %s because namespace %s is excluded", name, namespace)
@@ -375,22 +418,41 @@ func (*realItemBackupper) backupItem(ctx *backupContext, item map[string]interfa
 		}
 	}
 
-	if action != nil {
-		ctx.infof("Executing action on %s, ns=%s, name=%s", groupResource, namespace, name)
+	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+		ctx.infof("Excluding item %s because resource %s is excluded", name, groupResource.String())
+		return nil
+	}
 
-		actionCtx := ActionContext{logger: ctx.logger}
-		if err := action.Execute(actionCtx, item, ctx.backup); err != nil {
+	key := itemKey{
+		resource:  groupResource.String(),
+		namespace: namespace,
+		name:      name,
+	}
+
+	if _, exists := ctx.backedUpItems[key]; exists {
+		ctx.infof("Skipping item %s because it's already been backed up.", name)
+		return nil
+	}
+	ctx.backedUpItems[key] = struct{}{}
+
+	// Never save status
+	delete(item, "status")
+
+	if action, hasAction := ctx.actions[groupResource]; hasAction {
+		ctx.infof("Executing action on %s, ns=%s, name=%s", groupResource.String(), namespace, name)
+
+		if err := action.Execute(ctx, item, ib); err != nil {
 			return err
 		}
 	}
 
-	ctx.infof("Backing up resource=%s, ns=%s, name=%s", groupResource, namespace, name)
+	ctx.infof("Backing up resource=%s, ns=%s, name=%s", groupResource.String(), namespace, name)
 
 	var filePath string
 	if namespace != "" {
-		filePath = strings.Join([]string{api.NamespaceScopedDir, namespace, groupResource, name + ".json"}, "/")
+		filePath = strings.Join([]string{api.NamespaceScopedDir, namespace, groupResource.String(), name + ".json"}, "/")
 	} else {
-		filePath = strings.Join([]string{api.ClusterScopedDir, groupResource, name + ".json"}, "/")
+		filePath = strings.Join([]string{api.ClusterScopedDir, groupResource.String(), name + ".json"}, "/")
 	}
 
 	itemBytes, err := json.Marshal(item)

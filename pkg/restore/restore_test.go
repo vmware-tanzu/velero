@@ -85,15 +85,18 @@ func TestPrioritizeResources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			helper := &FakeDiscoveryHelper{RESTMapper: &FakeMapper{AutoReturnResource: true}}
+			var helperResourceList []*metav1.APIResourceList
 
 			for gv, resources := range test.apiResources {
 				resourceList := &metav1.APIResourceList{GroupVersion: gv}
 				for _, resource := range resources {
 					resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: resource})
 				}
-				helper.ResourceList = append(helper.ResourceList, resourceList)
+				helperResourceList = append(helperResourceList, resourceList)
 			}
+
+			helper := NewFakeDiscoveryHelper(true, nil)
+			helper.ResourceList = helperResourceList
 
 			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
 

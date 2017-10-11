@@ -200,8 +200,14 @@ func TestVolumeSnapshotAction(t *testing.T) {
 
 			log, _ := testlogger.NewNullLogger()
 
-			actionCtx := ActionContext{logger: log}
-			err = action.Execute(actionCtx, pv, backup)
+			ctx := &backupContext{
+				backup: backup,
+				logger: log,
+			}
+
+			// method under test
+			err = action.Execute(ctx, pv, nil)
+
 			gotErr := err != nil
 
 			if e, a := test.expectError, gotErr; e != a {

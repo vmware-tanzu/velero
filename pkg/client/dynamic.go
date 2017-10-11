@@ -80,6 +80,8 @@ type Dynamic interface {
 	List(metav1.ListOptions) (runtime.Object, error)
 	// Watch watches for changes to objects of a given resource.
 	Watch(metav1.ListOptions) (watch.Interface, error)
+	// Get fetches an object by name.
+	Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error)
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -99,4 +101,8 @@ func (d *dynamicResourceClient) List(options metav1.ListOptions) (runtime.Object
 
 func (d *dynamicResourceClient) Watch(options metav1.ListOptions) (watch.Interface, error) {
 	return d.resourceClient.Watch(options)
+}
+
+func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
+	return d.resourceClient.Get(name, opts)
 }

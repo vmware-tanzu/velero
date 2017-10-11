@@ -53,7 +53,7 @@ type fakeAction struct {
 
 var _ Action = &fakeAction{}
 
-func (a *fakeAction) Execute(ctx ActionContext, item map[string]interface{}, backup *v1.Backup) error {
+func (a *fakeAction) Execute(ctx *backupContext, item map[string]interface{}, backupper itemBackupper) error {
 	metadata, err := collections.GetMap(item, "metadata")
 	if err != nil {
 		return err
@@ -70,7 +70,7 @@ func (a *fakeAction) Execute(ctx ActionContext, item map[string]interface{}, bac
 	}
 
 	a.ids = append(a.ids, id)
-	a.backups = append(a.backups, backup)
+	a.backups = append(a.backups, ctx.backup)
 
 	return nil
 }
@@ -106,18 +106,15 @@ func TestResolveActions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dh := &FakeDiscoveryHelper{
-				RESTMapper: &FakeMapper{
-					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-						schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-						schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-						schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-						schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
-					},
-				},
+			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
+				schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
+				schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
+				schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
+				schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
 			}
+			discoveryHelper := NewFakeDiscoveryHelper(false, resources)
 
-			actual, err := resolveActions(dh, test.input)
+			actual, err := resolveActions(discoveryHelper, test.input)
 			gotError := err != nil
 
 			if e, a := test.expectError, gotError; e != a {
@@ -180,24 +177,20 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dh := &FakeDiscoveryHelper{
-				RESTMapper: &FakeMapper{
-					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-						schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-						schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-						schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-						schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
-					},
-				},
+			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
+				schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
+				schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
+				schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
+				schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
 			}
+			discoveryHelper := NewFakeDiscoveryHelper(false, resources)
 
 			log, _ := testlogger.NewNullLogger()
 
 			ctx := &backupContext{
 				logger: log,
 			}
-
-			actual := ctx.getResourceIncludesExcludes(dh, test.includes, test.excludes)
+			actual := ctx.getResourceIncludesExcludes(discoveryHelper, test.includes, test.excludes)
 
 			sort.Strings(test.expectedIncludes)
 			actualIncludes := actual.GetIncludes()
@@ -294,7 +287,7 @@ func TestBackupMethod(t *testing.T) {
 	}
 
 	discoveryHelper := &FakeDiscoveryHelper{
-		RESTMapper: &FakeMapper{
+		Mapper: &FakeMapper{
 			Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
 				schema.GroupVersionResource{Resource: "cm"}:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
 				schema.GroupVersionResource{Resource: "csr"}:   schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
@@ -636,29 +629,29 @@ func TestBackupResource(t *testing.T) {
 			expectedListedNamespaces:  []string{"a", "b"},
 			lists: []string{
 				`{
-	"apiVersion": "apps/v1beta1",
-	"kind": "DeploymentList",
-	"items": [
-		{
-			"metadata": {
-				"namespace": "a",
-				"name": "1"
-			}
-		}
-	]
-}`,
+			"apiVersion": "apps/v1beta1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
 				`{
-	"apiVersion": "apps/v1beta1v1",
-	"kind": "DeploymentList",
-	"items": [
-		{
-			"metadata": {
-				"namespace": "b",
-				"name": "2"
-			}
-		}
-	]
-}`,
+			"apiVersion": "apps/v1beta1v1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "b",
+						"name": "2"
+					}
+				}
+			]
+		}`,
 			},
 			expectedDeploymentsBackedUp: true,
 		},
@@ -674,17 +667,17 @@ func TestBackupResource(t *testing.T) {
 			expectedListedNamespaces:  []string{""},
 			lists: []string{
 				`{
-	"apiVersion": "networking.k8s.io/v1",
-	"kind": "NetworkPolicyList",
-	"items": [
-		{
-			"metadata": {
-				"namespace": "a",
-				"name": "1"
-			}
-		}
-	]
-}`,
+			"apiVersion": "networking.k8s.io/v1",
+			"kind": "NetworkPolicyList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
 			},
 			expectedNetworkPoliciesBackedUp: true,
 		},
@@ -701,19 +694,19 @@ func TestBackupResource(t *testing.T) {
 			labelSelector:             "a=b",
 			lists: []string{
 				`{
-	"apiVersion": "certifiaces.k8s.io/v1beta1",
-	"kind": "CertificateSigningRequestList",
-	"items": [
-		{
-			"metadata": {
-				"name": "1",
-				"labels": {
-					"a": "b"
+			"apiVersion": "certifiaces.k8s.io/v1beta1",
+			"kind": "CertificateSigningRequestList",
+			"items": [
+				{
+					"metadata": {
+						"name": "1",
+						"labels": {
+							"a": "b"
+						}
+					}
 				}
-			}
-		}
-	]
-}`,
+			]
+		}`,
 			},
 		},
 		{
@@ -729,7 +722,7 @@ func TestBackupResource(t *testing.T) {
 			labelSelector:             "a=b",
 			lists: []string{
 				`{
-	"apiVersion": "certifiaces.k8s.io/v1beta1",
+	"apiVersion": "certificates.k8s.io/v1beta1",
 	"kind": "CertificateSigningRequestList",
 	"items": [
 		{
@@ -803,7 +796,7 @@ func TestBackupResource(t *testing.T) {
 				require.NoError(t, err)
 				for i := range list {
 					item := list[i].(*unstructured.Unstructured)
-					itemBackupper.On("backupItem", ctx, item.Object, gr.String(), action).Return(nil)
+					itemBackupper.On("backupItem", ctx, item.Object, gr).Return(nil)
 					if action != nil {
 						a, err := meta.Accessor(item)
 						require.NoError(t, err)
@@ -822,14 +815,11 @@ func TestBackupResource(t *testing.T) {
 				}
 			}
 
-			discoveryHelper := &FakeDiscoveryHelper{
-				RESTMapper: &FakeMapper{
-					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-						schema.GroupVersionResource{Resource: "certificatesigningrequests"}: schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
-						schema.GroupVersionResource{Resource: "other"}:                      schema.GroupVersionResource{Group: "somegroup", Version: "someversion", Resource: "otherthings"},
-					},
-				},
+			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
+				schema.GroupVersionResource{Resource: "certificatesigningrequests"}: schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
+				schema.GroupVersionResource{Resource: "other"}:                      schema.GroupVersionResource{Group: "somegroup", Version: "someversion", Resource: "otherthings"},
 			}
+			discoveryHelper := NewFakeDiscoveryHelper(false, resources)
 
 			kb, err := NewKubernetesBackupper(discoveryHelper, dynamicFactory, test.actions)
 			require.NoError(t, err)
@@ -849,8 +839,8 @@ type fakeItemBackupper struct {
 	mock.Mock
 }
 
-func (f *fakeItemBackupper) backupItem(ctx *backupContext, obj map[string]interface{}, groupResource string, action Action) error {
-	args := f.Called(ctx, obj, groupResource, action)
+func (f *fakeItemBackupper) backupItem(ctx *backupContext, obj map[string]interface{}, groupResource schema.GroupResource) error {
+	args := f.Called(ctx, obj, groupResource)
 	return args.Error(0)
 }
 
@@ -989,26 +979,31 @@ func TestBackupItem(t *testing.T) {
 			}
 
 			var (
-				actionParam Action
-				action      *fakeAction
-				backup      *v1.Backup
+				action        *fakeAction
+				backup        = &v1.Backup{}
+				groupResource = schema.ParseGroupResource("resource.group")
+				log, _        = testlogger.NewNullLogger()
 			)
-			if test.customAction {
-				action = &fakeAction{}
-				actionParam = action
-				backup = &v1.Backup{}
-			}
-
-			log, _ := testlogger.NewNullLogger()
 
 			ctx := &backupContext{
 				backup: backup,
 				namespaceIncludesExcludes: namespaces,
-				w:      w,
-				logger: log,
+				w:                        w,
+				logger:                   log,
+				backedUpItems:            make(map[itemKey]struct{}),
+				resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			}
+
+			if test.customAction {
+				action = &fakeAction{}
+				ctx.actions = map[schema.GroupResource]Action{
+					groupResource: action,
+				}
+				backup = ctx.backup
+			}
+
 			b := &realItemBackupper{}
-			err = b.backupItem(ctx, item, "resource.group", actionParam)
+			err = b.backupItem(ctx, item, groupResource)
 			gotError := err != nil
 			if e, a := test.expectError, gotError; e != a {
 				t.Fatalf("error: expected %t, got %t", e, a)
@@ -1035,33 +1030,13 @@ func TestBackupItem(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if e, a := 1, len(w.headers); e != a {
-				t.Errorf("headers: expected %d, got %d", e, a)
-			}
-
-			if e, a := test.expectedTarHeaderName, w.headers[0].Name; e != a {
-				t.Errorf("header.name: expected %s, got %s", e, a)
-			}
-
-			if e, a := int64(len(itemWithoutStatus)), w.headers[0].Size; e != a {
-				t.Errorf("header.size: expected %d, got %d", e, a)
-			}
-
-			if e, a := byte(tar.TypeReg), w.headers[0].Typeflag; e != a {
-				t.Errorf("header.typeflag: expected %v, got %v", e, a)
-			}
-
-			if e, a := int64(0755), w.headers[0].Mode; e != a {
-				t.Errorf("header.mode: expected %d, got %d", e, a)
-			}
-
-			if w.headers[0].ModTime.IsZero() {
-				t.Errorf("header.modTime: expected it to be set")
-			}
-
-			if e, a := 1, len(w.data); e != a {
-				t.Errorf("# of data: expected %d, got %d", e, a)
-			}
+			require.Equal(t, 1, len(w.headers), "headers")
+			assert.Equal(t, test.expectedTarHeaderName, w.headers[0].Name, "header.name")
+			assert.Equal(t, int64(len(itemWithoutStatus)), w.headers[0].Size, "header.size")
+			assert.Equal(t, byte(tar.TypeReg), w.headers[0].Typeflag, "header.typeflag")
+			assert.Equal(t, int64(0755), w.headers[0].Mode, "header.mode")
+			assert.False(t, w.headers[0].ModTime.IsZero(), "header.modTime set")
+			assert.Equal(t, 1, len(w.data), "# of data")
 
 			actual, err := getAsMap(string(w.data[0]))
 			if err != nil {

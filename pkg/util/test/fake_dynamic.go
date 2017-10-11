@@ -64,3 +64,8 @@ func (c *FakeDynamicClient) Watch(options metav1.ListOptions) (watch.Interface, 
 	args := c.Called(options)
 	return args.Get(0).(watch.Interface), args.Error(1)
 }
+
+func (c *FakeDynamicClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
+	args := c.Called(name, opts)
+	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
+}

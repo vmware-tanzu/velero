@@ -72,9 +72,8 @@ type kubernetesRestorer struct {
 	logger             *logrus.Logger
 }
 
-// prioritizeResources takes a list of pre-prioritized resources and a full list of resources to restore,
-// and returns an ordered list of GroupResource-resolved resources in the order that they should be
-// restored.
+// prioritizeResources returns an ordered, fully-resolved list of resources to restore based on
+// the provided discovery helper, resource priorities, and included/excluded resources.
 func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger *logrus.Logger) ([]schema.GroupResource, error) {
 	var ret []schema.GroupResource
 
@@ -83,16 +82,16 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 
 	// start by resolving priorities into GroupResources and adding them to ret
 	for _, r := range priorities {
-		gr, err := helper.ResolveGroupResource(r)
+		gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(r).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}
+		gr := gvr.GroupResource()
 
 		if !includedResources.ShouldInclude(gr.String()) {
 			logger.WithField("groupResource", gr).Info("Not including resource")
 			continue
 		}
-
 		ret = append(ret, gr)
 		set.Insert(gr.String())
 	}
@@ -144,11 +143,11 @@ func NewKubernetesRestorer(
 ) (Restorer, error) {
 	r := make(map[schema.GroupResource]restorers.ResourceRestorer)
 	for gr, restorer := range customRestorers {
-		resolved, err := discoveryHelper.ResolveGroupResource(gr)
+		gvr, _, err := discoveryHelper.ResourceFor(schema.ParseGroupResource(gr).WithVersion(""))
 		if err != nil {
 			return nil, err
 		}
-		r[resolved] = restorer
+		r[gvr.GroupResource()] = restorer
 	}
 
 	return &kubernetesRestorer{
@@ -187,12 +186,13 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		restore.Spec.IncludedResources,
 		restore.Spec.ExcludedResources,
 		func(item string) string {
-			gr, err := kr.discoveryHelper.ResolveGroupResource(item)
+			gvr, _, err := kr.discoveryHelper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
 			if err != nil {
 				kr.logger.WithError(err).WithField("resource", item).Error("Unable to resolve resource")
 				return ""
 			}
 
+			gr := gvr.GroupResource()
 			return gr.String()
 		},
 	)
