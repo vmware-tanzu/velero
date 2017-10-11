@@ -5,7 +5,7 @@ All authors to the project retain copyright to their work. However, to ensure
 that they are only submitting work that they have rights to, we are requiring
 everyone to acknowledge this by signing their work.
 
-Any copyright notices in this repo should specify the author as "Heptio, Inc."
+Any copyright notices in this repo should specify the authors as "the Heptio Ark project contributors".
 
 To sign your work, just add a line like this at the end of your commit message:
 
