@@ -54,23 +54,25 @@ func NewCreateCommand(f client.Factory) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name              string
-	TTL               time.Duration
-	SnapshotVolumes   flag.OptionalBool
-	IncludeNamespaces flag.StringArray
-	ExcludeNamespaces flag.StringArray
-	IncludeResources  flag.StringArray
-	ExcludeResources  flag.StringArray
-	Labels            flag.Map
-	Selector          flag.LabelSelector
+	Name                    string
+	TTL                     time.Duration
+	SnapshotVolumes         flag.OptionalBool
+	IncludeNamespaces       flag.StringArray
+	ExcludeNamespaces       flag.StringArray
+	IncludeResources        flag.StringArray
+	ExcludeResources        flag.StringArray
+	Labels                  flag.Map
+	Selector                flag.LabelSelector
+	IncludeClusterResources flag.OptionalBool
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:               24 * time.Hour,
-		IncludeNamespaces: flag.NewStringArray("*"),
-		Labels:            flag.NewMap(),
-		SnapshotVolumes:   flag.NewOptionalBool(nil),
+		TTL:                     24 * time.Hour,
+		IncludeNamespaces:       flag.NewStringArray("*"),
+		Labels:                  flag.NewMap(),
+		SnapshotVolumes:         flag.NewOptionalBool(nil),
+		IncludeClusterResources: flag.NewOptionalBool(nil),
 	}
 }
 
@@ -85,6 +87,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
+	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
 }
 
@@ -125,6 +130,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			LabelSelector:      o.Selector.LabelSelector,
 			SnapshotVolumes:    o.SnapshotVolumes.Value,
 			TTL:                metav1.Duration{Duration: o.TTL},
+			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
 	}
 

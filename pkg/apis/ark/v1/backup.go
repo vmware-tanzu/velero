@@ -49,6 +49,10 @@ type BackupSpec struct {
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
 	TTL metav1.Duration `json:"ttl"`
+
+	// IncludeClusterResources specifies whether cluster-scoped resources
+	// should be included for consideration in the backup.
+	IncludeClusterResources *bool `json:"includeClusterResources"`
 }
 
 // BackupPhase is a string representation of the lifecycle phase

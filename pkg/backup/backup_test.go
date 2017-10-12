@@ -46,6 +46,13 @@ import (
 	. "github.com/heptio/ark/pkg/util/test"
 )
 
+var (
+	trueVal      = true
+	falseVal     = false
+	truePointer  = &trueVal
+	falsePointer = &falseVal
+)
+
 type fakeAction struct {
 	ids     []string
 	backups []*v1.Backup
@@ -434,8 +441,8 @@ func TestBackupMethod(t *testing.T) {
 	expectedFiles := sets.NewString(
 		"namespaces/a/configmaps/configMap1.json",
 		"namespaces/b/configmaps/configMap2.json",
-		"cluster/certificatesigningrequests.certificates.k8s.io/csr1.json",
 		"namespaces/a/roles.rbac.authorization.k8s.io/role1.json",
+		// CSRs are not expected because they're unrelated cluster-scoped resources
 	)
 
 	expectedData := map[string]string{
@@ -464,24 +471,6 @@ func TestBackupMethod(t *testing.T) {
 				}
 			}
 		`,
-		"cluster/certificatesigningrequests.certificates.k8s.io/csr1.json": `
-			{
-				"apiVersion": "certificates.k8s.io/v1beta1",
-				"kind": "CertificateSigningRequest",
-				"metadata": {
-					"name": "csr1"
-				},
-				"spec": {
-					"request": "some request",
-					"username": "bob",
-					"uid": "12345",
-					"groups": [
-						"group1",
-						"group2"
-					]
-				}
-			}
-		`,
 		"namespaces/a/roles.rbac.authorization.k8s.io/role1.json": `
 			{
 				"apiVersion": "rbac.authorization.k8s.io/v1beta1",
@@ -499,6 +488,7 @@ func TestBackupMethod(t *testing.T) {
 				]
 			}
 		`,
+		// CSRs are not expected because they're unrelated cluster-scoped resources
 	}
 
 	seenFiles := sets.NewString()
@@ -548,10 +538,10 @@ func TestBackupMethod(t *testing.T) {
 	}
 
 	expectedCMActionIDs := []string{"a/configMap1", "b/configMap2"}
-	expectedCSRActionIDs := []string{"csr1"}
 
 	assert.Equal(t, expectedCMActionIDs, cmAction.ids)
-	assert.Equal(t, expectedCSRActionIDs, csrAction.ids)
+	// CSRs are not expected because they're unrelated cluster-scoped resources
+	assert.Nil(t, csrAction.ids)
 }
 
 func TestBackupResource(t *testing.T) {
@@ -573,6 +563,7 @@ func TestBackupResource(t *testing.T) {
 		expectedDeploymentsBackedUp     bool
 		networkPoliciesBackedUp         bool
 		expectedNetworkPoliciesBackedUp bool
+		includeClusterResources         *bool
 	}{
 		{
 			name: "should not include resource",
@@ -615,6 +606,114 @@ func TestBackupResource(t *testing.T) {
 			resourceName:                    "networkpolicies",
 			resourceNamespaced:              true,
 			networkPoliciesBackedUp:         true,
+			expectedNetworkPoliciesBackedUp: true,
+		},
+		{
+			name: "should include deployments.extensions if we haven't seen deployments.apps",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "extensions",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "extensions/v1beta1",
+			resourceName:              "deployments",
+			resourceNamespaced:        true,
+			deploymentsBackedUp:       false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "extensions/v1beta1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:    []string{""},
+			expectedDeploymentsBackedUp: true,
+		},
+		{
+			name: "should include deployments.apps if we haven't seen deployments.extensions",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "apps",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "apps/v1beta1",
+			resourceName:              "deployments",
+			resourceNamespaced:        true,
+			deploymentsBackedUp:       false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "apps/v1beta1",
+			"kind": "DeploymentList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:    []string{""},
+			expectedDeploymentsBackedUp: true,
+		},
+		{
+			name: "should include networkpolicies.extensions if we haven't seen networkpolicies.networking.k8s.io",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "extensions",
+			resourceVersion:           "v1beta1",
+			resourceGV:                "extensions/v1beta1",
+			resourceName:              "networkpolicies",
+			resourceNamespaced:        true,
+			networkPoliciesBackedUp:   false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "extensions/v1beta1",
+			"kind": "NetworkPolicyList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:        []string{""},
+			expectedNetworkPoliciesBackedUp: true,
+		},
+		{
+			name: "should include networkpolicies.networking.k8s.io if we haven't seen networkpolicies.extensions",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "networking.k8s.io",
+			resourceVersion:           "v1",
+			resourceGV:                "networking.k8s.io/v1",
+			resourceName:              "networkpolicies",
+			resourceNamespaced:        true,
+			networkPoliciesBackedUp:   false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			lists: []string{
+				`{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind": "NetworkPolicyList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "a",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces:        []string{""},
 			expectedNetworkPoliciesBackedUp: true,
 		},
 		{
@@ -744,6 +843,117 @@ func TestBackupResource(t *testing.T) {
 				"certificatesigningrequests": {"1"},
 			},
 		},
+		{
+			name: "should include cluster-scoped resource if backing up subset of namespaces and --include-cluster-resources=true",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("ns-1"),
+			includeClusterResources:   truePointer,
+			lists: []string{
+				`{
+			"apiVersion": "foogroup/v1",
+			"kind": "BarList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces: []string{""},
+		},
+		{
+			name: "should not include cluster-scoped resource if backing up subset of namespaces and --include-cluster-resources=false",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("ns-1"),
+			includeClusterResources:   falsePointer,
+		},
+		{
+			name: "should not include cluster-scoped resource if backing up subset of namespaces and --include-cluster-resources=<nil>",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("ns-1"),
+			includeClusterResources:   nil,
+		},
+		{
+			name: "should include cluster-scoped resources if backing up all namespaces and --include-cluster-resources=true",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			includeClusterResources:   truePointer,
+			lists: []string{
+				`{
+			"apiVersion": "foogroup/v1",
+			"kind": "BarList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces: []string{""},
+		},
+		{
+			name: "should not include cluster-scoped resource if backing up all namespaces and --include-cluster-resources=false",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			includeClusterResources:   falsePointer,
+		},
+		{
+			name: "should include cluster-scoped resource if backing up all namespaces and --include-cluster-resources=<nil>",
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+			resourceGroup:             "foogroup",
+			resourceVersion:           "v1",
+			resourceGV:                "foogroup/v1",
+			resourceName:              "bars",
+			resourceNamespaced:        false,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			includeClusterResources:   nil,
+			lists: []string{
+				`{
+			"apiVersion": "foogroup/v1",
+			"kind": "BarList",
+			"items": [
+				{
+					"metadata": {
+						"namespace": "",
+						"name": "1"
+					}
+				}
+			]
+		}`,
+			},
+			expectedListedNamespaces: []string{""},
+		},
 	}
 
 	for _, test := range tests {
@@ -760,7 +970,8 @@ func TestBackupResource(t *testing.T) {
 			ctx := &backupContext{
 				backup: &v1.Backup{
 					Spec: v1.BackupSpec{
-						LabelSelector: labelSelector,
+						LabelSelector:           labelSelector,
+						IncludeClusterResources: test.includeClusterResources,
 					},
 				},
 				resourceIncludesExcludes:  test.resourceIncludesExcludes,
@@ -869,6 +1080,9 @@ func TestBackupItem(t *testing.T) {
 		name                      string
 		item                      string
 		namespaceIncludesExcludes *collections.IncludesExcludes
+		resourceIncludesExcludes  *collections.IncludesExcludes
+		includeClusterResources   *bool
+		backedUpItems             map[itemKey]struct{}
 		expectError               bool
 		expectExcluded            bool
 		expectedTarHeaderName     string
@@ -956,6 +1170,30 @@ func TestBackupItem(t *testing.T) {
 			customAction:          true,
 			expectedActionID:      "myns/bar",
 		},
+		{
+			name: "cluster-scoped item not backed up when --include-cluster-resources=false",
+			item: `{"metadata":{"namespace":"","name":"bar"}}`,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			includeClusterResources:   falsePointer,
+			expectError:               false,
+			expectExcluded:            true,
+		},
+		{
+			name: "item not backed up when resource includes/excludes excludes it",
+			item: `{"metadata":{"namespace":"","name":"bar"}}`,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*").Excludes("resource.group"),
+			expectError:               false,
+			expectExcluded:            true,
+		},
+		{
+			name: "item not backed up when it's already been backed up",
+			item: `{"metadata":{"namespace":"","name":"bar"}}`,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			backedUpItems:             map[itemKey]struct{}{itemKey{resource: "resource.group", namespace: "", name: "bar"}: struct{}{}},
+			expectError:               false,
+			expectExcluded:            true,
+		},
 	}
 
 	for _, test := range tests {
@@ -980,7 +1218,7 @@ func TestBackupItem(t *testing.T) {
 
 			var (
 				action        *fakeAction
-				backup        = &v1.Backup{}
+				backup        = &v1.Backup{Spec: v1.BackupSpec{IncludeClusterResources: test.includeClusterResources}}
 				groupResource = schema.ParseGroupResource("resource.group")
 				log, _        = testlogger.NewNullLogger()
 			)
@@ -992,6 +1230,14 @@ func TestBackupItem(t *testing.T) {
 				logger:                   log,
 				backedUpItems:            make(map[itemKey]struct{}),
 				resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			}
+
+			if test.resourceIncludesExcludes != nil {
+				ctx.resourceIncludesExcludes = test.resourceIncludesExcludes
+			}
+
+			if test.backedUpItems != nil {
+				ctx.backedUpItems = test.backedUpItems
 			}
 
 			if test.customAction {
