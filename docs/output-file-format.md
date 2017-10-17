@@ -62,26 +62,38 @@ Note that this file includes detailed info about your volume snapshots in the `s
 When unzipped, a typical backup directory (e.g. `backup1234.tar.gz`) looks like the following:
 
 ```
-cluster/
+resources/
     persistentvolumes/
-        pv01.json
-        ...
-namespaces/
-    namespace1/
-        configmaps/
-            myconfigmap.json
+        cluster/
+            pv01.json
             ...
-        pods
-            mypod.json
-            ...
-        jobs
-            awesome-job.json
-            ...
-        deployments
-            cool-deployment.json
-            ...
-        ...
-    namespace2/
-        ...
+    configmaps/
+        namespaces/
+            namespace1/
+                myconfigmap.json
+                ...
+            namespace2/
+                ...
+    pods/
+        namespaces/
+            namespace1/
+                mypod.json
+                ...
+            namespace2/
+                ...
+    jobs/
+        namespaces/
+            namespace1/
+                awesome-job.json
+                ...
+            namespace2/
+                ...
+    deployments/
+        namespaces/
+            namespace1/
+                cool-deployment.json
+                ...
+            namespace2/
+                ...
     ...
 ```
