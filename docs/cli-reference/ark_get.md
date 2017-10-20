@@ -1,16 +1,16 @@
-## ark restore
+## ark get
 
-Work with restores
+Get ark resources
 
 ### Synopsis
 
 
-Work with restores
+Get ark resources
 
 ### Options
 
 ```
-  -h, --help   help for restore
+  -h, --help   help for get
 ```
 
 ### Options inherited from parent commands
@@ -28,8 +28,7 @@ Work with restores
 
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark restore create](ark_restore_create.md)	 - Create a restore
-* [ark restore delete](ark_restore_delete.md)	 - Delete a restore
-* [ark restore get](ark_restore_get.md)	 - Get restores
-* [ark restore logs](ark_restore_logs.md)	 - Get restore logs
+* [ark get backups](ark_get_backups.md)	 - Get backups
+* [ark get restores](ark_get_restores.md)	 - Get restores
+* [ark get schedules](ark_get_schedules.md)	 - Get schedules
 

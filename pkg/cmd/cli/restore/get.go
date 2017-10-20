@@ -27,12 +27,12 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/output"
 )
 
-func NewGetCommand(f client.Factory) *cobra.Command {
+func NewGetCommand(f client.Factory, use string) *cobra.Command {
 	var listOptions metav1.ListOptions
 
 	c := &cobra.Command{
-		Use:   "get",
-		Short: "get restores",
+		Use:   use,
+		Short: "Get restores",
 		Run: func(c *cobra.Command, args []string) {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
