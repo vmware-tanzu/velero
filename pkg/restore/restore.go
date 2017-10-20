@@ -397,6 +397,11 @@ func addToResult(r *api.RestoreResult, ns string, e error) {
 func (ctx *context) restoreResource(resource, namespace, resourcePath string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
 
+	if ctx.restore.Spec.IncludeClusterResources != nil && !*ctx.restore.Spec.IncludeClusterResources && namespace == "" {
+		ctx.infof("Skipping resource %s because it's cluster-scoped", resource)
+		return warnings, errs
+	}
+
 	if namespace != "" {
 		ctx.infof("Restoring resource '%s' into namespace '%s' from: %s", resource, namespace, resourcePath)
 	} else {

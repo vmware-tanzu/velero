@@ -159,10 +159,15 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name:             "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"a", "b", "c"}, ExcludedNamespaces: []string{"b"}}},
+			name:       "namespacesToRestore properly filters with inclusion & exclusion filters",
+			fileSystem: newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			baseDir:    "bak",
+			restore: &api.Restore{
+				Spec: api.RestoreSpec{
+					IncludedNamespaces: []string{"a", "b", "c"},
+					ExcludedNamespaces: []string{"b"},
+				},
+			},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/c"},
 			prioritizedResources: []schema.GroupResource{
 				schema.GroupResource{Resource: "nodes"},
@@ -288,15 +293,23 @@ func TestRestorePriority(t *testing.T) {
 }
 
 func TestRestoreResourceForNamespace(t *testing.T) {
+	var (
+		trueVal  = true
+		falseVal = false
+		truePtr  = &trueVal
+		falsePtr = &falseVal
+	)
+
 	tests := []struct {
-		name           string
-		namespace      string
-		resourcePath   string
-		labelSelector  labels.Selector
-		fileSystem     *fakeFileSystem
-		restorers      map[schema.GroupResource]restorers.ResourceRestorer
-		expectedErrors api.RestoreResult
-		expectedObjs   []unstructured.Unstructured
+		name                    string
+		namespace               string
+		resourcePath            string
+		labelSelector           labels.Selector
+		includeClusterResources *bool
+		fileSystem              *fakeFileSystem
+		restorers               map[schema.GroupResource]restorers.ResourceRestorer
+		expectedErrors          api.RestoreResult
+		expectedObjs            []unstructured.Unstructured
 	}{
 		{
 			name:          "basic normal case",
@@ -394,6 +407,59 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{schema.GroupResource{Resource: "foo-resource"}: newFakeCustomRestorer()},
 			expectedObjs:  toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
+		{
+			name:                    "cluster-scoped resources are skipped when IncludeClusterResources=false",
+			namespace:               "",
+			resourcePath:            "persistentvolumes",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: falsePtr,
+			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+		},
+		{
+			name:                    "namespaced resources are not skipped when IncludeClusterResources=false",
+			namespace:               "ns-1",
+			resourcePath:            "configmaps",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: falsePtr,
+			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+		},
+		{
+			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=true",
+			namespace:               "",
+			resourcePath:            "persistentvolumes",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: truePtr,
+			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
+		},
+		{
+			name:                    "namespaced resources are not skipped when IncludeClusterResources=true",
+			namespace:               "ns-1",
+			resourcePath:            "configmaps",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: truePtr,
+			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+		},
+		{
+			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=nil",
+			namespace:               "",
+			resourcePath:            "persistentvolumes",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: nil,
+			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
+		},
+		{
+			name:                    "namespaced resources are not skipped when IncludeClusterResources=nil",
+			namespace:               "ns-1",
+			resourcePath:            "configmaps",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: nil,
+			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+		},
 	}
 
 	for _, test := range tests {
@@ -408,6 +474,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, test.namespace).Return(resourceClient, nil)
 
+			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
+
 			log, _ := testlogger.NewNullLogger()
 
 			ctx := &context{
@@ -420,12 +489,15 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 						Namespace: api.DefaultNamespace,
 						Name:      "my-restore",
 					},
+					Spec: api.RestoreSpec{
+						IncludeClusterResources: test.includeClusterResources,
+					},
 				},
 				backup: &api.Backup{},
 				logger: log,
 			}
 
-			warnings, errors := ctx.restoreResource("configmaps", test.namespace, test.resourcePath)
+			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
 
 			assert.Empty(t, warnings.Ark)
 			assert.Empty(t, warnings.Cluster)
@@ -517,10 +589,48 @@ func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
 
 		delete(metadata, "creationTimestamp")
 
+		if _, exists := metadata["namespace"]; !exists {
+			metadata["namespace"] = ""
+		}
+
+		delete(unstructuredObj.Object, "status")
+
 		res = append(res, unstructuredObj)
 	}
 
 	return res
+}
+
+type testPersistentVolume struct {
+	*v1.PersistentVolume
+}
+
+func newTestPV() *testPersistentVolume {
+	return &testPersistentVolume{
+		PersistentVolume: &v1.PersistentVolume{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "PersistentVolume",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-pv",
+			},
+			Status: v1.PersistentVolumeStatus{},
+		},
+	}
+}
+
+func (pv *testPersistentVolume) WithArkLabel(restoreName string) *testPersistentVolume {
+	if pv.Labels == nil {
+		pv.Labels = make(map[string]string)
+	}
+	pv.Labels[api.RestoreLabelKey] = restoreName
+	return pv
+}
+
+func (pv *testPersistentVolume) ToJSON() []byte {
+	bytes, _ := json.Marshal(pv.PersistentVolume)
+	return bytes
 }
 
 type testConfigMap struct {
