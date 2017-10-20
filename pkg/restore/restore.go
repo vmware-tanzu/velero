@@ -109,7 +109,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 			gr := groupVersion.WithResource(resource.Name).GroupResource()
 
 			if !includedResources.ShouldInclude(gr.String()) {
-				logger.WithField("groupResource", gr).Info("Not including resource")
+				logger.WithField("groupResource", gr.String()).Debug("Not including resource")
 				continue
 			}
 
