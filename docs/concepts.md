@@ -22,6 +22,10 @@ This section gives a quick overview of the Ark operation types.
 ### 1. Backups
 The *backup* operation (1) uploads a tarball of copied Kubernetes resources into cloud object storage and (2) uses the cloud provider API to make disk snapshots of persistent volumes, if specified. [Annotations][8] are cleared for PVs but kept for all other object types.
 
+You can optionally specify hooks that should be executed during the backup. For example, you may
+need to tell a database to flush its in-memory buffers to disk prior to taking a snapshot. You can
+find more information about hooks [here][11].
+
 Some things to be aware of:
 * *Cluster backups are not strictly atomic.* If API objects are being created or edited at the time of backup, they may or not be included in the backup. In practice, backups happen very quickly and so the odds of capturing inconsistent information are low, but still possible.
 
@@ -71,3 +75,4 @@ This allows *restore* functionality to work in a cluster migration scenario, whe
 [8]: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 [9]: #api-types
 [10]: api-types/
+[11]: hooks.md
