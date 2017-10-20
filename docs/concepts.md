@@ -5,6 +5,7 @@
     * [1. Backups][2]
     * [2. Schedules][3]
     * [3. Restores][4]
+* [API types][9]
 * [Expired backup deletion][5]
 * [Cloud storage sync][6]
 
@@ -43,6 +44,10 @@ Kubernetes API objects that have been restored can be identified with a label th
 
 You can also run the Ark server in *restore-only* mode, which disables backup, schedule, and garbage collection functionality during disaster recovery.
 
+## API types
+
+For information about the individual API types Ark uses, please see the [API types reference][10].
+
 ## Expired backup deletion
 
 When first creating a backup, you can specify a TTL. If Ark sees that an existing Backup resource has expired, it removes both:
@@ -64,3 +69,5 @@ This allows *restore* functionality to work in a cluster migration scenario, whe
 [6]: #cloud-storage-sync
 [7]: use-cases.md#cluster-migration
 [8]: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+[9]: #api-types
+[10]: api-types/
