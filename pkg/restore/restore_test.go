@@ -405,8 +405,8 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 
 			dynamicFactory := &FakeDynamicFactory{}
 			resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-			gvk := schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ConfigMap"}
-			dynamicFactory.On("ClientForGroupVersionKind", gvk, resource, test.namespace).Return(resourceClient, nil)
+			gv := schema.GroupVersion{Group: "", Version: "v1"}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, test.namespace).Return(resourceClient, nil)
 
 			log, _ := testlogger.NewNullLogger()
 

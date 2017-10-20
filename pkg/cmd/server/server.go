@@ -39,7 +39,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	kcorev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/api/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -134,6 +136,7 @@ func getSortedLogLevels() []string {
 }
 
 type server struct {
+	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
 	backupService         cloudprovider.BackupService
@@ -165,6 +168,7 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &server{
+		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
 		arkClient:             arkClient,
 		discoveryClient:       arkClient.Discovery(),
@@ -502,7 +506,7 @@ func (s *server) runControllers(config *api.Config) error {
 	if config.RestoreOnlyMode {
 		s.logger.Info("Restore only mode - not starting the backup, schedule or GC controllers")
 	} else {
-		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService)
+		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService, s.kubeClientConfig, s.kubeClient.CoreV1())
 		cmd.CheckError(err)
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Ark().V1().Backups(),
@@ -610,23 +614,27 @@ func newBackupper(
 	clientPool dynamic.ClientPool,
 	backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
+	kubeClientConfig *rest.Config,
+	kubeCoreV1Client kcorev1client.CoreV1Interface,
 ) (backup.Backupper, error) {
 	actions := map[string]backup.Action{}
+	dynamicFactory := client.NewDynamicFactory(clientPool)
 
 	if snapshotService != nil {
 		action, err := backup.NewVolumeSnapshotAction(snapshotService)
 		if err != nil {
 			return nil, err
 		}
-
 		actions["persistentvolumes"] = action
+
 		actions["persistentvolumeclaims"] = backup.NewBackupPVAction()
 	}
 
 	return backup.NewKubernetesBackupper(
 		discoveryHelper,
-		client.NewDynamicFactory(clientPool),
+		dynamicFactory,
 		actions,
+		backup.NewPodCommandExecutor(kubeClientConfig, kubeCoreV1Client.RESTClient()),
 	)
 }
 

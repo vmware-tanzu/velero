@@ -32,12 +32,10 @@ import (
 )
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
-func NamespaceAndName(metaAccessor metav1.ObjectMetaAccessor) string {
-	objMeta := metaAccessor.GetObjectMeta()
-	if objMeta == nil {
-		return ""
+func NamespaceAndName(objMeta metav1.Object) string {
+	if objMeta.GetNamespace() == "" {
+		return objMeta.GetName()
 	}
-
 	return fmt.Sprintf("%s/%s", objMeta.GetNamespace(), objMeta.GetName())
 }
 
