@@ -28,10 +28,9 @@ else
 endif
 
 # docker related vars
-DOCKER ?= docker
 REGISTRY ?= gcr.io/heptio-images
 BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.8-alpine3.6
-LDFLAGS := -X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION)
+LDFLAGS = -X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION)
 LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT)
 LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitSHA=$(GIT_SHA)
 LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitTreeState=$(GIT_TREE_STATE)
@@ -84,13 +83,22 @@ update: fmt
 all: cbuild container
 
 cbuild:
-	$(DOCKER) run --rm -v $(ROOT_DIR):$(BUILDMNT) $(EXTRA_MNTS) -w $(BUILDMNT) -e SKIP_TESTS=$(SKIP_TESTS) $(BUILD_IMAGE) /bin/sh -c 'make local verify test'
+	@docker run --rm \
+		-v $(ROOT_DIR):$(BUILDMNT) \
+		$(EXTRA_MNTS) \
+		-w $(BUILDMNT) \
+		-e SKIP_TESTS=$(SKIP_TESTS) \
+		$(BUILD_IMAGE) \
+		/bin/sh -c " \
+			VERSION=$(VERSION) \
+			make local verify test \
+		"
 
 container: cbuild
-	$(DOCKER) build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
+	@docker build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
 
 container-local: $(BINARIES)
-	$(DOCKER) build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
+	@docker build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
 
 push:
 	docker -- push $(REGISTRY)/$(PROJECT):$(VERSION)
@@ -99,4 +107,4 @@ push:
 
 clean:
 	rm -rf $(OUTPUT_DIR)
-	$(DOCKER) rmi $(REGISTRY)/$(PROJECT):latest $(REGISTRY)/$(PROJECT):$(VERSION) 2>/dev/null || :
+	@docker rmi $(REGISTRY)/$(PROJECT):latest $(REGISTRY)/$(PROJECT):$(VERSION) 2>/dev/null || :
