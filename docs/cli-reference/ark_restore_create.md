@@ -14,18 +14,19 @@ ark restore create BACKUP [flags]
 ### Options
 
 ```
-      --exclude-namespaces stringArray        namespaces to exclude from the restore
-      --exclude-resources stringArray         resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io
-  -h, --help                                  help for create
-      --include-namespaces stringArray        namespaces to include in the restore (use '*' for all namespaces) (default *)
-      --include-resources stringArray         resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)
-      --label-columns stringArray             a comma-separated list of labels to be displayed as columns
-      --labels mapStringString                labels to apply to the restore
-      --namespace-mappings mapStringString    namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...
-  -o, --output string                         Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
-      --restore-volumes optionalBool[=true]   whether to restore volumes from snapshots
-  -l, --selector labelSelector                only restore resources matching this label selector (default <none>)
-      --show-labels                           show labels in the last column
+      --exclude-namespaces stringArray                  namespaces to exclude from the restore
+      --exclude-resources stringArray                   resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io
+  -h, --help                                            help for create
+      --include-cluster-resources optionalBool[=true]   include cluster-scoped resources in the restore
+      --include-namespaces stringArray                  namespaces to include in the restore (use '*' for all namespaces) (default *)
+      --include-resources stringArray                   resources to include in the restore, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)
+      --label-columns stringArray                       a comma-separated list of labels to be displayed as columns
+      --labels mapStringString                          labels to apply to the restore
+      --namespace-mappings mapStringString              namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...
+  -o, --output string                                   Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
+      --restore-volumes optionalBool[=true]             whether to restore volumes from snapshots
+  -l, --selector labelSelector                          only restore resources matching this label selector (default <none>)
+      --show-labels                                     show labels in the last column
 ```
 
 ### Options inherited from parent commands
