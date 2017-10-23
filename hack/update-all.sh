@@ -1,4 +1,6 @@
-# Copyright 2017 Heptio Inc.
+#!/bin/bash -e
+#
+# Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.6
-MAINTAINER Andy Goldstein "andy@heptio.com"
+HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-RUN apk add --no-cache ca-certificates && \
-    adduser -S -D -H -u 1000 ark
+echo "Running all update scripts"
 
-ADD _output/bin/ark /ark
-
-USER ark
-ENTRYPOINT ["/ark"]
+for f in ${HACK_DIR}/update-*.sh; do
+  if [[ $f = "${HACK_DIR}/update-all.sh" ]]; then
+    continue
+  fi
+  $f
+done

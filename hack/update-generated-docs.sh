@@ -17,6 +17,9 @@
 ARK_ROOT=$(realpath $(dirname ${BASH_SOURCE})/..)
 BIN=${ARK_ROOT}/_output/bin
 mkdir -p ${BIN}
+
+echo "Updating generated docs"
+
 go build -o ${BIN}/docs-gen ./docs/generate/ark.go
 
 if [[ $# -gt 1 ]]; then
@@ -30,3 +33,5 @@ if [[ -z "${OUTPUT_DIR}" ]]; then
 fi
 
 ${BIN}/docs-gen ark ${OUTPUT_DIR}
+
+echo "Success!"

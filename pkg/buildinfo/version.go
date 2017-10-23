@@ -25,10 +25,6 @@ var (
 	// Version is the current version of Ark, set by the go linker's -X flag at build time.
 	Version string
 
-	// DockerImage is the full path to the docker image for this build, for example
-	// gcr.io/heptio-images/ark.
-	DockerImage string
-
 	// GitSHA is the actual commit that is being built, set by the go linker's -X flag at build time.
 	GitSHA string
 

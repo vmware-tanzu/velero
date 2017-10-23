@@ -25,7 +25,9 @@ cleanup() {
   rm -rf ${TMP_DIR}
 }
 
-${HACK_DIR}/update-generated-docs.sh ${TMP_DIR}
+echo "Verifying generated docs"
+
+${HACK_DIR}/update-generated-docs.sh ${TMP_DIR} > /dev/null
 
 exclude_file="README.md"
 output=$(echo "`diff -r ${DOCS_DIR} ${TMP_DIR}`" | sed "/${exclude_file}/d")
@@ -35,3 +37,5 @@ if [[ -n "${output}" ]] ; then
     echo "${output}"
     exit 1
 fi
+
+echo "Success!"

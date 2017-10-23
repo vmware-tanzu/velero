@@ -17,6 +17,9 @@
 ARK_ROOT=$(realpath $(dirname ${BASH_SOURCE})/..)
 BIN=${ARK_ROOT}/_output/bin
 mkdir -p ${BIN}
+
+echo "Updating generated informers"
+
 go build -o ${BIN}/informer-gen ./vendor/k8s.io/kubernetes/cmd/libs/go2idl/informer-gen
 
 OUTPUT_BASE=""
@@ -48,3 +51,5 @@ ${BIN}/informer-gen \
   --internal-clientset-package github.com/heptio/ark/pkg/generated/clientset \
   --versioned-clientset-package github.com/heptio/ark/pkg/generated/clientset \
   $@
+
+echo "Success!"
