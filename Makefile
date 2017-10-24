@@ -1,4 +1,6 @@
-# Copyright 2017 Heptio Inc.
+# Copyright 2016 The Kubernetes Authors.
+#
+# Modifications Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,99 +14,154 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# project related vars
-ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-PROJECT = ark
-VERSION ?= v0.4.0
-GOTARGET = github.com/heptio/$(PROJECT)
-OUTPUT_DIR = $(ROOT_DIR)/_output
-BIN_DIR = $(OUTPUT_DIR)/bin
-GIT_SHA=$(shell git rev-parse --short HEAD)
-GIT_DIRTY=$(shell git status --porcelain $(ROOT_DIR) 2> /dev/null)
-ifeq ($(GIT_DIRTY),)
-	GIT_TREE_STATE := clean
-else
-	GIT_TREE_STATE := dirty
-endif
+# The binary to build (just the basename).
+BIN := ark
 
-# docker related vars
+# This repo's root import path (under GOPATH).
+PKG := github.com/heptio/ark
+
+# Where to push the docker image.
 REGISTRY ?= gcr.io/heptio-images
-BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.8-alpine3.6
-LDFLAGS = -X $(GOTARGET)/pkg/buildinfo.Version=$(VERSION)
-LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.DockerImage=$(REGISTRY)/$(PROJECT)
-LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitSHA=$(GIT_SHA)
-LDFLAGS += -X $(GOTARGET)/pkg/buildinfo.GitTreeState=$(GIT_TREE_STATE)
-# go build -i installs compiled packages so they can be reused later.
-# This speeds up recompiles.
-BUILDCMD = go build -i -v -ldflags "$(LDFLAGS)"
-BUILDMNT = /go/src/$(GOTARGET)
-EXTRA_MNTS ?=
 
-# test related vars
-TESTARGS ?= -timeout 60s
-TEST_PKGS ?= ./cmd/... ./pkg/...
+# Which architecture to build - see $(ALL_ARCH) for options.
+ARCH ?= linux-amd64
+
+VERSION ?= master
+
+###
+### These variables should not need tweaking.
+###
+
+SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
+
+CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64
+CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64
+
+platform_temp = $(subst -, ,$(ARCH))
+GOOS = $(word 1, $(platform_temp))
+GOARCH = $(word 2, $(platform_temp))
+
+BASEIMAGE?=alpine:3.6
+
+# TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
+# Set default base image dynamically for each arch
+#ifeq ($(GOARCH),amd64)
+#		BASEIMAGE?=alpine:3.6
+#endif
+#ifeq ($(GOARCH),arm)
+#		BASEIMAGE?=armel/busybox
+#endif
+#ifeq ($(GOARCH),arm64)
+#		BASEIMAGE?=aarch64/busybox
+#endif
+
+IMAGE := $(REGISTRY)/$(BIN)
+
+BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.9-alpine3.6
+
+# If you want to build all binaries, see the 'all-build' rule.
+# If you want to build all containers, see the 'all-container' rule.
+# If you want to build AND push all containers, see the 'all-push' rule.
+all: build
+
+build-%:
+	@$(MAKE) --no-print-directory ARCH=$* build
+
+#container-%:
+#	@$(MAKE) --no-print-directory ARCH=$* container
+
+#push-%:
+#	@$(MAKE) --no-print-directory ARCH=$* push
+
+all-build: $(addprefix build-, $(CLI_PLATFORMS))
+
+#all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
+
+#all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+
+build: _output/bin/$(GOOS)/$(GOARCH)/$(BIN)
+
+_output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
+	@echo "building: $@"
+	@$(MAKE) shell CMD="-c '\
+		GOOS=$(GOOS) \
+		GOARCH=$(GOARCH) \
+		VERSION=$(VERSION) \
+		PKG=$(PKG) \
+		BIN=$(BIN) \
+		./hack/build.sh'"
+
+TTY := $(shell tty -s && echo "-t")
+
+# Example: make shell CMD="date > datefile"
+shell: build-dirs
+	@docker run \
+		-i $(TTY) \
+		--rm \
+		-u $$(id -u):$$(id -g) \
+		-v "$$(pwd)/.go/pkg:/go/pkg" \
+		-v "$$(pwd)/.go/src:/go/src" \
+		-v "$$(pwd)/.go/std:/go/std" \
+		-v "$$(pwd):/go/src/$(PKG)" \
+		-v "$$(pwd)/_output/bin:/output" \
+		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static" \
+		-w /go/src/$(PKG) \
+		$(BUILD_IMAGE) \
+		/bin/sh $(CMD)
+
+DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
+
+container: verify test .container-$(DOTFILE_IMAGE) container-name
+.container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) Dockerfile.in
+	@sed \
+		-e 's|ARG_BIN|$(BIN)|g' \
+		-e 's|ARG_OS|$(GOOS)|g' \
+		-e 's|ARG_ARCH|$(GOARCH)|g' \
+		-e 's|ARG_FROM|$(BASEIMAGE)|g' \
+		Dockerfile.in > _output/.dockerfile-$(GOOS)-$(GOARCH)
+	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(GOOS)-$(GOARCH) _output
+	@docker images -q $(IMAGE):$(VERSION) > $@
+
+container-name:
+	@echo "container: $(IMAGE):$(VERSION)"
+
+push: .push-$(DOTFILE_IMAGE) push-name
+.push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
+ifeq ($(findstring gcr.io,$(REGISTRY)),gcr.io)
+	@gcloud docker -- push $(IMAGE):$(VERSION)
+else
+	@docker push $(IMAGE):$(VERSION)
+endif
+	@docker images -q $(IMAGE):$(VERSION) > $@
+
+push-name:
+	@echo "pushed: $(IMAGE):$(VERSION)"
+
 SKIP_TESTS ?=
-
-# what we're building
-BINARIES = ark
-
-local: $(BINARIES)
-
-$(BINARIES):
-	mkdir -p $(BIN_DIR)
-	$(BUILDCMD) -o $(BIN_DIR)/$@ $(GOTARGET)/cmd/$@
+test: build-dirs
+ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/test.sh $(SRC_DIRS)'"
+endif
 
 fmt:
-	gofmt -w=true $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./pkg/generated/*")
-	goimports -w=true -d $$(find . -type f -name '*.go' -not -path "./vendor/*" -not -path "./pkg/generated/*")
-
-test:
-ifneq ($(SKIP_TESTS), 1)
-# go test -i installs compiled packages so they can be reused later
-# This speeds up retests.
-	go test -i -v $(TEST_PKGS)
-	go test $(TEST_PKGS) $(TESTARGS)
-endif
+	@$(MAKE) shell CMD="-c 'hack/update-fmt.sh'"
 
 verify:
 ifneq ($(SKIP_TESTS), 1)
-	${ROOT_DIR}/hack/verify-generated-docs.sh
-	${ROOT_DIR}/hack/verify-generated-clientsets.sh
-	${ROOT_DIR}/hack/verify-generated-listers.sh
-	${ROOT_DIR}/hack/verify-generated-informers.sh
+	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
 update: fmt
-	${ROOT_DIR}/hack/update-generated-clientsets.sh
-	${ROOT_DIR}/hack/update-generated-listers.sh
-	${ROOT_DIR}/hack/update-generated-informers.sh
-	${ROOT_DIR}/hack/update-generated-docs.sh
+	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
-all: cbuild container
+build-dirs:
+	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
+	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH)
 
-cbuild:
-	@docker run --rm \
-		-v $(ROOT_DIR):$(BUILDMNT) \
-		$(EXTRA_MNTS) \
-		-w $(BUILDMNT) \
-		-e SKIP_TESTS=$(SKIP_TESTS) \
-		$(BUILD_IMAGE) \
-		/bin/sh -c " \
-			VERSION=$(VERSION) \
-			make local verify test \
-		"
+clean: container-clean bin-clean
 
-container: cbuild
-	@docker build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
+container-clean:
+	rm -rf .container-* _output/.dockerfile-* .push-*
 
-container-local: $(BINARIES)
-	@docker build -t $(REGISTRY)/$(PROJECT):latest -t $(REGISTRY)/$(PROJECT):$(VERSION) .
-
-push:
-	docker -- push $(REGISTRY)/$(PROJECT):$(VERSION)
-
-.PHONY: all local container cbuild push test verify update fmt $(BINARIES)
-
-clean:
-	rm -rf $(OUTPUT_DIR)
-	@docker rmi $(REGISTRY)/$(PROJECT):latest $(REGISTRY)/$(PROJECT):$(VERSION) 2>/dev/null || :
+bin-clean:
+	rm -rf .go _output

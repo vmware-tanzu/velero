@@ -1,6 +1,6 @@
-#!/bin/bash -e
+# Copyright 2016 The Kubernetes Authors.
 #
-# Copyright 2017 Heptio Inc.
+# Modifications Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HACK_DIR=$(dirname "${BASH_SOURCE}")
+FROM ARG_FROM
 
-echo "Verifying generated clientsets"
+MAINTAINER Andy Goldstein <andy@heptio.com>
 
-if ! output=$(${HACK_DIR}/update-generated-clientsets.sh --verify-only 2>&1); then
-  echo "FAILURE: verification of clientsets failed:"
-  echo "${output}"
-  exit 1
-fi
+ADD /bin/ARG_OS/ARG_ARCH/ARG_BIN /ARG_BIN
 
-echo "Success!"
+USER nobody:nobody
+ENTRYPOINT ["/ARG_BIN"]

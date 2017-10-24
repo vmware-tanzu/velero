@@ -28,3 +28,7 @@ debug
 
 /ark
 .idea/
+
+.container-*
+.vimrc
+.go

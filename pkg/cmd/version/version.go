@@ -32,7 +32,6 @@ func NewCommand() *cobra.Command {
 			fmt.Printf("Version: %s\n", buildinfo.Version)
 			fmt.Printf("Git commit: %s\n", buildinfo.GitSHA)
 			fmt.Printf("Git tree state: %s\n", buildinfo.GitTreeState)
-			fmt.Println("Configured docker image:", buildinfo.DockerImage)
 		},
 	}
 

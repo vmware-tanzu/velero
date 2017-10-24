@@ -5,8 +5,9 @@ While the [README][0] pulls from the Heptio image registry, you can also build y
 * [0. Prerequisites][1]
 * [1. Download][2]
 * [2. Build][3]
-* [3. Run][7]
-* [4. Vendoring dependencies][10]
+* [3. Test][12]
+* [4. Run][7]
+* [5. Vendoring dependencies][10]
 
 ## 0. Prerequisites
 
@@ -30,12 +31,46 @@ Set the `$REGISTRY` environment variable (used in the `Makefile`) if you want to
 
 Run the following in the Ark root directory to build your container with the tag `$REGISTRY/$PROJECT:$VERSION`:
 ```
-sudo make all
+make container
 ```
 
 To push your image to a registry, use `make push`.
 
-## 3. Run
+### Updating generated files
+
+There are several files that are automatically generated based on the source code in the repository.
+These include:
+* The clientset
+* Listers
+* Shared informers
+* Documentation
+
+If you make any of the following changes, you will need to run `make update` to regenerate
+automatically generated files:
+* Add/edit/remove command line flags and/or their help text
+* Add/edit/remove commands or subcommands
+* Add new API types
+
+### Cross compiling
+
+By default, `make` will build an `ark` binary that runs on your host operating system and
+architecture. If you want to build for another platform, you can do so with `make
+build-<GOOS>-<GOARCH` - for example, to build for the Mac, you would do `make build-darwin-amd64`.
+All binaries are placed in `_output/bin/<GOOS>/<GOARCH>`, e.g. `_output/bin/darwin/amd64/ark`.
+
+Ark's `Makefile` has a convenience target, `all-build`, that builds the following platforms:
+* linux-amd64
+* linux-arm
+* linux-arm64
+* darwin-amd64
+* windows-amd64
+
+## 3. Test
+
+To run unit tests, use `make test`. You can also run `make verify` to ensure that all generated
+files (clientset, listers, shared informers, docs) are up to date.
+
+## 4. Run
 
 ### Considerations
 
@@ -58,7 +93,7 @@ kubectl set image deployment/ark ark=$REGISTRY/$PROJECT:$VERSION
 ```
 where `$REGISTRY`, `$PROJECT`, and `$VERSION` match what you used in the [build step][3].
 
-## 4. Vendoring dependencies
+## 5. Vendoring dependencies
 If you need to add or update the vendored dependencies, please see [Vendoring dependencies][11].
 
 [0]: ../README.md
@@ -68,8 +103,9 @@ If you need to add or update the vendored dependencies, please see [Vendoring de
 [4]: ../README.md#quickstart
 [5]: https://golang.org/doc/install
 [6]: /examples
-[7]: #3-run
+[7]: #4-run
 [8]: reference.md#ark-config-definition
 [9]: cloud-provider-specifics.md
 [10]: #4-vendoring-dependencies
 [11]: vendoring-dependencies.md
+[12]: #3-test

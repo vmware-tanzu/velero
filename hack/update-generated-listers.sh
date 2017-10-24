@@ -17,6 +17,9 @@
 ARK_ROOT=$(realpath $(dirname ${BASH_SOURCE})/..)
 BIN=${ARK_ROOT}/_output/bin
 mkdir -p ${BIN}
+
+echo "Updating generated listers"
+
 go build -o ${BIN}/lister-gen ./vendor/k8s.io/kubernetes/cmd/libs/go2idl/lister-gen
 
 OUTPUT_BASE=""
@@ -53,3 +56,5 @@ ${BIN}/lister-gen \
   --input-dirs github.com/heptio/ark/pkg/apis/ark/v1 \
   --output-package github.com/heptio/ark/pkg/generated/listers \
   $@
+
+echo "Success!"

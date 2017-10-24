@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2017 Heptio Inc.
+# Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,12 +16,11 @@
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-echo "Verifying generated clientsets"
+echo "Running all verification scripts"
 
-if ! output=$(${HACK_DIR}/update-generated-clientsets.sh --verify-only 2>&1); then
-  echo "FAILURE: verification of clientsets failed:"
-  echo "${output}"
-  exit 1
-fi
-
-echo "Success!"
+for f in ${HACK_DIR}/verify-*.sh; do
+  if [[ $f = "${HACK_DIR}/verify-all.sh" ]]; then
+    continue
+  fi
+  $f
+done
