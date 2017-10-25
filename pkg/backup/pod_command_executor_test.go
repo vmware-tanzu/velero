@@ -33,7 +33,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 )
@@ -201,13 +200,12 @@ func TestExecutePodCommand(t *testing.T) {
 			expectedURL, _ := url.Parse(
 				fmt.Sprintf("https://some.server/api/v1/namespaces/namespace/pods/name/exec?command=%s&container=%s&stderr=true&stdout=true", expectedCommand, test.expectedContainerName),
 			)
-			streamExecutorFactory.On("NewExecutor", clientConfig, "POST", expectedURL).Return(streamExecutor, nil)
+			streamExecutorFactory.On("NewSPDYExecutor", clientConfig, "POST", expectedURL).Return(streamExecutor, nil)
 
 			var stdout, stderr bytes.Buffer
 			expectedStreamOptions := remotecommand.StreamOptions{
-				SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-				Stdout:             &stdout,
-				Stderr:             &stderr,
+				Stdout: &stdout,
+				Stderr: &stderr,
 			}
 			streamExecutor.On("Stream", expectedStreamOptions).Return(test.hookError)
 
@@ -244,14 +242,14 @@ type mockStreamExecutorFactory struct {
 	mock.Mock
 }
 
-func (f *mockStreamExecutorFactory) NewExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.StreamExecutor, error) {
+func (f *mockStreamExecutorFactory) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
 	args := f.Called(config, method, url)
-	return args.Get(0).(remotecommand.StreamExecutor), args.Error(1)
+	return args.Get(0).(remotecommand.Executor), args.Error(1)
 }
 
 type mockStreamExecutor struct {
 	mock.Mock
-	remotecommand.StreamExecutor
+	remotecommand.Executor
 }
 
 func (e *mockStreamExecutor) Stream(options remotecommand.StreamOptions) error {
