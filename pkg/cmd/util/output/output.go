@@ -26,9 +26,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/pkg/api"
 	"k8s.io/kubernetes/pkg/printers"
 
+	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/generated/clientset/scheme"
 	"github.com/heptio/ark/pkg/util/encode"
@@ -168,7 +168,7 @@ func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
 
 	printer := printers.NewHumanReadablePrinter(
 		encoder,
-		scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
+		scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion),
 		options,
 	)
 

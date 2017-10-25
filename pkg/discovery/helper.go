@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/pkg/api"
 )
 
 // Helper exposes functions for interacting with the Kubernetes discovery
@@ -110,9 +109,6 @@ func (h *helper) Refresh() error {
 
 	h.resources = discovery.FilteredBy(
 		discovery.ResourcePredicateFunc(func(groupVersion string, r *metav1.APIResource) bool {
-			if groupVersion == api.SchemeGroupVersion.String() {
-				return false
-			}
 			return discovery.SupportsAllVerbs{Verbs: []string{"list", "create"}}.Match(groupVersion, r)
 		}),
 		preferredResources,

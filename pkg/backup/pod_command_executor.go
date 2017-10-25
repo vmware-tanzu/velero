@@ -25,9 +25,9 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	kapiv1 "k8s.io/api/core/v1"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
-	kapiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 )
