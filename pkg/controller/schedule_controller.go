@@ -35,8 +35,8 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"

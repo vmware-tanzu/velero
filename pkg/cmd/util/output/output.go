@@ -30,7 +30,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 	"github.com/heptio/ark/pkg/util/encode"
 )
 
