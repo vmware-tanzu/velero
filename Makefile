@@ -41,18 +41,16 @@ platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
 
-BASEIMAGE?=alpine:3.6
-
 # TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
-#ifeq ($(GOARCH),amd64)
-#		BASEIMAGE?=alpine:3.6
-#endif
+ifeq ($(GOARCH),amd64)
+		DOCKERFILE ?= Dockerfile.alpine
+endif
 #ifeq ($(GOARCH),arm)
-#		BASEIMAGE?=armel/busybox
+#		DOCKERFILE ?= Dockerfile.arm #armel/busybox
 #endif
 #ifeq ($(GOARCH),arm64)
-#		BASEIMAGE?=aarch64/busybox
+#		DOCKERFILE ?= Dockerfile.arm64 #aarch64/busybox
 #endif
 
 IMAGE := $(REGISTRY)/$(BIN)
@@ -112,13 +110,8 @@ shell: build-dirs
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
 container: verify test .container-$(DOTFILE_IMAGE) container-name
-.container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) Dockerfile.in
-	@sed \
-		-e 's|ARG_BIN|$(BIN)|g' \
-		-e 's|ARG_OS|$(GOOS)|g' \
-		-e 's|ARG_ARCH|$(GOARCH)|g' \
-		-e 's|ARG_FROM|$(BASEIMAGE)|g' \
-		Dockerfile.in > _output/.dockerfile-$(GOOS)-$(GOARCH)
+.container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
+	@cp $(DOCKERFILE) _output/.dockerfile-$(GOOS)-$(GOARCH)
 	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(GOOS)-$(GOARCH) _output
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
