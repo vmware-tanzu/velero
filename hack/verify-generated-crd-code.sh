@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2017 Heptio Inc.
+# Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,12 +16,4 @@
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-echo "Verifying generated informers"
-
-if ! output=$(${HACK_DIR}/update-generated-informers.sh --verify-only 2>&1); then
-  echo "FAILURE: verification of informers failed:"
-  echo "${output}"
-  exit 1
-fi
-
-echo "Success!"
+${HACK_DIR}/update-generated-crd-code.sh --verify-only

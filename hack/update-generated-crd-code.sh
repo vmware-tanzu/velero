@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2017 Heptio Inc.
+# Copyright 2017 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,13 +15,12 @@
 # limitations under the License.
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
+REPO_ROOT=${HACK_DIR}/..
 
-echo "Verifying generated clientsets"
-
-if ! output=$(${HACK_DIR}/update-generated-clientsets.sh --verify-only 2>&1); then
-  echo "FAILURE: verification of clientsets failed:"
-  echo "${output}"
-  exit 1
-fi
-
-echo "Success!"
+${REPO_ROOT}/vendor/k8s.io/code-generator/generate-groups.sh \
+  all \
+  github.com/heptio/ark/pkg/generated \
+  github.com/heptio/ark/pkg/apis \
+  ark:v1 \
+  --go-header-file hack/boilerplate.go.txt \
+  $@
