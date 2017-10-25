@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	kcorev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -194,11 +193,7 @@ func (s *server) run() error {
 
 	// watchConfig needs to examine the unmodified original config, so we keep that around as a
 	// separate object, and instead apply defaults to a clone.
-	copy, err := scheme.Scheme.DeepCopy(originalConfig)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	config := copy.(*api.Config)
+	config := originalConfig.DeepCopy()
 	applyConfigDefaults(config, s.logger)
 
 	s.watchConfig(originalConfig)
