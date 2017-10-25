@@ -1,8 +1,23 @@
+/*
+Copyright 2017 the Heptio Ark contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package v1
 
 import (
 	v1 "github.com/heptio/ark/pkg/apis/ark/v1"
-	scheme "github.com/heptio/ark/pkg/generated/clientset/scheme"
+	scheme "github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -43,6 +58,41 @@ func newBackups(c *ArkV1Client, namespace string) *backups {
 	}
 }
 
+// Get takes name of the backup, and returns the corresponding backup object, and an error if there is any.
+func (c *backups) Get(name string, options meta_v1.GetOptions) (result *v1.Backup, err error) {
+	result = &v1.Backup{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("backups").
+		Name(name).
+		VersionedParams(&options, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// List takes label and field selectors, and returns the list of Backups that match those selectors.
+func (c *backups) List(opts meta_v1.ListOptions) (result *v1.BackupList, err error) {
+	result = &v1.BackupList{}
+	err = c.client.Get().
+		Namespace(c.ns).
+		Resource("backups").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Do().
+		Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested backups.
+func (c *backups) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+	opts.Watch = true
+	return c.client.Get().
+		Namespace(c.ns).
+		Resource("backups").
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Watch()
+}
+
 // Create takes the representation of a backup and creates it.  Returns the server's representation of the backup, and an error, if there is any.
 func (c *backups) Create(backup *v1.Backup) (result *v1.Backup, err error) {
 	result = &v1.Backup{}
@@ -69,7 +119,7 @@ func (c *backups) Update(backup *v1.Backup) (result *v1.Backup, err error) {
 }
 
 // UpdateStatus was generated because the type contains a Status member.
-// Add a +genclientstatus=false comment above the type to avoid generating UpdateStatus().
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 
 func (c *backups) UpdateStatus(backup *v1.Backup) (result *v1.Backup, err error) {
 	result = &v1.Backup{}
@@ -104,41 +154,6 @@ func (c *backups) DeleteCollection(options *meta_v1.DeleteOptions, listOptions m
 		Body(options).
 		Do().
 		Error()
-}
-
-// Get takes name of the backup, and returns the corresponding backup object, and an error if there is any.
-func (c *backups) Get(name string, options meta_v1.GetOptions) (result *v1.Backup, err error) {
-	result = &v1.Backup{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("backups").
-		Name(name).
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// List takes label and field selectors, and returns the list of Backups that match those selectors.
-func (c *backups) List(opts meta_v1.ListOptions) (result *v1.BackupList, err error) {
-	result = &v1.BackupList{}
-	err = c.client.Get().
-		Namespace(c.ns).
-		Resource("backups").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Do().
-		Into(result)
-	return
-}
-
-// Watch returns a watch.Interface that watches the requested backups.
-func (c *backups) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
-	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("backups").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Watch()
 }
 
 // Patch applies the patch and returns the patched backup.

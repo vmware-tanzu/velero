@@ -1,8 +1,23 @@
-package clientset
+/*
+Copyright 2017 the Heptio Ark contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+package versioned
 
 import (
 	glog "github.com/golang/glog"
-	arkv1 "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -19,24 +34,18 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	*arkv1.ArkV1Client
+	arkV1 *arkv1.ArkV1Client
 }
 
 // ArkV1 retrieves the ArkV1Client
 func (c *Clientset) ArkV1() arkv1.ArkV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.ArkV1Client
+	return c.arkV1
 }
 
 // Deprecated: Ark retrieves the default version of ArkClient.
 // Please explicitly pick a version.
 func (c *Clientset) Ark() arkv1.ArkV1Interface {
-	if c == nil {
-		return nil
-	}
-	return c.ArkV1Client
+	return c.arkV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -55,7 +64,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.ArkV1Client, err = arkv1.NewForConfig(&configShallowCopy)
+	cs.arkV1, err = arkv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +81,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.ArkV1Client = arkv1.NewForConfigOrDie(c)
+	cs.arkV1 = arkv1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -81,7 +90,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.ArkV1Client = arkv1.New(c)
+	cs.arkV1 = arkv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs
