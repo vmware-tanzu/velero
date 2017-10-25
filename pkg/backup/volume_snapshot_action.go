@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/clock"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -37,7 +36,6 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 // that are backed by compatible cloud volumes.
 type volumeSnapshotAction struct {
 	snapshotService cloudprovider.SnapshotService
-	clock           clock.Clock
 }
 
 func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Action, error) {
@@ -47,7 +45,6 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Act
 
 	return &volumeSnapshotAction{
 		snapshotService: snapshotService,
-		clock:           clock.RealClock{},
 	}, nil
 }
 
