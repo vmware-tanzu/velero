@@ -184,7 +184,8 @@ type VolumeBackupInfo struct {
 	Iops *int64 `json:"iops,omitempty"`
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Backup is an Ark resource that respresents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).
@@ -195,6 +196,8 @@ type Backup struct {
 	Spec   BackupSpec   `json:"spec"`
 	Status BackupStatus `json:"status,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BackupList is a list of Backups.
 type BackupList struct {
