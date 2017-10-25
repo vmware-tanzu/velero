@@ -1,5 +1,28 @@
 # Changelog
 
+#### [v0.5.0](https://github.com/heptio/ark/tree/v0.5.0) - 2017-10-26
+Breaking changes:
+  * The backup tar file format has changed. Backups created using previous versions of Ark cannot be restored using v0.5.0.
+  * When backing up one or more specific namespaces, cluster-scoped resources are no longer backed up by default, with the exception of PVs that are used within the target namespace(s). Cluster-scoped resources can still be included by explicitly specifying `--include-cluster-resources`.
+
+New features:
+  * Add customized user-agent string for Ark CLI
+  * Switch from glog to logrus
+  * Exclude nodes from restoration
+  * Add a FAQ
+  * Record PV availability zone and use it when restoring volumes from snapshots
+  * Back up the PV associated with a PVC
+  * Add `--include-cluster-resources` flag to `ark backup create`
+  * Add `--include-cluster-resources` flag to `ark restore create`
+  * Properly support resource restore priorities across cluster-scoped and namespace-scoped resources
+  * Support `ark create ...` and `ark get ...`
+  * Make ark run as cluster-admin
+  * Add pod exec backup hooks
+  * Support cross-compilation & upgrade to go 1.9
+  
+Bug fixes:
+  * Make config change detection more robust
+
 #### [v0.4.0](https://github.com/heptio/ark/tree/v0.4.0) - 2017-09-14
 Breaking changes:
   * Snapshotting and restoring volumes is now enabled by default
