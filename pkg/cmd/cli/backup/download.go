@@ -107,7 +107,10 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	defer backupDest.Close()
 
 	err = downloadrequest.Stream(arkClient.ArkV1(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
-	cmd.CheckError(err)
+	if err != nil {
+		os.Remove(o.Output)
+		cmd.CheckError(err)
+	}
 
 	fmt.Printf("Backup %s has been successfully downloaded to %s\n", o.Name, backupDest.Name())
 	return nil
