@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ func (_m *BackupService) GetBackup(bucket string, name string) (*v1.Backup, erro
 }
 
 // UploadBackup provides a mock function with given fields: bucket, name, metadata, backup, log
-func (_m *BackupService) UploadBackup(bucket string, name string, metadata, backup, log io.Reader) error {
+func (_m *BackupService) UploadBackup(bucket string, name string, metadata io.Reader, backup io.Reader, log io.Reader) error {
 	ret := _m.Called(bucket, name, metadata, backup, log)
 
 	var r0 error
@@ -152,6 +152,20 @@ func (_m *BackupService) UploadRestoreLog(bucket string, backup string, restore 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(string, string, string, io.Reader) error); ok {
 		r0 = rf(bucket, backup, restore, log)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadRestoreResults provides a mock function with given fields: bucket, backup, restore, results
+func (_m *BackupService) UploadRestoreResults(bucket string, backup string, restore string, results io.Reader) error {
+	ret := _m.Called(bucket, backup, restore, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, io.Reader) error); ok {
+		r0 = rf(bucket, backup, restore, results)
 	} else {
 		r0 = ret.Error(0)
 	}

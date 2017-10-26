@@ -919,8 +919,6 @@ func (in *RestoreStatus) DeepCopyInto(out *RestoreStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	in.Warnings.DeepCopyInto(&out.Warnings)
-	in.Errors.DeepCopyInto(&out.Errors)
 	return
 }
 
