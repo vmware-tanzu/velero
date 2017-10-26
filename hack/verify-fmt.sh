@@ -16,9 +16,16 @@
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-echo "Updating formatting"
-
-gofmt -w -s $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
-goimports -w -d $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
-
+echo "Verifying gofmt"
+files=$(gofmt -l -s $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*"))
+if [[ -n "${files}" ]]; then
+  echo "The following files need gofmt updating - please run 'make update'"
+  echo "${files}"
+  exit 1
+fi
 echo "Success!"
+
+echo "Verifying goimports"
+goimports -l $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
+echo "Success!"
+
