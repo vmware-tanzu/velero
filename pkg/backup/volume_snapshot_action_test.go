@@ -26,7 +26,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -190,9 +189,6 @@ func TestVolumeSnapshotAction(t *testing.T) {
 
 			vsa, _ := NewVolumeSnapshotAction(snapshotService)
 			action := vsa.(*volumeSnapshotAction)
-
-			fakeClock := clock.NewFakeClock(time.Now())
-			action.clock = fakeClock
 
 			pv, err := getAsMap(test.pv)
 			if err != nil {
