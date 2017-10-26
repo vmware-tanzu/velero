@@ -83,7 +83,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
+				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
 		{
@@ -95,7 +95,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
+				"vol-abc123": {Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
 		{
@@ -107,7 +107,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-west-2a"},
+				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-west-2a"},
 			},
 		},
 		{
@@ -119,7 +119,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "pd-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"pd-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "gcp-zone2"},
+				"pd-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "gcp-zone2"},
 			},
 		},
 		{
@@ -131,7 +131,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "foo-disk",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"foo-disk": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"foo-disk": {Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
@@ -143,10 +143,10 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "pd-abc123",
 			ttl:                    5 * time.Minute,
 			existingVolumeBackups: map[string]*v1.VolumeBackupInfo{
-				"anotherpv": &v1.VolumeBackupInfo{SnapshotID: "anothersnap"},
+				"anotherpv": {SnapshotID: "anothersnap"},
 			},
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"pd-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"pd-abc123": {Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
@@ -164,7 +164,7 @@ func TestVolumeSnapshotAction(t *testing.T) {
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": v1.VolumeBackupInfo{Type: "gp", SnapshotID: "snap-1"},
+				"vol-abc123": {Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 	}

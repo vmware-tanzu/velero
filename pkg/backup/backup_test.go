@@ -96,8 +96,8 @@ func TestResolveActions(t *testing.T) {
 			name:  "resolved",
 			input: map[string]Action{"foo": &fakeAction{}, "bar": &fakeAction{}},
 			expected: map[schema.GroupResource]Action{
-				schema.GroupResource{Group: "somegroup", Resource: "foodies"}:      &fakeAction{},
-				schema.GroupResource{Group: "anothergroup", Resource: "barnacles"}: &fakeAction{},
+				{Group: "somegroup", Resource: "foodies"}:      &fakeAction{},
+				{Group: "anothergroup", Resource: "barnacles"}: &fakeAction{},
 			},
 		},
 	}
@@ -105,10 +105,10 @@ func TestResolveActions(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
-				schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-				schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-				schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-				schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+				{Resource: "foo"}: {Group: "somegroup", Resource: "foodies"},
+				{Resource: "fie"}: {Group: "somegroup", Resource: "fields"},
+				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
+				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
 			}
 			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
 
@@ -174,10 +174,10 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
-				schema.GroupVersionResource{Resource: "foo"}: schema.GroupVersionResource{Group: "somegroup", Resource: "foodies"},
-				schema.GroupVersionResource{Resource: "fie"}: schema.GroupVersionResource{Group: "somegroup", Resource: "fields"},
-				schema.GroupVersionResource{Resource: "bar"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "barnacles"},
-				schema.GroupVersionResource{Resource: "baz"}: schema.GroupVersionResource{Group: "anothergroup", Resource: "bazaars"},
+				{Resource: "foo"}: {Group: "somegroup", Resource: "foodies"},
+				{Resource: "fie"}: {Group: "somegroup", Resource: "fields"},
+				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
+				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
 			}
 			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
 
@@ -463,9 +463,9 @@ func TestBackup(t *testing.T) {
 			discoveryHelper := &arktest.FakeDiscoveryHelper{
 				Mapper: &arktest.FakeMapper{
 					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-						schema.GroupVersionResource{Resource: "cm"}:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
-						schema.GroupVersionResource{Resource: "csr"}:   schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
-						schema.GroupVersionResource{Resource: "roles"}: schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"},
+						{Resource: "cm"}:    {Group: "", Version: "v1", Resource: "configmaps"},
+						{Resource: "csr"}:   {Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
+						{Resource: "roles"}: {Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"},
 					},
 				},
 				ResourceList: []*metav1.APIResourceList{

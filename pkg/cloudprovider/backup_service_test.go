@@ -201,11 +201,11 @@ func TestGetAllBackups(t *testing.T) {
 				"backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []*api.Backup{
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
 				},
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-2"},
 				},
@@ -218,7 +218,7 @@ func TestGetAllBackups(t *testing.T) {
 				"backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
 			},
 			expectedRes: []*api.Backup{
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
 				},

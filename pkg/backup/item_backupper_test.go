@@ -83,7 +83,7 @@ func TestBackupItemSkips(t *testing.T) {
 			namespaces:    collections.NewIncludesExcludes(),
 			resources:     collections.NewIncludesExcludes(),
 			backedUpItems: map[itemKey]struct{}{
-				{resource: "bar.foo", namespace: "ns", name: "foo"}: struct{}{},
+				{resource: "bar.foo", namespace: "ns", name: "foo"}: {},
 			},
 		},
 	}
