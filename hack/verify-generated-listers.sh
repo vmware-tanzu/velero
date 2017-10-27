@@ -15,8 +15,13 @@
 # limitations under the License.
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
+
+echo "Verifying generated listers"
+
 if ! output=$(${HACK_DIR}/update-generated-listers.sh --verify-only 2>&1); then
   echo "FAILURE: verification of listers failed:"
   echo "${output}"
   exit 1
 fi
+
+echo "Success!"

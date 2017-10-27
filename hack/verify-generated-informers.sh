@@ -15,8 +15,13 @@
 # limitations under the License.
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
+
+echo "Verifying generated informers"
+
 if ! output=$(${HACK_DIR}/update-generated-informers.sh --verify-only 2>&1); then
   echo "FAILURE: verification of informers failed:"
   echo "${output}"
   exit 1
 fi
+
+echo "Success!"

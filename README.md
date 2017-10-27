@@ -76,12 +76,9 @@ kubectl get deployments -l component=ark --namespace=heptio-ark
 kubectl get deployments --namespace=nginx-example
 ```
 
-Finally, create an alias for the Ark client's Docker executable. (Make sure that your `KUBECONFIG` environment variable is pointing at the proper config first). This will save a lot of future typing:
-
-```
-alias ark='docker run --rm -u $(id -u) -v $(dirname $KUBECONFIG):/kubeconfig -e KUBECONFIG=/kubeconfig/$(basename $KUBECONFIG) gcr.io/heptio-images/ark:latest'
-```
-*NOTE*: Depending on how your Kubeconfig is written--if it refers to the Kubernetes API server using the host machine's `localhost`, for instance--you may need to add an additional `--net="host"` flag to the `docker run` command.
+Finally, install the Ark client somehwere in your `$PATH`:
+* [Download a pre-built release][26], or
+* [Build it from scratch][7]
 
 
 ### 3. Back up and restore
@@ -212,3 +209,4 @@ See [the list of releases][6] to find out about feature changes.
 [23]: /docs/cloud-provider-specifics.md
 [24]: http://j.hept.io/ark-list
 [25]: http://slack.kubernetes.io/
+[26]: https://github.com/heptio/ark/releases

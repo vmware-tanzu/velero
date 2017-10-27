@@ -175,7 +175,7 @@ func TestProcessRestore(t *testing.T) {
 			restore:     NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Restore,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "", "ns-1", "*", api.RestorePhaseFailedValidation).
+				NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseFailedValidation).
 					WithValidationError("BackupName must be non-empty and correspond to the name of a backup in object storage.").
 					Restore,
 			},
@@ -187,8 +187,8 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr:                 false,
 			backupServiceGetBackupError: errors.New("no backup here"),
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseCompleted).
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
 					WithErrors(api.RestoreResult{
 						Ark: []string{"no backup here"},
 					}).
@@ -202,8 +202,8 @@ func TestProcessRestore(t *testing.T) {
 			restorerError: errors.New("blarg"),
 			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseCompleted).
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
 					WithErrors(api.RestoreResult{
 						Namespaces: map[string][]string{
 							"ns-1": {"blarg"},
@@ -211,7 +211,7 @@ func TestProcessRestore(t *testing.T) {
 					}).
 					Restore,
 			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
 		{
 			name:        "valid restore gets executed",
@@ -219,21 +219,10 @@ func TestProcessRestore(t *testing.T) {
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseCompleted).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).Restore,
 			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).Restore,
-		},
-		{
-			name:        "restore with no restorable namespaces gets defaulted to *",
-			restore:     NewRestore("foo", "bar", "backup-1", "", "", api.RestorePhaseNew).Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "*", "*", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "*", "*", api.RestorePhaseCompleted).Restore,
-			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "*", "*", api.RestorePhaseInProgress).Restore,
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
 		{
 			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
@@ -242,10 +231,10 @@ func TestProcessRestore(t *testing.T) {
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseCompleted).WithRestorePVs(true).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).WithRestorePVs(true).Restore,
 			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
 		},
 		{
 			name:        "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
@@ -253,7 +242,7 @@ func TestProcessRestore(t *testing.T) {
 			backup:      NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseFailedValidation).
+				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseFailedValidation).
 					WithRestorePVs(true).
 					WithValidationError("Server is not configured for PV snapshot restores").
 					Restore,

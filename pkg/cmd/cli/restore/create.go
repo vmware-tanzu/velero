@@ -33,11 +33,11 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/output"
 )
 
-func NewCreateCommand(f client.Factory) *cobra.Command {
+func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
 	c := &cobra.Command{
-		Use:   "create BACKUP",
+		Use:   use + " BACKUP",
 		Short: "Create a restore",
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args))
@@ -54,23 +54,25 @@ func NewCreateCommand(f client.Factory) *cobra.Command {
 }
 
 type CreateOptions struct {
-	BackupName        string
-	RestoreVolumes    flag.OptionalBool
-	Labels            flag.Map
-	IncludeNamespaces flag.StringArray
-	ExcludeNamespaces flag.StringArray
-	IncludeResources  flag.StringArray
-	ExcludeResources  flag.StringArray
-	NamespaceMappings flag.Map
-	Selector          flag.LabelSelector
+	BackupName              string
+	RestoreVolumes          flag.OptionalBool
+	Labels                  flag.Map
+	IncludeNamespaces       flag.StringArray
+	ExcludeNamespaces       flag.StringArray
+	IncludeResources        flag.StringArray
+	ExcludeResources        flag.StringArray
+	NamespaceMappings       flag.Map
+	Selector                flag.LabelSelector
+	IncludeClusterResources flag.OptionalBool
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		Labels:            flag.NewMap(),
-		IncludeNamespaces: flag.NewStringArray("*"),
-		NamespaceMappings: flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
-		RestoreVolumes:    flag.NewOptionalBool(nil),
+		Labels:                  flag.NewMap(),
+		IncludeNamespaces:       flag.NewStringArray("*"),
+		NamespaceMappings:       flag.NewMap().WithEntryDelimiter(",").WithKeyValueDelimiter(":"),
+		RestoreVolumes:          flag.NewOptionalBool(nil),
+		IncludeClusterResources: flag.NewOptionalBool(nil),
 	}
 }
 
@@ -85,6 +87,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f := flags.VarPF(&o.RestoreVolumes, "restore-volumes", "", "whether to restore volumes from snapshots")
 	// this allows the user to just specify "--restore-volumes" as shorthand for "--restore-volumes=true"
 	// like a normal bool flag
+	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the restore")
 	f.NoOptDefVal = "true"
 }
 
@@ -118,14 +123,15 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Labels:    o.Labels.Data(),
 		},
 		Spec: api.RestoreSpec{
-			BackupName:         o.BackupName,
-			IncludedNamespaces: o.IncludeNamespaces,
-			ExcludedNamespaces: o.ExcludeNamespaces,
-			IncludedResources:  o.IncludeResources,
-			ExcludedResources:  o.ExcludeResources,
-			NamespaceMapping:   o.NamespaceMappings.Data(),
-			LabelSelector:      o.Selector.LabelSelector,
-			RestorePVs:         o.RestoreVolumes.Value,
+			BackupName:              o.BackupName,
+			IncludedNamespaces:      o.IncludeNamespaces,
+			ExcludedNamespaces:      o.ExcludeNamespaces,
+			IncludedResources:       o.IncludeResources,
+			ExcludedResources:       o.ExcludeResources,
+			NamespaceMapping:        o.NamespaceMappings.Data(),
+			LabelSelector:           o.Selector.LabelSelector,
+			RestorePVs:              o.RestoreVolumes.Value,
+			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
 	}
 

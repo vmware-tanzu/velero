@@ -53,7 +53,69 @@ type BackupSpec struct {
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
 	IncludeClusterResources *bool `json:"includeClusterResources"`
+
+	// Hooks represent custom behaviors that should be executed at different phases of the backup.
+	Hooks BackupHooks `json:"hooks"`
 }
+
+// BackupHooks contains custom behaviors that should be executed at different phases of the backup.
+type BackupHooks struct {
+	// Resources are hooks that should be executed when backing up individual instances of a resource.
+	Resources []BackupResourceHookSpec `json:"resources"`
+}
+
+// BackupResourceHookSpec defines one or more BackupResourceHooks that should be executed based on
+// the rules defined for namespaces, resources, and label selector.
+type BackupResourceHookSpec struct {
+	// Name is the name of this hook.
+	Name string `json:"name"`
+	// IncludedNamespaces specifies the namespaces to which this hook spec applies. If empty, it applies
+	// to all namespaces.
+	IncludedNamespaces []string `json:"includedNamespaces"`
+	// ExcludedNamespaces specifies the namespaces to which this hook spec does not apply.
+	ExcludedNamespaces []string `json:"excludedNamespaces"`
+	// IncludedResources specifies the resources to which this hook spec applies. If empty, it applies
+	// to all resources.
+	IncludedResources []string `json:"includedResources"`
+	// ExcludedResources specifies the resources to which this hook spec does not apply.
+	ExcludedResources []string `json:"excludedResources"`
+	// LabelSelector, if specified, filters the resources to which this hook spec applies.
+	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
+	// Hooks is a list of BackupResourceHooks to execute.
+	Hooks []BackupResourceHook `json:"hooks"`
+}
+
+// BackupResourceHook defines a hook for a resource.
+type BackupResourceHook struct {
+	// Exec defines an exec hook.
+	Exec *ExecHook `json:"exec"`
+}
+
+// ExecHook is a hook that uses the pod exec API to execute a command in a container in a pod.
+type ExecHook struct {
+	// Container is the container in the pod where the command should be executed. If not specified,
+	// the pod's first container is used.
+	Container string `json:"container"`
+	// Command is the command and arguments to execute.
+	Command []string `json:"command"`
+	// OnError specifies how Ark should behave if it encounters an error executing this hook.
+	OnError HookErrorMode `json:"onError"`
+	// Timeout defines the maximum amount of time Ark should wait for the hook to complete before
+	// considering the execution a failure.
+	Timeout metav1.Duration `json:"timeout"`
+}
+
+// HookErrorMode defines how Ark should treat an error from a hook.
+type HookErrorMode string
+
+const (
+	// HookErrorModeContinue means that an error from a hook is acceptable, and the backup can
+	// proceed.
+	HookErrorModeContinue HookErrorMode = "Continue"
+	// HookErrorModeFail means that an error from a hook is problematic, and the backup should be in
+	// error.
+	HookErrorModeFail HookErrorMode = "Fail"
+)
 
 // BackupPhase is a string representation of the lifecycle phase
 // of an Ark backup.

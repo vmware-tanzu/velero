@@ -1,4 +1,4 @@
-# Copyright 2017 Heptio Inc.
+# Copyright 2017 the Heptio Ark project contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
 # limitations under the License.
 
 FROM alpine:3.6
-MAINTAINER Andy Goldstein "andy@heptio.com"
 
-RUN apk add --no-cache ca-certificates && \
-    adduser -S -D -H -u 1000 ark
+MAINTAINER Andy Goldstein <andy@heptio.com>
 
-ADD _output/bin/ark /ark
+RUN apk add --no-cache ca-certificates
 
-USER ark
+ADD /bin/linux/amd64/ark /ark
+
+USER nobody:nobody
+
 ENTRYPOINT ["/ark"]

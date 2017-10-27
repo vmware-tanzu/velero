@@ -33,11 +33,11 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/output"
 )
 
-func NewCreateCommand(f client.Factory) *cobra.Command {
+func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
 	c := &cobra.Command{
-		Use:   "create NAME",
+		Use:   use + " NAME",
 		Short: "Create a backup",
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args))

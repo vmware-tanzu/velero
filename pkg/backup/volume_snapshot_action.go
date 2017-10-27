@@ -18,12 +18,13 @@ package backup
 
 import (
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -35,10 +36,7 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 // that are backed by compatible cloud volumes.
 type volumeSnapshotAction struct {
 	snapshotService cloudprovider.SnapshotService
-	clock           clock.Clock
 }
-
-var _ Action = &volumeSnapshotAction{}
 
 func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Action, error) {
 	if snapshotService == nil {
@@ -47,60 +45,62 @@ func NewVolumeSnapshotAction(snapshotService cloudprovider.SnapshotService) (Act
 
 	return &volumeSnapshotAction{
 		snapshotService: snapshotService,
-		clock:           clock.RealClock{},
 	}, nil
 }
 
 // Execute triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (a *volumeSnapshotAction) Execute(ctx *backupContext, volume map[string]interface{}, backupper itemBackupper) error {
-	var (
-		backup     = ctx.backup
-		backupName = kubeutil.NamespaceAndName(backup)
-	)
+func (a *volumeSnapshotAction) Execute(log *logrus.Entry, item runtime.Unstructured, backup *api.Backup) ([]ResourceIdentifier, error) {
+	var noAdditionalItems []ResourceIdentifier
+
+	log.Info("Executing volumeSnapshotAction")
 
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
-		ctx.infof("Backup %q has volume snapshots disabled; skipping volume snapshot action.", backupName)
-		return nil
+		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
+		return noAdditionalItems, nil
 	}
 
-	metadata := volume["metadata"].(map[string]interface{})
-	name := metadata["name"].(string)
+	metadata, err := meta.Accessor(item)
+	if err != nil {
+		return noAdditionalItems, errors.WithStack(err)
+	}
+
+	name := metadata.GetName()
 	var pvFailureDomainZone string
+	labels := metadata.GetLabels()
 
-	if labelsMap, err := collections.GetMap(metadata, "labels"); err != nil {
-		ctx.infof("error getting labels on PersistentVolume %q for backup %q: %v", name, backupName, err)
+	if labels[zoneLabel] != "" {
+		pvFailureDomainZone = labels[zoneLabel]
 	} else {
-		if labelsMap[zoneLabel] != nil {
-			pvFailureDomainZone = labelsMap[zoneLabel].(string)
-		} else {
-			ctx.infof("label %q is not present on PersistentVolume %q for backup %q.", zoneLabel, name, backupName)
-		}
+		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
 	}
 
-	volumeID, err := kubeutil.GetVolumeID(volume)
+	volumeID, err := kubeutil.GetVolumeID(item.UnstructuredContent())
 	// non-nil error means it's a supported PV source but volume ID can't be found
 	if err != nil {
-		return errors.Wrapf(err, "error getting volume ID for backup %q, PersistentVolume %q", backupName, name)
+		return noAdditionalItems, errors.Wrapf(err, "error getting volume ID for PersistentVolume")
 	}
 	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {
-		ctx.infof("Backup %q: PersistentVolume %q is not a supported volume type for snapshots, skipping.", backupName, name)
-		return nil
+		log.Info("PersistentVolume is not a supported volume type for snapshots, skipping.")
+		return noAdditionalItems, nil
 	}
 
-	ctx.infof("Backup %q: snapshotting PersistentVolume %q, volume-id %q", backupName, name, volumeID)
+	log = log.WithField("volumeID", volumeID)
+
+	log.Info("Snapshotting PersistentVolume")
 	snapshotID, err := a.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
 	if err != nil {
-		ctx.infof("error creating snapshot for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
-		return err
+		// log+error on purpose - log goes to the per-backup log file, error goes to the backup
+		log.WithError(err).Error("error creating snapshot")
+		return noAdditionalItems, errors.WithMessage(err, "error creating snapshot")
 	}
 
 	volumeType, iops, err := a.snapshotService.GetVolumeInfo(volumeID, pvFailureDomainZone)
 	if err != nil {
-		ctx.infof("error getting volume info for backup %q, volume %q, volume-id %q: %v", backupName, name, volumeID, err)
-		return err
+		log.WithError(err).Error("error getting volume info")
+		return noAdditionalItems, errors.WithMessage(err, "error getting volume info")
 	}
 
 	if backup.Status.VolumeBackups == nil {
@@ -114,5 +114,5 @@ func (a *volumeSnapshotAction) Execute(ctx *backupContext, volume map[string]int
 		AvailabilityZone: pvFailureDomainZone,
 	}
 
-	return nil
+	return noAdditionalItems, nil
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package collections
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -70,13 +72,33 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 		return false
 	}
 
-	return ie.includes.Has("*") || ie.includes.Has(s)
+	// len=0 means include everything
+	return ie.includes.Len() == 0 || ie.includes.Has("*") || ie.includes.Has(s)
 }
 
-// IncludeEverything returns true if the Includes list is '*'
-// and the Excludes list is empty, or false otherwise.
+// IncludesString returns a string containing all of the includes, separated by commas, or * if the
+// list is empty.
+func (ie *IncludesExcludes) IncludesString() string {
+	return asString(ie.GetIncludes())
+}
+
+// ExcludesString returns a string containing all of the excludes, separated by commas, or * if the
+// list is empty.
+func (ie *IncludesExcludes) ExcludesString() string {
+	return asString(ie.GetExcludes())
+}
+
+func asString(in []string) string {
+	if len(in) == 0 {
+		return "*"
+	}
+	return strings.Join(in, ", ")
+}
+
+// IncludeEverything returns true if the includes list is empty or '*'
+// and the excludes list is empty, or false otherwise.
 func (ie *IncludesExcludes) IncludeEverything() bool {
-	return ie.excludes.Len() == 0 && ie.includes.Len() == 1 && ie.includes.Has("*")
+	return ie.excludes.Len() == 0 && (ie.includes.Len() == 0 || (ie.includes.Len() == 1 && ie.includes.Has("*")))
 }
 
 // ValidateIncludesExcludes checks provided lists of included and excluded
@@ -90,10 +112,6 @@ func ValidateIncludesExcludes(includesList, excludesList []string) []error {
 
 	includes := sets.NewString(includesList...)
 	excludes := sets.NewString(excludesList...)
-
-	if includes.Len() == 0 {
-		errs = append(errs, errors.New("includes list cannot be empty"))
-	}
 
 	if includes.Len() > 1 && includes.Has("*") {
 		errs = append(errs, errors.New("includes list must either contain '*' only, or a non-empty list of items"))

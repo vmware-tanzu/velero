@@ -18,10 +18,12 @@ package backup
 
 import (
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
@@ -30,51 +32,29 @@ import (
 type backupPVAction struct {
 }
 
-var _ Action = &backupPVAction{}
-
 func NewBackupPVAction() Action {
 	return &backupPVAction{}
 }
 
+var pvGroupResource = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
+
 // Execute finds the PersistentVolume referenced by the provided
 // PersistentVolumeClaim and backs it up
-func (a *backupPVAction) Execute(ctx *backupContext, pvc map[string]interface{}, backupper itemBackupper) error {
-	pvcName, err := collections.GetString(pvc, "metadata.name")
-	if err != nil {
-		ctx.infof("unable to get metadata.name for PersistentVolumeClaim: %v", err)
-		return err
-	}
+func (a *backupPVAction) Execute(log *logrus.Entry, item runtime.Unstructured, backup *v1.Backup) ([]ResourceIdentifier, error) {
+	log.Info("Executing backupPVAction")
+	var additionalItems []ResourceIdentifier
+
+	pvc := item.UnstructuredContent()
 
 	volumeName, err := collections.GetString(pvc, "spec.volumeName")
 	if err != nil {
-		ctx.infof("unable to get spec.volumeName for PersistentVolumeClaim %s: %v", pvcName, err)
-		return err
+		return additionalItems, errors.WithMessage(err, "unable to get spec.volumeName")
 	}
 
-	gvr, resource, err := ctx.discoveryHelper.ResourceFor(schema.GroupVersionResource{Resource: "persistentvolumes"})
-	if err != nil {
-		ctx.infof("error getting GroupVersionResource for PersistentVolumes: %v", err)
-		return err
-	}
-	gr := gvr.GroupResource()
+	additionalItems = append(additionalItems, ResourceIdentifier{
+		GroupResource: pvGroupResource,
+		Name:          volumeName,
+	})
 
-	client, err := ctx.dynamicFactory.ClientForGroupVersionResource(gvr, resource, "")
-	if err != nil {
-		ctx.infof("error getting client for GroupVersionResource=%s, Resource=%s: %v", gvr.String(), resource, err)
-		return err
-	}
-
-	pv, err := client.Get(volumeName, metav1.GetOptions{})
-	if err != nil {
-		ctx.infof("error getting PersistentVolume %s: %v", volumeName, err)
-		return errors.WithStack(err)
-	}
-
-	ctx.infof("backing up PersistentVolume %s for PersistentVolumeClaim %s", volumeName, pvcName)
-	if err := backupper.backupItem(ctx, pv.UnstructuredContent(), gr); err != nil {
-		ctx.infof("error backing up PersistentVolume %s: %v", volumeName, err)
-		return err
-	}
-
-	return nil
+	return additionalItems, nil
 }

@@ -118,18 +118,16 @@ func TestProcessBackup(t *testing.T) {
 			expectBackup:     true,
 		},
 		{
-			name:             "if includednamespaces are specified, don't default to *",
-			key:              "heptio-ark/backup1",
-			backup:           NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
-			expectedIncludes: []string{"*"},
-			expectBackup:     true,
+			name:         "if includednamespaces are specified, don't default to *",
+			key:          "heptio-ark/backup1",
+			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
+			expectBackup: true,
 		},
 		{
-			name:             "ttl",
-			key:              "heptio-ark/backup1",
-			backup:           NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
-			expectedIncludes: []string{"*"},
-			expectBackup:     true,
+			name:         "ttl",
+			key:          "heptio-ark/backup1",
+			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
+			expectBackup: true,
 		},
 		{
 			name:         "backup with SnapshotVolumes when allowSnapshots=false fails validation",
@@ -138,12 +136,11 @@ func TestProcessBackup(t *testing.T) {
 			expectBackup: false,
 		},
 		{
-			name:             "backup with SnapshotVolumes when allowSnapshots=true gets executed",
-			key:              "heptio-ark/backup1",
-			backup:           NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
-			allowSnapshots:   true,
-			expectedIncludes: []string{"*"},
-			expectBackup:     true,
+			name:           "backup with SnapshotVolumes when allowSnapshots=true gets executed",
+			key:            "heptio-ark/backup1",
+			backup:         NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			allowSnapshots: true,
+			expectBackup:   true,
 		},
 	}
 
@@ -170,8 +167,6 @@ func TestProcessBackup(t *testing.T) {
 
 			var expiration time.Time
 
-			var expectedNSes []string
-
 			if test.backup != nil {
 				// add directly to the informer's store so the lister can function and so we don't have to
 				// start the shared informers.
@@ -187,14 +182,7 @@ func TestProcessBackup(t *testing.T) {
 				backup := copy.(*v1.Backup)
 				backup.Spec.IncludedResources = test.expectedIncludes
 				backup.Spec.ExcludedResources = test.expectedExcludes
-
-				if test.backup.Spec.IncludedNamespaces == nil {
-					expectedNSes = []string{"*"}
-				} else {
-					expectedNSes = test.backup.Spec.IncludedNamespaces
-				}
-
-				backup.Spec.IncludedNamespaces = expectedNSes
+				backup.Spec.IncludedNamespaces = test.backup.Spec.IncludedNamespaces
 				backup.Spec.SnapshotVolumes = test.backup.Spec.SnapshotVolumes
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
@@ -240,7 +228,7 @@ func TestProcessBackup(t *testing.T) {
 						WithPhase(v1.BackupPhaseInProgress).
 						WithIncludedResources(test.expectedIncludes...).
 						WithExcludedResources(test.expectedExcludes...).
-						WithIncludedNamespaces(expectedNSes...).
+						WithIncludedNamespaces(test.backup.Spec.IncludedNamespaces...).
 						WithTTL(test.backup.Spec.TTL.Duration).
 						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).
@@ -256,7 +244,7 @@ func TestProcessBackup(t *testing.T) {
 						WithPhase(v1.BackupPhaseCompleted).
 						WithIncludedResources(test.expectedIncludes...).
 						WithExcludedResources(test.expectedExcludes...).
-						WithIncludedNamespaces(expectedNSes...).
+						WithIncludedNamespaces(test.backup.Spec.IncludedNamespaces...).
 						WithTTL(test.backup.Spec.TTL.Duration).
 						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
 						WithExpiration(expiration).

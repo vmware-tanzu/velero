@@ -21,14 +21,14 @@ import (
 	"testing"
 	"time"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	. "github.com/heptio/ark/pkg/util/test"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestVolumeSnapshotAction(t *testing.T) {
@@ -185,28 +185,19 @@ func TestVolumeSnapshotAction(t *testing.T) {
 				},
 			}
 
-			snapshotService := &FakeSnapshotService{SnapshottableVolumes: test.volumeInfo}
+			snapshotService := &arktest.FakeSnapshotService{SnapshottableVolumes: test.volumeInfo}
 
 			vsa, _ := NewVolumeSnapshotAction(snapshotService)
 			action := vsa.(*volumeSnapshotAction)
-
-			fakeClock := clock.NewFakeClock(time.Now())
-			action.clock = fakeClock
 
 			pv, err := getAsMap(test.pv)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			log, _ := testlogger.NewNullLogger()
-
-			ctx := &backupContext{
-				backup: backup,
-				logger: log,
-			}
-
 			// method under test
-			err = action.Execute(ctx, pv, nil)
+			additionalItems, err := action.Execute(arktest.NewLogger(), &unstructured.Unstructured{Object: pv}, backup)
+			assert.Len(t, additionalItems, 0)
 
 			gotErr := err != nil
 

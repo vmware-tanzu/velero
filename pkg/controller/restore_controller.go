@@ -231,14 +231,6 @@ func (controller *restoreController) processRestore(key string) error {
 		return err
 	}
 
-	// defaulting
-	if len(restore.Spec.IncludedNamespaces) == 0 {
-		restore.Spec.IncludedNamespaces = []string{"*"}
-	}
-	if len(restore.Spec.IncludedResources) == 0 {
-		restore.Spec.IncludedResources = []string{"*"}
-	}
-
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
 		if !excludedResources.Has(nonrestorable) {

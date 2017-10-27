@@ -35,6 +35,8 @@ for i in "$@"; do
 done
 
 if [[ -z ${verify} ]]; then
+  echo "Updating generated clientsets"
+
   find ${ARK_ROOT}/pkg/generated/clientset \
     \( \
       -name '*.go' -and \
@@ -54,3 +56,5 @@ ${BIN}/client-gen \
   --input ark/v1 \
   --clientset-name clientset \
   $@
+
+echo "Success!"

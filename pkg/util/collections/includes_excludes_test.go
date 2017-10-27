@@ -34,9 +34,9 @@ func TestShouldInclude(t *testing.T) {
 		should   bool
 	}{
 		{
-			name:   "empty - don't include anything",
+			name:   "empty - include everything",
 			check:  "foo",
-			should: false,
+			should: true,
 		},
 		{
 			name:     "include *",
@@ -97,9 +97,8 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		expected []error
 	}{
 		{
-			name:     "include nothing not allowed",
+			name:     "empty includes (everything) is allowed",
 			includes: []string{},
-			expected: []error{errors.New("includes list cannot be empty")},
 		},
 		{
 			name:     "include everything",

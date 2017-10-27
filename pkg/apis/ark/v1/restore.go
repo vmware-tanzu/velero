@@ -54,6 +54,11 @@ type RestoreSpec struct {
 	// RestorePVs specifies whether to restore all included
 	// PVs from snapshot (via the cloudprovider).
 	RestorePVs *bool `json:"restorePVs"`
+
+	// IncludeClusterResources specifies whether cluster-scoped resources
+	// should be included for consideration in the restore. If null, defaults
+	// to true.
+	IncludeClusterResources *bool `json:"includeClusterResources"`
 }
 
 // RestorePhase is a string representation of the lifecycle phase

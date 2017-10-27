@@ -23,6 +23,8 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	"github.com/heptio/ark/pkg/cmd/cli/create"
+	"github.com/heptio/ark/pkg/cmd/cli/get"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
 	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 	"github.com/heptio/ark/pkg/cmd/server"
@@ -33,10 +35,13 @@ func NewCommand(name string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   name,
 		Short: "Back up and restore Kubernetes cluster resources.",
-		Long: `Heptio Ark is a tool for managing disaster recovery, specifically for
-Kubernetes cluster resources. It provides a simple, configurable,
-and operationally robust way to back up your application state and
-associated data.`,
+		Long: `Heptio Ark is a tool for managing disaster recovery, specifically for Kubernetes
+cluster resources. It provides a simple, configurable, and operationally robust
+way to back up your application state and associated data.
+
+If you're familiar with kubectl, Ark supports a similar model, allowing you to
+execute commands such as 'ark get backup' and 'ark create schedule'. The same
+operations can also be performed as 'ark backup get' and 'ark schedule create'.`,
 	}
 
 	f := client.NewFactory(name)
@@ -48,6 +53,8 @@ associated data.`,
 		restore.NewCommand(f),
 		server.NewCommand(),
 		version.NewCommand(),
+		get.NewCommand(f),
+		create.NewCommand(f),
 	)
 
 	// add the glog flags
