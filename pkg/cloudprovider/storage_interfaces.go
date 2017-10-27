@@ -26,7 +26,7 @@ import (
 type ObjectStorageAdapter interface {
 	// PutObject creates a new object using the data in body within the specified
 	// object storage bucket with the given key.
-	PutObject(bucket string, key string, body io.ReadSeeker) error
+	PutObject(bucket string, key string, body io.Reader) error
 
 	// GetObject retrieves the object with the given key from the specified
 	// bucket in object storage.

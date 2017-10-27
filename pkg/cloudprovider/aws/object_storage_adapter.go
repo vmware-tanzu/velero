@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -31,8 +32,9 @@ import (
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 
 type objectStorageAdapter struct {
-	s3       *s3.S3
-	kmsKeyID string
+	s3         *s3.S3
+	s3Uploader *s3manager.Uploader
+	kmsKeyID   string
 }
 
 func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStorageAdapter, error) {
@@ -64,13 +66,14 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 	}
 
 	return &objectStorageAdapter{
-		s3:       s3.New(sess),
-		kmsKeyID: kmsKeyID,
+		s3:         s3.New(sess),
+		s3Uploader: s3manager.NewUploader(sess),
+		kmsKeyID:   kmsKeyID,
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
-	req := &s3.PutObjectInput{
+func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
+	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
 		Body:   body,
@@ -82,7 +85,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 		req.SSEKMSKeyId = &op.kmsKeyID
 	}
 
-	_, err := op.s3.PutObject(req)
+	_, err := op.s3Uploader.Upload(req)
 
 	return errors.Wrapf(err, "error putting object %s", key)
 }

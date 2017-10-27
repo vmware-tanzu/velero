@@ -57,7 +57,7 @@ func NewObjectStorageAdapter(googleAccessID string, privateKey []byte) (cloudpro
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
+func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
 	obj := &storage.Object{
 		Name: key,
 	}
