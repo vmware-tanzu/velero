@@ -45,7 +45,7 @@ func TestBackupGroup(t *testing.T) {
 	discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
 
 	backedUpItems := map[itemKey]struct{}{
-		{resource: "a", namespace: "b", name: "c"}: struct{}{},
+		{resource: "a", namespace: "b", name: "c"}: {},
 	}
 
 	cohabitatingResources := map[string]*cohabitatingResource{
@@ -57,7 +57,7 @@ func TestBackupGroup(t *testing.T) {
 	}
 
 	actions := map[schema.GroupResource]Action{
-		schema.GroupResource{Group: "", Resource: "pods"}: &fakeAction{},
+		{Group: "", Resource: "pods"}: &fakeAction{},
 	}
 
 	podCommandExecutor := &mockPodCommandExecutor{}

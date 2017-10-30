@@ -35,8 +35,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -232,10 +231,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 
 	logContext.Debug("Cloning schedule")
 	// don't modify items in the cache
-	schedule, err = cloneSchedule(schedule)
-	if err != nil {
-		return err
-	}
+	schedule = schedule.DeepCopy()
 
 	// validation - even if the item is Enabled, we can't trust it
 	// so re-validate
@@ -268,20 +264,6 @@ func (controller *scheduleController) processSchedule(key string) error {
 	}
 
 	return nil
-}
-
-func cloneSchedule(in interface{}) (*api.Schedule, error) {
-	clone, err := scheme.Scheme.DeepCopy(in)
-	if err != nil {
-		return nil, errors.Wrap(err, "error deep-copying Schedule")
-	}
-
-	out, ok := clone.(*api.Schedule)
-	if !ok {
-		return nil, errors.Errorf("unexpected type: %T", clone)
-	}
-
-	return out, nil
 }
 
 func parseCronSchedule(itm *api.Schedule, logger *logrus.Logger) (cron.Schedule, []string) {
@@ -348,10 +330,7 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 		return errors.Wrap(err, "error creating Backup")
 	}
 
-	schedule, err := cloneSchedule(item)
-	if err != nil {
-		return err
-	}
+	schedule := item.DeepCopy()
 
 	schedule.Status.LastBackup = metav1.NewTime(now)
 

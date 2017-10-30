@@ -64,7 +64,8 @@ type DownloadRequestStatus struct {
 	Expiration metav1.Time `json:"expiration"`
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.
@@ -75,6 +76,8 @@ type DownloadRequest struct {
 	Spec   DownloadRequestSpec   `json:"spec"`
 	Status DownloadRequestStatus `json:"status,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DownloadRequestList is a list of DownloadRequests.
 type DownloadRequestList struct {

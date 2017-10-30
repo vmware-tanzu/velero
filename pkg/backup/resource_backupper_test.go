@@ -212,7 +212,7 @@ func TestBackupResource(t *testing.T) {
 		discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
 
 		backedUpItems := map[itemKey]struct{}{
-			{resource: "foo", namespace: "ns", name: "name"}: struct{}{},
+			{resource: "foo", namespace: "ns", name: "name"}: {},
 		}
 
 		cohabitatingResources := map[string]*cohabitatingResource{
@@ -352,7 +352,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
 
 			backedUpItems := map[itemKey]struct{}{
-				{resource: "foo", namespace: "ns", name: "name"}: struct{}{},
+				{resource: "foo", namespace: "ns", name: "name"}: {},
 			}
 
 			cohabitatingResources := map[string]*cohabitatingResource{

@@ -34,8 +34,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -210,11 +209,9 @@ const signedURLTTL = 10 * time.Minute
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
 func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest) error {
-	update, err := cloneDownloadRequest(downloadRequest)
-	if err != nil {
-		return err
-	}
+	update := downloadRequest.DeepCopy()
 
+	var err error
 	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, signedURLTTL)
 	if err != nil {
 		return err
@@ -258,19 +255,4 @@ func (c *downloadRequestController) resync() {
 
 		c.queue.Add(key)
 	}
-}
-
-// cloneDownloadRequest makes a deep copy of in.
-func cloneDownloadRequest(in *v1.DownloadRequest) (*v1.DownloadRequest, error) {
-	clone, err := scheme.Scheme.DeepCopy(in)
-	if err != nil {
-		return nil, errors.Wrap(err, "error deep-copying DownloadRequest")
-	}
-
-	out, ok := clone.(*v1.DownloadRequest)
-	if !ok {
-		return nil, errors.Errorf("unexpected type: %T", clone)
-	}
-
-	return out, nil
 }

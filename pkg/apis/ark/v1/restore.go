@@ -118,7 +118,8 @@ type RestoreResult struct {
 	Namespaces map[string][]string `json:"namespaces"`
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Restore is an Ark resource that represents the application of
 // resources from an Ark backup to a target Kubernetes cluster.
@@ -129,6 +130,8 @@ type Restore struct {
 	Spec   RestoreSpec   `json:"spec"`
 	Status RestoreStatus `json:"status,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RestoreList is a list of Restores.
 type RestoreList struct {

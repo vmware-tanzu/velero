@@ -28,13 +28,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/restore/restorers"
@@ -54,7 +54,7 @@ func TestPrioritizeResources(t *testing.T) {
 		{
 			name: "priorities & ordering are correctly applied",
 			apiResources: map[string][]string{
-				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
 			},
 			priorities: []string{"namespaces", "configmaps", "pods"},
 			includes:   []string{"*"},
@@ -63,7 +63,7 @@ func TestPrioritizeResources(t *testing.T) {
 		{
 			name: "includes are correctly applied",
 			apiResources: map[string][]string{
-				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
 			},
 			priorities: []string{"namespaces", "configmaps", "pods"},
 			includes:   []string{"namespaces", "aaa", "sss"},
@@ -72,7 +72,7 @@ func TestPrioritizeResources(t *testing.T) {
 		{
 			name: "excludes are correctly applied",
 			apiResources: map[string][]string{
-				"v1": []string{"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
 			},
 			priorities: []string{"namespaces", "configmaps", "pods"},
 			includes:   []string{"*"},
@@ -132,8 +132,8 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "nodes"},
-				schema.GroupResource{Resource: "secrets"},
+				{Resource: "nodes"},
+				{Resource: "secrets"},
 			},
 		},
 		{
@@ -143,8 +143,8 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "nodes"},
-				schema.GroupResource{Resource: "secrets"},
+				{Resource: "nodes"},
+				{Resource: "secrets"},
 			},
 		},
 		{
@@ -154,8 +154,8 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "nodes"},
-				schema.GroupResource{Resource: "secrets"},
+				{Resource: "nodes"},
+				{Resource: "secrets"},
 			},
 		},
 		{
@@ -170,8 +170,8 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/c"},
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "nodes"},
-				schema.GroupResource{Resource: "secrets"},
+				{Resource: "nodes"},
+				{Resource: "secrets"},
 			},
 		},
 	}
@@ -217,9 +217,9 @@ func TestRestorePriority(t *testing.T) {
 			baseDir:    "bak",
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "a"},
-				schema.GroupResource{Resource: "b"},
-				schema.GroupResource{Resource: "c"},
+				{Resource: "a"},
+				{Resource: "b"},
+				{Resource: "c"},
 			},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/a/cluster", "bak/resources/c/cluster"},
 		},
@@ -229,9 +229,9 @@ func TestRestorePriority(t *testing.T) {
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "c"},
-				schema.GroupResource{Resource: "b"},
-				schema.GroupResource{Resource: "a"},
+				{Resource: "c"},
+				{Resource: "b"},
+				{Resource: "a"},
 			},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/c/cluster", "bak/resources/a/cluster"},
 		},
@@ -241,9 +241,9 @@ func TestRestorePriority(t *testing.T) {
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "a"},
-				schema.GroupResource{Resource: "b"},
-				schema.GroupResource{Resource: "c"},
+				{Resource: "a"},
+				{Resource: "b"},
+				{Resource: "c"},
 			},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
 		},
@@ -255,9 +255,9 @@ func TestRestorePriority(t *testing.T) {
 			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir: "bak",
 			prioritizedResources: []schema.GroupResource{
-				schema.GroupResource{Resource: "a"},
-				schema.GroupResource{Resource: "b"},
-				schema.GroupResource{Resource: "c"},
+				{Resource: "a"},
+				{Resource: "b"},
+				{Resource: "c"},
 			},
 			expectedErrors: api.RestoreResult{
 				Namespaces: map[string][]string{
@@ -395,7 +395,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
 			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{schema.GroupResource{Resource: "configmaps"}: newFakeCustomRestorer()},
+			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{{Resource: "configmaps"}: newFakeCustomRestorer()},
 			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).WithArkLabel("my-restore").ConfigMap),
 		},
 		{
@@ -404,7 +404,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
 			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{schema.GroupResource{Resource: "foo-resource"}: newFakeCustomRestorer()},
+			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{{Resource: "foo-resource"}: newFakeCustomRestorer()},
 			expectedObjs:  toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
 		{

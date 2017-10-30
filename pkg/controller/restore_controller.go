@@ -36,8 +36,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restore"
@@ -226,10 +225,7 @@ func (controller *restoreController) processRestore(key string) error {
 
 	logContext.Debug("Cloning Restore")
 	// don't modify items in the cache
-	restore, err = cloneRestore(restore)
-	if err != nil {
-		return err
-	}
+	restore = restore.DeepCopy()
 
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -269,20 +265,6 @@ func (controller *restoreController) processRestore(key string) error {
 	}
 
 	return nil
-}
-
-func cloneRestore(in interface{}) (*api.Restore, error) {
-	clone, err := scheme.Scheme.DeepCopy(in)
-	if err != nil {
-		return nil, errors.Wrap(err, "error deep-copying Restore")
-	}
-
-	out, ok := clone.(*api.Restore)
-	if !ok {
-		return nil, errors.Errorf("unexpected type: %T", clone)
-	}
-
-	return out, nil
 }
 
 func (controller *restoreController) getValidationErrors(itm *api.Restore) []string {

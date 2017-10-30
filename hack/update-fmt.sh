@@ -18,7 +18,9 @@ HACK_DIR=$(dirname "${BASH_SOURCE}")
 
 echo "Updating formatting"
 
-gofmt -w=true $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*")
-goimports -w=true -d $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*")
+gofmt -w -s $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
+
+command -v goimports > /dev/null || go get golang.org/x/tools/cmd/goimports
+goimports -w -d $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
 
 echo "Success!"

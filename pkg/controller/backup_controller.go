@@ -38,8 +38,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
@@ -221,10 +220,7 @@ func (controller *backupController) processBackup(key string) error {
 
 	logContext.Debug("Cloning backup")
 	// don't modify items in the cache
-	backup, err = cloneBackup(backup)
-	if err != nil {
-		return err
-	}
+	backup = backup.DeepCopy()
 
 	// set backup version
 	backup.Status.Version = backupVersion
@@ -265,20 +261,6 @@ func (controller *backupController) processBackup(key string) error {
 	}
 
 	return nil
-}
-
-func cloneBackup(in interface{}) (*api.Backup, error) {
-	clone, err := scheme.Scheme.DeepCopy(in)
-	if err != nil {
-		return nil, errors.Wrap(err, "error deep-copying Backup")
-	}
-
-	out, ok := clone.(*api.Backup)
-	if !ok {
-		return nil, errors.Errorf("unexpected type: %T", clone)
-	}
-
-	return out, nil
 }
 
 func (controller *backupController) getValidationErrors(itm *api.Backup) []string {

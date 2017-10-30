@@ -21,11 +21,15 @@
 #  version = "2.4.0"
 
 required = [
-  "k8s.io/kubernetes/cmd/libs/go2idl/client-gen",
-  "k8s.io/kubernetes/cmd/libs/go2idl/lister-gen",
-  "k8s.io/kubernetes/cmd/libs/go2idl/informer-gen"
-]
+  "k8s.io/code-generator/cmd/client-gen",
+  # needed by generated clientsets, but not an explicit dep in client-gen itself
+  "k8s.io/apimachinery/pkg/apimachinery/registered",
 
+  "k8s.io/code-generator/cmd/deepcopy-gen",
+  "k8s.io/code-generator/cmd/defaulter-gen",
+  "k8s.io/code-generator/cmd/lister-gen",
+  "k8s.io/code-generator/cmd/informer-gen",
+]
 
 [[constraint]]
   name = "cloud.google.com/go"
@@ -85,16 +89,28 @@ required = [
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  revision = "1fd2e63a9a370677308a42f24fd40c86438afddf"
+  revision = "019ae5ada31de202164b118aee88ee2d14075c31"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "~4.0"
+  version = "~5.0"
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "~1.7"
+  version = "~1.8"
 
 [[override]]
   name = "github.com/russross/blackfriday"
   revision = "93622da34e54fb6529bfb7c57e710f37a8d9cbd8"
+
+[[constraint]]
+  branch = "release-1.8"
+  name = "k8s.io/api"
+
+[[constraint]]
+  branch = "release-1.8"
+  name = "k8s.io/code-generator"
+
+[[override]]
+  name = "k8s.io/gengo"
+  revision = "9e661e9308f078838e266cca1c673922088c0ea4"

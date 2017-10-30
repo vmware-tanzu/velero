@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
-	"github.com/heptio/ark/pkg/generated/clientset"
+	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
 
 // Factory knows how to create an ArkClient.

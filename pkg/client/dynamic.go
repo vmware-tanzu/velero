@@ -92,7 +92,7 @@ type Dynamic interface {
 
 // dynamicResourceClient implements Dynamic.
 type dynamicResourceClient struct {
-	resourceClient *dynamic.ResourceClient
+	resourceClient dynamic.ResourceInterface
 }
 
 var _ Dynamic = &dynamicResourceClient{}
