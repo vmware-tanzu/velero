@@ -87,6 +87,7 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 		VERSION=$(VERSION) \
 		PKG=$(PKG) \
 		BIN=$(BIN) \
+		OUTPUT_DIR=/output/$(GOOS)/$(GOARCH) \
 		./hack/build.sh'"
 
 TTY := $(shell tty -s && echo "-t")
@@ -181,3 +182,8 @@ container-clean:
 
 bin-clean:
 	rm -rf .go _output
+
+ci:
+	hack/verify-all.sh
+	hack/test.sh $(SRC_DIRS)
+	GOOS=$(GOOS) GOARCH=$(GOARCH) VERSION=$(VERSION) PKG=$(PKG) BIN=$(BIN) ./hack/build.sh
