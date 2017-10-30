@@ -50,6 +50,7 @@ import (
 	arkaws "github.com/heptio/ark/pkg/cloudprovider/aws"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
+	"github.com/heptio/ark/pkg/cloudprovider/openstack"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
@@ -370,6 +371,13 @@ func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
 		found = true
 	}
 
+	if cloudConfig.OpenStack != nil {
+		if found {
+			return false
+		}
+		found = true
+	}
+
 	return found
 }
 
@@ -380,7 +388,7 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string,
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+		return nil, errors.Errorf("you must specify exactly one of aws, gcp, azure, or openstack for %s", field)
 	}
 
 	switch {
@@ -414,6 +422,8 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string,
 		objectStorage, err = gcp.NewObjectStorageAdapter(email, privateKey)
 	case cloudConfig.Azure != nil:
 		objectStorage, err = azure.NewObjectStorageAdapter()
+	case cloudConfig.OpenStack != nil:
+		objectStorage, err = openstack.NewObjectStorageAdapter(cloudConfig.OpenStack.Region)
 	}
 
 	if err != nil {
@@ -430,7 +440,7 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+		return nil, errors.Errorf("you must specify exactly one of aws, gcp, azure, or openstack for %s", field)
 	}
 
 	switch {
@@ -440,6 +450,8 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project)
 	case cloudConfig.Azure != nil:
 		blockStorage, err = azure.NewBlockStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
+	case cloudConfig.OpenStack != nil:
+		blockStorage, err = openstack.NewBlockStorageAdapter(cloudConfig.OpenStack.Region)
 	}
 
 	if err != nil {

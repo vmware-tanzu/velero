@@ -267,6 +267,66 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
   * Replace `<YOUR_BUCKET>`, `<YOUR_LOCATION>`, and `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
 
+### OpenStack
+
+#### Create new user
+
+To integrate Heptio Ark with OpenStack, you should follow the instructions below to create an Ark-specific user.
+
+1. If you do not have the `openstack` CLI locally installed, follow the [user guide][22] to set it up.
+
+2. Next, create a user:
+
+    ```
+    export ARK_PW=$(openssl rand -base64 25 | tr -d '=/+')
+    openstack user create \
+        --project $PROJECT \
+        --password $ARK_PW \
+        --description "Ark-specific user" \
+        --enable ark
+    ```
+
+3. In order for ark to create, list and delete OpenStack resources, it needs to be assigned the `admin` role:
+
+    ```
+    openstack role add \
+        --user $USER \
+        --project $PROJECT \
+        admin
+    ```
+
+4. The last step is optional but recommended. Log into the Horizon control panel as the `ark` user and navigate to 
+Compute > Access & Security > API Access. Then download the OpenStack RC File v3. This will allow you to easily 
+load all the OpenStack configuration into your environment:
+
+    ```
+    source ./path/to/openstack-file.rc
+    ```
+
+#### Credentials and configuration
+
+In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
+
+```
+kubectl apply -f examples/common/00-prereqs.yaml
+```
+
+Now you need to create a Secret that contains all the environment variables you just set via the RC file. The command looks like the following:
+
+```
+kubectl --namespace=heptio-ark create secret generic cloud-credentials \
+    --from-literal OS_AUTH_URL=$OS_AUTH_URL \
+    --from-literal OS_PROJECT_ID=$OS_PROJECT_ID \
+    --from-literal OS_USERNAME=$OS_USERNAME \
+    --from-literal OS_PASSWORD=$OS_PASSWORD \
+    --from-literal OS_DOMAIN_NAME=$OS_DOMAIN_NAME
+```
+
+Now that you have your OpenStack credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
+
+* In file `examples/openstack/10-ark-config.yaml`, replace:
+  * `<YOUR_REGION>` with your region name (this is usually `RegionOne`)
+  * `<CONTAINER_NAME>` with the name of the Swift container you want Ark to persist backups to. **Important**: this must exist before you first run Ark.
 
 ## Run
 
@@ -281,11 +341,11 @@ Make sure that you have run `kubectl apply -f examples/common/00-prereqs.yaml` f
   kubectl apply -f examples/common/10-deployment.yaml
   kubectl apply -f examples/<CLOUD-PROVIDER>/
   ```
-* **Azure**
+* **Azure and OpenStack**
 
-  Because Azure loads its credentials differently (from environment variables rather than a file), you need to instead run:
+  Because Azure and OpenStack load their credentials differently (from environment variables rather than a file), you need to instead run:
   ```
-  kubectl apply -f examples/azure/
+  kubectl apply -f examples/<CLOUD-PROVIDER>/
   ```
 
 ### Basic example (No PVs)
@@ -359,4 +419,4 @@ ark restore create nginx-backup
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
-
+[22]: https://pypi.python.org/pypi/python-openstackclient

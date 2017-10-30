@@ -80,6 +80,9 @@ type CloudProviderConfig struct {
 
 	// Azure is configuration information for connecting to Azure.
 	Azure *AzureConfig `json:"azure"`
+
+	// OpenStack is configuration information for connecting to OpenStack.
+	OpenStack *OpenStackConfig `json:"openstack"`
 }
 
 // ObjectStorageProviderConfig is configuration information for connecting to
@@ -112,4 +115,9 @@ type GCPConfig struct {
 type AzureConfig struct {
 	Location   string          `json:"location"`
 	APITimeout metav1.Duration `json:"apiTimeout"`
+}
+
+// OpenStackConfig is configuration information for connecting to OpenStack.
+type OpenStackConfig struct {
+	Region string `json:"region"`
 }
