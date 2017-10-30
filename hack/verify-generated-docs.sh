@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARK_ROOT=$(realpath $(dirname ${BASH_SOURCE})/..)
+ARK_ROOT=$(dirname ${BASH_SOURCE})/..
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 DOCS_DIR=${ARK_ROOT}/docs/cli-reference
 TMP_DIR="$(mktemp -d)"
