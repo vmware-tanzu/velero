@@ -26,6 +26,7 @@ fi
 echo "Success!"
 
 echo "Verifying goimports"
+command -v goimports > /dev/null || go get golang.org/x/tools/cmd/goimports
 goimports -l $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
 echo "Success!"
 
