@@ -49,7 +49,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = arkClient.ArkV1().Backups(api.DefaultNamespace).List(metav1.ListOptions{})
+				backups, err = arkClient.ArkV1().Backups(api.DefaultNamespace).List(listOptions)
 				cmd.CheckError(err)
 			}
 
