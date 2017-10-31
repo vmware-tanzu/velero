@@ -49,7 +49,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					schedules.Items = append(schedules.Items, *schedule)
 				}
 			} else {
-				schedules, err = arkClient.ArkV1().Schedules(api.DefaultNamespace).List(metav1.ListOptions{})
+				schedules, err = arkClient.ArkV1().Schedules(api.DefaultNamespace).List(listOptions)
 				cmd.CheckError(err)
 			}
 
