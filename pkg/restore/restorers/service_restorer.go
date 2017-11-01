@@ -45,7 +45,10 @@ func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restor
 		return nil, nil, err
 	}
 
-	delete(spec, "clusterIP")
+	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
+	if val, _ := collections.GetString(spec, "clusterIP"); val != "None" {
+		delete(spec, "clusterIP")
+	}
 
 	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
 	if err != nil {
