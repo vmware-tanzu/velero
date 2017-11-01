@@ -43,6 +43,12 @@ func TestServiceRestorerPrepare(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithName("svc-1").WithSpec("foo").WithSpecField("ports", []interface{}{}).Unstructured,
 		},
 		{
+			name:        "headless clusterIP should not be deleted from spec",
+			obj:         NewTestUnstructured().WithName("svc-1").WithSpecField("clusterIP", "None").WithSpecField("ports", []interface{}{}).Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").WithSpecField("clusterIP", "None").WithSpecField("ports", []interface{}{}).Unstructured,
+		},
+		{
 			name: "nodePort (only) should be deleted from all spec.ports",
 			obj: NewTestUnstructured().WithName("svc-1").
 				WithSpecField("ports", []interface{}{
