@@ -40,7 +40,7 @@ type BackupService interface {
 	// UploadBackup uploads the specified Ark backup of a set of Kubernetes API objects, whose manifests are
 	// stored in the specified file, into object storage in an Ark bucket, tagged with Ark metadata. Returns
 	// an error if a problem is encountered accessing the file or performing the upload via the cloud API.
-	UploadBackup(bucket, name string, metadata, backup, log io.ReadSeeker) error
+	UploadBackup(bucket, name string, metadata, backup, log io.Reader) error
 
 	// DownloadBackup downloads an Ark backup with the specified object key from object storage via the cloud API.
 	// It returns the snapshot metadata and data (separately), or an error if a problem is encountered
@@ -58,7 +58,7 @@ type BackupService interface {
 	CreateSignedURL(target api.DownloadTarget, bucket string, ttl time.Duration) (string, error)
 
 	// UploadRestoreLog uploads the restore's log file to object storage.
-	UploadRestoreLog(bucket, backup, restore string, log io.ReadSeeker) error
+	UploadRestoreLog(bucket, backup, restore string, log io.Reader) error
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -108,7 +108,7 @@ func NewBackupService(objectStorage ObjectStorageAdapter, logger *logrus.Logger)
 	}
 }
 
-func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.ReadSeeker) error {
+func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.Reader) error {
 	// upload metadata file
 	metadataKey := getMetadataKey(backupName)
 	if err := br.objectStorage.PutObject(bucket, metadataKey, metadata); err != nil {
@@ -231,7 +231,7 @@ func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket strin
 	}
 }
 
-func (br *backupService) UploadRestoreLog(bucket, backup, restore string, log io.ReadSeeker) error {
+func (br *backupService) UploadRestoreLog(bucket, backup, restore string, log io.Reader) error {
 	key := getRestoreLogKey(backup, restore)
 	return br.objectStorage.PutObject(bucket, key, log)
 }

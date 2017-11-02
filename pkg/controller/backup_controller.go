@@ -338,5 +338,5 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return errors.Wrap(err, "error resetting Backup log file offset")
 	}
 
-	return controller.backupService.UploadBackup(bucket, backup.Name, bytes.NewReader(buf.Bytes()), backupFile, logFile)
+	return controller.backupService.UploadBackup(bucket, backup.Name, buf, backupFile, logFile)
 }

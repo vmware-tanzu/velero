@@ -41,7 +41,7 @@ func (f *FakeBackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
 	return backups, args.Error(1)
 }
 
-func (f *FakeBackupService) UploadBackup(bucket, name string, metadata, backup io.ReadSeeker) error {
+func (f *FakeBackupService) UploadBackup(bucket, name string, metadata, backup io.Reader) error {
 	args := f.Called(bucket, name, metadata, backup)
 	return args.Error(0)
 }

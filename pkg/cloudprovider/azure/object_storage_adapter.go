@@ -50,7 +50,7 @@ func NewObjectStorageAdapter() (cloudprovider.ObjectStorageAdapter, error) {
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
+func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
 	container, err := getContainerReference(op.blobClient, bucket)
 	if err != nil {
 		return err
@@ -59,19 +59,6 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 	blob, err := getBlobReference(container, key)
 	if err != nil {
 		return err
-	}
-
-	// TODO having to seek to end/back to beginning to get
-	// length here is ugly. refactor to make this better.
-	len, err := body.Seek(0, io.SeekEnd)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	blob.Properties.ContentLength = len
-
-	if _, err := body.Seek(0, 0); err != nil {
-		return errors.WithStack(err)
 	}
 
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
