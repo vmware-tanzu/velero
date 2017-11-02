@@ -31,15 +31,13 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-type objectStorageAdapter struct {
+type objectStore struct {
 	gcs            *storage.Service
 	googleAccessID string
 	privateKey     []byte
 }
 
-var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
-
-func NewObjectStorageAdapter(googleAccessID string, privateKey []byte) (cloudprovider.ObjectStorageAdapter, error) {
+func NewObjectStore(googleAccessID string, privateKey []byte) (cloudprovider.ObjectStore, error) {
 	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -50,14 +48,14 @@ func NewObjectStorageAdapter(googleAccessID string, privateKey []byte) (cloudpro
 		return nil, errors.WithStack(err)
 	}
 
-	return &objectStorageAdapter{
+	return &objectStore{
 		gcs:            gcs,
 		googleAccessID: googleAccessID,
 		privateKey:     privateKey,
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
+func (op *objectStore) PutObject(bucket string, key string, body io.Reader) error {
 	obj := &storage.Object{
 		Name: key,
 	}
@@ -67,7 +65,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 	return errors.WithStack(err)
 }
 
-func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	res, err := op.gcs.Objects.Get(bucket, key).Download()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -76,7 +74,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res.Body, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
 	res, err := op.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -92,7 +90,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	res, err := op.gcs.Objects.List(bucket).Prefix(prefix).Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -106,11 +104,11 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
+func (op *objectStore) DeleteObject(bucket string, key string) error {
 	return errors.Wrapf(op.gcs.Objects.Delete(bucket, key).Do(), "error deleting object %s", key)
 }
 
-func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (op *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	if op.googleAccessID == "" {
 		return "", errors.New("unable to create a pre-signed URL - make sure GOOGLE_APPLICATION_CREDENTIALS points to a valid GCE service account file (missing email address)")
 	}

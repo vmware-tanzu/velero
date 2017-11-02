@@ -325,12 +325,12 @@ func (s *server) watchConfig(config *api.Config) {
 
 func (s *server) initBackupService(config *api.Config) error {
 	s.logger.Info("Configuring cloud provider for backup service")
-	objectStorage, err := getObjectStorageProvider(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider", s.logger)
+	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider", s.logger)
 	if err != nil {
 		return err
 	}
 
-	s.backupService = cloudprovider.NewBackupService(objectStorage, s.logger)
+	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
 	return nil
 }
 
@@ -341,11 +341,11 @@ func (s *server) initSnapshotService(config *api.Config) error {
 	}
 
 	s.logger.Info("Configuring cloud provider for snapshot service")
-	blockStorage, err := getBlockStorageProvider(*config.PersistentVolumeProvider, "persistentVolumeProvider")
+	blockStore, err := getBlockStore(*config.PersistentVolumeProvider, "persistentVolumeProvider")
 	if err != nil {
 		return err
 	}
-	s.snapshotService = cloudprovider.NewSnapshotService(blockStorage)
+	s.snapshotService = cloudprovider.NewSnapshotService(blockStore)
 	return nil
 }
 
@@ -373,10 +373,10 @@ func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
 	return found
 }
 
-func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
+func getObjectStore(cloudConfig api.CloudProviderConfig, field string, logger *logrus.Logger) (cloudprovider.ObjectStore, error) {
 	var (
-		objectStorage cloudprovider.ObjectStorageAdapter
-		err           error
+		objectStore cloudprovider.ObjectStore
+		err         error
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
@@ -385,7 +385,7 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string,
 
 	switch {
 	case cloudConfig.AWS != nil:
-		objectStorage, err = arkaws.NewObjectStorageAdapter(
+		objectStore, err = arkaws.NewObjectStore(
 			cloudConfig.AWS.Region,
 			cloudConfig.AWS.S3Url,
 			cloudConfig.AWS.KMSKeyID,
@@ -411,22 +411,22 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string,
 			logger.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
 		}
 
-		objectStorage, err = gcp.NewObjectStorageAdapter(email, privateKey)
+		objectStore, err = gcp.NewObjectStore(email, privateKey)
 	case cloudConfig.Azure != nil:
-		objectStorage, err = azure.NewObjectStorageAdapter()
+		objectStore, err = azure.NewObjectStore()
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return objectStorage, nil
+	return objectStore, nil
 }
 
-func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.BlockStorageAdapter, error) {
+func getBlockStore(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.BlockStore, error) {
 	var (
-		blockStorage cloudprovider.BlockStorageAdapter
-		err          error
+		blockStore cloudprovider.BlockStore
+		err        error
 	)
 
 	if !hasOneCloudProvider(cloudConfig) {
@@ -435,18 +435,18 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 
 	switch {
 	case cloudConfig.AWS != nil:
-		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region)
+		blockStore, err = arkaws.NewBlockStore(cloudConfig.AWS.Region)
 	case cloudConfig.GCP != nil:
-		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project)
+		blockStore, err = gcp.NewBlockStore(cloudConfig.GCP.Project)
 	case cloudConfig.Azure != nil:
-		blockStorage, err = azure.NewBlockStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
+		blockStore, err = azure.NewBlockStore(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	return blockStorage, nil
+	return blockStore, nil
 }
 
 func durationMin(a, b time.Duration) time.Duration {

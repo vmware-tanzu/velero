@@ -21,9 +21,9 @@ import (
 	"time"
 )
 
-// ObjectStorageAdapter exposes basic object-storage operations required
+// ObjectStore exposes basic object-storage operations required
 // by Ark.
-type ObjectStorageAdapter interface {
+type ObjectStore interface {
 	// PutObject creates a new object using the data in body within the specified
 	// object storage bucket with the given key.
 	PutObject(bucket string, key string, body io.Reader) error
@@ -48,9 +48,9 @@ type ObjectStorageAdapter interface {
 	CreateSignedURL(bucket, key string, ttl time.Duration) (string, error)
 }
 
-// BlockStorageAdapter exposes basic block-storage operations required
+// BlockStore exposes basic block-storage operations required
 // by Ark.
-type BlockStorageAdapter interface {
+type BlockStore interface {
 	// CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
 	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error)

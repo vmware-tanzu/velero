@@ -31,14 +31,12 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-type blockStorageAdapter struct {
+type blockStore struct {
 	gce     *compute.Service
 	project string
 }
 
-var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
-
-func NewBlockStorageAdapter(project string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStore(project string) (cloudprovider.BlockStore, error) {
 	if project == "" {
 		return nil, errors.New("missing project in gcp configuration in config file")
 	}
@@ -63,13 +61,13 @@ func NewBlockStorageAdapter(project string) (cloudprovider.BlockStorageAdapter, 
 		return nil, errors.Errorf("error getting project %q", project)
 	}
 
-	return &blockStorageAdapter{
+	return &blockStore{
 		gce:     gce,
 		project: project,
 	}, nil
 }
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	res, err := op.gce.Snapshots.Get(op.project, snapshotID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -88,7 +86,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	return disk.Name, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", nil, errors.WithStack(err)
@@ -97,7 +95,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 	return res.Type, nil, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	disk, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return false, errors.WithStack(err)
@@ -107,7 +105,7 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready b
 	return disk.Status == "READY", nil
 }
 
-func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	useParentheses := len(tagFilters) > 1
 	subFilters := make([]string, 0, len(tagFilters))
 
@@ -134,7 +132,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// snapshot names must adhere to RFC1035 and be 1-63 characters
 	// long
 	var snapshotName string
@@ -180,7 +178,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 	return gceSnap.Name, nil
 }
 
-func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
+func (op *blockStore) DeleteSnapshot(snapshotID string) error {
 	_, err := op.gce.Snapshots.Delete(op.project, snapshotID).Do()
 
 	return errors.WithStack(err)

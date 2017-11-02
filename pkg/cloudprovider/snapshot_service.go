@@ -56,20 +56,20 @@ const (
 )
 
 type snapshotService struct {
-	blockStorage BlockStorageAdapter
+	blockStore BlockStore
 }
 
 var _ SnapshotService = &snapshotService{}
 
-// NewSnapshotService creates a snapshot service using the provided block storage adapter
-func NewSnapshotService(blockStorage BlockStorageAdapter) SnapshotService {
+// NewSnapshotService creates a snapshot service using the provided block store
+func NewSnapshotService(blockStore BlockStore) SnapshotService {
 	return &snapshotService{
-		blockStorage: blockStorage,
+		blockStore: blockStore,
 	}
 }
 
 func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeType string, volumeAZ string, iops *int64) (string, error) {
-	volumeID, err := sr.blockStorage.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
+	volumeID, err := sr.blockStore.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 	if err != nil {
 		return "", err
 	}
@@ -85,7 +85,7 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 		case <-timeout.C:
 			return "", errors.Errorf("timeout reached waiting for volume %v to be ready", volumeID)
 		case <-ticker.C:
-			if ready, err := sr.blockStorage.IsVolumeReady(volumeID, volumeAZ); err == nil && ready {
+			if ready, err := sr.blockStore.IsVolumeReady(volumeID, volumeAZ); err == nil && ready {
 				return volumeID, nil
 			}
 		}
@@ -97,7 +97,7 @@ func (sr *snapshotService) GetAllSnapshots() ([]string, error) {
 		snapshotTagKey: snapshotTagVal,
 	}
 
-	res, err := sr.blockStorage.ListSnapshots(tags)
+	res, err := sr.blockStore.ListSnapshots(tags)
 	if err != nil {
 		return nil, err
 	}
@@ -110,13 +110,13 @@ func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, er
 		snapshotTagKey: snapshotTagVal,
 	}
 
-	return sr.blockStorage.CreateSnapshot(volumeID, volumeAZ, tags)
+	return sr.blockStore.CreateSnapshot(volumeID, volumeAZ, tags)
 }
 
 func (sr *snapshotService) DeleteSnapshot(snapshotID string) error {
-	return sr.blockStorage.DeleteSnapshot(snapshotID)
+	return sr.blockStore.DeleteSnapshot(snapshotID)
 }
 
 func (sr *snapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	return sr.blockStorage.GetVolumeInfo(volumeID, volumeAZ)
+	return sr.blockStore.GetVolumeInfo(volumeID, volumeAZ)
 }

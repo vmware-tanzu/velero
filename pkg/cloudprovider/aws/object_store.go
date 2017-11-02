@@ -29,15 +29,13 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
-
-type objectStorageAdapter struct {
+type objectStore struct {
 	s3         *s3.S3
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
 }
 
-func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStorageAdapter, error) {
+func NewObjectStore(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStore, error) {
 	if region == "" {
 		return nil, errors.New("missing region in aws configuration in config file")
 	}
@@ -65,14 +63,14 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 		return nil, err
 	}
 
-	return &objectStorageAdapter{
+	return &objectStore{
 		s3:         s3.New(sess),
 		s3Uploader: s3manager.NewUploader(sess),
 		kmsKeyID:   kmsKeyID,
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
+func (op *objectStore) PutObject(bucket string, key string, body io.Reader) error {
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -90,7 +88,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 	return errors.Wrapf(err, "error putting object %s", key)
 }
 
-func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -104,7 +102,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res.Body, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
@@ -125,7 +123,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
@@ -146,7 +144,7 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
+func (op *objectStore) DeleteObject(bucket string, key string) error {
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -157,7 +155,7 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 	return errors.Wrapf(err, "error deleting object %s", key)
 }
 
-func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (op *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

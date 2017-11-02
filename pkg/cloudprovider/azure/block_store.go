@@ -33,7 +33,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-type blockStorageAdapter struct {
+type blockStore struct {
 	disks         *disk.DisksClient
 	snaps         *disk.SnapshotsClient
 	subscription  string
@@ -41,8 +41,6 @@ type blockStorageAdapter struct {
 	location      string
 	apiTimeout    time.Duration
 }
-
-var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
 const (
 	azureClientIDKey         string = "AZURE_CLIENT_ID"
@@ -72,7 +70,7 @@ func getConfig() map[string]string {
 	return cfg
 }
 
-func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStore(location string, apiTimeout time.Duration) (cloudprovider.BlockStore, error) {
 	if location == "" {
 		return nil, errors.New("missing location in azure configuration in config file")
 	}
@@ -120,7 +118,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 		return nil, errors.Errorf("location %q not found", location)
 	}
 
-	return &blockStorageAdapter{
+	return &blockStore{
 		disks:         &disksClient,
 		snaps:         &snapsClient,
 		subscription:  cfg[azureSubscriptionIDKey],
@@ -130,7 +128,7 @@ func NewBlockStorageAdapter(location string, apiTimeout time.Duration) (cloudpro
 	}, nil
 }
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	fullSnapshotName := getFullSnapshotName(op.subscription, op.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
@@ -159,7 +157,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	return diskName, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
@@ -168,7 +166,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 	return string(res.AccountType), nil, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	res, err := op.disks.Get(op.resourceGroup, volumeID)
 	if err != nil {
 		return false, errors.WithStack(err)
@@ -181,7 +179,7 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready b
 	return *res.ProvisioningState == "Succeeded", nil
 }
 
-func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	res, err := op.snaps.ListByResourceGroup(op.resourceGroup)
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -215,7 +213,7 @@ Snapshot:
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	fullDiskName := getFullDiskName(op.subscription, op.resourceGroup, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
@@ -258,7 +256,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 	return snapshotName, nil
 }
 
-func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
+func (op *blockStore) DeleteSnapshot(snapshotID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), op.apiTimeout)
 	defer cancel()
 

@@ -27,9 +27,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
-
-type blockStorageAdapter struct {
+type blockStore struct {
 	ec2 *ec2.EC2
 }
 
@@ -46,7 +44,7 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStorageAdapter(region string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStore(region string) (cloudprovider.BlockStore, error) {
 	if region == "" {
 		return nil, errors.New("missing region in aws configuration in config file")
 	}
@@ -58,7 +56,7 @@ func NewBlockStorageAdapter(region string) (cloudprovider.BlockStorageAdapter, e
 		return nil, err
 	}
 
-	return &blockStorageAdapter{
+	return &blockStore{
 		ec2: ec2.New(sess),
 	}, nil
 }
@@ -68,7 +66,7 @@ func NewBlockStorageAdapter(region string) (cloudprovider.BlockStorageAdapter, e
 // from snapshot.
 var iopsVolumeTypes = sets.NewString("io1")
 
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
@@ -87,7 +85,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	return *res.VolumeId, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -119,7 +117,7 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 	return volumeType, iops, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -135,7 +133,7 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready b
 	return *res.Volumes[0].State == ec2.VolumeStateAvailable, nil
 }
 
-func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	req := &ec2.DescribeSnapshotsInput{}
 
 	for k, v := range tagFilters {
@@ -161,7 +159,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &ec2.CreateSnapshotInput{
 		VolumeId: &volumeID,
 	}
@@ -191,7 +189,7 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 	return *res.SnapshotId, errors.WithStack(err)
 }
 
-func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
+func (op *blockStore) DeleteSnapshot(snapshotID string) error {
 	req := &ec2.DeleteSnapshotInput{
 		SnapshotId: &snapshotID,
 	}
