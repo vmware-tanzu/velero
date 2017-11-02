@@ -304,6 +304,24 @@ func TestCreateSignedURL(t *testing.T) {
 			targetName:  "b-cool-20170913154901-20170913154902",
 			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-logs.gz",
 		},
+		{
+			name:        "restore results - backup has no dash",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-20170913154901",
+			expectedKey: "b/restore-b-20170913154901-results.gz",
+		},
+		{
+			name:        "restore results - backup has 1 dash",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-cool-20170913154901",
+			expectedKey: "b-cool/restore-b-cool-20170913154901-results.gz",
+		},
+		{
+			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-cool-20170913154901-20170913154902",
+			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-results.gz",
+		},
 	}
 
 	for _, test := range tests {

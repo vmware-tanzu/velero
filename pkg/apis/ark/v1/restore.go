@@ -91,13 +91,13 @@ type RestoreStatus struct {
 	// applicable)
 	ValidationErrors []string `json:"validationErrors"`
 
-	// Warnings is a collection of all warning messages that were
-	// generated during execution of the restore
-	Warnings RestoreResult `json:"warnings"`
+	// Warnings is a count of all warning messages that were generated during
+	// execution of the restore. The actual warnings are stored in object storage.
+	Warnings int `json:"warnings"`
 
-	// Errors is a collection of all error messages that were
-	// generated during execution of the restore
-	Errors RestoreResult `json:"errors"`
+	// Errors is a count of all error messages that were generated during
+	// execution of the restore. The actual errors are stored in object storage.
+	Errors int `json:"errors"`
 }
 
 // RestoreResult is a collection of messages that were generated

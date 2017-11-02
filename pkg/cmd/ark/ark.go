@@ -24,6 +24,7 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/cli/backup"
 	"github.com/heptio/ark/pkg/cmd/cli/create"
+	"github.com/heptio/ark/pkg/cmd/cli/describe"
 	"github.com/heptio/ark/pkg/cmd/cli/get"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
 	"github.com/heptio/ark/pkg/cmd/cli/schedule"
@@ -54,6 +55,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		server.NewCommand(),
 		version.NewCommand(),
 		get.NewCommand(f),
+		describe.NewCommand(f),
 		create.NewCommand(f),
 	)
 

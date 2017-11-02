@@ -30,6 +30,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 ### SEE ALSO
 * [ark backup](ark_backup.md)	 - Work with backups
 * [ark create](ark_create.md)	 - Create ark resources
+* [ark describe](ark_describe.md)	 - Describe ark resources
 * [ark get](ark_get.md)	 - Get ark resources
 * [ark restore](ark_restore.md)	 - Work with restores
 * [ark schedule](ark_schedule.md)	 - Work with schedules

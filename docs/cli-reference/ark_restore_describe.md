@@ -1,16 +1,24 @@
-## ark restore
+## ark restore describe
 
-Work with restores
+Describe restores
 
 ### Synopsis
 
 
-Work with restores
+Describe restores
+
+```
+ark restore describe [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for restore
+  -h, --help                        help for describe
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
+  -l, --selector string             only show items matching this label selector
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -27,10 +35,5 @@ Work with restores
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark restore create](ark_restore_create.md)	 - Create a restore
-* [ark restore delete](ark_restore_delete.md)	 - Delete a restore
-* [ark restore describe](ark_restore_describe.md)	 - Describe restores
-* [ark restore get](ark_restore_get.md)	 - Get restores
-* [ark restore logs](ark_restore_logs.md)	 - Get restore logs
+* [ark restore](ark_restore.md)	 - Work with restores
 

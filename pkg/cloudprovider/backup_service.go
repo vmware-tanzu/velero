@@ -59,6 +59,9 @@ type BackupService interface {
 
 	// UploadRestoreLog uploads the restore's log file to object storage.
 	UploadRestoreLog(bucket, backup, restore string, log io.Reader) error
+
+	// UploadRestoreResults uploads the restore's results file to object storage.
+	UploadRestoreResults(bucket, backup, restore string, results io.Reader) error
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -68,10 +71,11 @@ type BackupGetter interface {
 }
 
 const (
-	metadataFileFormatString   = "%s/ark-backup.json"
-	backupFileFormatString     = "%s/%s.tar.gz"
-	backupLogFileFormatString  = "%s/%s-logs.gz"
-	restoreLogFileFormatString = "%s/restore-%s-logs.gz"
+	metadataFileFormatString       = "%s/ark-backup.json"
+	backupFileFormatString         = "%s/%s.tar.gz"
+	backupLogFileFormatString      = "%s/%s-logs.gz"
+	restoreLogFileFormatString     = "%s/restore-%s-logs.gz"
+	restoreResultsFileFormatString = "%s/restore-%s-results.gz"
 )
 
 func getMetadataKey(backup string) string {
@@ -88,6 +92,10 @@ func getBackupLogKey(backup string) string {
 
 func getRestoreLogKey(backup, restore string) string {
 	return fmt.Sprintf(restoreLogFileFormatString, backup, restore)
+}
+
+func getRestoreResultsKey(backup, restore string) string {
+	return fmt.Sprintf(restoreResultsFileFormatString, backup, restore)
 }
 
 type backupService struct {
@@ -219,21 +227,33 @@ func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket strin
 	case api.DownloadTargetKindBackupLog:
 		return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(target.Name), ttl)
 	case api.DownloadTargetKindRestoreLog:
-		// restore name is formatted as <backup name>-<timestamp>
-		i := strings.LastIndex(target.Name, "-")
-		if i < 0 {
-			i = len(target.Name)
-		}
-		backup := target.Name[0:i]
+		backup := extractBackupName(target.Name)
 		return br.objectStorage.CreateSignedURL(bucket, getRestoreLogKey(backup, target.Name), ttl)
+	case api.DownloadTargetKindRestoreResults:
+		backup := extractBackupName(target.Name)
+		return br.objectStorage.CreateSignedURL(bucket, getRestoreResultsKey(backup, target.Name), ttl)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
 }
 
+func extractBackupName(s string) string {
+	// restore name is formatted as <backup name>-<timestamp>
+	i := strings.LastIndex(s, "-")
+	if i < 0 {
+		i = len(s)
+	}
+	return s[0:i]
+}
+
 func (br *backupService) UploadRestoreLog(bucket, backup, restore string, log io.Reader) error {
 	key := getRestoreLogKey(backup, restore)
 	return br.objectStorage.PutObject(bucket, key, log)
+}
+
+func (br *backupService) UploadRestoreResults(bucket, backup, restore string, results io.Reader) error {
+	key := getRestoreResultsKey(backup, restore)
+	return br.objectStorage.PutObject(bucket, key, results)
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

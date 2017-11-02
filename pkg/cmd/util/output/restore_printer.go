@@ -53,15 +53,17 @@ func printRestore(restore *v1.Restore, w io.Writer, options printers.PrintOption
 		status = v1.RestorePhaseNew
 	}
 
-	warnings := len(restore.Status.Warnings.Ark) + len(restore.Status.Warnings.Cluster)
-	for _, w := range restore.Status.Warnings.Namespaces {
-		warnings += len(w)
-	}
-	errors := len(restore.Status.Errors.Ark) + len(restore.Status.Errors.Cluster)
-	for _, e := range restore.Status.Errors.Namespaces {
-		errors += len(e)
-	}
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%d\t%s\t%s", name, restore.Spec.BackupName, status, warnings, errors, restore.CreationTimestamp.Time, metav1.FormatLabelSelector(restore.Spec.LabelSelector)); err != nil {
+	if _, err := fmt.Fprintf(
+		w,
+		"%s\t%s\t%s\t%d\t%d\t%s\t%s",
+		name,
+		restore.Spec.BackupName,
+		status,
+		restore.Status.Warnings,
+		restore.Status.Errors,
+		restore.CreationTimestamp.Time,
+		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
+	); err != nil {
 		return err
 	}
 
