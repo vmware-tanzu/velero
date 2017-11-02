@@ -195,6 +195,24 @@ func TestBackupResource(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                     "should include specified namespaces if backing up subset of namespaces and --include-cluster-resources=nil",
+			namespaces:               collections.NewIncludesExcludes().Includes("ns-1"),
+			resources:                collections.NewIncludesExcludes(),
+			includeClusterResources:  nil,
+			expectedListedNamespaces: []string{"ns-1"},
+			apiGroup:                 v1Group,
+			apiResource:              namespacesResource,
+			groupVersion:             schema.GroupVersion{Group: "", Version: "v1"},
+			groupResource:            schema.GroupResource{Group: "", Resource: "namespaces"},
+			expectSkip:               false,
+			listResponses: [][]*unstructured.Unstructured{
+				{
+					unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`),
+					unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-2"}}`),
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -275,7 +293,11 @@ func TestBackupResource(t *testing.T) {
 					client := &arktest.FakeDynamicClient{}
 					defer client.AssertExpectations(t)
 
-					dynamicFactory.On("ClientForGroupVersionResource", test.groupVersion, test.apiResource, namespace).Return(client, nil)
+					if test.groupResource.Resource == "namespaces" {
+						dynamicFactory.On("ClientForGroupVersionResource", test.groupVersion, test.apiResource, "").Return(client, nil)
+					} else {
+						dynamicFactory.On("ClientForGroupVersionResource", test.groupVersion, test.apiResource, namespace).Return(client, nil)
+					}
 
 					list := &unstructured.UnstructuredList{
 						Items: []unstructured.Unstructured{},

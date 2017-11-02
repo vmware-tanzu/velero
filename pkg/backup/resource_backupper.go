@@ -129,7 +129,9 @@ func (rb *defaultResourceBackupper) backupResource(
 		// (all namespaces) backup. Note that in the case of a subset of
 		// namespaces being backed up, some related cluster-scoped resources
 		// may still be backed up if triggered by a custom action (e.g. PVC->PV).
-		if !resource.Namespaced && !rb.namespaces.IncludeEverything() {
+		// If we're processing namespaces themselves, we will not skip here, they may be
+		// filtered out later.
+		if !resource.Namespaced && resource.Kind != "Namespace" && !rb.namespaces.IncludeEverything() {
 			log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
 			return nil
 		}
@@ -173,6 +175,8 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.discoveryHelper,
 	)
 
+	// TODO: when processing namespaces, and only including certain namespaces, we still list
+	// them all here. Could optimize to get specifics, but watch out for label selector.
 	var namespacesToList []string
 	if resource.Namespaced {
 		namespacesToList = getNamespacesToList(rb.namespaces)
