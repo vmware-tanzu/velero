@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
@@ -122,24 +123,27 @@ func (rb *defaultResourceBackupper) backupResource(
 
 	log := rb.log.WithField("groupResource", grString)
 
-	switch {
-	case rb.backup.Spec.IncludeClusterResources == nil:
-		// when IncludeClusterResources == nil (auto), only directly
-		// back up cluster-scoped resources if we're doing a full-cluster
-		// (all namespaces) backup. Note that in the case of a subset of
-		// namespaces being backed up, some related cluster-scoped resources
-		// may still be backed up if triggered by a custom action (e.g. PVC->PV).
-		if !resource.Namespaced && !rb.namespaces.IncludeEverything() {
-			log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
-			return nil
-		}
-	case *rb.backup.Spec.IncludeClusterResources == false:
-		if !resource.Namespaced {
+	clusterScoped := !resource.Namespaced
+
+	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
+	// we should include it based on the IncludeClusterResources setting.
+	if gr != namespacesGroupResource && clusterScoped {
+		if rb.backup.Spec.IncludeClusterResources == nil {
+			if !rb.namespaces.IncludeEverything() {
+				// when IncludeClusterResources == nil (auto), only directly
+				// back up cluster-scoped resources if we're doing a full-cluster
+				// (all namespaces) backup. Note that in the case of a subset of
+				// namespaces being backed up, some related cluster-scoped resources
+				// may still be backed up if triggered by a custom action (e.g. PVC->PV).
+				// If we're processing namespaces themselves, we will not skip here, they may be
+				// filtered out later.
+				log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
+				return nil
+			}
+		} else if !*rb.backup.Spec.IncludeClusterResources {
 			log.Info("Skipping resource because it's cluster-scoped")
 			return nil
 		}
-	case *rb.backup.Spec.IncludeClusterResources == true:
-		// include the resource, no action required
 	}
 
 	if !rb.resources.ShouldInclude(grString) {
@@ -173,12 +177,50 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.discoveryHelper,
 	)
 
-	var namespacesToList []string
-	if resource.Namespaced {
-		namespacesToList = getNamespacesToList(rb.namespaces)
-	} else {
+	namespacesToList := getNamespacesToList(rb.namespaces)
+
+	// Check if we're backing up namespaces, and only certain ones
+	if gr == namespacesGroupResource && namespacesToList[0] != "" {
+		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
+		if err != nil {
+			return err
+		}
+
+		var labelSelector labels.Selector
+		if rb.backup.Spec.LabelSelector != nil {
+			labelSelector, err = metav1.LabelSelectorAsSelector(rb.backup.Spec.LabelSelector)
+			if err != nil {
+				// This should never happen...
+				return errors.Wrap(err, "invalid label selector")
+			}
+		}
+
+		for _, ns := range namespacesToList {
+			unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
+			if err != nil {
+				errs = append(errs, errors.Wrap(err, "error getting namespace"))
+				continue
+			}
+
+			labels := labels.Set(unstructured.GetLabels())
+			if labelSelector != nil && !labelSelector.Matches(labels) {
+				log.WithField("name", unstructured.GetName()).Info("skipping item because it does not match the backup's label selector")
+				continue
+			}
+
+			if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		return kuberrs.NewAggregate(errs)
+	}
+
+	// If we get here, we're backing up something other than namespaces
+	if clusterScoped {
 		namespacesToList = []string{""}
 	}
+
 	for _, namespace := range namespacesToList {
 		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, namespace)
 		if err != nil {
@@ -200,6 +242,17 @@ func (rb *defaultResourceBackupper) backupResource(
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
 				errs = append(errs, errors.Errorf("unexpected type %T", item))
+				continue
+			}
+
+			metadata, err := meta.Accessor(unstructured)
+			if err != nil {
+				errs = append(errs, errors.Wrapf(err, "unable to get a metadata accessor"))
+				continue
+			}
+
+			if gr == namespacesGroupResource && !rb.namespaces.ShouldInclude(metadata.GetName()) {
+				log.WithField("name", metadata.GetName()).Info("skipping namespace because it is excluded")
 				continue
 			}
 

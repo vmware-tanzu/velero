@@ -230,7 +230,7 @@ func TestGetNamespaceIncludesExcludes(t *testing.T) {
 var (
 	v1Group = &metav1.APIResourceList{
 		GroupVersion: "v1",
-		APIResources: []metav1.APIResource{configMapsResource, podsResource},
+		APIResources: []metav1.APIResource{configMapsResource, podsResource, namespacesResource},
 	}
 
 	configMapsResource = metav1.APIResource{
@@ -263,6 +263,14 @@ var (
 		SingularName: "role",
 		Namespaced:   true,
 		Kind:         "Role",
+		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
+	}
+
+	namespacesResource = metav1.APIResource{
+		Name:         "namespaces",
+		SingularName: "namespace",
+		Namespaced:   false,
+		Kind:         "Namespace",
 		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
 	}
 
