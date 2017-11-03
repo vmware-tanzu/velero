@@ -103,6 +103,7 @@ type defaultItemBackupper struct {
 }
 
 var podsGroupResource = schema.GroupResource{Group: "", Resource: "pods"}
+var namespacesGroupResource = schema.GroupResource{Group: "", Resource: "namespaces"}
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
@@ -127,7 +128,9 @@ func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Uns
 		return nil
 	}
 
-	if namespace == "" && ib.backup.Spec.IncludeClusterResources != nil && !*ib.backup.Spec.IncludeClusterResources {
+	// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
+	// false.
+	if namespace == "" && groupResource != namespacesGroupResource && ib.backup.Spec.IncludeClusterResources != nil && !*ib.backup.Spec.IncludeClusterResources {
 		log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
 		return nil
 	}
