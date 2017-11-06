@@ -17,7 +17,7 @@ backup-test-2-20170726180515  backup-test-2   Completed   0          1         2
 
 To delve into the warnings and errors into more detail, you can use the `-o` option:
 ```
-kubectl restore get backup-test-20170726180512 -o yaml
+ark restore get backup-test-20170726180512 -o yaml
 ```
 The output YAML has a `status` field which may look like the following:
 ```
