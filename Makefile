@@ -161,6 +161,7 @@ all-tar-bin: $(addprefix tar-bin-, $(CLI_PLATFORMS))
 tar-bin-%:
 	@$(MAKE) ARCH=$* tar-bin
 
+GIT_DESCRIBE = $(shell git describe --tags --always --dirty)
 tar-bin: build
 	mkdir -p _output/release
 
@@ -169,7 +170,7 @@ tar-bin: build
 		tar \
 			-C _output/bin/$(GOOS)/$(GOARCH) \
 			--files-from=- \
-			-zcf _output/release/$(BIN)-$(GOOS)-$(GOARCH).tar.gz
+			-zcf _output/release/$(BIN)-$(GIT_DESCRIBE)-$(GOOS)-$(GOARCH).tar.gz
 
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
