@@ -55,6 +55,7 @@ type restoreController struct {
 	restorer            restore.Restorer
 	backupService       cloudprovider.BackupService
 	bucket              string
+	path                string
 	pvProviderExists    bool
 	backupLister        listers.BackupLister
 	backupListerSynced  cache.InformerSynced
@@ -72,6 +73,7 @@ func NewRestoreController(
 	restorer restore.Restorer,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	path string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
 	logger *logrus.Logger,
@@ -82,6 +84,7 @@ func NewRestoreController(
 		restorer:            restorer,
 		backupService:       backupService,
 		bucket:              bucket,
+		path:                path,
 		pvProviderExists:    pvProviderExists,
 		backupLister:        backupInformer.Lister(),
 		backupListerSynced:  backupInformer.Informer().HasSynced,
@@ -258,7 +261,7 @@ func (controller *restoreController) processRestore(key string) error {
 
 	logContext.Debug("Running restore")
 	// execution & upload of restore
-	restore.Status.Warnings, restore.Status.Errors = controller.runRestore(restore, controller.bucket)
+	restore.Status.Warnings, restore.Status.Errors = controller.runRestore(restore, controller.bucket, controller.path)
 
 	logContext.Debug("restore completed")
 	restore.Status.Phase = api.RestorePhaseCompleted
@@ -314,7 +317,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 	return validationErrors
 }
 
-func (controller *restoreController) fetchBackup(bucket, name string) (*api.Backup, error) {
+func (controller *restoreController) fetchBackup(bucket, path, name string) (*api.Backup, error) {
 	backup, err := controller.backupLister.Backups(api.DefaultNamespace).Get(name)
 	if err == nil {
 		return backup, nil
@@ -327,7 +330,7 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	logContext := controller.logger.WithField("backupName", name)
 
 	logContext.Debug("Backup not found in backupLister, checking object storage directly")
-	backup, err = controller.backupService.GetBackup(bucket, name)
+	backup, err = controller.backupService.GetBackup(bucket, path, name)
 	if err != nil {
 		return nil, err
 	}
@@ -345,17 +348,17 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	return backup, nil
 }
 
-func (controller *restoreController) runRestore(restore *api.Restore, bucket string) (warnings, restoreErrors api.RestoreResult) {
+func (controller *restoreController) runRestore(restore *api.Restore, bucket, path string) (warnings, restoreErrors api.RestoreResult) {
 	logContext := controller.logger.WithField("restore", kubeutil.NamespaceAndName(restore))
 
-	backup, err := controller.fetchBackup(bucket, restore.Spec.BackupName)
+	backup, err := controller.fetchBackup(bucket, path, restore.Spec.BackupName)
 	if err != nil {
 		logContext.WithError(err).WithField("backup", restore.Spec.BackupName).Error("Error getting backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
 
-	tmpFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket, controller.logger)
+	tmpFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket, path, controller.logger)
 	if err != nil {
 		logContext.WithError(err).WithField("backup", restore.Spec.BackupName).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
@@ -397,15 +400,15 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		return
 	}
 
-	if err := controller.backupService.UploadRestoreLog(bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
+	if err := controller.backupService.UploadRestoreLog(bucket, path, restore.Spec.BackupName, restore.Name, logFile); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
 	}
 
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger *logrus.Logger) (*os.File, error) {
-	readCloser, err := backupService.DownloadBackup(bucket, backupName)
+func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, path string, logger *logrus.Logger) (*os.File, error) {
+	readCloser, err := backupService.DownloadBackup(bucket, path, backupName)
 	if err != nil {
 		return nil, err
 	}

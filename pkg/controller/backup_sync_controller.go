@@ -35,6 +35,7 @@ type backupSyncController struct {
 	client        arkv1client.BackupsGetter
 	backupService cloudprovider.BackupService
 	bucket        string
+	path          string
 	syncPeriod    time.Duration
 	logger        *logrus.Logger
 }
@@ -43,6 +44,7 @@ func NewBackupSyncController(
 	client arkv1client.BackupsGetter,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	path string,
 	syncPeriod time.Duration,
 	logger *logrus.Logger,
 ) Interface {
@@ -54,6 +56,7 @@ func NewBackupSyncController(
 		client:        client,
 		backupService: backupService,
 		bucket:        bucket,
+		path:          path,
 		syncPeriod:    syncPeriod,
 		logger:        logger,
 	}
@@ -70,7 +73,7 @@ func (c *backupSyncController) Run(ctx context.Context, workers int) error {
 
 func (c *backupSyncController) run() {
 	c.logger.Info("Syncing backups from object storage")
-	backups, err := c.backupService.GetAllBackups(c.bucket)
+	backups, err := c.backupService.GetAllBackups(c.bucket, c.path)
 	if err != nil {
 		c.logger.WithError(err).Error("error listing backups")
 		return

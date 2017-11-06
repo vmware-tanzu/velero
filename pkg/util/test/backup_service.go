@@ -28,19 +28,19 @@ type BackupService struct {
 }
 
 // CreateSignedURL provides a mock function with given fields: target, bucket, ttl
-func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket string, ttl time.Duration) (string, error) {
-	ret := _m.Called(target, bucket, ttl)
+func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket string, path string, ttl time.Duration) (string, error) {
+	ret := _m.Called(target, bucket, path, ttl)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(v1.DownloadTarget, string, time.Duration) string); ok {
-		r0 = rf(target, bucket, ttl)
+	if rf, ok := ret.Get(0).(func(v1.DownloadTarget, string, string, time.Duration) string); ok {
+		r0 = rf(target, bucket, path, ttl)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(v1.DownloadTarget, string, time.Duration) error); ok {
-		r1 = rf(target, bucket, ttl)
+	if rf, ok := ret.Get(1).(func(v1.DownloadTarget, string, string, time.Duration) error); ok {
+		r1 = rf(target, bucket, path, ttl)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -49,12 +49,12 @@ func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket string
 }
 
 // DeleteBackupDir provides a mock function with given fields: bucket, backupName
-func (_m *BackupService) DeleteBackupDir(bucket string, backupName string) error {
-	ret := _m.Called(bucket, backupName)
+func (_m *BackupService) DeleteBackupDir(bucket string, path string, backupName string) error {
+	ret := _m.Called(bucket, path, backupName)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string) error); ok {
-		r0 = rf(bucket, backupName)
+	if rf, ok := ret.Get(0).(func(string, string, string) error); ok {
+		r0 = rf(bucket, path, backupName)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -63,12 +63,12 @@ func (_m *BackupService) DeleteBackupDir(bucket string, backupName string) error
 }
 
 // DownloadBackup provides a mock function with given fields: bucket, name
-func (_m *BackupService) DownloadBackup(bucket string, name string) (io.ReadCloser, error) {
-	ret := _m.Called(bucket, name)
+func (_m *BackupService) DownloadBackup(bucket string, path string, name string) (io.ReadCloser, error) {
+	ret := _m.Called(bucket, path, name)
 
 	var r0 io.ReadCloser
-	if rf, ok := ret.Get(0).(func(string, string) io.ReadCloser); ok {
-		r0 = rf(bucket, name)
+	if rf, ok := ret.Get(0).(func(string, string, string) io.ReadCloser); ok {
+		r0 = rf(bucket, path, name)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(io.ReadCloser)
@@ -76,8 +76,8 @@ func (_m *BackupService) DownloadBackup(bucket string, name string) (io.ReadClos
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(bucket, name)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(bucket, path, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -86,12 +86,12 @@ func (_m *BackupService) DownloadBackup(bucket string, name string) (io.ReadClos
 }
 
 // GetAllBackups provides a mock function with given fields: bucket
-func (_m *BackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
-	ret := _m.Called(bucket)
+func (_m *BackupService) GetAllBackups(bucket string, path string) ([]*v1.Backup, error) {
+	ret := _m.Called(bucket, path)
 
 	var r0 []*v1.Backup
-	if rf, ok := ret.Get(0).(func(string) []*v1.Backup); ok {
-		r0 = rf(bucket)
+	if rf, ok := ret.Get(0).(func(string, string) []*v1.Backup); ok {
+		r0 = rf(bucket, path)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*v1.Backup)
@@ -99,8 +99,8 @@ func (_m *BackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(bucket)
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(bucket, path)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -109,12 +109,12 @@ func (_m *BackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
 }
 
 // GetBackup provides a mock function with given fields: bucket, name
-func (_m *BackupService) GetBackup(bucket string, name string) (*v1.Backup, error) {
-	ret := _m.Called(bucket, name)
+func (_m *BackupService) GetBackup(bucket string, path string, name string) (*v1.Backup, error) {
+	ret := _m.Called(bucket, path, name)
 
 	var r0 *v1.Backup
-	if rf, ok := ret.Get(0).(func(string, string) *v1.Backup); ok {
-		r0 = rf(bucket, name)
+	if rf, ok := ret.Get(0).(func(string, string, string) *v1.Backup); ok {
+		r0 = rf(bucket, path, name)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.Backup)
@@ -122,8 +122,8 @@ func (_m *BackupService) GetBackup(bucket string, name string) (*v1.Backup, erro
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(bucket, name)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(bucket, path, name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -132,12 +132,12 @@ func (_m *BackupService) GetBackup(bucket string, name string) (*v1.Backup, erro
 }
 
 // UploadBackup provides a mock function with given fields: bucket, name, metadata, backup, log
-func (_m *BackupService) UploadBackup(bucket string, name string, metadata io.ReadSeeker, backup io.ReadSeeker, log io.ReadSeeker) error {
-	ret := _m.Called(bucket, name, metadata, backup, log)
+func (_m *BackupService) UploadBackup(bucket string, path string, name string, metadata io.ReadSeeker, backup io.ReadSeeker, log io.ReadSeeker) error {
+	ret := _m.Called(bucket, path, name, metadata, backup, log)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, io.ReadSeeker, io.ReadSeeker, io.ReadSeeker) error); ok {
-		r0 = rf(bucket, name, metadata, backup, log)
+	if rf, ok := ret.Get(0).(func(string, string, string, io.ReadSeeker, io.ReadSeeker, io.ReadSeeker) error); ok {
+		r0 = rf(bucket, path, name, metadata, backup, log)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -146,12 +146,12 @@ func (_m *BackupService) UploadBackup(bucket string, name string, metadata io.Re
 }
 
 // UploadRestoreLog provides a mock function with given fields: bucket, backup, restore, log
-func (_m *BackupService) UploadRestoreLog(bucket string, backup string, restore string, log io.ReadSeeker) error {
-	ret := _m.Called(bucket, backup, restore, log)
+func (_m *BackupService) UploadRestoreLog(bucket string, path string, backup string, restore string, log io.ReadSeeker) error {
+	ret := _m.Called(bucket, path, backup, restore, log)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, io.ReadSeeker) error); ok {
-		r0 = rf(bucket, backup, restore, log)
+	if rf, ok := ret.Get(0).(func(string, string, string, string, io.ReadSeeker) error); ok {
+		r0 = rf(bucket, path, backup, restore, log)
 	} else {
 		r0 = ret.Error(0)
 	}

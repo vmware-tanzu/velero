@@ -47,6 +47,7 @@ type downloadRequestController struct {
 	downloadRequestListerSynced cache.InformerSynced
 	backupService               cloudprovider.BackupService
 	bucket                      string
+	path                        string
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
 	clock                       clock.Clock
@@ -59,6 +60,7 @@ func NewDownloadRequestController(
 	downloadRequestInformer informers.DownloadRequestInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	path string,
 	logger *logrus.Logger,
 ) Interface {
 	c := &downloadRequestController{
@@ -67,6 +69,7 @@ func NewDownloadRequestController(
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
 		backupService:               backupService,
 		bucket:                      bucket,
+		path:                        path,
 		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
 		clock:                       &clock.RealClock{},
 		logger:                      logger,
@@ -215,7 +218,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return err
 	}
 
-	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, signedURLTTL)
+	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, c.path, signedURLTTL)
 	if err != nil {
 		return err
 	}

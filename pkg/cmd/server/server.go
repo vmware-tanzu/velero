@@ -480,6 +480,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.Path,
 		config.BackupSyncPeriod.Duration,
 		s.logger,
 	)
@@ -514,6 +515,7 @@ func (s *server) runControllers(config *api.Config) error {
 			backupper,
 			s.backupService,
 			config.BackupStorageProvider.Bucket,
+			config.BackupStorageProvider.Path,
 			s.snapshotService != nil,
 			s.logger,
 		)
@@ -540,6 +542,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.backupService,
 			s.snapshotService,
 			config.BackupStorageProvider.Bucket,
+			config.BackupStorageProvider.Path,
 			config.GCSyncPeriod.Duration,
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
@@ -573,6 +576,7 @@ func (s *server) runControllers(config *api.Config) error {
 		restorer,
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.Path,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
 		s.logger,
@@ -588,6 +592,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.Path,
 		s.logger,
 	)
 	wg.Add(1)

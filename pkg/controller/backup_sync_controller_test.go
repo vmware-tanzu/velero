@@ -66,11 +66,12 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				client.ArkV1(),
 				bs,
 				"bucket",
+				"path",
 				time.Duration(0),
 				logger,
 			).(*backupSyncController)
 
-			bs.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)
+			bs.On("GetAllBackups", "bucket", "path").Return(test.cloudBackups, test.getAllBackupsError)
 
 			c.run()
 

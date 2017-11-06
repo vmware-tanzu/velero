@@ -85,6 +85,7 @@ func TestFetchBackup(t *testing.T) {
 				restorer,
 				backupSvc,
 				"bucket",
+				"path",
 				sharedInformers.Ark().V1().Backups(),
 				false,
 				logger,
@@ -95,10 +96,10 @@ func TestFetchBackup(t *testing.T) {
 			}
 
 			if test.backupServiceBackup != nil || test.backupServiceError != nil {
-				backupSvc.On("GetBackup", "bucket", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
+				backupSvc.On("GetBackup", "bucket", "path", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
 			}
 
-			backup, err := c.fetchBackup("bucket", test.backupName)
+			backup, err := c.fetchBackup("bucket", "path", test.backupName)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, backup)
@@ -282,6 +283,7 @@ func TestProcessRestore(t *testing.T) {
 				restorer,
 				backupSvc,
 				"bucket",
+				"path",
 				sharedInformers.Ark().V1().Backups(),
 				test.allowRestoreSnapshots,
 				logger,
@@ -316,9 +318,9 @@ func TestProcessRestore(t *testing.T) {
 			}
 			if test.expectedRestorerCall != nil {
 				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
-				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
+				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything, mock.Anything).Return(downloadedBackup, nil)
 				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
-				backupSvc.On("UploadRestoreLog", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
+				backupSvc.On("UploadRestoreLog", "bucket", "path", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
 			}
 
 			var (
@@ -333,7 +335,7 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			if test.backupServiceGetBackupError != nil {
-				backupSvc.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
+				backupSvc.On("GetBackup", "bucket", "path", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
 			}
 
 			err = c.processRestore(key)

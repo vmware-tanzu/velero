@@ -42,6 +42,7 @@ type gcController struct {
 	backupService       cloudprovider.BackupService
 	snapshotService     cloudprovider.SnapshotService
 	bucket              string
+	path                string
 	syncPeriod          time.Duration
 	clock               clock.Clock
 	backupLister        listers.BackupLister
@@ -58,6 +59,7 @@ func NewGCController(
 	backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
 	bucket string,
+	path string,
 	syncPeriod time.Duration,
 	backupInformer informers.BackupInformer,
 	backupClient arkv1client.BackupsGetter,
@@ -74,6 +76,7 @@ func NewGCController(
 		backupService:       backupService,
 		snapshotService:     snapshotService,
 		bucket:              bucket,
+		path:                path,
 		syncPeriod:          syncPeriod,
 		clock:               clock.RealClock{},
 		backupLister:        backupInformer.Lister(),
@@ -136,7 +139,7 @@ func (c *gcController) garbageCollectBackup(backup *api.Backup, deleteBackupFile
 	// because otherwise the backup sync controller could re-sync the backup from object storage.
 	if deleteBackupFiles {
 		logContext.Info("Removing backup from object storage")
-		if err := c.backupService.DeleteBackupDir(c.bucket, backup.Name); err != nil {
+		if err := c.backupService.DeleteBackupDir(c.bucket, c.path, backup.Name); err != nil {
 			logContext.WithError(err).Error("Error deleting backup")
 			deletionFailure = true
 		}
@@ -189,7 +192,7 @@ func (c *gcController) processBackups() {
 
 	// GC backups in object storage. We do this in addition
 	// to GC'ing API objects to prevent orphan backup files.
-	backups, err := c.backupService.GetAllBackups(c.bucket)
+	backups, err := c.backupService.GetAllBackups(c.bucket, c.path)
 	if err != nil {
 		c.logger.WithError(err).Error("Error getting all backups from object storage")
 		return

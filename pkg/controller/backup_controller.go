@@ -53,6 +53,7 @@ type backupController struct {
 	backupper        backup.Backupper
 	backupService    cloudprovider.BackupService
 	bucket           string
+	path             string
 	pvProviderExists bool
 	lister           listers.BackupLister
 	listerSynced     cache.InformerSynced
@@ -69,6 +70,7 @@ func NewBackupController(
 	backupper backup.Backupper,
 	backupService cloudprovider.BackupService,
 	bucket string,
+	path string,
 	pvProviderExists bool,
 	logger *logrus.Logger,
 ) Interface {
@@ -76,6 +78,7 @@ func NewBackupController(
 		backupper:        backupper,
 		backupService:    backupService,
 		bucket:           bucket,
+		path:             path,
 		pvProviderExists: pvProviderExists,
 		lister:           backupInformer.Lister(),
 		listerSynced:     backupInformer.Informer().HasSynced,
@@ -254,7 +257,7 @@ func (controller *backupController) processBackup(key string) error {
 
 	logContext.Debug("Running backup")
 	// execution & upload of backup
-	if err := controller.runBackup(backup, controller.bucket); err != nil {
+	if err := controller.runBackup(backup, controller.bucket, controller.path); err != nil {
 		logContext.WithError(err).Error("backup failed")
 		backup.Status.Phase = api.BackupPhaseFailed
 	}
@@ -299,7 +302,7 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 	return validationErrors
 }
 
-func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
+func (controller *backupController) runBackup(backup *api.Backup, bucket, path string) error {
 	backupFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for Backup")
@@ -356,5 +359,5 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return errors.Wrap(err, "error resetting Backup log file offset")
 	}
 
-	return controller.backupService.UploadBackup(bucket, backup.Name, bytes.NewReader(buf.Bytes()), backupFile, logFile)
+	return controller.backupService.UploadBackup(bucket, path, backup.Name, bytes.NewReader(buf.Bytes()), backupFile, logFile)
 }

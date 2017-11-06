@@ -160,6 +160,7 @@ func TestProcessBackup(t *testing.T) {
 				backupper,
 				cloudBackups,
 				"bucket",
+				"path",
 				test.allowSnapshots,
 				logger,
 			).(*backupController)
@@ -189,7 +190,7 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Version = 1
 				backupper.On("Backup", backup, mock.Anything, mock.Anything).Return(nil)
 
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				cloudBackups.On("UploadBackup", "bucket", "path", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 			}
 
 			// this is necessary so the Update() call returns the appropriate object

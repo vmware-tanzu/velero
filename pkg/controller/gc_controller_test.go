@@ -152,6 +152,7 @@ func TestGarbageCollect(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				snapSvc         cloudprovider.SnapshotService
 				bucket          = "bucket"
+				path            = "path"
 				logger, _       = testlogger.NewNullLogger()
 			)
 
@@ -163,6 +164,7 @@ func TestGarbageCollect(t *testing.T) {
 				backupService,
 				snapSvc,
 				bucket,
+				path,
 				1*time.Millisecond,
 				sharedInformers.Ark().V1().Backups(),
 				client.ArkV1(),
@@ -172,9 +174,9 @@ func TestGarbageCollect(t *testing.T) {
 			).(*gcController)
 			controller.clock = fakeClock
 
-			backupService.On("GetAllBackups", bucket).Return(test.backups, nil)
+			backupService.On("GetAllBackups", bucket, path).Return(test.backups, nil)
 			for _, b := range test.expectedDeletions.List() {
-				backupService.On("DeleteBackupDir", bucket, b).Return(nil)
+				backupService.On("DeleteBackupDir", bucket, path, b).Return(nil)
 			}
 
 			controller.processBackups()
@@ -237,11 +239,13 @@ func TestGarbageCollectBackup(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				bucket          = "bucket-1"
+				path            = "path-1"
 				logger, _       = testlogger.NewNullLogger()
 				controller      = NewGCController(
 					backupService,
 					snapshotService,
 					bucket,
+					path,
 					1*time.Millisecond,
 					sharedInformers.Ark().V1().Backups(),
 					client.ArkV1(),
@@ -257,7 +261,7 @@ func TestGarbageCollectBackup(t *testing.T) {
 			}
 
 			for _, b := range test.expectedObjectStorageDeletions.List() {
-				backupService.On("DeleteBackupDir", bucket, b).Return(nil)
+				backupService.On("DeleteBackupDir", bucket, path, b).Return(nil)
 			}
 
 			// METHOD UNDER TEST
@@ -328,6 +332,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 		backupService,
 		snapshotService,
 		"bucket",
+		"path",
 		1*time.Millisecond,
 		sharedInformers.Ark().V1().Backups(),
 		client.ArkV1(),
@@ -337,7 +342,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	).(*gcController)
 	controller.clock = fakeClock
 
-	backupService.On("GetAllBackups", "bucket").Return(scenario.backups, nil)
+	backupService.On("GetAllBackups", "bucket", "path").Return(scenario.backups, nil)
 
 	// PASS 1
 	controller.processBackups()
@@ -347,7 +352,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 
 	// PASS 2
 	fakeClock.Step(1 * time.Minute)
-	backupService.On("DeleteBackupDir", "bucket", "backup-1").Return(nil)
+	backupService.On("DeleteBackupDir", "bucket", "path", "backup-1").Return(nil)
 	controller.processBackups()
 
 	assert.Equal(0, len(snapshotService.SnapshotsTaken), "snapshots should have been garbage-collected.")
