@@ -351,7 +351,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 				continue
 			}
 
-			w, e := ctx.restoreResource(resource.String(), nsName, nsPath)
+			w, e := ctx.restoreResource(resource.String(), mappedNsName, nsPath)
 			merge(&warnings, &w)
 			merge(&errs, &e)
 		}

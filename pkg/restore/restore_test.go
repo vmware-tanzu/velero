@@ -292,6 +292,53 @@ func TestRestorePriority(t *testing.T) {
 	}
 }
 
+func TestNamespaceRemapping(t *testing.T) {
+	var (
+		baseDir              = "bak"
+		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
+		prioritizedResources = []schema.GroupResource{{Resource: "configmaps"}}
+		labelSelector        = labels.NewSelector()
+		fileSystem           = newFakeFileSystem().WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON())
+		expectedNS           = "ns-2"
+		expectedObjs         = toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("").ConfigMap)
+	)
+
+	resourceClient := &FakeDynamicClient{}
+	for i := range expectedObjs {
+		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
+	}
+
+	dynamicFactory := &FakeDynamicFactory{}
+	resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
+	gv := schema.GroupVersion{Group: "", Version: "v1"}
+	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
+
+	log, _ := testlogger.NewNullLogger()
+
+	ctx := &context{
+		dynamicFactory:       dynamicFactory,
+		fileSystem:           fileSystem,
+		selector:             labelSelector,
+		namespaceClient:      &fakeNamespaceClient{},
+		prioritizedResources: prioritizedResources,
+		restore:              restore,
+		backup:               &api.Backup{},
+		logger:               log,
+	}
+
+	warnings, errors := ctx.restoreFromDir(baseDir)
+
+	assert.Empty(t, warnings.Ark)
+	assert.Empty(t, warnings.Cluster)
+	assert.Empty(t, warnings.Namespaces)
+	assert.Empty(t, errors.Ark)
+	assert.Empty(t, errors.Cluster)
+	assert.Empty(t, errors.Namespaces)
+
+	dynamicFactory.AssertExpectations(t)
+	resourceClient.AssertExpectations(t)
+}
+
 func TestRestoreResourceForNamespace(t *testing.T) {
 	var (
 		trueVal  = true

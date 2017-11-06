@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARK_ROOT=$(realpath $(dirname ${BASH_SOURCE})/..)
+ARK_ROOT=$(dirname ${BASH_SOURCE})/..
 BIN=${ARK_ROOT}/_output/bin
 mkdir -p ${BIN}
 go build -o ${BIN}/client-gen ./vendor/k8s.io/kubernetes/cmd/libs/go2idl/client-gen

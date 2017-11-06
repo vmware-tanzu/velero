@@ -103,6 +103,23 @@ func TestBackupItemSkips(t *testing.T) {
 	}
 }
 
+func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t *testing.T) {
+	f := false
+	ib := &defaultItemBackupper{
+		backup: &v1.Backup{
+			Spec: v1.BackupSpec{
+				IncludeClusterResources: &f,
+			},
+		},
+		namespaces: collections.NewIncludesExcludes(),
+		resources:  collections.NewIncludesExcludes(),
+	}
+
+	u := unstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
+	err := ib.backupItem(arktest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
+	assert.NoError(t, err)
+}
+
 func TestBackupItemNoSkips(t *testing.T) {
 	tests := []struct {
 		name                                  string
