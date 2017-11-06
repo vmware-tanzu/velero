@@ -1,5 +1,12 @@
 # Changelog
 
+#### [v0.5.1](https://github.com/heptio/ark/tree/v0.5.1) - 2017-11-06
+Bug fixes:
+  * If a Service is headless, retain ClusterIP = None when backing up and restoring.
+  * Use the specifed --label-selector when listing backups, schedules, and restores.
+  * Restore namespace mapping functionality that was accidentally broken in 0.5.0.
+  * Always include namespaces in the backup, regardless of the --include-cluster-resources setting.
+
 #### [v0.5.0](https://github.com/heptio/ark/tree/v0.5.0) - 2017-10-26
 Breaking changes:
   * The backup tar file format has changed. Backups created using previous versions of Ark cannot be restored using v0.5.0.
