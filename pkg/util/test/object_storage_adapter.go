@@ -85,12 +85,12 @@ func (_m *ObjectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 }
 
 // ListCommonPrefixes provides a mock function with given fields: bucket, delimiter
-func (_m *ObjectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	ret := _m.Called(bucket, delimiter)
+func (_m *ObjectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
+	ret := _m.Called(bucket, delimiter, prefix)
 
 	var r0 []string
-	if rf, ok := ret.Get(0).(func(string, string) []string); ok {
-		r0 = rf(bucket, delimiter)
+	if rf, ok := ret.Get(0).(func(string, string, string) []string); ok {
+		r0 = rf(bucket, delimiter, prefix)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]string)
@@ -98,8 +98,8 @@ func (_m *ObjectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(bucket, delimiter)
+	if rf, ok := ret.Get(1).(func(string, string, string) error); ok {
+		r1 = rf(bucket, delimiter, prefix)
 	} else {
 		r1 = ret.Error(1)
 	}

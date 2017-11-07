@@ -237,7 +237,7 @@ func TestGetAllBackups(t *testing.T) {
 				logger, _ = testlogger.NewNullLogger()
 			)
 
-			objStore.On("ListCommonPrefixes", bucket, path+"/").Return([]string{"backup-1", "backup-2"}, nil)
+			objStore.On("ListCommonPrefixes", bucket, "/", path).Return([]string{"backup-1", "backup-2"}, nil)
 			objStore.On("GetObject", bucket, path+"/"+"backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
 			objStore.On("GetObject", bucket, path+"/"+"backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
 
