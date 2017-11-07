@@ -30,6 +30,7 @@ Work with restores
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark restore create](ark_restore_create.md)	 - Create a restore
 * [ark restore delete](ark_restore_delete.md)	 - Delete a restore
+* [ark restore describe](ark_restore_describe.md)	 - Describe restores
 * [ark restore get](ark_restore_get.md)	 - Get restores
 * [ark restore logs](ark_restore_logs.md)	 - Get restore logs
 

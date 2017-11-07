@@ -32,15 +32,14 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2/google"
 
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	kcorev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
@@ -55,8 +54,8 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/generated/clientset"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/restore/restorers"
@@ -194,11 +193,7 @@ func (s *server) run() error {
 
 	// watchConfig needs to examine the unmodified original config, so we keep that around as a
 	// separate object, and instead apply defaults to a clone.
-	copy, err := scheme.Scheme.DeepCopy(originalConfig)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	config := copy.(*api.Config)
+	config := originalConfig.DeepCopy()
 	applyConfigDefaults(config, s.logger)
 
 	s.watchConfig(originalConfig)

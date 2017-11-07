@@ -32,7 +32,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 )
 
 // BackupService contains methods for working with backups in object storage.
@@ -41,7 +41,7 @@ type BackupService interface {
 	// UploadBackup uploads the specified Ark backup of a set of Kubernetes API objects, whose manifests are
 	// stored in the specified file, into object storage in an Ark bucket, tagged with Ark metadata. Returns
 	// an error if a problem is encountered accessing the file or performing the upload via the cloud API.
-	UploadBackup(bucket, bucketPath, name string, metadata, backup, log io.ReadSeeker) error
+	UploadBackup(bucket, bucketPath, name string, metadata, backup, log io.Reader) error
 
 	// DownloadBackup downloads an Ark backup with the specified object key from object storage via the cloud API.
 	// It returns the snapshot metadata and data (separately), or an error if a problem is encountered
@@ -59,7 +59,10 @@ type BackupService interface {
 	CreateSignedURL(target api.DownloadTarget, bucket string, bucketPath string, ttl time.Duration) (string, error)
 
 	// UploadRestoreLog uploads the restore's log file to object storage.
-	UploadRestoreLog(bucket, bucketPath, backup, restore string, log io.ReadSeeker) error
+	UploadRestoreLog(bucket, bucketPath, backup, restore string, log io.Reader) error
+
+	// UploadRestoreResults uploads the restore's results file to object storage.
+	UploadRestoreResults(bucket, bucketPath, backup, restore string, results io.Reader) error
 }
 
 // BackupGetter knows how to list backups in object storage.
@@ -69,10 +72,11 @@ type BackupGetter interface {
 }
 
 const (
-	metadataFileFormatString   = "%s/ark-backup.json"
-	backupFileFormatString     = "%s/%s.tar.gz"
-	backupLogFileFormatString  = "%s/%s-logs.gz"
-	restoreLogFileFormatString = "%s/restore-%s-logs.gz"
+	metadataFileFormatString       = "%s/ark-backup.json"
+	backupFileFormatString         = "%s/%s.tar.gz"
+	backupLogFileFormatString      = "%s/%s-logs.gz"
+	restoreLogFileFormatString     = "%s/restore-%s-logs.gz"
+	restoreResultsFileFormatString = "%s/restore-%s-results.gz"
 )
 
 func joinPathPrefix(prefix string, suffix string) string {
@@ -95,6 +99,10 @@ func getRestoreLogKey(path string, backup, restore string) string {
 	return joinPathPrefix(path, fmt.Sprintf(restoreLogFileFormatString, backup, restore))
 }
 
+func getRestoreResultsKey(path, backup, restore string) string {
+	return joinPathPrefix(path, fmt.Sprintf(restoreResultsFileFormatString, backup, restore))
+}
+
 type backupService struct {
 	objectStorage ObjectStorageAdapter
 	decoder       runtime.Decoder
@@ -113,7 +121,7 @@ func NewBackupService(objectStorage ObjectStorageAdapter, logger *logrus.Logger)
 	}
 }
 
-func (br *backupService) UploadBackup(bucket, bucketPath, backupName string, metadata, backup, log io.ReadSeeker) error {
+func (br *backupService) UploadBackup(bucket, bucketPath, backupName string, metadata, backup, log io.Reader) error {
 	// upload metadata file
 	metadataKey := getMetadataKey(bucketPath, backupName)
 	if err := br.objectStorage.PutObject(bucket, metadataKey, metadata); err != nil {
@@ -224,21 +232,33 @@ func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket strin
 	case api.DownloadTargetKindBackupLog:
 		return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(bucketPath, target.Name), ttl)
 	case api.DownloadTargetKindRestoreLog:
-		// restore name is formatted as <backup name>-<timestamp>
-		i := strings.LastIndex(target.Name, "-")
-		if i < 0 {
-			i = len(target.Name)
-		}
-		backup := target.Name[0:i]
+		backup := extractBackupName(target.Name)
 		return br.objectStorage.CreateSignedURL(bucket, getRestoreLogKey(bucketPath, backup, target.Name), ttl)
+	case api.DownloadTargetKindRestoreResults:
+		backup := extractBackupName(target.Name)
+		return br.objectStorage.CreateSignedURL(bucket, getRestoreResultsKey(bucketPath, backup, target.Name), ttl)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
 }
 
-func (br *backupService) UploadRestoreLog(bucket, bucketPath, backup, restore string, log io.ReadSeeker) error {
+func extractBackupName(s string) string {
+	// restore name is formatted as <backup name>-<timestamp>
+	i := strings.LastIndex(s, "-")
+	if i < 0 {
+		i = len(s)
+	}
+	return s[0:i]
+}
+
+func (br *backupService) UploadRestoreLog(bucket, bucketPath, backup, restore string, log io.Reader) error {
 	key := getRestoreLogKey(bucketPath, backup, restore)
 	return br.objectStorage.PutObject(bucket, key, log)
+}
+
+func (br *backupService) UploadRestoreResults(bucket, bucketPath, backup, restore string, results io.Reader) error {
+	key := getRestoreResultsKey(bucketPath, backup, restore)
+	return br.objectStorage.PutObject(bucket, key, results)
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

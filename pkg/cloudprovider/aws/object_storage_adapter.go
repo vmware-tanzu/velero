@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -32,9 +33,10 @@ import (
 var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 
 type objectStorageAdapter struct {
-	s3       *s3.S3
-	kmsKeyID string
-	logger   *logrus.Logger
+	s3         *s3.S3
+	s3Uploader *s3manager.Uploader
+	kmsKeyID   string
+	logger     *logrus.Logger
 }
 
 func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
@@ -66,15 +68,16 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 	}
 
 	return &objectStorageAdapter{
-		s3:       s3.New(sess),
-		kmsKeyID: kmsKeyID,
-		logger:   logger,
+		s3:         s3.New(sess),
+		s3Uploader: s3manager.NewUploader(sess),
+		kmsKeyID:   kmsKeyID,
+		logger:     logger,
 	}, nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
+func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
 	op.logger.Infof("put s3 object s3://%s/%s", bucket, key)
-	req := &s3.PutObjectInput{
+	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
 		Body:   body,
@@ -86,7 +89,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 		req.SSEKMSKeyId = &op.kmsKeyID
 	}
 
-	_, err := op.s3.PutObject(req)
+	_, err := op.s3Uploader.Upload(req)
 
 	return errors.Wrapf(err, "error putting object %s", key)
 }

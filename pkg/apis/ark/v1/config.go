@@ -18,6 +18,8 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // ConfigList is a list of Configs.
 type ConfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -26,7 +28,8 @@ type ConfigList struct {
 	Items []Config `json:"items"`
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Config is an Ark resource that captures configuration information to be
 // used for running the Ark server.

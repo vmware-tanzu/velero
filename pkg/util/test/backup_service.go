@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -132,11 +132,12 @@ func (_m *BackupService) GetBackup(bucket string, path string, name string) (*v1
 }
 
 // UploadBackup provides a mock function with given fields: bucket, name, metadata, backup, log
-func (_m *BackupService) UploadBackup(bucket string, path string, name string, metadata io.ReadSeeker, backup io.ReadSeeker, log io.ReadSeeker) error {
+
+func (_m *BackupService) UploadBackup(bucket string, path string, name string, metadata io.Reader, backup io.Reader, log io.Reader) error {
 	ret := _m.Called(bucket, path, name, metadata, backup, log)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, io.ReadSeeker, io.ReadSeeker, io.ReadSeeker) error); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string, io.Reader, io.Reader, io.Reader) error); ok {
 		r0 = rf(bucket, path, name, metadata, backup, log)
 	} else {
 		r0 = ret.Error(0)
@@ -146,12 +147,27 @@ func (_m *BackupService) UploadBackup(bucket string, path string, name string, m
 }
 
 // UploadRestoreLog provides a mock function with given fields: bucket, backup, restore, log
-func (_m *BackupService) UploadRestoreLog(bucket string, path string, backup string, restore string, log io.ReadSeeker) error {
+func (_m *BackupService) UploadRestoreLog(bucket string, path string, backup string, restore string, log io.Reader) error {
 	ret := _m.Called(bucket, path, backup, restore, log)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string, io.ReadSeeker) error); ok {
+	if rf, ok := ret.Get(0).(func(string, string, string, string, io.Reader) error); ok {
 		r0 = rf(bucket, path, backup, restore, log)
+
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// UploadRestoreResults provides a mock function with given fields: bucket, backup, restore, results
+func (_m *BackupService) UploadRestoreResults(bucket string, path string, backup string, restore string, results io.Reader) error {
+	ret := _m.Called(bucket, path, backup, restore, results)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string, io.Reader) error); ok {
+		r0 = rf(bucket, path, backup, restore, results)
 	} else {
 		r0 = ret.Error(0)
 	}

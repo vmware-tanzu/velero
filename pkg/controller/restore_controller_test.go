@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/fake"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	. "github.com/heptio/ark/pkg/util/test"
 )
@@ -190,9 +190,7 @@ func TestProcessRestore(t *testing.T) {
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
-					WithErrors(api.RestoreResult{
-						Ark: []string{"no backup here"},
-					}).
+					WithErrors(1).
 					Restore,
 			},
 		},
@@ -205,11 +203,7 @@ func TestProcessRestore(t *testing.T) {
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
-					WithErrors(api.RestoreResult{
-						Namespaces: map[string][]string{
-							"ns-1": {"blarg"},
-						},
-					}).
+					WithErrors(1).
 					Restore,
 			},
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
@@ -321,6 +315,7 @@ func TestProcessRestore(t *testing.T) {
 				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything, mock.Anything).Return(downloadedBackup, nil)
 				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
 				backupSvc.On("UploadRestoreLog", "bucket", "path", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
+				backupSvc.On("UploadRestoreResults", "bucket", "path", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(nil)
 			}
 
 			var (

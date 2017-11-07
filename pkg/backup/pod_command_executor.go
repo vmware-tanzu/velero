@@ -25,9 +25,8 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
+	kapiv1 "k8s.io/api/core/v1"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
-	kapiv1 "k8s.io/client-go/pkg/api/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 )
@@ -129,7 +128,7 @@ func (e *defaultPodCommandExecutor) executePodCommand(log *logrus.Entry, item ma
 		Stderr:    true,
 	}, kscheme.ParameterCodec)
 
-	executor, err := e.streamExecutorFactory.NewExecutor(e.restClientConfig, "POST", req.URL())
+	executor, err := e.streamExecutorFactory.NewSPDYExecutor(e.restClientConfig, "POST", req.URL())
 	if err != nil {
 		return err
 	}
@@ -137,9 +136,8 @@ func (e *defaultPodCommandExecutor) executePodCommand(log *logrus.Entry, item ma
 	var stdout, stderr bytes.Buffer
 
 	streamOptions := remotecommand.StreamOptions{
-		SupportedProtocols: remotecommandconsts.SupportedStreamingProtocols,
-		Stdout:             &stdout,
-		Stderr:             &stderr,
+		Stdout: &stdout,
+		Stderr: &stderr,
 	}
 
 	errCh := make(chan error)
@@ -215,11 +213,11 @@ func setDefaultHookContainer(pod map[string]interface{}, hook *api.ExecHook) err
 }
 
 type streamExecutorFactory interface {
-	NewExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.StreamExecutor, error)
+	NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error)
 }
 
 type defaultStreamExecutorFactory struct{}
 
-func (f *defaultStreamExecutorFactory) NewExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.StreamExecutor, error) {
-	return remotecommand.NewExecutor(config, method, url)
+func (f *defaultStreamExecutorFactory) NewSPDYExecutor(config *rest.Config, method string, url *url.URL) (remotecommand.Executor, error) {
+	return remotecommand.NewSPDYExecutor(config, method, url)
 }

@@ -31,6 +31,7 @@ const (
 	DownloadTargetKindBackupLog      DownloadTargetKind = "BackupLog"
 	DownloadTargetKindBackupContents DownloadTargetKind = "BackupContents"
 	DownloadTargetKindRestoreLog     DownloadTargetKind = "RestoreLog"
+	DownloadTargetKindRestoreResults DownloadTargetKind = "RestoreResults"
 )
 
 // DownloadTarget is the specification for what kind of file to download, and the name of the
@@ -64,7 +65,8 @@ type DownloadRequestStatus struct {
 	Expiration metav1.Time `json:"expiration"`
 }
 
-// +genclient=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.
@@ -75,6 +77,8 @@ type DownloadRequest struct {
 	Spec   DownloadRequestSpec   `json:"spec"`
 	Status DownloadRequestStatus `json:"status,omitempty"`
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DownloadRequestList is a list of DownloadRequests.
 type DownloadRequestList struct {

@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkclientv1 "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkclientv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 )
 
 func Stream(client arkclientv1.DownloadRequestsGetter, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration) error {

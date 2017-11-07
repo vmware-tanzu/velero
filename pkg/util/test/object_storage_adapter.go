@@ -131,11 +131,11 @@ func (_m *ObjectStorageAdapter) ListObjects(bucket string, prefix string) ([]str
 }
 
 // PutObject provides a mock function with given fields: bucket, key, body
-func (_m *ObjectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
+func (_m *ObjectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
 	ret := _m.Called(bucket, key, body)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, io.ReadSeeker) error); ok {
+	if rf, ok := ret.Get(0).(func(string, string, io.Reader) error); ok {
 		r0 = rf(bucket, key, body)
 	} else {
 		r0 = ret.Error(0)

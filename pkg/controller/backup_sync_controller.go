@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/typed/ark/v1"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 

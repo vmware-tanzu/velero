@@ -29,7 +29,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/fake"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	. "github.com/heptio/ark/pkg/util/test"
 )
@@ -48,7 +48,7 @@ func TestGarbageCollect(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 
 	tests := []gcTest{
-		gcTest{
+		{
 			name: "basic-expired",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-1").
@@ -61,7 +61,7 @@ func TestGarbageCollect(t *testing.T) {
 			expectedDeletions:          sets.NewString("backup-1"),
 			expectedSnapshotsRemaining: sets.NewString(),
 		},
-		gcTest{
+		{
 			name: "basic-unexpired",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-1").
@@ -74,7 +74,7 @@ func TestGarbageCollect(t *testing.T) {
 			expectedDeletions:          sets.NewString(),
 			expectedSnapshotsRemaining: sets.NewString("snapshot-1", "snapshot-2"),
 		},
-		gcTest{
+		{
 			name: "one expired, one unexpired",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-1").
@@ -92,7 +92,7 @@ func TestGarbageCollect(t *testing.T) {
 			expectedDeletions:          sets.NewString("backup-1"),
 			expectedSnapshotsRemaining: sets.NewString("snapshot-3", "snapshot-4"),
 		},
-		gcTest{
+		{
 			name: "none expired in target bucket",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-2").
@@ -105,7 +105,7 @@ func TestGarbageCollect(t *testing.T) {
 			expectedDeletions:          sets.NewString(),
 			expectedSnapshotsRemaining: sets.NewString("snapshot-1", "snapshot-2", "snapshot-3", "snapshot-4"),
 		},
-		gcTest{
+		{
 			name: "orphan snapshots",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-1").
@@ -118,7 +118,7 @@ func TestGarbageCollect(t *testing.T) {
 			expectedDeletions:          sets.NewString("backup-1"),
 			expectedSnapshotsRemaining: sets.NewString("snapshot-3", "snapshot-4"),
 		},
-		gcTest{
+		{
 			name: "no snapshot service only GC's backups without snapshots",
 			backups: []*api.Backup{
 				NewTestBackup().WithName("backup-1").

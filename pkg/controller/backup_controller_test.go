@@ -31,8 +31,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/fake"
-	"github.com/heptio/ark/pkg/generated/clientset/scheme"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	. "github.com/heptio/ark/pkg/util/test"
 )

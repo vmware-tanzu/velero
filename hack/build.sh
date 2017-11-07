@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Copyright 2016 The Kubernetes Authors.
 #
@@ -53,7 +53,10 @@ LDFLAGS="-X ${PKG}/pkg/buildinfo.Version=${VERSION}"
 LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitSHA=${GIT_SHA}"
 LDFLAGS="${LDFLAGS} -X ${PKG}/pkg/buildinfo.GitTreeState=${GIT_TREE_STATE}"
 
-OUTPUT=/output/${GOOS}/${GOARCH}/${BIN}
+if [[ -z "${OUTPUT_DIR:-}" ]]; then
+  OUTPUT_DIR=.
+fi
+OUTPUT=${OUTPUT_DIR}/${BIN}
 if [[ "${GOOS}" = "windows" ]]; then
   OUTPUT="${OUTPUT}.exe"
 fi

@@ -65,8 +65,8 @@ func (r *TestRestore) WithBackup(name string) *TestRestore {
 	return r
 }
 
-func (r *TestRestore) WithErrors(e api.RestoreResult) *TestRestore {
-	r.Status.Errors = e
+func (r *TestRestore) WithErrors(i int) *TestRestore {
+	r.Status.Errors = i
 	return r
 }
 

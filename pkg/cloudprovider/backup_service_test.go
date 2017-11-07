@@ -203,11 +203,11 @@ func TestGetAllBackups(t *testing.T) {
 				"backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []*api.Backup{
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
 				},
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-2"},
 				},
@@ -220,7 +220,7 @@ func TestGetAllBackups(t *testing.T) {
 				"backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
 			},
 			expectedRes: []*api.Backup{
-				&api.Backup{
+				{
 					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
 					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
 				},
@@ -306,6 +306,24 @@ func TestCreateSignedURL(t *testing.T) {
 			targetKind:  api.DownloadTargetKindRestoreLog,
 			targetName:  "b-cool-20170913154901-20170913154902",
 			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-logs.gz",
+		},
+		{
+			name:        "restore results - backup has no dash",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-20170913154901",
+			expectedKey: "b/restore-b-20170913154901-results.gz",
+		},
+		{
+			name:        "restore results - backup has 1 dash",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-cool-20170913154901",
+			expectedKey: "b-cool/restore-b-cool-20170913154901-results.gz",
+		},
+		{
+			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
+			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetName:  "b-cool-20170913154901-20170913154902",
+			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-results.gz",
 		},
 	}
 
