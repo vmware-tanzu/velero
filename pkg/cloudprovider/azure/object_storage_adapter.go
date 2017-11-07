@@ -96,7 +96,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
 	container, err := getContainerReference(op.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -104,6 +104,10 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 
 	params := storage.ListBlobsParameters{
 		Delimiter: delimiter,
+	}
+
+	if prefix != "" {
+		params.Prefix = prefix
 	}
 
 	res, err := container.ListBlobs(params)

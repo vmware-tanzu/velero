@@ -72,7 +72,7 @@ func (c *backupSyncController) Run(ctx context.Context, workers int) error {
 }
 
 func (c *backupSyncController) run() {
-	c.logger.Info("Syncing backups from object storage")
+	c.logger.Infof("Syncing backups from object storage %s/%s", c.bucket, c.path)
 	backups, err := c.backupService.GetAllBackups(c.bucket, c.path)
 	if err != nil {
 		c.logger.WithError(err).Error("error listing backups")

@@ -24,6 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -33,9 +34,10 @@ var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
 type objectStorageAdapter struct {
 	s3       *s3.S3
 	kmsKeyID string
+	logger   *logrus.Logger
 }
 
-func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStorageAdapter, error) {
+func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
 	if region == "" {
 		return nil, errors.New("missing region in aws configuration in config file")
 	}
@@ -66,10 +68,12 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 	return &objectStorageAdapter{
 		s3:       s3.New(sess),
 		kmsKeyID: kmsKeyID,
+		logger:   logger,
 	}, nil
 }
 
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.ReadSeeker) error {
+	op.logger.Infof("put s3 object s3://%s/%s", bucket, key)
 	req := &s3.PutObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -88,6 +92,7 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 }
 
 func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
+	op.logger.Infof("get s3 object s3://%s/%s", bucket, key)
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -101,10 +106,15 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res.Body, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
+	op.logger.Infof("list s3 common prefix s3://%s/%s", bucket, prefix)
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
+	}
+
+	if prefix != "" {
+		req.Prefix = &prefix
 	}
 
 	var ret []string
@@ -123,6 +133,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 }
 
 func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
+	op.logger.Infof("list s3 objects s3://%s/%s", bucket, prefix)
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
@@ -144,6 +155,7 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 }
 
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
+	op.logger.Infof("delete s3 object s3://%s/%s", bucket, key)
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -155,6 +167,7 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 }
 
 func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	op.logger.Debug("create signed s3 url s3://%s/%s %s ttl", bucket, key, ttl)
 	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

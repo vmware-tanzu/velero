@@ -73,7 +73,6 @@ const (
 	backupFileFormatString     = "%s/%s.tar.gz"
 	backupLogFileFormatString  = "%s/%s-logs.gz"
 	restoreLogFileFormatString = "%s/restore-%s-logs.gz"
-	pathFormatString           = "%s/%s"
 )
 
 func joinPathPrefix(prefix string, suffix string) string {
@@ -148,7 +147,7 @@ func (br *backupService) DownloadBackup(bucket, bucketPath, backupName string) (
 }
 
 func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api.Backup, error) {
-	prefixes, err := br.objectStorage.ListCommonPrefixes(bucket, joinPathPrefix(bucketPath, "/"))
+	prefixes, err := br.objectStorage.ListCommonPrefixes(bucket, "/", bucketPath)
 	if err != nil {
 		return nil, err
 	}

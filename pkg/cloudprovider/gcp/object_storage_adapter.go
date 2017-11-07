@@ -76,8 +76,14 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res.Body, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	res, err := op.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
+func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
+	req := op.gcs.Objects.List(bucket).Delimiter(delimiter)
+
+	if prefix != "" {
+		req = req.Prefix(prefix)
+	}
+
+	res, err := req.Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

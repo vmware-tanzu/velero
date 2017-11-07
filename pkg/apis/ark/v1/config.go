@@ -89,6 +89,10 @@ type ObjectStorageProviderConfig struct {
 	// Bucket is the name of the bucket in object storage where Ark backups
 	// are stored.
 	Bucket string `json:"bucket"`
+
+	// Path is the sub-dir of the bucket in object storage where Ark backups
+	// are stored.
+	Path string `json:"path"`
 }
 
 // AWSConfig is configuration information for connecting to AWS.

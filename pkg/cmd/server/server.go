@@ -394,7 +394,8 @@ func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string,
 			cloudConfig.AWS.Region,
 			cloudConfig.AWS.S3Url,
 			cloudConfig.AWS.KMSKeyID,
-			cloudConfig.AWS.S3ForcePathStyle)
+			cloudConfig.AWS.S3ForcePathStyle,
+			logger)
 	case cloudConfig.GCP != nil:
 		var email string
 		var privateKey []byte
