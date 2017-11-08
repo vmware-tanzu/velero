@@ -123,6 +123,8 @@ func (rb *defaultResourceBackupper) backupResource(
 
 	log := rb.log.WithField("groupResource", grString)
 
+	log.Info("Evaluating resource")
+
 	clusterScoped := !resource.Namespaced
 
 	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
@@ -196,6 +198,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		}
 
 		for _, ns := range namespacesToList {
+			log.WithField("namespace", ns).Info("Getting namespace")
 			unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting namespace"))
@@ -227,6 +230,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return err
 		}
 
+		log.WithField("namespace", namespace).Info("Listing items")
 		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: rb.labelSelector})
 		if err != nil {
 			return errors.WithStack(err)
@@ -238,6 +242,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return errors.WithStack(err)
 		}
 
+		log.WithField("namespace", namespace).Infof("Retrieved %d items", len(items))
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
