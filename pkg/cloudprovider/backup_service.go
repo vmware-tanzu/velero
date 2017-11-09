@@ -163,7 +163,7 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	for _, backupDir := range prefixes {
 		backup, err := br.GetBackup(bucket, backupDir)
 		if err != nil {
-			br.logger.WithError(err).WithField("dir", backupDir).Error("Error reading backup directory")
+			br.logger.WithError(err).WithField("bucket", bucket).WithField("dir", backupDir).Error("Error reading backup directory")
 			continue
 		}
 

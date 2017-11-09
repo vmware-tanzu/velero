@@ -159,6 +159,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [".","openstack","openstack/blockstorage/v2/snapshots","openstack/blockstorage/v2/volumes","openstack/identity/v2/tenants","openstack/identity/v2/tokens","openstack/identity/v3/tokens","openstack/objectstorage/v1/accounts","openstack/objectstorage/v1/objects","openstack/utils","pagination"]
+  revision = "c7551a666c4fee120cc314dce91ba3d0663a86f3"
+
+[[projects]]
+  branch = "master"
   name = "github.com/hashicorp/golang-lru"
   packages = [".","simplelru"]
   revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
