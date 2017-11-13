@@ -17,8 +17,6 @@ limitations under the License.
 package plugin
 
 import (
-	"log"
-
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/spf13/cobra"
 
@@ -30,6 +28,8 @@ import (
 )
 
 func NewCommand() *cobra.Command {
+	logger := arkplugin.NewPluginLogger()
+
 	objectStores := map[string]cloudprovider.ObjectStore{
 		"aws":   aws.NewObjectStore(),
 		"gcp":   gcp.NewObjectStore(),
@@ -48,24 +48,24 @@ func NewCommand() *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			if len(args) != 2 {
-				log.Fatalf("You must specify exactly two arguments, the plugin kind and the plugin name")
+				logger.Fatal("You must specify exactly two arguments, the plugin kind and the plugin name")
 			}
 
 			kind := args[0]
 			name := args[1]
 
-			log.Printf("Running plugin command for kind=%s, name=%s", kind, name)
+			logger.Debugf("Running plugin command for kind=%s, name=%s", kind, name)
 
 			switch kind {
 			case "cloudprovider":
 				objectStore, found := objectStores[name]
 				if !found {
-					log.Fatalf("Unrecognized plugin name %q", name)
+					logger.Fatalf("Unrecognized plugin name %q", name)
 				}
 
 				blockStore, found := blockStores[name]
 				if !found {
-					log.Fatalf("Unrecognized plugin name %q", name)
+					logger.Fatalf("Unrecognized plugin name %q", name)
 				}
 
 				plugin.Serve(&plugin.ServeConfig{
@@ -77,7 +77,7 @@ func NewCommand() *cobra.Command {
 					GRPCServer: plugin.DefaultGRPCServer,
 				})
 			default:
-				log.Fatalf("Unsupported plugin kind %q", kind)
+				logger.Fatalf("Unsupported plugin kind %q", kind)
 			}
 		},
 	}
