@@ -137,15 +137,12 @@ ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/test.sh $(SRC_DIRS)'"
 endif
 
-fmt:
-	@$(MAKE) shell CMD="-c 'hack/update-fmt.sh'"
-
 verify:
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
-update: fmt
+update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 release: all-tar-bin checksum
