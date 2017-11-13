@@ -31,44 +31,52 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
+const projectKey = "project"
+
 type blockStore struct {
 	gce     *compute.Service
 	project string
 }
 
-func NewBlockStore(project string) (cloudprovider.BlockStore, error) {
+func NewBlockStore() cloudprovider.BlockStore {
+	return &blockStore{}
+}
+
+func (b *blockStore) Init(config map[string]string) error {
+	project := config[projectKey]
+
 	if project == "" {
-		return nil, errors.New("missing project in gcp configuration in config file")
+		return errors.Errorf("missing %s in gcp configuration", projectKey)
 	}
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	gce, err := compute.New(client)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	// validate project
 	res, err := gce.Projects.Get(project).Do()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	if res == nil {
-		return nil, errors.Errorf("error getting project %q", project)
+		return errors.Errorf("error getting project %q", project)
 	}
 
-	return &blockStore{
-		gce:     gce,
-		project: project,
-	}, nil
+	b.gce = gce
+	b.project = project
+
+	return nil
 }
 
-func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
-	res, err := op.gce.Snapshots.Get(op.project, snapshotID).Do()
+func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	res, err := b.gce.Snapshots.Get(b.project, snapshotID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -79,15 +87,15 @@ func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ 
 		Type:           volumeType,
 	}
 
-	if _, err = op.gce.Disks.Insert(op.project, volumeAZ, disk).Do(); err != nil {
+	if _, err = b.gce.Disks.Insert(b.project, volumeAZ, disk).Do(); err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	return disk.Name, nil
 }
 
-func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
+func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	res, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
@@ -95,8 +103,8 @@ func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, 
 	return res.Type, nil, nil
 }
 
-func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	disk, err := op.gce.Disks.Get(op.project, volumeAZ, volumeID).Do()
+func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
@@ -105,7 +113,7 @@ func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err 
 	return disk.Status == "READY", nil
 }
 
-func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	useParentheses := len(tagFilters) > 1
 	subFilters := make([]string, 0, len(tagFilters))
 
@@ -119,7 +127,7 @@ func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, err
 
 	filter := strings.Join(subFilters, " ")
 
-	res, err := op.gce.Snapshots.List(op.project).Filter(filter).Do()
+	res, err := b.gce.Snapshots.List(b.project).Filter(filter).Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -132,7 +140,7 @@ func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, err
 	return ret, nil
 }
 
-func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// snapshot names must adhere to RFC1035 and be 1-63 characters
 	// long
 	var snapshotName string
@@ -148,7 +156,7 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 		Name: snapshotName,
 	}
 
-	_, err := op.gce.Disks.CreateSnapshot(op.project, volumeAZ, volumeID, &gceSnap).Do()
+	_, err := b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -156,7 +164,7 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 	// the snapshot is not immediately available after creation for putting labels
 	// on it. poll for a period of time.
 	if pollErr := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-		if res, err := op.gce.Snapshots.Get(op.project, gceSnap.Name).Do(); err == nil {
+		if res, err := b.gce.Snapshots.Get(b.project, gceSnap.Name).Do(); err == nil {
 			gceSnap = *res
 			return true, nil
 		}
@@ -170,7 +178,7 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 		LabelFingerprint: gceSnap.LabelFingerprint,
 	}
 
-	_, err = op.gce.Snapshots.SetLabels(op.project, gceSnap.Name, labels).Do()
+	_, err = b.gce.Snapshots.SetLabels(b.project, gceSnap.Name, labels).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -178,8 +186,8 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 	return gceSnap.Name, nil
 }
 
-func (op *blockStore) DeleteSnapshot(snapshotID string) error {
-	_, err := op.gce.Snapshots.Delete(op.project, snapshotID).Do()
+func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+	_, err := b.gce.Snapshots.Delete(b.project, snapshotID).Do()
 
 	return errors.WithStack(err)
 }

@@ -27,29 +27,31 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-// ref. https://github.com/Azure-Samples/storage-blob-go-getting-started/blob/master/storageExample.go
-
 type objectStore struct {
 	blobClient *storage.BlobStorageClient
 }
 
-func NewObjectStore() (cloudprovider.ObjectStore, error) {
+func NewObjectStore() cloudprovider.ObjectStore {
+	return &objectStore{}
+}
+
+func (o *objectStore) Init(config map[string]string) error {
 	cfg := getConfig()
 
 	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	blobClient := storageClient.GetBlobService()
 
-	return &objectStore{
-		blobClient: &blobClient,
-	}, nil
+	o.blobClient = &blobClient
+
+	return nil
 }
 
-func (op *objectStore) PutObject(bucket string, key string, body io.Reader) error {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return err
 	}
@@ -62,8 +64,8 @@ func (op *objectStore) PutObject(bucket string, key string, body io.Reader) erro
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
-func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +83,8 @@ func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, erro
 	return res, nil
 }
 
-func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +108,8 @@ func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]st
 	return ret, nil
 }
 
-func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
 	}
@@ -129,8 +131,8 @@ func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (op *objectStore) DeleteObject(bucket string, key string) error {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) DeleteObject(bucket string, key string) error {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return err
 	}
@@ -145,8 +147,8 @@ func (op *objectStore) DeleteObject(bucket string, key string) error {
 
 const sasURIReadPermission = "r"
 
-func (op *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	container, err := getContainerReference(op.blobClient, bucket)
+func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return "", err
 	}

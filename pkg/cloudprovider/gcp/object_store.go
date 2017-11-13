@@ -18,6 +18,8 @@ package gcp
 
 import (
 	"io"
+	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -31,42 +33,69 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
+const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
+
 type objectStore struct {
 	gcs            *storage.Service
 	googleAccessID string
 	privateKey     []byte
 }
 
-func NewObjectStore(googleAccessID string, privateKey []byte) (cloudprovider.ObjectStore, error) {
+func NewObjectStore() cloudprovider.ObjectStore {
+	return &objectStore{}
+}
+
+func (o *objectStore) Init(config map[string]string) error {
+	credentialsFile := os.Getenv(credentialsEnvVar)
+	if credentialsFile == "" {
+		return errors.Errorf("%s is undefined", credentialsEnvVar)
+	}
+
+	// Get the email and private key from the credentials file so we can pre-sign download URLs
+	creds, err := ioutil.ReadFile(credentialsFile)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	jwtConfig, err := google.JWTConfigFromJSON(creds)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if jwtConfig.Email == "" {
+		return errors.Errorf("credentials file pointed to by %s does not contain an email", credentialsEnvVar)
+	}
+	if len(jwtConfig.PrivateKey) == 0 {
+		return errors.Errorf("credentials file pointed to by %s does not contain a private key", credentialsEnvVar)
+	}
+
 	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	gcs, err := storage.New(client)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
-	return &objectStore{
-		gcs:            gcs,
-		googleAccessID: googleAccessID,
-		privateKey:     privateKey,
-	}, nil
+	o.gcs = gcs
+	o.googleAccessID = jwtConfig.Email
+	o.privateKey = jwtConfig.PrivateKey
+
+	return nil
 }
 
-func (op *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
 	obj := &storage.Object{
 		Name: key,
 	}
 
-	_, err := op.gcs.Objects.Insert(bucket, obj).Media(body).Do()
+	_, err := o.gcs.Objects.Insert(bucket, obj).Media(body).Do()
 
 	return errors.WithStack(err)
 }
 
-func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
-	res, err := op.gcs.Objects.Get(bucket, key).Download()
+func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+	res, err := o.gcs.Objects.Get(bucket, key).Download()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -74,8 +103,8 @@ func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, erro
 	return res.Body, nil
 }
 
-func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	res, err := op.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+	res, err := o.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -90,8 +119,8 @@ func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]st
 	return ret, nil
 }
 
-func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
-	res, err := op.gcs.Objects.List(bucket).Prefix(prefix).Do()
+func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+	res, err := o.gcs.Objects.List(bucket).Prefix(prefix).Do()
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -104,21 +133,14 @@ func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (op *objectStore) DeleteObject(bucket string, key string) error {
-	return errors.Wrapf(op.gcs.Objects.Delete(bucket, key).Do(), "error deleting object %s", key)
+func (o *objectStore) DeleteObject(bucket string, key string) error {
+	return errors.Wrapf(o.gcs.Objects.Delete(bucket, key).Do(), "error deleting object %s", key)
 }
 
-func (op *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	if op.googleAccessID == "" {
-		return "", errors.New("unable to create a pre-signed URL - make sure GOOGLE_APPLICATION_CREDENTIALS points to a valid GCE service account file (missing email address)")
-	}
-	if len(op.privateKey) == 0 {
-		return "", errors.New("unable to create a pre-signed URL - make sure GOOGLE_APPLICATION_CREDENTIALS points to a valid GCE service account file (missing private key)")
-	}
-
+func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	return newstorage.SignedURL(bucket, key, &newstorage.SignedURLOptions{
-		GoogleAccessID: op.googleAccessID,
-		PrivateKey:     op.privateKey,
+		GoogleAccessID: o.googleAccessID,
+		PrivateKey:     o.privateKey,
 		Method:         "GET",
 		Expires:        time.Now().Add(ttl),
 	})

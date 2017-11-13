@@ -24,6 +24,11 @@ import (
 // ObjectStore exposes basic object-storage operations required
 // by Ark.
 type ObjectStore interface {
+	// Init prepares the ObjectStore for usage using the provided map of
+	// configuration key-value pairs. It returns an error if the ObjectStore
+	// cannot be initialized from the provided config.
+	Init(config map[string]string) error
+
 	// PutObject creates a new object using the data in body within the specified
 	// object storage bucket with the given key.
 	PutObject(bucket string, key string, body io.Reader) error
@@ -51,6 +56,11 @@ type ObjectStore interface {
 // BlockStore exposes basic block-storage operations required
 // by Ark.
 type BlockStore interface {
+	// Init prepares the BlockStore for usage using the provided map of
+	// configuration key-value pairs. It returns an error if the BlockStore
+	// cannot be initialized from the provided config.
+	Init(config map[string]string) error
+
 	// CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
 	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error)

@@ -84,6 +84,20 @@ func (_m *ObjectStore) GetObject(bucket string, key string) (io.ReadCloser, erro
 	return r0, r1
 }
 
+// Init provides a mock function with given fields: config
+func (_m *ObjectStore) Init(config map[string]string) error {
+	ret := _m.Called(config)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(map[string]string) error); ok {
+		r0 = rf(config)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ListCommonPrefixes provides a mock function with given fields: bucket, delimiter
 func (_m *ObjectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
 	ret := _m.Called(bucket, delimiter)

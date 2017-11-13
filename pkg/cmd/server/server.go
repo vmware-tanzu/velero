@@ -19,8 +19,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -30,7 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2/google"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,9 +44,6 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	arkaws "github.com/heptio/ark/pkg/cloudprovider/aws"
-	"github.com/heptio/ark/pkg/cloudprovider/azure"
-	"github.com/heptio/ark/pkg/cloudprovider/gcp"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
@@ -57,6 +51,7 @@ import (
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -146,6 +141,7 @@ type server struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                *logrus.Logger
+	pluginManager         plugin.Manager
 }
 
 func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, error) {
@@ -173,9 +169,10 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
 		sharedInformerFactory: informers.NewSharedInformerFactory(arkClient, 0),
-		ctx:        ctx,
-		cancelFunc: cancelFunc,
-		logger:     logger,
+		ctx:           ctx,
+		cancelFunc:    cancelFunc,
+		logger:        logger,
+		pluginManager: plugin.NewManager(logger, logger.Level),
 	}
 
 	return s, nil
@@ -325,7 +322,7 @@ func (s *server) watchConfig(config *api.Config) {
 
 func (s *server) initBackupService(config *api.Config) error {
 	s.logger.Info("Configuring cloud provider for backup service")
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider", s.logger)
+	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
 	if err != nil {
 		return err
 	}
@@ -341,7 +338,7 @@ func (s *server) initSnapshotService(config *api.Config) error {
 	}
 
 	s.logger.Info("Configuring cloud provider for snapshot service")
-	blockStore, err := getBlockStore(*config.PersistentVolumeProvider, "persistentVolumeProvider")
+	blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
 	if err != nil {
 		return err
 	}
@@ -349,100 +346,34 @@ func (s *server) initSnapshotService(config *api.Config) error {
 	return nil
 }
 
-func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
-	found := false
-
-	if cloudConfig.AWS != nil {
-		found = true
+func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("object storage provider name must not be empty")
 	}
 
-	if cloudConfig.GCP != nil {
-		if found {
-			return false
-		}
-		found = true
-	}
-
-	if cloudConfig.Azure != nil {
-		if found {
-			return false
-		}
-		found = true
-	}
-
-	return found
-}
-
-func getObjectStore(cloudConfig api.CloudProviderConfig, field string, logger *logrus.Logger) (cloudprovider.ObjectStore, error) {
-	var (
-		objectStore cloudprovider.ObjectStore
-		err         error
-	)
-
-	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
-	}
-
-	switch {
-	case cloudConfig.AWS != nil:
-		objectStore, err = arkaws.NewObjectStore(
-			cloudConfig.AWS.Region,
-			cloudConfig.AWS.S3Url,
-			cloudConfig.AWS.KMSKeyID,
-			cloudConfig.AWS.S3ForcePathStyle)
-	case cloudConfig.GCP != nil:
-		var email string
-		var privateKey []byte
-
-		credentialsFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-		if credentialsFile != "" {
-			// Get the email and private key from the credentials file so we can pre-sign download URLs
-			creds, err := ioutil.ReadFile(credentialsFile)
-			if err != nil {
-				return nil, errors.WithStack(err)
-			}
-			jwtConfig, err := google.JWTConfigFromJSON(creds)
-			if err != nil {
-				return nil, errors.WithStack(err)
-			}
-			email = jwtConfig.Email
-			privateKey = jwtConfig.PrivateKey
-		} else {
-			logger.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
-		}
-
-		objectStore, err = gcp.NewObjectStore(email, privateKey)
-	case cloudConfig.Azure != nil:
-		objectStore, err = azure.NewObjectStore()
-	}
-
+	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := objectStore.Init(cloudConfig.Config); err != nil {
 		return nil, err
 	}
 
 	return objectStore, nil
 }
 
-func getBlockStore(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.BlockStore, error) {
-	var (
-		blockStore cloudprovider.BlockStore
-		err        error
-	)
-
-	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("block storage provider name must not be empty")
 	}
 
-	switch {
-	case cloudConfig.AWS != nil:
-		blockStore, err = arkaws.NewBlockStore(cloudConfig.AWS.Region)
-	case cloudConfig.GCP != nil:
-		blockStore, err = gcp.NewBlockStore(cloudConfig.GCP.Project)
-	case cloudConfig.Azure != nil:
-		blockStore, err = azure.NewBlockStore(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
-	}
-
+	blockStore, err := manager.GetBlockStore(cloudConfig.Name)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := blockStore.Init(cloudConfig.Config); err != nil {
 		return nil, err
 	}
 

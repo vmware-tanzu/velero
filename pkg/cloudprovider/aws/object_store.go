@@ -18,6 +18,7 @@ package aws
 
 import (
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -29,15 +30,40 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
+const (
+	s3URLKey            = "s3Url"
+	kmsKeyIDKey         = "kmsKeyId"
+	s3ForcePathStyleKey = "s3ForcePathStyle"
+)
+
 type objectStore struct {
 	s3         *s3.S3
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
 }
 
-func NewObjectStore(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (cloudprovider.ObjectStore, error) {
+func NewObjectStore() cloudprovider.ObjectStore {
+	return &objectStore{}
+}
+
+func (o *objectStore) Init(config map[string]string) error {
+	var (
+		region              = config[regionKey]
+		s3URL               = config[s3URLKey]
+		kmsKeyID            = config[kmsKeyIDKey]
+		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
+		s3ForcePathStyle    bool
+		err                 error
+	)
+
 	if region == "" {
-		return nil, errors.New("missing region in aws configuration in config file")
+		return errors.Errorf("missing %s in aws configuration", regionKey)
+	}
+
+	if s3ForcePathStyleVal != "" {
+		if s3ForcePathStyle, err = strconv.ParseBool(s3ForcePathStyleVal); err != nil {
+			return errors.Wrapf(err, "could not parse %s (expected bool)", s3ForcePathStyleKey)
+		}
 	}
 
 	awsConfig := aws.NewConfig().
@@ -60,17 +86,17 @@ func NewObjectStore(region, s3URL, kmsKeyID string, s3ForcePathStyle bool) (clou
 
 	sess, err := getSession(awsConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &objectStore{
-		s3:         s3.New(sess),
-		s3Uploader: s3manager.NewUploader(sess),
-		kmsKeyID:   kmsKeyID,
-	}, nil
+	o.s3 = s3.New(sess)
+	o.s3Uploader = s3manager.NewUploader(sess)
+	o.kmsKeyID = kmsKeyID
+
+	return nil
 }
 
-func (op *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -78,23 +104,23 @@ func (op *objectStore) PutObject(bucket string, key string, body io.Reader) erro
 	}
 
 	// if kmsKeyID is not empty, enable "aws:kms" encryption
-	if op.kmsKeyID != "" {
+	if o.kmsKeyID != "" {
 		req.ServerSideEncryption = aws.String("aws:kms")
-		req.SSEKMSKeyId = &op.kmsKeyID
+		req.SSEKMSKeyId = &o.kmsKeyID
 	}
 
-	_, err := op.s3Uploader.Upload(req)
+	_, err := o.s3Uploader.Upload(req)
 
 	return errors.Wrapf(err, "error putting object %s", key)
 }
 
-func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	}
 
-	res, err := op.s3.GetObject(req)
+	res, err := o.s3.GetObject(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting object %s", key)
 	}
@@ -102,14 +128,14 @@ func (op *objectStore) GetObject(bucket string, key string) (io.ReadCloser, erro
 	return res.Body, nil
 }
 
-func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := o.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, prefix := range page.CommonPrefixes {
 			ret = append(ret, *prefix.Prefix)
 		}
@@ -123,14 +149,14 @@ func (op *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]st
 	return ret, nil
 }
 
-func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := o.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, obj := range page.Contents {
 			ret = append(ret, *obj.Key)
 		}
@@ -144,19 +170,19 @@ func (op *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (op *objectStore) DeleteObject(bucket string, key string) error {
+func (o *objectStore) DeleteObject(bucket string, key string) error {
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	}
 
-	_, err := op.s3.DeleteObject(req)
+	_, err := o.s3.DeleteObject(req)
 
 	return errors.Wrapf(err, "error deleting object %s", key)
 }
 
-func (op *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
+func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	req, _ := o.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})

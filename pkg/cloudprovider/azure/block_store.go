@@ -33,15 +33,6 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-type blockStore struct {
-	disks         *disk.DisksClient
-	snaps         *disk.SnapshotsClient
-	subscription  string
-	resourceGroup string
-	location      string
-	apiTimeout    time.Duration
-}
-
 const (
 	azureClientIDKey         string = "AZURE_CLIENT_ID"
 	azureClientSecretKey     string = "AZURE_CLIENT_SECRET"
@@ -50,7 +41,19 @@ const (
 	azureStorageAccountIDKey string = "AZURE_STORAGE_ACCOUNT_ID"
 	azureStorageKeyKey       string = "AZURE_STORAGE_KEY"
 	azureResourceGroupKey    string = "AZURE_RESOURCE_GROUP"
+
+	locationKey   = "location"
+	apiTimeoutKey = "apiTimeout"
 )
+
+type blockStore struct {
+	disks         *disk.DisksClient
+	snaps         *disk.SnapshotsClient
+	subscription  string
+	resourceGroup string
+	location      string
+	apiTimeout    time.Duration
+}
 
 func getConfig() map[string]string {
 	cfg := map[string]string{
@@ -70,9 +73,24 @@ func getConfig() map[string]string {
 	return cfg
 }
 
-func NewBlockStore(location string, apiTimeout time.Duration) (cloudprovider.BlockStore, error) {
+func NewBlockStore() cloudprovider.BlockStore {
+	return &blockStore{}
+}
+
+func (b *blockStore) Init(config map[string]string) error {
+	var (
+		location      = config[locationKey]
+		apiTimeoutVal = config[apiTimeoutKey]
+		apiTimeout    time.Duration
+		err           error
+	)
+
 	if location == "" {
-		return nil, errors.New("missing location in azure configuration in config file")
+		return errors.Errorf("missing %s in azure configuration", locationKey)
+	}
+
+	if apiTimeout, err = time.ParseDuration(apiTimeoutVal); err != nil {
+		return errors.Wrapf(err, "could not parse %s (expected time.Duration)", apiTimeoutKey)
 	}
 
 	if apiTimeout == 0 {
@@ -83,7 +101,7 @@ func NewBlockStore(location string, apiTimeout time.Duration) (cloudprovider.Blo
 
 	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating new service principal token")
+		return errors.Wrap(err, "error creating new service principal token")
 	}
 
 	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
@@ -99,11 +117,11 @@ func NewBlockStore(location string, apiTimeout time.Duration) (cloudprovider.Blo
 
 	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 
 	if locs.Value == nil {
-		return nil, errors.New("no locations returned from Azure API")
+		return errors.New("no locations returned from Azure API")
 	}
 
 	locationExists := false
@@ -115,26 +133,26 @@ func NewBlockStore(location string, apiTimeout time.Duration) (cloudprovider.Blo
 	}
 
 	if !locationExists {
-		return nil, errors.Errorf("location %q not found", location)
+		return errors.Errorf("location %q not found", location)
 	}
 
-	return &blockStore{
-		disks:         &disksClient,
-		snaps:         &snapsClient,
-		subscription:  cfg[azureSubscriptionIDKey],
-		resourceGroup: cfg[azureResourceGroupKey],
-		location:      location,
-		apiTimeout:    apiTimeout,
-	}, nil
+	b.disks = &disksClient
+	b.snaps = &snapsClient
+	b.subscription = cfg[azureSubscriptionIDKey]
+	b.resourceGroup = cfg[azureResourceGroupKey]
+	b.location = location
+	b.apiTimeout = apiTimeout
+
+	return nil
 }
 
-func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
-	fullSnapshotName := getFullSnapshotName(op.subscription, op.resourceGroup, snapshotID)
+func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	fullSnapshotName := getFullSnapshotName(b.subscription, b.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
 	disk := disk.Model{
 		Name:     &diskName,
-		Location: &op.location,
+		Location: &b.location,
 		Properties: &disk.Properties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
@@ -144,10 +162,10 @@ func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ 
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), op.apiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := op.disks.CreateOrUpdate(op.resourceGroup, *disk.Name, disk, ctx.Done())
+	_, errChan := b.disks.CreateOrUpdate(b.resourceGroup, *disk.Name, disk, ctx.Done())
 
 	err := <-errChan
 
@@ -157,8 +175,8 @@ func (op *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ 
 	return diskName, nil
 }
 
-func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := op.disks.Get(op.resourceGroup, volumeID)
+func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	res, err := b.disks.Get(b.resourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
@@ -166,8 +184,8 @@ func (op *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, 
 	return string(res.AccountType), nil, nil
 }
 
-func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	res, err := op.disks.Get(op.resourceGroup, volumeID)
+func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+	res, err := b.disks.Get(b.resourceGroup, volumeID)
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
@@ -179,8 +197,8 @@ func (op *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err 
 	return *res.ProvisioningState == "Succeeded", nil
 }
 
-func (op *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
-	res, err := op.snaps.ListByResourceGroup(op.resourceGroup)
+func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+	res, err := b.snaps.ListByResourceGroup(b.resourceGroup)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -213,8 +231,8 @@ Snapshot:
 	return ret, nil
 }
 
-func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
-	fullDiskName := getFullDiskName(op.subscription, op.resourceGroup, volumeID)
+func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+	fullDiskName := getFullDiskName(b.subscription, b.resourceGroup, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
 	suffix := "-" + uuid.NewV4().String()
@@ -234,7 +252,7 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 			},
 		},
 		Tags:     &map[string]*string{},
-		Location: &op.location,
+		Location: &b.location,
 	}
 
 	for k, v := range tags {
@@ -242,10 +260,10 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 		(*snap.Tags)[k] = &val
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), op.apiTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := op.snaps.CreateOrUpdate(op.resourceGroup, *snap.Name, snap, ctx.Done())
+	_, errChan := b.snaps.CreateOrUpdate(b.resourceGroup, *snap.Name, snap, ctx.Done())
 
 	err := <-errChan
 
@@ -256,11 +274,11 @@ func (op *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]
 	return snapshotName, nil
 }
 
-func (op *blockStore) DeleteSnapshot(snapshotID string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), op.apiTimeout)
+func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := op.snaps.Delete(op.resourceGroup, snapshotID, ctx.Done())
+	_, errChan := b.snaps.Delete(b.resourceGroup, snapshotID, ctx.Done())
 
 	err := <-errChan
 

@@ -69,17 +69,11 @@ type Config struct {
 }
 
 // CloudProviderConfig is configuration information about how to connect
-// to a particular cloud. Only one of the members (AWS, GCP, Azure) may
-// be present.
+// to a particular cloud.
 type CloudProviderConfig struct {
-	// AWS is configuration information for connecting to AWS.
-	AWS *AWSConfig `json:"aws"`
+	Name string `json:"name"`
 
-	// GCP is configuration information for connecting to GCP.
-	GCP *GCPConfig `json:"gcp"`
-
-	// Azure is configuration information for connecting to Azure.
-	Azure *AzureConfig `json:"azure"`
+	Config map[string]string `json:"config"`
 }
 
 // ObjectStorageProviderConfig is configuration information for connecting to
@@ -92,24 +86,4 @@ type ObjectStorageProviderConfig struct {
 	// Bucket is the name of the bucket in object storage where Ark backups
 	// are stored.
 	Bucket string `json:"bucket"`
-}
-
-// AWSConfig is configuration information for connecting to AWS.
-type AWSConfig struct {
-	Region           string `json:"region"`
-	DisableSSL       bool   `json:"disableSSL"`
-	S3ForcePathStyle bool   `json:"s3ForcePathStyle"`
-	S3Url            string `json:"s3Url"`
-	KMSKeyID         string `json:"kmsKeyId"`
-}
-
-// GCPConfig is configuration information for connecting to GCP.
-type GCPConfig struct {
-	Project string `json:"project"`
-}
-
-// AzureConfig is configuration information for connecting to Azure.
-type AzureConfig struct {
-	Location   string          `json:"location"`
-	APITimeout metav1.Duration `json:"apiTimeout"`
 }
