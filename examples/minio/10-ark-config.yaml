@@ -19,8 +19,9 @@ metadata:
   namespace: heptio-ark
   name: default
 backupStorageProvider:
+  name: aws
   bucket: ark
-  aws:
+  config:
     region: minio
     s3ForcePathStyle: true
     s3Url: http://minio:9000

@@ -19,11 +19,12 @@ metadata:
   namespace: heptio-ark
   name: default
 persistentVolumeProvider:
-  gcp:
+  name: gcp
+  config:
     project: <YOUR_PROJECT>
 backupStorageProvider:
+  name: gcp
   bucket: <YOUR_BUCKET>
-  gcp: {}
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m

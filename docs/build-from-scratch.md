@@ -44,12 +44,17 @@ These include:
 * Listers
 * Shared informers
 * Documentation
+* Protobuf/gRPC types
 
 If you make any of the following changes, you will need to run `make update` to regenerate
 automatically generated files:
 * Add/edit/remove command line flags and/or their help text
 * Add/edit/remove commands or subcommands
 * Add new API types
+
+If you make the following change, you will need to run [generate-proto.sh][13] to regenerate
+automatically generated files (note that this requires the [proto compiler][14] to be installed):
+* Add/edit/remove protobuf message or service definitions 
 
 ### Cross compiling
 
@@ -109,3 +114,5 @@ If you need to add or update the vendored dependencies, please see [Vendoring de
 [10]: #4-vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #3-test
+[13]: ../hack/generate-proto.sh
+[14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
