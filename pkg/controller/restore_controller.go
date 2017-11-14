@@ -391,7 +391,9 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		}
 	}()
 
+	logContext.Info("starting restore")
 	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile)
+	logContext.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
 
