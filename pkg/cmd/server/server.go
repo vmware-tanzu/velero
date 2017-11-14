@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -83,6 +84,7 @@ func NewCommand() *cobra.Command {
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
+			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
 			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
 
