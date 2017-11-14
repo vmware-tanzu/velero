@@ -1,0 +1,66 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message CreateVolumeRequest {
+    string snapshotID = 1;
+    string volumeType = 2;
+    string volumeAZ = 3;
+    int64 iops = 4;
+}
+
+message CreateVolumeResponse {
+    string volumeID = 1;
+}
+
+message GetVolumeInfoRequest {
+    string volumeID = 1;
+    string volumeAZ = 2;
+}
+
+message GetVolumeInfoResponse {
+    string volumeType = 1;
+    int64 iops = 2;
+}
+
+message IsVolumeReadyRequest {
+    string volumeID = 1;
+    string volumeAZ = 2;
+}
+
+message IsVolumeReadyResponse {
+    bool ready = 1;
+}
+
+message ListSnapshotsRequest {
+    map<string, string> tagFilters = 1;
+}
+
+message ListSnapshotsResponse {
+    repeated string snapshotIDs = 2;
+}
+
+message CreateSnapshotRequest {
+    string volumeID = 1;
+    string volumeAZ = 2;
+    map<string, string> tags = 3;
+}
+
+message CreateSnapshotResponse {
+    string snapshotID = 1;
+}
+
+message DeleteSnapshotRequest {
+    string snapshotID = 1;
+}
+
+service BlockStore {
+    rpc Init(InitRequest) returns (Empty);
+    rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
+    rpc GetVolumeInfo(GetVolumeInfoRequest) returns (GetVolumeInfoResponse);
+    rpc IsVolumeReady(IsVolumeReadyRequest) returns (IsVolumeReadyResponse);
+    rpc ListSnapshots(ListSnapshotsRequest) returns (ListSnapshotsResponse);
+    rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
+    rpc DeleteSnapshot(DeleteSnapshotRequest) returns (Empty);
+}

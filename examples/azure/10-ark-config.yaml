@@ -19,12 +19,13 @@ metadata:
   namespace: heptio-ark
   name: default
 persistentVolumeProvider:
-  azure:
+  name: azure
+  config:
     location: <YOUR_LOCATION>
     apiTimeout: <YOUR_TIMEOUT>
 backupStorageProvider:
+  name: azure
   bucket: <YOUR_BUCKET>
-  azure: {}
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m

@@ -1,0 +1,63 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message PutObjectRequest {
+    string bucket = 1;
+    string key = 2;
+    bytes body = 3;
+}
+
+message GetObjectRequest {
+    string bucket = 1;
+    string key = 2;
+}
+
+message Bytes {
+    bytes data = 1;
+}
+
+message ListCommonPrefixesRequest {
+    string bucket = 1;
+    string delimiter = 2;
+}
+
+message ListCommonPrefixesResponse {
+    repeated string prefixes = 1;
+}
+
+message ListObjectsRequest {
+    string bucket = 1;
+    string prefix = 2;
+}
+
+message ListObjectsResponse {
+    repeated string keys = 1;
+}
+
+message DeleteObjectRequest {
+    string bucket = 1;  
+    string key = 2;
+}
+
+
+message CreateSignedURLRequest {
+    string bucket = 1;
+    string key = 2;
+    int64 ttl = 3;
+}
+
+message CreateSignedURLResponse {
+    string url = 1;
+}
+
+service ObjectStore {
+    rpc Init(InitRequest) returns (Empty);
+    rpc PutObject(stream PutObjectRequest) returns (Empty);
+    rpc GetObject(GetObjectRequest) returns (stream Bytes);
+    rpc ListCommonPrefixes(ListCommonPrefixesRequest) returns (ListCommonPrefixesResponse);
+    rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);
+    rpc DeleteObject(DeleteObjectRequest) returns (Empty);
+    rpc CreateSignedURL(CreateSignedURLRequest) returns (CreateSignedURLResponse);
+}

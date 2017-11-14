@@ -19,11 +19,13 @@ metadata:
   namespace: heptio-ark
   name: default
 persistentVolumeProvider:
-  aws:
+  name: aws
+  config:
     region: <YOUR_REGION>
 backupStorageProvider:
+  name: aws
   bucket: <YOUR_BUCKET>
-  aws:
+  config:
     region: <YOUR_REGION>
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
