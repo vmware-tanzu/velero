@@ -37,7 +37,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
    ```
    ark backup create <BACKUP-NAME>
    ```
-   The default TTL is 24 hours; you can use the `--ttl` flag to change this as necessary.
+   The default TTL is 30 days (720 hours); you can use the `--ttl` flag to change this as necessary.
 
 2. *(Cluster 2)* Make sure that the `persistentVolumeProvider` and `backupStorageProvider` fields in the Ark Config match the ones from *Cluster 1*, so that your new Ark server instance is pointing to the same bucket.
 

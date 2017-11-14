@@ -68,7 +68,7 @@ type CreateOptions struct {
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:                     24 * time.Hour,
+		TTL:                     30 * 24 * time.Hour,
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
