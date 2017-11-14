@@ -35,6 +35,7 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 // Backupper performs backups.
@@ -183,6 +184,8 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 
 	logger := logrus.New()
 	logger.Out = gzippedLog
+	logger.Hooks.Add(&logging.ErrorLocationHook{})
+	logger.Hooks.Add(&logging.LogLocationHook{})
 	log := logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 

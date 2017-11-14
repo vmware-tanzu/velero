@@ -27,6 +27,9 @@ import (
 const (
 	logSourceField          = "logSource"
 	logSourceSetMarkerField = "@logSourceSetBy"
+	logrusPackage           = "github.com/sirupsen/logrus"
+	arkPackage              = "github.com/heptio/ark"
+	arkPackageLen           = len(arkPackage)
 )
 
 // LogLocationHook is a logrus hook that attaches location information
@@ -73,7 +76,7 @@ func (h *LogLocationHook) Fire(entry *logrus.Entry) error {
 	for more {
 		frame, more = frames.Next()
 
-		if strings.Contains(frame.File, "github.com/sirupsen/logrus") {
+		if strings.Contains(frame.File, logrusPackage) {
 			continue
 		}
 
@@ -87,7 +90,13 @@ func (h *LogLocationHook) Fire(entry *logrus.Entry) error {
 		// we're in Ark server and not logging something that has the marker
 		// set (which would indicate the log statement is coming from a plugin).
 		if h.loggerName != "" || getLogSourceSetMarker(entry) == "" {
-			entry.Data[logSourceField] = fmt.Sprintf("%s:%d", frame.File, frame.Line)
+			file := frame.File
+			if index := strings.Index(file, arkPackage); index != -1 {
+				// strip off .../github.com/heptio/ark/ so we just have pkg/...
+				file = frame.File[index+arkPackageLen+1:]
+			}
+
+			entry.Data[logSourceField] = fmt.Sprintf("%s:%d", file, frame.Line)
 		}
 
 		// if we're in the Ark server, remove the marker field since we don't

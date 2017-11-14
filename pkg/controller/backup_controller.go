@@ -316,6 +316,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		err = kuberrs.NewAggregate(errs)
 	}()
 
+	controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup)).Info("starting backup")
 	if err := controller.backupper.Backup(backup, backupFile, logFile); err != nil {
 		return err
 	}
