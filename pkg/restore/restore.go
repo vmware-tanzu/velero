@@ -46,6 +46,7 @@ import (
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 // Restorer knows how to restore a backup.
@@ -207,6 +208,8 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 
 	log := logrus.New()
 	log.Out = gzippedLog
+	log.Hooks.Add(&logging.ErrorLocationHook{})
+	log.Hooks.Add(&logging.LogLocationHook{})
 
 	ctx := &context{
 		backup:               backup,
