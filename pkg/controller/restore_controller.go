@@ -420,6 +420,10 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	}
 	gzippedResultsFile.Close()
 
+	if _, err = resultsFile.Seek(0, 0); err != nil {
+		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
+		return
+	}
 	if err := controller.backupService.UploadRestoreResults(bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
 	}
