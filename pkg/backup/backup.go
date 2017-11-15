@@ -26,12 +26,13 @@ import (
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -42,38 +43,36 @@ import (
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(backup *api.Backup, backupFile, logFile io.Writer) error
+	Backup(backup *api.Backup, backupFile, logFile io.Writer, actions []ItemAction) error
 }
 
 // kubernetesBackupper implements Backupper.
 type kubernetesBackupper struct {
-	dynamicFactory     client.DynamicFactory
-	discoveryHelper    discovery.Helper
-	actions            map[schema.GroupResource]Action
-	podCommandExecutor podCommandExecutor
-
+	dynamicFactory        client.DynamicFactory
+	discoveryHelper       discovery.Helper
+	podCommandExecutor    podCommandExecutor
 	groupBackupperFactory groupBackupperFactory
-}
-
-// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
-type ResourceIdentifier struct {
-	schema.GroupResource
-	Namespace string
-	Name      string
-}
-
-// Action is an actor that performs an operation on an individual item being backed up.
-type Action interface {
-	// Execute allows the Action to perform arbitrary logic with the item being backed up and the
-	// backup itself. Implementations may return additional ResourceIdentifiers that indicate specific
-	// items that also need to be backed up.
-	Execute(log *logrus.Entry, item runtime.Unstructured, backup *api.Backup) ([]ResourceIdentifier, error)
+	snapshotService       cloudprovider.SnapshotService
 }
 
 type itemKey struct {
 	resource  string
 	namespace string
 	name      string
+}
+
+type resolvedAction struct {
+	ItemAction
+
+	resourceIncludesExcludes  *collections.IncludesExcludes
+	namespaceIncludesExcludes *collections.IncludesExcludes
+	selector                  labels.Selector
+}
+
+// LogSetter is an interface for a type that allows a FieldLogger
+// to be set on it.
+type LogSetter interface {
+	SetLog(logrus.FieldLogger)
 }
 
 func (i *itemKey) String() string {
@@ -84,38 +83,48 @@ func (i *itemKey) String() string {
 func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	actions map[string]Action,
 	podCommandExecutor podCommandExecutor,
+	snapshotService cloudprovider.SnapshotService,
 ) (Backupper, error) {
-	resolvedActions, err := resolveActions(discoveryHelper, actions)
-	if err != nil {
-		return nil, err
-	}
-
 	return &kubernetesBackupper{
-		discoveryHelper:    discoveryHelper,
-		dynamicFactory:     dynamicFactory,
-		actions:            resolvedActions,
-		podCommandExecutor: podCommandExecutor,
-
+		discoveryHelper:       discoveryHelper,
+		dynamicFactory:        dynamicFactory,
+		podCommandExecutor:    podCommandExecutor,
 		groupBackupperFactory: &defaultGroupBackupperFactory{},
+		snapshotService:       snapshotService,
 	}, nil
 }
 
-// resolveActions resolves the string-based map of group-resources to actions and returns a map of
-// schema.GroupResources to actions.
-func resolveActions(helper discovery.Helper, actions map[string]Action) (map[schema.GroupResource]Action, error) {
-	ret := make(map[schema.GroupResource]Action)
+func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+	var resolved []resolvedAction
 
-	for resource, action := range actions {
-		gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(resource).WithVersion(""))
+	for _, action := range actions {
+		resourceSelector, err := action.AppliesTo()
 		if err != nil {
 			return nil, err
 		}
-		ret[gvr.GroupResource()] = action
+
+		resources := getResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
+		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
+
+		selector := labels.Everything()
+		if resourceSelector.LabelSelector != "" {
+			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
+				return nil, err
+			}
+		}
+
+		res := resolvedAction{
+			ItemAction:                action,
+			resourceIncludesExcludes:  resources,
+			namespaceIncludesExcludes: namespaces,
+			selector:                  selector,
+		}
+
+		resolved = append(resolved, res)
 	}
 
-	return ret, nil
+	return resolved, nil
 }
 
 // getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
@@ -172,7 +181,7 @@ func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper di
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io.Writer) error {
+func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io.Writer, actions []ItemAction) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -215,6 +224,11 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
 	}
 
+	resolvedActions, err := resolveActions(actions, kb.discoveryHelper)
+	if err != nil {
+		return err
+	}
+
 	gb := kb.groupBackupperFactory.newGroupBackupper(
 		log,
 		backup,
@@ -225,10 +239,11 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		kb.discoveryHelper,
 		backedUpItems,
 		cohabitatingResources,
-		kb.actions,
+		resolvedActions,
 		kb.podCommandExecutor,
 		tw,
 		resourceHooks,
+		kb.snapshotService,
 	)
 
 	for _, group := range kb.discoveryHelper.Resources() {

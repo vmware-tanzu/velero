@@ -18,8 +18,10 @@ package plugin
 
 import (
 	plugin "github.com/hashicorp/go-plugin"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cloudprovider/aws"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
@@ -42,6 +44,10 @@ func NewCommand() *cobra.Command {
 		"azure": azure.NewBlockStore(),
 	}
 
+	backupActions := map[string]backup.ItemAction{
+		"backup_pv": backup.NewBackupPVAction(logger),
+	}
+
 	c := &cobra.Command{
 		Use:    "plugin [KIND] [NAME]",
 		Hidden: true,
@@ -54,31 +60,45 @@ func NewCommand() *cobra.Command {
 			kind := args[0]
 			name := args[1]
 
-			logger.Debugf("Running plugin command for kind=%s, name=%s", kind, name)
+			logger = logger.WithFields(logrus.Fields{"kind": kind, "name": name})
+
+			serveConfig := &plugin.ServeConfig{
+				HandshakeConfig: arkplugin.Handshake,
+				GRPCServer:      plugin.DefaultGRPCServer,
+			}
+
+			logger.Debugf("Running plugin command")
 
 			switch kind {
 			case "cloudprovider":
 				objectStore, found := objectStores[name]
 				if !found {
-					logger.Fatalf("Unrecognized plugin name %q", name)
+					logger.Fatalf("Unrecognized plugin name")
 				}
 
 				blockStore, found := blockStores[name]
 				if !found {
-					logger.Fatalf("Unrecognized plugin name %q", name)
+					logger.Fatalf("Unrecognized plugin name")
 				}
 
-				plugin.Serve(&plugin.ServeConfig{
-					HandshakeConfig: arkplugin.Handshake,
-					Plugins: map[string]plugin.Plugin{
-						string(arkplugin.PluginKindObjectStore): arkplugin.NewObjectStorePlugin(objectStore),
-						string(arkplugin.PluginKindBlockStore):  arkplugin.NewBlockStorePlugin(blockStore),
-					},
-					GRPCServer: plugin.DefaultGRPCServer,
-				})
+				serveConfig.Plugins = map[string]plugin.Plugin{
+					string(arkplugin.PluginKindObjectStore): arkplugin.NewObjectStorePlugin(objectStore),
+					string(arkplugin.PluginKindBlockStore):  arkplugin.NewBlockStorePlugin(blockStore),
+				}
+			case arkplugin.PluginKindBackupItemAction.String():
+				action, found := backupActions[name]
+				if !found {
+					logger.Fatalf("Unrecognized plugin name")
+				}
+
+				serveConfig.Plugins = map[string]plugin.Plugin{
+					arkplugin.PluginKindBackupItemAction.String(): arkplugin.NewBackupItemActionPlugin(action),
+				}
 			default:
-				logger.Fatalf("Unsupported plugin kind %q", kind)
+				logger.Fatalf("Unsupported plugin kind")
 			}
+
+			plugin.Serve(serveConfig)
 		},
 	}
 

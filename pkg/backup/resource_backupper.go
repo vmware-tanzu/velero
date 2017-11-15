@@ -19,6 +19,7 @@ package backup
 import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
@@ -33,7 +34,7 @@ import (
 
 type resourceBackupperFactory interface {
 	newResourceBackupper(
-		log *logrus.Entry,
+		log logrus.FieldLogger,
 		backup *api.Backup,
 		namespaces *collections.IncludesExcludes,
 		resources *collections.IncludesExcludes,
@@ -42,17 +43,18 @@ type resourceBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		backedUpItems map[itemKey]struct{},
 		cohabitatingResources map[string]*cohabitatingResource,
-		actions map[schema.GroupResource]Action,
+		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
+		snapshotService cloudprovider.SnapshotService,
 	) resourceBackupper
 }
 
 type defaultResourceBackupperFactory struct{}
 
 func (f *defaultResourceBackupperFactory) newResourceBackupper(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	backup *api.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,
@@ -61,10 +63,11 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
+	snapshotService cloudprovider.SnapshotService,
 ) resourceBackupper {
 	return &defaultResourceBackupper{
 		log:                   log,
@@ -80,8 +83,8 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 		podCommandExecutor:    podCommandExecutor,
 		tarWriter:             tarWriter,
 		resourceHooks:         resourceHooks,
-
-		itemBackupperFactory: &defaultItemBackupperFactory{},
+		snapshotService:       snapshotService,
+		itemBackupperFactory:  &defaultItemBackupperFactory{},
 	}
 }
 
@@ -90,7 +93,7 @@ type resourceBackupper interface {
 }
 
 type defaultResourceBackupper struct {
-	log                   *logrus.Entry
+	log                   logrus.FieldLogger
 	backup                *api.Backup
 	namespaces            *collections.IncludesExcludes
 	resources             *collections.IncludesExcludes
@@ -99,12 +102,12 @@ type defaultResourceBackupper struct {
 	discoveryHelper       discovery.Helper
 	backedUpItems         map[itemKey]struct{}
 	cohabitatingResources map[string]*cohabitatingResource
-	actions               map[schema.GroupResource]Action
+	actions               []resolvedAction
 	podCommandExecutor    podCommandExecutor
 	tarWriter             tarWriter
 	resourceHooks         []resourceHook
-
-	itemBackupperFactory itemBackupperFactory
+	snapshotService       cloudprovider.SnapshotService
+	itemBackupperFactory  itemBackupperFactory
 }
 
 // backupResource backs up all the objects for a given group-version-resource.
@@ -177,6 +180,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.resourceHooks,
 		rb.dynamicFactory,
 		rb.discoveryHelper,
+		rb.snapshotService,
 	)
 
 	namespacesToList := getNamespacesToList(rb.namespaces)

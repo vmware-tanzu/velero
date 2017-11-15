@@ -30,25 +30,33 @@ import (
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
 // that it references and backs it up
 type backupPVAction struct {
+	log logrus.FieldLogger
 }
 
-func NewBackupPVAction() Action {
-	return &backupPVAction{}
+func NewBackupPVAction(log logrus.FieldLogger) ItemAction {
+	return &backupPVAction{log: log}
 }
 
 var pvGroupResource = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
 
+func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
+	return ResourceSelector{
+		IncludedResources: []string{"persistentvolumeclaims"},
+	}, nil
+}
+
 // Execute finds the PersistentVolume referenced by the provided
 // PersistentVolumeClaim and backs it up
-func (a *backupPVAction) Execute(log *logrus.Entry, item runtime.Unstructured, backup *v1.Backup) ([]ResourceIdentifier, error) {
-	log.Info("Executing backupPVAction")
+func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+	a.log.Info("Executing backupPVAction")
+
 	var additionalItems []ResourceIdentifier
 
 	pvc := item.UnstructuredContent()
 
 	volumeName, err := collections.GetString(pvc, "spec.volumeName")
 	if err != nil {
-		return additionalItems, errors.WithMessage(err, "unable to get spec.volumeName")
+		return nil, nil, errors.WithMessage(err, "unable to get spec.volumeName")
 	}
 
 	additionalItems = append(additionalItems, ResourceIdentifier{
@@ -56,5 +64,5 @@ func (a *backupPVAction) Execute(log *logrus.Entry, item runtime.Unstructured, b
 		Name:          volumeName,
 	})
 
-	return additionalItems, nil
+	return item, additionalItems, nil
 }
