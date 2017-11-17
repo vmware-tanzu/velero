@@ -15,37 +15,89 @@ backup-test-2-20170726180514  backup-test-2   Completed   0          0         2
 backup-test-2-20170726180515  backup-test-2   Completed   0          1         2017-07-26 13:32:59 -0400 EDT   <none>
 ```
 
-To delve into the warnings and errors into more detail, you can use the `-o` option:
+To delve into the warnings and errors into more detail, you can use `ark restore describe`:
 ```
-ark restore get backup-test-20170726180512 -o yaml
+ark restore describe backup-test-20170726180512
 ```
-The output YAML has a `status` field which may look like the following:
+The output looks like this:
 ```
-status:
-  errors:
-    ark: null
-    cluster: null
-    namespaces: null 
-  phase: Completed
-  validationErrors: null
-  warnings:
-    ark: null
-    cluster: null
-    namespaces:
-      cm1:
-      - secrets "default-token-t0slk" already exists
+Name:         backup-test-20170726180512
+Namespace:    heptio-ark
+Labels:       <none>
+Annotations:  <none>
+
+Backup:  backup-test
+
+Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included:        serviceaccounts
+  Excluded:        nodes
+  Cluster-scoped:  auto
+
+Namespace mappings:  <none>
+
+Label selector:  <none>
+
+Restore PVs:  auto
+
+Phase:  Completed
+
+Validation errors:  <none>
+
+Warnings:
+  Ark:        <none>
+  Cluster:    <none>
+  Namespaces:
+    heptio-ark:   serviceaccounts "ark" already exists
+                  serviceaccounts "default" already exists
+    kube-public:  serviceaccounts "default" already exists
+    kube-system:  serviceaccounts "attachdetach-controller" already exists
+                  serviceaccounts "certificate-controller" already exists
+                  serviceaccounts "cronjob-controller" already exists
+                  serviceaccounts "daemon-set-controller" already exists
+                  serviceaccounts "default" already exists
+                  serviceaccounts "deployment-controller" already exists
+                  serviceaccounts "disruption-controller" already exists
+                  serviceaccounts "endpoint-controller" already exists
+                  serviceaccounts "generic-garbage-collector" already exists
+                  serviceaccounts "horizontal-pod-autoscaler" already exists
+                  serviceaccounts "job-controller" already exists
+                  serviceaccounts "kube-dns" already exists
+                  serviceaccounts "namespace-controller" already exists
+                  serviceaccounts "node-controller" already exists
+                  serviceaccounts "persistent-volume-binder" already exists
+                  serviceaccounts "pod-garbage-collector" already exists
+                  serviceaccounts "replicaset-controller" already exists
+                  serviceaccounts "replication-controller" already exists
+                  serviceaccounts "resourcequota-controller" already exists
+                  serviceaccounts "service-account-controller" already exists
+                  serviceaccounts "service-controller" already exists
+                  serviceaccounts "statefulset-controller" already exists
+                  serviceaccounts "ttl-controller" already exists
+    default:      serviceaccounts "default" already exists
+
+Errors:
+  Ark:        <none>
+  Cluster:    <none>
+  Namespaces: <none>
 ```
 
 ## Structure
-The `status` field in a Restore's YAML has subfields for `errors` and `warnings`. `errors` appear for incomplete or partial restores. `warnings` appear for non-blocking issues (e.g. the restore looks "normal" and all resources referenced in the backup exist in some form, although some of them may have been pre-existing).
 
-Both `errors` and `warnings` are structured in the same way:
+Errors appear for incomplete or partial restores. Warnings appear for non-blocking issues (e.g. the
+restore looks "normal" and all resources referenced in the backup exist in some form, although some
+of them may have been pre-existing).
 
-* `ark`: A list of system-related issues encountered by the Ark server (e.g. couldn't read directory).
+Both errors and warnings are structured in the same way:
 
-* `cluster`: A list of issues related to the restore of cluster-scoped resources.
+* `Ark`: A list of system-related issues encountered by the Ark server (e.g. couldn't read directory).
 
-* `namespaces`: A map of namespaces to the list of issues related to the restore of their respective resources.
+* `Cluster`: A list of issues related to the restore of cluster-scoped resources.
+
+* `Namespaces`: A map of namespaces to the list of issues related to the restore of their respective resources.
 
 [0]: #example
 [1]: #structure
