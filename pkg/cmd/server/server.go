@@ -162,6 +162,11 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 		return nil, errors.WithStack(err)
 	}
 
+	pluginManager, err := plugin.NewManager(logger, logger.Level)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &server{
@@ -174,7 +179,7 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 		ctx:           ctx,
 		cancelFunc:    cancelFunc,
 		logger:        logger,
-		pluginManager: plugin.NewManager(logger, logger.Level),
+		pluginManager: pluginManager,
 	}
 
 	return s, nil
@@ -444,6 +449,7 @@ func (s *server) runControllers(config *api.Config) error {
 			config.BackupStorageProvider.Bucket,
 			s.snapshotService != nil,
 			s.logger,
+			s.pluginManager,
 		)
 		wg.Add(1)
 		go func() {
@@ -545,24 +551,11 @@ func newBackupper(
 	kubeClientConfig *rest.Config,
 	kubeCoreV1Client kcorev1client.CoreV1Interface,
 ) (backup.Backupper, error) {
-	actions := map[string]backup.Action{}
-	dynamicFactory := client.NewDynamicFactory(clientPool)
-
-	if snapshotService != nil {
-		action, err := backup.NewVolumeSnapshotAction(snapshotService)
-		if err != nil {
-			return nil, err
-		}
-		actions["persistentvolumes"] = action
-
-		actions["persistentvolumeclaims"] = backup.NewBackupPVAction()
-	}
-
 	return backup.NewKubernetesBackupper(
 		discoveryHelper,
-		dynamicFactory,
-		actions,
+		client.NewDynamicFactory(clientPool),
 		backup.NewPodCommandExecutor(kubeClientConfig, kubeCoreV1Client.RESTClient()),
+		snapshotService,
 	)
 }
 

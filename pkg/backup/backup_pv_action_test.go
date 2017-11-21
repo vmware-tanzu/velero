@@ -35,13 +35,13 @@ func TestBackupPVAction(t *testing.T) {
 
 	backup := &v1.Backup{}
 
-	a := NewBackupPVAction()
+	a := NewBackupPVAction(arktest.NewLogger())
 
-	additional, err := a.Execute(arktest.NewLogger(), pvc, backup)
+	_, additional, err := a.Execute(pvc, backup)
 	assert.EqualError(t, err, "unable to get spec.volumeName: key volumeName not found")
 
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = "myVolume"
-	additional, err = a.Execute(arktest.NewLogger(), pvc, backup)
+	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Len(t, additional, 1)
 	assert.Equal(t, ResourceIdentifier{GroupResource: pvGroupResource, Name: "myVolume"}, additional[0])

@@ -1,0 +1,34 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message AppliesToResponse {
+    repeated string includedNamespaces = 1;
+    repeated string excludedNamespaces = 2;
+    repeated string includedResources = 3;
+    repeated string excludedResources = 4;
+    string selector = 5;
+}
+
+message ExecuteRequest {
+    bytes item = 1;
+    bytes backup = 2;
+}
+
+message ExecuteResponse {
+    bytes item = 1;
+    repeated ResourceIdentifier additionalItems = 2;
+}
+
+message ResourceIdentifier {
+    string group = 1;
+    string resource = 2;
+    string namespace = 3;
+    string name = 4;
+}
+
+service BackupItemAction {
+    rpc AppliesTo(Empty) returns (AppliesToResponse);
+    rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}

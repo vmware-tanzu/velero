@@ -19,19 +19,21 @@ package backup
 import (
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kuberrs "k8s.io/apimachinery/pkg/util/errors"
+
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type groupBackupperFactory interface {
 	newGroupBackupper(
-		log *logrus.Entry,
+		log logrus.FieldLogger,
 		backup *v1.Backup,
 		namespaces, resources *collections.IncludesExcludes,
 		labelSelector string,
@@ -39,17 +41,18 @@ type groupBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		backedUpItems map[itemKey]struct{},
 		cohabitatingResources map[string]*cohabitatingResource,
-		actions map[schema.GroupResource]Action,
+		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
+		snapshotService cloudprovider.SnapshotService,
 	) groupBackupper
 }
 
 type defaultGroupBackupperFactory struct{}
 
 func (f *defaultGroupBackupperFactory) newGroupBackupper(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	labelSelector string,
@@ -57,26 +60,27 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
+	snapshotService cloudprovider.SnapshotService,
 ) groupBackupper {
 	return &defaultGroupBackupper{
-		log:                   log,
-		backup:                backup,
-		namespaces:            namespaces,
-		resources:             resources,
-		labelSelector:         labelSelector,
-		dynamicFactory:        dynamicFactory,
-		discoveryHelper:       discoveryHelper,
-		backedUpItems:         backedUpItems,
-		cohabitatingResources: cohabitatingResources,
-		actions:               actions,
-		podCommandExecutor:    podCommandExecutor,
-		tarWriter:             tarWriter,
-		resourceHooks:         resourceHooks,
-
+		log:                      log,
+		backup:                   backup,
+		namespaces:               namespaces,
+		resources:                resources,
+		labelSelector:            labelSelector,
+		dynamicFactory:           dynamicFactory,
+		discoveryHelper:          discoveryHelper,
+		backedUpItems:            backedUpItems,
+		cohabitatingResources:    cohabitatingResources,
+		actions:                  actions,
+		podCommandExecutor:       podCommandExecutor,
+		tarWriter:                tarWriter,
+		resourceHooks:            resourceHooks,
+		snapshotService:          snapshotService,
 		resourceBackupperFactory: &defaultResourceBackupperFactory{},
 	}
 }
@@ -86,7 +90,7 @@ type groupBackupper interface {
 }
 
 type defaultGroupBackupper struct {
-	log                      *logrus.Entry
+	log                      logrus.FieldLogger
 	backup                   *v1.Backup
 	namespaces, resources    *collections.IncludesExcludes
 	labelSelector            string
@@ -94,10 +98,11 @@ type defaultGroupBackupper struct {
 	discoveryHelper          discovery.Helper
 	backedUpItems            map[itemKey]struct{}
 	cohabitatingResources    map[string]*cohabitatingResource
-	actions                  map[schema.GroupResource]Action
+	actions                  []resolvedAction
 	podCommandExecutor       podCommandExecutor
 	tarWriter                tarWriter
 	resourceHooks            []resourceHook
+	snapshotService          cloudprovider.SnapshotService
 	resourceBackupperFactory resourceBackupperFactory
 }
 
@@ -121,6 +126,7 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 			gb.podCommandExecutor,
 			gb.tarWriter,
 			gb.resourceHooks,
+			gb.snapshotService,
 		)
 	)
 

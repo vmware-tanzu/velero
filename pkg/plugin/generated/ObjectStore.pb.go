@@ -26,7 +26,7 @@ type PutObjectRequest struct {
 func (m *PutObjectRequest) Reset()                    { *m = PutObjectRequest{} }
 func (m *PutObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*PutObjectRequest) ProtoMessage()               {}
-func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
+func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
 
 func (m *PutObjectRequest) GetBucket() string {
 	if m != nil {
@@ -57,7 +57,7 @@ type GetObjectRequest struct {
 func (m *GetObjectRequest) Reset()                    { *m = GetObjectRequest{} }
 func (m *GetObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetObjectRequest) ProtoMessage()               {}
-func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{1} }
+func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
 
 func (m *GetObjectRequest) GetBucket() string {
 	if m != nil {
@@ -80,7 +80,7 @@ type Bytes struct {
 func (m *Bytes) Reset()                    { *m = Bytes{} }
 func (m *Bytes) String() string            { return proto.CompactTextString(m) }
 func (*Bytes) ProtoMessage()               {}
-func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{2} }
+func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
 
 func (m *Bytes) GetData() []byte {
 	if m != nil {
@@ -97,7 +97,7 @@ type ListCommonPrefixesRequest struct {
 func (m *ListCommonPrefixesRequest) Reset()                    { *m = ListCommonPrefixesRequest{} }
 func (m *ListCommonPrefixesRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesRequest) ProtoMessage()               {}
-func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{3} }
+func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{3} }
 
 func (m *ListCommonPrefixesRequest) GetBucket() string {
 	if m != nil {
@@ -120,7 +120,7 @@ type ListCommonPrefixesResponse struct {
 func (m *ListCommonPrefixesResponse) Reset()                    { *m = ListCommonPrefixesResponse{} }
 func (m *ListCommonPrefixesResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesResponse) ProtoMessage()               {}
-func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
+func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{4} }
 
 func (m *ListCommonPrefixesResponse) GetPrefixes() []string {
 	if m != nil {
@@ -137,7 +137,7 @@ type ListObjectsRequest struct {
 func (m *ListObjectsRequest) Reset()                    { *m = ListObjectsRequest{} }
 func (m *ListObjectsRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsRequest) ProtoMessage()               {}
-func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
+func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{5} }
 
 func (m *ListObjectsRequest) GetBucket() string {
 	if m != nil {
@@ -160,7 +160,7 @@ type ListObjectsResponse struct {
 func (m *ListObjectsResponse) Reset()                    { *m = ListObjectsResponse{} }
 func (m *ListObjectsResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsResponse) ProtoMessage()               {}
-func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{6} }
+func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{6} }
 
 func (m *ListObjectsResponse) GetKeys() []string {
 	if m != nil {
@@ -177,7 +177,7 @@ type DeleteObjectRequest struct {
 func (m *DeleteObjectRequest) Reset()                    { *m = DeleteObjectRequest{} }
 func (m *DeleteObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteObjectRequest) ProtoMessage()               {}
-func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{7} }
+func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{7} }
 
 func (m *DeleteObjectRequest) GetBucket() string {
 	if m != nil {
@@ -202,7 +202,7 @@ type CreateSignedURLRequest struct {
 func (m *CreateSignedURLRequest) Reset()                    { *m = CreateSignedURLRequest{} }
 func (m *CreateSignedURLRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLRequest) ProtoMessage()               {}
-func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{8} }
+func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{8} }
 
 func (m *CreateSignedURLRequest) GetBucket() string {
 	if m != nil {
@@ -232,7 +232,7 @@ type CreateSignedURLResponse struct {
 func (m *CreateSignedURLResponse) Reset()                    { *m = CreateSignedURLResponse{} }
 func (m *CreateSignedURLResponse) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLResponse) ProtoMessage()               {}
-func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9} }
+func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{9} }
 
 func (m *CreateSignedURLResponse) GetUrl() string {
 	if m != nil {
@@ -586,9 +586,9 @@ var _ObjectStore_serviceDesc = grpc.ServiceDesc{
 	Metadata: "ObjectStore.proto",
 }
 
-func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor1) }
+func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor2) }
 
-var fileDescriptor1 = []byte{
+var fileDescriptor2 = []byte{
 	// 444 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0xdf, 0x8b, 0xd3, 0x40,
 	0x10, 0xc7, 0x89, 0xa9, 0xc5, 0xcc, 0x15, 0x8c, 0x73, 0x50, 0x6b, 0x4e, 0xa5, 0x2e, 0x0a, 0x15,
