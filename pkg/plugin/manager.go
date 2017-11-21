@@ -23,13 +23,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/restore"
 )
 
 // PluginKind is a type alias for a string that describes
@@ -71,6 +71,10 @@ const (
 	// a Backup ItemAction plugin.
 	PluginKindBackupItemAction PluginKind = "backupitemaction"
 
+	// PluginKindRestoreItemAction is the Kind string for
+	// a Restore ItemAction plugin.
+	PluginKindRestoreItemAction PluginKind = "restoreitemaction"
+
 	pluginDir = "/plugins"
 )
 
@@ -79,6 +83,7 @@ var AllPluginKinds = []PluginKind{
 	PluginKindBlockStore,
 	PluginKindCloudProvider,
 	PluginKindBackupItemAction,
+	PluginKindRestoreItemAction,
 }
 
 type pluginInfo struct {
@@ -104,15 +109,26 @@ type Manager interface {
 	// (mainly because each one outputs to a per-backup log),
 	// and should be terminated upon completion of the backup with
 	// CloseBackupItemActions().
-	GetBackupItemActions(backupName string, logger logrus.FieldLogger, level logrus.Level) ([]backup.ItemAction, error)
+	GetBackupItemActions(backupName string) ([]backup.ItemAction, error)
 
 	// CloseBackupItemActions terminates the plugin sub-processes that
 	// are hosting BackupItemAction plugins for the given backup name.
 	CloseBackupItemActions(backupName string) error
+
+	// GetRestoreItemActions returns all restore.ItemAction plugins.
+	// These plugin instances should ONLY be used for a single restore
+	// (mainly because each one outputs to a per-restore log),
+	// and should be terminated upon completion of the restore with
+	// CloseRestoreItemActions().
+	GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error)
+
+	// CloseRestoreItemActions terminates the plugin sub-processes that
+	// are hosting RestoreItemAction plugins for the given restore name.
+	CloseRestoreItemActions(restoreName string) error
 }
 
 type manager struct {
-	logger         hclog.Logger
+	logger         *logrusAdapter
 	pluginRegistry *registry
 	clientStore    *clientStore
 }
@@ -162,7 +178,11 @@ func (m *manager) registerPlugins() error {
 	for _, provider := range []string{"aws", "gcp", "azure"} {
 		m.pluginRegistry.register(provider, "/ark", []string{"plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
 	}
-	m.pluginRegistry.register("backup_pv", "/ark", []string{"plugin", string(PluginKindBackupItemAction), "backup_pv"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("pv", "/ark", []string{"plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
+
+	m.pluginRegistry.register("job", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("pod", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("svc", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
 
 	// second, register external plugins (these will override internal plugins, if applicable)
 	if _, err := os.Stat(pluginDir); err != nil {
@@ -272,7 +292,7 @@ func (m *manager) getCloudProviderPlugin(name string, kind PluginKind) (interfac
 // (mainly because each one outputs to a per-backup log),
 // and should be terminated upon completion of the backup with
 // CloseBackupActions().
-func (m *manager) GetBackupItemActions(backupName string, logger logrus.FieldLogger, level logrus.Level) ([]backup.ItemAction, error) {
+func (m *manager) GetBackupItemActions(backupName string) ([]backup.ItemAction, error) {
 	clients, err := m.clientStore.list(PluginKindBackupItemAction, backupName)
 	if err != nil {
 		pluginInfo, err := m.pluginRegistry.list(PluginKindBackupItemAction)
@@ -280,14 +300,12 @@ func (m *manager) GetBackupItemActions(backupName string, logger logrus.FieldLog
 			return nil, err
 		}
 
-		// create clients for each, using the provided logger
-		log := &logrusAdapter{impl: logger, level: level}
-
+		// create clients for each
 		for _, plugin := range pluginInfo {
 			client := newClientBuilder(baseConfig()).
 				withCommand(plugin.commandName, plugin.commandArgs...).
-				withPlugin(PluginKindBackupItemAction, &BackupItemActionPlugin{log: log}).
-				withLogger(log).
+				withPlugin(PluginKindBackupItemAction, &BackupItemActionPlugin{log: m.logger}).
+				withLogger(m.logger).
 				client()
 
 			m.clientStore.add(client, PluginKindBackupItemAction, plugin.name, backupName)
@@ -300,12 +318,14 @@ func (m *manager) GetBackupItemActions(backupName string, logger logrus.FieldLog
 	for _, client := range clients {
 		plugin, err := getPluginInstance(client, PluginKindBackupItemAction)
 		if err != nil {
+			m.CloseBackupItemActions(backupName)
 			return nil, err
 		}
 
 		backupAction, ok := plugin.(backup.ItemAction)
 		if !ok {
-			return nil, errors.New("could not convert gRPC client to backup.BackupAction")
+			m.CloseBackupItemActions(backupName)
+			return nil, errors.New("could not convert gRPC client to backup.ItemAction")
 		}
 
 		backupActions = append(backupActions, backupAction)
@@ -317,7 +337,59 @@ func (m *manager) GetBackupItemActions(backupName string, logger logrus.FieldLog
 // CloseBackupItemActions terminates the plugin sub-processes that
 // are hosting BackupItemAction plugins for the given backup name.
 func (m *manager) CloseBackupItemActions(backupName string) error {
-	clients, err := m.clientStore.list(PluginKindBackupItemAction, backupName)
+	return closeAll(m.clientStore, PluginKindBackupItemAction, backupName)
+}
+
+func (m *manager) GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error) {
+	clients, err := m.clientStore.list(PluginKindRestoreItemAction, restoreName)
+	if err != nil {
+		pluginInfo, err := m.pluginRegistry.list(PluginKindRestoreItemAction)
+		if err != nil {
+			return nil, err
+		}
+
+		// create clients for each
+		for _, plugin := range pluginInfo {
+			client := newClientBuilder(baseConfig()).
+				withCommand(plugin.commandName, plugin.commandArgs...).
+				withPlugin(PluginKindRestoreItemAction, &RestoreItemActionPlugin{log: m.logger}).
+				withLogger(m.logger).
+				client()
+
+			m.clientStore.add(client, PluginKindRestoreItemAction, plugin.name, restoreName)
+
+			clients = append(clients, client)
+		}
+	}
+
+	var itemActions []restore.ItemAction
+	for _, client := range clients {
+		plugin, err := getPluginInstance(client, PluginKindRestoreItemAction)
+		if err != nil {
+			m.CloseRestoreItemActions(restoreName)
+			return nil, err
+		}
+
+		itemAction, ok := plugin.(restore.ItemAction)
+		if !ok {
+			m.CloseRestoreItemActions(restoreName)
+			return nil, errors.New("could not convert gRPC client to restore.ItemAction")
+		}
+
+		itemActions = append(itemActions, itemAction)
+	}
+
+	return itemActions, nil
+}
+
+// CloseRestoreItemActions terminates the plugin sub-processes that
+// are hosting RestoreItemAction plugins for the given restore name.
+func (m *manager) CloseRestoreItemActions(restoreName string) error {
+	return closeAll(m.clientStore, PluginKindRestoreItemAction, restoreName)
+}
+
+func closeAll(store *clientStore, kind PluginKind, scope string) error {
+	clients, err := store.list(kind, scope)
 	if err != nil {
 		return err
 	}
@@ -326,7 +398,7 @@ func (m *manager) CloseBackupItemActions(backupName string) error {
 		client.Kill()
 	}
 
-	m.clientStore.deleteAll(PluginKindBackupItemAction, backupName)
+	store.deleteAll(kind, scope)
 
 	return nil
 }

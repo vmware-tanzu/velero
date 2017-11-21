@@ -37,6 +37,7 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 type itemBackupperFactory interface {
@@ -187,7 +188,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 		log.Info("Executing custom action")
 
-		if logSetter, ok := action.ItemAction.(LogSetter); ok {
+		if logSetter, ok := action.ItemAction.(logging.LogSetter); ok {
 			logSetter.SetLog(log)
 		}
 

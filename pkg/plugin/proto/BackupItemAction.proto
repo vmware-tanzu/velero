@@ -3,14 +3,6 @@ package generated;
 
 import "Shared.proto";
 
-message AppliesToResponse {
-    repeated string includedNamespaces = 1;
-    repeated string excludedNamespaces = 2;
-    repeated string includedResources = 3;
-    repeated string excludedResources = 4;
-    string selector = 5;
-}
-
 message ExecuteRequest {
     bytes item = 1;
     bytes backup = 2;

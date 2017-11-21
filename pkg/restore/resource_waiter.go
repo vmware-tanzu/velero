@@ -36,14 +36,16 @@ const objectCreateWaitTimeout = 30 * time.Second
 // of this struct is to construct it, register all of the desired items to wait for via
 // RegisterItem, and then to Wait() for them to become ready or the timeout to be exceeded.
 type resourceWaiter struct {
+	itemWatch watch.Interface
 	watchChan <-chan watch.Event
 	items     sets.String
 	readyFunc func(runtime.Unstructured) bool
 }
 
-func newResourceWaiter(watchChan <-chan watch.Event, readyFunc func(runtime.Unstructured) bool) *resourceWaiter {
+func newResourceWaiter(itemWatch watch.Interface, readyFunc func(runtime.Unstructured) bool) *resourceWaiter {
 	return &resourceWaiter{
-		watchChan: watchChan,
+		itemWatch: itemWatch,
+		watchChan: itemWatch.ResultChan(),
 		items:     sets.NewString(),
 		readyFunc: readyFunc,
 	}
@@ -81,4 +83,8 @@ func (rw *resourceWaiter) Wait() error {
 			return errors.New("failed to observe all items becoming ready within the timeout")
 		}
 	}
+}
+
+func (rw *resourceWaiter) Stop() {
+	rw.itemWatch.Stop()
 }

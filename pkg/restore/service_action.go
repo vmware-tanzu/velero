@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,32 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restorers
+package restore
 
 import (
+	"github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
-type serviceRestorer struct{}
-
-var _ ResourceRestorer = &serviceRestorer{}
-
-func NewServiceRestorer() ResourceRestorer {
-	return &serviceRestorer{}
+type serviceAction struct {
+	log logrus.FieldLogger
 }
 
-func (sr *serviceRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bool {
-	return true
-}
-
-func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
-	if _, err := resetMetadataAndStatus(obj, true); err != nil {
-		return nil, nil, err
+func NewServiceAction(log logrus.FieldLogger) ItemAction {
+	return &serviceAction{
+		log: log,
 	}
+}
 
+func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
+	return ResourceSelector{
+		IncludedResources: []string{"services"},
+	}, nil
+}
+
+func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
 		return nil, nil, err
@@ -61,12 +63,4 @@ func (sr *serviceRestorer) Prepare(obj runtime.Unstructured, restore *api.Restor
 	}
 
 	return obj, nil, nil
-}
-
-func (sr *serviceRestorer) Wait() bool {
-	return false
-}
-
-func (sr *serviceRestorer) Ready(obj runtime.Unstructured) bool {
-	return true
 }

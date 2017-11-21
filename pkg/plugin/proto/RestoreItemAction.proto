@@ -1,0 +1,19 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message RestoreExecuteRequest {
+    bytes item = 1;
+    bytes restore = 2;
+}
+
+message RestoreExecuteResponse {
+    bytes item = 1;
+    string warning = 2;
+}
+
+service RestoreItemAction {
+    rpc AppliesTo(Empty) returns (AppliesToResponse);
+    rpc Execute(RestoreExecuteRequest) returns (RestoreExecuteResponse);
+}

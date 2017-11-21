@@ -22,6 +22,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus/hooks/test"
 	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
@@ -37,9 +38,9 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/restore/restorers"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/util/collections"
-	. "github.com/heptio/ark/pkg/util/test"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestPrioritizeResources(t *testing.T) {
@@ -95,7 +96,7 @@ func TestPrioritizeResources(t *testing.T) {
 				helperResourceList = append(helperResourceList, resourceList)
 			}
 
-			helper := NewFakeDiscoveryHelper(true, nil)
+			helper := arktest.NewFakeDiscoveryHelper(true, nil)
 			helper.ResourceList = helperResourceList
 
 			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
@@ -303,12 +304,12 @@ func TestNamespaceRemapping(t *testing.T) {
 		expectedObjs         = toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("").ConfigMap)
 	)
 
-	resourceClient := &FakeDynamicClient{}
+	resourceClient := &arktest.FakeDynamicClient{}
 	for i := range expectedObjs {
 		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
 	}
 
-	dynamicFactory := &FakeDynamicFactory{}
+	dynamicFactory := &arktest.FakeDynamicFactory{}
 	resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
 	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
@@ -354,7 +355,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		labelSelector           labels.Selector
 		includeClusterResources *bool
 		fileSystem              *fakeFileSystem
-		restorers               map[schema.GroupResource]restorers.ResourceRestorer
+		actions                 []resolvedAction
 		expectedErrors          api.RestoreResult
 		expectedObjs            []unstructured.Unstructured
 	}{
@@ -442,8 +443,15 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
 			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{{Resource: "configmaps"}: newFakeCustomRestorer()},
-			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).WithArkLabel("my-restore").ConfigMap),
+			actions: []resolvedAction{
+				{
+					ItemAction:                newFakeAction("configmaps"),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
+			},
+			expectedObjs: toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).WithArkLabel("my-restore").ConfigMap),
 		},
 		{
 			name:          "custom restorer for different group/resource is not used",
@@ -451,8 +459,15 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
 			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			restorers:     map[schema.GroupResource]restorers.ResourceRestorer{{Resource: "foo-resource"}: newFakeCustomRestorer()},
-			expectedObjs:  toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+			actions: []resolvedAction{
+				{
+					ItemAction:                newFakeAction("foo-resource"),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
+			},
+			expectedObjs: toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
 		{
 			name:                    "cluster-scoped resources are skipped when IncludeClusterResources=false",
@@ -511,24 +526,23 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &FakeDynamicClient{}
+			resourceClient := &arktest.FakeDynamicClient{}
 			for i := range test.expectedObjs {
 				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
 			}
 
-			dynamicFactory := &FakeDynamicFactory{}
-			resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
+			dynamicFactory := &arktest.FakeDynamicFactory{}
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
+
+			resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, test.namespace).Return(resourceClient, nil)
 
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
 
-			log, _ := testlogger.NewNullLogger()
-
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
-				restorers:      test.restorers,
+				actions:        test.actions,
 				fileSystem:     test.fileSystem,
 				selector:       test.labelSelector,
 				restore: &api.Restore{
@@ -541,7 +555,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				logger: log,
+				logger: arktest.NewLogger(),
 			}
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
@@ -615,6 +629,312 @@ func TestHasControllerOwner(t *testing.T) {
 			assert.Equal(t, test.expectOwner, hasOwner)
 		})
 	}
+}
+
+func TestResetMetadataAndStatus(t *testing.T) {
+	tests := []struct {
+		name            string
+		obj             *unstructured.Unstructured
+		keepAnnotations bool
+		expectedErr     bool
+		expectedRes     *unstructured.Unstructured
+	}{
+		{
+			name:            "no metadata causes error",
+			obj:             NewTestUnstructured().Unstructured,
+			keepAnnotations: false,
+			expectedErr:     true,
+		},
+		{
+			name:            "don't keep annotations",
+			obj:             NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
+			keepAnnotations: false,
+			expectedErr:     false,
+			expectedRes:     NewTestUnstructured().WithMetadata("name", "namespace", "labels").Unstructured,
+		},
+		{
+			name:            "keep annotations",
+			obj:             NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
+			keepAnnotations: true,
+			expectedErr:     false,
+			expectedRes:     NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
+		},
+		{
+			name:            "don't keep extraneous metadata",
+			obj:             NewTestUnstructured().WithMetadata("foo").Unstructured,
+			keepAnnotations: false,
+			expectedErr:     false,
+			expectedRes:     NewTestUnstructured().WithMetadata().Unstructured,
+		},
+		{
+			name:            "don't keep status",
+			obj:             NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			keepAnnotations: false,
+			expectedErr:     false,
+			expectedRes:     NewTestUnstructured().WithMetadata().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := resetMetadataAndStatus(test.obj, test.keepAnnotations)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestRestoreVolumeFromSnapshot(t *testing.T) {
+	iops := int64(1000)
+
+	tests := []struct {
+		name              string
+		obj               *unstructured.Unstructured
+		restore           *api.Restore
+		backup            *api.Backup
+		volumeMap         map[api.VolumeBackupInfo]string
+		noSnapshotService bool
+		expectedWarn      bool
+		expectedErr       bool
+		expectedRes       *unstructured.Unstructured
+	}{
+		{
+			name:        "no name should error",
+			obj:         NewTestUnstructured().WithMetadata().Unstructured,
+			restore:     arktest.NewDefaultTestRestore().Restore,
+			expectedErr: true,
+		},
+		{
+			name:        "no spec should error",
+			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
+			restore:     arktest.NewDefaultTestRestore().Restore,
+			expectedErr: true,
+		},
+		{
+			name:        "when RestorePVs=false, should not error if there is no PV->BackupInfo map",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{}},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+		},
+		{
+			name:        "when RestorePVs=true, return without error if there is no PV->BackupInfo map",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{}},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+		},
+		{
+			name:        "when RestorePVs=true, error if there is PV->BackupInfo map but no entry for this PV",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"another-pv": {}}}},
+			expectedErr: true,
+		},
+		{
+			name:        "when RestorePVs=true, AWS volume ID should be set correctly",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", map[string]interface{}{"volumeID": "volume-1"}).Unstructured,
+		},
+		{
+			name:        "when RestorePVs=true, GCE pdName should be set correctly",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("gcePersistentDisk", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("gcePersistentDisk", map[string]interface{}{"pdName": "volume-1"}).Unstructured,
+		},
+		{
+			name:        "when RestorePVs=true, Azure pdName should be set correctly",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("azureDisk", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("azureDisk", map[string]interface{}{"diskName": "volume-1"}).Unstructured,
+		},
+		{
+			name:        "when RestorePVs=true, unsupported PV source should not get snapshot restored",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("unsupportedPVSource", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("unsupportedPVSource", make(map[string]interface{})).Unstructured,
+		},
+		{
+			name:        "volume type and IOPS are correctly passed to CreateVolume",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1", Type: "gp", Iops: &iops}}}},
+			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1", Type: "gp", Iops: &iops}: "volume-1"},
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", map[string]interface{}{"volumeID": "volume-1"}).Unstructured,
+		},
+		{
+			name:              "When no SnapshotService, warn if backup has snapshots that will not be restored",
+			obj:               NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:           arktest.NewDefaultTestRestore().Restore,
+			backup:            &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			noSnapshotService: true,
+			expectedErr:       false,
+			expectedWarn:      true,
+			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var snapshotService cloudprovider.SnapshotService
+			if !test.noSnapshotService {
+				snapshotService = &arktest.FakeSnapshotService{RestorableVolumes: test.volumeMap}
+			}
+
+			ctx := &context{
+				restore:         test.restore,
+				backup:          test.backup,
+				snapshotService: snapshotService,
+				logger:          arktest.NewLogger(),
+			}
+
+			res, warn, err := ctx.restoreVolumeFromSnapshot(test.obj)
+
+			assert.Equal(t, test.expectedWarn, warn != nil)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestIsPVReady(t *testing.T) {
+	tests := []struct {
+		name     string
+		obj      *unstructured.Unstructured
+		expected bool
+	}{
+		{
+			name:     "no status returns not ready",
+			obj:      NewTestUnstructured().Unstructured,
+			expected: false,
+		},
+		{
+			name:     "no status.phase returns not ready",
+			obj:      NewTestUnstructured().WithStatus().Unstructured,
+			expected: false,
+		},
+		{
+			name:     "empty status.phase returns not ready",
+			obj:      NewTestUnstructured().WithStatusField("phase", "").Unstructured,
+			expected: false,
+		},
+		{
+			name:     "non-Available status.phase returns not ready",
+			obj:      NewTestUnstructured().WithStatusField("phase", "foo").Unstructured,
+			expected: false,
+		},
+		{
+			name:     "Available status.phase returns ready",
+			obj:      NewTestUnstructured().WithStatusField("phase", "Available").Unstructured,
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expected, isPVReady(test.obj))
+		})
+	}
+}
+
+type testUnstructured struct {
+	*unstructured.Unstructured
+}
+
+func NewTestUnstructured() *testUnstructured {
+	obj := &testUnstructured{
+		Unstructured: &unstructured.Unstructured{
+			Object: make(map[string]interface{}),
+		},
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
+	return obj.withMap("metadata", fields...)
+}
+
+func (obj *testUnstructured) WithSpec(fields ...string) *testUnstructured {
+	return obj.withMap("spec", fields...)
+}
+
+func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
+	return obj.withMap("status", fields...)
+}
+
+func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("metadata", field, value)
+}
+
+func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("spec", field, value)
+}
+
+func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("status", field, value)
+}
+
+func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured {
+	annotations := make(map[string]interface{})
+	for _, field := range fields {
+		annotations[field] = "foo"
+	}
+
+	obj = obj.WithMetadataField("annotations", annotations)
+
+	return obj
+}
+
+func (obj *testUnstructured) WithName(name string) *testUnstructured {
+	return obj.WithMetadataField("name", name)
+}
+
+func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
+	m := make(map[string]interface{})
+	obj.Object[name] = m
+
+	for _, field := range fields {
+		m[field] = "foo"
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
+	var m map[string]interface{}
+
+	if res, ok := obj.Unstructured.Object[mapName]; !ok {
+		m = make(map[string]interface{})
+		obj.Unstructured.Object[mapName] = m
+	} else {
+		m = res.(map[string]interface{})
+	}
+
+	m[field] = value
+
+	return obj
 }
 
 func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
@@ -802,17 +1122,21 @@ func (fs *fakeFileSystem) DirExists(path string) (bool, error) {
 	return afero.DirExists(fs.fs, path)
 }
 
-type fakeCustomRestorer struct {
-	restorers.ResourceRestorer
+type fakeAction struct {
+	resource string
 }
 
-func newFakeCustomRestorer() *fakeCustomRestorer {
-	return &fakeCustomRestorer{
-		ResourceRestorer: restorers.NewBasicRestorer(true),
-	}
+func newFakeAction(resource string) *fakeAction {
+	return &fakeAction{resource}
 }
 
-func (r *fakeCustomRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
+func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
+	return ResourceSelector{
+		IncludedResources: []string{r.resource},
+	}, nil
+}
+
+func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
 	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
 	if err != nil {
 		return nil, nil, err
@@ -824,8 +1148,18 @@ func (r *fakeCustomRestorer) Prepare(obj runtime.Unstructured, restore *api.Rest
 
 	metadata["labels"].(map[string]interface{})["fake-restorer"] = "foo"
 
+	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	if !ok {
+		return nil, nil, errors.New("Unexpected type")
+	}
+
 	// want the baseline functionality too
-	return r.ResourceRestorer.Prepare(obj, restore, backup)
+	res, err := resetMetadataAndStatus(unstructuredObj, true)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return res, nil, nil
 }
 
 type fakeNamespaceClient struct {

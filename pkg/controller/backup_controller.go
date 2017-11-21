@@ -320,7 +320,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		err = kuberrs.NewAggregate(errs)
 	}()
 
-	actions, err := controller.pluginManager.GetBackupItemActions(backup.Name, controller.logger, controller.logger.Level)
+	actions, err := controller.pluginManager.GetBackupItemActions(backup.Name)
 	if err != nil {
 		return err
 	}

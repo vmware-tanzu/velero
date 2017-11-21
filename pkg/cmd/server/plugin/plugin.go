@@ -27,6 +27,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
 	arkplugin "github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/ark/pkg/restore"
 )
 
 func NewCommand() *cobra.Command {
@@ -44,8 +45,14 @@ func NewCommand() *cobra.Command {
 		"azure": azure.NewBlockStore(),
 	}
 
-	backupActions := map[string]backup.ItemAction{
-		"backup_pv": backup.NewBackupPVAction(logger),
+	backupItemActions := map[string]backup.ItemAction{
+		"pv": backup.NewBackupPVAction(logger),
+	}
+
+	restoreItemActions := map[string]restore.ItemAction{
+		"job": restore.NewJobAction(logger),
+		"pod": restore.NewPodAction(logger),
+		"svc": restore.NewServiceAction(logger),
 	}
 
 	c := &cobra.Command{
@@ -86,13 +93,22 @@ func NewCommand() *cobra.Command {
 					string(arkplugin.PluginKindBlockStore):  arkplugin.NewBlockStorePlugin(blockStore),
 				}
 			case arkplugin.PluginKindBackupItemAction.String():
-				action, found := backupActions[name]
+				action, found := backupItemActions[name]
 				if !found {
 					logger.Fatalf("Unrecognized plugin name")
 				}
 
 				serveConfig.Plugins = map[string]plugin.Plugin{
-					arkplugin.PluginKindBackupItemAction.String(): arkplugin.NewBackupItemActionPlugin(action),
+					kind: arkplugin.NewBackupItemActionPlugin(action),
+				}
+			case arkplugin.PluginKindRestoreItemAction.String():
+				action, found := restoreItemActions[name]
+				if !found {
+					logger.Fatalf("Unrecognized plugin name")
+				}
+
+				serveConfig.Plugins = map[string]plugin.Plugin{
+					kind: arkplugin.NewRestoreItemActionPlugin(action),
 				}
 			default:
 				logger.Fatalf("Unsupported plugin kind")

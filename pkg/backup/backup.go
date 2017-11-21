@@ -69,12 +69,6 @@ type resolvedAction struct {
 	selector                  labels.Selector
 }
 
-// LogSetter is an interface for a type that allows a FieldLogger
-// to be set on it.
-type LogSetter interface {
-	SetLog(logrus.FieldLogger)
-}
-
 func (i *itemKey) String() string {
 	return fmt.Sprintf("resource=%s,namespace=%s,name=%s", i.resource, i.namespace, i.name)
 }

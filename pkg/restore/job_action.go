@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restorers
+package restore
 
 import (
 	"github.com/sirupsen/logrus"
@@ -25,51 +25,37 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
-type jobRestorer struct {
-	logger *logrus.Logger
+type jobAction struct {
+	logger logrus.FieldLogger
 }
 
-var _ ResourceRestorer = &jobRestorer{}
-
-func NewJobRestorer(logger *logrus.Logger) ResourceRestorer {
-	return &jobRestorer{
+func NewJobAction(logger logrus.FieldLogger) ItemAction {
+	return &jobAction{
 		logger: logger,
 	}
 }
 
-func (r *jobRestorer) Handles(obj runtime.Unstructured, restore *api.Restore) bool {
-	return true
+func (a *jobAction) AppliesTo() (ResourceSelector, error) {
+	return ResourceSelector{
+		IncludedResources: []string{"jobs"},
+	}, nil
 }
 
-func (r *jobRestorer) Prepare(obj runtime.Unstructured, restore *api.Restore, backup *api.Backup) (runtime.Unstructured, error, error) {
-	r.logger.Debug("resetting metadata and status")
-	_, err := resetMetadataAndStatus(obj, true)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
 	fieldDeletions := map[string]string{
 		"spec.selector.matchLabels":     "controller-uid",
 		"spec.template.metadata.labels": "controller-uid",
 	}
 
 	for k, v := range fieldDeletions {
-		r.logger.Debugf("Getting %s", k)
+		a.logger.Debugf("Getting %s", k)
 		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
 		if err != nil {
-			r.logger.WithError(err).Debugf("Unable to get %s", k)
+			a.logger.WithError(err).Debugf("Unable to get %s", k)
 		} else {
 			delete(labels, v)
 		}
 	}
 
 	return obj, nil, nil
-}
-
-func (r *jobRestorer) Wait() bool {
-	return false
-}
-
-func (r *jobRestorer) Ready(obj runtime.Unstructured) bool {
-	return true
 }

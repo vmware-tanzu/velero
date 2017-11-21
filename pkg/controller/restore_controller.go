@@ -41,6 +41,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -63,7 +64,8 @@ type restoreController struct {
 	restoreListerSynced cache.InformerSynced
 	syncHandler         func(restoreName string) error
 	queue               workqueue.RateLimitingInterface
-	logger              *logrus.Logger
+	logger              logrus.FieldLogger
+	pluginManager       plugin.Manager
 }
 
 func NewRestoreController(
@@ -75,7 +77,8 @@ func NewRestoreController(
 	bucket string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
+	pluginManager plugin.Manager,
 ) Interface {
 	c := &restoreController{
 		restoreClient:       restoreClient,
@@ -90,6 +93,7 @@ func NewRestoreController(
 		restoreListerSynced: restoreInformer.Informer().HasSynced,
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 		logger:              logger,
+		pluginManager:       pluginManager,
 	}
 
 	c.syncHandler = c.processRestore
@@ -391,8 +395,15 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		}
 	}()
 
+	actions, err := controller.pluginManager.GetRestoreItemActions(restore.Name)
+	if err != nil {
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		return
+	}
+	defer controller.pluginManager.CloseRestoreItemActions(restore.Name)
+
 	logContext.Info("starting restore")
-	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile)
+	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile, actions)
 	logContext.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
@@ -431,7 +442,7 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger *logrus.Logger) (*os.File, error) {
+func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger logrus.FieldLogger) (*os.File, error) {
 	readCloser, err := backupService.DownloadBackup(bucket, backupName)
 	if err != nil {
 		return nil, err

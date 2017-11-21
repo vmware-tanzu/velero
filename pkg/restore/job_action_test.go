@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,29 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restorers
+package restore
 
 import (
 	"testing"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/runtime"
+
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
-func TestJobRestorerPrepare(t *testing.T) {
+func TestJobActionExecute(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         runtime.Unstructured
 		expectedErr bool
 		expectedRes runtime.Unstructured
 	}{
-		{
-			name:        "no metadata should error",
-			obj:         NewTestUnstructured().Unstructured,
-			expectedErr: true,
-		},
 		{
 			name: "missing spec.selector and/or spec.template should not error",
 			obj: NewTestUnstructured().WithName("job-1").
@@ -127,12 +123,9 @@ func TestJobRestorerPrepare(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				logger, _ = testlogger.NewNullLogger()
-				restorer  = NewJobRestorer(logger)
-			)
+			action := NewJobAction(arktest.NewLogger())
 
-			res, _, err := restorer.Prepare(test.obj, nil, nil)
+			res, _, err := action.Execute(test.obj, nil)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)

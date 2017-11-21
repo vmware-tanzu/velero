@@ -14,31 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package restore
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
-// ItemAction is an actor that performs an operation on an individual item being backed up.
+// ItemAction is an actor that performs an operation on an individual item being restored.
 type ItemAction interface {
 	// AppliesTo returns information about which resources this action should be invoked for.
 	AppliesTo() (ResourceSelector, error)
 
-	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up.
-	// Implementations may return additional ResourceIdentifiers that indicate specific items
-	// that also need to be backed up.
-	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []ResourceIdentifier, error)
-}
-
-// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
-type ResourceIdentifier struct {
-	schema.GroupResource
-	Namespace string
-	Name      string
+	// Execute allows the ItemAction to perform arbitrary logic with the item being restored.
+	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error)
 }
 
 // ResourceSelector is a collection of included/excluded namespaces,

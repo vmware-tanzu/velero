@@ -20,13 +20,14 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
@@ -34,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -43,7 +45,6 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
@@ -52,10 +53,8 @@ import (
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer) (api.RestoreResult, api.RestoreResult)
+	Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer, actions []ItemAction) (api.RestoreResult, api.RestoreResult)
 }
-
-var _ Restorer = &kubernetesRestorer{}
 
 type gvString string
 type kindString string
@@ -64,8 +63,8 @@ type kindString string
 type kubernetesRestorer struct {
 	discoveryHelper    discovery.Helper
 	dynamicFactory     client.DynamicFactory
-	restorers          map[schema.GroupResource]restorers.ResourceRestorer
 	backupService      cloudprovider.BackupService
+	snapshotService    cloudprovider.SnapshotService
 	backupClient       arkv1client.BackupsGetter
 	namespaceClient    corev1.NamespaceInterface
 	resourcePriorities []string
@@ -75,7 +74,7 @@ type kubernetesRestorer struct {
 
 // prioritizeResources returns an ordered, fully-resolved list of resources to restore based on
 // the provided discovery helper, resource priorities, and included/excluded resources.
-func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger *logrus.Logger) ([]schema.GroupResource, error) {
+func prioritizeResources(helper discovery.Helper, priorities []string, includedResources *collections.IncludesExcludes, logger logrus.FieldLogger) ([]schema.GroupResource, error) {
 	var ret []schema.GroupResource
 
 	// set keeps track of resolved GroupResource names
@@ -110,7 +109,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 			gr := groupVersion.WithResource(resource.Name).GroupResource()
 
 			if !includedResources.ShouldInclude(gr.String()) {
-				logger.WithField("groupResource", gr.String()).Debug("Not including resource")
+				logger.WithField("groupResource", gr.String()).Info("Not including resource")
 				continue
 			}
 
@@ -135,27 +134,18 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	customRestorers map[string]restorers.ResourceRestorer,
 	backupService cloudprovider.BackupService,
+	snapshotService cloudprovider.SnapshotService,
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
 	logger *logrus.Logger,
 ) (Restorer, error) {
-	r := make(map[schema.GroupResource]restorers.ResourceRestorer)
-	for gr, restorer := range customRestorers {
-		gvr, _, err := discoveryHelper.ResourceFor(schema.ParseGroupResource(gr).WithVersion(""))
-		if err != nil {
-			return nil, err
-		}
-		r[gvr.GroupResource()] = restorer
-	}
-
 	return &kubernetesRestorer{
 		discoveryHelper:    discoveryHelper,
 		dynamicFactory:     dynamicFactory,
-		restorers:          r,
 		backupService:      backupService,
+		snapshotService:    snapshotService,
 		backupClient:       backupClient,
 		namespaceClient:    namespaceClient,
 		resourcePriorities: resourcePriorities,
@@ -167,7 +157,7 @@ func NewKubernetesRestorer(
 // Restore executes a restore into the target Kubernetes cluster according to the restore spec
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
-func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer) (api.RestoreResult, api.RestoreResult) {
+func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer, actions []ItemAction) (api.RestoreResult, api.RestoreResult) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -182,27 +172,6 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
 
-	// get resource includes-excludes
-	resourceIncludesExcludes := collections.GenerateIncludesExcludes(
-		restore.Spec.IncludedResources,
-		restore.Spec.ExcludedResources,
-		func(item string) string {
-			gvr, _, err := kr.discoveryHelper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
-			if err != nil {
-				kr.logger.WithError(err).WithField("resource", item).Error("Unable to resolve resource")
-				return ""
-			}
-
-			gr := gvr.GroupResource()
-			return gr.String()
-		},
-	)
-
-	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, kr.logger)
-	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
-	}
-
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
@@ -210,6 +179,18 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	log.Out = gzippedLog
 	log.Hooks.Add(&logging.ErrorLocationHook{})
 	log.Hooks.Add(&logging.LogLocationHook{})
+
+	// get resource includes-excludes
+	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
+	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, log)
+	if err != nil {
+		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+	}
+
+	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
+	if err != nil {
+		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+	}
 
 	ctx := &context{
 		backup:               backup,
@@ -221,10 +202,73 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		dynamicFactory:       kr.dynamicFactory,
 		fileSystem:           kr.fileSystem,
 		namespaceClient:      kr.namespaceClient,
-		restorers:            kr.restorers,
+		actions:              resolvedActions,
+		snapshotService:      kr.snapshotService,
+		waitForPVs:           true,
 	}
 
 	return ctx.execute()
+}
+
+// getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
+// discovery helper to resolve them to fully-qualified group-resource names, and returns an
+// IncludesExcludes list.
+func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []string) *collections.IncludesExcludes {
+	resources := collections.GenerateIncludesExcludes(
+		includes,
+		excludes,
+		func(item string) string {
+			gvr, _, err := helper.ResourceFor(schema.ParseGroupResource(item).WithVersion(""))
+			if err != nil {
+				return ""
+			}
+
+			gr := gvr.GroupResource()
+			return gr.String()
+		},
+	)
+
+	return resources
+}
+
+type resolvedAction struct {
+	ItemAction
+
+	resourceIncludesExcludes  *collections.IncludesExcludes
+	namespaceIncludesExcludes *collections.IncludesExcludes
+	selector                  labels.Selector
+}
+
+func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+	var resolved []resolvedAction
+
+	for _, action := range actions {
+		resourceSelector, err := action.AppliesTo()
+		if err != nil {
+			return nil, err
+		}
+
+		resources := getResourceIncludesExcludes(helper, resourceSelector.IncludedResources, resourceSelector.ExcludedResources)
+		namespaces := collections.NewIncludesExcludes().Includes(resourceSelector.IncludedNamespaces...).Excludes(resourceSelector.ExcludedNamespaces...)
+
+		selector := labels.Everything()
+		if resourceSelector.LabelSelector != "" {
+			if selector, err = labels.Parse(resourceSelector.LabelSelector); err != nil {
+				return nil, err
+			}
+		}
+
+		res := resolvedAction{
+			ItemAction:                action,
+			resourceIncludesExcludes:  resources,
+			namespaceIncludesExcludes: namespaces,
+			selector:                  selector,
+		}
+
+		resolved = append(resolved, res)
+	}
+
+	return resolved, nil
 }
 
 type context struct {
@@ -233,11 +277,13 @@ type context struct {
 	restore              *api.Restore
 	prioritizedResources []schema.GroupResource
 	selector             labels.Selector
-	logger               *logrus.Logger
+	logger               logrus.FieldLogger
 	dynamicFactory       client.DynamicFactory
 	fileSystem           FileSystem
 	namespaceClient      corev1.NamespaceInterface
-	restorers            map[schema.GroupResource]restorers.ResourceRestorer
+	actions              []resolvedAction
+	snapshotService      cloudprovider.SnapshotService
+	waitForPVs           bool
 }
 
 func (ctx *context) infof(msg string, args ...interface{}) {
@@ -262,7 +308,9 @@ func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
 func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
 
-	namespaceFilter := collections.NewIncludesExcludes().Includes(ctx.restore.Spec.IncludedNamespaces...).Excludes(ctx.restore.Spec.ExcludedNamespaces...)
+	namespaceFilter := collections.NewIncludesExcludes().
+		Includes(ctx.restore.Spec.IncludedNamespaces...).
+		Excludes(ctx.restore.Spec.ExcludedNamespaces...)
 
 	// Make sure the top level "resources" dir exists:
 	resourcesDir := filepath.Join(dir, api.ResourcesDir)
@@ -273,6 +321,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	}
 	if !rde {
 		addArkError(&errs, errors.New("backup does not contain top level resources directory"))
+		return warnings, errs
 	}
 
 	resourceDirs, err := ctx.fileSystem.ReadDir(resourcesDir)
@@ -287,6 +336,8 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 		rscName := rscDir.Name()
 		resourceDirsMap[rscName] = rscDir
 	}
+
+	existingNamespaces := sets.NewString()
 
 	for _, resource := range ctx.prioritizedResources {
 		rscDir := resourceDirsMap[resource.String()]
@@ -343,15 +394,21 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 				mappedNsName = target
 			}
 
-			// ensure namespace exists
-			ns := &v1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: mappedNsName,
-				},
-			}
-			if _, err := kube.EnsureNamespaceExists(ns, ctx.namespaceClient); err != nil {
-				addArkError(&errs, err)
-				continue
+			// if we don't know whether this namespace exists yet, attempt to create
+			// it in order to ensure it exists. Try to get it from the backup tarball
+			// (in order to get any backed-up metadata), but if we don't find it there,
+			// create a blank one.
+			if !existingNamespaces.Has(mappedNsName) {
+				logger := ctx.logger.WithField("namespace", nsName)
+				ns := getNamespace(logger, filepath.Join(dir, api.ResourcesDir, "namespaces", api.ClusterScopedDir, nsName+".json"), mappedNsName)
+				if _, err := kube.EnsureNamespaceExists(ns, ctx.namespaceClient); err != nil {
+					addArkError(&errs, err)
+					continue
+				}
+
+				// keep track of namespaces that we know exist so we don't
+				// have to try to create them multiple times
+				existingNamespaces.Insert(mappedNsName)
 			}
 
 			w, e := ctx.restoreResource(resource.String(), mappedNsName, nsPath)
@@ -361,6 +418,42 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	}
 
 	return warnings, errs
+}
+
+// getNamespace returns a namespace API object that we should attempt to
+// create before restoring anything into it. It will come from the backup
+// tarball if it exists, else will be a new one. If from the tarball, it
+// will retain its labels, annotations, and spec.
+func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Namespace {
+	var nsBytes []byte
+	var err error
+
+	if nsBytes, err = ioutil.ReadFile(path); err != nil {
+		return &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: remappedName,
+			},
+		}
+	}
+
+	var backupNS v1.Namespace
+	if err := json.Unmarshal(nsBytes, &backupNS); err != nil {
+		logger.Warnf("Error unmarshalling namespace from backup, creating new one.")
+		return &v1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: remappedName,
+			},
+		}
+	}
+
+	return &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        remappedName,
+			Labels:      backupNS.Labels,
+			Annotations: backupNS.Annotations,
+		},
+		Spec: backupNS.Spec,
+	}
 }
 
 // merge combines two RestoreResult objects into one
@@ -421,11 +514,25 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 	}
 
 	var (
-		resourceClient client.Dynamic
-		restorer       restorers.ResourceRestorer
-		waiter         *resourceWaiter
-		groupResource  = schema.ParseGroupResource(resource)
+		resourceClient    client.Dynamic
+		waiter            *resourceWaiter
+		groupResource     = schema.ParseGroupResource(resource)
+		applicableActions []resolvedAction
 	)
+
+	// pre-filter the actions based on namespace & resource includes/excludes since
+	// these will be the same for all items being restored below
+	for _, action := range ctx.actions {
+		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+			continue
+		}
+
+		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
+			continue
+		}
+
+		applicableActions = append(applicableActions, action)
+	}
 
 	for _, file := range files {
 		fullPath := filepath.Join(resourcePath, file.Name())
@@ -439,8 +546,13 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			continue
 		}
 
-		if restorer == nil {
-			// initialize client & restorer for this Resource. we need
+		if hasControllerOwner(obj.GetOwnerReferences()) {
+			ctx.infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
+			continue
+		}
+
+		if resourceClient == nil {
+			// initialize client for this Resource. we need
 			// metadata from an object to do this.
 			ctx.infof("Getting client for %v", obj.GroupVersionKind())
 
@@ -455,72 +567,88 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 				addArkError(&errs, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
 				return warnings, errs
 			}
+		}
 
-			restorer = ctx.restorers[groupResource]
-			if restorer == nil {
-				ctx.infof("Using default restorer for %v", &groupResource)
-				restorer = restorers.NewBasicRestorer(true)
-			} else {
-				ctx.infof("Using custom restorer for %v", &groupResource)
+		if groupResource.Group == "" && groupResource.Resource == "persistentvolumes" {
+			// restore the PV from snapshot (if applicable)
+			updatedObj, warning, err := ctx.executePVAction(obj)
+			if warning != nil {
+				addToResult(&warnings, namespace, fmt.Errorf("warning executing PVAction for %s: %v", fullPath, warning))
 			}
+			if err != nil {
+				addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", fullPath, err))
+				continue
+			}
+			obj = updatedObj
 
-			if restorer.Wait() {
-				itmWatch, err := resourceClient.Watch(metav1.ListOptions{})
+			// wait for the PV to be ready
+			if ctx.waitForPVs {
+				pvWatch, err := resourceClient.Watch(metav1.ListOptions{})
 				if err != nil {
-					addArkError(&errs, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
+					addToResult(&errs, namespace, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
 					return warnings, errs
 				}
-				watchChan := itmWatch.ResultChan()
-				defer itmWatch.Stop()
 
-				waiter = newResourceWaiter(watchChan, restorer.Ready)
+				waiter = newResourceWaiter(pvWatch, isPVReady)
+				defer waiter.Stop()
 			}
 		}
 
-		if !restorer.Handles(obj, ctx.restore) {
-			continue
+		for _, action := range applicableActions {
+			if !action.selector.Matches(labels.Set(obj.GetLabels())) {
+				continue
+			}
+
+			ctx.infof("Executing item action for %v", &groupResource)
+
+			if logSetter, ok := action.ItemAction.(logging.LogSetter); ok {
+				logSetter.SetLog(ctx.logger)
+			}
+
+			updatedObj, warning, err := action.Execute(obj, ctx.restore)
+			if warning != nil {
+				addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, warning))
+			}
+			if err != nil {
+				addToResult(&errs, namespace, fmt.Errorf("error preparing %s: %v", fullPath, err))
+				continue
+			}
+
+			unstructuredObj, ok := updatedObj.(*unstructured.Unstructured)
+			if !ok {
+				addToResult(&errs, namespace, fmt.Errorf("%s: unexpected type %T", fullPath, updatedObj))
+				continue
+			}
+
+			obj = unstructuredObj
 		}
 
-		if hasControllerOwner(obj.GetOwnerReferences()) {
-			ctx.infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
-			continue
-		}
-
-		preparedObj, warning, err := restorer.Prepare(obj, ctx.restore, ctx.backup)
-		if warning != nil {
-			addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, warning))
-		}
-		if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error preparing %s: %v", fullPath, err))
-			continue
-		}
-
-		unstructuredObj, ok := preparedObj.(*unstructured.Unstructured)
-		if !ok {
-			addToResult(&errs, namespace, fmt.Errorf("%s: unexpected type %T", fullPath, preparedObj))
+		// clear out non-core metadata fields & status
+		if obj, err = resetMetadataAndStatus(obj, true); err != nil {
+			addToResult(&errs, namespace, err)
 			continue
 		}
 
 		// necessary because we may have remapped the namespace
-		unstructuredObj.SetNamespace(namespace)
+		obj.SetNamespace(namespace)
 
 		// add an ark-restore label to each resource for easy ID
-		addLabel(unstructuredObj, api.RestoreLabelKey, ctx.restore.Name)
+		addLabel(obj, api.RestoreLabelKey, ctx.restore.Name)
 
-		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, unstructuredObj.GetName())
-		_, err = resourceClient.Create(unstructuredObj)
+		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, obj.GetName())
+		_, err = resourceClient.Create(obj)
 		if apierrors.IsAlreadyExists(err) {
 			addToResult(&warnings, namespace, err)
 			continue
 		}
 		if err != nil {
-			ctx.infof("error restoring %s: %v", unstructuredObj.GetName(), err)
+			ctx.infof("error restoring %s: %v", obj.GetName(), err)
 			addToResult(&errs, namespace, fmt.Errorf("error restoring %s: %v", fullPath, err))
 			continue
 		}
 
 		if waiter != nil {
-			waiter.RegisterItem(unstructuredObj.GetName())
+			waiter.RegisterItem(obj.GetName())
 		}
 	}
 
@@ -531,6 +659,127 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 	}
 
 	return warnings, errs
+}
+
+func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error, error) {
+	// we need to remove annotations from PVs since they potentially contain
+	// information about dynamic provisioners which will confuse the controllers.
+	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	if err != nil {
+		return nil, nil, err
+	}
+	delete(metadata, "annotations")
+
+	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	if err != nil {
+		return nil, nil, err
+	}
+	delete(spec, "claimRef")
+	delete(spec, "storageClassName")
+
+	// restore the PV from snapshot (if applicable)
+	return ctx.restoreVolumeFromSnapshot(obj)
+}
+
+func (ctx *context) restoreVolumeFromSnapshot(obj *unstructured.Unstructured) (*unstructured.Unstructured, error, error) {
+	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// if it's an unsupported volume type for snapshot restores, don't try to
+	// do a snapshot restore
+	if sourceType, _ := kube.GetPVSource(spec); sourceType == "" {
+		return obj, nil, nil
+	}
+
+	var (
+		pvName              = obj.GetName()
+		restoreFromSnapshot = false
+		restore             = ctx.restore
+		backup              = ctx.backup
+	)
+
+	if restore.Spec.RestorePVs != nil && *restore.Spec.RestorePVs {
+		// when RestorePVs = yes, it's an error if we don't have a snapshot service
+		if ctx.snapshotService == nil {
+			return nil, nil, errors.New("PV restorer is not configured for PV snapshot restores")
+		}
+
+		// if there are no snapshots in the backup, return without error
+		if backup.Status.VolumeBackups == nil {
+			return obj, nil, nil
+		}
+
+		// if there are snapshots, and this is a supported PV type, but there's no
+		// snapshot for this PV, it's an error
+		if backup.Status.VolumeBackups[pvName] == nil {
+			return nil, nil, errors.Errorf("no snapshot found to restore volume %s from", pvName)
+		}
+
+		restoreFromSnapshot = true
+	}
+	if restore.Spec.RestorePVs == nil && ctx.snapshotService != nil {
+		// when RestorePVs = Auto, don't error if the backup doesn't have snapshots
+		if backup.Status.VolumeBackups == nil || backup.Status.VolumeBackups[pvName] == nil {
+			return obj, nil, nil
+		}
+
+		restoreFromSnapshot = true
+	}
+
+	if restoreFromSnapshot {
+		backupInfo := backup.Status.VolumeBackups[pvName]
+
+		ctx.infof("restoring PersistentVolume %s from SnapshotID %s", pvName, backupInfo.SnapshotID)
+		volumeID, err := ctx.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
+		if err != nil {
+			return nil, nil, err
+		}
+		ctx.infof("successfully restored PersistentVolume %s from snapshot", pvName)
+
+		if err := kube.SetVolumeID(spec, volumeID); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	var warning error
+
+	if ctx.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
+		warning = errors.New("unable to restore PV snapshots: Ark server is not configured with a PersistentVolumeProvider")
+	}
+
+	return obj, warning, nil
+}
+
+func isPVReady(obj runtime.Unstructured) bool {
+	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
+	if err != nil {
+		return false
+	}
+
+	return phase == string(v1.VolumeAvailable)
+}
+
+func resetMetadataAndStatus(obj *unstructured.Unstructured, keepAnnotations bool) (*unstructured.Unstructured, error) {
+	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	if err != nil {
+		return nil, err
+	}
+
+	for k := range metadata {
+		if k == "name" || k == "namespace" || k == "labels" || (k == "annotations" && keepAnnotations) {
+			continue
+		}
+
+		delete(metadata, k)
+	}
+
+	// this should never be backed up anyway, but remove it just
+	// in case.
+	delete(obj.UnstructuredContent(), "status")
+
+	return obj, nil
 }
 
 // addLabel applies the specified key/value to an object as a label.
