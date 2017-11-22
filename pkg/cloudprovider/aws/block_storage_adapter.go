@@ -30,7 +30,8 @@ import (
 var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
 
 type blockStorageAdapter struct {
-	ec2 *ec2.EC2
+	ec2      *ec2.EC2
+	kmsKeyId string
 }
 
 func getSession(config *aws.Config) (*session.Session, error) {
@@ -46,7 +47,7 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStorageAdapter(region string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStorageAdapter(region string, kmsKeyId string) (cloudprovider.BlockStorageAdapter, error) {
 	if region == "" {
 		return nil, errors.New("missing region in aws configuration in config file")
 	}
@@ -73,6 +74,12 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
+	}
+
+	if op.kmsKeyId != "" {
+		var encrypt = true
+		req.KmsKeyId = &op.kmsKeyId
+		req.Encrypted = &encrypt
 	}
 
 	if iopsVolumeTypes.Has(volumeType) && iops != nil {

@@ -436,7 +436,7 @@ func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) 
 
 	switch {
 	case cloudConfig.AWS != nil:
-		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region)
+		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region, cloudConfig.AWS.KMSKeyID)
 	case cloudConfig.GCP != nil:
 		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project)
 	case cloudConfig.Azure != nil:
