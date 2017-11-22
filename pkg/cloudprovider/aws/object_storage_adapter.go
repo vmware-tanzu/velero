@@ -76,7 +76,12 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 }
 
 func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
-	op.logger.Infof("put s3 object s3://%s/%s", bucket, key)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"key":    key},
+	).Infof("put s3 object")
+
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -95,7 +100,11 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 }
 
 func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
-	op.logger.Infof("get s3 object s3://%s/%s", bucket, key)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"key":    key},
+	).Infof("get s3 object")
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -110,7 +119,13 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 }
 
 func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
-	op.logger.Infof("list s3 common prefix s3://%s/%s", bucket, prefix)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket":    bucket,
+			"prefix":    prefix,
+			"delimiter": delimiter},
+	).Infof("list s3 common prefix")
+
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
@@ -136,7 +151,12 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 }
 
 func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
-	op.logger.Infof("list s3 objects s3://%s/%s", bucket, prefix)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"prefix": prefix},
+	).Infof("list s3 objects")
+
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
@@ -158,7 +178,12 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 }
 
 func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
-	op.logger.Infof("delete s3 object s3://%s/%s", bucket, key)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"key":    key},
+	).Infof("delete s3 object")
+
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -170,7 +195,13 @@ func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
 }
 
 func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	op.logger.Debug("create signed s3 url s3://%s/%s %s ttl", bucket, key, ttl)
+	op.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"key":    key,
+			"ttl":    ttl},
+	).Infof("create signed s3 url")
+
 	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
