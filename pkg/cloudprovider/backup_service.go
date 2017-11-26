@@ -155,7 +155,7 @@ func (br *backupService) DownloadBackup(bucket, bucketPath, backupName string) (
 }
 
 func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api.Backup, error) {
-	prefixes, err := br.objectStorage.ListCommonPrefixes(bucket, "/", bucketPath)
+	prefixes, err := br.objectStorage.ListCommonPrefixes(bucket, "/", path.Clean(bucketPath)+"/")
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +166,11 @@ func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api
 	output := make([]*api.Backup, 0, len(prefixes))
 
 	for _, backupDir := range prefixes {
+
+		if bucketPath != "" {
+			_, backupDir = path.Split(backupDir)
+		}
+
 		backup, err := br.GetBackup(bucket, bucketPath, backupDir)
 		if err != nil {
 			br.logger.WithError(err).WithField("dir", backupDir).Error("Error reading backup directory")
