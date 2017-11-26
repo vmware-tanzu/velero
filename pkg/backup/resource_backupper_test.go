@@ -21,6 +21,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -238,8 +239,11 @@ func TestBackupResource(t *testing.T) {
 			"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
 		}
 
-		actions := map[schema.GroupResource]Action{
-			{Group: "", Resource: "pods"}: &fakeAction{},
+		actions := []resolvedAction{
+			{
+				ItemAction:               newFakeAction("pods"),
+				resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
+			},
 		}
 
 		resourceHooks := []resourceHook{
@@ -266,6 +270,7 @@ func TestBackupResource(t *testing.T) {
 				podCommandExecutor,
 				tarWriter,
 				resourceHooks,
+				nil,
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -287,6 +292,7 @@ func TestBackupResource(t *testing.T) {
 					resourceHooks,
 					dynamicFactory,
 					discoveryHelper,
+					mock.Anything,
 				).Return(itemBackupper)
 
 				if len(test.listResponses) > 0 {
@@ -393,8 +399,11 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
 			}
 
-			actions := map[schema.GroupResource]Action{
-				{Group: "", Resource: "pods"}: &fakeAction{},
+			actions := []resolvedAction{
+				{
+					ItemAction:               newFakeAction("pods"),
+					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
+				},
 			}
 
 			resourceHooks := []resourceHook{
@@ -420,6 +429,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				podCommandExecutor,
 				tarWriter,
 				resourceHooks,
+				nil,
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -440,6 +450,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				resourceHooks,
 				dynamicFactory,
 				discoveryHelper,
+				mock.Anything,
 			).Return(itemBackupper)
 
 			client := &arktest.FakeDynamicClient{}
@@ -476,7 +487,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 
 	cohabitatingResources := map[string]*cohabitatingResource{}
 
-	actions := map[schema.GroupResource]Action{}
+	actions := []resolvedAction{}
 
 	resourceHooks := []resourceHook{}
 
@@ -499,6 +510,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		nil,
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -519,6 +531,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
 		itemHookHandler: itemHookHandler,
+		snapshotService: nil,
 	}
 
 	itemBackupperFactory.On("newItemBackupper",
@@ -532,6 +545,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
+		mock.Anything,
 	).Return(itemBackupper)
 
 	client := &arktest.FakeDynamicClient{}
@@ -567,7 +581,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 
 	cohabitatingResources := map[string]*cohabitatingResource{}
 
-	actions := map[schema.GroupResource]Action{}
+	actions := []resolvedAction{}
 
 	resourceHooks := []resourceHook{}
 
@@ -590,6 +604,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		nil,
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -613,6 +628,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
+		mock.Anything,
 	).Return(itemBackupper)
 
 	client := &arktest.FakeDynamicClient{}
@@ -642,12 +658,13 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	backedUpItems map[itemKey]struct{},
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
+	snapshotService cloudprovider.SnapshotService,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
@@ -660,6 +677,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
+		snapshotService,
 	)
 	return args.Get(0).(ItemBackupper)
 }

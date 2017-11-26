@@ -21,6 +21,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -56,8 +57,11 @@ func TestBackupGroup(t *testing.T) {
 		},
 	}
 
-	actions := map[schema.GroupResource]Action{
-		{Group: "", Resource: "pods"}: &fakeAction{},
+	actions := []resolvedAction{
+		{
+			ItemAction:               newFakeAction("pods"),
+			resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
+		},
 	}
 
 	podCommandExecutor := &mockPodCommandExecutor{}
@@ -83,6 +87,7 @@ func TestBackupGroup(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		nil,
 	).(*defaultGroupBackupper)
 
 	resourceBackupperFactory := &mockResourceBackupperFactory{}
@@ -106,6 +111,7 @@ func TestBackupGroup(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		nil,
 	).Return(resourceBackupper)
 
 	group := &metav1.APIResourceList{
@@ -140,7 +146,7 @@ type mockResourceBackupperFactory struct {
 }
 
 func (rbf *mockResourceBackupperFactory) newResourceBackupper(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	backup *v1.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,
@@ -149,10 +155,11 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
+	snapshotService cloudprovider.SnapshotService,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
@@ -168,6 +175,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		snapshotService,
 	)
 	return args.Get(0).(resourceBackupper)
 }

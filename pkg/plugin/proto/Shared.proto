@@ -1,0 +1,8 @@
+syntax = "proto3";
+package generated;
+
+message Empty {}
+
+message InitRequest {
+    map<string, string> config = 1;
+}

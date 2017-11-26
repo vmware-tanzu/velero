@@ -22,16 +22,21 @@ import (
 	"path/filepath"
 	"time"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/util/collections"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 type itemBackupperFactory interface {
@@ -39,12 +44,13 @@ type itemBackupperFactory interface {
 		backup *api.Backup,
 		namespaces, resources *collections.IncludesExcludes,
 		backedUpItems map[itemKey]struct{},
-		actions map[schema.GroupResource]Action,
+		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
 		dynamicFactory client.DynamicFactory,
 		discoveryHelper discovery.Helper,
+		snapshotService cloudprovider.SnapshotService,
 	) ItemBackupper
 }
 
@@ -54,12 +60,13 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	backup *api.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	backedUpItems map[itemKey]struct{},
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
+	snapshotService cloudprovider.SnapshotService,
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
 		backup:          backup,
@@ -71,7 +78,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 		resourceHooks:   resourceHooks,
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
-
+		snapshotService: snapshotService,
 		itemHookHandler: &defaultItemHookHandler{
 			podCommandExecutor: podCommandExecutor,
 		},
@@ -84,7 +91,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 }
 
 type ItemBackupper interface {
-	backupItem(logger *logrus.Entry, obj runtime.Unstructured, groupResource schema.GroupResource) error
+	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error
 }
 
 type defaultItemBackupper struct {
@@ -92,11 +99,12 @@ type defaultItemBackupper struct {
 	namespaces      *collections.IncludesExcludes
 	resources       *collections.IncludesExcludes
 	backedUpItems   map[itemKey]struct{}
-	actions         map[schema.GroupResource]Action
+	actions         []resolvedAction
 	tarWriter       tarWriter
 	resourceHooks   []resourceHook
 	dynamicFactory  client.DynamicFactory
 	discoveryHelper discovery.Helper
+	snapshotService cloudprovider.SnapshotService
 
 	itemHookHandler         itemHookHandler
 	additionalItemBackupper ItemBackupper
@@ -107,7 +115,7 @@ var namespacesGroupResource = schema.GroupResource{Group: "", Resource: "namespa
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
-func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Unstructured, groupResource schema.GroupResource) error {
+func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -154,18 +162,38 @@ func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Uns
 
 	log.Info("Backing up resource")
 
-	item := obj.UnstructuredContent()
 	// Never save status
-	delete(item, "status")
+	delete(obj.UnstructuredContent(), "status")
 
 	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks); err != nil {
 		return err
 	}
 
-	if action, found := ib.actions[groupResource]; found {
+	for _, action := range ib.actions {
+		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+			log.Debug("Skipping action because it does not apply to this resource")
+			continue
+		}
+
+		if namespace != "" && !action.namespaceIncludesExcludes.ShouldInclude(namespace) {
+			log.Debug("Skipping action because it does not apply to this namespace")
+			continue
+		}
+
+		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
+			log.Debug("Skipping action because label selector does not match")
+			continue
+		}
+
 		log.Info("Executing custom action")
 
-		if additionalItemIdentifiers, err := action.Execute(log, obj, ib.backup); err == nil {
+		if logSetter, ok := action.ItemAction.(LogSetter); ok {
+			logSetter.SetLog(log)
+		}
+
+		if updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backup); err == nil {
+			obj = updatedItem
+
 			for _, additionalItem := range additionalItemIdentifiers {
 				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
 				if err != nil {
@@ -189,6 +217,16 @@ func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Uns
 		}
 	}
 
+	if groupResource == pvGroupResource {
+		if ib.snapshotService == nil {
+			log.Debug("Skipping Persistent Volume snapshot because they're not enabled.")
+		} else {
+			if err := ib.takePVSnapshot(obj, ib.backup, log); err != nil {
+				return err
+			}
+		}
+	}
+
 	var filePath string
 	if namespace != "" {
 		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
@@ -196,7 +234,7 @@ func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Uns
 		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
 	}
 
-	itemBytes, err := json.Marshal(item)
+	itemBytes, err := json.Marshal(obj.UnstructuredContent())
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -215,6 +253,77 @@ func (ib *defaultItemBackupper) backupItem(logger *logrus.Entry, obj runtime.Uns
 
 	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
 		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+// zoneLabel is the label that stores availability-zone info
+// on PVs
+const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
+
+// takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
+// backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
+// disk type and IOPS (if applicable) to be able to restore to current state later.
+func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *api.Backup, log logrus.FieldLogger) error {
+	log.Info("Executing takePVSnapshot")
+
+	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
+		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
+		return nil
+	}
+
+	metadata, err := meta.Accessor(pv)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	name := metadata.GetName()
+	var pvFailureDomainZone string
+	labels := metadata.GetLabels()
+
+	if labels[zoneLabel] != "" {
+		pvFailureDomainZone = labels[zoneLabel]
+	} else {
+		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
+	}
+
+	volumeID, err := kubeutil.GetVolumeID(pv.UnstructuredContent())
+	// non-nil error means it's a supported PV source but volume ID can't be found
+	if err != nil {
+		return errors.Wrapf(err, "error getting volume ID for PersistentVolume")
+	}
+	// no volumeID / nil error means unsupported PV source
+	if volumeID == "" {
+		log.Info("PersistentVolume is not a supported volume type for snapshots, skipping.")
+		return nil
+	}
+
+	log = log.WithField("volumeID", volumeID)
+
+	log.Info("Snapshotting PersistentVolume")
+	snapshotID, err := ib.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
+	if err != nil {
+		// log+error on purpose - log goes to the per-backup log file, error goes to the backup
+		log.WithError(err).Error("error creating snapshot")
+		return errors.WithMessage(err, "error creating snapshot")
+	}
+
+	volumeType, iops, err := ib.snapshotService.GetVolumeInfo(volumeID, pvFailureDomainZone)
+	if err != nil {
+		log.WithError(err).Error("error getting volume info")
+		return errors.WithMessage(err, "error getting volume info")
+	}
+
+	if backup.Status.VolumeBackups == nil {
+		backup.Status.VolumeBackups = make(map[string]*api.VolumeBackupInfo)
+	}
+
+	backup.Status.VolumeBackups[name] = &api.VolumeBackupInfo{
+		SnapshotID:       snapshotID,
+		Type:             volumeType,
+		Iops:             iops,
+		AvailabilityZone: pvFailureDomainZone,
 	}
 
 	return nil

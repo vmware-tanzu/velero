@@ -159,9 +159,27 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/hashicorp/go-hclog"
+  packages = ["."]
+  revision = "ca137eb4b4389c9bc6f1a6d887f056bf16c00510"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/go-plugin"
+  packages = ["."]
+  revision = "e2fbc6864d18d3c37b6cde4297ec9fca266d28f1"
+
+[[projects]]
+  branch = "master"
   name = "github.com/hashicorp/golang-lru"
   packages = [".","simplelru"]
   revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/yamux"
+  packages = ["."]
+  revision = "f5742cb6b85602e7fa834e9d5d91a7d7fa850824"
 
 [[projects]]
   branch = "master"
@@ -204,6 +222,12 @@
   name = "github.com/mailru/easyjson"
   packages = ["buffer","jlexer","jwriter"]
   revision = "2f5df55504ebc322e4d52d34df6a1f5b503bf26d"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/mitchellh/go-testing-interface"
+  packages = ["."]
+  revision = "a61a99592b77c9ba629d254a693acffaeb4b7e28"
 
 [[projects]]
   branch = "master"
@@ -343,7 +367,7 @@
 
 [[projects]]
   name = "google.golang.org/grpc"
-  packages = [".","codes","connectivity","credentials","grpclb/grpc_lb_v1","grpclog","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
+  packages = [".","codes","connectivity","credentials","grpclb/grpc_lb_v1","grpclog","health","health/grpc_health_v1","internal","keepalive","metadata","naming","peer","stats","status","tap","transport"]
   revision = "b3ddf786825de56a4178401b7e174ee332173b66"
   version = "v1.5.2"
 
@@ -402,6 +426,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c726286fac3935d4b5e3d39b37c1c5137f0f4714e24716b32fcb82e61e827541"
+  inputs-digest = "9d8af931a171a23e1a04151e37c15ebadf7457512a6b149da20e228b6469314d"
   solver-name = "gps-cdcl"
   solver-version = 1

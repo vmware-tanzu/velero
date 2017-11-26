@@ -18,6 +18,7 @@ package aws
 
 import (
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -25,23 +26,44 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-var _ cloudprovider.ObjectStorageAdapter = &objectStorageAdapter{}
+const (
+	s3URLKey            = "s3Url"
+	kmsKeyIDKey         = "kmsKeyId"
+	s3ForcePathStyleKey = "s3ForcePathStyle"
+)
 
-type objectStorageAdapter struct {
+type objectStore struct {
 	s3         *s3.S3
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
-	logger     *logrus.Logger
 }
 
-func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bool, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
+func NewObjectStore() cloudprovider.ObjectStore {
+	return &objectStore{}
+}
+
+func (o *objectStore) Init(config map[string]string) error {
+	var (
+		region              = config[regionKey]
+		s3URL               = config[s3URLKey]
+		kmsKeyID            = config[kmsKeyIDKey]
+		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
+		s3ForcePathStyle    bool
+		err                 error
+	)
+
 	if region == "" {
-		return nil, errors.New("missing region in aws configuration in config file")
+		return errors.Errorf("missing %s in aws configuration", regionKey)
+	}
+
+	if s3ForcePathStyleVal != "" {
+		if s3ForcePathStyle, err = strconv.ParseBool(s3ForcePathStyleVal); err != nil {
+			return errors.Wrapf(err, "could not parse %s (expected bool)", s3ForcePathStyleKey)
+		}
 	}
 
 	awsConfig := aws.NewConfig().
@@ -64,24 +86,17 @@ func NewObjectStorageAdapter(region, s3URL, kmsKeyID string, s3ForcePathStyle bo
 
 	sess, err := getSession(awsConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &objectStorageAdapter{
-		s3:         s3.New(sess),
-		s3Uploader: s3manager.NewUploader(sess),
-		kmsKeyID:   kmsKeyID,
-		logger:     logger,
-	}, nil
+	o.s3 = s3.New(sess)
+	o.s3Uploader = s3manager.NewUploader(sess)
+	o.kmsKeyID = kmsKeyID
+
+	return nil
 }
 
-func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Reader) error {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket": bucket,
-			"key":    key},
-	).Infof("put s3 object")
-
+func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -89,28 +104,23 @@ func (op *objectStorageAdapter) PutObject(bucket string, key string, body io.Rea
 	}
 
 	// if kmsKeyID is not empty, enable "aws:kms" encryption
-	if op.kmsKeyID != "" {
+	if o.kmsKeyID != "" {
 		req.ServerSideEncryption = aws.String("aws:kms")
-		req.SSEKMSKeyId = &op.kmsKeyID
+		req.SSEKMSKeyId = &o.kmsKeyID
 	}
 
-	_, err := op.s3Uploader.Upload(req)
+	_, err := o.s3Uploader.Upload(req)
 
 	return errors.Wrapf(err, "error putting object %s", key)
 }
 
-func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadCloser, error) {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket": bucket,
-			"key":    key},
-	).Infof("get s3 object")
+func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	}
 
-	res, err := op.s3.GetObject(req)
+	res, err := o.s3.GetObject(req)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting object %s", key)
 	}
@@ -118,14 +128,7 @@ func (op *objectStorageAdapter) GetObject(bucket string, key string) (io.ReadClo
 	return res.Body, nil
 }
 
-func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket":    bucket,
-			"prefix":    prefix,
-			"delimiter": delimiter},
-	).Infof("list s3 common prefix")
-
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
@@ -136,7 +139,7 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := o.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, prefix := range page.CommonPrefixes {
 			ret = append(ret, *prefix.Prefix)
 		}
@@ -150,20 +153,14 @@ func (op *objectStorageAdapter) ListCommonPrefixes(bucket string, delimiter stri
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, error) {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket": bucket,
-			"prefix": prefix},
-	).Infof("list s3 objects")
-
+func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
 	}
 
 	var ret []string
-	err := op.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
+	err := o.s3.ListObjectsV2Pages(req, func(page *s3.ListObjectsV2Output, lastPage bool) bool {
 		for _, obj := range page.Contents {
 			ret = append(ret, *obj.Key)
 		}
@@ -177,32 +174,19 @@ func (op *objectStorageAdapter) ListObjects(bucket, prefix string) ([]string, er
 	return ret, nil
 }
 
-func (op *objectStorageAdapter) DeleteObject(bucket string, key string) error {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket": bucket,
-			"key":    key},
-	).Infof("delete s3 object")
-
+func (o *objectStore) DeleteObject(bucket string, key string) error {
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	}
 
-	_, err := op.s3.DeleteObject(req)
+	_, err := o.s3.DeleteObject(req)
 
 	return errors.Wrapf(err, "error deleting object %s", key)
 }
 
-func (op *objectStorageAdapter) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	op.logger.WithFields(
-		logrus.Fields{
-			"bucket": bucket,
-			"key":    key,
-			"ttl":    ttl},
-	).Infof("create signed s3 url")
-
-	req, _ := op.s3.GetObjectRequest(&s3.GetObjectInput{
+func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+	req, _ := o.s3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})

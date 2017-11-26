@@ -393,7 +393,9 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		}
 	}()
 
+	logContext.Info("starting restore")
 	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile)
+	logContext.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
 
@@ -420,6 +422,10 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 	}
 	gzippedResultsFile.Close()
 
+	if _, err = resultsFile.Seek(0, 0); err != nil {
+		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
+		return
+	}
 	if err := controller.backupService.UploadRestoreResults(bucket, path, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
 	}

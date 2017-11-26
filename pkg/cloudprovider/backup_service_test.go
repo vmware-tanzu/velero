@@ -82,7 +82,7 @@ func TestUploadBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objStore   = &testutil.ObjectStorageAdapter{}
+				objStore   = &testutil.ObjectStore{}
 				bucket     = "test-bucket"
 				path       = "test-path"
 				backupName = "test-backup"
@@ -119,7 +119,7 @@ func TestUploadBackup(t *testing.T) {
 
 func TestDownloadBackup(t *testing.T) {
 	var (
-		o         = &testutil.ObjectStorageAdapter{}
+		o         = &testutil.ObjectStore{}
 		bucket    = "b"
 		path      = "p"
 		backup    = "bak"
@@ -160,7 +160,7 @@ func TestDeleteBackup(t *testing.T) {
 				bucket    = "bucket"
 				backup    = "bak"
 				objects   = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
-				objStore  = &testutil.ObjectStorageAdapter{}
+				objStore  = &testutil.ObjectStore{}
 				logger, _ = testlogger.NewNullLogger()
 			)
 
@@ -233,7 +233,7 @@ func TestGetAllBackups(t *testing.T) {
 			var (
 				bucket    = "bucket"
 				path      = "path"
-				objStore  = &testutil.ObjectStorageAdapter{}
+				objStore  = &testutil.ObjectStore{}
 				logger, _ = testlogger.NewNullLogger()
 			)
 
@@ -330,7 +330,7 @@ func TestCreateSignedURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objectStorage = &testutil.ObjectStorageAdapter{}
+				objectStorage = &testutil.ObjectStore{}
 				logger, _     = testlogger.NewNullLogger()
 				backupService = NewBackupService(objectStorage, logger)
 			)

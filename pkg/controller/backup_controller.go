@@ -41,6 +41,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -61,6 +62,7 @@ type backupController struct {
 	queue            workqueue.RateLimitingInterface
 	clock            clock.Clock
 	logger           *logrus.Logger
+	pluginManager    plugin.Manager
 }
 
 func NewBackupController(
@@ -72,6 +74,7 @@ func NewBackupController(
 	path string,
 	pvProviderExists bool,
 	logger *logrus.Logger,
+	pluginManager plugin.Manager,
 ) Interface {
 	c := &backupController{
 		backupper:        backupper,
@@ -85,6 +88,7 @@ func NewBackupController(
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
 		clock:            &clock.RealClock{},
 		logger:           logger,
+		pluginManager:    pluginManager,
 	}
 
 	c.syncHandler = c.processBackup
@@ -319,9 +323,18 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket, path s
 		err = kuberrs.NewAggregate(errs)
 	}()
 
-	if err := controller.backupper.Backup(backup, backupFile, logFile); err != nil {
+	actions, err := controller.pluginManager.GetBackupItemActions(backup.Name, controller.logger, controller.logger.Level)
+	if err != nil {
 		return err
 	}
+	defer controller.pluginManager.CloseBackupItemActions(backup.Name)
+
+	controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup)).Info("starting backup")
+
+	if err := controller.backupper.Backup(backup, backupFile, logFile, actions); err != nil {
+		return err
+	}
+
 	controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup)).Info("backup completed")
 
 	// note: updating this here so the uploaded JSON shows "completed". If

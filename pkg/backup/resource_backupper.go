@@ -19,6 +19,7 @@ package backup
 import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
@@ -33,7 +34,7 @@ import (
 
 type resourceBackupperFactory interface {
 	newResourceBackupper(
-		log *logrus.Entry,
+		log logrus.FieldLogger,
 		backup *api.Backup,
 		namespaces *collections.IncludesExcludes,
 		resources *collections.IncludesExcludes,
@@ -42,17 +43,18 @@ type resourceBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		backedUpItems map[itemKey]struct{},
 		cohabitatingResources map[string]*cohabitatingResource,
-		actions map[schema.GroupResource]Action,
+		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
+		snapshotService cloudprovider.SnapshotService,
 	) resourceBackupper
 }
 
 type defaultResourceBackupperFactory struct{}
 
 func (f *defaultResourceBackupperFactory) newResourceBackupper(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	backup *api.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,
@@ -61,10 +63,11 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
+	snapshotService cloudprovider.SnapshotService,
 ) resourceBackupper {
 	return &defaultResourceBackupper{
 		log:                   log,
@@ -80,8 +83,8 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 		podCommandExecutor:    podCommandExecutor,
 		tarWriter:             tarWriter,
 		resourceHooks:         resourceHooks,
-
-		itemBackupperFactory: &defaultItemBackupperFactory{},
+		snapshotService:       snapshotService,
+		itemBackupperFactory:  &defaultItemBackupperFactory{},
 	}
 }
 
@@ -90,7 +93,7 @@ type resourceBackupper interface {
 }
 
 type defaultResourceBackupper struct {
-	log                   *logrus.Entry
+	log                   logrus.FieldLogger
 	backup                *api.Backup
 	namespaces            *collections.IncludesExcludes
 	resources             *collections.IncludesExcludes
@@ -99,12 +102,12 @@ type defaultResourceBackupper struct {
 	discoveryHelper       discovery.Helper
 	backedUpItems         map[itemKey]struct{}
 	cohabitatingResources map[string]*cohabitatingResource
-	actions               map[schema.GroupResource]Action
+	actions               []resolvedAction
 	podCommandExecutor    podCommandExecutor
 	tarWriter             tarWriter
 	resourceHooks         []resourceHook
-
-	itemBackupperFactory itemBackupperFactory
+	snapshotService       cloudprovider.SnapshotService
+	itemBackupperFactory  itemBackupperFactory
 }
 
 // backupResource backs up all the objects for a given group-version-resource.
@@ -122,6 +125,8 @@ func (rb *defaultResourceBackupper) backupResource(
 	grString := gr.String()
 
 	log := rb.log.WithField("groupResource", grString)
+
+	log.Info("Evaluating resource")
 
 	clusterScoped := !resource.Namespaced
 
@@ -175,6 +180,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.resourceHooks,
 		rb.dynamicFactory,
 		rb.discoveryHelper,
+		rb.snapshotService,
 	)
 
 	namespacesToList := getNamespacesToList(rb.namespaces)
@@ -196,6 +202,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		}
 
 		for _, ns := range namespacesToList {
+			log.WithField("namespace", ns).Info("Getting namespace")
 			unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting namespace"))
@@ -227,6 +234,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return err
 		}
 
+		log.WithField("namespace", namespace).Info("Listing items")
 		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: rb.labelSelector})
 		if err != nil {
 			return errors.WithStack(err)
@@ -238,6 +246,7 @@ func (rb *defaultResourceBackupper) backupResource(
 			return errors.WithStack(err)
 		}
 
+		log.WithField("namespace", namespace).Infof("Retrieved %d items", len(items))
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
