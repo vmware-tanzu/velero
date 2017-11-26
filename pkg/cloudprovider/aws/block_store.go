@@ -27,9 +27,15 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
-var _ cloudprovider.BlockStorageAdapter = &blockStorageAdapter{}
+const regionKey = "region"
+const kmsKeyIdKey = "kmsKeyId"
 
-type blockStorageAdapter struct {
+// iopsVolumeTypes is a set of AWS EBS volume types for which IOPS should
+// be captured during snapshot and provided when creating a new volume
+// from snapshot.
+var iopsVolumeTypes = sets.NewString("io1")
+
+type blockStore struct {
 	ec2      *ec2.EC2
 	kmsKeyId string
 }
@@ -47,38 +53,40 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStorageAdapter(region string, kmsKeyId string) (cloudprovider.BlockStorageAdapter, error) {
+func NewBlockStore() cloudprovider.BlockStore {
+	return &blockStore{}
+}
+
+func (b *blockStore) Init(config map[string]string) error {
+	region := config[regionKey]
+
 	if region == "" {
-		return nil, errors.New("missing region in aws configuration in config file")
+		return errors.Errorf("missing %s in aws configuration", regionKey)
 	}
 
 	awsConfig := aws.NewConfig().WithRegion(region)
 
 	sess, err := getSession(awsConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return &blockStorageAdapter{
-		ec2: ec2.New(sess),
-	}, nil
+	b.ec2 = ec2.New(sess)
+	b.kmsKeyId = config[kmsKeyIdKey]
+
+	return nil
 }
 
-// iopsVolumeTypes is a set of AWS EBS volume types for which IOPS should
-// be captured during snapshot and provided when creating a new volume
-// from snapshot.
-var iopsVolumeTypes = sets.NewString("io1")
-
-func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
 	}
 
-	if op.kmsKeyId != "" {
+	if b.kmsKeyId != "" {
 		var encrypt = true
-		req.KmsKeyId = &op.kmsKeyId
+		req.KmsKeyId = &b.kmsKeyId
 		req.Encrypted = &encrypt
 	}
 
@@ -86,7 +94,7 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 		req.Iops = iops
 	}
 
-	res, err := op.ec2.CreateVolume(req)
+	res, err := b.ec2.CreateVolume(req)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -94,12 +102,12 @@ func (op *blockStorageAdapter) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 	return *res.VolumeId, nil
 }
 
-func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
 
-	res, err := op.ec2.DescribeVolumes(req)
+	res, err := b.ec2.DescribeVolumes(req)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
@@ -126,12 +134,12 @@ func (op *blockStorageAdapter) GetVolumeInfo(volumeID, volumeAZ string) (string,
 	return volumeType, iops, nil
 }
 
-func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
 
-	res, err := op.ec2.DescribeVolumes(req)
+	res, err := b.ec2.DescribeVolumes(req)
 	if err != nil {
 		return false, errors.WithStack(err)
 	}
@@ -142,7 +150,7 @@ func (op *blockStorageAdapter) IsVolumeReady(volumeID, volumeAZ string) (ready b
 	return *res.Volumes[0].State == ec2.VolumeStateAvailable, nil
 }
 
-func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]string, error) {
+func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
 	req := &ec2.DescribeSnapshotsInput{}
 
 	for k, v := range tagFilters {
@@ -154,7 +162,7 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	}
 
 	var ret []string
-	err := op.ec2.DescribeSnapshotsPages(req, func(res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
+	err := b.ec2.DescribeSnapshotsPages(req, func(res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
 		for _, snapshot := range res.Snapshots {
 			ret = append(ret, *snapshot.SnapshotId)
 		}
@@ -168,12 +176,12 @@ func (op *blockStorageAdapter) ListSnapshots(tagFilters map[string]string) ([]st
 	return ret, nil
 }
 
-func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &ec2.CreateSnapshotInput{
 		VolumeId: &volumeID,
 	}
 
-	res, err := op.ec2.CreateSnapshot(req)
+	res, err := b.ec2.CreateSnapshot(req)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -193,17 +201,17 @@ func (op *blockStorageAdapter) CreateSnapshot(volumeID, volumeAZ string, tags ma
 
 	tagsReq.SetTags(ec2Tags)
 
-	_, err = op.ec2.CreateTags(tagsReq)
+	_, err = b.ec2.CreateTags(tagsReq)
 
 	return *res.SnapshotId, errors.WithStack(err)
 }
 
-func (op *blockStorageAdapter) DeleteSnapshot(snapshotID string) error {
+func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	req := &ec2.DeleteSnapshotInput{
 		SnapshotId: &snapshotID,
 	}
 
-	_, err := op.ec2.DeleteSnapshot(req)
+	_, err := b.ec2.DeleteSnapshot(req)
 
 	return errors.WithStack(err)
 }

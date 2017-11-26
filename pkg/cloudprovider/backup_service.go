@@ -104,35 +104,35 @@ func getRestoreResultsKey(path, backup, restore string) string {
 }
 
 type backupService struct {
-	objectStorage ObjectStorageAdapter
-	decoder       runtime.Decoder
-	logger        *logrus.Logger
+	objectStore ObjectStore
+	decoder     runtime.Decoder
+	logger      *logrus.Logger
 }
 
 var _ BackupService = &backupService{}
 var _ BackupGetter = &backupService{}
 
-// NewBackupService creates a backup service using the provided object storage adapter
-func NewBackupService(objectStorage ObjectStorageAdapter, logger *logrus.Logger) BackupService {
+// NewBackupService creates a backup service using the provided object store
+func NewBackupService(objectStore ObjectStore, logger *logrus.Logger) BackupService {
 	return &backupService{
-		objectStorage: objectStorage,
-		decoder:       scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
-		logger:        logger,
+		objectStore: objectStore,
+		decoder:     scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
+		logger:      logger,
 	}
 }
 
 func (br *backupService) UploadBackup(bucket, bucketPath, backupName string, metadata, backup, log io.Reader) error {
 	// upload metadata file
 	metadataKey := getMetadataKey(bucketPath, backupName)
-	if err := br.objectStorage.PutObject(bucket, metadataKey, metadata); err != nil {
+	if err := br.objectStore.PutObject(bucket, metadataKey, metadata); err != nil {
 		// failure to upload metadata file is a hard-stop
 		return err
 	}
 
 	// upload tar file
-	if err := br.objectStorage.PutObject(bucket, getBackupContentsKey(bucketPath, backupName), backup); err != nil {
+	if err := br.objectStore.PutObject(bucket, getBackupContentsKey(bucketPath, backupName), backup); err != nil {
 		// try to delete the metadata file since the data upload failed
-		deleteErr := br.objectStorage.DeleteObject(bucket, metadataKey)
+		deleteErr := br.objectStore.DeleteObject(bucket, metadataKey)
 
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
@@ -140,7 +140,7 @@ func (br *backupService) UploadBackup(bucket, bucketPath, backupName string, met
 	// uploading log file is best-effort; if it fails, we log the error but call the overall upload a
 	// success
 	logKey := getBackupLogKey(bucketPath, backupName)
-	if err := br.objectStorage.PutObject(bucket, logKey, log); err != nil {
+	if err := br.objectStore.PutObject(bucket, logKey, log); err != nil {
 		br.logger.WithError(err).WithFields(logrus.Fields{
 			"bucket": bucket,
 			"key":    logKey,
@@ -151,11 +151,12 @@ func (br *backupService) UploadBackup(bucket, bucketPath, backupName string, met
 }
 
 func (br *backupService) DownloadBackup(bucket, bucketPath, backupName string) (io.ReadCloser, error) {
-	return br.objectStorage.GetObject(bucket, getBackupContentsKey(bucketPath, backupName))
+	return br.objectStore.GetObject(bucket, getBackupContentsKey(bucketPath, backupName))
 }
 
 func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api.Backup, error) {
-	prefixes, err := br.objectStorage.ListCommonPrefixes(bucket, "/", bucketPath)
+	prefixes, err := br.objectStore.ListCommonPrefixes(bucket, "/", path.Clean(bucketPath)+"/")
+
 	if err != nil {
 		return nil, err
 	}
@@ -166,6 +167,11 @@ func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api
 	output := make([]*api.Backup, 0, len(prefixes))
 
 	for _, backupDir := range prefixes {
+
+		if bucketPath != "" {
+			_, backupDir = path.Split(backupDir)
+		}
+
 		backup, err := br.GetBackup(bucket, bucketPath, backupDir)
 		if err != nil {
 			br.logger.WithError(err).WithField("dir", backupDir).Error("Error reading backup directory")
@@ -181,7 +187,7 @@ func (br *backupService) GetAllBackups(bucket string, bucketPath string) ([]*api
 func (br *backupService) GetBackup(bucket, bucketPath, name string) (*api.Backup, error) {
 	key := getMetadataKey(bucketPath, name)
 
-	res, err := br.objectStorage.GetObject(bucket, key)
+	res, err := br.objectStore.GetObject(bucket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +212,7 @@ func (br *backupService) GetBackup(bucket, bucketPath, name string) (*api.Backup
 }
 
 func (br *backupService) DeleteBackupDir(bucket, bucketPath, backupName string) error {
-	objects, err := br.objectStorage.ListObjects(bucket, joinPathPrefix(bucketPath, backupName)+"/")
+	objects, err := br.objectStore.ListObjects(bucket, joinPathPrefix(bucketPath, backupName)+"/")
 	if err != nil {
 		return err
 	}
@@ -217,7 +223,7 @@ func (br *backupService) DeleteBackupDir(bucket, bucketPath, backupName string) 
 			"bucket": bucket,
 			"key":    key,
 		}).Debug("Trying to delete object")
-		if err := br.objectStorage.DeleteObject(bucket, key); err != nil {
+		if err := br.objectStore.DeleteObject(bucket, key); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -228,15 +234,15 @@ func (br *backupService) DeleteBackupDir(bucket, bucketPath, backupName string) 
 func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket string, bucketPath string, ttl time.Duration) (string, error) {
 	switch target.Kind {
 	case api.DownloadTargetKindBackupContents:
-		return br.objectStorage.CreateSignedURL(bucket, getBackupContentsKey(bucketPath, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getBackupContentsKey(bucketPath, target.Name), ttl)
 	case api.DownloadTargetKindBackupLog:
-		return br.objectStorage.CreateSignedURL(bucket, getBackupLogKey(bucketPath, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getBackupLogKey(bucketPath, target.Name), ttl)
 	case api.DownloadTargetKindRestoreLog:
 		backup := extractBackupName(target.Name)
-		return br.objectStorage.CreateSignedURL(bucket, getRestoreLogKey(bucketPath, backup, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getRestoreLogKey(bucketPath, backup, target.Name), ttl)
 	case api.DownloadTargetKindRestoreResults:
 		backup := extractBackupName(target.Name)
-		return br.objectStorage.CreateSignedURL(bucket, getRestoreResultsKey(bucketPath, backup, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getRestoreResultsKey(bucketPath, backup, target.Name), ttl)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
@@ -253,12 +259,12 @@ func extractBackupName(s string) string {
 
 func (br *backupService) UploadRestoreLog(bucket, bucketPath, backup, restore string, log io.Reader) error {
 	key := getRestoreLogKey(bucketPath, backup, restore)
-	return br.objectStorage.PutObject(bucket, key, log)
+	return br.objectStore.PutObject(bucket, key, log)
 }
 
 func (br *backupService) UploadRestoreResults(bucket, bucketPath, backup, restore string, results io.Reader) error {
 	key := getRestoreResultsKey(bucketPath, backup, restore)
-	return br.objectStorage.PutObject(bucket, key, results)
+	return br.objectStore.PutObject(bucket, key, results)
 }
 
 // cachedBackupService wraps a real backup service with a cache for getting cloud backups.

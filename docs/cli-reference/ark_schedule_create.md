@@ -27,7 +27,7 @@ ark schedule create NAME [flags]
   -l, --selector labelSelector                          only back up resources matching this label selector (default <none>)
       --show-labels                                     show labels in the last column
       --snapshot-volumes optionalBool[=true]            take snapshots of PersistentVolumes as part of the backup
-      --ttl duration                                    how long before the backup can be garbage collected (default 24h0m0s)
+      --ttl duration                                    how long before the backup can be garbage collected (default 720h0m0s)
 ```
 
 ### Options inherited from parent commands

@@ -41,6 +41,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -55,49 +56,73 @@ var (
 )
 
 type fakeAction struct {
+	selector        ResourceSelector
 	ids             []string
-	backups         []*v1.Backup
+	backups         []v1.Backup
 	additionalItems []ResourceIdentifier
 }
 
-var _ Action = &fakeAction{}
+var _ ItemAction = &fakeAction{}
 
-func (a *fakeAction) Execute(log *logrus.Entry, item runtime.Unstructured, backup *v1.Backup) ([]ResourceIdentifier, error) {
+func newFakeAction(resource string) *fakeAction {
+	return (&fakeAction{}).ForResource(resource)
+}
+
+func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
-		return a.additionalItems, err
+		return item, a.additionalItems, err
 	}
 	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
-	a.backups = append(a.backups, backup)
+	a.backups = append(a.backups, *backup)
 
-	return a.additionalItems, nil
+	return item, a.additionalItems, nil
+}
+
+func (a *fakeAction) AppliesTo() (ResourceSelector, error) {
+	return a.selector, nil
+}
+
+func (a *fakeAction) ForResource(resource string) *fakeAction {
+	a.selector.IncludedResources = []string{resource}
+	return a
 }
 
 func TestResolveActions(t *testing.T) {
 	tests := []struct {
 		name                string
-		input               map[string]Action
-		expected            map[schema.GroupResource]Action
+		input               []ItemAction
+		expected            []resolvedAction
 		resourcesWithErrors []string
 		expectError         bool
 	}{
 		{
 			name:     "empty input",
-			input:    map[string]Action{},
-			expected: map[schema.GroupResource]Action{},
+			input:    []ItemAction{},
+			expected: nil,
 		},
 		{
-			name:        "mapper error",
-			input:       map[string]Action{"badresource": &fakeAction{}},
-			expected:    map[schema.GroupResource]Action{},
+			name:        "resolve error",
+			input:       []ItemAction{&fakeAction{selector: ResourceSelector{LabelSelector: "=invalid-selector"}}},
+			expected:    nil,
 			expectError: true,
 		},
 		{
 			name:  "resolved",
-			input: map[string]Action{"foo": &fakeAction{}, "bar": &fakeAction{}},
-			expected: map[schema.GroupResource]Action{
-				{Group: "somegroup", Resource: "foodies"}:      &fakeAction{},
-				{Group: "anothergroup", Resource: "barnacles"}: &fakeAction{},
+			input: []ItemAction{newFakeAction("foo"), newFakeAction("bar")},
+			expected: []resolvedAction{
+				{
+					ItemAction:                newFakeAction("foo"),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foodies.somegroup"),
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
+				{
+					ItemAction:                newFakeAction("bar"),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("barnacles.anothergroup"),
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
 			},
 		},
 	}
@@ -112,7 +137,7 @@ func TestResolveActions(t *testing.T) {
 			}
 			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
 
-			actual, err := resolveActions(discoveryHelper, test.input)
+			actual, err := resolveActions(test.input, discoveryHelper)
 			gotError := err != nil
 
 			if e, a := test.expectError, gotError; e != a {
@@ -349,7 +374,6 @@ func TestBackup(t *testing.T) {
 	tests := []struct {
 		name                  string
 		backup                *v1.Backup
-		actions               map[string]Action
 		expectedNamespaces    *collections.IncludesExcludes
 		expectedResources     *collections.IncludesExcludes
 		expectedLabelSelector string
@@ -369,7 +393,6 @@ func TestBackup(t *testing.T) {
 					ExcludedNamespaces: []string{"c", "d"},
 				},
 			},
-			actions:            map[string]Action{},
 			expectedNamespaces: collections.NewIncludesExcludes().Includes("a", "b").Excludes("c", "d"),
 			expectedResources:  collections.NewIncludesExcludes().Includes("configmaps", "certificatesigningrequests.certificates.k8s.io", "roles.rbac.authorization.k8s.io"),
 			expectedHooks:      []resourceHook{},
@@ -388,7 +411,6 @@ func TestBackup(t *testing.T) {
 					},
 				},
 			},
-			actions:               map[string]Action{},
 			expectedNamespaces:    collections.NewIncludesExcludes(),
 			expectedResources:     collections.NewIncludesExcludes(),
 			expectedHooks:         []resourceHook{},
@@ -402,7 +424,6 @@ func TestBackup(t *testing.T) {
 		{
 			name:               "backupGroup errors",
 			backup:             &v1.Backup{},
-			actions:            map[string]Action{},
 			expectedNamespaces: collections.NewIncludesExcludes(),
 			expectedResources:  collections.NewIncludesExcludes(),
 			expectedHooks:      []resourceHook{},
@@ -440,7 +461,6 @@ func TestBackup(t *testing.T) {
 					},
 				},
 			},
-			actions:            map[string]Action{},
 			expectedNamespaces: collections.NewIncludesExcludes(),
 			expectedResources:  collections.NewIncludesExcludes(),
 			expectedHooks: []resourceHook{
@@ -491,8 +511,8 @@ func TestBackup(t *testing.T) {
 			b, err := NewKubernetesBackupper(
 				discoveryHelper,
 				dynamicFactory,
-				test.actions,
 				podCommandExecutor,
+				nil,
 			)
 			require.NoError(t, err)
 			kb := b.(*kubernetesBackupper)
@@ -519,10 +539,11 @@ func TestBackup(t *testing.T) {
 				discoveryHelper,
 				map[itemKey]struct{}{}, // backedUpItems
 				cohabitatingResources,
-				kb.actions,
+				mock.Anything,
 				kb.podCommandExecutor,
 				mock.Anything, // tarWriter
 				test.expectedHooks,
+				mock.Anything,
 			).Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
@@ -531,7 +552,7 @@ func TestBackup(t *testing.T) {
 
 			var backupFile, logFile bytes.Buffer
 
-			err = b.Backup(test.backup, &backupFile, &logFile)
+			err = b.Backup(test.backup, &backupFile, &logFile, nil)
 			defer func() {
 				// print log if anything failed
 				if t.Failed() {
@@ -560,7 +581,7 @@ type mockGroupBackupperFactory struct {
 }
 
 func (f *mockGroupBackupperFactory) newGroupBackupper(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
 	labelSelector string,
@@ -568,10 +589,11 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions map[schema.GroupResource]Action,
+	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
+	snapshotService cloudprovider.SnapshotService,
 ) groupBackupper {
 	args := f.Called(
 		log,
@@ -587,6 +609,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
+		snapshotService,
 	)
 	return args.Get(0).(groupBackupper)
 }

@@ -82,7 +82,7 @@ func TestUploadBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objStore   = &testutil.ObjectStorageAdapter{}
+				objStore   = &testutil.ObjectStore{}
 				bucket     = "test-bucket"
 				path       = "test-path"
 				backupName = "test-backup"
@@ -119,7 +119,7 @@ func TestUploadBackup(t *testing.T) {
 
 func TestDownloadBackup(t *testing.T) {
 	var (
-		o         = &testutil.ObjectStorageAdapter{}
+		o         = &testutil.ObjectStore{}
 		bucket    = "b"
 		path      = "p"
 		backup    = "bak"
@@ -160,7 +160,7 @@ func TestDeleteBackup(t *testing.T) {
 				bucket    = "bucket"
 				backup    = "bak"
 				objects   = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
-				objStore  = &testutil.ObjectStorageAdapter{}
+				objStore  = &testutil.ObjectStore{}
 				logger, _ = testlogger.NewNullLogger()
 			)
 
@@ -233,11 +233,11 @@ func TestGetAllBackups(t *testing.T) {
 			var (
 				bucket    = "bucket"
 				path      = "path"
-				objStore  = &testutil.ObjectStorageAdapter{}
+				objStore  = &testutil.ObjectStore{}
 				logger, _ = testlogger.NewNullLogger()
 			)
 
-			objStore.On("ListCommonPrefixes", bucket, "/", path).Return([]string{"backup-1", "backup-2"}, nil)
+			objStore.On("ListCommonPrefixes", bucket, "/", path+"/").Return([]string{"backup-1", "backup-2"}, nil)
 			objStore.On("GetObject", bucket, path+"/"+"backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
 			objStore.On("GetObject", bucket, path+"/"+"backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
 
@@ -330,7 +330,7 @@ func TestCreateSignedURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objectStorage = &testutil.ObjectStorageAdapter{}
+				objectStorage = &testutil.ObjectStore{}
 				logger, _     = testlogger.NewNullLogger()
 				backupService = NewBackupService(objectStorage, logger)
 			)

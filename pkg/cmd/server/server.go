@@ -19,18 +19,16 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2/google"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -47,9 +45,6 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	arkaws "github.com/heptio/ark/pkg/cloudprovider/aws"
-	"github.com/heptio/ark/pkg/cloudprovider/azure"
-	"github.com/heptio/ark/pkg/cloudprovider/gcp"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
@@ -57,6 +52,7 @@ import (
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -88,6 +84,7 @@ func NewCommand() *cobra.Command {
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
+			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
 			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
 
@@ -146,6 +143,7 @@ type server struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                *logrus.Logger
+	pluginManager         plugin.Manager
 }
 
 func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, error) {
@@ -164,6 +162,11 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 		return nil, errors.WithStack(err)
 	}
 
+	pluginManager, err := plugin.NewManager(logger, logger.Level)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &server{
@@ -173,9 +176,10 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
 		sharedInformerFactory: informers.NewSharedInformerFactory(arkClient, 0),
-		ctx:        ctx,
-		cancelFunc: cancelFunc,
-		logger:     logger,
+		ctx:           ctx,
+		cancelFunc:    cancelFunc,
+		logger:        logger,
+		pluginManager: pluginManager,
 	}
 
 	return s, nil
@@ -325,12 +329,12 @@ func (s *server) watchConfig(config *api.Config) {
 
 func (s *server) initBackupService(config *api.Config) error {
 	s.logger.Info("Configuring cloud provider for backup service")
-	objectStorage, err := getObjectStorageProvider(config.BackupStorageProvider.CloudProviderConfig, "backupStorageProvider", s.logger)
+	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
 	if err != nil {
 		return err
 	}
 
-	s.backupService = cloudprovider.NewBackupService(objectStorage, s.logger)
+	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
 	return nil
 }
 
@@ -341,113 +345,46 @@ func (s *server) initSnapshotService(config *api.Config) error {
 	}
 
 	s.logger.Info("Configuring cloud provider for snapshot service")
-	blockStorage, err := getBlockStorageProvider(*config.PersistentVolumeProvider, "persistentVolumeProvider")
+	blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
 	if err != nil {
 		return err
 	}
-	s.snapshotService = cloudprovider.NewSnapshotService(blockStorage)
+	s.snapshotService = cloudprovider.NewSnapshotService(blockStore)
 	return nil
 }
 
-func hasOneCloudProvider(cloudConfig api.CloudProviderConfig) bool {
-	found := false
-
-	if cloudConfig.AWS != nil {
-		found = true
+func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("object storage provider name must not be empty")
 	}
 
-	if cloudConfig.GCP != nil {
-		if found {
-			return false
-		}
-		found = true
-	}
-
-	if cloudConfig.Azure != nil {
-		if found {
-			return false
-		}
-		found = true
-	}
-
-	return found
-}
-
-func getObjectStorageProvider(cloudConfig api.CloudProviderConfig, field string, logger *logrus.Logger) (cloudprovider.ObjectStorageAdapter, error) {
-	var (
-		objectStorage cloudprovider.ObjectStorageAdapter
-		err           error
-	)
-
-	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
-	}
-
-	switch {
-	case cloudConfig.AWS != nil:
-		objectStorage, err = arkaws.NewObjectStorageAdapter(
-			cloudConfig.AWS.Region,
-			cloudConfig.AWS.S3Url,
-			cloudConfig.AWS.KMSKeyID,
-			cloudConfig.AWS.S3ForcePathStyle,
-			logger)
-	case cloudConfig.GCP != nil:
-		var email string
-		var privateKey []byte
-
-		credentialsFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")
-		if credentialsFile != "" {
-			// Get the email and private key from the credentials file so we can pre-sign download URLs
-			creds, err := ioutil.ReadFile(credentialsFile)
-			if err != nil {
-				return nil, errors.WithStack(err)
-			}
-			jwtConfig, err := google.JWTConfigFromJSON(creds)
-			if err != nil {
-				return nil, errors.WithStack(err)
-			}
-			email = jwtConfig.Email
-			privateKey = jwtConfig.PrivateKey
-		} else {
-			logger.Warning("GOOGLE_APPLICATION_CREDENTIALS is undefined; some features such as downloading log files will not work")
-		}
-
-		objectStorage, err = gcp.NewObjectStorageAdapter(email, privateKey)
-	case cloudConfig.Azure != nil:
-		objectStorage, err = azure.NewObjectStorageAdapter()
-	}
-
+	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	return objectStorage, nil
+	if err := objectStore.Init(cloudConfig.Config); err != nil {
+		return nil, err
+	}
+
+	return objectStore, nil
 }
 
-func getBlockStorageProvider(cloudConfig api.CloudProviderConfig, field string) (cloudprovider.BlockStorageAdapter, error) {
-	var (
-		blockStorage cloudprovider.BlockStorageAdapter
-		err          error
-	)
-
-	if !hasOneCloudProvider(cloudConfig) {
-		return nil, errors.Errorf("you must specify exactly one of aws, gcp, or azure for %s", field)
+func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("block storage provider name must not be empty")
 	}
 
-	switch {
-	case cloudConfig.AWS != nil:
-		blockStorage, err = arkaws.NewBlockStorageAdapter(cloudConfig.AWS.Region, cloudConfig.AWS.KMSKeyID)
-	case cloudConfig.GCP != nil:
-		blockStorage, err = gcp.NewBlockStorageAdapter(cloudConfig.GCP.Project)
-	case cloudConfig.Azure != nil:
-		blockStorage, err = azure.NewBlockStorageAdapter(cloudConfig.Azure.Location, cloudConfig.Azure.APITimeout.Duration)
-	}
-
+	blockStore, err := manager.GetBlockStore(cloudConfig.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	return blockStorage, nil
+	if err := blockStore.Init(cloudConfig.Config); err != nil {
+		return nil, err
+	}
+
+	return blockStore, nil
 }
 
 func durationMin(a, b time.Duration) time.Duration {
@@ -514,6 +451,7 @@ func (s *server) runControllers(config *api.Config) error {
 			config.BackupStorageProvider.Path,
 			s.snapshotService != nil,
 			s.logger,
+			s.pluginManager,
 		)
 		wg.Add(1)
 		go func() {
@@ -618,24 +556,11 @@ func newBackupper(
 	kubeClientConfig *rest.Config,
 	kubeCoreV1Client kcorev1client.CoreV1Interface,
 ) (backup.Backupper, error) {
-	actions := map[string]backup.Action{}
-	dynamicFactory := client.NewDynamicFactory(clientPool)
-
-	if snapshotService != nil {
-		action, err := backup.NewVolumeSnapshotAction(snapshotService)
-		if err != nil {
-			return nil, err
-		}
-		actions["persistentvolumes"] = action
-
-		actions["persistentvolumeclaims"] = backup.NewBackupPVAction()
-	}
-
 	return backup.NewKubernetesBackupper(
 		discoveryHelper,
-		dynamicFactory,
-		actions,
+		client.NewDynamicFactory(clientPool),
 		backup.NewPodCommandExecutor(kubeClientConfig, kubeCoreV1Client.RESTClient()),
+		snapshotService,
 	)
 }
 
