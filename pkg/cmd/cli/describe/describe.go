@@ -20,7 +20,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cmd/cli/backup"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
+	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -30,18 +32,18 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long:  "Describe ark resources",
 	}
 
-	//backupCommand := backup.NewGetCommand(f, "backups")
-	//backupCommand.Aliases = []string{"backup"}
+	backupCommand := backup.NewDescribeCommand(f, "backups")
+	backupCommand.Aliases = []string{"backup"}
 
-	//scheduleCommand := schedule.NewGetCommand(f, "schedules")
-	//scheduleCommand.Aliases = []string{"schedule"}
+	scheduleCommand := schedule.NewDescribeCommand(f, "schedules")
+	scheduleCommand.Aliases = []string{"schedule"}
 
 	restoreCommand := restore.NewDescribeCommand(f, "restores")
 	restoreCommand.Aliases = []string{"restore"}
 
 	c.AddCommand(
-		//backupCommand,
-		//scheduleCommand,
+		backupCommand,
+		scheduleCommand,
 		restoreCommand,
 	)
 

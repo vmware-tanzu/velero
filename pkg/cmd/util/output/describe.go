@@ -19,7 +19,6 @@ package output
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"text/tabwriter"
@@ -27,30 +26,46 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Describe configures a tab writer, passing it to fn. The tab writer's output is returned to the
-// caller.
-func Describe(fn func(out io.Writer)) string {
-	out := new(tabwriter.Writer)
-	buf := &bytes.Buffer{}
-	out.Init(buf, 0, 8, 2, ' ', 0)
+type Describer struct {
+	Prefix string
+	out    *tabwriter.Writer
+	buf    *bytes.Buffer
+}
 
-	fn(out)
+func Describe(fn func(d *Describer)) string {
+	d := Describer{
+		out: new(tabwriter.Writer),
+		buf: new(bytes.Buffer),
+	}
+	d.out.Init(d.buf, 0, 8, 2, ' ', 0)
 
-	out.Flush()
-	return buf.String()
+	fn(&d)
+
+	d.out.Flush()
+	return d.buf.String()
+}
+
+func (d *Describer) Printf(msg string, args ...interface{}) {
+	fmt.Fprint(d.out, d.Prefix)
+	fmt.Fprintf(d.out, msg, args...)
+}
+
+func (d *Describer) Println(args ...interface{}) {
+	fmt.Fprint(d.out, d.Prefix)
+	fmt.Fprintln(d.out, args...)
 }
 
 // DescribeMetadata describes standard object metadata in a consistent manner.
-func DescribeMetadata(out io.Writer, metadata metav1.ObjectMeta) {
-	fmt.Fprintf(out, "Name:\t%s\n", metadata.Name)
-	fmt.Fprintf(out, "Namespace:\t%s\n", metadata.Namespace)
-	DescribeMap(out, "Labels", metadata.Labels)
-	DescribeMap(out, "Annotations", metadata.Annotations)
+func (d *Describer) DescribeMetadata(metadata metav1.ObjectMeta) {
+	d.Printf("Name:\t%s\n", metadata.Name)
+	d.Printf("Namespace:\t%s\n", metadata.Namespace)
+	d.DescribeMap("Labels", metadata.Labels)
+	d.DescribeMap("Annotations", metadata.Annotations)
 }
 
 // DescribeMap describes a map of key-value pairs using name as the heading.
-func DescribeMap(out io.Writer, name string, m map[string]string) {
-	fmt.Fprintf(out, "%s:\t", name)
+func (d *Describer) DescribeMap(name string, m map[string]string) {
+	d.Printf("%s:\t", name)
 
 	first := true
 	prefix := ""
@@ -61,35 +76,35 @@ func DescribeMap(out io.Writer, name string, m map[string]string) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			fmt.Fprintf(out, "%s%s=%s\n", prefix, key, m[key])
+			d.Printf("%s%s=%s\n", prefix, key, m[key])
 			if first {
 				first = false
 				prefix = "\t"
 			}
 		}
 	} else {
-		fmt.Fprint(out, "<none>\n")
+		d.Printf("<none>\n")
 	}
 }
 
 // DescribeSlice describes a slice of strings using name as the heading. The output is prefixed by
 // "preindent" number of tabs.
-func DescribeSlice(out io.Writer, preindent int, name string, s []string) {
+func (d *Describer) DescribeSlice(preindent int, name string, s []string) {
 	pretab := strings.Repeat("\t", preindent)
-	fmt.Fprintf(out, "%s%s:\t", pretab, name)
+	d.Printf("%s%s:\t", pretab, name)
 
 	first := true
 	prefix := ""
 	if len(s) > 0 {
 		for _, x := range s {
-			fmt.Fprintf(out, "%s%s\n", prefix, x)
+			d.Printf("%s%s\n", prefix, x)
 			if first {
 				first = false
 				prefix = pretab + "\t"
 			}
 		}
 	} else {
-		fmt.Fprintf(out, "%s<none>\n", pretab)
+		d.Printf("%s<none>\n", pretab)
 	}
 }
 

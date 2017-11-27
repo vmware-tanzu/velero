@@ -1,20 +1,20 @@
-## ark describe restores
+## ark backup describe
 
-Describe restores
+Describe backups
 
 ### Synopsis
 
 
-Describe restores
+Describe backups
 
 ```
-ark describe restores [NAME1] [NAME2] [NAME...] [flags]
+ark backup describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for restores
+  -h, --help              help for describe
   -l, --selector string   only show items matching this label selector
 ```
 
@@ -32,5 +32,5 @@ ark describe restores [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### SEE ALSO
-* [ark describe](ark_describe.md)	 - Describe ark resources
+* [ark backup](ark_backup.md)	 - Work with backups
 

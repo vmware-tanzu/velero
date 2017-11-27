@@ -1,20 +1,20 @@
-## ark describe restores
+## ark schedule describe
 
-Describe restores
+Describe schedules
 
 ### Synopsis
 
 
-Describe restores
+Describe schedules
 
 ```
-ark describe restores [NAME1] [NAME2] [NAME...] [flags]
+ark schedule describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for restores
+  -h, --help              help for describe
   -l, --selector string   only show items matching this label selector
 ```
 
@@ -32,5 +32,5 @@ ark describe restores [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### SEE ALSO
-* [ark describe](ark_describe.md)	 - Describe ark resources
+* [ark schedule](ark_schedule.md)	 - Work with schedules
 
