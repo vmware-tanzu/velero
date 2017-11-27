@@ -1,20 +1,20 @@
-## ark describe restores
+## ark describe backups
 
-Describe restores
+Describe backups
 
 ### Synopsis
 
 
-Describe restores
+Describe backups
 
 ```
-ark describe restores [NAME1] [NAME2] [NAME...] [flags]
+ark describe backups [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for restores
+  -h, --help              help for backups
   -l, --selector string   only show items matching this label selector
 ```
 

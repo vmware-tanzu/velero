@@ -30,5 +30,6 @@ Work with schedules
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark schedule create](ark_schedule_create.md)	 - Create a schedule
 * [ark schedule delete](ark_schedule_delete.md)	 - Delete a schedule
+* [ark schedule describe](ark_schedule_describe.md)	 - Describe schedules
 * [ark schedule get](ark_schedule_get.md)	 - Get schedules
 

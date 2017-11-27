@@ -8,17 +8,14 @@ Describe restores
 Describe restores
 
 ```
-ark restore describe [flags]
+ark restore describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                        help for describe
-      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
-  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
-  -l, --selector string             only show items matching this label selector
-      --show-labels                 show labels in the last column
+  -h, --help              help for describe
+  -l, --selector string   only show items matching this label selector
 ```
 
 ### Options inherited from parent commands
