@@ -127,8 +127,8 @@ func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, er
 // ListCommonPrefixes gets a list of all object key prefixes that come
 // before the provided delimiter (this is often used to simulate a directory
 // hierarchy in object storage).
-func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, delimiter string) ([]string, error) {
-	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), &proto.ListCommonPrefixesRequest{Bucket: bucket, Delimiter: delimiter})
+func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, delimiter string, prefix string) ([]string, error) {
+	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), &proto.ListCommonPrefixesRequest{Bucket: bucket, Delimiter: delimiter, Prefix: prefix})
 	if err != nil {
 		return nil, err
 	}
