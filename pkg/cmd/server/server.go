@@ -54,7 +54,6 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/restore/restorers"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 )
@@ -510,6 +509,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
 		s.logger,
+		s.pluginManager,
 	)
 	wg.Add(1)
 	go func() {
@@ -569,20 +569,11 @@ func newRestorer(
 	kubeClient kubernetes.Interface,
 	logger *logrus.Logger,
 ) (restore.Restorer, error) {
-	restorers := map[string]restorers.ResourceRestorer{
-		"persistentvolumes":      restorers.NewPersistentVolumeRestorer(snapshotService),
-		"persistentvolumeclaims": restorers.NewPersistentVolumeClaimRestorer(),
-		"services":               restorers.NewServiceRestorer(),
-		"namespaces":             restorers.NewNamespaceRestorer(),
-		"pods":                   restorers.NewPodRestorer(logger),
-		"jobs":                   restorers.NewJobRestorer(logger),
-	}
-
 	return restore.NewKubernetesRestorer(
 		discoveryHelper,
 		client.NewDynamicFactory(clientPool),
-		restorers,
 		backupService,
+		snapshotService,
 		resourcePriorities,
 		backupClient,
 		kubeClient.CoreV1().Namespaces(),

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 Heptio Inc.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,17 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restorers
+package restore
 
 import (
 	"testing"
 
+	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func TestServiceRestorerPrepare(t *testing.T) {
+func TestServiceActionExecute(t *testing.T) {
 	tests := []struct {
 		name        string
 		obj         runtime.Unstructured
@@ -66,9 +67,9 @@ func TestServiceRestorerPrepare(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			restorer := NewServiceRestorer()
+			action := NewServiceAction(arktest.NewLogger())
 
-			res, _, err := restorer.Prepare(test.obj, nil, nil)
+			res, _, err := action.Execute(test.obj, nil)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)

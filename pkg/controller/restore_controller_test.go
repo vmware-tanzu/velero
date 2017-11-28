@@ -23,7 +23,6 @@ import (
 	"io/ioutil"
 	"testing"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
@@ -35,7 +34,8 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	. "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/restore"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestFetchBackup(t *testing.T) {
@@ -51,14 +51,14 @@ func TestFetchBackup(t *testing.T) {
 		{
 			name:            "lister has backup",
 			backupName:      "backup-1",
-			informerBackups: []*api.Backup{NewTestBackup().WithName("backup-1").Backup},
-			expectedRes:     NewTestBackup().WithName("backup-1").Backup,
+			informerBackups: []*api.Backup{arktest.NewTestBackup().WithName("backup-1").Backup},
+			expectedRes:     arktest.NewTestBackup().WithName("backup-1").Backup,
 		},
 		{
 			name:                "backupSvc has backup",
 			backupName:          "backup-1",
-			backupServiceBackup: NewTestBackup().WithName("backup-1").Backup,
-			expectedRes:         NewTestBackup().WithName("backup-1").Backup,
+			backupServiceBackup: arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedRes:         arktest.NewTestBackup().WithName("backup-1").Backup,
 		},
 		{
 			name:               "no backup",
@@ -74,8 +74,9 @@ func TestFetchBackup(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &BackupService{}
-				logger, _       = testlogger.NewNullLogger()
+				backupSvc       = &arktest.BackupService{}
+				logger          = arktest.NewLogger()
+				pluginManager   = &MockManager{}
 			)
 
 			c := NewRestoreController(
@@ -88,6 +89,7 @@ func TestFetchBackup(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				false,
 				logger,
+				pluginManager,
 			).(*restoreController)
 
 			for _, itm := range test.informerBackups {
@@ -135,23 +137,23 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:        "restore with phase InProgress does not get processed",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
+			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
 			expectedErr: false,
 		},
 		{
 			name:        "restore with phase Completed does not get processed",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
+			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
 			expectedErr: false,
 		},
 		{
 			name:        "restore with phase FailedValidation does not get processed",
-			restore:     NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
+			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
 			expectedErr: false,
 		},
 		{
 			name:        "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
 			restore:     NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
+			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseFailedValidation).WithExcludedNamespace("another-1").
@@ -162,7 +164,7 @@ func TestProcessRestore(t *testing.T) {
 		{
 			name:        "restore with resource in both includedResources and excludedResources fails validation",
 			restore:     NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).WithExcludedResource("a-resource").Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
+			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseFailedValidation).WithExcludedResource("a-resource").
@@ -182,21 +184,21 @@ func TestProcessRestore(t *testing.T) {
 		},
 
 		{
-			name:                        "restore with non-existent backup name fails",
-			restore:                     NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
-			expectedErr:                 false,
-			backupServiceGetBackupError: errors.New("no backup here"),
+			name:        "restore with non-existent backup name fails",
+			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
 					WithErrors(1).
 					Restore,
 			},
+			backupServiceGetBackupError: errors.New("no backup here"),
 		},
 		{
 			name:          "restorer throwing an error causes the restore to fail",
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:        NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
 			restorerError: errors.New("blarg"),
 			expectedErr:   false,
 			expectedRestoreUpdates: []*api.Restore{
@@ -210,7 +212,7 @@ func TestProcessRestore(t *testing.T) {
 		{
 			name:        "valid restore gets executed",
 			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
+			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
@@ -221,7 +223,7 @@ func TestProcessRestore(t *testing.T) {
 		{
 			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
 			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:                NewTestBackup().WithName("backup-1").Backup,
+			backup:                arktest.NewTestBackup().WithName("backup-1").Backup,
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
 			expectedRestoreUpdates: []*api.Restore{
@@ -233,7 +235,7 @@ func TestProcessRestore(t *testing.T) {
 		{
 			name:        "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
 			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
+			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseFailedValidation).
@@ -245,7 +247,7 @@ func TestProcessRestore(t *testing.T) {
 		{
 			name:        "restoration of nodes is not supported",
 			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
-			backup:      NewTestBackup().WithName("backup-1").Backup,
+			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
 			expectedErr: false,
 			expectedRestoreUpdates: []*api.Restore{
 				NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseFailedValidation).
@@ -262,8 +264,9 @@ func TestProcessRestore(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &BackupService{}
-				logger, _       = testlogger.NewNullLogger()
+				backupSvc       = &arktest.BackupService{}
+				logger          = arktest.NewLogger()
+				pluginManager   = &MockManager{}
 			)
 
 			defer restorer.AssertExpectations(t)
@@ -279,6 +282,7 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				test.allowRestoreSnapshots,
 				logger,
+				pluginManager,
 			).(*restoreController)
 
 			if test.restore != nil {
@@ -331,6 +335,11 @@ func TestProcessRestore(t *testing.T) {
 				backupSvc.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
 			}
 
+			if test.restore != nil {
+				pluginManager.On("GetRestoreItemActions", test.restore.Name).Return(nil, nil)
+				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return(nil)
+			}
+
 			err = c.processRestore(key)
 			backupSvc.AssertExpectations(t)
 			restorer.AssertExpectations(t)
@@ -367,8 +376,8 @@ func TestProcessRestore(t *testing.T) {
 	}
 }
 
-func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.RestorePhase) *TestRestore {
-	restore := NewTestRestore(ns, name, phase).WithBackup(backup)
+func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.RestorePhase) *arktest.TestRestore {
+	restore := arktest.NewTestRestore(ns, name, phase).WithBackup(backup)
 
 	if includeNS != "" {
 		restore = restore.WithIncludedNamespace(includeNS)
@@ -390,7 +399,13 @@ type fakeRestorer struct {
 	calledWithArg api.Restore
 }
 
-func (r *fakeRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logger io.Writer) (api.RestoreResult, api.RestoreResult) {
+func (r *fakeRestorer) Restore(
+	restore *api.Restore,
+	backup *api.Backup,
+	backupReader io.Reader,
+	logger io.Writer,
+	actions []restore.ItemAction,
+) (api.RestoreResult, api.RestoreResult) {
 	res := r.Called(restore, backup, backupReader, logger)
 
 	r.calledWithArg = *restore
