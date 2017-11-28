@@ -28,8 +28,8 @@ type FakeBackupService struct {
 	mock.Mock
 }
 
-func (f *FakeBackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
-	args := f.Called(bucket)
+func (f *FakeBackupService) GetAllBackups(bucket, path string) ([]*v1.Backup, error) {
+	args := f.Called(bucket, path)
 
 	var backups []*v1.Backup
 
@@ -41,24 +41,24 @@ func (f *FakeBackupService) GetAllBackups(bucket string) ([]*v1.Backup, error) {
 	return backups, args.Error(1)
 }
 
-func (f *FakeBackupService) UploadBackup(bucket, name string, metadata, backup io.Reader) error {
-	args := f.Called(bucket, name, metadata, backup)
+func (f *FakeBackupService) UploadBackup(bucket, path, name string, metadata, backup io.Reader) error {
+	args := f.Called(bucket, path, name, metadata, backup)
 	return args.Error(0)
 }
 
-func (f *FakeBackupService) DownloadBackup(bucket, name string) (io.ReadCloser, error) {
-	args := f.Called(bucket, name)
+func (f *FakeBackupService) DownloadBackup(bucket, path, name string) (io.ReadCloser, error) {
+	args := f.Called(bucket, path, name)
 	return args.Get(0).(io.ReadCloser), args.Error(1)
 }
 
-func (f *FakeBackupService) DeleteBackup(bucket, backupName string) error {
-	args := f.Called(bucket, backupName)
+func (f *FakeBackupService) DeleteBackup(bucket, path, backupName string) error {
+	args := f.Called(bucket, path, backupName)
 	return args.Error(0)
 }
 
-func (f *FakeBackupService) GetBackup(bucket, name string) (*v1.Backup, error) {
+func (f *FakeBackupService) GetBackup(bucket, path, name string) (*v1.Backup, error) {
 	var (
-		args   = f.Called(bucket, name)
+		args   = f.Called(bucket, path, name)
 		b      = args.Get(0)
 		backup *v1.Backup
 	)

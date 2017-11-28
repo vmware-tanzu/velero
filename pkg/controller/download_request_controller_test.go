@@ -108,6 +108,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 				downloadRequestsInformer,
 				backupService,
 				"bucket",
+				"path",
 				logger,
 			).(*downloadRequestController)
 
@@ -129,7 +130,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 					},
 				)
 
-				backupService.On("CreateSignedURL", target, "bucket", 10*time.Minute).Return("signedURL", nil)
+				backupService.On("CreateSignedURL", target, "bucket", "path", 10*time.Minute).Return("signedURL", nil)
 			}
 
 			var updatedRequest *v1.DownloadRequest

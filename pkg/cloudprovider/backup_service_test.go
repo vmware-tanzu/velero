@@ -84,26 +84,27 @@ func TestUploadBackup(t *testing.T) {
 			var (
 				objStore   = &testutil.ObjectStore{}
 				bucket     = "test-bucket"
+				path       = "test-path"
 				backupName = "test-backup"
 				logger, _  = testlogger.NewNullLogger()
 			)
 
 			if test.metadata != nil {
-				objStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
+				objStore.On("PutObject", bucket, path+"/"+backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
 			}
 			if test.backup != nil {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
+				objStore.On("PutObject", bucket, path+"/"+backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
 			}
 			if test.log != nil {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+"-logs.gz", test.log).Return(test.logError)
+				objStore.On("PutObject", bucket, path+"/"+backupName+"/"+backupName+"-logs.gz", test.log).Return(test.logError)
 			}
 			if test.expectMetadataDelete {
-				objStore.On("DeleteObject", bucket, backupName+"/ark-backup.json").Return(nil)
+				objStore.On("DeleteObject", bucket, path+"/"+backupName+"/ark-backup.json").Return(nil)
 			}
 
 			backupService := NewBackupService(objStore, logger)
 
-			err := backupService.UploadBackup(bucket, backupName, test.metadata, test.backup, test.log)
+			err := backupService.UploadBackup(bucket, path, backupName, test.metadata, test.backup, test.log)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -120,13 +121,14 @@ func TestDownloadBackup(t *testing.T) {
 	var (
 		o         = &testutil.ObjectStore{}
 		bucket    = "b"
+		path      = "p"
 		backup    = "bak"
 		logger, _ = testlogger.NewNullLogger()
 	)
-	o.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
+	o.On("GetObject", bucket, path+"/"+backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
 
 	s := NewBackupService(o, logger)
-	rc, err := s.DownloadBackup(bucket, backup)
+	rc, err := s.DownloadBackup(bucket, path, backup)
 	require.NoError(t, err)
 	require.NotNil(t, rc)
 	data, err := ioutil.ReadAll(rc)
@@ -174,7 +176,7 @@ func TestDeleteBackup(t *testing.T) {
 
 			backupService := NewBackupService(objStore, logger)
 
-			err := backupService.DeleteBackupDir(bucket, backup)
+			err := backupService.DeleteBackupDir(bucket, "", backup)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -230,17 +232,18 @@ func TestGetAllBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				bucket    = "bucket"
+				path      = "path"
 				objStore  = &testutil.ObjectStore{}
 				logger, _ = testlogger.NewNullLogger()
 			)
 
-			objStore.On("ListCommonPrefixes", bucket, "/").Return([]string{"backup-1", "backup-2"}, nil)
-			objStore.On("GetObject", bucket, "backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
-			objStore.On("GetObject", bucket, "backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
+			objStore.On("ListCommonPrefixes", bucket, "/", path+"/").Return([]string{"backup-1", "backup-2"}, nil)
+			objStore.On("GetObject", bucket, path+"/"+"backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
+			objStore.On("GetObject", bucket, path+"/"+"backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
 
 			backupService := NewBackupService(objStore, logger)
 
-			res, err := backupService.GetAllBackups(bucket)
+			res, err := backupService.GetAllBackups(bucket, path)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -337,7 +340,7 @@ func TestCreateSignedURL(t *testing.T) {
 				Name: test.targetName,
 			}
 			objectStorage.On("CreateSignedURL", "bucket", test.expectedKey, time.Duration(0)).Return("url", nil)
-			url, err := backupService.CreateSignedURL(target, "bucket", 0)
+			url, err := backupService.CreateSignedURL(target, "bucket", "", 0)
 			require.NoError(t, err)
 			assert.Equal(t, "url", url)
 			objectStorage.AssertExpectations(t)

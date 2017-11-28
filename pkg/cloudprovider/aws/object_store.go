@@ -128,10 +128,14 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return res.Body, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Delimiter: &delimiter,
+	}
+
+	if prefix != "" {
+		req.Prefix = &prefix
 	}
 
 	var ret []string

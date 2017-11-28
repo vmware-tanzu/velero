@@ -252,6 +252,7 @@ func TestProcessBackup(t *testing.T) {
 				backupper,
 				cloudBackups,
 				"bucket",
+				"path",
 				test.allowSnapshots,
 				logger,
 				pluginManager,
@@ -281,9 +282,7 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Expiration.Time = expiration
 				backup.Status.Version = 1
 				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
+				cloudBackups.On("UploadBackup", "bucket", "path", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				pluginManager.On("GetBackupItemActions", backup.Name, logger, logger.Level).Return(nil, nil)
 				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
 			}
