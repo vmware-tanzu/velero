@@ -40,7 +40,7 @@ type ObjectStore interface {
 	// ListCommonPrefixes gets a list of all object key prefixes that come
 	// before the provided delimiter (this is often used to simulate a directory
 	// hierarchy in object storage).
-	ListCommonPrefixes(bucket string, delimiter string) ([]string, error)
+	ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error)
 
 	// ListObjects gets a list of all objects in bucket that have the same prefix.
 	ListObjects(bucket, prefix string) ([]string, error)

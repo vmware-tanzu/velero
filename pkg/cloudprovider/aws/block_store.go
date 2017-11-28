@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 
@@ -28,6 +29,7 @@ import (
 )
 
 const regionKey = "region"
+const kmsKeyIdKey = "kmsKeyId"
 
 // iopsVolumeTypes is a set of AWS EBS volume types for which IOPS should
 // be captured during snapshot and provided when creating a new volume
@@ -35,7 +37,8 @@ const regionKey = "region"
 var iopsVolumeTypes = sets.NewString("io1")
 
 type blockStore struct {
-	ec2 *ec2.EC2
+	ec2    *ec2.EC2
+	logger logrus.FieldLogger
 }
 
 func getSession(config *aws.Config) (*session.Session, error) {
@@ -51,12 +54,13 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStore() cloudprovider.BlockStore {
-	return &blockStore{}
+func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
+	return &blockStore{logger: logger}
 }
 
 func (b *blockStore) Init(config map[string]string) error {
 	region := config[regionKey]
+
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)
 	}
@@ -69,25 +73,60 @@ func (b *blockStore) Init(config map[string]string) error {
 	}
 
 	b.ec2 = ec2.New(sess)
-
 	return nil
 }
 
+func (b *blockStore) isSnapshotEncrypted(snapshotID string) (encrypted bool, err error) {
+	req := &ec2.DescribeSnapshotsInput{
+		SnapshotIds: []*string{&snapshotID},
+	}
+
+	res, err := b.ec2.DescribeSnapshots(req)
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	if len(res.Snapshots) != 1 {
+		return false, errors.Errorf("Expected one snapshot from DescribeSnaphots for snapshot ID %v, got %v", snapshotID, len(res.Snapshots))
+	}
+
+	snapshot := res.Snapshots[0]
+	return *snapshot.Encrypted, nil
+}
+
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	encrypted, err := b.isSnapshotEncrypted(snapshotID)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
+		Encrypted:        &encrypted,
 	}
 
 	if iopsVolumeTypes.Has(volumeType) && iops != nil {
 		req.Iops = iops
 	}
 
+	b.logger.WithFields(
+		logrus.Fields{
+			"request": req,
+		},
+	).Debug("creating volume with snapshot")
+
 	res, err := b.ec2.CreateVolume(req)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+
+	b.logger.WithFields(
+		logrus.Fields{
+			"response": res,
+		},
+	).Debug("volume created from snapshot")
 
 	return *res.VolumeId, nil
 }

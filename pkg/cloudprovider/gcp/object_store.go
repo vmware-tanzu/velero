@@ -103,8 +103,15 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return res.Body, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	res, err := o.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
+	req := o.gcs.Objects.List(bucket).Delimiter(delimiter)
+
+	if prefix != "" {
+		req = req.Prefix(prefix)
+	}
+
+	res, err := req.Do()
+
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

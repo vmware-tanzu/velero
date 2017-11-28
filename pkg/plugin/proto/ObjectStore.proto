@@ -21,6 +21,7 @@ message Bytes {
 message ListCommonPrefixesRequest {
     string bucket = 1;
     string delimiter = 2;
+    string prefix = 3;
 }
 
 message ListCommonPrefixesResponse {
@@ -37,7 +38,7 @@ message ListObjectsResponse {
 }
 
 message DeleteObjectRequest {
-    string bucket = 1;  
+    string bucket = 1;
     string key = 2;
 }
 

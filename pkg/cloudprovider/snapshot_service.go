@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 )
 
 // SnapshotService exposes Ark-specific operations for snapshotting and restoring block
@@ -57,14 +58,16 @@ const (
 
 type snapshotService struct {
 	blockStore BlockStore
+	logger     logrus.FieldLogger
 }
 
 var _ SnapshotService = &snapshotService{}
 
 // NewSnapshotService creates a snapshot service using the provided block store
-func NewSnapshotService(blockStore BlockStore) SnapshotService {
+func NewSnapshotService(blockStore BlockStore, logger logrus.FieldLogger) SnapshotService {
 	return &snapshotService{
 		blockStore: blockStore,
+		logger:     logger,
 	}
 }
 

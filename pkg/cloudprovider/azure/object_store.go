@@ -83,7 +83,7 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return res, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string, prefix string) ([]string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -91,6 +91,10 @@ func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]str
 
 	params := storage.ListBlobsParameters{
 		Delimiter: delimiter,
+	}
+
+	if prefix != "" {
+		params.Prefix = prefix
 	}
 
 	res, err := container.ListBlobs(params)

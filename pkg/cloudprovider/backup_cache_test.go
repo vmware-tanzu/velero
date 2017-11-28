@@ -45,32 +45,32 @@ func TestNewBackupCache(t *testing.T) {
 		test.NewTestBackup().WithName("backup1").Backup,
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(bucket1, nil).Once()
+	delegate.On("GetAllBackups", "bucket1", "path").Return(bucket1, nil).Once()
 
 	// should be updated via refresh
 	updatedBucket1 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(updatedBucket1, nil)
+	delegate.On("GetAllBackups", "bucket1", "path").Return(updatedBucket1, nil)
 
 	// nothing in cache, live lookup
 	bucket2 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup5").Backup,
 		test.NewTestBackup().WithName("backup6").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket2").Return(bucket2, nil).Once()
+	delegate.On("GetAllBackups", "bucket2", "path").Return(bucket2, nil).Once()
 
 	// should be updated via refresh
 	updatedBucket2 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup7").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket2").Return(updatedBucket2, nil)
+	delegate.On("GetAllBackups", "bucket2", "path").Return(updatedBucket2, nil)
 
-	backups, err := c.GetAllBackups("bucket1")
+	backups, err := c.GetAllBackups("bucket1", "path")
 	assert.Equal(t, bucket1, backups)
 	assert.NoError(t, err)
 
-	backups, err = c.GetAllBackups("bucket2")
+	backups, err = c.GetAllBackups("bucket2", "path")
 	assert.Equal(t, bucket2, backups)
 	assert.NoError(t, err)
 
@@ -85,14 +85,14 @@ func TestNewBackupCache(t *testing.T) {
 			}
 		}
 
-		backups, err = c.GetAllBackups("bucket1")
+		backups, err = c.GetAllBackups("bucket1", "path")
 		if len(backups) == 1 {
 			if assert.Equal(t, updatedBucket1[0], backups[0]) {
 				done1 = true
 			}
 		}
 
-		backups, err = c.GetAllBackups("bucket2")
+		backups, err = c.GetAllBackups("bucket2", "path")
 		if len(backups) == 1 {
 			if assert.Equal(t, updatedBucket2[0], backups[0]) {
 				done2 = true
@@ -121,9 +121,9 @@ func TestBackupCacheRefresh(t *testing.T) {
 		test.NewTestBackup().WithName("backup1").Backup,
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(bucket1, nil)
+	delegate.On("GetAllBackups", "bucket1", "").Return(bucket1, nil)
 
-	delegate.On("GetAllBackups", "bucket2").Return(nil, errors.New("bad"))
+	delegate.On("GetAllBackups", "bucket2", "").Return(nil, errors.New("bad"))
 
 	c.refresh()
 
@@ -159,13 +159,13 @@ func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 		test.NewTestBackup().WithName("backup4").Backup,
 	}
 
-	delegate.On("GetAllBackups", "bucket2").Return(bucket2, nil)
+	delegate.On("GetAllBackups", "bucket2", "path").Return(bucket2, nil)
 
-	backups, err := c.GetAllBackups("bucket1")
+	backups, err := c.GetAllBackups("bucket1", "path")
 	assert.Equal(t, bucket1, backups)
 	assert.NoError(t, err)
 
-	backups, err = c.GetAllBackups("bucket2")
+	backups, err = c.GetAllBackups("bucket2", "path")
 	assert.Equal(t, bucket2, backups)
 	assert.NoError(t, err)
 }
