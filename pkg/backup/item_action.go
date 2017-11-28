@@ -26,11 +26,14 @@ import (
 // ItemAction is an actor that performs an operation on an individual item being backed up.
 type ItemAction interface {
 	// AppliesTo returns information about which resources this action should be invoked for.
+	// An ItemAction's Execute function will only be invoked on items that match the returned
+	// selector. A zero-valued ResourceSelector matches all resources.
 	AppliesTo() (ResourceSelector, error)
 
-	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up.
-	// Implementations may return additional ResourceIdentifiers that indicate specific items
-	// that also need to be backed up.
+	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up,
+	// including mutating the item itself prior to backup. The item (unmodified or modified)
+	// should be returned, along with an optional slice of ResourceIdentifiers specifying
+	// additional related items that should be backed up.
 	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []ResourceIdentifier, error)
 }
 

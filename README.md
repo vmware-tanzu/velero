@@ -155,6 +155,14 @@ Looking at a specific example--an `ark backup create test-backup` command trigge
 
 5. By default, Ark also makes disk snapshots of any persistent volumes, using the appropriate cloud service API. (This can be disabled via the option `--snapshot-volumes=false`)
 
+## Extensibility
+
+Ark has multiple mechanisms for extending the core functionality to meet your individual backup/restore needs:
+
+* [Hooks][27] allow you to specify commands to be executed within running pods during a backup. This is useful if you need to run a workload-specific command prior to taking a backup (for example, to flush disk buffers or to freeze a database).
+* [Plugins][28] enable you to develop custom object/block storage back-ends or per-item backup/restore actions that can execute arbitrary logic, including modifying the items being backed up/restored. Plugins can be used by Ark without needing to be compiled into the core Ark binary.
+
+
 ## Further documentation
 
  To learn more about Heptio Ark operations and their applications, see the [`/docs` directory][3].
@@ -210,3 +218,5 @@ See [the list of releases][6] to find out about feature changes.
 [24]: http://j.hept.io/ark-list
 [25]: http://slack.kubernetes.io/
 [26]: https://github.com/heptio/ark/releases
+[27]: /docs/hooks.md
+[28]: /docs/plugins.md

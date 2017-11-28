@@ -25,9 +25,15 @@ import (
 // ItemAction is an actor that performs an operation on an individual item being restored.
 type ItemAction interface {
 	// AppliesTo returns information about which resources this action should be invoked for.
+	// An ItemAction's Execute function will only be invoked on items that match the returned
+	// selector. A zero-valued ResourceSelector matches all resources.
 	AppliesTo() (ResourceSelector, error)
 
-	// Execute allows the ItemAction to perform arbitrary logic with the item being restored.
+	// Execute allows the ItemAction to perform arbitrary logic with the item being restored,
+	// including mutating the item itself prior to restore. The item (unmodified or modified)
+	// should be returned, along with a warning (which will be logged but will not prevent
+	// the item from being restored) or error (which will be logged and will prevent the item
+	// from being restored) if applicable.
 	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error)
 }
 

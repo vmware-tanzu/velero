@@ -40,14 +40,16 @@ type ObjectStore interface {
 	GetObject(bucket string, key string) (io.ReadCloser, error)
 
 	// ListCommonPrefixes gets a list of all object key prefixes that come
-	// before the provided delimiter (this is often used to simulate a directory
-	// hierarchy in object storage).
+	// before the provided delimiter. For example, if the bucket contains
+	// the keys "foo-1/bar", "foo-1/baz", and "foo-2/baz", and the delimiter
+	// is "/", this will return the slice {"foo-1", "foo-2"}.
 	ListCommonPrefixes(bucket string, delimiter string) ([]string, error)
 
-	// ListObjects gets a list of all objects in bucket that have the same prefix.
+	// ListObjects gets a list of all keys in the specified bucket
+	// that have the given prefix.
 	ListObjects(bucket, prefix string) ([]string, error)
 
-	// DeleteObject removes object with the specified key from the given
+	// DeleteObject removes the object with the specified key from the given
 	// bucket.
 	DeleteObject(bucket string, key string) error
 
@@ -63,7 +65,8 @@ type BlockStore interface {
 	// cannot be initialized from the provided config.
 	Init(config map[string]string) error
 
-	// CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
+	// CreateVolumeFromSnapshot creates a new block volume in the specified
+	// availability zone, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
 	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error)
 
@@ -73,8 +76,8 @@ type BlockStore interface {
 	// SetVolumeID sets the cloud provider specific identifier for the PersistentVolume.
 	SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error)
 
-	// GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
-	// volume.
+	// GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for
+	// the specified block volume in the given availability zone.
 	GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error)
 
 	// IsVolumeReady returns whether the specified volume is ready to be used.
