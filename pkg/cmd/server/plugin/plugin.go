@@ -39,7 +39,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	blockStores := map[string]cloudprovider.BlockStore{
-		"aws":   aws.NewBlockStore(),
+		"aws":   aws.NewBlockStore(logger),
 		"gcp":   gcp.NewBlockStore(),
 		"azure": azure.NewBlockStore(),
 	}

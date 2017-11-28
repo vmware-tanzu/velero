@@ -349,7 +349,7 @@ func (s *server) initSnapshotService(config *api.Config) error {
 	if err != nil {
 		return err
 	}
-	s.snapshotService = cloudprovider.NewSnapshotService(blockStore)
+	s.snapshotService = cloudprovider.NewSnapshotService(blockStore, s.logger)
 	return nil
 }
 
