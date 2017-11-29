@@ -56,7 +56,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	c := &cobra.Command{
-		Use:    "plugin [KIND] [NAME]",
+		Use:    "run-plugin [KIND] [NAME]",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
@@ -74,7 +74,7 @@ func NewCommand() *cobra.Command {
 				GRPCServer:      plugin.DefaultGRPCServer,
 			}
 
-			logger.Debugf("Running plugin command")
+			logger.Debugf("Executing run-plugin command")
 
 			switch kind {
 			case "cloudprovider":

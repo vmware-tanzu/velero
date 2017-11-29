@@ -37,6 +37,8 @@ spec:
           volumeMounts:
             - name: cloud-credentials
               mountPath: /credentials
+            - name: plugins
+              mountPath: /plugins
           env:
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
@@ -44,3 +46,5 @@ spec:
         - name: cloud-credentials
           secret:
             secretName: cloud-credentials
+        - name: plugins
+          emptyDir: {}

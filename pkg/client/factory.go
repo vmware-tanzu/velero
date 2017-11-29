@@ -20,16 +20,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 
+	"k8s.io/client-go/kubernetes"
+
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
 
-// Factory knows how to create an ArkClient.
+// Factory knows how to create an ArkClient and Kubernetes client.
 type Factory interface {
 	// BindFlags binds common flags such as --kubeconfig to the passed-in FlagSet.
 	BindFlags(flags *pflag.FlagSet)
 	// Client returns an ArkClient. It uses the following priority to specify the cluster
 	// configuration:  --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	Client() (clientset.Interface, error)
+	// KubeClient returns a Kubernetes client. It uses the following priority to specify the cluster
+	// configuration:  --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
+	KubeClient() (kubernetes.Interface, error)
 }
 
 type factory struct {
@@ -64,4 +69,17 @@ func (f *factory) Client() (clientset.Interface, error) {
 		return nil, errors.WithStack(err)
 	}
 	return arkClient, nil
+}
+
+func (f *factory) KubeClient() (kubernetes.Interface, error) {
+	clientConfig, err := Config(f.kubeconfig, f.baseName)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return kubeClient, nil
 }
