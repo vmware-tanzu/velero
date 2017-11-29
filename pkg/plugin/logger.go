@@ -22,9 +22,9 @@ import (
 	"github.com/heptio/ark/pkg/util/logging"
 )
 
-// NewPluginLogger returns a logger that is suitable for use within an
+// NewLogger returns a logger that is suitable for use within an
 // Ark plugin.
-func NewPluginLogger() logrus.FieldLogger {
+func NewLogger() logrus.FieldLogger {
 	logger := logrus.New()
 
 	// we use the JSON formatter because go-plugin will parse incoming

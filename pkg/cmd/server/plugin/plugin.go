@@ -31,7 +31,7 @@ import (
 )
 
 func NewCommand() *cobra.Command {
-	logger := arkplugin.NewPluginLogger()
+	logger := arkplugin.NewLogger()
 
 	objectStores := map[string]cloudprovider.ObjectStore{
 		"aws":   aws.NewObjectStore(),

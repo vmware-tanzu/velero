@@ -33,14 +33,6 @@ message IsVolumeReadyResponse {
     bool ready = 1;
 }
 
-message ListSnapshotsRequest {
-    map<string, string> tagFilters = 1;
-}
-
-message ListSnapshotsResponse {
-    repeated string snapshotIDs = 2;
-}
-
 message CreateSnapshotRequest {
     string volumeID = 1;
     string volumeAZ = 2;
@@ -77,7 +69,6 @@ service BlockStore {
     rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
     rpc GetVolumeInfo(GetVolumeInfoRequest) returns (GetVolumeInfoResponse);
     rpc IsVolumeReady(IsVolumeReadyRequest) returns (IsVolumeReadyResponse);
-    rpc ListSnapshots(ListSnapshotsRequest) returns (ListSnapshotsResponse);
     rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
     rpc DeleteSnapshot(DeleteSnapshotRequest) returns (Empty);
     rpc GetVolumeID(GetVolumeIDRequest) returns (GetVolumeIDResponse);

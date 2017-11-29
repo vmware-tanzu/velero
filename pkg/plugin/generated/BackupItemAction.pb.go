@@ -21,8 +21,6 @@ It has these top-level messages:
 	GetVolumeInfoResponse
 	IsVolumeReadyRequest
 	IsVolumeReadyResponse
-	ListSnapshotsRequest
-	ListSnapshotsResponse
 	CreateSnapshotRequest
 	CreateSnapshotResponse
 	DeleteSnapshotRequest

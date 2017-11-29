@@ -200,40 +200,6 @@ func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err e
 	return *res.ProvisioningState == "Succeeded", nil
 }
 
-func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
-	res, err := b.snaps.ListByResourceGroup(b.resourceGroup)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	if res.Value == nil {
-		return nil, errors.New("nil Value returned from ListByResourceGroup call")
-	}
-
-	ret := make([]string, 0, len(*res.Value))
-Snapshot:
-	for _, snap := range *res.Value {
-		if snap.Tags == nil && len(tagFilters) > 0 {
-			continue
-		}
-		if snap.ID == nil {
-			continue
-		}
-
-		// Azure doesn't offer tag-filtering through the API so we have to manually
-		// filter results. Require all filter keys to be present, with matching vals.
-		for filterKey, filterVal := range tagFilters {
-			if val, ok := (*snap.Tags)[filterKey]; !ok || val == nil || *val != filterVal {
-				continue Snapshot
-			}
-		}
-
-		ret = append(ret, *snap.Name)
-	}
-
-	return ret, nil
-}
-
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	fullDiskName := getFullDiskName(b.subscription, b.resourceGroup, volumeID)
 	// snapshot names must be <= 80 characters long

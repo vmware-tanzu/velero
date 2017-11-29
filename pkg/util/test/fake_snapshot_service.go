@@ -39,10 +39,6 @@ type FakeSnapshotService struct {
 	VolumeIDSet string
 }
 
-func (s *FakeSnapshotService) GetAllSnapshots() ([]string, error) {
-	return s.SnapshotsTaken.List(), nil
-}
-
 func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, error) {
 	if _, exists := s.SnapshottableVolumes[volumeID]; !exists {
 		return "", errors.New("snapshottable volume not found")

@@ -17,7 +17,6 @@ limitations under the License.
 package gcp
 
 import (
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -113,33 +112,6 @@ func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err e
 
 	// TODO can we consider a disk ready while it's in the RESTORING state?
 	return disk.Status == "READY", nil
-}
-
-func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
-	useParentheses := len(tagFilters) > 1
-	subFilters := make([]string, 0, len(tagFilters))
-
-	for k, v := range tagFilters {
-		fs := k + " eq " + v
-		if useParentheses {
-			fs = "(" + fs + ")"
-		}
-		subFilters = append(subFilters, fs)
-	}
-
-	filter := strings.Join(subFilters, " ")
-
-	res, err := b.gce.Snapshots.List(b.project).Filter(filter).Do()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	ret := make([]string, 0, len(res.Items))
-	for _, snap := range res.Items {
-		ret = append(ret, snap.Name)
-	}
-
-	return ret, nil
 }
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {

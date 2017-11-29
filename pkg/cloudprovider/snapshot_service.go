@@ -26,11 +26,6 @@ import (
 // SnapshotService exposes Ark-specific operations for snapshotting and restoring block
 // volumes.
 type SnapshotService interface {
-	// GetAllSnapshots returns a slice of all snapshots found in the cloud API that
-	// are tagged with Ark metadata. Returns an error if a problem is encountered accessing
-	// the cloud API.
-	GetAllSnapshots() ([]string, error)
-
 	// CreateSnapshot triggers a snapshot for the specified cloud volume and tags it with metadata.
 	// it returns the cloud snapshot ID, or an error if a problem is encountered triggering the snapshot via
 	// the cloud API.
@@ -97,19 +92,6 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 			}
 		}
 	}
-}
-
-func (sr *snapshotService) GetAllSnapshots() ([]string, error) {
-	tags := map[string]string{
-		snapshotTagKey: snapshotTagVal,
-	}
-
-	res, err := sr.blockStore.ListSnapshots(tags)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
 }
 
 func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, error) {
