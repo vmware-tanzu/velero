@@ -93,6 +93,12 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 			logger.WithField("groupResource", gr).Info("Not including resource")
 			continue
 		}
+		// we don't want to explicitly restore namespace API objs because we'll handle
+		// them as a special case prior to restoring anything into them
+		if gr.Group == "" && gr.Resource == "namespaces" {
+			continue
+		}
+
 		ret = append(ret, gr)
 		set.Insert(gr.String())
 	}
@@ -111,6 +117,11 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 
 			if !includedResources.ShouldInclude(gr.String()) {
 				logger.WithField("groupResource", gr.String()).Info("Not including resource")
+				continue
+			}
+			// we don't want to explicitly restore namespace API objs because we'll handle
+			// them as a special case prior to restoring anything into them
+			if gr.Group == "" && gr.Resource == "namespaces" {
 				continue
 			}
 
