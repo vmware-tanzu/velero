@@ -45,6 +45,10 @@ func NewBlockStorePlugin(blockStore cloudprovider.BlockStore) *BlockStorePlugin 
 	}
 }
 
+func (p *BlockStorePlugin) Kind() PluginKind {
+	return PluginKindBlockStore
+}
+
 // GRPCServer registers a BlockStore gRPC server.
 func (p *BlockStorePlugin) GRPCServer(s *grpc.Server) error {
 	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{impl: p.impl})

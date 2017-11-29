@@ -18,21 +18,10 @@ package plugin
 
 import plugin "github.com/hashicorp/go-plugin"
 
-// Handshake is configuration information that allows go-plugin
-// clients and servers to perform a handshake.
-var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  1,
-	MagicCookieKey:   "ARK_PLUGIN",
-	MagicCookieValue: "hello",
-}
+// Interface represents an Ark plugin.
+type Interface interface {
+	plugin.Plugin
 
-// Serve serves the plugin p.
-func Serve(p Interface) {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: Handshake,
-		Plugins: map[string]plugin.Plugin{
-			string(p.Kind()): p,
-		},
-		GRPCServer: plugin.DefaultGRPCServer,
-	})
+	// Kind returns the PluginKind for the plugin.
+	Kind() PluginKind
 }
