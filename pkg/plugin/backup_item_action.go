@@ -49,6 +49,10 @@ func NewBackupItemActionPlugin(itemAction arkbackup.ItemAction) *BackupItemActio
 	}
 }
 
+func (p *BackupItemActionPlugin) Kind() PluginKind {
+	return PluginKindBackupItemAction
+}
+
 // GRPCServer registers a BackupItemAction gRPC server.
 func (p *BackupItemActionPlugin) GRPCServer(s *grpc.Server) error {
 	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{impl: p.impl})

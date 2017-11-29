@@ -46,6 +46,10 @@ func NewObjectStorePlugin(objectStore cloudprovider.ObjectStore) *ObjectStorePlu
 	}
 }
 
+func (p *ObjectStorePlugin) Kind() PluginKind {
+	return PluginKindObjectStore
+}
+
 // GRPCServer registers an ObjectStore gRPC server.
 func (p *ObjectStorePlugin) GRPCServer(s *grpc.Server) error {
 	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{impl: p.impl})

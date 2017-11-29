@@ -49,6 +49,10 @@ func NewRestoreItemActionPlugin(itemAction restore.ItemAction) *RestoreItemActio
 	}
 }
 
+func (p *RestoreItemActionPlugin) Kind() PluginKind {
+	return PluginKindRestoreItemAction
+}
+
 // GRPCServer registers a RestoreItemAction gRPC server.
 func (p *RestoreItemActionPlugin) GRPCServer(s *grpc.Server) error {
 	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{impl: p.impl})

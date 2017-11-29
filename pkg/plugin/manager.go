@@ -265,7 +265,8 @@ func (m *manager) getCloudProviderPlugin(name string, kind PluginKind) (interfac
 
 		// build a plugin client that can dispense all of the PluginKinds it's registered for
 		clientBuilder := newClientBuilder(baseConfig()).
-			withCommand(pluginInfo.commandName, pluginInfo.commandArgs...)
+			withCommand(pluginInfo.commandName, pluginInfo.commandArgs...).
+			withLogger(m.logger)
 
 		for _, kind := range pluginInfo.kinds {
 			clientBuilder.withPlugin(kind, pluginForKind(kind))
