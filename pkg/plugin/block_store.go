@@ -124,16 +124,6 @@ func (c *BlockStoreGRPCClient) IsVolumeReady(volumeID, volumeAZ string) (bool, e
 	return res.Ready, nil
 }
 
-// ListSnapshots returns a list of all snapshots matching the specified set of tag key/values.
-func (c *BlockStoreGRPCClient) ListSnapshots(tagFilters map[string]string) ([]string, error) {
-	res, err := c.grpcClient.ListSnapshots(context.Background(), &proto.ListSnapshotsRequest{TagFilters: tagFilters})
-	if err != nil {
-		return nil, err
-	}
-
-	return res.SnapshotIDs, nil
-}
-
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
 func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
@@ -265,16 +255,6 @@ func (s *BlockStoreGRPCServer) IsVolumeReady(ctx context.Context, req *proto.IsV
 	}
 
 	return &proto.IsVolumeReadyResponse{Ready: ready}, nil
-}
-
-// ListSnapshots returns a list of all snapshots matching the specified set of tag key/values.
-func (s *BlockStoreGRPCServer) ListSnapshots(ctx context.Context, req *proto.ListSnapshotsRequest) (*proto.ListSnapshotsResponse, error) {
-	snapshotIDs, err := s.impl.ListSnapshots(req.TagFilters)
-	if err != nil {
-		return nil, err
-	}
-
-	return &proto.ListSnapshotsResponse{SnapshotIDs: snapshotIDs}, nil
 }
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided

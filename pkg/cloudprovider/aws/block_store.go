@@ -144,32 +144,6 @@ func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err e
 	return *res.Volumes[0].State == ec2.VolumeStateAvailable, nil
 }
 
-func (b *blockStore) ListSnapshots(tagFilters map[string]string) ([]string, error) {
-	req := &ec2.DescribeSnapshotsInput{}
-
-	for k, v := range tagFilters {
-		filter := &ec2.Filter{}
-		filter.SetName(k)
-		filter.SetValues([]*string{&v})
-
-		req.Filters = append(req.Filters, filter)
-	}
-
-	var ret []string
-	err := b.ec2.DescribeSnapshotsPages(req, func(res *ec2.DescribeSnapshotsOutput, lastPage bool) bool {
-		for _, snapshot := range res.Snapshots {
-			ret = append(ret, *snapshot.SnapshotId)
-		}
-
-		return !lastPage
-	})
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return ret, nil
-}
-
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &ec2.CreateSnapshotInput{
 		VolumeId: &volumeID,
