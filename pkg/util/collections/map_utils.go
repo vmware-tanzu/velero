@@ -112,3 +112,13 @@ func ForEach(root map[string]interface{}, path string, fn func(obj map[string]in
 
 	return nil
 }
+
+// Exists returns true if root[path] exists, or false otherwise.
+func Exists(root map[string]interface{}, path string) bool {
+	if root == nil {
+		return false
+	}
+
+	_, err := GetValue(root, path)
+	return err == nil
+}

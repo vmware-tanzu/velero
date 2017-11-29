@@ -55,6 +55,23 @@ message DeleteSnapshotRequest {
     string snapshotID = 1;
 }
 
+message GetVolumeIDRequest {
+  bytes persistentVolume = 1;
+}
+
+message GetVolumeIDResponse {
+  string volumeID = 1;
+}
+
+message SetVolumeIDRequest {
+  bytes persistentVolume = 1;
+  string volumeID = 2;
+}
+
+message SetVolumeIDResponse {
+  bytes persistentVolume = 1;
+}
+
 service BlockStore {
     rpc Init(InitRequest) returns (Empty);
     rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
@@ -63,4 +80,6 @@ service BlockStore {
     rpc ListSnapshots(ListSnapshotsRequest) returns (ListSnapshotsResponse);
     rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
     rpc DeleteSnapshot(DeleteSnapshotRequest) returns (Empty);
+    rpc GetVolumeID(GetVolumeIDRequest) returns (GetVolumeIDResponse);
+    rpc SetVolumeID(SetVolumeIDRequest) returns (SetVolumeIDResponse);
 }

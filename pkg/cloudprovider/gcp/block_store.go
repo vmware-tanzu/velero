@@ -26,9 +26,11 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v0.beta"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const projectKey = "project"
@@ -190,4 +192,28 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	_, err := b.gce.Snapshots.Delete(b.project, snapshotID).Do()
 
 	return errors.WithStack(err)
+}
+
+func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	if !collections.Exists(pv.UnstructuredContent(), "spec.gcePersistentDisk") {
+		return "", nil
+	}
+
+	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
+	if err != nil {
+		return "", err
+	}
+
+	return volumeID, nil
+}
+
+func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	gce, err := collections.GetMap(pv.UnstructuredContent(), "spec.gcePersistentDisk")
+	if err != nil {
+		return nil, err
+	}
+
+	gce["pdName"] = volumeID
+
+	return pv, nil
 }

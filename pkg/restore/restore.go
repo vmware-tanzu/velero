@@ -45,6 +45,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
@@ -571,10 +572,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 		if groupResource.Group == "" && groupResource.Resource == "persistentvolumes" {
 			// restore the PV from snapshot (if applicable)
-			updatedObj, warning, err := ctx.executePVAction(obj)
-			if warning != nil {
-				addToResult(&warnings, namespace, fmt.Errorf("warning executing PVAction for %s: %v", fullPath, warning))
-			}
+			updatedObj, err := ctx.executePVAction(obj)
 			if err != nil {
 				addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", fullPath, err))
 				continue
@@ -661,95 +659,70 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 	return warnings, errs
 }
 
-func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error, error) {
-	// we need to remove annotations from PVs since they potentially contain
-	// information about dynamic provisioners which will confuse the controllers.
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, nil, err
+func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	pvName := obj.GetName()
+	if pvName == "" {
+		return nil, errors.New("PersistentVolume is missing its name")
 	}
-	delete(metadata, "annotations")
 
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
+
+	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	if err != nil {
+		return nil, err
+	}
+
+	// We need to remove annotations from PVs since they potentially contain
+	// information about dynamic provisioners which will confuse the controllers.
+	delete(metadata, "annotations")
+
 	delete(spec, "claimRef")
 	delete(spec, "storageClassName")
 
-	// restore the PV from snapshot (if applicable)
-	return ctx.restoreVolumeFromSnapshot(obj)
-}
+	if boolptr.IsSetToFalse(ctx.backup.Spec.SnapshotVolumes) {
+		// The backup had snapshots disabled, so we can return early
+		return obj, nil
+	}
 
-func (ctx *context) restoreVolumeFromSnapshot(obj *unstructured.Unstructured) (*unstructured.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	if boolptr.IsSetToFalse(ctx.restore.Spec.RestorePVs) {
+		// The restore has pv restores disabled, so we can return early
+		return obj, nil
+	}
+
+	// If we can't find a snapshot record for this particular PV, it most likely wasn't a PV that Ark
+	// could snapshot, so return early instead of trying to restore from a snapshot.
+	backupInfo, found := ctx.backup.Status.VolumeBackups[pvName]
+	if !found {
+		return obj, nil
+	}
+
+	// Past this point, we expect to be doing a restore
+
+	if ctx.snapshotService == nil {
+		return nil, errors.New("you must configure a persistentVolumeProvider to restore PersistentVolumes from snapshots")
+	}
+
+	ctx.infof("restoring PersistentVolume %s from SnapshotID %s", pvName, backupInfo.SnapshotID)
+	volumeID, err := ctx.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+	ctx.infof("successfully restored PersistentVolume %s from snapshot", pvName)
+
+	updated1, err := ctx.snapshotService.SetVolumeID(obj, volumeID)
+	if err != nil {
+		return nil, err
 	}
 
-	// if it's an unsupported volume type for snapshot restores, don't try to
-	// do a snapshot restore
-	if sourceType, _ := kube.GetPVSource(spec); sourceType == "" {
-		return obj, nil, nil
+	updated2, ok := updated1.(*unstructured.Unstructured)
+	if !ok {
+		return nil, errors.Errorf("unexpected type %T", updated1)
 	}
 
-	var (
-		pvName              = obj.GetName()
-		restoreFromSnapshot = false
-		restore             = ctx.restore
-		backup              = ctx.backup
-	)
-
-	if restore.Spec.RestorePVs != nil && *restore.Spec.RestorePVs {
-		// when RestorePVs = yes, it's an error if we don't have a snapshot service
-		if ctx.snapshotService == nil {
-			return nil, nil, errors.New("PV restorer is not configured for PV snapshot restores")
-		}
-
-		// if there are no snapshots in the backup, return without error
-		if backup.Status.VolumeBackups == nil {
-			return obj, nil, nil
-		}
-
-		// if there are snapshots, and this is a supported PV type, but there's no
-		// snapshot for this PV, it's an error
-		if backup.Status.VolumeBackups[pvName] == nil {
-			return nil, nil, errors.Errorf("no snapshot found to restore volume %s from", pvName)
-		}
-
-		restoreFromSnapshot = true
-	}
-	if restore.Spec.RestorePVs == nil && ctx.snapshotService != nil {
-		// when RestorePVs = Auto, don't error if the backup doesn't have snapshots
-		if backup.Status.VolumeBackups == nil || backup.Status.VolumeBackups[pvName] == nil {
-			return obj, nil, nil
-		}
-
-		restoreFromSnapshot = true
-	}
-
-	if restoreFromSnapshot {
-		backupInfo := backup.Status.VolumeBackups[pvName]
-
-		ctx.infof("restoring PersistentVolume %s from SnapshotID %s", pvName, backupInfo.SnapshotID)
-		volumeID, err := ctx.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
-		if err != nil {
-			return nil, nil, err
-		}
-		ctx.infof("successfully restored PersistentVolume %s from snapshot", pvName)
-
-		if err := kube.SetVolumeID(spec, volumeID); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	var warning error
-
-	if ctx.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
-		warning = errors.New("unable to restore PV snapshots: Ark server is not configured with a PersistentVolumeProvider")
-	}
-
-	return obj, warning, nil
+	return updated2, nil
 }
 
 func isPVReady(obj runtime.Unstructured) bool {

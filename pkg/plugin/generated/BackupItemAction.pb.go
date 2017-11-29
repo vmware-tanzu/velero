@@ -26,6 +26,10 @@ It has these top-level messages:
 	CreateSnapshotRequest
 	CreateSnapshotResponse
 	DeleteSnapshotRequest
+	GetVolumeIDRequest
+	GetVolumeIDResponse
+	SetVolumeIDRequest
+	SetVolumeIDResponse
 	PutObjectRequest
 	GetObjectRequest
 	Bytes
