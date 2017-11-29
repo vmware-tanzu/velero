@@ -37,3 +37,9 @@ spec:
           envFrom:
             - secretRef:
                 name: cloud-credentials
+          volumeMounts:
+          - name: plugins
+            mountPath: /plugins
+      volumes:
+        - name: plugins
+          emptyDir: {}

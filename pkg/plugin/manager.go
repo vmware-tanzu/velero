@@ -176,13 +176,13 @@ func getPluginInstance(client *plugin.Client, kind PluginKind) (interface{}, err
 func (m *manager) registerPlugins() error {
 	// first, register internal plugins
 	for _, provider := range []string{"aws", "gcp", "azure"} {
-		m.pluginRegistry.register(provider, "/ark", []string{"plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
+		m.pluginRegistry.register(provider, "/ark", []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
 	}
-	m.pluginRegistry.register("pv", "/ark", []string{"plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("pv", "/ark", []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
 
-	m.pluginRegistry.register("job", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("pod", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("svc", "/ark", []string{"plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("job", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("pod", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("svc", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
 
 	// second, register external plugins (these will override internal plugins, if applicable)
 	if _, err := os.Stat(pluginDir); err != nil {
