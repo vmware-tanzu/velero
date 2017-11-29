@@ -36,7 +36,6 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/util/collections"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 )
 
@@ -289,12 +288,10 @@ func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *
 		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
 	}
 
-	volumeID, err := kubeutil.GetVolumeID(pv.UnstructuredContent())
-	// non-nil error means it's a supported PV source but volume ID can't be found
+	volumeID, err := ib.snapshotService.GetVolumeID(pv)
 	if err != nil {
 		return errors.Wrapf(err, "error getting volume ID for PersistentVolume")
 	}
-	// no volumeID / nil error means unsupported PV source
 	if volumeID == "" {
 		log.Info("PersistentVolume is not a supported volume type for snapshots, skipping.")
 		return nil

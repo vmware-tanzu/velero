@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // SnapshotService exposes Ark-specific operations for snapshotting and restoring block
@@ -46,6 +47,12 @@ type SnapshotService interface {
 
 	// GetVolumeInfo gets the type and IOPS (if applicable) from the cloud API.
 	GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error)
+
+	// GetVolumeID returns the cloud provider specific identifier for the PersistentVolume.
+	GetVolumeID(pv runtime.Unstructured) (string, error)
+
+	// SetVolumeID sets the cloud provider specific identifier for the PersistentVolume.
+	SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error)
 }
 
 const (
@@ -119,4 +126,12 @@ func (sr *snapshotService) DeleteSnapshot(snapshotID string) error {
 
 func (sr *snapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	return sr.blockStore.GetVolumeInfo(volumeID, volumeAZ)
+}
+
+func (sr *snapshotService) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	return sr.blockStore.GetVolumeID(pv)
+}
+
+func (sr *snapshotService) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	return sr.blockStore.SetVolumeID(pv, volumeID)
 }

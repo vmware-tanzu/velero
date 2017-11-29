@@ -39,6 +39,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
@@ -686,7 +687,7 @@ func TestResetMetadataAndStatus(t *testing.T) {
 	}
 }
 
-func TestRestoreVolumeFromSnapshot(t *testing.T) {
+func TestExecutePVAction(t *testing.T) {
 	iops := int64(1000)
 
 	tests := []struct {
@@ -696,9 +697,10 @@ func TestRestoreVolumeFromSnapshot(t *testing.T) {
 		backup            *api.Backup
 		volumeMap         map[api.VolumeBackupInfo]string
 		noSnapshotService bool
-		expectedWarn      bool
 		expectedErr       bool
 		expectedRes       *unstructured.Unstructured
+		volumeID          string
+		expectSetVolumeID bool
 	}{
 		{
 			name:        "no name should error",
@@ -713,91 +715,79 @@ func TestRestoreVolumeFromSnapshot(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "when RestorePVs=false, should not error if there is no PV->BackupInfo map",
+			name:        "ensure annotations, spec.claimRef, spec.storageClassName are deleted",
+			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:      &api.Backup{},
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("someOtherField").Unstructured,
+		},
+		{
+			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
+			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      &api.Backup{Spec: api.BackupSpec{SnapshotVolumes: boolptr.False()}},
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("someOtherField").Unstructured,
+		},
+		{
+			name:        "not restoring, return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{}},
+			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
-			name:        "when RestorePVs=true, return without error if there is no PV->BackupInfo map",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			name:        "restoring, return without error if there is no PV->BackupInfo map",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
 			backup:      &api.Backup{Status: api.BackupStatus{}},
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:        "when RestorePVs=true, error if there is PV->BackupInfo map but no entry for this PV",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			name:        "restoring, return early if there is PV->BackupInfo map but no entry for this PV",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
 			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"another-pv": {}}}},
-			expectedErr: true,
-		},
-		{
-			name:        "when RestorePVs=true, AWS volume ID should be set correctly",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
 			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", map[string]interface{}{"volumeID": "volume-1"}).Unstructured,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:        "when RestorePVs=true, GCE pdName should be set correctly",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("gcePersistentDisk", make(map[string]interface{})).Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("gcePersistentDisk", map[string]interface{}{"pdName": "volume-1"}).Unstructured,
+			name:              "volume type and IOPS are correctly passed to CreateVolume",
+			obj:               NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			restore:           arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:            &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1", Type: "gp", Iops: &iops}}}},
+			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1", Type: "gp", Iops: &iops}: "volume-1"},
+			volumeID:          "volume-1",
+			expectedErr:       false,
+			expectSetVolumeID: true,
+			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:        "when RestorePVs=true, Azure pdName should be set correctly",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("azureDisk", make(map[string]interface{})).Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("azureDisk", map[string]interface{}{"diskName": "volume-1"}).Unstructured,
-		},
-		{
-			name:        "when RestorePVs=true, unsupported PV source should not get snapshot restored",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("unsupportedPVSource", make(map[string]interface{})).Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("unsupportedPVSource", make(map[string]interface{})).Unstructured,
-		},
-		{
-			name:        "volume type and IOPS are correctly passed to CreateVolume",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1", Type: "gp", Iops: &iops}}}},
-			volumeMap:   map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1", Type: "gp", Iops: &iops}: "volume-1"},
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", map[string]interface{}{"volumeID": "volume-1"}).Unstructured,
-		},
-		{
-			name:              "When no SnapshotService, warn if backup has snapshots that will not be restored",
+			name:              "restoring, snapshotService=nil, backup has at least 1 snapshot -> error",
 			obj:               NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
 			restore:           arktest.NewDefaultTestRestore().Restore,
 			backup:            &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
 			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			volumeID:          "volume-1",
 			noSnapshotService: true,
-			expectedErr:       false,
-			expectedWarn:      true,
+			expectedErr:       true,
 			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var snapshotService cloudprovider.SnapshotService
+			var (
+				snapshotService     cloudprovider.SnapshotService
+				fakeSnapshotService *arktest.FakeSnapshotService
+			)
 			if !test.noSnapshotService {
-				snapshotService = &arktest.FakeSnapshotService{RestorableVolumes: test.volumeMap}
+				fakeSnapshotService = &arktest.FakeSnapshotService{
+					RestorableVolumes: test.volumeMap,
+					VolumeID:          test.volumeID,
+				}
+				snapshotService = fakeSnapshotService
 			}
 
 			ctx := &context{
@@ -807,13 +797,20 @@ func TestRestoreVolumeFromSnapshot(t *testing.T) {
 				logger:          arktest.NewLogger(),
 			}
 
-			res, warn, err := ctx.restoreVolumeFromSnapshot(test.obj)
+			res, err := ctx.executePVAction(test.obj)
 
-			assert.Equal(t, test.expectedWarn, warn != nil)
-
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
+			if test.expectedErr {
+				require.Error(t, err)
+				return
 			}
+			require.NoError(t, err)
+
+			if test.expectSetVolumeID {
+				assert.Equal(t, test.volumeID, fakeSnapshotService.VolumeIDSet)
+			} else {
+				assert.Equal(t, "", fakeSnapshotService.VolumeIDSet)
+			}
+			assert.Equal(t, test.expectedRes, res)
 		})
 	}
 }

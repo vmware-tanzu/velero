@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
@@ -29,8 +30,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const (
@@ -291,4 +294,37 @@ func getFullDiskName(subscription string, resourceGroup string, diskName string)
 
 func getFullSnapshotName(subscription string, resourceGroup string, snapshotName string) string {
 	return fmt.Sprintf("/subscriptions/%v/resourceGroups/%v/providers/Microsoft.Compute/snapshots/%v", subscription, resourceGroup, snapshotName)
+}
+
+func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
+		return "", nil
+	}
+
+	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.azureDisk.diskName")
+	if err != nil {
+		return "", err
+	}
+
+	return volumeID, nil
+}
+
+func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
+	if err != nil {
+		return nil, err
+	}
+
+	if uri, err := collections.GetString(azure, "diskURI"); err == nil {
+		previousVolumeID, err := collections.GetString(azure, "diskName")
+		if err != nil {
+			return nil, err
+		}
+
+		azure["diskURI"] = strings.Replace(uri, previousVolumeID, volumeID, -1)
+	}
+
+	azure["diskName"] = volumeID
+
+	return pv, nil
 }

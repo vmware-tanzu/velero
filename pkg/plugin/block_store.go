@@ -17,9 +17,13 @@ limitations under the License.
 package plugin
 
 import (
+	"encoding/json"
+
 	"github.com/hashicorp/go-plugin"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
@@ -150,6 +154,49 @@ func (c *BlockStoreGRPCClient) DeleteSnapshot(snapshotID string) error {
 	return err
 }
 
+func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	encodedPV, err := json.Marshal(pv.UnstructuredContent())
+	if err != nil {
+		return "", err
+	}
+
+	req := &proto.GetVolumeIDRequest{
+		PersistentVolume: encodedPV,
+	}
+
+	resp, err := c.grpcClient.GetVolumeID(context.Background(), req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.VolumeID, nil
+}
+
+func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	encodedPV, err := json.Marshal(pv.UnstructuredContent())
+	if err != nil {
+		return nil, err
+	}
+
+	req := &proto.SetVolumeIDRequest{
+		PersistentVolume: encodedPV,
+		VolumeID:         volumeID,
+	}
+
+	resp, err := c.grpcClient.SetVolumeID(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+
+	var updatedPV unstructured.Unstructured
+	if err := json.Unmarshal(resp.PersistentVolume, &updatedPV); err != nil {
+		return nil, err
+
+	}
+
+	return &updatedPV, nil
+}
+
 // BlockStoreGRPCServer implements the proto-generated BlockStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BlockStoreGRPCServer struct {
@@ -244,4 +291,39 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 	}
 
 	return &proto.Empty{}, nil
+}
+
+func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (*proto.GetVolumeIDResponse, error) {
+	var pv unstructured.Unstructured
+
+	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
+		return nil, err
+	}
+
+	volumeID, err := s.impl.GetVolumeID(&pv)
+	if err != nil {
+		return nil, err
+	}
+
+	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
+}
+
+func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (*proto.SetVolumeIDResponse, error) {
+	var pv unstructured.Unstructured
+
+	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
+		return nil, err
+	}
+
+	updatedPV, err := s.impl.SetVolumeID(&pv, req.VolumeID)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedPVBytes, err := json.Marshal(updatedPV.UnstructuredContent())
+	if err != nil {
+		return nil, err
+	}
+
+	return &proto.SetVolumeIDResponse{PersistentVolume: updatedPVBytes}, nil
 }

@@ -17,14 +17,18 @@ limitations under the License.
 package aws
 
 import (
+	"regexp"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const regionKey = "region"
@@ -204,4 +208,30 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	_, err := b.ec2.DeleteSnapshot(req)
 
 	return errors.WithStack(err)
+}
+
+var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
+
+func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	if !collections.Exists(pv.UnstructuredContent(), "spec.awsElasticBlockStore") {
+		return "", nil
+	}
+
+	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
+	if err != nil {
+		return "", err
+	}
+
+	return ebsVolumeIDRegex.FindString(volumeID), nil
+}
+
+func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	aws, err := collections.GetMap(pv.UnstructuredContent(), "spec.awsElasticBlockStore")
+	if err != nil {
+		return nil, err
+	}
+
+	aws["volumeID"] = volumeID
+
+	return pv, nil
 }

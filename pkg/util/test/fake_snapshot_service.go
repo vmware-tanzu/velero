@@ -19,6 +19,7 @@ package test
 import (
 	"errors"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -33,6 +34,9 @@ type FakeSnapshotService struct {
 
 	// VolumeBackupInfo -> VolumeID
 	RestorableVolumes map[api.VolumeBackupInfo]string
+
+	VolumeID    string
+	VolumeIDSet string
 }
 
 func (s *FakeSnapshotService) GetAllSnapshots() ([]string, error) {
@@ -79,4 +83,13 @@ func (s *FakeSnapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, 
 	} else {
 		return volumeInfo.Type, volumeInfo.Iops, nil
 	}
+}
+
+func (s *FakeSnapshotService) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	return s.VolumeID, nil
+}
+
+func (s *FakeSnapshotService) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	s.VolumeIDSet = volumeID
+	return pv, nil
 }

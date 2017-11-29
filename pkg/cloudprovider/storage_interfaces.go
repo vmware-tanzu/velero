@@ -19,6 +19,8 @@ package cloudprovider
 import (
 	"io"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // ObjectStore exposes basic object-storage operations required
@@ -64,6 +66,12 @@ type BlockStore interface {
 	// CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
 	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error)
+
+	// GetVolumeID returns the cloud provider specific identifier for the PersistentVolume.
+	GetVolumeID(pv runtime.Unstructured) (string, error)
+
+	// SetVolumeID sets the cloud provider specific identifier for the PersistentVolume.
+	SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error)
 
 	// GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 	// volume.

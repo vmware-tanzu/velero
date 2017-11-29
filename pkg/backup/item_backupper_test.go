@@ -324,7 +324,10 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			var snapshotService *arktest.FakeSnapshotService
 			if test.snapshottableVolumes != nil {
-				snapshotService = &arktest.FakeSnapshotService{SnapshottableVolumes: test.snapshottableVolumes}
+				snapshotService = &arktest.FakeSnapshotService{
+					SnapshottableVolumes: test.snapshottableVolumes,
+					VolumeID:             "vol-abc123",
+				}
 				b.snapshotService = snapshotService
 			}
 
@@ -356,7 +359,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			err = b.backupItem(arktest.NewLogger(), obj, groupResource)
 			gotError := err != nil
 			if e, a := test.expectError, gotError; e != a {
-				t.Fatalf("error: expected %t, got %t", e, a)
+				t.Fatalf("error: expected %t, got %t: %v", e, a, err)
 			}
 			if test.expectError {
 				return
@@ -446,31 +449,13 @@ func TestTakePVSnapshot(t *testing.T) {
 			snapshotEnabled: false,
 		},
 		{
-			name:            "can't find volume id - missing spec",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}}`,
-			expectError:     true,
-		},
-		{
 			name:            "unsupported PV source type",
 			snapshotEnabled: true,
 			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"unsupportedPVSource": {}}}`,
 			expectError:     false,
 		},
 		{
-			name:            "can't find volume id - aws but no volume id",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"awsElasticBlockStore": {}}}`,
-			expectError:     true,
-		},
-		{
-			name:            "can't find volume id - gce but no volume id",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {}}}`,
-			expectError:     true,
-		},
-		{
-			name:                   "aws - simple volume id",
+			name:                   "without iops",
 			snapshotEnabled:        true,
 			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:            false,
@@ -482,7 +467,7 @@ func TestTakePVSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:                   "aws - simple volume id with provisioned IOPS",
+			name:                   "with iops",
 			snapshotEnabled:        true,
 			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:            false,
@@ -491,42 +476,6 @@ func TestTakePVSnapshot(t *testing.T) {
 			ttl:                    5 * time.Minute,
 			volumeInfo: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": {Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:                   "aws - dynamically provisioned volume id",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-west-2a"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-west-2a/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-west-2a"},
-			},
-		},
-		{
-			name:                   "gce",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "gcp-zone2"}}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "pd-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"pd-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "gcp-zone2"},
-			},
-		},
-		{
-			name:                   "azure",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"azureDisk": {"diskName": "foo-disk"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "foo-disk",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"foo-disk": {Type: "gp", SnapshotID: "snap-1"},
 			},
 		},
 		{
@@ -545,10 +494,11 @@ func TestTakePVSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:            "create snapshot error",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectError:     true,
+			name:             "create snapshot error",
+			snapshotEnabled:  true,
+			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
+			expectedVolumeID: "pd-abc123",
+			expectError:      true,
 		},
 		{
 			name:                   "PV with label metadata but no failureDomainZone",
@@ -580,7 +530,10 @@ func TestTakePVSnapshot(t *testing.T) {
 				},
 			}
 
-			snapshotService := &arktest.FakeSnapshotService{SnapshottableVolumes: test.volumeInfo}
+			snapshotService := &arktest.FakeSnapshotService{
+				SnapshottableVolumes: test.volumeInfo,
+				VolumeID:             test.expectedVolumeID,
+			}
 
 			ib := &defaultItemBackupper{snapshotService: snapshotService}
 
