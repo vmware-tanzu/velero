@@ -298,11 +298,13 @@ func TestNamespaceRemapping(t *testing.T) {
 	var (
 		baseDir              = "bak"
 		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
-		prioritizedResources = []schema.GroupResource{{Resource: "configmaps"}}
+		prioritizedResources = []schema.GroupResource{{Resource: "namespaces"}, {Resource: "configmaps"}}
 		labelSelector        = labels.NewSelector()
-		fileSystem           = newFakeFileSystem().WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON())
-		expectedNS           = "ns-2"
-		expectedObjs         = toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("").ConfigMap)
+		fileSystem           = newFakeFileSystem().
+					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
+					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
+		expectedNS   = "ns-2"
+		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("").ConfigMap)
 	)
 
 	resourceClient := &arktest.FakeDynamicClient{}
@@ -315,17 +317,17 @@ func TestNamespaceRemapping(t *testing.T) {
 	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
 
-	log, _ := testlogger.NewNullLogger()
+	namespaceClient := &fakeNamespaceClient{}
 
 	ctx := &context{
 		dynamicFactory:       dynamicFactory,
 		fileSystem:           fileSystem,
 		selector:             labelSelector,
-		namespaceClient:      &fakeNamespaceClient{},
+		namespaceClient:      namespaceClient,
 		prioritizedResources: prioritizedResources,
 		restore:              restore,
 		backup:               &api.Backup{},
-		logger:               log,
+		logger:               arktest.NewLogger(),
 	}
 
 	warnings, errors := ctx.restoreFromDir(baseDir)
@@ -336,6 +338,13 @@ func TestNamespaceRemapping(t *testing.T) {
 	assert.Empty(t, errors.Ark)
 	assert.Empty(t, errors.Cluster)
 	assert.Empty(t, errors.Namespaces)
+
+	// ensure the remapped NS (only) was created via the namespaceClient
+	assert.Equal(t, 1, len(namespaceClient.createdNamespaces))
+	assert.Equal(t, "ns-2", namespaceClient.createdNamespaces[0].Name)
+
+	// ensure that we did not try to create namespaces via dynamic client
+	dynamicFactory.AssertNotCalled(t, "ClientForGroupVersionResource", gv, metav1.APIResource{Name: "namespaces", Namespaced: true}, "")
 
 	dynamicFactory.AssertExpectations(t)
 	resourceClient.AssertExpectations(t)
@@ -997,6 +1006,29 @@ func (pv *testPersistentVolume) ToJSON() []byte {
 	return bytes
 }
 
+type testNamespace struct {
+	*v1.Namespace
+}
+
+func newTestNamespace(name string) *testNamespace {
+	return &testNamespace{
+		Namespace: &v1.Namespace{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "Namespace",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+			},
+		},
+	}
+}
+
+func (ns *testNamespace) ToJSON() []byte {
+	bytes, _ := json.Marshal(ns.Namespace)
+	return bytes
+}
+
 type testConfigMap struct {
 	*v1.ConfigMap
 }
@@ -1160,9 +1192,12 @@ func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (ru
 }
 
 type fakeNamespaceClient struct {
+	createdNamespaces []*v1.Namespace
+
 	corev1.NamespaceInterface
 }
 
 func (nsc *fakeNamespaceClient) Create(ns *v1.Namespace) (*v1.Namespace, error) {
+	nsc.createdNamespaces = append(nsc.createdNamespaces, ns)
 	return ns, nil
 }

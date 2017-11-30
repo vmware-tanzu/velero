@@ -341,6 +341,12 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	existingNamespaces := sets.NewString()
 
 	for _, resource := range ctx.prioritizedResources {
+		// we don't want to explicitly restore namespace API objs because we'll handle
+		// them as a special case prior to restoring anything into them
+		if resource.Group == "" && resource.Resource == "namespaces" {
+			continue
+		}
+
 		rscDir := resourceDirsMap[resource.String()]
 		if rscDir == nil {
 			continue
