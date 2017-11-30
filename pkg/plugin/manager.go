@@ -128,7 +128,8 @@ type Manager interface {
 }
 
 type manager struct {
-	logger         *logrusAdapter
+	logger         logrus.FieldLogger
+	logLevel       logrus.Level
 	pluginRegistry *registry
 	clientStore    *clientStore
 }
@@ -136,7 +137,8 @@ type manager struct {
 // NewManager constructs a manager for getting plugin implementations.
 func NewManager(logger logrus.FieldLogger, level logrus.Level) (Manager, error) {
 	m := &manager{
-		logger:         &logrusAdapter{impl: logger, level: level},
+		logger:         logger,
+		logLevel:       level,
 		pluginRegistry: newRegistry(),
 		clientStore:    newClientStore(),
 	}
@@ -266,7 +268,7 @@ func (m *manager) getCloudProviderPlugin(name string, kind PluginKind) (interfac
 		// build a plugin client that can dispense all of the PluginKinds it's registered for
 		clientBuilder := newClientBuilder(baseConfig()).
 			withCommand(pluginInfo.commandName, pluginInfo.commandArgs...).
-			withLogger(m.logger)
+			withLogger(&logrusAdapter{impl: m.logger, level: m.logLevel})
 
 		for _, kind := range pluginInfo.kinds {
 			clientBuilder.withPlugin(kind, pluginForKind(kind))
@@ -303,10 +305,11 @@ func (m *manager) GetBackupItemActions(backupName string) ([]backup.ItemAction, 
 
 		// create clients for each
 		for _, plugin := range pluginInfo {
+			logger := &logrusAdapter{impl: m.logger, level: m.logLevel}
 			client := newClientBuilder(baseConfig()).
 				withCommand(plugin.commandName, plugin.commandArgs...).
-				withPlugin(PluginKindBackupItemAction, &BackupItemActionPlugin{log: m.logger}).
-				withLogger(m.logger).
+				withPlugin(PluginKindBackupItemAction, &BackupItemActionPlugin{log: logger}).
+				withLogger(logger).
 				client()
 
 			m.clientStore.add(client, PluginKindBackupItemAction, plugin.name, backupName)
@@ -351,10 +354,11 @@ func (m *manager) GetRestoreItemActions(restoreName string) ([]restore.ItemActio
 
 		// create clients for each
 		for _, plugin := range pluginInfo {
+			logger := &logrusAdapter{impl: m.logger, level: m.logLevel}
 			client := newClientBuilder(baseConfig()).
 				withCommand(plugin.commandName, plugin.commandArgs...).
-				withPlugin(PluginKindRestoreItemAction, &RestoreItemActionPlugin{log: m.logger}).
-				withLogger(m.logger).
+				withPlugin(PluginKindRestoreItemAction, &RestoreItemActionPlugin{log: logger}).
+				withLogger(logger).
 				client()
 
 			m.clientStore.add(client, PluginKindRestoreItemAction, plugin.name, restoreName)
