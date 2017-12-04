@@ -81,7 +81,7 @@ build: _output/bin/$(GOOS)/$(GOARCH)/$(BIN)
 
 _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 	@echo "building: $@"
-	@$(MAKE) shell CMD="-c '\
+	$(MAKE) shell CMD="-c '\
 		GOOS=$(GOOS) \
 		GOARCH=$(GOARCH) \
 		VERSION=$(VERSION) \
@@ -156,7 +156,7 @@ checksum:
 all-tar-bin: $(addprefix tar-bin-, $(CLI_PLATFORMS))
 
 tar-bin-%:
-	@$(MAKE) ARCH=$* tar-bin
+	$(MAKE) ARCH=$* VERSION=$(VERSION) tar-bin
 
 GIT_DESCRIBE = $(shell git describe --tags --always --dirty)
 tar-bin: build
