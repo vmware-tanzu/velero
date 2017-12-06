@@ -155,6 +155,8 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
 
 In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
 
+When using Google Kubernetes Engine (GKE), be sure to make your current IAM user a cluster-admin. See [their docs][22] for more information.
+
 ```bash
 kubectl apply -f examples/common/00-prereqs.yaml
 ```
@@ -441,4 +443,5 @@ ark restore create nginx-backup
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
+[22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control
 
