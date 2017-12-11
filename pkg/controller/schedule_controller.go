@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -29,7 +30,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -50,7 +53,7 @@ type scheduleController struct {
 	queue                 workqueue.RateLimitingInterface
 	syncPeriod            time.Duration
 	clock                 clock.Clock
-	logger                *logrus.Logger
+	logger                logrus.FieldLogger
 }
 
 func NewScheduleController(
@@ -58,7 +61,7 @@ func NewScheduleController(
 	backupsClient arkv1client.BackupsGetter,
 	schedulesInformer informers.ScheduleInformer,
 	syncPeriod time.Duration,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) *scheduleController {
 	if syncPeriod < time.Minute {
 		logger.WithField("syncPeriod", syncPeriod).Info("Provided schedule sync period is too short. Setting to 1 minute")
@@ -230,6 +233,8 @@ func (controller *scheduleController) processSchedule(key string) error {
 	}
 
 	logContext.Debug("Cloning schedule")
+	// store ref to original for creating patch
+	original := schedule
 	// don't modify items in the cache
 	schedule = schedule.DeepCopy()
 
@@ -247,7 +252,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 
 	// update status if it's changed
 	if currentPhase != schedule.Status.Phase {
-		updatedSchedule, err := controller.schedulesClient.Schedules(ns).Update(schedule)
+		updatedSchedule, err := patchSchedule(original, schedule, controller.schedulesClient)
 		if err != nil {
 			return errors.Wrapf(err, "error updating Schedule phase to %s", schedule.Status.Phase)
 		}
@@ -266,7 +271,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 	return nil
 }
 
-func parseCronSchedule(itm *api.Schedule, logger *logrus.Logger) (cron.Schedule, []string) {
+func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Schedule, []string) {
 	var validationErrors []string
 	var schedule cron.Schedule
 
@@ -330,11 +335,12 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 		return errors.Wrap(err, "error creating Backup")
 	}
 
+	original := item
 	schedule := item.DeepCopy()
 
 	schedule.Status.LastBackup = metav1.NewTime(now)
 
-	if _, err := controller.schedulesClient.Schedules(schedule.Namespace).Update(schedule); err != nil {
+	if _, err := patchSchedule(original, schedule, controller.schedulesClient); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)
 	}
 
@@ -364,4 +370,28 @@ func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
 	}
 
 	return backup
+}
+
+func patchSchedule(original, updated *api.Schedule, client arkv1client.SchedulesGetter) (*api.Schedule, error) {
+	origBytes, err := json.Marshal(original)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling original schedule")
+	}
+
+	updatedBytes, err := json.Marshal(updated)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling updated schedule")
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Schedule{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating two-way merge patch for schedule")
+	}
+
+	res, err := client.Schedules(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error patching schedule")
+	}
+
+	return res, nil
 }

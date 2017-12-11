@@ -31,7 +31,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -230,6 +232,8 @@ func (controller *restoreController) processRestore(key string) error {
 	}
 
 	logContext.Debug("Cloning Restore")
+	// store ref to original for creating patch
+	original := restore
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
@@ -248,11 +252,13 @@ func (controller *restoreController) processRestore(key string) error {
 	}
 
 	// update status
-	updatedRestore, err := controller.restoreClient.Restores(ns).Update(restore)
+	updatedRestore, err := patchRestore(original, restore, controller.restoreClient)
 	if err != nil {
 		return errors.Wrapf(err, "error updating Restore phase to %s", restore.Status.Phase)
 	}
-	restore = updatedRestore
+	// store ref to just-updated item for creating patch
+	original = updatedRestore
+	restore = updatedRestore.DeepCopy()
 
 	if restore.Status.Phase == api.RestorePhaseFailedValidation {
 		return nil
@@ -276,7 +282,7 @@ func (controller *restoreController) processRestore(key string) error {
 	restore.Status.Phase = api.RestorePhaseCompleted
 
 	logContext.Debug("Updating Restore final status")
-	if _, err = controller.restoreClient.Restores(ns).Update(restore); err != nil {
+	if _, err = patchRestore(original, restore, controller.restoreClient); err != nil {
 		logContext.WithError(errors.WithStack(err)).Info("Error updating Restore final status")
 	}
 
@@ -471,4 +477,28 @@ func downloadToTempFile(backupName string, backupService cloudprovider.BackupSer
 	}
 
 	return file, nil
+}
+
+func patchRestore(original, updated *api.Restore, client arkv1client.RestoresGetter) (*api.Restore, error) {
+	origBytes, err := json.Marshal(original)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling original restore")
+	}
+
+	updatedBytes, err := json.Marshal(updated)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling updated restore")
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Restore{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating two-way merge patch for restore")
+	}
+
+	res, err := client.Restores(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error patching restore")
+	}
+
+	return res, nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -25,12 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/test"
 )
 
@@ -111,36 +112,27 @@ func TestProcessDownloadRequest(t *testing.T) {
 				logger,
 			).(*downloadRequestController)
 
+			var downloadRequest *v1.DownloadRequest
+
 			if tc.expectedPhase == v1.DownloadRequestPhaseProcessed {
 				target := v1.DownloadTarget{
 					Kind: tc.targetKind,
 					Name: tc.targetName,
 				}
 
-				downloadRequestsInformer.Informer().GetStore().Add(
-					&v1.DownloadRequest{
-						ObjectMeta: metav1.ObjectMeta{
-							Namespace: v1.DefaultNamespace,
-							Name:      "dr1",
-						},
-						Spec: v1.DownloadRequestSpec{
-							Target: target,
-						},
+				downloadRequest = &v1.DownloadRequest{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: v1.DefaultNamespace,
+						Name:      "dr1",
 					},
-				)
+					Spec: v1.DownloadRequestSpec{
+						Target: target,
+					},
+				}
+				downloadRequestsInformer.Informer().GetStore().Add(downloadRequest)
 
 				backupService.On("CreateSignedURL", target, "bucket", 10*time.Minute).Return("signedURL", nil)
 			}
-
-			var updatedRequest *v1.DownloadRequest
-
-			client.PrependReactor("update", "downloadrequests", func(action core.Action) (bool, runtime.Object, error) {
-				obj := action.(core.UpdateAction).GetObject()
-				r, ok := obj.(*v1.DownloadRequest)
-				require.True(t, ok)
-				updatedRequest = r
-				return true, obj, nil
-			})
 
 			// method under test
 			err := c.processDownloadRequest(tc.key)
@@ -152,16 +144,37 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 			require.NoError(t, err)
 
-			var (
-				updatedPhase v1.DownloadRequestPhase
-				updatedURL   string
-			)
-			if updatedRequest != nil {
-				updatedPhase = updatedRequest.Status.Phase
-				updatedURL = updatedRequest.Status.DownloadURL
+			actions := client.Actions()
+
+			// if we don't expect a phase update, this means
+			// we don't expect any actions to take place
+			if tc.expectedPhase == "" {
+				require.Equal(t, 0, len(actions))
+				return
 			}
-			assert.Equal(t, tc.expectedPhase, updatedPhase)
-			assert.Equal(t, tc.expectedURL, updatedURL)
+
+			// otherwise, we should get exactly 1 patch
+			require.Equal(t, 1, len(actions))
+			patchAction, ok := actions[0].(core.PatchAction)
+			require.True(t, ok, "action is not a PatchAction")
+
+			patch := make(map[string]interface{})
+			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+			// check the URL
+			assert.True(t, collections.HasKeyAndVal(patch, "status.downloadURL", tc.expectedURL), "patch's status.downloadURL does not match")
+
+			// check the Phase
+			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(tc.expectedPhase)), "patch's status.phase does not match")
+
+			// check that Expiration exists
+			// TODO pass a fake clock to the controller and verify
+			// the expiration value
+			assert.True(t, collections.Exists(patch, "status.expiration"), "patch's status.expiration does not exist")
+
+			// we expect 3 total updates.
+			res, _ := collections.GetMap(patch, "status")
+			assert.Equal(t, 3, len(res), "patch's status has the wrong number of keys")
 		})
 	}
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"io"
 	"testing"
 	"time"
@@ -25,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -34,10 +34,10 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/restore"
-	. "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/util/collections"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 type fakeBackupper struct {
@@ -56,7 +56,7 @@ func TestProcessBackup(t *testing.T) {
 		expectError      bool
 		expectedIncludes []string
 		expectedExcludes []string
-		backup           *TestBackup
+		backup           *arktest.TestBackup
 		expectBackup     bool
 		allowSnapshots   bool
 	}{
@@ -73,49 +73,49 @@ func TestProcessBackup(t *testing.T) {
 		{
 			name:         "do not process phase FailedValidation",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailedValidation),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailedValidation),
 			expectBackup: false,
 		},
 		{
 			name:         "do not process phase InProgress",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseInProgress),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseInProgress),
 			expectBackup: false,
 		},
 		{
 			name:         "do not process phase Completed",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseCompleted),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseCompleted),
 			expectBackup: false,
 		},
 		{
 			name:         "do not process phase Failed",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailed),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailed),
 			expectBackup: false,
 		},
 		{
 			name:         "do not process phase other",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase("arg"),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase("arg"),
 			expectBackup: false,
 		},
 		{
 			name:         "invalid included/excluded resources fails validation",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("foo").WithExcludedResources("foo"),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("foo").WithExcludedResources("foo"),
 			expectBackup: false,
 		},
 		{
 			name:         "invalid included/excluded namespaces fails validation",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("foo").WithExcludedNamespaces("foo"),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("foo").WithExcludedNamespaces("foo"),
 			expectBackup: false,
 		},
 		{
 			name:             "make sure specified included and excluded resources are honored",
 			key:              "heptio-ark/backup1",
-			backup:           NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("i", "j").WithExcludedResources("k", "l"),
+			backup:           arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("i", "j").WithExcludedResources("k", "l"),
 			expectedIncludes: []string{"i", "j"},
 			expectedExcludes: []string{"k", "l"},
 			expectBackup:     true,
@@ -123,25 +123,25 @@ func TestProcessBackup(t *testing.T) {
 		{
 			name:         "if includednamespaces are specified, don't default to *",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
 			expectBackup: true,
 		},
 		{
 			name:         "ttl",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
 			expectBackup: true,
 		},
 		{
 			name:         "backup with SnapshotVolumes when allowSnapshots=false fails validation",
 			key:          "heptio-ark/backup1",
-			backup:       NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
 			expectBackup: false,
 		},
 		{
 			name:           "backup with SnapshotVolumes when allowSnapshots=true gets executed",
 			key:            "heptio-ark/backup1",
-			backup:         NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			backup:         arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
 			allowSnapshots: true,
 			expectBackup:   true,
 		},
@@ -152,9 +152,9 @@ func TestProcessBackup(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				backupper       = &fakeBackupper{}
-				cloudBackups    = &BackupService{}
+				cloudBackups    = &arktest.BackupService{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger, _       = testlogger.NewNullLogger()
+				logger          = arktest.NewLogger()
 				pluginManager   = &MockManager{}
 			)
 
@@ -182,9 +182,7 @@ func TestProcessBackup(t *testing.T) {
 				}
 
 				// set up a Backup object to represent what we expect to be passed to backupper.Backup()
-				copy, err := scheme.Scheme.Copy(test.backup.Backup)
-				assert.NoError(t, err, "copy error")
-				backup := copy.(*v1.Backup)
+				backup := test.backup.DeepCopy()
 				backup.Spec.IncludedResources = test.expectedIncludes
 				backup.Spec.ExcludedResources = test.expectedExcludes
 				backup.Spec.IncludedNamespaces = test.backup.Spec.IncludedNamespaces
@@ -200,16 +198,35 @@ func TestProcessBackup(t *testing.T) {
 				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
 			}
 
-			// this is necessary so the Update() call returns the appropriate object
-			client.PrependReactor("update", "backups", func(action core.Action) (bool, runtime.Object, error) {
-				obj := action.(core.UpdateAction).GetObject()
-				// need to deep copy so we can test the backup state for each call to update
-				copy, err := scheme.Scheme.DeepCopy(obj)
-				if err != nil {
+			// this is necessary so the Patch() call returns the appropriate object
+			client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+				if test.backup == nil {
+					return true, nil, nil
+				}
+
+				patch := action.(core.PatchAction).GetPatch()
+				patchMap := make(map[string]interface{})
+
+				if err := json.Unmarshal(patch, &patchMap); err != nil {
+					t.Logf("error unmarshalling patch: %s\n", err)
 					return false, nil, err
 				}
-				ret := copy.(runtime.Object)
-				return true, ret, nil
+
+				phase, err := collections.GetString(patchMap, "status.phase")
+				if err != nil {
+					t.Logf("error getting status.phase: %s\n", err)
+					return false, nil, err
+				}
+
+				res := test.backup.DeepCopy()
+
+				// these are the fields that we expect to be set by
+				// the controller
+				res.Status.Version = 1
+				res.Status.Expiration.Time = expiration
+				res.Status.Phase = v1.BackupPhase(phase)
+
+				return true, res, nil
 			})
 
 			// method under test
@@ -227,41 +244,41 @@ func TestProcessBackup(t *testing.T) {
 				return
 			}
 
-			expectedActions := []core.Action{
-				core.NewUpdateAction(
-					v1.SchemeGroupVersion.WithResource("backups"),
-					v1.DefaultNamespace,
-					NewTestBackup().
-						WithName(test.backup.Name).
-						WithPhase(v1.BackupPhaseInProgress).
-						WithIncludedResources(test.expectedIncludes...).
-						WithExcludedResources(test.expectedExcludes...).
-						WithIncludedNamespaces(test.backup.Spec.IncludedNamespaces...).
-						WithTTL(test.backup.Spec.TTL.Duration).
-						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
-						WithExpiration(expiration).
-						WithVersion(1).
-						Backup,
-				),
+			actions := client.Actions()
+			require.Equal(t, 2, len(actions))
 
-				core.NewUpdateAction(
-					v1.SchemeGroupVersion.WithResource("backups"),
-					v1.DefaultNamespace,
-					NewTestBackup().
-						WithName(test.backup.Name).
-						WithPhase(v1.BackupPhaseCompleted).
-						WithIncludedResources(test.expectedIncludes...).
-						WithExcludedResources(test.expectedExcludes...).
-						WithIncludedNamespaces(test.backup.Spec.IncludedNamespaces...).
-						WithTTL(test.backup.Spec.TTL.Duration).
-						WithSnapshotVolumesPointer(test.backup.Spec.SnapshotVolumes).
-						WithExpiration(expiration).
-						WithVersion(1).
-						Backup,
-				),
+			// validate Patch call 1 (setting version, expiration, and phase)
+			patchAction, ok := actions[0].(core.PatchAction)
+			require.True(t, ok, "action is not a PatchAction")
+
+			patch := make(map[string]interface{})
+			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+
+			expectedStatusKeys := 2
+			if test.backup.Spec.TTL.Duration > 0 {
+				assert.True(t, collections.HasKeyAndVal(patch, "status.expiration", expiration.UTC().Format(time.RFC3339)), "patch's status.expiration does not match")
+				expectedStatusKeys = 3
 			}
 
-			assert.Equal(t, expectedActions, client.Actions())
+			assert.True(t, collections.HasKeyAndVal(patch, "status.version", float64(1)))
+			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(v1.BackupPhaseInProgress)), "patch's status.phase does not match")
+
+			res, _ := collections.GetMap(patch, "status")
+			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+
+			// validate Patch call 2 (setting phase)
+			patchAction, ok = actions[1].(core.PatchAction)
+			require.True(t, ok, "action is not a PatchAction")
+
+			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+
+			res, _ = collections.GetMap(patch, "status")
+			assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
+			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(v1.BackupPhaseCompleted)), "patch's status.phase does not match")
 		})
 	}
 }

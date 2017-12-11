@@ -122,3 +122,14 @@ func Exists(root map[string]interface{}, path string) bool {
 	_, err := GetValue(root, path)
 	return err == nil
 }
+
+// HasKeyAndVal returns true if root[path] exists and the value
+// contained is equal to val, or false otherwise.
+func HasKeyAndVal(root map[string]interface{}, path string, val interface{}) bool {
+	valObj, err := GetValue(root, path)
+	if err != nil {
+		return false
+	}
+
+	return valObj == val
+}
