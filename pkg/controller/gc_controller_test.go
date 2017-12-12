@@ -20,7 +20,6 @@ import (
 	"testing"
 	"time"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -31,7 +30,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	. "github.com/heptio/ark/pkg/util/test"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 type gcTest struct {
@@ -51,7 +50,7 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "basic-expired",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-1").
+				arktest.NewTestBackup().WithName("backup-1").
 					WithExpiration(fakeClock.Now().Add(-1*time.Second)).
 					WithSnapshot("pv-1", "snapshot-1").
 					WithSnapshot("pv-2", "snapshot-2").
@@ -64,7 +63,7 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "basic-unexpired",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-1").
+				arktest.NewTestBackup().WithName("backup-1").
 					WithExpiration(fakeClock.Now().Add(1*time.Minute)).
 					WithSnapshot("pv-1", "snapshot-1").
 					WithSnapshot("pv-2", "snapshot-2").
@@ -77,12 +76,12 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "one expired, one unexpired",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-1").
+				arktest.NewTestBackup().WithName("backup-1").
 					WithExpiration(fakeClock.Now().Add(-1*time.Minute)).
 					WithSnapshot("pv-1", "snapshot-1").
 					WithSnapshot("pv-2", "snapshot-2").
 					Backup,
-				NewTestBackup().WithName("backup-2").
+				arktest.NewTestBackup().WithName("backup-2").
 					WithExpiration(fakeClock.Now().Add(1*time.Minute)).
 					WithSnapshot("pv-3", "snapshot-3").
 					WithSnapshot("pv-4", "snapshot-4").
@@ -95,7 +94,7 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "none expired in target bucket",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-2").
+				arktest.NewTestBackup().WithName("backup-2").
 					WithExpiration(fakeClock.Now().Add(1*time.Minute)).
 					WithSnapshot("pv-3", "snapshot-3").
 					WithSnapshot("pv-4", "snapshot-4").
@@ -108,7 +107,7 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "orphan snapshots",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-1").
+				arktest.NewTestBackup().WithName("backup-1").
 					WithExpiration(fakeClock.Now().Add(-1*time.Minute)).
 					WithSnapshot("pv-1", "snapshot-1").
 					WithSnapshot("pv-2", "snapshot-2").
@@ -121,12 +120,12 @@ func TestGarbageCollect(t *testing.T) {
 		{
 			name: "no snapshot service only GC's backups without snapshots",
 			backups: []*api.Backup{
-				NewTestBackup().WithName("backup-1").
+				arktest.NewTestBackup().WithName("backup-1").
 					WithExpiration(fakeClock.Now().Add(-1*time.Second)).
 					WithSnapshot("pv-1", "snapshot-1").
 					WithSnapshot("pv-2", "snapshot-2").
 					Backup,
-				NewTestBackup().WithName("backup-2").
+				arktest.NewTestBackup().WithName("backup-2").
 					WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
 					Backup,
 			},
@@ -138,12 +137,12 @@ func TestGarbageCollect(t *testing.T) {
 
 	for _, test := range tests {
 		var (
-			backupService   = &BackupService{}
-			snapshotService *FakeSnapshotService
+			backupService   = &arktest.BackupService{}
+			snapshotService *arktest.FakeSnapshotService
 		)
 
 		if !test.nilSnapshotService {
-			snapshotService = &FakeSnapshotService{SnapshotsTaken: test.snapshots}
+			snapshotService = &arktest.FakeSnapshotService{SnapshotsTaken: test.snapshots}
 		}
 
 		t.Run(test.name, func(t *testing.T) {
@@ -152,7 +151,7 @@ func TestGarbageCollect(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				snapSvc         cloudprovider.SnapshotService
 				bucket          = "bucket"
-				logger, _       = testlogger.NewNullLogger()
+				logger          = arktest.NewLogger()
 			)
 
 			if snapshotService != nil {
@@ -204,7 +203,7 @@ func TestGarbageCollectBackup(t *testing.T) {
 	}{
 		{
 			name: "deleteBackupFile=false, snapshot deletion fails, don't delete kube backup",
-			backup: NewTestBackup().WithName("backup-1").
+			backup: arktest.NewTestBackup().WithName("backup-1").
 				WithSnapshot("pv-1", "snapshot-1").
 				WithSnapshot("pv-2", "snapshot-2").
 				Backup,
@@ -215,12 +214,12 @@ func TestGarbageCollectBackup(t *testing.T) {
 		},
 		{
 			name:             "related restores should be deleted",
-			backup:           NewTestBackup().WithName("backup-1").Backup,
+			backup:           arktest.NewTestBackup().WithName("backup-1").Backup,
 			deleteBackupFile: true,
 			snapshots:        sets.NewString(),
 			restores: []*api.Restore{
-				NewTestRestore(api.DefaultNamespace, "restore-1", api.RestorePhaseCompleted).WithBackup("backup-1").Restore,
-				NewTestRestore(api.DefaultNamespace, "restore-2", api.RestorePhaseCompleted).WithBackup("backup-2").Restore,
+				arktest.NewTestRestore(api.DefaultNamespace, "restore-1", api.RestorePhaseCompleted).WithBackup("backup-1").Restore,
+				arktest.NewTestRestore(api.DefaultNamespace, "restore-2", api.RestorePhaseCompleted).WithBackup("backup-2").Restore,
 			},
 			expectedRestoreDeletes:         []string{"restore-1"},
 			expectedBackupDelete:           "backup-1",
@@ -232,12 +231,12 @@ func TestGarbageCollectBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				backupService   = &BackupService{}
-				snapshotService = &FakeSnapshotService{SnapshotsTaken: test.snapshots}
+				backupService   = &arktest.BackupService{}
+				snapshotService = &arktest.FakeSnapshotService{SnapshotsTaken: test.snapshots}
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				bucket          = "bucket-1"
-				logger, _       = testlogger.NewNullLogger()
+				logger          = arktest.NewLogger()
 				controller      = NewGCController(
 					backupService,
 					snapshotService,
@@ -298,8 +297,8 @@ func TestGarbageCollectBackup(t *testing.T) {
 
 func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	var (
-		backupService   = &BackupService{}
-		snapshotService = &FakeSnapshotService{}
+		backupService   = &arktest.BackupService{}
+		snapshotService = &arktest.FakeSnapshotService{}
 		fakeClock       = clock.NewFakeClock(time.Now())
 		assert          = assert.New(t)
 	)
@@ -307,7 +306,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	scenario := gcTest{
 		name: "basic-expired",
 		backups: []*api.Backup{
-			NewTestBackup().WithName("backup-1").
+			arktest.NewTestBackup().WithName("backup-1").
 				WithExpiration(fakeClock.Now().Add(1*time.Second)).
 				WithSnapshot("pv-1", "snapshot-1").
 				WithSnapshot("pv-2", "snapshot-2").
@@ -321,7 +320,7 @@ func TestGarbageCollectPicksUpBackupUponExpiration(t *testing.T) {
 	var (
 		client          = fake.NewSimpleClientset()
 		sharedInformers = informers.NewSharedInformerFactory(client, 0)
-		logger, _       = testlogger.NewNullLogger()
+		logger          = arktest.NewLogger()
 	)
 
 	controller := NewGCController(

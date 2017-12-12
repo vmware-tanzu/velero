@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/robfig/cron"
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -362,7 +361,7 @@ func TestParseCronSchedule(t *testing.T) {
 		},
 	}
 
-	logger, _ := testlogger.NewNullLogger()
+	logger := arktest.NewLogger()
 
 	c, errs := parseCronSchedule(s, logger)
 	require.Empty(t, errs)

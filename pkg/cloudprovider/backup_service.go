@@ -101,14 +101,14 @@ func getRestoreResultsKey(backup, restore string) string {
 type backupService struct {
 	objectStore ObjectStore
 	decoder     runtime.Decoder
-	logger      *logrus.Logger
+	logger      logrus.FieldLogger
 }
 
 var _ BackupService = &backupService{}
 var _ BackupGetter = &backupService{}
 
 // NewBackupService creates a backup service using the provided object store
-func NewBackupService(objectStore ObjectStore, logger *logrus.Logger) BackupService {
+func NewBackupService(objectStore ObjectStore, logger logrus.FieldLogger) BackupService {
 	return &backupService{
 		objectStore: objectStore,
 		decoder:     scheme.Codecs.UniversalDecoder(api.SchemeGroupVersion),
@@ -268,7 +268,7 @@ func NewBackupServiceWithCachedBackupGetter(
 	ctx context.Context,
 	delegate BackupService,
 	resyncPeriod time.Duration,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) BackupService {
 	return &cachedBackupService{
 		BackupService: delegate,

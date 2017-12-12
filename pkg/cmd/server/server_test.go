@@ -20,16 +20,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestApplyConfigDefaults(t *testing.T) {
 	var (
-		logger, _ = test.NewNullLogger()
-		c         = &v1.Config{}
+		logger = arktest.NewLogger()
+		c      = &v1.Config{}
 	)
 
 	// test defaulting

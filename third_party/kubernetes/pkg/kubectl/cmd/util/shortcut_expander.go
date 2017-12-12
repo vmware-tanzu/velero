@@ -39,12 +39,12 @@ type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
 	discoveryClient discovery.DiscoveryInterface
-	logger          *logrus.Logger
+	logger          logrus.FieldLogger
 }
 
 var _ meta.RESTMapper = &shortcutExpander{}
 
-func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, logger *logrus.Logger) (shortcutExpander, error) {
+func NewShortcutExpander(delegate meta.RESTMapper, client discovery.DiscoveryInterface, logger logrus.FieldLogger) (shortcutExpander, error) {
 	if client == nil {
 		return shortcutExpander{}, errors.New("Please provide discovery client to shortcut expander")
 	}

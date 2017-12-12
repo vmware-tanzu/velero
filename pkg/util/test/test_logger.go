@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewLogger() *logrus.Entry {
+func NewLogger() logrus.FieldLogger {
 	logger := logrus.New()
 	logger.Out = ioutil.Discard
 	return logrus.NewEntry(logger)

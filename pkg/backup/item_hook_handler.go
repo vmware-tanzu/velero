@@ -37,7 +37,7 @@ type itemHookHandler interface {
 	// to specify a hook, that is executed. Otherwise, this looks at the backup context's Backup to
 	// determine if there are any hooks relevant to the item, taking into account the hook spec's
 	// namespaces, resources, and label selector.
-	handleHooks(log *logrus.Entry, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook) error
+	handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook) error
 }
 
 // defaultItemHookHandler is the default itemHookHandler.
@@ -46,7 +46,7 @@ type defaultItemHookHandler struct {
 }
 
 func (h *defaultItemHookHandler) handleHooks(
-	log *logrus.Entry,
+	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
 	obj runtime.Unstructured,
 	resourceHooks []resourceHook,

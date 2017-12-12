@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,7 +31,7 @@ import (
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/test"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestProcessDownloadRequest(t *testing.T) {
@@ -99,8 +98,8 @@ func TestProcessDownloadRequest(t *testing.T) {
 				client                   = fake.NewSimpleClientset()
 				sharedInformers          = informers.NewSharedInformerFactory(client, 0)
 				downloadRequestsInformer = sharedInformers.Ark().V1().DownloadRequests()
-				backupService            = &test.BackupService{}
-				logger, _                = testlogger.NewNullLogger()
+				backupService            = &arktest.BackupService{}
+				logger                   = arktest.NewLogger()
 			)
 			defer backupService.AssertExpectations(t)
 

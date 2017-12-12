@@ -41,13 +41,13 @@ type backupCache struct {
 	// This doesn't really need to be a map right now, but if we ever move to supporting multiple
 	// buckets, this will be ready for it.
 	buckets map[string]*backupCacheBucket
-	logger  *logrus.Logger
+	logger  logrus.FieldLogger
 }
 
 var _ BackupGetter = &backupCache{}
 
 // NewBackupCache returns a new backup cache that refreshes from delegate every resyncPeriod.
-func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger *logrus.Logger) BackupGetter {
+func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger logrus.FieldLogger) BackupGetter {
 	c := &backupCache{
 		delegate: delegate,
 		buckets:  make(map[string]*backupCacheBucket),

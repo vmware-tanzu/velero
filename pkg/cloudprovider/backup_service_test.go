@@ -27,7 +27,6 @@ import (
 	"time"
 
 	testutil "github.com/heptio/ark/pkg/util/test"
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -36,6 +35,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/encode"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestUploadBackup(t *testing.T) {
@@ -85,7 +85,7 @@ func TestUploadBackup(t *testing.T) {
 				objStore   = &testutil.ObjectStore{}
 				bucket     = "test-bucket"
 				backupName = "test-backup"
-				logger, _  = testlogger.NewNullLogger()
+				logger     = arktest.NewLogger()
 			)
 
 			if test.metadata != nil {
@@ -118,10 +118,10 @@ func TestUploadBackup(t *testing.T) {
 
 func TestDownloadBackup(t *testing.T) {
 	var (
-		o         = &testutil.ObjectStore{}
-		bucket    = "b"
-		backup    = "bak"
-		logger, _ = testlogger.NewNullLogger()
+		o      = &testutil.ObjectStore{}
+		bucket = "b"
+		backup = "bak"
+		logger = arktest.NewLogger()
 	)
 	o.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
 
@@ -155,11 +155,11 @@ func TestDeleteBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bucket    = "bucket"
-				backup    = "bak"
-				objects   = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
-				objStore  = &testutil.ObjectStore{}
-				logger, _ = testlogger.NewNullLogger()
+				bucket   = "bucket"
+				backup   = "bak"
+				objects  = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
+				objStore = &testutil.ObjectStore{}
+				logger   = arktest.NewLogger()
 			)
 
 			objStore.On("ListObjects", bucket, backup+"/").Return(objects, test.listObjectsError)
@@ -229,9 +229,9 @@ func TestGetAllBackups(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bucket    = "bucket"
-				objStore  = &testutil.ObjectStore{}
-				logger, _ = testlogger.NewNullLogger()
+				bucket   = "bucket"
+				objStore = &testutil.ObjectStore{}
+				logger   = arktest.NewLogger()
 			)
 
 			objStore.On("ListCommonPrefixes", bucket, "/").Return([]string{"backup-1", "backup-2"}, nil)
@@ -328,7 +328,7 @@ func TestCreateSignedURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				objectStorage = &testutil.ObjectStore{}
-				logger, _     = testlogger.NewNullLogger()
+				logger        = arktest.NewLogger()
 				backupService = NewBackupService(objectStorage, logger)
 			)
 

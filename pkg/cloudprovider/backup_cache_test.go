@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -34,7 +33,7 @@ func TestNewBackupCache(t *testing.T) {
 	var (
 		delegate    = &test.FakeBackupService{}
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-		logger, _   = testlogger.NewNullLogger()
+		logger      = test.NewLogger()
 	)
 	defer cancel()
 
@@ -104,8 +103,8 @@ func TestNewBackupCache(t *testing.T) {
 
 func TestBackupCacheRefresh(t *testing.T) {
 	var (
-		delegate  = &test.FakeBackupService{}
-		logger, _ = testlogger.NewNullLogger()
+		delegate = &test.FakeBackupService{}
+		logger   = test.NewLogger()
 	)
 
 	c := &backupCache{
@@ -136,9 +135,9 @@ func TestBackupCacheRefresh(t *testing.T) {
 
 func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 	var (
-		delegate  = &test.FakeBackupService{}
-		logger, _ = testlogger.NewNullLogger()
-		bucket1   = []*v1.Backup{
+		delegate = &test.FakeBackupService{}
+		logger   = test.NewLogger()
+		bucket1  = []*v1.Backup{
 			test.NewTestBackup().WithName("backup1").Backup,
 			test.NewTestBackup().WithName("backup2").Backup,
 		}

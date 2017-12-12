@@ -141,7 +141,7 @@ type server struct {
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
-	logger                *logrus.Logger
+	logger                logrus.FieldLogger
 	pluginManager         plugin.Manager
 }
 
@@ -272,7 +272,7 @@ var defaultResourcePriorities = []string{
 	"configmaps",
 }
 
-func applyConfigDefaults(c *api.Config, logger *logrus.Logger) {
+func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
 	if c.GCSyncPeriod.Duration == 0 {
 		c.GCSyncPeriod.Duration = defaultGCSyncPeriod
 	}
@@ -567,7 +567,7 @@ func newRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	kubeClient kubernetes.Interface,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) (restore.Restorer, error) {
 	return restore.NewKubernetesRestorer(
 		discoveryHelper,

@@ -52,7 +52,7 @@ type downloadRequestController struct {
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
 	clock                       clock.Clock
-	logger                      *logrus.Logger
+	logger                      logrus.FieldLogger
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -61,7 +61,7 @@ func NewDownloadRequestController(
 	downloadRequestInformer informers.DownloadRequestInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{
 		downloadRequestClient:       downloadRequestClient,

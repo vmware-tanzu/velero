@@ -21,14 +21,13 @@ import (
 	"testing"
 	"time"
 
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	. "github.com/heptio/ark/pkg/util/test"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestBackupSyncControllerRun(t *testing.T) {
@@ -47,9 +46,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		{
 			name: "normal case",
 			cloudBackups: []*v1.Backup{
-				NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-				NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
-				NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
 			},
 		},
 	}
@@ -57,9 +56,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bs        = &BackupService{}
-				client    = fake.NewSimpleClientset()
-				logger, _ = testlogger.NewNullLogger()
+				bs     = &arktest.BackupService{}
+				client = fake.NewSimpleClientset()
+				logger = arktest.NewLogger()
 			)
 
 			c := NewBackupSyncController(
