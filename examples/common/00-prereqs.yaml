@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# three CRDs: backups, schedules, configs
+# namespace: heptio-ark
+# serviceaccount: ark
+# clusterrolebinding to cluster-admin, full privileges
+# role with *
+# 10Gi PVC ark-volume
+
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
@@ -91,7 +98,7 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: heptio-ark
+  name: ark
 
 ---
 apiVersion: v1
@@ -110,9 +117,9 @@ metadata:
   labels:
     component: ark
 subjects:
-  - kind: ServiceAccount
-    namespace: heptio-ark
-    name: ark
+- kind: ServiceAccount
+  namespace: heptio-ark
+  name: ark
 roleRef:
   kind: ClusterRole
   name: cluster-admin
@@ -127,12 +134,12 @@ metadata:
   labels:
     component: ark
 rules:
-  - apiGroups:
-      - ark.heptio.com
-    verbs:
-      - "*"
-    resources:
-      - "*"
+- apiGroups:
+  - ark.heptio.com
+  verbs:
+  - "*"
+  resources:
+  - "*"
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -143,9 +150,9 @@ metadata:
   labels:
     component: ark
 subjects:
-  - kind: ServiceAccount
-    namespace: heptio-ark
-    name: ark
+- kind: ServiceAccount
+  namespace: heptio-ark
+  name: ark
 roleRef:
   kind: Role
   name: ark

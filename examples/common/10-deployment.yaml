@@ -28,23 +28,23 @@ spec:
       restartPolicy: Always
       serviceAccountName: ark
       containers:
-        - name: ark
-          image: gcr.io/heptio-images/ark:latest
-          command:
-            - /ark
-          args:
-            - server
-          volumeMounts:
-            - name: cloud-credentials
-              mountPath: /credentials
-            - name: plugins
-              mountPath: /plugins
-          env:
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: /credentials/cloud
-      volumes:
+      - name: ark
+        image: gcr.io/heptio-images/ark:latest
+        command:
+        - /ark
+        args:
+        - server
+        volumeMounts:
         - name: cloud-credentials
-          secret:
-            secretName: cloud-credentials
+          mountPath: /credentials
         - name: plugins
-          emptyDir: {}
+          mountPath: /plugins
+        env:
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /credentials/cloud
+      volumes:
+      - name: cloud-credentials
+        secret:
+          secretName: cloud-credentials
+      - name: plugins
+        emptyDir: {}
