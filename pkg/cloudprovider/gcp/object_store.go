@@ -17,18 +17,18 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"io"
 	"io/ioutil"
 	"os"
 	"strings"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	// TODO switch to using newstorage
-	newstorage "cloud.google.com/go/storage"
-	storage "google.golang.org/api/storage/v1"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -36,7 +36,7 @@ import (
 const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 
 type objectStore struct {
-	gcs            *storage.Service
+	client         *storage.Client
 	googleAccessID string
 	privateKey     []byte
 }
@@ -67,78 +67,88 @@ func (o *objectStore) Init(config map[string]string) error {
 		return errors.Errorf("credentials file pointed to by %s does not contain a private key", credentialsEnvVar)
 	}
 
-	client, err := google.DefaultClient(oauth2.NoContext, storage.DevstorageReadWriteScope)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	gcs, err := storage.New(client)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	o.gcs = gcs
 	o.googleAccessID = jwtConfig.Email
 	o.privateKey = jwtConfig.PrivateKey
+
+	client, err := storage.NewClient(context.Background(), option.WithScopes(storage.ScopeReadWrite))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	o.client = client
 
 	return nil
 }
 
 func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
-	obj := &storage.Object{
-		Name: key,
-	}
+	w := o.client.Bucket(bucket).Object(key).NewWriter(context.Background())
+	defer w.Close()
 
-	_, err := o.gcs.Objects.Insert(bucket, obj).Media(body).Do()
+	_, err := io.Copy(w, body)
 
 	return errors.WithStack(err)
 }
 
 func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
-	res, err := o.gcs.Objects.Get(bucket, key).Download()
+	r, err := o.client.Bucket(bucket).Object(key).NewReader(context.Background())
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	return res.Body, nil
+	return r, nil
 }
 
 func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
-	res, err := o.gcs.Objects.List(bucket).Delimiter(delimiter).Do()
-	if err != nil {
-		return nil, errors.WithStack(err)
+	q := &storage.Query{
+		Delimiter: delimiter,
 	}
 
-	// GCP returns prefixes inclusive of the last delimiter. We need to strip
-	// it.
-	ret := make([]string, 0, len(res.Prefixes))
-	for _, prefix := range res.Prefixes {
-		ret = append(ret, prefix[0:strings.LastIndex(prefix, delimiter)])
-	}
+	var res []string
 
-	return ret, nil
+	iter := o.client.Bucket(bucket).Objects(context.Background(), q)
+
+	for {
+		obj, err := iter.Next()
+		if err == iterator.Done {
+			return res, nil
+		}
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		if obj.Prefix != "" {
+			res = append(res, obj.Prefix[0:strings.LastIndex(obj.Prefix, delimiter)])
+		}
+	}
 }
 
 func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
-	res, err := o.gcs.Objects.List(bucket).Prefix(prefix).Do()
-	if err != nil {
-		return nil, errors.WithStack(err)
+	q := &storage.Query{
+		Prefix: prefix,
 	}
 
-	ret := make([]string, 0, len(res.Items))
-	for _, item := range res.Items {
-		ret = append(ret, item.Name)
-	}
+	var res []string
 
-	return ret, nil
+	iter := o.client.Bucket(bucket).Objects(context.Background(), q)
+
+	for {
+		obj, err := iter.Next()
+		if err == iterator.Done {
+			return res, nil
+		}
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		res = append(res, obj.Name)
+	}
 }
 
 func (o *objectStore) DeleteObject(bucket string, key string) error {
-	return errors.Wrapf(o.gcs.Objects.Delete(bucket, key).Do(), "error deleting object %s", key)
+	return errors.Wrapf(o.client.Bucket(bucket).Object(key).Delete(context.Background()), "error deleting object %s", key)
 }
 
 func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	return newstorage.SignedURL(bucket, key, &newstorage.SignedURLOptions{
+	return storage.SignedURL(bucket, key, &storage.SignedURLOptions{
 		GoogleAccessID: o.googleAccessID,
 		PrivateKey:     o.privateKey,
 		Method:         "GET",
