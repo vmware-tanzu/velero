@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,8 +30,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -60,7 +63,7 @@ type backupController struct {
 	syncHandler      func(backupName string) error
 	queue            workqueue.RateLimitingInterface
 	clock            clock.Clock
-	logger           *logrus.Logger
+	logger           logrus.FieldLogger
 	pluginManager    plugin.Manager
 }
 
@@ -71,7 +74,7 @@ func NewBackupController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	pvProviderExists bool,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 	pluginManager plugin.Manager,
 ) Interface {
 	c := &backupController{
@@ -223,6 +226,8 @@ func (controller *backupController) processBackup(key string) error {
 	}
 
 	logContext.Debug("Cloning backup")
+	// store ref to original for creating patch
+	original := backup
 	// don't modify items in the cache
 	backup = backup.DeepCopy()
 
@@ -242,11 +247,13 @@ func (controller *backupController) processBackup(key string) error {
 	}
 
 	// update status
-	updatedBackup, err := controller.client.Backups(ns).Update(backup)
+	updatedBackup, err := patchBackup(original, backup, controller.client)
 	if err != nil {
 		return errors.Wrapf(err, "error updating Backup status to %s", backup.Status.Phase)
 	}
-	backup = updatedBackup
+	// store ref to just-updated item for creating patch
+	original = updatedBackup
+	backup = updatedBackup.DeepCopy()
 
 	if backup.Status.Phase == api.BackupPhaseFailedValidation {
 		return nil
@@ -260,11 +267,35 @@ func (controller *backupController) processBackup(key string) error {
 	}
 
 	logContext.Debug("Updating backup's final status")
-	if _, err = controller.client.Backups(ns).Update(backup); err != nil {
+	if _, err := patchBackup(original, backup, controller.client); err != nil {
 		logContext.WithError(err).Error("error updating backup's final status")
 	}
 
 	return nil
+}
+
+func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter) (*api.Backup, error) {
+	origBytes, err := json.Marshal(original)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling original backup")
+	}
+
+	updatedBytes, err := json.Marshal(updated)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling updated backup")
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Backup{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating two-way merge patch for backup")
+	}
+
+	res, err := client.Backups(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error patching backup")
+	}
+
+	return res, nil
 }
 
 func (controller *backupController) getValidationErrors(itm *api.Backup) []string {

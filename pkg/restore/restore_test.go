@@ -23,8 +23,6 @@ import (
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus/hooks/test"
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,7 +81,7 @@ func TestPrioritizeResources(t *testing.T) {
 		},
 	}
 
-	logger, _ := test.NewNullLogger()
+	logger := arktest.NewLogger()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -180,7 +178,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			log, _ := testlogger.NewNullLogger()
+			log := arktest.NewLogger()
 
 			ctx := &context{
 				restore:              test.restore,
@@ -272,7 +270,7 @@ func TestRestorePriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			log, _ := testlogger.NewNullLogger()
+			log := arktest.NewLogger()
 
 			ctx := &context{
 				restore:              test.restore,

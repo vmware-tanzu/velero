@@ -36,7 +36,7 @@ type backupSyncController struct {
 	backupService cloudprovider.BackupService
 	bucket        string
 	syncPeriod    time.Duration
-	logger        *logrus.Logger
+	logger        logrus.FieldLogger
 }
 
 func NewBackupSyncController(
@@ -44,7 +44,7 @@ func NewBackupSyncController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	syncPeriod time.Duration,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {
 		logger.Infof("Provided backup sync period %v is too short. Setting to 1 minute", syncPeriod)

@@ -38,7 +38,7 @@ type mockItemHookHandler struct {
 	mock.Mock
 }
 
-func (h *mockItemHookHandler) handleHooks(log *logrus.Entry, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook) error {
+func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook) error {
 	args := h.Called(log, groupResource, obj, resourceHooks)
 	return args.Error(0)
 }

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -25,9 +26,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
@@ -35,6 +36,7 @@ import (
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -120,7 +122,9 @@ func TestProcessRestore(t *testing.T) {
 		restorerError               error
 		allowRestoreSnapshots       bool
 		expectedErr                 bool
-		expectedRestoreUpdates      []*api.Restore
+		expectedPhase               string
+		expectedValidationErrors    []string
+		expectedRestoreErrors       int
 		expectedRestorerCall        *api.Restore
 		backupServiceGetBackupError error
 		uploadLogError              error
@@ -151,73 +155,53 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:        "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
-			restore:     NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseFailedValidation).WithExcludedNamespace("another-1").
-					WithValidationError("Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: another-1").
-					Restore,
-			},
+			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
+			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:              false,
+			expectedPhase:            string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: another-1"},
 		},
 		{
-			name:        "restore with resource in both includedResources and excludedResources fails validation",
-			restore:     NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).WithExcludedResource("a-resource").Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseFailedValidation).WithExcludedResource("a-resource").
-					WithValidationError("Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: a-resource").
-					Restore,
-			},
+			name:                     "restore with resource in both includedResources and excludedResources fails validation",
+			restore:                  NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).WithExcludedResource("a-resource").Restore,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:              false,
+			expectedPhase:            string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: a-resource"},
 		},
 		{
-			name:        "new restore with empty backup name fails validation",
-			restore:     NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Restore,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseFailedValidation).
-					WithValidationError("BackupName must be non-empty and correspond to the name of a backup in object storage.").
-					Restore,
-			},
+			name:                     "new restore with empty backup name fails validation",
+			restore:                  NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Restore,
+			expectedErr:              false,
+			expectedPhase:            string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{"BackupName must be non-empty and correspond to the name of a backup in object storage."},
 		},
 
 		{
-			name:        "restore with non-existent backup name fails",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
-					WithErrors(1).
-					Restore,
-			},
+			name:                        "restore with non-existent backup name fails",
+			restore:                     arktest.NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+			expectedErr:                 false,
+			expectedPhase:               string(api.RestorePhaseInProgress),
+			expectedRestoreErrors:       1,
 			backupServiceGetBackupError: errors.New("no backup here"),
 		},
 		{
-			name:          "restorer throwing an error causes the restore to fail",
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
-			restorerError: errors.New("blarg"),
-			expectedErr:   false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).
-					WithErrors(1).
-					Restore,
-			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
+			name:                  "restorer throwing an error causes the restore to fail",
+			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
+			backup:                arktest.NewTestBackup().WithName("backup-1").Backup,
+			restorerError:         errors.New("blarg"),
+			expectedErr:           false,
+			expectedPhase:         string(api.RestorePhaseInProgress),
+			expectedRestoreErrors: 1,
+			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
 		{
-			name:        "valid restore gets executed",
-			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).Restore,
-			},
+			name:                 "valid restore gets executed",
+			restore:              NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
+			backup:               arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:          false,
+			expectedPhase:        string(api.RestorePhaseInProgress),
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
 		{
@@ -226,34 +210,26 @@ func TestProcessRestore(t *testing.T) {
 			backup:                arktest.NewTestBackup().WithName("backup-1").Backup,
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseCompleted).WithRestorePVs(true).Restore,
-			},
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
+			expectedPhase:         string(api.RestorePhaseInProgress),
+			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
 		},
 		{
-			name:        "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
-			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseFailedValidation).
-					WithRestorePVs(true).
-					WithValidationError("Server is not configured for PV snapshot restores").
-					Restore,
-			},
+			name:                     "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:              false,
+			expectedPhase:            string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{"Server is not configured for PV snapshot restores"},
 		},
 		{
-			name:        "restoration of nodes is not supported",
-			restore:     NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedErr: false,
-			expectedRestoreUpdates: []*api.Restore{
-				NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseFailedValidation).
-					WithValidationError("nodes are a non-restorable resource").
-					WithValidationError("Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: nodes").
-					Restore,
+			name:          "restoration of nodes is not supported",
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:   false,
+			expectedPhase: string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{
+				"nodes are a non-restorable resource",
+				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: nodes",
 			},
 		},
 	}
@@ -288,16 +264,34 @@ func TestProcessRestore(t *testing.T) {
 			if test.restore != nil {
 				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
 
-				// this is necessary so the Update() call returns the appropriate object
-				client.PrependReactor("update", "restores", func(action core.Action) (bool, runtime.Object, error) {
-					obj := action.(core.UpdateAction).GetObject()
-					// need to deep copy so we can test the backup state for each call to update
-					copy, err := scheme.Scheme.DeepCopy(obj)
-					if err != nil {
+				// this is necessary so the Patch() call returns the appropriate object
+				client.PrependReactor("patch", "restores", func(action core.Action) (bool, runtime.Object, error) {
+					if test.restore == nil {
+						return true, nil, nil
+					}
+
+					patch := action.(core.PatchAction).GetPatch()
+					patchMap := make(map[string]interface{})
+
+					if err := json.Unmarshal(patch, &patchMap); err != nil {
+						t.Logf("error unmarshalling patch: %s\n", err)
 						return false, nil, err
 					}
-					ret := copy.(runtime.Object)
-					return true, ret, nil
+
+					phase, err := collections.GetString(patchMap, "status.phase")
+					if err != nil {
+						t.Logf("error getting status.phase: %s\n", err)
+						return false, nil, err
+					}
+
+					res := test.restore.DeepCopy()
+
+					// these are the fields that we expect to be set by
+					// the controller
+
+					res.Status.Phase = api.RestorePhase(phase)
+
+					return true, res, nil
 				})
 			}
 
@@ -346,32 +340,75 @@ func TestProcessRestore(t *testing.T) {
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 
-			if test.expectedRestoreUpdates != nil {
-				var expectedActions []core.Action
+			actions := client.Actions()
 
-				for _, upd := range test.expectedRestoreUpdates {
-					action := core.NewUpdateAction(
-						api.SchemeGroupVersion.WithResource("restores"),
-						upd.Namespace,
-						upd)
-
-					expectedActions = append(expectedActions, action)
-				}
-
-				assert.Equal(t, expectedActions, client.Actions())
+			if test.expectedPhase == "" {
+				require.Equal(t, 0, len(actions), "len(actions) should be zero")
+				return
 			}
 
+			// validate Patch call 1 (setting phase, validation errs)
+			require.True(t, len(actions) > 0, "len(actions) is too small")
+
+			patchAction, ok := actions[0].(core.PatchAction)
+			require.True(t, ok, "action is not a PatchAction")
+
+			patch := make(map[string]interface{})
+			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+			expectedStatusKeys := 1
+
+			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
+
+			if len(test.expectedValidationErrors) > 0 {
+				errs, err := collections.GetSlice(patch, "status.validationErrors")
+				require.NoError(t, err, "error getting patch's status.validationErrors")
+
+				var errStrings []string
+				for _, err := range errs {
+					errStrings = append(errStrings, err.(string))
+				}
+
+				assert.Equal(t, test.expectedValidationErrors, errStrings, "patch's status.validationErrors does not match")
+
+				expectedStatusKeys++
+			}
+
+			res, _ := collections.GetMap(patch, "status")
+			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+
+			// if we don't expect a restore, validate it wasn't called and exit the test
 			if test.expectedRestorerCall == nil {
 				assert.Empty(t, restorer.Calls)
 				assert.Zero(t, restorer.calledWithArg)
-			} else {
-				assert.Equal(t, 1, len(restorer.Calls))
-
-				// explicitly capturing the argument passed to Restore myself because
-				// I want to validate the called arg as of the time of calling, but
-				// the mock stores the pointer, which gets modified after
-				assert.Equal(t, *test.expectedRestorerCall, restorer.calledWithArg)
+				return
 			}
+			assert.Equal(t, 1, len(restorer.Calls))
+
+			// validate Patch call 2 (setting phase)
+			patchAction, ok = actions[1].(core.PatchAction)
+			require.True(t, ok, "action is not a PatchAction")
+
+			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+
+			res, _ = collections.GetMap(patch, "status")
+			expectedStatusKeys = 1
+
+			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(api.RestorePhaseCompleted)), "patch's status.phase does not match")
+
+			if test.expectedRestoreErrors != 0 {
+				assert.True(t, collections.HasKeyAndVal(patch, "status.errors", float64(test.expectedRestoreErrors)), "patch's status.errors does not match")
+				expectedStatusKeys++
+			}
+
+			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has wrong number of keys")
+
+			// explicitly capturing the argument passed to Restore myself because
+			// I want to validate the called arg as of the time of calling, but
+			// the mock stores the pointer, which gets modified after
+			assert.Equal(t, *test.expectedRestorerCall, restorer.calledWithArg)
 		})
 	}
 }

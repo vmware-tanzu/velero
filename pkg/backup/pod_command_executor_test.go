@@ -270,7 +270,7 @@ type mockPodCommandExecutor struct {
 	mock.Mock
 }
 
-func (e *mockPodCommandExecutor) executePodCommand(log *logrus.Entry, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
+func (e *mockPodCommandExecutor) executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
 	args := e.Called(log, item, namespace, name, hookName, hook)
 	return args.Error(0)
 }

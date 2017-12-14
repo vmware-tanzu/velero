@@ -70,7 +70,7 @@ type kubernetesRestorer struct {
 	namespaceClient    corev1.NamespaceInterface
 	resourcePriorities []string
 	fileSystem         FileSystem
-	logger             *logrus.Logger
+	logger             logrus.FieldLogger
 }
 
 // prioritizeResources returns an ordered, fully-resolved list of resources to restore based on
@@ -140,7 +140,7 @@ func NewKubernetesRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
 		discoveryHelper:    discoveryHelper,

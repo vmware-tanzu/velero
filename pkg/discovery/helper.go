@@ -49,7 +49,7 @@ type Helper interface {
 
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
-	logger          *logrus.Logger
+	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
 	lock         sync.RWMutex
@@ -60,7 +60,7 @@ type helper struct {
 
 var _ Helper = &helper{}
 
-func NewHelper(discoveryClient discovery.DiscoveryInterface, logger *logrus.Logger) (Helper, error) {
+func NewHelper(discoveryClient discovery.DiscoveryInterface, logger logrus.FieldLogger) (Helper, error) {
 	h := &helper{
 		discoveryClient: discoveryClient,
 	}

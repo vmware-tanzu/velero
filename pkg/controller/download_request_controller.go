@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -27,7 +28,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -49,7 +52,7 @@ type downloadRequestController struct {
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
 	clock                       clock.Clock
-	logger                      *logrus.Logger
+	logger                      logrus.FieldLogger
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -58,7 +61,7 @@ func NewDownloadRequestController(
 	downloadRequestInformer informers.DownloadRequestInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{
 		downloadRequestClient:       downloadRequestClient,
@@ -220,7 +223,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	update.Status.Phase = v1.DownloadRequestPhaseProcessed
 	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(signedURLTTL))
 
-	_, err = c.downloadRequestClient.DownloadRequests(update.Namespace).Update(update)
+	_, err = patchDownloadRequest(downloadRequest, update, c.downloadRequestClient)
 	return errors.WithStack(err)
 }
 
@@ -255,4 +258,28 @@ func (c *downloadRequestController) resync() {
 
 		c.queue.Add(key)
 	}
+}
+
+func patchDownloadRequest(original, updated *v1.DownloadRequest, client arkv1client.DownloadRequestsGetter) (*v1.DownloadRequest, error) {
+	origBytes, err := json.Marshal(original)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling original download request")
+	}
+
+	updatedBytes, err := json.Marshal(updated)
+	if err != nil {
+		return nil, errors.Wrap(err, "error marshalling updated download request")
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, v1.DownloadRequest{})
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating two-way merge patch for download request")
+	}
+
+	res, err := client.DownloadRequests(v1.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "error patching download request")
+	}
+
+	return res, nil
 }

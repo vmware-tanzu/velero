@@ -17,37 +17,39 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/robfig/cron"
-	testlogger "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/client-go/kubernetes/scheme"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	. "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/util/collections"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestProcessSchedule(t *testing.T) {
 	tests := []struct {
-		name                             string
-		scheduleKey                      string
-		schedule                         *api.Schedule
-		fakeClockTime                    string
-		expectedErr                      bool
-		expectedSchedulePhaseUpdate      *api.Schedule
-		expectedScheduleLastBackupUpdate *api.Schedule
-		expectedBackupCreate             *api.Backup
+		name                    string
+		scheduleKey             string
+		schedule                *api.Schedule
+		fakeClockTime           string
+		expectedErr             bool
+		expectedPhase           string
+		expectedValidationError string
+		expectedBackupCreate    *api.Backup
+		expectedLastBackup      string
 	}{
 		{
 			name:        "invalid key returns error",
@@ -61,70 +63,64 @@ func TestProcessSchedule(t *testing.T) {
 		},
 		{
 			name:        "schedule with phase FailedValidation does not get processed",
-			schedule:    NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).Schedule,
+			schedule:    arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).Schedule,
 			expectedErr: false,
 		},
 		{
-			name:        "schedule with phase New gets validated and failed if invalid",
-			schedule:    NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
-			expectedErr: false,
-			expectedSchedulePhaseUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).
-				WithValidationError("Schedule must be a non-empty valid Cron expression").Schedule,
+			name:                    "schedule with phase New gets validated and failed if invalid",
+			schedule:                arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
+			expectedErr:             false,
+			expectedPhase:           string(api.SchedulePhaseFailedValidation),
+			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
 		},
 		{
-			name:        "schedule with phase <blank> gets validated and failed if invalid",
-			schedule:    NewTestSchedule("ns", "name").Schedule,
-			expectedErr: false,
-			expectedSchedulePhaseUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).
-				WithValidationError("Schedule must be a non-empty valid Cron expression").Schedule,
+			name:                    "schedule with phase <blank> gets validated and failed if invalid",
+			schedule:                arktest.NewTestSchedule("ns", "name").Schedule,
+			expectedErr:             false,
+			expectedPhase:           string(api.SchedulePhaseFailedValidation),
+			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
 		},
 		{
-			name:        "schedule with phase Enabled gets re-validated and failed if invalid",
-			schedule:    NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
-			expectedErr: false,
-			expectedSchedulePhaseUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).
-				WithValidationError("Schedule must be a non-empty valid Cron expression").Schedule,
+			name:                    "schedule with phase Enabled gets re-validated and failed if invalid",
+			schedule:                arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
+			expectedErr:             false,
+			expectedPhase:           string(api.SchedulePhaseFailedValidation),
+			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
 		},
 		{
-			name:                        "schedule with phase New gets validated and triggers a backup",
-			schedule:                    NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).WithCronSchedule("@every 5m").Schedule,
-			fakeClockTime:               "2017-01-01 12:00:00",
-			expectedErr:                 false,
-			expectedSchedulePhaseUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
-			expectedBackupCreate:        NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
-			expectedScheduleLastBackupUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
-				WithCronSchedule("@every 5m").WithLastBackupTime("2017-01-01 12:00:00").Schedule,
+			name:                 "schedule with phase New gets validated and triggers a backup",
+			schedule:             arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).WithCronSchedule("@every 5m").Schedule,
+			fakeClockTime:        "2017-01-01 12:00:00",
+			expectedErr:          false,
+			expectedPhase:        string(api.SchedulePhaseEnabled),
+			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name:                 "schedule with phase Enabled gets re-validated and triggers a backup if valid",
-			schedule:             NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
+			schedule:             arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
-			expectedScheduleLastBackupUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
-				WithCronSchedule("@every 5m").WithLastBackupTime("2017-01-01 12:00:00").Schedule,
+			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name: "schedule that's already run gets LastBackup updated",
-			schedule: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
+			schedule: arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
 				WithCronSchedule("@every 5m").WithLastBackupTime("2000-01-01 00:00:00").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
-			expectedScheduleLastBackupUpdate: NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
-				WithCronSchedule("@every 5m").WithLastBackupTime("2017-01-01 12:00:00").Schedule,
+			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 	}
-
-	// flag.Set("logtostderr", "true")
-	// flag.Set("v", "4")
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger, _       = testlogger.NewNullLogger()
+				logger          = arktest.NewLogger()
 			)
 
 			c := NewScheduleController(
@@ -148,16 +144,36 @@ func TestProcessSchedule(t *testing.T) {
 			if test.schedule != nil {
 				sharedInformers.Ark().V1().Schedules().Informer().GetStore().Add(test.schedule)
 
-				// this is necessary so the Update() call returns the appropriate object
-				client.PrependReactor("update", "schedules", func(action core.Action) (bool, runtime.Object, error) {
-					obj := action.(core.UpdateAction).GetObject()
-					// need to deep copy so we can test the schedule state for each call to update
-					copy, err := scheme.Scheme.DeepCopy(obj)
-					if err != nil {
+				// this is necessary so the Patch() call returns the appropriate object
+				client.PrependReactor("patch", "schedules", func(action core.Action) (bool, runtime.Object, error) {
+					var (
+						patch    = action.(core.PatchAction).GetPatch()
+						patchMap = make(map[string]interface{})
+						res      = test.schedule.DeepCopy()
+					)
+
+					if err := json.Unmarshal(patch, &patchMap); err != nil {
+						t.Logf("error unmarshalling patch: %s\n", err)
 						return false, nil, err
 					}
-					ret := copy.(runtime.Object)
-					return true, ret, nil
+
+					// these are the fields that may be updated by the controller
+					phase, err := collections.GetString(patchMap, "status.phase")
+					if err == nil {
+						res.Status.Phase = api.SchedulePhase(phase)
+					}
+
+					lastBackupStr, err := collections.GetString(patchMap, "status.lastBackup")
+					if err == nil {
+						parsed, err := time.Parse(time.RFC3339, lastBackupStr)
+						if err != nil {
+							t.Logf("error parsing status.lastBackup: %s\n", err)
+							return false, nil, err
+						}
+						res.Status.LastBackup = metav1.Time{Time: parsed}
+					}
+
+					return true, res, nil
 				})
 			}
 
@@ -171,35 +187,86 @@ func TestProcessSchedule(t *testing.T) {
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 
-			expectedActions := make([]core.Action, 0)
+			actions := client.Actions()
+			index := 0
 
-			if upd := test.expectedSchedulePhaseUpdate; upd != nil {
-				action := core.NewUpdateAction(
-					api.SchemeGroupVersion.WithResource("schedules"),
-					upd.Namespace,
-					upd)
-				expectedActions = append(expectedActions, action)
+			if test.expectedPhase != "" {
+				require.True(t, len(actions) > index, "len(actions) is too small")
+
+				patchAction, ok := actions[index].(core.PatchAction)
+				require.True(t, ok, "action is not a PatchAction")
+
+				patch := make(map[string]interface{})
+				require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+
+				expectedStatusKeys := 1
+
+				assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
+
+				if test.expectedValidationError != "" {
+					errs, err := collections.GetSlice(patch, "status.validationErrors")
+					require.NoError(t, err, "error getting patch's status.validationErrors")
+
+					require.Equal(t, 1, len(errs))
+
+					assert.Equal(t, test.expectedValidationError, errs[0].(string), "patch's status.validationErrors does not match")
+
+					expectedStatusKeys++
+				}
+
+				res, _ := collections.GetMap(patch, "status")
+				assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+
+				index++
 			}
 
 			if created := test.expectedBackupCreate; created != nil {
+				require.True(t, len(actions) > index, "len(actions) is too small")
+
 				action := core.NewCreateAction(
 					api.SchemeGroupVersion.WithResource("backups"),
 					created.Namespace,
 					created)
-				expectedActions = append(expectedActions, action)
+
+				assert.Equal(t, action, actions[index])
+
+				index++
 			}
 
-			if upd := test.expectedScheduleLastBackupUpdate; upd != nil {
-				action := core.NewUpdateAction(
-					api.SchemeGroupVersion.WithResource("schedules"),
-					upd.Namespace,
-					upd)
-				expectedActions = append(expectedActions, action)
-			}
+			if test.expectedLastBackup != "" {
+				require.True(t, len(actions) > index, "len(actions) is too small")
 
-			assert.Equal(t, expectedActions, client.Actions())
+				patchAction, ok := actions[index].(core.PatchAction)
+				require.True(t, ok, "action is not a PatchAction")
+
+				patch := make(map[string]interface{})
+				require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+
+				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+
+				lastBackup, _ := collections.GetValue(patch, "status.lastBackup")
+				fmt.Println(lastBackup)
+
+				assert.True(
+					t,
+					collections.HasKeyAndVal(patch, "status.lastBackup", parseTime(test.expectedLastBackup).UTC().Format(time.RFC3339)),
+					"patch's status.lastBackup does not match",
+				)
+
+				res, _ := collections.GetMap(patch, "status")
+				assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
+
+				index++
+			}
 		})
 	}
+}
+
+func parseTime(timeString string) time.Time {
+	res, _ := time.Parse("2006-01-02 15:04:05", timeString)
+	return res
 }
 
 func TestGetNextRunTime(t *testing.T) {
@@ -294,7 +361,7 @@ func TestParseCronSchedule(t *testing.T) {
 		},
 	}
 
-	logger, _ := testlogger.NewNullLogger()
+	logger := arktest.NewLogger()
 
 	c, errs := parseCronSchedule(s, logger)
 	require.Empty(t, errs)

@@ -50,7 +50,7 @@ type gcController struct {
 	restoreLister       listers.RestoreLister
 	restoreListerSynced cache.InformerSynced
 	restoreClient       arkv1client.RestoresGetter
-	logger              *logrus.Logger
+	logger              logrus.FieldLogger
 }
 
 // NewGCController constructs a new gcController.
@@ -63,7 +63,7 @@ func NewGCController(
 	backupClient arkv1client.BackupsGetter,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
-	logger *logrus.Logger,
+	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {
 		logger.WithField("syncPeriod", syncPeriod).Info("Provided GC sync period is too short. Setting to 1 minute")
