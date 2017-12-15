@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark Contributors.
+Copyright 2017 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,28 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package delete
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cmd/cli/backup"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "backup",
-		Short: "Work with backups",
-		Long:  "Work with backups",
+		Use:   "delete",
+		Short: "Delete ark resources",
+		Long:  "Delete ark resources",
 	}
 
+	backupCommand := backup.NewDeleteCommand(f, "backup")
+	backupCommand.Aliases = []string{"backups"}
+
 	c.AddCommand(
-		NewCreateCommand(f, "create"),
-		NewGetCommand(f, "get"),
-		NewLogsCommand(f),
-		NewDescribeCommand(f, "describe"),
-		NewDownloadCommand(f),
-		NewDeleteCommand(f, "delete"),
+		backupCommand,
 	)
 
 	return c

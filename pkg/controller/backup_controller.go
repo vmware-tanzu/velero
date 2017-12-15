@@ -234,6 +234,11 @@ func (controller *backupController) processBackup(key string) error {
 	// set backup version
 	backup.Status.Version = backupVersion
 
+	// add GC finalizer if it's not there already
+	if !has(backup.Finalizers, gcFinalizer) {
+		backup.Finalizers = append(backup.Finalizers, gcFinalizer)
+	}
+
 	// calculate expiration
 	if backup.Spec.TTL.Duration > 0 {
 		backup.Status.Expiration = metav1.NewTime(controller.clock.Now().Add(backup.Spec.TTL.Duration))

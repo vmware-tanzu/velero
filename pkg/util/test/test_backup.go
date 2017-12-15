@@ -114,3 +114,18 @@ func (b *TestBackup) WithSnapshotVolumesPointer(value *bool) *TestBackup {
 	b.Spec.SnapshotVolumes = value
 	return b
 }
+
+func (b *TestBackup) WithDeletionTimestamp(time time.Time) *TestBackup {
+	b.DeletionTimestamp = &metav1.Time{Time: time}
+	return b
+}
+
+func (b *TestBackup) WithFinalizers(finalizers ...string) *TestBackup {
+	b.Finalizers = finalizers
+	return b
+}
+
+func (b *TestBackup) WithResourceVersion(version string) *TestBackup {
+	b.ResourceVersion = version
+	return b
+}

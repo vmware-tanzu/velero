@@ -190,6 +190,7 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
 				backup.Status.Version = 1
+				backup.Finalizers = []string{gcFinalizer}
 				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -225,6 +226,7 @@ func TestProcessBackup(t *testing.T) {
 				res.Status.Version = 1
 				res.Status.Expiration.Time = expiration
 				res.Status.Phase = v1.BackupPhase(phase)
+				res.Finalizers = []string{gcFinalizer}
 
 				return true, res, nil
 			})
@@ -247,14 +249,15 @@ func TestProcessBackup(t *testing.T) {
 			actions := client.Actions()
 			require.Equal(t, 2, len(actions))
 
-			// validate Patch call 1 (setting version, expiration, and phase)
+			// validate Patch call 1 (setting finalizer, version, expiration, and phase)
 			patchAction, ok := actions[0].(core.PatchAction)
 			require.True(t, ok, "action is not a PatchAction")
 
 			patch := make(map[string]interface{})
 			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
 
-			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
+			// should have metadata and status
+			assert.Equal(t, 2, len(patch), "patch has wrong number of keys")
 
 			expectedStatusKeys := 2
 			if test.backup.Spec.TTL.Duration > 0 {
@@ -268,10 +271,19 @@ func TestProcessBackup(t *testing.T) {
 			res, _ := collections.GetMap(patch, "status")
 			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
+			finalizers, err := collections.GetSlice(patch, "metadata.finalizers")
+			require.NoError(t, err, "patch does not contain metadata.finalizers")
+			assert.Equal(t, 1, len(finalizers))
+			assert.Equal(t, gcFinalizer, finalizers[0])
+
+			res, _ = collections.GetMap(patch, "metadata")
+			assert.Equal(t, 1, len(res), "patch's metadata has the wrong number of keys")
+
 			// validate Patch call 2 (setting phase)
 			patchAction, ok = actions[1].(core.PatchAction)
 			require.True(t, ok, "action is not a PatchAction")
 
+			patch = make(map[string]interface{})
 			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
 
 			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
