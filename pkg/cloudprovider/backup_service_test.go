@@ -46,36 +46,46 @@ func TestUploadBackup(t *testing.T) {
 		expectMetadataDelete bool
 		backup               io.ReadSeeker
 		backupError          error
+		expectBackupUpload   bool
 		log                  io.ReadSeeker
 		logError             error
 		expectedErr          string
 	}{
 		{
-			name:     "normal case",
-			metadata: newStringReadSeeker("foo"),
-			backup:   newStringReadSeeker("bar"),
-			log:      newStringReadSeeker("baz"),
+			name:               "normal case",
+			metadata:           newStringReadSeeker("foo"),
+			backup:             newStringReadSeeker("bar"),
+			expectBackupUpload: true,
+			log:                newStringReadSeeker("baz"),
 		},
 		{
-			name:          "error on metadata upload does not upload data or log",
+			name:          "error on metadata upload does not upload data",
 			metadata:      newStringReadSeeker("foo"),
 			metadataError: errors.New("md"),
+			log:           newStringReadSeeker("baz"),
 			expectedErr:   "md",
 		},
 		{
 			name:                 "error on data upload deletes metadata",
 			metadata:             newStringReadSeeker("foo"),
 			backup:               newStringReadSeeker("bar"),
+			expectBackupUpload:   true,
 			backupError:          errors.New("backup"),
 			expectMetadataDelete: true,
 			expectedErr:          "backup",
 		},
 		{
-			name:     "error on log upload is ok",
-			metadata: newStringReadSeeker("foo"),
-			backup:   newStringReadSeeker("bar"),
-			log:      newStringReadSeeker("baz"),
-			logError: errors.New("log"),
+			name:               "error on log upload is ok",
+			metadata:           newStringReadSeeker("foo"),
+			backup:             newStringReadSeeker("bar"),
+			expectBackupUpload: true,
+			log:                newStringReadSeeker("baz"),
+			logError:           errors.New("log"),
+		},
+		{
+			name:   "don't upload data when metadata is nil",
+			backup: newStringReadSeeker("bar"),
+			log:    newStringReadSeeker("baz"),
 		},
 	}
 
@@ -87,11 +97,12 @@ func TestUploadBackup(t *testing.T) {
 				backupName = "test-backup"
 				logger     = arktest.NewLogger()
 			)
+			defer objStore.AssertExpectations(t)
 
 			if test.metadata != nil {
 				objStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
 			}
-			if test.backup != nil {
+			if test.backup != nil && test.expectBackupUpload {
 				objStore.On("PutObject", bucket, backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
 			}
 			if test.log != nil {
@@ -111,7 +122,6 @@ func TestUploadBackup(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			objStore.AssertExpectations(t)
 		})
 	}
 }
@@ -372,5 +382,5 @@ func newStringReadSeeker(s string) *stringReadSeeker {
 }
 
 func (srs *stringReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	panic("not implemented")
+	return 0, nil
 }
