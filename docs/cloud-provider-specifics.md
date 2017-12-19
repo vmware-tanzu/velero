@@ -157,10 +157,10 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
 
 #### Credentials and configuration
 
-When using Google Kubernetes Engine (GKE), be sure to make your current IAM user a cluster-admin. See [their docs][22] for more information.
+When using Google Kubernetes Engine (GKE), be sure to make your current IAM user a cluster-admin, since creating RBAC objects requires it.
+See [their docs][22] for more information.
 
 In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
-
 
 ```bash
 kubectl apply -f examples/common/00-prereqs.yaml
