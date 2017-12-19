@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,8 +44,8 @@ func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-// Execute finds the PersistentVolume referenced by the provided
-// PersistentVolumeClaim and backs it up
+// Execute finds the PersistentVolume bound by the provided
+// PersistentVolumeClaim, if any, and backs it up
 func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
 	a.log.Info("Executing backupPVAction")
 
@@ -55,8 +54,12 @@ func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (
 	pvc := item.UnstructuredContent()
 
 	volumeName, err := collections.GetString(pvc, "spec.volumeName")
-	if err != nil {
-		return nil, nil, errors.WithMessage(err, "unable to get spec.volumeName")
+	// if there's no volume name, it's not an error, since it's possible
+	// for the PVC not be bound; don't return an additional PV item to
+	// back up.
+	if err != nil || volumeName == "" {
+		a.log.Info("No spec.volumeName found for PersistentVolumeClaim")
+		return nil, nil, nil
 	}
 
 	additionalItems = append(additionalItems, ResourceIdentifier{
