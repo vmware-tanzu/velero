@@ -270,6 +270,7 @@ var defaultResourcePriorities = []string{
 	"persistentvolumeclaims",
 	"secrets",
 	"configmaps",
+	"serviceaccounts",
 }
 
 func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
