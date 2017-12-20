@@ -34,7 +34,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		NewGetCommand(f, "get"),
 		NewLogsCommand(f),
 		NewDescribeCommand(f, "describe"),
-		NewDeleteCommand(f),
+		NewDeleteCommand(f, "delete"),
 	)
 
 	return c

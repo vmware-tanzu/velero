@@ -1,16 +1,20 @@
-## ark delete
+## ark delete schedule
 
-Delete ark resources
+Delete a schedule
 
 ### Synopsis
 
 
-Delete ark resources
+Delete a schedule
+
+```
+ark delete schedule NAME [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for delete
+  -h, --help   help for schedule
 ```
 
 ### Options inherited from parent commands
@@ -27,8 +31,5 @@ Delete ark resources
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark delete backup](ark_delete_backup.md)	 - Delete a backup
-* [ark delete restore](ark_delete_restore.md)	 - Delete a restore
-* [ark delete schedule](ark_delete_schedule.md)	 - Delete a schedule
+* [ark delete](ark_delete.md)	 - Delete ark resources
 
