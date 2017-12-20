@@ -37,9 +37,21 @@ func TestBackupPVAction(t *testing.T) {
 
 	a := NewBackupPVAction(arktest.NewLogger())
 
+	// no spec.volumeName should result in no error
+	// and no additional items
 	_, additional, err := a.Execute(pvc, backup)
-	assert.EqualError(t, err, "unable to get spec.volumeName: key volumeName not found")
+	assert.NoError(t, err)
+	assert.Len(t, additional, 0)
 
+	// empty spec.volumeName should result in no error
+	// and no additional items
+	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
+	_, additional, err = a.Execute(pvc, backup)
+	assert.NoError(t, err)
+	assert.Len(t, additional, 0)
+
+	// non-empty spec.volumeName should result in
+	// no error and an additional item for the PV
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = "myVolume"
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
