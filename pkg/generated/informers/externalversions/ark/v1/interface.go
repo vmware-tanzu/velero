@@ -37,35 +37,37 @@ type Interface interface {
 }
 
 type version struct {
-	internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	namespace        string
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
 // New returns a new Interface.
-func New(f internalinterfaces.SharedInformerFactory) Interface {
-	return &version{f}
+func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
+	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
 }
 
 // Backups returns a BackupInformer.
 func (v *version) Backups() BackupInformer {
-	return &backupInformer{factory: v.SharedInformerFactory}
+	return &backupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Configs returns a ConfigInformer.
 func (v *version) Configs() ConfigInformer {
-	return &configInformer{factory: v.SharedInformerFactory}
+	return &configInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DownloadRequests returns a DownloadRequestInformer.
 func (v *version) DownloadRequests() DownloadRequestInformer {
-	return &downloadRequestInformer{factory: v.SharedInformerFactory}
+	return &downloadRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Restores returns a RestoreInformer.
 func (v *version) Restores() RestoreInformer {
-	return &restoreInformer{factory: v.SharedInformerFactory}
+	return &restoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Schedules returns a ScheduleInformer.
 func (v *version) Schedules() ScheduleInformer {
-	return &scheduleInformer{factory: v.SharedInformerFactory}
+	return &scheduleInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

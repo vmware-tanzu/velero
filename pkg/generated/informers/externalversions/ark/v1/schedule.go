@@ -38,19 +38,34 @@ type ScheduleInformer interface {
 }
 
 type scheduleInformer struct {
-	factory internalinterfaces.SharedInformerFactory
+	factory          internalinterfaces.SharedInformerFactory
+	tweakListOptions internalinterfaces.TweakListOptionsFunc
+	namespace        string
 }
 
 // NewScheduleInformer constructs a new informer for Schedule type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
 func NewScheduleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredScheduleInformer(client, namespace, resyncPeriod, indexers, nil)
+}
+
+// NewFilteredScheduleInformer constructs a new informer for Schedule type.
+// Always prefer using an informer factory to get a shared informer instead of getting an independent
+// one. This reduces memory footprint and number of connections to the server.
+func NewFilteredScheduleInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.ArkV1().Schedules(namespace).List(options)
 			},
 			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+				if tweakListOptions != nil {
+					tweakListOptions(&options)
+				}
 				return client.ArkV1().Schedules(namespace).Watch(options)
 			},
 		},
@@ -60,12 +75,12 @@ func NewScheduleInformer(client versioned.Interface, namespace string, resyncPer
 	)
 }
 
-func defaultScheduleInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewScheduleInformer(client, meta_v1.NamespaceAll, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+func (f *scheduleInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredScheduleInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *scheduleInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&ark_v1.Schedule{}, defaultScheduleInformer)
+	return f.factory.InformerFor(&ark_v1.Schedule{}, f.defaultInformer)
 }
 
 func (f *scheduleInformer) Lister() v1.ScheduleLister {
