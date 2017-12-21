@@ -105,6 +105,10 @@ Now that you have your IAM user credentials stored in a Secret, you need to repl
 
 ### GCP
 
+There are two ways to use Kubernetes on Google's Cloud Platform - Kubernetes running on top of Google Compute Engine
+virtual machines, or through the Google Kubernetes Engine. The instructions provided here should work on either,
+with one noted exception.
+
 #### Service account creation
 
 To integrate Heptio Ark with GCP, you should follow the instructions below to create an Ark-specific [Service Account][15].
@@ -152,6 +156,9 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
     ```
 
 #### Credentials and configuration
+
+When using Google Kubernetes Engine (GKE), be sure to make your current IAM user a cluster-admin, since creating RBAC objects requires it.
+See [their docs][22] for more information.
 
 In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding:
 
@@ -441,4 +448,5 @@ ark restore create nginx-backup
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
+[22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control
 
