@@ -21,7 +21,7 @@ set -o pipefail
 # generate-internal-groups generates everything for a project with internal types, e.g. an
 # user-provided API server based on k8s.io/apiserver.
 
-if [ "$#" -le 5 ] || [ "${1}" == "--help" ]; then
+if [ "$#" -lt 5 ] || [ "${1}" == "--help" ]; then
   cat <<EOF
 Usage: $(basename $0) <generators> <output-package> <internal-apis-package> <extensiona-apis-package> <groups-versions> ...
 
@@ -87,7 +87,7 @@ fi
 if [ "${GENS}" = "all" ] || grep -qw "client" <<<"${GENS}"; then
   echo "Generating clientset for ${GROUPS_WITH_VERSIONS} at ${OUTPUT_PKG}/clientset"
   if [ -n "${INT_APIS_PKG}" ]; then
-    ${GOPATH}/bin/client-gen --clientset-name internalversion --input-base "" --input $(codegen::join "/," "${INT_FQ_APIS[@]}")/ --clientset-path ${OUTPUT_PKG}/clientset "$@"
+    ${GOPATH}/bin/client-gen --clientset-name internalversion --input-base "" --input $(codegen::join , $(printf '%s/ ' "${INT_FQ_APIS[@]}")) --clientset-path ${OUTPUT_PKG}/clientset "$@"
   fi
   ${GOPATH}/bin/client-gen --clientset-name versioned --input-base "" --input $(codegen::join , "${EXT_FQ_APIS[@]}") --clientset-path ${OUTPUT_PKG}/clientset "$@"
 fi
