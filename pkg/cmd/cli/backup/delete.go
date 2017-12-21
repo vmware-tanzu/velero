@@ -20,11 +20,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
+	"github.com/heptio/ark/pkg/controller"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
@@ -35,6 +38,16 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) != 1 {
 				c.Usage()
 				os.Exit(1)
+			}
+
+			kubeClient, err := f.KubeClient()
+			cmd.CheckError(err)
+
+			serverVersion, err := kubeutil.ServerVersion(kubeClient.Discovery())
+			cmd.CheckError(err)
+
+			if !serverVersion.AtLeast(controller.MinVersionForDelete) {
+				cmd.CheckError(errors.Errorf("this command requires the Kubernetes server version to be at least %s", controller.MinVersionForDelete))
 			}
 
 			arkClient, err := f.Client()

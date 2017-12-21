@@ -31,6 +31,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/util/version"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -41,6 +42,13 @@ import (
 )
 
 const gcFinalizer = "gc.ark.heptio.com"
+
+// MinVersionForDelete is the minimum Kubernetes server version that Ark
+// requires in order to be able to properly delete backups (including
+// the associated snapshots and object storage files). This is because
+// Ark uses finalizers on the backup CRD to implement garbage-collection
+// and deletion.
+var MinVersionForDelete = version.MustParseSemantic("1.7.5")
 
 // gcController removes expired backup content from object storage.
 type gcController struct {

@@ -55,6 +55,7 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/kube"
+	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 )
 
@@ -470,22 +471,31 @@ func (s *server) runControllers(config *api.Config) error {
 			wg.Done()
 		}()
 
-		gcController := controller.NewGCController(
-			s.backupService,
-			s.snapshotService,
-			config.BackupStorageProvider.Bucket,
-			config.GCSyncPeriod.Duration,
-			s.sharedInformerFactory.Ark().V1().Backups(),
-			s.arkClient.ArkV1(),
-			s.sharedInformerFactory.Ark().V1().Restores(),
-			s.arkClient.ArkV1(),
-			s.logger,
-		)
-		wg.Add(1)
-		go func() {
-			gcController.Run(ctx, 1)
-			wg.Done()
-		}()
+		serverVersion, err := kubeutil.ServerVersion(s.kubeClient.Discovery())
+		if err != nil {
+			return err
+		}
+
+		if !serverVersion.AtLeast(controller.MinVersionForDelete) {
+			s.logger.Errorf("Garbage-collection is disabled because it requires the Kubernetes server version to be at least %s", controller.MinVersionForDelete)
+		} else {
+			gcController := controller.NewGCController(
+				s.backupService,
+				s.snapshotService,
+				config.BackupStorageProvider.Bucket,
+				config.GCSyncPeriod.Duration,
+				s.sharedInformerFactory.Ark().V1().Backups(),
+				s.arkClient.ArkV1(),
+				s.sharedInformerFactory.Ark().V1().Restores(),
+				s.arkClient.ArkV1(),
+				s.logger,
+			)
+			wg.Add(1)
+			go func() {
+				gcController.Run(ctx, 1)
+				wg.Done()
+			}()
+		}
 	}
 
 	restorer, err := newRestorer(
