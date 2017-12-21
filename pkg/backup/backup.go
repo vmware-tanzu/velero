@@ -246,7 +246,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		}
 	}
 
-	err = kuberrs.NewAggregate(errs)
+	err = kuberrs.Flatten(kuberrs.NewAggregate(errs))
 	if err == nil {
 		log.Infof("Backup completed successfully")
 	} else {
