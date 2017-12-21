@@ -393,7 +393,7 @@ kubectl apply -f examples/nginx-app/base.yaml
 Now create a backup:
 
 ```bash
-ark backup create nginx-backup --selector app=nginx
+ark backup create nginx-backup --include-namespaces nginx-example
 ```
 
 Simulate a disaster:
@@ -418,17 +418,10 @@ Start the sample nginx app:
 kubectl apply -f examples/nginx-app/with-pv.yaml
 ```
 
-Because Kubernetes does not automatically transfer labels from PVCs to dynamically generated PVs, you need to do so manually:
-
-```bash
-nginx_pv_name=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="nginx-logs")].metadata.name}')
-kubectl label pv $nginx_pv_name app=nginx
-```
-
 Now create a backup with PV snapshotting:
 
 ```bash
-ark backup create nginx-backup --selector app=nginx
+ark backup create nginx-backup --include-namespaces nginx-example
 ```
 
 Simulate a disaster:
