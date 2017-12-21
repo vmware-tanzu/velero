@@ -19,19 +19,30 @@ While the [Quickstart][0] uses a local storage service to quickly set up Heptio 
 ## Setup
 ### AWS
 
+If you do not have the `aws` CLI locally installed, follow the [user guide][5] to set it up.
+
+#### S3 bucket creation
+
+Heptio Ark requires an object storage bucket in which to store backups. Create an S3 bucket (replacing placeholders appropriately):
+
+```bash
+aws s3api create-bucket \
+    --bucket <YOUR_BUCKET> \
+    --region <YOUR_REGION> \
+    --create-bucket-configuration LocationConstraint=<YOUR_REGION>
+```
+
 #### IAM user creation
 
 To integrate Heptio Ark with AWS, you should follow the instructions below to create an Ark-specific [IAM user][14].
 
-1. If you do not have the AWS CLI locally installed, follow the [user guide][5] to set it up.
-
-2. Create an IAM user:
+1. Create an IAM user:
 
     ```bash
     aws iam create-user --user-name heptio-ark
     ```
 
-3. Attach a policy to give `heptio-ark` the necessary permissions:
+2. Attach policies to give `heptio-ark` the necessary permissions:
 
     ```bash
     aws iam attach-user-policy \
@@ -42,7 +53,7 @@ To integrate Heptio Ark with AWS, you should follow the instructions below to cr
         --user-name heptio-ark
     ```
 
-4. Create an access key for the user:
+3. Create an access key for the user:
 
     ```bash
     aws iam create-access-key --user-name heptio-ark
@@ -61,14 +72,13 @@ To integrate Heptio Ark with AWS, you should follow the instructions below to cr
           }
      }
     ```
-5. Using the output from the previous command, create an Ark-specific credentials file (`credentials-ark`) in your local directory that looks like the following:
+4. Using the output from the previous command, create an Ark-specific credentials file (`credentials-ark`) in your local directory that looks like the following:
 
     ```
     [default]
     aws_access_key_id=<AWS_ACCESS_KEY_ID>
     aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
     ```
-
 
 #### Credentials and configuration
 
@@ -109,13 +119,21 @@ There are two ways to use Kubernetes on Google's Cloud Platform - Kubernetes run
 virtual machines, or through the Google Kubernetes Engine. The instructions provided here should work on either,
 with one noted exception.
 
+If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the [user guide][16] to set them up.
+
+#### GCS bucket creation
+
+Heptio Ark requires an object storage bucket in which to store backups. Create a GCS bucket (replacing placeholders appropriately):
+
+```bash
+gsutil mb gs://<YOUR_BUCKET>/
+```
+
 #### Service account creation
 
 To integrate Heptio Ark with GCP, you should follow the instructions below to create an Ark-specific [Service Account][15].
 
-1. If you do not have the gcloud CLI locally installed, follow the [user guide][16] to set it up.
-
-2. View your current config settings:
+1. View your current config settings:
 
     ```bash
     gcloud config list
@@ -137,7 +155,7 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
 
     Set the `$SERVICE_ACCOUNT_EMAIL` variable to match its `email` value.
 
-3. Attach policies to give `heptio-ark` the necessary permissions to function (replacing placeholders appropriately):
+3. Attach policies to give `heptio-ark` the necessary permissions to function:
 
     ```bash
     gcloud projects add-iam-policy-binding $PROJECT_ID \
@@ -192,19 +210,60 @@ Now that you have your Google Cloud credentials stored in a Secret, you need to 
 
 ### Azure
 
+If you do not have the `az` Azure CLI 2.0 locally installed, follow the [install guide][18] to set it up. Once done, run:
+
+```bash
+az login
+```
+
 #### Kubernetes cluster prerequisites
 
 Ensure that the VMs for your agent pool allow Managed Disks. If I/O performance is critical,
 consider using Premium Managed Disks, as these are SSD backed.
 
+#### Azure storage account and blob container creation
+
+Heptio Ark requires a storage account and blob container in which to store backups.
+
+The storage account can be created in the same Resource Group as your Kubernetes cluster or
+separated into its own Resource Group. The example below shows the storage account created in a
+separate `Ark_Backups` Resource Group.
+
+The storage account needs to be created with a globally unique id since this is used for dns. The
+random function ensures you don't have to come up with a unique name. The storage account is
+created with encryption at rest capabilities (Microsoft managed keys) and is configured to only
+allow access via https.
+
+```bash
+# Create a resource group for the backups storage account. Change the location as needed.
+AZURE_BACKUP_RESOURCE_GROUP=Ark_Backups
+az group create -n $AZURE_BACKUP_RESOURCE_GROUP --location WestUS
+
+# Create the storage account
+AZURE_STORAGE_ACCOUNT_ID="ark`cat /proc/sys/kernel/random/uuid | cut -d '-' -f5`"
+az storage account create \
+    --name $AZURE_STORAGE_ACCOUNT_ID \
+    --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
+    --sku Standard_GRS \
+    --encryption-services blob \
+    --https-only true \
+    --kind BlobStorage \
+    --access-tier Hot
+
+# Create the blob container named "ark". Feel free to use a different name; you'll need to
+# adjust the `bucket` field under `backupStorageProvider` in the Ark Config accordingly if you do.
+az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
+
+# Obtain the storage access key for the storage account just created
+AZURE_STORAGE_KEY=`az storage account keys list \
+    --account-name $AZURE_STORAGE_ACCOUNT_ID \
+    --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
+    --query [0].value \
+    -o tsv`
+```
+
 #### Service principal creation
 To integrate Heptio Ark with Azure, you should follow the instructions below to create an Ark-specific [service principal][17].
-
-1. If you do not have the `az` Azure CLI 2.0 locally installed, follow the [install guide][18] to set it up. Once done, run:
-
-    ```bash
-    az login
-    ```
 
 2. There are seven environment variables that need to be set for Heptio Ark to work properly. The following steps detail how to acquire these, in the process of setting up the necessary RBAC.
 
@@ -243,45 +302,6 @@ To integrate Heptio Ark with Azure, you should follow the instructions below to 
     # After creating the service principal, obtain the client id
     AZURE_CLIENT_ID=`az ad sp list --display-name "heptio-ark" --query '[0].appId' -o tsv`
     ```
-
-6. Create the storage account and blob container for Ark to store the backups in.
-
-    The storage account can be created in the same Resource Group as your Kubernetes cluster or
-    separated into its own Resource Group. The example below shows the storage account created in a
-    separate `Ark_Backups` Resource Group.
-
-    The storage account needs to be created with a globally unique id since this is used for dns. The
-    random function ensures you don't have to come up with a unique name. The storage account is
-    created with encryption at rest capabilities (Microsoft managed keys) and is configured to only
-    allow access via https.
-
-   ```bash
-    # Create a resource group for the backups storage account. Change the location as needed.
-    AZURE_BACKUP_RESOURCE_GROUP=Ark_Backups
-    az group create -n $AZURE_BACKUP_RESOURCE_GROUP --location WestUS
-
-    # Create the storage account
-    AZURE_STORAGE_ACCOUNT_ID="ark`cat /proc/sys/kernel/random/uuid | cut -d '-' -f5`"
-    az storage account create \
-      --name $AZURE_STORAGE_ACCOUNT_ID \
-      --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
-      --sku Standard_GRS \
-      --encryption-services blob \
-      --https-only true \
-      --kind BlobStorage \
-      --access-tier Hot
-
-    # Create the blob container named "ark". Feel free to use a different name; you'll need to
-    # adjust the `bucket` field under `backupStorageProvider` in the Ark Config accordingly if you do.
-    az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
-
-    # Obtain the storage access key for the storage account just created
-    AZURE_STORAGE_KEY=`az storage account keys list \
-      --account-name $AZURE_STORAGE_ACCOUNT_ID \
-      --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
-      --query [0].value \
-      -o tsv`
-   ```
 
 #### Credentials and configuration
 
@@ -373,7 +393,7 @@ kubectl apply -f examples/nginx-app/base.yaml
 Now create a backup:
 
 ```bash
-ark backup create nginx-backup --selector app=nginx
+ark backup create nginx-backup --include-namespaces nginx-example
 ```
 
 Simulate a disaster:
@@ -398,17 +418,10 @@ Start the sample nginx app:
 kubectl apply -f examples/nginx-app/with-pv.yaml
 ```
 
-Because Kubernetes does not automatically transfer labels from PVCs to dynamically generated PVs, you need to do so manually:
-
-```bash
-nginx_pv_name=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="nginx-logs")].metadata.name}')
-kubectl label pv $nginx_pv_name app=nginx
-```
-
 Now create a backup with PV snapshotting:
 
 ```bash
-ark backup create nginx-backup --selector app=nginx
+ark backup create nginx-backup --include-namespaces nginx-example
 ```
 
 Simulate a disaster:
@@ -442,7 +455,7 @@ ark restore create nginx-backup
 [13]: #run
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [15]: https://cloud.google.com/compute/docs/access/service-accounts
-[16]: https://cloud.google.com/compute/docs/gcloud-compute
+[16]: https://cloud.google.com/sdk/docs/
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
