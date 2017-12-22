@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"sort"
 	"strings"
@@ -29,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -61,7 +63,6 @@ import (
 
 func NewCommand() *cobra.Command {
 	var (
-		kubeconfig      string
 		sortedLogLevels = getSortedLogLevels()
 		logLevelFlag    = flag.NewEnum(logrus.InfoLevel.String(), sortedLogLevels...)
 	)
@@ -86,7 +87,21 @@ func NewCommand() *cobra.Command {
 			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
 			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
-			s, err := newServer(kubeconfig, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
+			// NOTE: the namespace flag is bound to ark's persistent flags when the root ark command
+			// creates the client Factory and binds the Factory's flags. We're not using a Factory here in
+			// the server because the Factory gets its basename set at creation time, and the basename is
+			// used to construct the user-agent for clients. Also, the Factory's Namespace() method uses
+			// the client config file to determine the appropriate namespace to use, and that isn't
+			// applicable to the server (it uses the method directly below instead). We could potentially
+			// add a SetBasename() method to the Factory, and tweak how Namespace() works, if we wanted to
+			// have the server use the Factory.
+			namespaceFlag := c.Flag("namespace")
+			if namespaceFlag == nil {
+				cmd.CheckError(errors.New("unable to look up namespace flag"))
+			}
+			namespace := getServerNamespace(namespaceFlag)
+
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
 
 			cmd.CheckError(err)
 
@@ -95,9 +110,22 @@ func NewCommand() *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(sortedLogLevels, ", ")))
-	command.Flags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 
 	return command
+}
+
+func getServerNamespace(namespaceFlag *pflag.Flag) string {
+	if namespaceFlag.Changed {
+		return namespaceFlag.Value.String()
+	}
+
+	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
+			return ns
+		}
+	}
+
+	return api.DefaultNamespace
 }
 
 func newLogger(level logrus.Level, hooks ...logrus.Hook) *logrus.Logger {
@@ -132,6 +160,7 @@ func getSortedLogLevels() []string {
 }
 
 type server struct {
+	namespace             string
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
@@ -146,8 +175,8 @@ type server struct {
 	pluginManager         plugin.Manager
 }
 
-func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, error) {
-	clientConfig, err := client.Config(kubeconfig, baseName)
+func newServer(namespace, baseName string, logger *logrus.Logger) (*server, error) {
+	clientConfig, err := client.Config("", baseName)
 	if err != nil {
 		return nil, err
 	}
@@ -170,12 +199,13 @@ func newServer(kubeconfig, baseName string, logger *logrus.Logger) (*server, err
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &server{
+		namespace:             namespace,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
 		arkClient:             arkClient,
 		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
-		sharedInformerFactory: informers.NewSharedInformerFactory(arkClient, 0),
+		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
 		ctx:           ctx,
 		cancelFunc:    cancelFunc,
 		logger:        logger,
@@ -218,12 +248,12 @@ func (s *server) run() error {
 }
 
 func (s *server) ensureArkNamespace() error {
-	logContext := s.logger.WithField("namespace", api.DefaultNamespace)
+	logContext := s.logger.WithField("namespace", s.namespace)
 
 	logContext.Info("Ensuring namespace exists for backups")
 	defaultNamespace := v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: api.DefaultNamespace,
+			Name: s.namespace,
 		},
 	}
 
@@ -243,7 +273,7 @@ func (s *server) loadConfig() (*api.Config, error) {
 		err    error
 	)
 	for {
-		config, err = s.arkClient.ArkV1().Configs(api.DefaultNamespace).Get("default", metav1.GetOptions{})
+		config, err = s.arkClient.ArkV1().Configs(s.namespace).Get("default", metav1.GetOptions{})
 		if err == nil {
 			break
 		}
@@ -459,6 +489,7 @@ func (s *server) runControllers(config *api.Config) error {
 		}()
 
 		scheduleController := controller.NewScheduleController(
+			s.namespace,
 			s.arkClient.ArkV1(),
 			s.arkClient.ArkV1(),
 			s.sharedInformerFactory.Ark().V1().Schedules(),
@@ -511,6 +542,7 @@ func (s *server) runControllers(config *api.Config) error {
 	cmd.CheckError(err)
 
 	restoreController := controller.NewRestoreController(
+		s.namespace,
 		s.sharedInformerFactory.Ark().V1().Restores(),
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),

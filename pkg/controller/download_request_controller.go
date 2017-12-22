@@ -276,7 +276,7 @@ func patchDownloadRequest(original, updated *v1.DownloadRequest, client arkv1cli
 		return nil, errors.Wrap(err, "error creating two-way merge patch for download request")
 	}
 
-	res, err := client.DownloadRequests(v1.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.DownloadRequests(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching download request")
 	}

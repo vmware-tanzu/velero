@@ -54,6 +54,7 @@ import (
 var nonRestorableResources = []string{"nodes"}
 
 type restoreController struct {
+	namespace           string
 	restoreClient       arkv1client.RestoresGetter
 	backupClient        arkv1client.BackupsGetter
 	restorer            restore.Restorer
@@ -71,6 +72,7 @@ type restoreController struct {
 }
 
 func NewRestoreController(
+	namespace string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
 	backupClient arkv1client.BackupsGetter,
@@ -83,6 +85,7 @@ func NewRestoreController(
 	pluginManager plugin.Manager,
 ) Interface {
 	c := &restoreController{
+		namespace:           namespace,
 		restoreClient:       restoreClient,
 		backupClient:        backupClient,
 		restorer:            restorer,
@@ -319,7 +322,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 }
 
 func (controller *restoreController) fetchBackup(bucket, name string) (*api.Backup, error) {
-	backup, err := controller.backupLister.Backups(api.DefaultNamespace).Get(name)
+	backup, err := controller.backupLister.Backups(controller.namespace).Get(name)
 	if err == nil {
 		return backup, nil
 	}
@@ -338,8 +341,10 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 
 	// ResourceVersion needs to be cleared in order to create the object in the API
 	backup.ResourceVersion = ""
+	// Clear out the namespace too, just in case
+	backup.Namespace = ""
 
-	created, createErr := controller.backupClient.Backups(api.DefaultNamespace).Create(backup)
+	created, createErr := controller.backupClient.Backups(controller.namespace).Create(backup)
 	if createErr != nil {
 		logContext.WithError(errors.WithStack(createErr)).Error("Unable to create API object for Backup")
 	} else {
@@ -495,7 +500,7 @@ func patchRestore(original, updated *api.Restore, client arkv1client.RestoresGet
 		return nil, errors.Wrap(err, "error creating two-way merge patch for restore")
 	}
 
-	res, err := client.Restores(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Restores(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching restore")
 	}

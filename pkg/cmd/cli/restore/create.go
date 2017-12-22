@@ -118,7 +118,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.DefaultNamespace,
+			Namespace: f.Namespace(),
 			Name:      fmt.Sprintf("%s-%s", o.BackupName, time.Now().Format("20060102150405")),
 			Labels:    o.Labels.Data(),
 		},

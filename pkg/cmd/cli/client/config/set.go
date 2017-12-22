@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2018 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,37 +14,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restore
+package config
 
 import (
 	"fmt"
 	"os"
-
-	"github.com/spf13/cobra"
+	"strings"
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
-func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
+func NewSetCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:   fmt.Sprintf("%s NAME", use),
-		Short: "Delete a restore",
+		Use:   "set KEY=VALUE [KEY=VALUE]...",
+		Short: "Set client configuration file values",
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				c.Usage()
-				os.Exit(1)
+			if len(args) < 1 {
+				cmd.CheckError(errors.Errorf("At least one KEY=VALUE argument is required"))
 			}
 
-			arkClient, err := f.Client()
+			config, err := client.LoadConfig()
 			cmd.CheckError(err)
 
-			name := args[0]
+			for _, arg := range args {
+				pair := strings.Split(arg, "=")
+				if len(pair) != 2 {
+					fmt.Fprintf(os.Stderr, "WARNING: invalid KEY=VALUE: %q\n", arg)
+					continue
+				}
+				key, value := pair[0], pair[1]
 
-			err = arkClient.ArkV1().Restores(f.Namespace()).Delete(name, nil)
-			cmd.CheckError(err)
+				if value == "" {
+					delete(config, key)
+				} else {
+					config[key] = value
+				}
+			}
 
-			fmt.Printf("Restore %q deleted\n", name)
+			cmd.CheckError(client.SaveConfig(config))
 		},
 	}
 

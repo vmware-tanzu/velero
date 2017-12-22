@@ -42,12 +42,12 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				backups = new(v1.BackupList)
 				for _, name := range args {
-					backup, err := arkClient.Ark().Backups(v1.DefaultNamespace).Get(name, metav1.GetOptions{})
+					backup, err := arkClient.Ark().Backups(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = arkClient.ArkV1().Backups(v1.DefaultNamespace).List(listOptions)
+				backups, err = arkClient.ArkV1().Backups(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 

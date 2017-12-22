@@ -42,12 +42,12 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				restores = new(api.RestoreList)
 				for _, name := range args {
-					restore, err := arkClient.Ark().Restores(api.DefaultNamespace).Get(name, metav1.GetOptions{})
+					restore, err := arkClient.Ark().Restores(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					restores.Items = append(restores.Items, *restore)
 				}
 			} else {
-				restores, err = arkClient.ArkV1().Restores(api.DefaultNamespace).List(listOptions)
+				restores, err = arkClient.ArkV1().Restores(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2018 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,42 +14,47 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package config
 
 import (
-	"os"
-	"time"
+	"fmt"
+	"sort"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-
-	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
+	"github.com/spf13/cobra"
 )
 
-func NewLogsCommand(f client.Factory) *cobra.Command {
-	timeout := time.Minute
-
+func NewGetCommand() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "logs BACKUP",
-		Short: "Get backup logs",
+		Use:   "get [KEY 1] [KEY 2] [...]",
+		Short: "Get client configuration file values",
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				err := errors.New("backup name is required")
-				cmd.CheckError(err)
+			config, err := client.LoadConfig()
+			cmd.CheckError(err)
+
+			if len(args) == 0 {
+				keys := make([]string, 0, len(config))
+				for key := range config {
+					keys = append(keys, key)
+				}
+
+				sort.Strings(keys)
+
+				for _, key := range keys {
+					fmt.Printf("%s: %s\n", key, config[key])
+				}
+			} else {
+				for _, key := range args {
+					value, found := config[key]
+					if !found {
+						value = "<NOT SET>"
+					}
+					fmt.Printf("%s: %s\n", key, value)
+				}
 			}
-
-			arkClient, err := f.Client()
-			cmd.CheckError(err)
-
-			err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), args[0], v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
-			cmd.CheckError(err)
 		},
 	}
-
-	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
 
 	return c
 }

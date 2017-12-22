@@ -23,6 +23,7 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	cliclient "github.com/heptio/ark/pkg/cmd/cli/client"
 	"github.com/heptio/ark/pkg/cmd/cli/create"
 	"github.com/heptio/ark/pkg/cmd/cli/delete"
 	"github.com/heptio/ark/pkg/cmd/cli/describe"
@@ -63,6 +64,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		runplugin.NewCommand(),
 		plugin.NewCommand(f),
 		delete.NewCommand(f),
+		cliclient.NewCommand(),
 	)
 
 	// add the glog flags

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2018 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package config
+package client
 
 import (
+	"github.com/heptio/ark/pkg/cmd/cli/client/config"
 	"github.com/spf13/cobra"
-
-	"github.com/heptio/ark/pkg/client"
 )
 
-func NewGetCommand(f client.Factory) *cobra.Command {
-	c := &cobra.Command{}
+func NewCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "client",
+		Short: "Ark client related commands",
+	}
+
+	c.AddCommand(
+		config.NewCommand(),
+	)
 
 	return c
 }

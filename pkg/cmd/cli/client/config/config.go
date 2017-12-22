@@ -18,12 +18,18 @@ package config
 
 import (
 	"github.com/spf13/cobra"
-
-	"github.com/heptio/ark/pkg/client"
 )
 
-func NewSetCommand(f client.Factory) *cobra.Command {
-	c := &cobra.Command{}
+func NewCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "config",
+		Short: "Get and set client configuration file values",
+	}
+
+	c.AddCommand(
+		NewGetCommand(),
+		NewSetCommand(),
+	)
 
 	return c
 }

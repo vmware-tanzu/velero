@@ -124,6 +124,7 @@ func TestProcessSchedule(t *testing.T) {
 			)
 
 			c := NewScheduleController(
+				"namespace",
 				client.ArkV1(),
 				client.ArkV1(),
 				sharedInformers.Ark().V1().Schedules(),

@@ -33,10 +33,10 @@ import (
 	arkclientv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 )
 
-func Stream(client arkclientv1.DownloadRequestsGetter, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration) error {
+func Stream(client arkclientv1.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration) error {
 	req := &v1.DownloadRequest{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: v1.DefaultNamespace,
+			Namespace: namespace,
 			Name:      fmt.Sprintf("%s-%s", name, time.Now().Format("20060102150405")),
 		},
 		Spec: v1.DownloadRequestSpec{
@@ -47,18 +47,19 @@ func Stream(client arkclientv1.DownloadRequestsGetter, name string, kind v1.Down
 		},
 	}
 
-	req, err := client.DownloadRequests(v1.DefaultNamespace).Create(req)
+	req, err := client.DownloadRequests(namespace).Create(req)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer client.DownloadRequests(v1.DefaultNamespace).Delete(req.Name, nil)
+	defer client.DownloadRequests(namespace).Delete(req.Name, nil)
 
 	listOptions := metav1.ListOptions{
-		//TODO: once kube-apiserver http://issue.k8s.io/51046 is fixed, uncomment
+		// TODO: once the minimum supported Kubernetes version is v1.9.0, uncomment the following line.
+		// See http://issue.k8s.io/51046 for details.
 		//FieldSelector:   "metadata.name=" + req.Name
 		ResourceVersion: req.ResourceVersion,
 	}
-	watcher, err := client.DownloadRequests(v1.DefaultNamespace).Watch(listOptions)
+	watcher, err := client.DownloadRequests(namespace).Watch(listOptions)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -78,6 +79,8 @@ Loop:
 				return errors.Errorf("unexpected type %T", e.Object)
 			}
 
+			// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
+			// See http://issue.k8s.io/51046 for details.
 			if updated.Name != req.Name {
 				continue
 			}

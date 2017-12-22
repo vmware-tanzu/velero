@@ -106,7 +106,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(arkClient.ArkV1(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
+	err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

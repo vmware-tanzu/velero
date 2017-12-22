@@ -150,7 +150,7 @@ func TestStream(t *testing.T) {
 			output := new(bytes.Buffer)
 			errCh := make(chan error)
 			go func() {
-				err := Stream(client.ArkV1(), "name", test.kind, output, timeout)
+				err := Stream(client.ArkV1(), "namespace", "name", test.kind, output, timeout)
 				errCh <- err
 			}()
 

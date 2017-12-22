@@ -45,6 +45,7 @@ import (
 )
 
 type scheduleController struct {
+	namespace             string
 	schedulesClient       arkv1client.SchedulesGetter
 	backupsClient         arkv1client.BackupsGetter
 	schedulesLister       listers.ScheduleLister
@@ -57,6 +58,7 @@ type scheduleController struct {
 }
 
 func NewScheduleController(
+	namespace string,
 	schedulesClient arkv1client.SchedulesGetter,
 	backupsClient arkv1client.BackupsGetter,
 	schedulesInformer informers.ScheduleInformer,
@@ -69,6 +71,7 @@ func NewScheduleController(
 	}
 
 	c := &scheduleController{
+		namespace:             namespace,
 		schedulesClient:       schedulesClient,
 		backupsClient:         backupsClient,
 		schedulesLister:       schedulesInformer.Lister(),
@@ -153,7 +156,7 @@ func (controller *scheduleController) Run(ctx context.Context, numWorkers int) e
 }
 
 func (controller *scheduleController) enqueueAllEnabledSchedules() {
-	schedules, err := controller.schedulesLister.Schedules(api.DefaultNamespace).List(labels.NewSelector())
+	schedules, err := controller.schedulesLister.Schedules(controller.namespace).List(labels.NewSelector())
 	if err != nil {
 		controller.logger.WithError(errors.WithStack(err)).Error("Error listing Schedules")
 		return
@@ -388,7 +391,7 @@ func patchSchedule(original, updated *api.Schedule, client arkv1client.Schedules
 		return nil, errors.Wrap(err, "error creating two-way merge patch for schedule")
 	}
 
-	res, err := client.Schedules(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Schedules(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching schedule")
 	}

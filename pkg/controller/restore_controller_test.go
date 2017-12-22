@@ -82,6 +82,7 @@ func TestFetchBackup(t *testing.T) {
 			)
 
 			c := NewRestoreController(
+				api.DefaultNamespace,
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(),
 				client.ArkV1(),
@@ -249,6 +250,7 @@ func TestProcessRestore(t *testing.T) {
 			defer backupSvc.AssertExpectations(t)
 
 			c := NewRestoreController(
+				api.DefaultNamespace,
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(),
 				client.ArkV1(),
