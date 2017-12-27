@@ -104,10 +104,6 @@ func (ie *IncludesExcludes) IncludeEverything() bool {
 // ValidateIncludesExcludes checks provided lists of included and excluded
 // items to ensure they are a valid set of IncludesExcludes data.
 func ValidateIncludesExcludes(includesList, excludesList []string) []error {
-	// TODO we should not allow an IncludesExcludes object to be created that
-	// does not meet these criteria. Do a more significant refactoring to embed
-	// this logic in object creation/modification.
-
 	var errs []error
 
 	includes := sets.NewString(includesList...)

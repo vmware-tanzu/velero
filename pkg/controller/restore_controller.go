@@ -45,7 +45,6 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -292,23 +291,11 @@ func (controller *restoreController) processRestore(key string) error {
 func (controller *restoreController) getValidationErrors(itm *api.Restore) []string {
 	var validationErrors []string
 
-	if itm.Spec.BackupName == "" {
-		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
-	}
-
 	includedResources := sets.NewString(itm.Spec.IncludedResources...)
 	for _, nonRestorableResource := range nonRestorableResources {
 		if includedResources.Has(nonRestorableResource) {
 			validationErrors = append(validationErrors, fmt.Sprintf("%v are a non-restorable resource", nonRestorableResource))
 		}
-	}
-
-	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedNamespaces, itm.Spec.ExcludedNamespaces) {
-		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
-	}
-
-	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedResources, itm.Spec.ExcludedResources) {
-		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
 	if !controller.pvProviderExists && itm.Spec.RestorePVs != nil && *itm.Spec.RestorePVs {

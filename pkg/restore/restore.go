@@ -159,6 +159,13 @@ func NewKubernetesRestorer(
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer, actions []ItemAction) (api.RestoreResult, api.RestoreResult) {
+	// validate Restore
+	if restore.Status.ValidationErrors = getRestoreValidationErrors(restore); len(restore.Status.ValidationErrors) > 0 {
+		restore.Status.Phase = api.RestorePhaseFailedValidation
+	} else {
+		restore.Status.Phase = api.RestorePhaseInProgress
+	}
+
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -230,6 +237,24 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 	)
 
 	return resources
+}
+
+func getRestoreValidationErrors(restore *api.Restore) []string {
+	var validationErrors []string
+
+	if restore.Spec.BackupName == "" {
+		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage")
+	}
+
+	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedNamespaces, restore.Spec.ExcludedNamespaces) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+	}
+
+	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedResources, restore.Spec.ExcludedResources) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
+	}
+
+	return validationErrors
 }
 
 type resolvedAction struct {

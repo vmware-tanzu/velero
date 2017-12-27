@@ -173,9 +173,30 @@ func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper di
 	return resourceHooks, nil
 }
 
+func getBackupValidationErrors(backup *api.Backup) []string {
+	var validationErrors []string
+
+	for _, err := range collections.ValidateIncludesExcludes(backup.Spec.IncludedResources, backup.Spec.ExcludedResources) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
+	}
+
+	for _, err := range collections.ValidateIncludesExcludes(backup.Spec.IncludedNamespaces, backup.Spec.ExcludedNamespaces) {
+		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+	}
+
+	return validationErrors
+}
+
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
 func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io.Writer, actions []ItemAction) error {
+	// validate Backup
+	if backup.Status.ValidationErrors = getBackupValidationErrors(backup); len(backup.Status.ValidationErrors) > 0 {
+		backup.Status.Phase = api.BackupPhaseFailedValidation
+	} else {
+		backup.Status.Phase = api.BackupPhaseInProgress
+	}
+
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
