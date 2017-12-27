@@ -139,7 +139,7 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
     gcloud config list
     ```
 
-    Store the `project` value from the results in the environment variable `$PROJECT_ID`.
+    Store the `project` value from the results in the environment variable `$CLOUDSDK_CORE_PROJECT`.
 
 2. Create a service account:
 
@@ -158,10 +158,10 @@ To integrate Heptio Ark with GCP, you should follow the instructions below to cr
 3. Attach policies to give `heptio-ark` the necessary permissions to function:
 
     ```bash
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
+    gcloud projects add-iam-policy-binding $CLOUDSDK_CORE_PROJECT \
         --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
         --role roles/compute.storageAdmin
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
+    gcloud projects add-iam-policy-binding $CLOUDSDK_CORE_PROJECT \
         --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
         --role roles/storage.admin
     ```
