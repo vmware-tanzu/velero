@@ -641,51 +641,33 @@ func TestHasControllerOwner(t *testing.T) {
 
 func TestResetMetadataAndStatus(t *testing.T) {
 	tests := []struct {
-		name            string
-		obj             *unstructured.Unstructured
-		keepAnnotations bool
-		expectedErr     bool
-		expectedRes     *unstructured.Unstructured
+		name        string
+		obj         *unstructured.Unstructured
+		expectedErr bool
+		expectedRes *unstructured.Unstructured
 	}{
 		{
-			name:            "no metadata causes error",
-			obj:             NewTestUnstructured().Unstructured,
-			keepAnnotations: false,
-			expectedErr:     true,
+			name:        "no metadata causes error",
+			obj:         NewTestUnstructured().Unstructured,
+			expectedErr: true,
 		},
 		{
-			name:            "don't keep annotations",
-			obj:             NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
-			keepAnnotations: false,
-			expectedErr:     false,
-			expectedRes:     NewTestUnstructured().WithMetadata("name", "namespace", "labels").Unstructured,
+			name:        "keep name, namespace, labels, annotations only",
+			obj:         NewTestUnstructured().WithMetadata("name", "blah", "namespace", "labels", "annotations", "foo").Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
 		},
 		{
-			name:            "keep annotations",
-			obj:             NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
-			keepAnnotations: true,
-			expectedErr:     false,
-			expectedRes:     NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
-		},
-		{
-			name:            "don't keep extraneous metadata",
-			obj:             NewTestUnstructured().WithMetadata("foo").Unstructured,
-			keepAnnotations: false,
-			expectedErr:     false,
-			expectedRes:     NewTestUnstructured().WithMetadata().Unstructured,
-		},
-		{
-			name:            "don't keep status",
-			obj:             NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
-			keepAnnotations: false,
-			expectedErr:     false,
-			expectedRes:     NewTestUnstructured().WithMetadata().Unstructured,
+			name:        "don't keep status",
+			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res, err := resetMetadataAndStatus(test.obj, test.keepAnnotations)
+			res, err := resetMetadataAndStatus(test.obj)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)
@@ -722,18 +704,18 @@ func TestExecutePVAction(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "ensure annotations, spec.claimRef, spec.storageClassName are deleted",
+			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
 			backup:      &api.Backup{},
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("someOtherField").Unstructured,
+			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
 			backup:      &api.Backup{Spec: api.BackupSpec{SnapshotVolumes: boolptr.False()}},
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("someOtherField").Unstructured,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "not restoring, return early",
@@ -1181,7 +1163,7 @@ func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (ru
 	}
 
 	// want the baseline functionality too
-	res, err := resetMetadataAndStatus(unstructuredObj, true)
+	res, err := resetMetadataAndStatus(unstructuredObj)
 	if err != nil {
 		return nil, nil, err
 	}

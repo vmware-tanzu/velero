@@ -628,7 +628,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		// clear out non-core metadata fields & status
-		if obj, err = resetMetadataAndStatus(obj, true); err != nil {
+		if obj, err = resetMetadataAndStatus(obj); err != nil {
 			addToResult(&errs, namespace, err)
 			continue
 		}
@@ -675,15 +675,6 @@ func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructur
 	if err != nil {
 		return nil, err
 	}
-
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, err
-	}
-
-	// We need to remove annotations from PVs since they potentially contain
-	// information about dynamic provisioners which will confuse the controllers.
-	delete(metadata, "annotations")
 
 	delete(spec, "claimRef")
 	delete(spec, "storageClassName")
@@ -740,18 +731,18 @@ func isPVReady(obj runtime.Unstructured) bool {
 	return phase == string(v1.VolumeAvailable)
 }
 
-func resetMetadataAndStatus(obj *unstructured.Unstructured, keepAnnotations bool) (*unstructured.Unstructured, error) {
+func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
 	if err != nil {
 		return nil, err
 	}
 
 	for k := range metadata {
-		if k == "name" || k == "namespace" || k == "labels" || (k == "annotations" && keepAnnotations) {
-			continue
+		switch k {
+		case "name", "namespace", "labels", "annotations":
+		default:
+			delete(metadata, k)
 		}
-
-		delete(metadata, k)
 	}
 
 	// this should never be backed up anyway, but remove it just
