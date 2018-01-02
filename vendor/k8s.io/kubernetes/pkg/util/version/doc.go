@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,27 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package schedule
-
-import (
-	"github.com/spf13/cobra"
-
-	"github.com/heptio/ark/pkg/client"
-)
-
-func NewCommand(f client.Factory) *cobra.Command {
-	c := &cobra.Command{
-		Use:   "schedule",
-		Short: "Work with schedules",
-		Long:  "Work with schedules",
-	}
-
-	c.AddCommand(
-		NewCreateCommand(f, "create"),
-		NewGetCommand(f, "get"),
-		NewDescribeCommand(f, "describe"),
-		NewDeleteCommand(f, "delete"),
-	)
-
-	return c
-}
+// Package version provides utilities for version number comparisons
+package version // import "k8s.io/kubernetes/pkg/util/version"

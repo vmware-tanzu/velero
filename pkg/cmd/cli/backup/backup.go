@@ -35,10 +35,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		NewLogsCommand(f),
 		NewDescribeCommand(f, "describe"),
 		NewDownloadCommand(f),
-
-		// If you delete a backup and it still exists in object storage, the backup sync controller will
-		// recreate it. Until we have a good UX around this, we're disabling the delete command.
-		// NewDeleteCommand(f),
+		NewDeleteCommand(f, "delete"),
 	)
 
 	return c

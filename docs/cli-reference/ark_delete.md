@@ -1,16 +1,16 @@
-## ark backup
+## ark delete
 
-Work with backups
+Delete ark resources
 
 ### Synopsis
 
 
-Work with backups
+Delete ark resources
 
 ### Options
 
 ```
-  -h, --help   help for backup
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -28,10 +28,7 @@ Work with backups
 
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark backup create](ark_backup_create.md)	 - Create a backup
-* [ark backup delete](ark_backup_delete.md)	 - Delete a backup
-* [ark backup describe](ark_backup_describe.md)	 - Describe backups
-* [ark backup download](ark_backup_download.md)	 - Download a backup
-* [ark backup get](ark_backup_get.md)	 - Get backups
-* [ark backup logs](ark_backup_logs.md)	 - Get backup logs
+* [ark delete backup](ark_delete_backup.md)	 - Delete a backup
+* [ark delete restore](ark_delete_restore.md)	 - Delete a restore
+* [ark delete schedule](ark_delete_schedule.md)	 - Delete a schedule
 

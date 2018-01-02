@@ -14,26 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package schedule
+package delete
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	"github.com/heptio/ark/pkg/cmd/cli/restore"
+	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "schedule",
-		Short: "Work with schedules",
-		Long:  "Work with schedules",
+		Use:   "delete",
+		Short: "Delete ark resources",
+		Long:  "Delete ark resources",
 	}
 
+	backupCommand := backup.NewDeleteCommand(f, "backup")
+	backupCommand.Aliases = []string{"backups"}
+
+	restoreCommand := restore.NewDeleteCommand(f, "restore")
+	restoreCommand.Aliases = []string{"restores"}
+
+	scheduleCommand := schedule.NewDeleteCommand(f, "schedule")
+	scheduleCommand.Aliases = []string{"schedules"}
+
 	c.AddCommand(
-		NewCreateCommand(f, "create"),
-		NewGetCommand(f, "get"),
-		NewDescribeCommand(f, "describe"),
-		NewDeleteCommand(f, "delete"),
+		backupCommand,
+		restoreCommand,
+		scheduleCommand,
 	)
 
 	return c

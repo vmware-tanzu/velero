@@ -27,9 +27,9 @@ import (
 	"github.com/heptio/ark/pkg/cmd"
 )
 
-func NewDeleteCommand(f client.Factory) *cobra.Command {
+func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "delete NAME",
+		Use:   fmt.Sprintf("%s NAME", use),
 		Short: "Delete a schedule",
 		Run: func(c *cobra.Command, args []string) {
 			if len(args) != 1 {

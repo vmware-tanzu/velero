@@ -419,13 +419,13 @@
 
 [[projects]]
   name = "k8s.io/kubernetes"
-  packages = ["pkg/printers"]
+  packages = ["pkg/printers","pkg/util/version"]
   revision = "bdaeafa71f6c7c04636251031f93464384d54963"
   version = "v1.8.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c3cd1b703421685e5b2343ced6eaa6ec958b9c44d62277322f4c93de164c2d04"
+  inputs-digest = "cd582891fb7e89c2ea28ea41e52687e2902b6105c6c3bf989bd628ebb4b72208"
   solver-name = "gps-cdcl"
   solver-version = 1
