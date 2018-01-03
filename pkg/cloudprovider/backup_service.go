@@ -116,30 +116,61 @@ func NewBackupService(objectStore ObjectStore, logger logrus.FieldLogger) Backup
 	}
 }
 
+func seekToBeginning(r io.Reader) error {
+	seeker, ok := r.(io.Seeker)
+	if !ok {
+		return nil
+	}
+
+	_, err := seeker.Seek(0, 0)
+	return err
+}
+
+func (br *backupService) seekAndPutObject(bucket, key string, file io.Reader) error {
+	if file == nil {
+		return nil
+	}
+
+	if err := seekToBeginning(file); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return br.objectStore.PutObject(bucket, key, file)
+}
+
 func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.Reader) error {
-	// upload metadata file
-	metadataKey := getMetadataKey(backupName)
-	if err := br.objectStore.PutObject(bucket, metadataKey, metadata); err != nil {
-		// failure to upload metadata file is a hard-stop
-		return err
-	}
-
-	// upload tar file
-	if err := br.objectStore.PutObject(bucket, getBackupContentsKey(backupName), backup); err != nil {
-		// try to delete the metadata file since the data upload failed
-		deleteErr := br.objectStore.DeleteObject(bucket, metadataKey)
-
-		return kerrors.NewAggregate([]error{err, deleteErr})
-	}
-
-	// uploading log file is best-effort; if it fails, we log the error but call the overall upload a
-	// success
+	// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
+	// backup's status.
 	logKey := getBackupLogKey(backupName)
-	if err := br.objectStore.PutObject(bucket, logKey, log); err != nil {
+	if err := br.seekAndPutObject(bucket, logKey, log); err != nil {
 		br.logger.WithError(err).WithFields(logrus.Fields{
 			"bucket": bucket,
 			"key":    logKey,
 		}).Error("Error uploading log file")
+	}
+
+	if metadata == nil {
+		// If we don't have metadata, something failed, and there's no point in continuing. An object
+		// storage bucket that is missing the metadata file can't be restored, nor can its logs be
+		// viewed.
+		return nil
+	}
+
+	// upload metadata file
+	metadataKey := getMetadataKey(backupName)
+	if err := br.seekAndPutObject(bucket, metadataKey, metadata); err != nil {
+		// failure to upload metadata file is a hard-stop
+		return err
+	}
+
+	if backup != nil {
+		// upload tar file
+		if err := br.seekAndPutObject(bucket, getBackupContentsKey(backupName), backup); err != nil {
+			// try to delete the metadata file since the data upload failed
+			deleteErr := br.objectStore.DeleteObject(bucket, metadataKey)
+
+			return kerrors.NewAggregate([]error{err, deleteErr})
+		}
 	}
 
 	return nil
@@ -173,8 +204,8 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	return output, nil
 }
 
-func (br *backupService) GetBackup(bucket, name string) (*api.Backup, error) {
-	key := fmt.Sprintf(metadataFileFormatString, name)
+func (br *backupService) GetBackup(bucket, backupName string) (*api.Backup, error) {
+	key := getMetadataKey(backupName)
 
 	res, err := br.objectStore.GetObject(bucket, key)
 	if err != nil {
