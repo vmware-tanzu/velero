@@ -213,7 +213,12 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 				ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource())
 			}
 		} else {
-			return errors.Wrap(err, "error executing custom action")
+			// We want this to show up in the log file at the place where the error occurs. When we return
+			// the error, it get aggregated with all the other ones at the end of the backup, making it
+			// harder to tell when it happened.
+			log.WithError(err).Error("error executing custom action")
+
+			return errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
 	}
 
