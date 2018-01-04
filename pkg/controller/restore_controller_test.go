@@ -182,8 +182,8 @@ func TestProcessRestore(t *testing.T) {
 			name:                        "restore with non-existent backup name fails",
 			restore:                     arktest.NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
 			expectedErr:                 false,
-			expectedPhase:               string(api.RestorePhaseInProgress),
-			expectedRestoreErrors:       1,
+			expectedPhase:               string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors:    []string{"Error retrieving backup: no backup here"},
 			backupServiceGetBackupError: errors.New("no backup here"),
 		},
 		{

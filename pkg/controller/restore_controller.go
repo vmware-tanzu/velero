@@ -294,6 +294,8 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	} else if _, err := controller.fetchBackup(controller.bucket, itm.Spec.BackupName); err != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
 	}
 
 	includedResources := sets.NewString(itm.Spec.IncludedResources...)
