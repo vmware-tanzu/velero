@@ -144,6 +144,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	fmt.Printf("Restore %q created successfully.\n", restore.Name)
+	fmt.Printf("Restore request %q submitted successfully.\n", restore.Name)
+	fmt.Printf("Run `ark restore describe %s` for more details.\n", restore.Name)
 	return nil
 }
