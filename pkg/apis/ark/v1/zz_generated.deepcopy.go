@@ -293,6 +293,20 @@ func (in *BackupResourceHookSpec) DeepCopyInto(out *BackupResourceHookSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PreHooks != nil {
+		in, out := &in.PreHooks, &out.PreHooks
+		*out = make([]BackupResourceHook, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.PostHooks != nil {
+		in, out := &in.PostHooks, &out.PostHooks
+		*out = make([]BackupResourceHook, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	return
 }
 

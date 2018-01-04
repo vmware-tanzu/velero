@@ -181,9 +181,10 @@ func (m *manager) registerPlugins() error {
 		m.pluginRegistry.register(provider, "/ark", []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
 	}
 	m.pluginRegistry.register("pv", "/ark", []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("backup-pod", "/ark", []string{"run-plugin", string(PluginKindBackupItemAction), "pod"}, PluginKindBackupItemAction)
 
 	m.pluginRegistry.register("job", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("pod", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("restore-pod", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
 	m.pluginRegistry.register("svc", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
 
 	// second, register external plugins (these will override internal plugins, if applicable)

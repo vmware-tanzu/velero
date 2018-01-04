@@ -188,3 +188,29 @@ func (rb *mockResourceBackupper) backupResource(group *metav1.APIResourceList, r
 	args := rb.Called(group, resource)
 	return args.Error(0)
 }
+
+func TestSortCoreGroup(t *testing.T) {
+	group := &metav1.APIResourceList{
+		GroupVersion: "v1",
+		APIResources: []metav1.APIResource{
+			{Name: "persistentvolumes"},
+			{Name: "configmaps"},
+			{Name: "antelopes"},
+			{Name: "persistentvolumeclaims"},
+			{Name: "pods"},
+		},
+	}
+
+	sortCoreGroup(group)
+
+	expected := []string{
+		"pods",
+		"persistentvolumeclaims",
+		"persistentvolumes",
+		"configmaps",
+		"antelopes",
+	}
+	for i, r := range group.APIResources {
+		assert.Equal(t, expected[i], r.Name)
+	}
+}

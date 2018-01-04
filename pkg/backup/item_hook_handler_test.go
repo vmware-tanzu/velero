@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -38,8 +39,8 @@ type mockItemHookHandler struct {
 	mock.Mock
 }
 
-func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook) error {
-	args := h.Called(log, groupResource, obj, resourceHooks)
+func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook, phase hookPhase) error {
+	args := h.Called(log, groupResource, obj, resourceHooks, phase)
 	return args.Error(0)
 }
 
@@ -102,7 +103,7 @@ func TestHandleHooksSkips(t *testing.T) {
 				},
 				{
 					name: "missing exec hook",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{},
 						{},
 					},
@@ -121,15 +122,16 @@ func TestHandleHooksSkips(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks)
+			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks, hookPhasePre)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
+func TestHandleHooks(t *testing.T) {
 	tests := []struct {
 		name                  string
+		phase                 hookPhase
 		groupResource         string
 		item                  runtime.Unstructured
 		hooks                 []resourceHook
@@ -139,7 +141,8 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 		expectedPodHookError  error
 	}{
 		{
-			name:          "pod, no annotation, spec (multiple hooks) = run spec",
+			name:          "pod, no annotation, spec (multiple pre hooks) = run spec",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -153,24 +156,24 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			hooks: []resourceHook{
 				{
 					name: "hook1",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
-								Command:   []string{"1a"},
+								Command:   []string{"pre-1a"},
 							},
 						},
 						{
 							Exec: &v1.ExecHook{
 								Container: "1b",
-								Command:   []string{"1b"},
+								Command:   []string{"pre-1b"},
 							},
 						},
 					},
 				},
 				{
 					name: "hook2",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "2a",
@@ -188,7 +191,58 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			},
 		},
 		{
-			name:          "pod, annotation, no spec = run annotation",
+			name:          "pod, no annotation, spec (multiple post hooks) = run spec",
+			phase:         hookPhasePost,
+			groupResource: "pods",
+			item: unstructuredOrDie(`
+		{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"namespace": "ns",
+				"name": "name"
+			}
+		}`),
+			hooks: []resourceHook{
+				{
+					name: "hook1",
+					post: []v1.BackupResourceHook{
+						{
+							Exec: &v1.ExecHook{
+								Container: "1a",
+								Command:   []string{"pre-1a"},
+							},
+						},
+						{
+							Exec: &v1.ExecHook{
+								Container: "1b",
+								Command:   []string{"pre-1b"},
+							},
+						},
+					},
+				},
+				{
+					name: "hook2",
+					post: []v1.BackupResourceHook{
+						{
+							Exec: &v1.ExecHook{
+								Container: "2a",
+								Command:   []string{"2a"},
+							},
+						},
+						{
+							Exec: &v1.ExecHook{
+								Container: "2b",
+								Command:   []string{"2b"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:          "pod, annotation (legacy), no spec = run annotation",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -209,7 +263,52 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			},
 		},
 		{
+			name:          "pod, annotation (pre), no spec = run annotation",
+			phase:         hookPhasePre,
+			groupResource: "pods",
+			item: unstructuredOrDie(`
+		{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"namespace": "ns",
+				"name": "name",
+				"annotations": {
+					"pre.hook.backup.ark.heptio.com/container": "c",
+					"pre.hook.backup.ark.heptio.com/command": "/bin/ls"
+				}
+			}
+		}`),
+			expectedPodHook: &v1.ExecHook{
+				Container: "c",
+				Command:   []string{"/bin/ls"},
+			},
+		},
+		{
+			name:          "pod, annotation (post), no spec = run annotation",
+			phase:         hookPhasePost,
+			groupResource: "pods",
+			item: unstructuredOrDie(`
+		{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"namespace": "ns",
+				"name": "name",
+				"annotations": {
+					"post.hook.backup.ark.heptio.com/container": "c",
+					"post.hook.backup.ark.heptio.com/command": "/bin/ls"
+				}
+			}
+		}`),
+			expectedPodHook: &v1.ExecHook{
+				Container: "c",
+				Command:   []string{"/bin/ls"},
+			},
+		},
+		{
 			name:          "pod, annotation & spec = run annotation",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -231,7 +330,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			hooks: []resourceHook{
 				{
 					name: "hook1",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -244,6 +343,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation, onError=fail = return error",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -269,6 +369,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name:          "pod, annotation, onError=continue = return nil",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -294,6 +395,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name:          "pod, spec, onError=fail = don't run other hooks",
+			phase:         hookPhasePre,
 			groupResource: "pods",
 			item: unstructuredOrDie(`
 		{
@@ -307,7 +409,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			hooks: []resourceHook{
 				{
 					name: "hook1",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "1a",
@@ -325,7 +427,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 				},
 				{
 					name: "hook2",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "2",
@@ -337,7 +439,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 				},
 				{
 					name: "hook3",
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Container: "3",
@@ -369,7 +471,14 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			} else {
 			hookLoop:
 				for _, resourceHook := range test.hooks {
-					for _, hook := range resourceHook.hooks {
+					for _, hook := range resourceHook.pre {
+						hookError := test.hookErrorsByContainer[hook.Exec.Container]
+						podCommandExecutor.On("executePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
+						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
+							break hookLoop
+						}
+					}
+					for _, hook := range resourceHook.post {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
 						podCommandExecutor.On("executePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
 						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
@@ -380,7 +489,7 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks)
+			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
@@ -393,103 +502,106 @@ func TestHandleHooksPodFromPodAnnotation(t *testing.T) {
 }
 
 func TestGetPodExecHookFromAnnotations(t *testing.T) {
-	tests := []struct {
-		name         string
-		annotations  map[string]string
-		expectedHook *v1.ExecHook
-	}{
-		{
-			name:         "missing command annotation",
-			expectedHook: nil,
-		},
-		{
-			name: "malformed command json array",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "[blarg",
+	phases := []hookPhase{"", hookPhasePre, hookPhasePost}
+	for _, phase := range phases {
+		tests := []struct {
+			name         string
+			annotations  map[string]string
+			expectedHook *v1.ExecHook
+		}{
+			{
+				name:         "missing command annotation",
+				expectedHook: nil,
 			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"[blarg"},
+			{
+				name: "malformed command json array",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "[blarg",
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"[blarg"},
+				},
 			},
-		},
-		{
-			name: "valid command json array",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: `["a","b","c"]`,
+			{
+				name: "valid command json array",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): `["a","b","c"]`,
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"a", "b", "c"},
+				},
 			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"a", "b", "c"},
+			{
+				name: "command as a string",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"/usr/bin/foo"},
+				},
 			},
-		},
-		{
-			name: "command as a string",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "/usr/bin/foo",
+			{
+				name: "hook mode set to continue",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
+					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(v1.HookErrorModeContinue),
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"/usr/bin/foo"},
+					OnError: v1.HookErrorModeContinue,
+				},
 			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"/usr/bin/foo"},
+			{
+				name: "hook mode set to fail",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
+					phasedKey(phase, podBackupHookOnErrorAnnotationKey): string(v1.HookErrorModeFail),
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"/usr/bin/foo"},
+					OnError: v1.HookErrorModeFail,
+				},
 			},
-		},
-		{
-			name: "hook mode set to continue",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "/usr/bin/foo",
-				podBackupHookOnErrorAnnotationKey: string(v1.HookErrorModeContinue),
+			{
+				name: "use the specified timeout",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
+					phasedKey(phase, podBackupHookTimeoutAnnotationKey): "5m3s",
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"/usr/bin/foo"},
+					Timeout: metav1.Duration{Duration: 5*time.Minute + 3*time.Second},
+				},
 			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"/usr/bin/foo"},
-				OnError: v1.HookErrorModeContinue,
+			{
+				name: "invalid timeout is ignored",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
+					phasedKey(phase, podBackupHookTimeoutAnnotationKey): "invalid",
+				},
+				expectedHook: &v1.ExecHook{
+					Command: []string{"/usr/bin/foo"},
+				},
 			},
-		},
-		{
-			name: "hook mode set to fail",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "/usr/bin/foo",
-				podBackupHookOnErrorAnnotationKey: string(v1.HookErrorModeFail),
+			{
+				name: "use the specified container",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookContainerAnnotationKey): "some-container",
+					phasedKey(phase, podBackupHookCommandAnnotationKey):   "/usr/bin/foo",
+				},
+				expectedHook: &v1.ExecHook{
+					Container: "some-container",
+					Command:   []string{"/usr/bin/foo"},
+				},
 			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"/usr/bin/foo"},
-				OnError: v1.HookErrorModeFail,
-			},
-		},
-		{
-			name: "use the specified timeout",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "/usr/bin/foo",
-				podBackupHookTimeoutAnnotationKey: "5m3s",
-			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"/usr/bin/foo"},
-				Timeout: metav1.Duration{Duration: 5*time.Minute + 3*time.Second},
-			},
-		},
-		{
-			name: "invalid timeout is ignored",
-			annotations: map[string]string{
-				podBackupHookCommandAnnotationKey: "/usr/bin/foo",
-				podBackupHookTimeoutAnnotationKey: "invalid",
-			},
-			expectedHook: &v1.ExecHook{
-				Command: []string{"/usr/bin/foo"},
-			},
-		},
-		{
-			name: "use the specified container",
-			annotations: map[string]string{
-				podBackupHookContainerAnnotationKey: "some-container",
-				podBackupHookCommandAnnotationKey:   "/usr/bin/foo",
-			},
-			expectedHook: &v1.ExecHook{
-				Container: "some-container",
-				Command:   []string{"/usr/bin/foo"},
-			},
-		},
-	}
+		}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			hook := getPodExecHookFromAnnotations(test.annotations)
-			assert.Equal(t, test.expectedHook, hook)
-		})
+		for _, test := range tests {
+			t.Run(fmt.Sprintf("%s (phase=%q)", test.name, phase), func(t *testing.T) {
+				hook := getPodExecHookFromAnnotations(test.annotations, phase)
+				assert.Equal(t, test.expectedHook, hook)
+			})
+		}
 	}
 }
 

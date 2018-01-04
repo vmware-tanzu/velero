@@ -343,7 +343,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 			b.additionalItemBackupper = additionalItemBackupper
 
 			obj := &unstructured.Unstructured{Object: item}
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks).Return(nil)
+			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePre).Return(nil)
+			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
 
 			for i, item := range test.customActionAdditionalItemIdentifiers {
 				itemClient := &arktest.FakeDynamicClient{}
