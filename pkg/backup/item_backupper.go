@@ -165,7 +165,8 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	// Never save status
 	delete(obj.UnstructuredContent(), "status")
 
-	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks); err != nil {
+	log.Info("Executing pre hooks")
+	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePre); err != nil {
 		return err
 	}
 
@@ -230,6 +231,11 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 				return err
 			}
 		}
+	}
+
+	log.Info("Executing post hooks")
+	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePost); err != nil {
+		return err
 	}
 
 	var filePath string

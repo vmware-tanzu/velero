@@ -151,26 +151,43 @@ func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExclu
 func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]resourceHook, error) {
 	resourceHooks := make([]resourceHook, 0, len(hookSpecs))
 
-	for _, r := range hookSpecs {
-		h := resourceHook{
-			name:       r.Name,
-			namespaces: collections.NewIncludesExcludes().Includes(r.IncludedNamespaces...).Excludes(r.ExcludedNamespaces...),
-			resources:  getResourceIncludesExcludes(discoveryHelper, r.IncludedResources, r.ExcludedResources),
-			hooks:      r.Hooks,
-		}
-
-		if r.LabelSelector != nil {
-			labelSelector, err := metav1.LabelSelectorAsSelector(r.LabelSelector)
-			if err != nil {
-				return []resourceHook{}, errors.WithStack(err)
-			}
-			h.labelSelector = labelSelector
+	for _, s := range hookSpecs {
+		h, err := getResourceHook(s, discoveryHelper)
+		if err != nil {
+			return []resourceHook{}, err
 		}
 
 		resourceHooks = append(resourceHooks, h)
 	}
 
 	return resourceHooks, nil
+}
+
+func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
+	// Use newer PreHooks if it's set
+	preHooks := hookSpec.PreHooks
+	if len(preHooks) == 0 {
+		// Fall back to Hooks otherwise (DEPRECATED)
+		preHooks = hookSpec.Hooks
+	}
+
+	h := resourceHook{
+		name:       hookSpec.Name,
+		namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
+		resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
+		pre:        preHooks,
+		post:       hookSpec.PostHooks,
+	}
+
+	if hookSpec.LabelSelector != nil {
+		labelSelector, err := metav1.LabelSelectorAsSelector(hookSpec.LabelSelector)
+		if err != nil {
+			return resourceHook{}, errors.WithStack(err)
+		}
+		h.labelSelector = labelSelector
+	}
+
+	return h, nil
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file

@@ -88,8 +88,12 @@ spec:
           matchLabels:
             app: ark
             component: server
-        # An array of hooks to run. Currently only "exec" hooks are supported.
+        # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
+        # DEPRECATED. Use pre instead.
         hooks:
+          # Same content as pre below.
+        # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
+        pre:
           - 
             # The type of hook. This must be "exec".
             exec:
@@ -105,6 +109,10 @@ spec:
               onError: Fail
               # How long to wait for the command to finish executing. Defaults to 30 seconds. Optional.
               timeout: 10s
+        # An array of hooks to run after all custom actions and additional items have been
+        # processed. Currently only "exec" hooks are supported.
+        post:
+          # Same content as pre above.
 # Status about the Backup. Users should not set any data here.
 status:
   # The date and time when the Backup is eligible for garbage collection.

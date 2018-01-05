@@ -556,7 +556,8 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 	ns1 := unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
 	client.On("Get", "ns-1", metav1.GetOptions{}).Return(ns1, nil)
 
-	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks).Return(nil)
+	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks, hookPhasePre).Return(nil)
+	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks, hookPhasePost).Return(nil)
 
 	err := rb.backupResource(v1Group, namespacesResource)
 	require.NoError(t, err)

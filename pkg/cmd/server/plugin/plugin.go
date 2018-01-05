@@ -46,7 +46,8 @@ func NewCommand() *cobra.Command {
 	}
 
 	backupItemActions := map[string]backup.ItemAction{
-		"pv": backup.NewBackupPVAction(logger),
+		"pv":  backup.NewBackupPVAction(logger),
+		"pod": backup.NewPodAction(logger),
 	}
 
 	restoreItemActions := map[string]restore.ItemAction{

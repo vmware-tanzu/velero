@@ -469,7 +469,7 @@ func TestBackup(t *testing.T) {
 					namespaces:    collections.NewIncludesExcludes().Includes("a").Excludes("b"),
 					resources:     collections.NewIncludesExcludes().Includes("configmaps").Excludes("roles.rbac.authorization.k8s.io"),
 					labelSelector: parseLabelSelectorOrDie("1=2"),
-					hooks: []v1.BackupResourceHook{
+					pre: []v1.BackupResourceHook{
 						{
 							Exec: &v1.ExecHook{
 								Command: []string{"ls", "/tmp"},
@@ -623,325 +623,6 @@ func (gb *mockGroupBackupper) backupGroup(group *metav1.APIResourceList) error {
 	return args.Error(0)
 }
 
-/*
-func TestBackupMethod(t *testing.T) {
-	// TODO ensure LabelSelector is passed through to the List() calls
-	backup := &v1.Backup{
-		Spec: v1.BackupSpec{
-			// cm - shortcut in legacy api group, namespaced
-			// csr - shortcut in certificates.k8s.io api group, cluster-scoped
-			// roles - fully qualified in rbac.authorization.k8s.io api group, namespaced
-			IncludedResources:  []string{"cm", "csr", "roles"},
-			IncludedNamespaces: []string{"a", "b"},
-			ExcludedNamespaces: []string{"c", "d"},
-		},
-	}
-
-	configMapsResource := metav1.APIResource{
-		Name:         "configmaps",
-		SingularName: "configmap",
-		Namespaced:   true,
-		Kind:         "ConfigMap",
-		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
-		ShortNames:   []string{"cm"},
-		Categories:   []string{"all"},
-	}
-
-	podsResource := metav1.APIResource{
-		Name:         "pods",
-		SingularName: "pod",
-		Namespaced:   true,
-		Kind:         "Pod",
-		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
-		ShortNames:   []string{"po"},
-		Categories:   []string{"all"},
-	}
-
-	rolesResource := metav1.APIResource{
-		Name:         "roles",
-		SingularName: "role",
-		Namespaced:   true,
-		Kind:         "Role",
-		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
-	}
-
-	certificateSigningRequestsResource := metav1.APIResource{
-		Name:         "certificatesigningrequests",
-		SingularName: "certificatesigningrequest",
-		Namespaced:   false,
-		Kind:         "CertificateSigningRequest",
-		Verbs:        metav1.Verbs([]string{"create", "update", "get", "list", "watch", "delete"}),
-		ShortNames:   []string{"csr"},
-	}
-
-	discoveryHelper := &arktest.FakeDiscoveryHelper{
-		Mapper: &arktest.FakeMapper{
-			Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
-				schema.GroupVersionResource{Resource: "cm"}:    schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"},
-				schema.GroupVersionResource{Resource: "csr"}:   schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
-				schema.GroupVersionResource{Resource: "roles"}: schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"},
-			},
-		},
-		ResourceList: []*metav1.APIResourceList{
-			{
-				GroupVersion: "v1",
-				APIResources: []metav1.APIResource{configMapsResource, podsResource},
-			},
-			{
-				GroupVersion: "certificates.k8s.io/v1beta1",
-				APIResources: []metav1.APIResource{certificateSigningRequestsResource},
-			},
-			{
-				GroupVersion: "rbac.authorization.k8s.io/v1beta1",
-				APIResources: []metav1.APIResource{rolesResource},
-			},
-		},
-	}
-
-	dynamicFactory := &arktest.FakeDynamicFactory{}
-
-	legacyGV := schema.GroupVersionResource{Version: "v1"}
-
-	configMapsClientA := &arktest.FakeDynamicClient{}
-	configMapsA := toRuntimeObject(t, `{
-		"apiVersion": "v1",
-		"kind": "ConfigMapList",
-		"items": [
-		  {
-		  	"metadata": {
-		  		"namespace":"a",
-					"name":"configMap1"
-				},
-				"data": {
-					"a": "b"
-				}
-			}
-		]
-	}`)
-	configMapsClientA.On("List", metav1.ListOptions{}).Return(configMapsA, nil)
-	dynamicFactory.On("ClientForGroupVersionResource", legacyGV, configMapsResource, "a").Return(configMapsClientA, nil)
-
-	configMapsClientB := &arktest.FakeDynamicClient{}
-	configMapsB := toRuntimeObject(t, `{
-		"apiVersion": "v1",
-		"kind": "ConfigMapList",
-		"items": [
-		  {
-		  	"metadata": {
-		  		"namespace":"b",
-					"name":"configMap2"
-				},
-				"data": {
-					"c": "d"
-				}
-			}
-		]
-	}`)
-	configMapsClientB.On("List", metav1.ListOptions{}).Return(configMapsB, nil)
-	dynamicFactory.On("ClientForGroupVersionResource", legacyGV, configMapsResource, "b").Return(configMapsClientB, nil)
-
-	certificatesGV := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1beta1"}
-
-	csrList := toRuntimeObject(t, `{
-		"apiVersion": "certificates.k8s.io/v1beta1",
-		"kind": "CertificateSigningRequestList",
-		"items": [
-			{
-				"metadata": {
-					"name": "csr1"
-				},
-				"spec": {
-					"request": "some request",
-					"username": "bob",
-					"uid": "12345",
-					"groups": [
-						"group1",
-						"group2"
-					]
-				},
-				"status": {
-					"certificate": "some cert"
-				}
-			}
-		]
-	}`)
-	csrClient := &arktest.FakeDynamicClient{}
-	csrClient.On("List", metav1.ListOptions{}).Return(csrList, nil)
-	dynamicFactory.On("ClientForGroupVersionResource", certificatesGV, certificateSigningRequestsResource, "").Return(csrClient, nil)
-
-	roleListA := toRuntimeObject(t, `{
-		"apiVersion": "rbac.authorization.k8s.io/v1beta1",
-		"kind": "RoleList",
-		"items": [
-			{
-				"metadata": {
-					"namespace": "a",
-					"name": "role1"
-				},
-				"rules": [
-					{
-						"verbs": ["get","list"],
-						"apiGroups": ["apps","extensions"],
-						"resources": ["deployments"]
-					}
-				]
-			}
-		]
-	}`)
-
-	roleListB := toRuntimeObject(t, `{
-		"apiVersion": "rbac.authorization.k8s.io/v1beta1",
-		"kind": "RoleList",
-		"items": []
-	}`)
-
-	rbacGV := schema.GroupVersionResource{Group: "rbac.authorization.k8s.io", Version: "v1beta1"}
-
-	rolesClientA := &arktest.FakeDynamicClient{}
-	rolesClientA.On("List", metav1.ListOptions{}).Return(roleListA, nil)
-	dynamicFactory.On("ClientForGroupVersionResource", rbacGV, rolesResource, "a").Return(rolesClientA, nil)
-	rolesClientB := &arktest.FakeDynamicClient{}
-	rolesClientB.On("List", metav1.ListOptions{}).Return(roleListB, nil)
-	dynamicFactory.On("ClientForGroupVersionResource", rbacGV, rolesResource, "b").Return(rolesClientB, nil)
-
-	cmAction := &fakeAction{}
-	csrAction := &fakeAction{}
-
-	actions := map[string]Action{
-		"cm":  cmAction,
-		"csr": csrAction,
-	}
-
-	podCommandExecutor := &arktest.PodCommandExecutor{}
-	defer podCommandExecutor.AssertExpectations(t)
-
-	backupper, err := NewKubernetesBackupper(discoveryHelper, dynamicFactory, actions, podCommandExecutor)
-	require.NoError(t, err)
-
-	var output, log bytes.Buffer
-	err = backupper.Backup(backup, &output, &log)
-	defer func() {
-		// print log if anything failed
-		if t.Failed() {
-			gzr, err := gzip.NewReader(&log)
-			require.NoError(t, err)
-			t.Log("Backup log contents:")
-			var buf bytes.Buffer
-			_, err = io.Copy(&buf, gzr)
-			require.NoError(t, err)
-			require.NoError(t, gzr.Close())
-			t.Log(buf.String())
-		}
-	}()
-	require.NoError(t, err)
-
-	expectedFiles := sets.NewString(
-		"resources/configmaps/namespaces/a/configMap1.json",
-		"resources/configmaps/namespaces/b/configMap2.json",
-		"resources/roles.rbac.authorization.k8s.io/namespaces/a/role1.json",
-		// CSRs are not expected because they're unrelated cluster-scoped resources
-	)
-
-	expectedData := map[string]string{
-		"resources/configmaps/namespaces/a/configMap1.json": `
-			{
-				"apiVersion": "v1",
-				"kind": "ConfigMap",
-				"metadata": {
-					"namespace":"a",
-					"name":"configMap1"
-				},
-				"data": {
-					"a": "b"
-				}
-			}`,
-		"resources/configmaps/namespaces/b/configMap2.json": `
-			{
-				"apiVersion": "v1",
-				"kind": "ConfigMap",
-				"metadata": {
-					"namespace":"b",
-					"name":"configMap2"
-				},
-				"data": {
-					"c": "d"
-				}
-			}
-		`,
-		"resources/roles.rbac.authorization.k8s.io/namespaces/a/role1.json": `
-			{
-				"apiVersion": "rbac.authorization.k8s.io/v1beta1",
-				"kind": "Role",
-				"metadata": {
-					"namespace":"a",
-					"name": "role1"
-				},
-				"rules": [
-					{
-						"verbs": ["get","list"],
-						"apiGroups": ["apps","extensions"],
-						"resources": ["deployments"]
-					}
-				]
-			}
-		`,
-		// CSRs are not expected because they're unrelated cluster-scoped resources
-	}
-
-	seenFiles := sets.NewString()
-
-	gzipReader, err := gzip.NewReader(&output)
-	require.NoError(t, err)
-	defer gzipReader.Close()
-
-	tarReader := tar.NewReader(gzipReader)
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		require.NoError(t, err)
-
-		switch header.Typeflag {
-		case tar.TypeReg:
-			seenFiles.Insert(header.Name)
-			expected, err := getAsMap(expectedData[header.Name])
-			if !assert.NoError(t, err, "%q: %v", header.Name, err) {
-				continue
-			}
-
-			buf := new(bytes.Buffer)
-			n, err := io.Copy(buf, tarReader)
-			if !assert.NoError(t, err) {
-				continue
-			}
-
-			if !assert.Equal(t, header.Size, n) {
-				continue
-			}
-
-			actual, err := getAsMap(string(buf.Bytes()))
-			if !assert.NoError(t, err) {
-				continue
-			}
-			assert.Equal(t, expected, actual)
-		default:
-			t.Errorf("unexpected header: %#v", header)
-		}
-	}
-
-	if !expectedFiles.Equal(seenFiles) {
-		t.Errorf("did not get expected files. expected-seen: %v. seen-expected: %v", expectedFiles.Difference(seenFiles), seenFiles.Difference(expectedFiles))
-	}
-
-	expectedCMActionIDs := []string{"a/configMap1", "b/configMap2"}
-
-	assert.Equal(t, expectedCMActionIDs, cmAction.ids)
-	// CSRs are not expected because they're unrelated cluster-scoped resources
-	assert.Nil(t, csrAction.ids)
-}
-*/
-
 func getAsMap(j string) (map[string]interface{}, error) {
 	m := make(map[string]interface{})
 	err := json.Unmarshal([]byte(j), &m)
@@ -960,4 +641,138 @@ func unstructuredOrDie(data string) *unstructured.Unstructured {
 		panic(err)
 	}
 	return o.(*unstructured.Unstructured)
+}
+
+func TestGetResourceHook(t *testing.T) {
+	tests := []struct {
+		name     string
+		hookSpec v1.BackupResourceHookSpec
+		expected resourceHook
+	}{
+		{
+			name: "PreHooks take priority over Hooks",
+			hookSpec: v1.BackupResourceHookSpec{
+				Name: "spec1",
+				PreHooks: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+				Hooks: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "c",
+							Command:   []string{"d"},
+						},
+					},
+				},
+			},
+			expected: resourceHook{
+				name:       "spec1",
+				namespaces: collections.NewIncludesExcludes(),
+				resources:  collections.NewIncludesExcludes(),
+				pre: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Use Hooks if PreHooks isn't set",
+			hookSpec: v1.BackupResourceHookSpec{
+				Name: "spec1",
+				Hooks: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+			},
+			expected: resourceHook{
+				name:       "spec1",
+				namespaces: collections.NewIncludesExcludes(),
+				resources:  collections.NewIncludesExcludes(),
+				pre: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Full test",
+			hookSpec: v1.BackupResourceHookSpec{
+				Name:               "spec1",
+				IncludedNamespaces: []string{"ns1", "ns2"},
+				ExcludedNamespaces: []string{"ns3", "ns4"},
+				IncludedResources:  []string{"foo", "fie"},
+				ExcludedResources:  []string{"bar", "baz"},
+				PreHooks: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+				PostHooks: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "c",
+							Command:   []string{"d"},
+						},
+					},
+				},
+			},
+			expected: resourceHook{
+				name:       "spec1",
+				namespaces: collections.NewIncludesExcludes().Includes("ns1", "ns2").Excludes("ns3", "ns4"),
+				resources:  collections.NewIncludesExcludes().Includes("foodies.somegroup", "fields.somegroup").Excludes("barnacles.anothergroup", "bazaars.anothergroup"),
+				pre: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "a",
+							Command:   []string{"b"},
+						},
+					},
+				},
+				post: []v1.BackupResourceHook{
+					{
+						Exec: &v1.ExecHook{
+							Container: "c",
+							Command:   []string{"d"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
+				{Resource: "foo"}: {Group: "somegroup", Resource: "foodies"},
+				{Resource: "fie"}: {Group: "somegroup", Resource: "fields"},
+				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
+				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
+			}
+			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
+
+			actual, err := getResourceHook(test.hookSpec, discoveryHelper)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, actual)
+		})
+	}
 }

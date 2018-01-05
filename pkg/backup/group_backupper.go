@@ -17,11 +17,14 @@ limitations under the License.
 package backup
 
 import (
+	"sort"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -110,7 +113,6 @@ type defaultGroupBackupper struct {
 func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) error {
 	var (
 		errs []error
-		pv   *metav1.APIResource
 		log  = gb.log.WithField("group", group.GroupVersion)
 		rb   = gb.resourceBackupperFactory.newResourceBackupper(
 			log,
@@ -132,26 +134,69 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 
 	log.Infof("Backing up group")
 
-	processResource := func(resource metav1.APIResource) {
+	// Parse so we can check if this is the core group
+	gv, err := schema.ParseGroupVersion(group.GroupVersion)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing GroupVersion %q", group.GroupVersion)
+	}
+	if gv.Group == "" {
+		// This is the core group, so make sure we process in the following order: pods, pvcs, pvs,
+		// everything else.
+		sortCoreGroup(group)
+	}
+
+	for _, resource := range group.APIResources {
 		if err := rb.backupResource(group, resource); err != nil {
 			errs = append(errs, err)
 		}
 	}
 
-	for _, resource := range group.APIResources {
-		// do PVs last because if we're also backing up PVCs, we want to backup PVs within the scope of
-		// the PVCs (within the PVC action) to allow for hooks to run
-		if strings.ToLower(resource.Name) == "persistentvolumes" && strings.ToLower(group.GroupVersion) == "v1" {
-			pvResource := resource
-			pv = &pvResource
-			continue
-		}
-		processResource(resource)
-	}
-
-	if pv != nil {
-		processResource(*pv)
-	}
-
 	return kuberrs.NewAggregate(errs)
+}
+
+// sortCoreGroup sorts group as a coreGroup.
+func sortCoreGroup(group *metav1.APIResourceList) {
+	sort.Stable(coreGroup(group.APIResources))
+}
+
+// coreGroup is used to sort APIResources in the core API group. The sort order is pods, pvcs, pvs,
+// then everything else.
+type coreGroup []metav1.APIResource
+
+func (c coreGroup) Len() int {
+	return len(c)
+}
+
+func (c coreGroup) Less(i, j int) bool {
+	return coreGroupResourcePriority(c[i].Name) < coreGroupResourcePriority(c[j].Name)
+}
+
+func (c coreGroup) Swap(i, j int) {
+	c[j], c[i] = c[i], c[j]
+}
+
+// These constants represent the relative priorities for resources in the core API group. We want to
+// ensure that we process pods, then pvcs, then pvs, then anything else. This ensures that when a
+// pod is backed up, we can perform a pre hook, then process pvcs and pvs (including taking a
+// snapshot), then perform a post hook on the pod.
+const (
+	pod = iota
+	pvc
+	pv
+	other
+)
+
+// coreGroupResourcePriority returns the relative priority of the resource, in the following order:
+// pods, pvcs, pvs, everything else.
+func coreGroupResourcePriority(resource string) int {
+	switch strings.ToLower(resource) {
+	case "pods":
+		return pod
+	case "persistentvolumeclaims":
+		return pvc
+	case "persistentvolumes":
+		return pv
+	}
+
+	return other
 }
