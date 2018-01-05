@@ -1,16 +1,16 @@
-## ark describe
+## ark client config
 
-Describe ark resources
+Get and set client configuration file values
 
 ### Synopsis
 
 
-Describe ark resources
+Get and set client configuration file values
 
 ### Options
 
 ```
-  -h, --help   help for describe
+  -h, --help   help for config
 ```
 
 ### Options inherited from parent commands
@@ -28,8 +28,7 @@ Describe ark resources
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark describe backups](ark_describe_backups.md)	 - Describe backups
-* [ark describe restores](ark_describe_restores.md)	 - Describe restores
-* [ark describe schedules](ark_describe_schedules.md)	 - Describe schedules
+* [ark client](ark_client.md)	 - Ark client related commands
+* [ark client config get](ark_client_config_get.md)	 - Get client configuration file values
+* [ark client config set](ark_client_config_set.md)	 - Set client configuration file values
 
