@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
-	ark "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
@@ -61,7 +60,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			arkDeploy, err := kubeClient.AppsV1beta1().Deployments(ark.DefaultNamespace).Get(arkDeployment, metav1.GetOptions{})
+			arkDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(arkDeployment, metav1.GetOptions{})
 			if err != nil {
 				cmd.CheckError(err)
 			}
@@ -131,7 +130,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(original, updated, v1beta1.Deployment{})
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(ark.DefaultNamespace).Patch(arkDeploy.Name, types.StrategicMergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1beta1().Deployments(arkDeploy.Namespace).Patch(arkDeploy.Name, types.StrategicMergePatchType, patchBytes)
 			cmd.CheckError(err)
 		},
 	}

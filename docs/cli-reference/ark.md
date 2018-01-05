@@ -22,6 +22,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
       --log_backtrace_at traceLocation   when logging hits line file:N, emit a stack trace (default :0)
       --log_dir string                   If non-empty, write log files in this directory
       --logtostderr                      log to standard error instead of files
+  -n, --namespace string                 The namespace in which Ark should operate (default "heptio-ark")
       --stderrthreshold severity         logs at or above this threshold go to stderr (default 2)
   -v, --v Level                          log level for V logs
       --vmodule moduleSpec               comma-separated list of pattern=N settings for file-filtered logging
@@ -29,6 +30,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 
 ### SEE ALSO
 * [ark backup](ark_backup.md)	 - Work with backups
+* [ark client](ark_client.md)	 - Ark client related commands
 * [ark create](ark_create.md)	 - Create ark resources
 * [ark delete](ark_delete.md)	 - Delete ark resources
 * [ark describe](ark_describe.md)	 - Describe ark resources

@@ -22,7 +22,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 )
@@ -42,7 +41,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 			name := args[0]
 
-			err = arkClient.ArkV1().Restores(api.DefaultNamespace).Delete(name, nil)
+			err = arkClient.ArkV1().Restores(f.Namespace()).Delete(name, nil)
 			cmd.CheckError(err)
 
 			fmt.Printf("Restore %q deleted\n", name)

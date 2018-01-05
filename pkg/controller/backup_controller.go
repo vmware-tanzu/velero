@@ -297,7 +297,7 @@ func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter
 		return nil, errors.Wrap(err, "error creating two-way merge patch for backup")
 	}
 
-	res, err := client.Backups(api.DefaultNamespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Backups(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching backup")
 	}

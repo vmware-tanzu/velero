@@ -93,7 +93,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	schedule := &api.Schedule{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.DefaultNamespace,
+			Namespace: f.Namespace(),
 			Name:      o.BackupOptions.Name,
 		},
 		Spec: api.ScheduleSpec{

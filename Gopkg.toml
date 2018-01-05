@@ -88,32 +88,32 @@ required = [
   name = "google.golang.org/api"
 
 [[constraint]]
-  name = "k8s.io/apimachinery"
-  revision = "019ae5ada31de202164b118aee88ee2d14075c31"
+  name = "k8s.io/kubernetes"
+  version = "~1.9"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "~5.0"
+  version = "~6.0"
 
 [[constraint]]
-  name = "k8s.io/kubernetes"
-  version = "~1.8"
+  name = "k8s.io/apimachinery"
+  version = "kubernetes-1.9.0"
+
+[[constraint]]
+  name = "k8s.io/api"
+  version = "kubernetes-1.9.0"
+
+[[constraint]]
+  name = "k8s.io/code-generator"
+  version = "kubernetes-1.9.0"
+
+[[override]]
+  name = "k8s.io/gengo"
+  revision = "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
 
 [[override]]
   name = "github.com/russross/blackfriday"
   revision = "93622da34e54fb6529bfb7c57e710f37a8d9cbd8"
-
-[[constraint]]
-  branch = "release-1.8"
-  name = "k8s.io/api"
-
-[[constraint]]
-  branch = "release-1.8"
-  name = "k8s.io/code-generator"
-
-[[override]]
-  name = "k8s.io/gengo"
-  revision = "9e661e9308f078838e266cca1c673922088c0ea4"
 
 [[constraint]]
   branch = "master"

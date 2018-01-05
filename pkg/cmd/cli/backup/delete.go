@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/controller"
@@ -55,7 +54,7 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 			backupName := args[0]
 
-			err = arkClient.ArkV1().Backups(api.DefaultNamespace).Delete(backupName, nil)
+			err = arkClient.ArkV1().Backups(f.Namespace()).Delete(backupName, nil)
 			cmd.CheckError(err)
 
 			fmt.Printf("Backup %q deleted\n", backupName)

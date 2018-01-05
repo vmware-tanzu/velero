@@ -44,7 +44,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			arkClient, err := f.Client()
 			cmd.CheckError(err)
 
-			err = downloadrequest.Stream(arkClient.ArkV1(), args[0], v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
+			err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), args[0], v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
 			cmd.CheckError(err)
 		},
 	}

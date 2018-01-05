@@ -42,12 +42,12 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				schedules = new(v1.ScheduleList)
 				for _, name := range args {
-					schedule, err := arkClient.Ark().Schedules(v1.DefaultNamespace).Get(name, metav1.GetOptions{})
+					schedule, err := arkClient.Ark().Schedules(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					schedules.Items = append(schedules.Items, *schedule)
 				}
 			} else {
-				schedules, err = arkClient.ArkV1().Schedules(v1.DefaultNamespace).List(listOptions)
+				schedules, err = arkClient.ArkV1().Schedules(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 

@@ -108,7 +108,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, arkClient clients
 	var buf bytes.Buffer
 	var resultMap map[string]v1.RestoreResult
 
-	if err := downloadrequest.Stream(arkClient.ArkV1(), restore.Name, v1.DownloadTargetKindRestoreResults, &buf, 30*time.Second); err != nil {
+	if err := downloadrequest.Stream(arkClient.ArkV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, 30*time.Second); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}
