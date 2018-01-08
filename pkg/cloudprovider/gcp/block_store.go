@@ -17,16 +17,13 @@ limitations under the License.
 package gcp
 
 import (
-	"time"
-
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/compute/v0.beta"
+	"google.golang.org/api/compute/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/util/collections"
@@ -127,32 +124,11 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	}
 
 	gceSnap := compute.Snapshot{
-		Name: snapshotName,
+		Name:   snapshotName,
+		Labels: tags,
 	}
 
 	_, err := b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	// the snapshot is not immediately available after creation for putting labels
-	// on it. poll for a period of time.
-	if pollErr := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
-		if res, err := b.gce.Snapshots.Get(b.project, gceSnap.Name).Do(); err == nil {
-			gceSnap = *res
-			return true, nil
-		}
-		return false, nil
-	}); pollErr != nil {
-		return "", errors.WithStack(err)
-	}
-
-	labels := &compute.GlobalSetLabelsRequest{
-		Labels:           tags,
-		LabelFingerprint: gceSnap.LabelFingerprint,
-	}
-
-	_, err = b.gce.Snapshots.SetLabels(b.project, gceSnap.Name, labels).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
