@@ -143,6 +143,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	fmt.Printf("Backup %q created successfully.\n", backup.Name)
+	fmt.Printf("Backup request %q submitted successfully.\n", backup.Name)
+	fmt.Printf("Run `ark backup describe %s` for more details.\n", backup.Name)
 	return nil
 }
