@@ -1,1 +1,2 @@
-remote_theme: tomjoht/documentation-theme-jekyll
+theme: jekyll-theme-minimal
+
