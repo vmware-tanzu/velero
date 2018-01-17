@@ -31,6 +31,14 @@ aws s3api create-bucket \
     --region <YOUR_REGION> \
     --create-bucket-configuration LocationConstraint=<YOUR_REGION>
 ```
+Note: us-east-1 does not support a `LocationConstraint`.  If your region is `us-east-1`, omit the bucket configuration:
+
+```bash
+
+aws s3api create-bucket \
+    --bucket <YOUR_BUCKET> \
+    --region us-east-1
+```
 
 #### IAM user creation
 
@@ -462,4 +470,3 @@ ark restore create nginx-backup
 [20]: /CHANGELOG.md
 [21]: /docs/build-from-scratch.md
 [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control
-
