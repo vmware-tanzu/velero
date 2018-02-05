@@ -61,6 +61,12 @@ func LoadConfig() (map[string]string, error) {
 func SaveConfig(config map[string]string) error {
 	fileName := configFileName()
 
+	// Try to make the directory in case it doesn't exist
+	dir := filepath.Dir(fileName)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return errors.WithStack(err)
+	}
+
 	configFile, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return errors.WithStack(err)
