@@ -12,7 +12,9 @@
 
 Heptio Ark defines its own Config object (a custom resource) for specifying Ark backup and cloud provider settings. When the Ark server is first deployed, it waits until you create a Config--specifically one named `default`--in the `heptio-ark` namespace.
 
-> *NOTE*: There is an underlying assumption that you're running the Ark server as a Kubernetes deployment. If the `default` Config is modified, the server shuts down gracefully. Once the kubelet restarts the Ark server pod, the server then uses the updated Config values.
+In version 0.7.0 and later, you can run Ark in any namespace. In earlier versions, the `heptio-ark` namespace was required.
+
+> **NOTE**: This example assumes that the Ark server is running as a Kubernetes deployment. If you modify the `default` Config, the server shuts down gracefully. The kubelet then restarts the Ark server pod with the updated Config values.
 
 ## Example
 
