@@ -2,10 +2,11 @@
 
 * [Example][0]
 * [Structure][1]
+* [Restoring a load balancer Service][2]
 
 ## Example
 
-When Heptio Ark finishes a Restore, its status changes to "Completed" regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from `ark restore get`:
+When Heptio Ark finishes a Restore, its status changes to "Completed" regardless of whether there were issues during the process. The number of warnings and errors are indicated in the output columns from `ark restore get`:
 
 ```
 NAME                          BACKUP          STATUS      WARNINGS   ERRORS    CREATED                         SELECTOR
@@ -99,5 +100,15 @@ Both errors and warnings are structured in the same way:
 
 * `Namespaces`: A map of namespaces to the list of issues related to the restore of their respective resources.
 
+## Restoring a load balancer Service
+
+> **Warning** When Ark restores a load balancer Service, the UID of the Service changes. The UID is set by the Kubernetes apiserver and cannot be manually changed. The identifier for your cloud provider load balancer also changes. If you specify a DNS CNAME for your application that points at the DNS name of your cloud provider load balancer, you should check the CNAME pointer after the Ark restore, and update it if necessary.
+
+For more information, see the dicussion in these Kubernetes pull requests: 
+
+* [#49903](https://github.com/kubernetes/kubernetes/pull/49903) 
+* [#56832](https://github.com/kubernetes/kubernetes/pull/56832)
+
 [0]: #example
 [1]: #structure
+[2]: #restoring-a-loadbalancer-service
