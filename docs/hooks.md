@@ -37,7 +37,7 @@ You can use the following annotations on a pod to make Ark execute a hook when b
 Ark v0.7.0+ continues to support the original (deprecated) way to specify pre hooks - without the
 `pre.` prefix in the annotation names (e.g. `hook.backup.ark.heptio.com/container`).
 
-#### Post hooks (v0.7.0+)
+#### Post hooks (v0.7.0 and later)
 
 | Annotation Name | Description |
 | --- | --- |
@@ -48,7 +48,7 @@ Ark v0.7.0+ continues to support the original (deprecated) way to specify pre ho
 
 ### Specifying Hooks in the Backup Spec
 
-Please see the documentation on the [Backup API Type][1] for how to specify hooks in the Backup
+See the documentation on the [Backup API Type][1] for how to specify hooks in the Backup
 spec.
 
 [1]: api-types/backup.md
