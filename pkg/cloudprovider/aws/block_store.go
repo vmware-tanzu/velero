@@ -20,9 +20,15 @@ import (
 	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
+
+	"net/http"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,6 +49,32 @@ type blockStore struct {
 }
 
 func getSession(config *aws.Config) (*session.Session, error) {
+	// we need to override the entire credential provider chain in order to set
+	// higher timeout for ec2metata service as this can cause problems with kube2iam
+	metaSess, err := session.NewSession()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	creds := credentials.NewChainCredentials(
+		[]credentials.Provider{
+			// this is the order in which credential providers will be tried
+			&credentials.EnvProvider{},
+			&credentials.SharedCredentialsProvider{},
+			&ec2rolecreds.EC2RoleProvider{
+				Client: ec2metadata.New(
+					metaSess,
+					&aws.Config{
+						HTTPClient: &http.Client{
+							Timeout: 30 * time.Second,
+						},
+					},
+				),
+			},
+		},
+	)
+	config.WithCredentials(creds)
+
 	sess, err := session.NewSession(config)
 	if err != nil {
 		return nil, errors.WithStack(err)
