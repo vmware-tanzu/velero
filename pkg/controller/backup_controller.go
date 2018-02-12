@@ -49,6 +49,7 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
 const backupVersion = 1
@@ -237,8 +238,8 @@ func (controller *backupController) processBackup(key string) error {
 	backup.Status.Version = backupVersion
 
 	// add GC finalizer if it's not there already
-	if !has(backup.Finalizers, gcFinalizer) {
-		backup.Finalizers = append(backup.Finalizers, gcFinalizer)
+	if !stringslice.Has(backup.Finalizers, api.GCFinalizer) {
+		backup.Finalizers = append(backup.Finalizers, api.GCFinalizer)
 	}
 
 	// calculate expiration

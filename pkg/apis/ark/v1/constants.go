@@ -37,4 +37,8 @@ const (
 	// NamespaceScopedDir is the name of the directory containing namespace-scoped
 	// resource within an Ark backup.
 	NamespaceScopedDir = "namespaces"
+
+	// GCFinalizer is the name of the finalizer Ark uses for backups to allow for the GC Controller to
+	// delete all resources associated with a backup.
+	GCFinalizer = "gc.ark.heptio.com"
 )

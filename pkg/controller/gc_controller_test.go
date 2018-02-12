@@ -306,17 +306,17 @@ func TestHandleFinalizer(t *testing.T) {
 			backup: arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).Backup,
 		},
 		{
-			name:   "no gcFinalizer exits early",
+			name:   "no GCFinalizer exits early",
 			backup: arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).WithFinalizers("foo").Backup,
 		},
 		{
 			name:                 "error when calling garbageCollect exits without patch",
-			backup:               arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).WithFinalizers(gcFinalizer).Backup,
+			backup:               arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).WithFinalizers(api.GCFinalizer).Backup,
 			deleteBackupDirError: true,
 		},
 		{
 			name:                 "normal case - patch includes the appropriate fields",
-			backup:               arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).WithFinalizers(gcFinalizer, "foo").WithResourceVersion("1").Backup,
+			backup:               arktest.NewTestBackup().WithDeletionTimestamp(time.Now()).WithFinalizers(api.GCFinalizer, "foo").WithResourceVersion("1").Backup,
 			expectGarbageCollect: true,
 			expectedPatch:        []byte(`{"metadata":{"finalizers":["foo"],"resourceVersion":"1"}}`),
 		},
