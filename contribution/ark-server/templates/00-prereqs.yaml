@@ -1,0 +1,166 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: backups.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: backups
+    kind: Backup
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: schedules.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: schedules
+    kind: Schedule
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: restores.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: restores
+    kind: Restore
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: configs.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: configs
+    kind: Config
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: downloadrequests.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: downloadrequests
+    kind: DownloadRequest
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ark
+  namespace: heptio-ark
+  labels:
+    component: ark
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: ark
+  labels:
+    component: ark
+subjects:
+  - kind: ServiceAccount
+    namespace: heptio-ark
+    name: ark
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: Role
+metadata:
+  namespace: heptio-ark
+  name: ark
+  labels:
+    component: ark
+rules:
+  - apiGroups:
+      - ark.heptio.com
+    verbs:
+      - "*"
+    resources:
+      - "*"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: RoleBinding
+metadata:
+  namespace: heptio-ark
+  name: ark
+  labels:
+    component: ark
+subjects:
+  - kind: ServiceAccount
+    namespace: heptio-ark
+    name: ark
+roleRef:
+  kind: Role
+  name: ark
+  apiGroup: rbac.authorization.k8s.io
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deploy-ark
+  namespace: heptio-ark
+
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: deploy-ark
+rules:
+- apiGroups: ['*']
+  resources: ['*']
+  verbs: ['*']
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: deploy-ark
+  namespace: heptio-ark
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: deploy-ark
+subjects:
+- kind: ServiceAccount
+  name: deploy-ark
+  namespace: heptio-ark
