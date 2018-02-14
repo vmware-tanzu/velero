@@ -6,10 +6,13 @@ replicaCount: 1
 
 configuration:
   cloudprovider:
-  project:
-  bucket:
+  project: 
+  bucket: 
   credentials:
-  namespace: heptio-ark
+
+namespace:
+  create: true
+  name: heptio-ark
 
 image:
   repository: gcr.io/heptio-images/ark
