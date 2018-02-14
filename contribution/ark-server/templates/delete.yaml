@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: delete-ark
+  namespace: heptio-ark
   annotations:
     "helm.sh/hook": pre-delete
     "helm.sh/hook-delete-policy": hook-succeeded
@@ -9,6 +10,7 @@ spec:
   template:
     metadata:
       name: delete-ark
+      namespace: heptio-ark
     spec:
       restartPolicy: Never
       containers:
