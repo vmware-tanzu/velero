@@ -30,3 +30,14 @@ Create chart name and version as used by the chart label.
 {{- define "ark-server.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{/*
+Create the name of the service account to use for deploying
+*/}}
+{{- define "ark-server.deploySA" -}}
+{{- if .Values.serviceAccount.deploy.create -}}
+    {{ default (include "ark-server.fullname" .) .Values.serviceAccount.deploy.name }}
+{{- else -}}
+    {{ default "default" .Values.serviceAccount.deploy.name }}
+{{- end -}}
+{{- end -}}

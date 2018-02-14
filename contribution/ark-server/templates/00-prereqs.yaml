@@ -4,6 +4,10 @@ metadata:
   name: backups.ark.heptio.com
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 spec:
   group: ark.heptio.com
   version: v1
@@ -19,6 +23,10 @@ metadata:
   name: schedules.ark.heptio.com
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 spec:
   group: ark.heptio.com
   version: v1
@@ -34,6 +42,10 @@ metadata:
   name: restores.ark.heptio.com
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 spec:
   group: ark.heptio.com
   version: v1
@@ -49,6 +61,10 @@ metadata:
   name: configs.ark.heptio.com
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 spec:
   group: ark.heptio.com
   version: v1
@@ -64,6 +80,10 @@ metadata:
   name: downloadrequests.ark.heptio.com
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 spec:
   group: ark.heptio.com
   version: v1
@@ -80,6 +100,10 @@ metadata:
   namespace: heptio-ark
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
@@ -88,6 +112,10 @@ metadata:
   name: ark
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 subjects:
   - kind: ServiceAccount
     namespace: heptio-ark
@@ -105,6 +133,10 @@ metadata:
   name: ark
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 rules:
   - apiGroups:
       - ark.heptio.com
@@ -121,6 +153,10 @@ metadata:
   name: ark
   labels:
     component: ark
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 subjects:
   - kind: ServiceAccount
     namespace: heptio-ark
@@ -134,9 +170,15 @@ roleRef:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: deploy-ark
+  name: {{ template "ark-server.deploySA" . }}
   namespace: heptio-ark
+  labels:
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 
+{{- if .Values.rbac.create }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
@@ -145,6 +187,10 @@ metadata:
     rbac.authorization.kubernetes.io/autoupdate: "true"
   labels:
     kubernetes.io/bootstrapping: rbac-defaults
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
   name: deploy-ark
 rules:
 - apiGroups: ['*']
@@ -156,11 +202,17 @@ kind: ClusterRoleBinding
 metadata:
   name: deploy-ark
   namespace: heptio-ark
+  labels:
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    heritage: {{ .Release.Service }}
+    release: {{ .Release.Name }}
+    app: {{ template "ark-server.name" . }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: deploy-ark
 subjects:
 - kind: ServiceAccount
-  name: deploy-ark
+  name: {{ template "ark-server.deploySA" . }}
   namespace: heptio-ark
+{{- end }}
