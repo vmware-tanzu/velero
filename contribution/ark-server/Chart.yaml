@@ -4,5 +4,5 @@ description: A Helm chart for ark-server
 name: ark-server
 version: 0.6.0
 maintainers:
-- name: Domenico Caruso
+- name: domcar
   email: domenico.caruso@de.clara.net
