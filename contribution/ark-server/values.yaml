@@ -5,10 +5,10 @@
 replicaCount: 1
 
 configuration:
-  cloudprovider: changeme
-  project: changeme
-  bucket: changeme
-  credentials: changeme
+  cloudprovider:
+  project:
+  bucket:
+  credentials:
 
 image:
   repository: gcr.io/heptio-images/ark
@@ -21,8 +21,6 @@ secret:
 service:
   type: ClusterIP
   port: 80
-
-
 
 rbac:
   create: true

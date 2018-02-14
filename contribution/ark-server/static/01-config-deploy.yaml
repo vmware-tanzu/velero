@@ -5,12 +5,12 @@ metadata:
   namespace: heptio-ark
   name: default
 persistentVolumeProvider:
-  name: {{ .Values.configuration.cloudprovider  }}
+  name: {{ required "PLEASE CHANGE VALUE" .Values.configuration.cloudprovider  }}
   config:
-    project: {{ .Values.configuration.project  }}
+    project: {{ required "PLEASE CHANGE VALUE" .Values.configuration.project  }}
 backupStorageProvider:
-  name: {{ .Values.configuration.cloudprovider  }}
-  bucket: {{ .Values.configuration.bucket  }}
+  name: {{ required "PLEASE CHANGE VALUE" .Values.configuration.cloudprovider  }}
+  bucket: {{ required "PLEASE CHANGE VALUE" .Values.configuration.bucket  }}
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m
@@ -44,7 +44,7 @@ spec:
             - name: plugins
               mountPath: /plugins
           env:
-            - name: {{ .Values.configuration.credentials }}
+            - name: {{ required "PLEASE CHANGE VALUE" .Values.configuration.credentials }}
               value: /credentials/cloud
       volumes:
         - name: cloud-credentials
