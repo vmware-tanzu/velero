@@ -9,6 +9,7 @@ configuration:
   project:
   bucket:
   credentials:
+  namespace: heptio-ark
 
 image:
   repository: gcr.io/heptio-images/ark

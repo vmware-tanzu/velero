@@ -97,7 +97,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ark
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
   labels:
     component: ark
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
@@ -118,7 +118,7 @@ metadata:
     app: {{ template "ark-server.name" . }}
 subjects:
   - kind: ServiceAccount
-    namespace: heptio-ark
+    namespace: {{ .Values.configuration.namespace }}
     name: ark
 roleRef:
   kind: ClusterRole
@@ -129,7 +129,7 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: Role
 metadata:
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
   name: ark
   labels:
     component: ark
@@ -149,7 +149,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
   name: ark
   labels:
     component: ark
@@ -159,7 +159,7 @@ metadata:
     app: {{ template "ark-server.name" . }}
 subjects:
   - kind: ServiceAccount
-    namespace: heptio-ark
+    namespace: {{ .Values.configuration.namespace }}
     name: ark
 roleRef:
   kind: Role
@@ -171,7 +171,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ template "ark-server.deploySA" . }}
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
   labels:
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     heritage: {{ .Release.Service }}
@@ -201,7 +201,7 @@ apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
   name: deploy-ark
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
   labels:
     chart: {{ .Chart.Name }}-{{ .Chart.Version }}
     heritage: {{ .Release.Service }}
@@ -214,5 +214,5 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ template "ark-server.deploySA" . }}
-  namespace: heptio-ark
+  namespace: {{ .Values.configuration.namespace }}
 {{- end }}
