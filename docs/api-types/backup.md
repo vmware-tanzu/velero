@@ -22,7 +22,7 @@ kind: Backup
 metadata:
   # Backup name. May be any valid Kubernetes object name. Required.
   name: a
-  # Backup namespace. Must be heptio-ark. Required.
+  # Backup namespace. Required. In version 0.7.0 and later, can be any string. Must be the namespace of the Ark server.
   namespace: heptio-ark
 # Parameters about the backup. Required.
 spec:

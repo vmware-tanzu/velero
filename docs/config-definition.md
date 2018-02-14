@@ -114,6 +114,4 @@ No parameters required.
 [8]: #overview
 [9]: #example
 [10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
-[11]: ../examples/gcp/00-ark-config.yaml
-[12]: ../examples/azure/10-ark-config.yaml
 
