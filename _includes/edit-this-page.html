@@ -1,0 +1,16 @@
+{% if page.version == 'master' %}
+  {% assign base = page.path | remove_first: "master/" %}
+  {% assign edit_prefix = site.contact.github | append: "/edit/master/" %}
+
+  {% if base == "README.md" %}
+    {% assign edit_url = base | prepend: edit_prefix %}
+  {% else %}
+    {% assign edit_url = base | prepend: "docs/" | prepend: edit_prefix %}
+  {% endif %}
+
+  <div class="edit-page">
+    <a href="{{edit_url}}">
+      <i class="fa fa-edit"></i>Edit this page
+    </a>
+  </div>
+{% endif %}

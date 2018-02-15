@@ -1,0 +1,38 @@
+<header class="sticky-header">
+  <div class="logo-version--container">
+    <a href="{{ page.version | relative_url }}">
+      <img src="{{'/assets/img/logo.svg' | relative_url }}" alt="">
+      <h1>Heptio <span>{{ site.name | capitalize }}</span></h1>
+    </a>
+
+    <span class="version-selector">
+       {% if site.versioning %}
+          <a href="#">
+            <span>{{ page.version }}</span><i class="fa fa-caret-down" aria-hidden="true"></i>
+          </a>
+          <ul>
+          {% assign original_version = page.version | prepend: '/' | append: '/' %}
+          {% assign master_url = page.url | replace: original_version, '/master/' | relative_url %}
+          <li><a href="{{ master_url }}">master</a></li>
+          {% for version in site.versions %}
+            {% assign new_version = version | prepend: '/' | append: '/' %}
+            <li><a href="{{ page.url | replace: original_version, new_version | relative_url }}">{{ version }}</a></li>
+          {% endfor %}
+          </ul>
+        {% else %}
+          <span>{{ site.latest }}</span>
+        {% endif %}
+    </span>
+  </div>
+
+  <!-- Block google from indexing versioned docs -->
+  {% if page.version != "master" %}
+  <meta name="robots" content="noindex">
+  {% endif %}
+
+  <ul class="social--links">
+    <li><a href="{{ site.contact.github }}" target="_blank"><img src="{{'/assets/img/icon-github.svg' | relative_url }}" alt="github"></a></li>
+    <li><a href="{{ site.contact.twitter }}" target="_blank"><img src="{{'/assets/img/icon-twitter.svg' | relative_url }}" alt="twitter"></a></li>
+    <li><a href="{{ site.contact.slack }}" target="_blank"><img src="{{'/assets/img/icon-slack.svg' | relative_url }}" alt="slack"></a></li>
+  </ul>
+</header>
