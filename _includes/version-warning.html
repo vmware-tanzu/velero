@@ -1,0 +1,10 @@
+{% if page.version != 'master' and page.version != site.latest %}
+  <div class="version-warning">
+    <p>
+    <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+    Documentation for version {{ page.version }} is no longer actively maintained.
+    The version you are currently viewing is a static snapshot.
+    For up-to-date documentation, see the <a href="{{master_url}}">latest version</a>.
+    </p>
+  </div>
+{% endif %}

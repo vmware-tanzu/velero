@@ -26,9 +26,11 @@ _testmain.go
 
 debug
 
-/ark
 .idea/
 
 .container-*
 .vimrc
 .go
+
+.svn/
+_site/

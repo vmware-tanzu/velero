@@ -1,0 +1,13 @@
+# This file can be used to explicitly map a release to a specific table-of-contents
+# (TOC). You'll want to use this after any revamps to information architecture, to ensure
+# that the navigation for older versions still work.
+#
+# Below is a commented out example of what this may look like:
+
+# v0.9.0: old
+# # v0.10.0 is unspecified, so it uses the toc under default.yml
+# v0.11.0: default
+# v0.12.0: default
+
+master: v7-toc
+v0.7.0: v7-toc
