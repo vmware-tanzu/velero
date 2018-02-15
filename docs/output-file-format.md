@@ -2,9 +2,9 @@
 
 A backup is a gzip-compressed tar file whose name matches the Backup API resource's `metadata.name` (what is specified during `ark backup create <NAME>`).
 
-In cloud object storage, *each backup file is stored in its own subdirectory* beneath the bucket specified in the Ark server configuration. This subdirectory includes an additional file called `ark-backup.json`. The JSON file explicitly lists all info about your associated Backup resource--including any default values used--so that you have a complete historical record of its configuration. It also specifies `status.version`, which corresponds to the output file format.
+In cloud object storage, each backup file is stored in its own subdirectory in the bucket specified in the Ark server configuration. This subdirectory includes an additional file called `ark-backup.json`. The JSON file lists all information about your associated Backup resource, including any default values. This gives you a complete historical record of the backup configuration. The JSON file also specifies `status.version`, which corresponds to the output file format.
 
-All together, the directory structure in your cloud storage may look like:
+The directory structure in your cloud storage looks something like:
 
 ```
 rootBucket/
@@ -13,8 +13,8 @@ rootBucket/
         backup1234.tar.gz
 ```
 
-## `ark-backup.json`
-An example of this file looks like the following:
+## Example backup JSON file
+
 ```
 {
   "kind": "Backup",

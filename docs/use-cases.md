@@ -41,7 +41,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
 
 2. *(Cluster 2)* Make sure that the `persistentVolumeProvider` and `backupStorageProvider` fields in the Ark Config match the ones from *Cluster 1*, so that your new Ark server instance is pointing to the same bucket.
 
-3. *(Cluster 2)* Make sure that the Ark Backup object has been created. Ark resources are [synced][2] with the backup files available in cloud storage.
+3. *(Cluster 2)* Make sure that the Ark Backup object has been created. Ark resources are synced with the backup files available in cloud storage.
 
 4. *(Cluster 2)* Once you have confirmed that the right Backup (`<BACKUP-NAME>`) is now present, you can restore everything with:
 ```
@@ -50,5 +50,4 @@ ark restore create <BACKUP-NAME>
 
 [0]: #disaster-recovery
 [1]: #cluster-migration
-[2]: concepts.md#cloud-storage-sync
-[3]: config-definition.md#main-config-parameters
+[3]: /config-definition.md#main-config-parameters
