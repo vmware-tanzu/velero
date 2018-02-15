@@ -54,3 +54,5 @@ defaults:
     values:
       version: "v0.3.0"
       gh: https://github.com/heptio/ark/tree/v0.3.0
+
+theme: jekyll-theme-minimal
