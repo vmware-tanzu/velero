@@ -55,11 +55,11 @@ the files:
 
 If you make the following change, you must run [generate-proto.sh][13] to regenerate files:
 
-* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14]. 
+* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14].
 
 ### Cross compiling
 
-By default, `make` builds an `ark` binary that runs on your host operating system and architecture. 
+By default, `make` builds an `ark` binary that runs on your host operating system and architecture.
 To build for another platform, run `make build-<GOOS>-<GOARCH`.
 For example, to build for the Mac, run `make build-darwin-amd64`.
 All binaries are placed in `_output/bin/<GOOS>/<GOARCH>`-- for example, `_output/bin/darwin/amd64/ark`.
@@ -71,12 +71,12 @@ Ark's `Makefile` has a convenience target, `all-build`, that builds the followin
 * darwin-amd64
 * windows-amd64
 
-## 3. Test
+## Test
 
 To run unit tests, use `make test`. You can also run `make verify` to ensure that all generated
 files (clientset, listers, shared informers, docs) are up to date.
 
-## 4. Run
+## Run
 
 When running Heptio Ark, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
 
