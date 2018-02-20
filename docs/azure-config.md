@@ -115,7 +115,7 @@ Now you need to create a Secret that contains all the seven environment variable
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_NAMESPACE> \
+    --namespace <ARK_SERVER_NAMESPACE> \
     --from-literal AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID} \
     --from-literal AZURE_TENANT_ID=${AZURE_TENANT_ID} \
     --from-literal AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP} \

@@ -133,6 +133,18 @@ For more information, see [the debugging information][18].
 
 ### Clean up
 
+Delete any backups you created:
+
+```
+kubectl delete -n heptio-ark backup --all
+```
+
+Before you continue, wait for the following to show no backups:
+
+```
+ark backup get
+```
+
 To remove the Kubernetes objects for this example from your cluster, run:
 
 ```
