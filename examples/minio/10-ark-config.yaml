@@ -24,7 +24,7 @@ backupStorageProvider:
   config:
     region: minio
     s3ForcePathStyle: "true"
-    s3Url: http://minio.heptio-ark.svc:9000
+    s3Url: http://minio.heptio-ark-server.svc:9000
 backupSyncPeriod: 1m
 gcSyncPeriod: 1m
 scheduleSyncPeriod: 1m

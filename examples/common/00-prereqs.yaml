@@ -95,10 +95,16 @@ metadata:
 
 ---
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: heptio-ark-server
+
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ark
-  namespace: heptio-ark
+  namespace: heptio-ark-server
   labels:
     component: ark
 
@@ -111,42 +117,9 @@ metadata:
     component: ark
 subjects:
   - kind: ServiceAccount
-    namespace: heptio-ark
+    namespace: heptio-ark-server
     name: ark
 roleRef:
   kind: ClusterRole
   name: cluster-admin
-  apiGroup: rbac.authorization.k8s.io
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: Role
-metadata:
-  namespace: heptio-ark
-  name: ark
-  labels:
-    component: ark
-rules:
-  - apiGroups:
-      - ark.heptio.com
-    verbs:
-      - "*"
-    resources:
-      - "*"
-
----
-apiVersion: rbac.authorization.k8s.io/v1beta1
-kind: RoleBinding
-metadata:
-  namespace: heptio-ark
-  name: ark
-  labels:
-    component: ark
-subjects:
-  - kind: ServiceAccount
-    namespace: heptio-ark
-    name: ark
-roleRef:
-  kind: Role
-  name: ark
   apiGroup: rbac.authorization.k8s.io

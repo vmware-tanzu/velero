@@ -16,7 +16,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark
+  namespace: heptio-ark-server
   name: ark
 spec:
   replicas: 1
@@ -34,6 +34,8 @@ spec:
             - /ark
           args:
             - server
+            - --namespace
+            - heptio-ark
           volumeMounts:
             - name: cloud-credentials
               mountPath: /credentials

@@ -16,7 +16,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark
+  namespace: heptio-ark-server
   name: ark
 spec:
   replicas: 1
@@ -32,6 +32,8 @@ spec:
           image: gcr.io/heptio-images/ark:latest
           command:
             - /ark
+            - --namespace
+            - heptio-ark
           args:
             - server
           envFrom:
