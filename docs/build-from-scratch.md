@@ -114,7 +114,7 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [8]: /config-definition.md
 [9]: /cloud-common.md
 [10]: #vendoring-dependencies
-[11]: /vendoring-dependencies.md
+[11]: ./vendoring-dependencies.md
 [12]: #test
 [13]: https://github.com/heptio/ark/blob/master/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
