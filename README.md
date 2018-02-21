@@ -159,7 +159,7 @@ kubectl delete -f examples/nginx-app/base.yaml
 
 ## Troubleshooting
 
-If you encounter any problems that the documentation does not address, [file an issue][4] or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
+If you encounter any problems that the documentation does not address, review the [troubleshooting][30] page, [file an issue][4], or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
 
 ## Contributing
 
@@ -209,3 +209,4 @@ See [the list of releases][6] to find out about feature changes.
 [27]: /docs/hooks.md
 [28]: /docs/plugins.md
 [29]: https://heptio.github.io/ark/
+[30]: /docs/troubleshooting.md
