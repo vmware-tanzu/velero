@@ -6,7 +6,7 @@ These tips can help you troubleshoot known issues. If they don't help, you can [
 
 * [Debug restores][1]
 
-[0]: /docs/debugging-deletes.md
-[1]: /docs/debugging-restores.md
+[0]: debugging-deletes.md
+[1]: debugging-restores.md
 [4]: https://github.com/heptio/ark/issues
 [25]: http://slack.kubernetes.io/

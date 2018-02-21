@@ -101,8 +101,8 @@ In the root of your Ark directory, run:
   kubectl apply -f examples/common/10-deployment.yaml
   ```
 
-  [0]: /namespace.md
-  [7]: /config-definition.md#gcp
+  [0]: namespace.md
+  [7]: config-definition.md#gcp
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
   [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control

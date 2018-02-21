@@ -167,7 +167,7 @@ In the root of your Ark directory, run:
   kubectl apply -f examples/azure/
   ```
 
-  [0]: /namespace.md
+  [0]: namespace.md
   [8]: config-definition.md#azure
   [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
   [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli

@@ -50,4 +50,4 @@ ark restore create <BACKUP-NAME>
 
 [0]: #disaster-recovery
 [1]: #cluster-migration
-[3]: /config-definition.md#main-config-parameters
+[3]: config-definition.md#main-config-parameters
