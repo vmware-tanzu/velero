@@ -117,6 +117,6 @@ In the root of your Ark directory, run:
   kubectl apply -f examples/common/10-deployment.yaml
   ```
 
-  [0]: /namespace.md
-  [6]: /config-definition.md#aws
+  [0]: namespace.md
+  [6]: config-definition.md#aws
   [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
