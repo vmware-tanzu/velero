@@ -17,6 +17,10 @@ Ark consists of:
 * A server that runs on your cluster
 * A command-line client that runs locally
 
+## More information
+
+[The documentation][29] provides detailed information about building from source, architecture, extending Ark, and more.
+
 ## Getting started
 
 The following example sets up the Ark server and client, then backs up and restores a sample application.
@@ -153,13 +157,9 @@ kubectl delete -f examples/minio/
 kubectl delete -f examples/nginx-app/base.yaml
 ```
 
-## More information
-
-[The documentation][29] provides detailed information about building from source, architecture, extending Ark, and more.
-
 ## Troubleshooting
 
-If you encounter any problems that the documentation does not address, review the [troubleshooting][30] page, [file an issue][4], or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
 
 ## Contributing
 
