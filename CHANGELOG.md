@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.7.1](https://github.com/heptio/ark/releases/tag/v0.7.1) - 2018-02-22
+
+Bug Fixes:
+  * Run the Ark server in its own namespace, separate from backups/schedules/restores/config (#322, @ncdc)
+
 #### [v0.7.0](https://github.com/heptio/ark/releases/tag/v0.7.0) - 2018-02-15
 
 New Features:
