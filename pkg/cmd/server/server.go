@@ -176,7 +176,7 @@ type server struct {
 }
 
 func newServer(namespace, baseName string, logger *logrus.Logger) (*server, error) {
-	clientConfig, err := client.Config("", baseName)
+	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
 	}

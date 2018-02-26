@@ -43,10 +43,11 @@ type Factory interface {
 }
 
 type factory struct {
-	flags      *pflag.FlagSet
-	kubeconfig string
-	baseName   string
-	namespace  string
+	flags       *pflag.FlagSet
+	kubeconfig  string
+	kubecontext string
+	baseName    string
+	namespace   string
 }
 
 // NewFactory returns a Factory.
@@ -68,6 +69,7 @@ func NewFactory(baseName string) Factory {
 
 	f.flags.StringVar(&f.kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 	f.flags.StringVarP(&f.namespace, "namespace", "n", f.namespace, "The namespace in which Ark should operate")
+	f.flags.StringVar(&f.kubecontext, "kubecontext", "", "The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)")
 
 	return f
 }
@@ -77,7 +79,7 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (f *factory) Client() (clientset.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig, f.baseName)
+	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +92,7 @@ func (f *factory) Client() (clientset.Interface, error) {
 }
 
 func (f *factory) KubeClient() (kubernetes.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig, f.baseName)
+	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
 	if err != nil {
 		return nil, err
 	}
