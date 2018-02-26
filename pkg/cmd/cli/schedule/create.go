@@ -36,8 +36,20 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
 	c := &cobra.Command{
-		Use:   use + " NAME",
+		Use:   use + " NAME --schedule",
 		Short: "Create a schedule",
+		Long: `The --schedule flag is required, in cron notation:
+
+| Character Position | Character Period | Acceptable Values |
+| -------------------|:----------------:| -----------------:|
+| 1                  | Minute           | 0-59,*            |
+| 2                  | Hour             | 0-23,*            |
+| 3                  | Day of Month     | 1-31,*            |
+| 4                  | Month            | 1-12,*            |
+| 5                  | Day of Week      | 0-7,*             |`,
+
+		Example: `ark create schedule NAME --schedule="0 */6 * * *"`,
+
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Complete(args))

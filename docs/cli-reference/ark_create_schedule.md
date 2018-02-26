@@ -5,10 +5,24 @@ Create a schedule
 ### Synopsis
 
 
-Create a schedule
+The --schedule flag is required, in cron notation:
+
+| Character Position | Character Period | Acceptable Values |
+| -------------------|:----------------:| -----------------:|
+| 1                  | Minute           | 0-59,*            |
+| 2                  | Hour             | 0-23,*            |
+| 3                  | Day of Month     | 1-31,*            |
+| 4                  | Month            | 1-12,*            |
+| 5                  | Day of Week      | 0-7,*             |
 
 ```
-ark create schedule NAME [flags]
+ark create schedule NAME --schedule [flags]
+```
+
+### Examples
+
+```
+ark create schedule NAME --schedule="0 */6 * * *"
 ```
 
 ### Options
