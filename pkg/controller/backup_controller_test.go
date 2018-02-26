@@ -190,7 +190,7 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
 				backup.Status.Version = 1
-				backup.Finalizers = []string{gcFinalizer}
+				backup.Finalizers = []string{v1.GCFinalizer}
 				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -226,7 +226,7 @@ func TestProcessBackup(t *testing.T) {
 				res.Status.Version = 1
 				res.Status.Expiration.Time = expiration
 				res.Status.Phase = v1.BackupPhase(phase)
-				res.Finalizers = []string{gcFinalizer}
+				res.Finalizers = []string{v1.GCFinalizer}
 
 				return true, res, nil
 			})
@@ -274,7 +274,7 @@ func TestProcessBackup(t *testing.T) {
 			finalizers, err := collections.GetSlice(patch, "metadata.finalizers")
 			require.NoError(t, err, "patch does not contain metadata.finalizers")
 			assert.Equal(t, 1, len(finalizers))
-			assert.Equal(t, gcFinalizer, finalizers[0])
+			assert.Equal(t, v1.GCFinalizer, finalizers[0])
 
 			res, _ = collections.GetMap(patch, "metadata")
 			assert.Equal(t, 1, len(res), "patch's metadata has the wrong number of keys")

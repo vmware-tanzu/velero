@@ -39,9 +39,8 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/stringslice"
 )
-
-const gcFinalizer = "gc.ark.heptio.com"
 
 // MinVersionForDelete is the minimum Kubernetes server version that Ark
 // requires in order to be able to properly delete backups (including
@@ -122,7 +121,7 @@ func (c *gcController) handleFinalizer(_, newObj interface{}) {
 	}
 	log.Debugf("Backup has finalizers %s", backup.Finalizers)
 
-	if !has(backup.Finalizers, gcFinalizer) {
+	if !stringslice.Has(backup.Finalizers, api.GCFinalizer) {
 		return
 	}
 
@@ -137,7 +136,7 @@ func (c *gcController) handleFinalizer(_, newObj interface{}) {
 
 	patchMap := map[string]interface{}{
 		"metadata": map[string]interface{}{
-			"finalizers":      except(backup.Finalizers, gcFinalizer),
+			"finalizers":      stringslice.Except(backup.Finalizers, api.GCFinalizer),
 			"resourceVersion": backup.ResourceVersion,
 		},
 	}
@@ -151,32 +150,6 @@ func (c *gcController) handleFinalizer(_, newObj interface{}) {
 	if _, err = c.backupClient.Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error patching backup")
 	}
-}
-
-// has returns true if the `items` slice contains the
-// value `val`, or false otherwise.
-func has(items []string, val string) bool {
-	for _, itm := range items {
-		if itm == val {
-			return true
-		}
-	}
-
-	return false
-}
-
-// except returns a new string slice that contains all of the entries
-// from `items` except `val`.
-func except(items []string, val string) []string {
-	var newItems []string
-
-	for _, itm := range items {
-		if itm != val {
-			newItems = append(newItems, itm)
-		}
-	}
-
-	return newItems
 }
 
 // Run is a blocking function that runs a single worker to garbage-collect backups

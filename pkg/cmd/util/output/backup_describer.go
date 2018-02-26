@@ -32,7 +32,8 @@ func DescribeBackup(backup *v1.Backup) string {
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup.Status)
+		deleting := backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero()
+		DescribeBackupStatus(d, backup.Status, deleting)
 	})
 }
 
@@ -143,10 +144,13 @@ func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
 
 }
 
-func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
+func DescribeBackupStatus(d *Describer, status v1.BackupStatus, deleting bool) {
 	phase := status.Phase
 	if phase == "" {
 		phase = v1.BackupPhaseNew
+	}
+	if deleting {
+		phase = "Deleting"
 	}
 	d.Printf("Phase:\t%s\n", phase)
 
