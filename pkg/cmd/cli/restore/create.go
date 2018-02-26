@@ -31,6 +31,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/output"
+	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -40,7 +41,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " BACKUP",
 		Short: "Create a restore",
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args))
 			cmd.CheckError(o.Run(c, f))
 		},
@@ -64,6 +65,8 @@ type CreateOptions struct {
 	NamespaceMappings       flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
+
+	client arkclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -93,12 +96,23 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = "true"
 }
 
-func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
+func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if len(args) != 1 {
 		return errors.New("you must specify only one argument, the backup's name")
 	}
 
 	if err := output.ValidateFlags(c); err != nil {
+		return err
+	}
+
+	client, err := f.Client()
+	if err != nil {
+		return err
+	}
+	o.client = client
+
+	_, err = o.client.ArkV1().Backups(f.Namespace()).Get(args[0], metav1.GetOptions{})
+	if err != nil {
 		return err
 	}
 
@@ -111,9 +125,9 @@ func (o *CreateOptions) Complete(args []string) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	arkClient, err := f.Client()
-	if err != nil {
-		return err
+	if o.client == nil {
+		// This should never happen
+		return errors.New("Ark client is not set; unable to proceed")
 	}
 
 	restore := &api.Restore{
@@ -139,7 +153,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	restore, err = arkClient.ArkV1().Restores(restore.Namespace).Create(restore)
+	restore, err := o.client.ArkV1().Restores(restore.Namespace).Create(restore)
 	if err != nil {
 		return err
 	}
