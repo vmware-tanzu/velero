@@ -27,16 +27,16 @@
     - Per-item restore actions
 - Ark describe backup, restore, schedule
 
-## Upcoming Versions
-
-The following versions, dates, and features are approximate and are subject to change.
-
-### v0.7.0 - ~ 2018-02-15
+### v0.7.0 - 2018-02-15
 - Allow Ark to run in any namespace - [#106](https://github.com/heptio/ark/issues/106)
 - Ark backup delete command - [#252](https://github.com/heptio/ark/issues/252)
 - Always try to upload backup log file, even if backup fails - [#250](https://github.com/heptio/ark/issues/250)
 - Support pre and post pod exec hooks - [#244](https://github.com/heptio/ark/issues/244)
 - Add serviceaccounts to list of default prioritized resources during restore - [#239](https://github.com/heptio/ark/issues/239)
+
+## Upcoming Versions
+
+The following versions, dates, and features are approximate and are subject to change.
 
 ### v0.8.0 - ~ 2018-04-19
 - Backup targets
