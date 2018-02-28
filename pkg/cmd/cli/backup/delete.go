@@ -24,9 +24,12 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	kubeerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/controller"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -58,9 +61,11 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type DeleteOptions struct {
-	Name    string
-	Force   bool
-	Confirm bool
+	Names    []string
+	Force    bool
+	Confirm  bool
+	All      bool
+	Selector flag.LabelSelector
 
 	client    clientset.Interface
 	namespace string
@@ -69,11 +74,25 @@ type DeleteOptions struct {
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Force, "force", o.Force, "Forcefully delete the backup, potentially leaving orphaned cloud resources")
 	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm forceful deletion")
+	flags.BoolVar(&o.All, "all", o.All, "Delete all backups")
+	flags.VarP(&o.Selector, "selector", "l", "Delete all backups matching this label selector")
 }
 
 func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if len(args) != 1 {
-		return errors.New("you must specify only one argument, the backup's name")
+	haveNames := len(args) > 0
+	haveAll := o.All
+	haveSelector := o.Selector.LabelSelector != nil
+
+	if !haveNames && !haveAll && !haveSelector {
+		return errors.New("you must specify backup name(s), --selector, or --all")
+	}
+
+	if haveAll && haveSelector {
+		return errors.New("cannot set --all and --selector at the same time")
+	}
+
+	if haveNames && (haveAll || haveSelector) {
+		return errors.New("cannot specify name(s) with --all or --selector")
 	}
 
 	kubeClient, err := f.KubeClient()
@@ -94,7 +113,7 @@ func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Facto
 }
 
 func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
-	o.Name = args[0]
+	o.Names = args
 
 	var err error
 	o.client, err = f.Client()
@@ -108,64 +127,91 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 }
 
 func (o *DeleteOptions) Run() error {
-	if o.Force {
-		return o.forceDelete()
+	var backups []*v1.Backup
+	var errs []error
+
+	if len(o.Names) > 0 {
+		for _, name := range o.Names {
+			backup, err := o.client.ArkV1().Backups(o.namespace).Get(name, metav1.GetOptions{})
+			if err != nil {
+				errs = append(errs, errors.WithStack(err))
+				continue
+			}
+
+			backups = append(backups, backup)
+		}
 	}
 
-	return o.normalDelete()
-}
-
-func (o *DeleteOptions) normalDelete() error {
-	if err := o.client.ArkV1().Backups(o.namespace).Delete(o.Name, nil); err != nil {
-		return err
+	if o.All || o.Selector.LabelSelector != nil {
+		// Default to all
+		selector := labels.Everything().String()
+		// Or use label selector
+		if o.Selector.LabelSelector != nil {
+			selector = o.Selector.String()
+		}
+		list, err := o.client.ArkV1().Backups(o.namespace).List(metav1.ListOptions{LabelSelector: selector})
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		for i := range list.Items {
+			backups = append(backups, &list.Items[i])
+		}
 	}
 
-	fmt.Printf("Request to delete backup %q submitted successfully.\nThe backup will be fully deleted after all associated data (disk snapshots, backup files, restores) are removed.\n", o.Name)
-	return nil
-}
-
-func (o *DeleteOptions) forceDelete() error {
-	backup, err := o.client.ArkV1().Backups(o.namespace).Get(o.Name, metav1.GetOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if !o.Confirm {
+	if o.Force && !o.Confirm {
 		// If the user didn't specify --confirm, we need to prompt for it
 		if !getConfirmation() {
 			return nil
 		}
 	}
 
-	// Step 1: patch to remove our finalizer, if it's there
-	if stringslice.Has(backup.Finalizers, v1.GCFinalizer) {
-		patchMap := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers":      stringslice.Except(backup.Finalizers, v1.GCFinalizer),
-				"resourceVersion": backup.ResourceVersion,
-			},
-		}
+	if len(backups) == 0 {
+		fmt.Println("No backups found")
+		return nil
+	}
 
-		patchBytes, err := json.Marshal(patchMap)
-		if err != nil {
-			return errors.WithStack(err)
-		}
+	for _, backup := range backups {
+		if o.Force {
+			// Step 1: patch to remove our finalizer, if it's there
+			if stringslice.Has(backup.Finalizers, v1.GCFinalizer) {
+				patchMap := map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"finalizers":      stringslice.Except(backup.Finalizers, v1.GCFinalizer),
+						"resourceVersion": backup.ResourceVersion,
+					},
+				}
 
-		if _, err = o.client.ArkV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
-			return errors.WithStack(err)
+				patchBytes, err := json.Marshal(patchMap)
+				if err != nil {
+					errs = append(errs, errors.WithStack(err))
+					continue
+				}
+
+				if _, err = o.client.ArkV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
+					errs = append(errs, errors.WithStack(err))
+					continue
+				}
+			}
+
+			// Step 2: issue the delete ONLY if it has never been issued before
+			if backup.DeletionTimestamp == nil {
+				if err := o.client.ArkV1().Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
+					errs = append(errs, errors.WithStack(err))
+					continue
+				}
+			}
+
+			fmt.Printf("Backup %q force-deleted.\n", backup.Name)
+		} else {
+			if err := o.client.ArkV1().Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
+				errs = append(errs, errors.WithStack(err))
+				continue
+			}
+			fmt.Printf("Requested deletion of backup %q. It will be removed once all associated data (disk snapshots, backup files, restores) are deleted.\n", backup.Name)
 		}
 	}
 
-	// Step 2: issue the delete ONLY if it has never been issued before
-	if backup.DeletionTimestamp == nil {
-		if err = o.client.ArkV1().Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
-			return errors.WithStack(err)
-		}
-	}
-
-	fmt.Printf("Backup %q force-deleted.\n", backup.Name)
-
-	return nil
+	return kubeerrors.NewAggregate(errs)
 }
 
 func getConfirmation() bool {
