@@ -44,6 +44,14 @@ func (c *FakeArkV1) DownloadRequests(namespace string) v1.DownloadRequestInterfa
 	return &FakeDownloadRequests{c, namespace}
 }
 
+func (c *FakeArkV1) PodVolumeBackups(namespace string) v1.PodVolumeBackupInterface {
+	return &FakePodVolumeBackups{c, namespace}
+}
+
+func (c *FakeArkV1) PodVolumeRestores(namespace string) v1.PodVolumeRestoreInterface {
+	return &FakePodVolumeRestores{c, namespace}
+}
+
 func (c *FakeArkV1) Restores(namespace string) v1.RestoreInterface {
 	return &FakeRestores{c, namespace}
 }

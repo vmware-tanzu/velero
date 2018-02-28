@@ -20,6 +20,14 @@ RUN apk add --no-cache ca-certificates
 
 ADD /bin/linux/amd64/ark /ark
 
+RUN apk add --update --no-cache bzip2 && \
+    wget --quiet https://github.com/restic/restic/releases/download/v0.9.0/restic_0.9.0_linux_amd64.bz2 && \
+    bunzip2 restic_0.9.0_linux_amd64.bz2 && \
+    mv restic_0.9.0_linux_amd64 /restic && \
+    chmod +x /restic
+
+ADD /complete-restore.sh /complete-restore.sh
+
 USER nobody:nobody
 
 ENTRYPOINT ["/ark"]

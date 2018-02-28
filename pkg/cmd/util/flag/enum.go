@@ -18,15 +18,13 @@ package flag
 
 import (
 	"github.com/pkg/errors"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Enum is a Cobra-compatible wrapper for defining
 // a string flag that can be one of a specified set
 // of values.
 type Enum struct {
-	allowedValues sets.String
+	allowedValues []string
 	value         string
 }
 
@@ -35,7 +33,7 @@ type Enum struct {
 // none is set.
 func NewEnum(defaultValue string, allowedValues ...string) *Enum {
 	return &Enum{
-		allowedValues: sets.NewString(allowedValues...),
+		allowedValues: allowedValues,
 		value:         defaultValue,
 	}
 }
@@ -50,12 +48,14 @@ func (e *Enum) String() string {
 // receiver. It returns an error if the string
 // is not an allowed value.
 func (e *Enum) Set(s string) error {
-	if !e.allowedValues.Has(s) {
-		return errors.Errorf("invalid value: %q", s)
+	for _, val := range e.allowedValues {
+		if val == s {
+			e.value = s
+			return nil
+		}
 	}
 
-	e.value = s
-	return nil
+	return errors.Errorf("invalid value: %q", s)
 }
 
 // Type returns a string representation of the
@@ -65,4 +65,10 @@ func (e *Enum) Type() string {
 	// the type because the usage text for the flag should capture
 	// the possible options.
 	return ""
+}
+
+// AllowedValues returns a slice of the flag's valid
+// values.
+func (e *Enum) AllowedValues() []string {
+	return e.allowedValues
 }

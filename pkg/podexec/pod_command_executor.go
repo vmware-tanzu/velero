@@ -14,28 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package podexec
 
 import (
 	"bytes"
 	"net/url"
 	"time"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
 	kapiv1 "k8s.io/api/core/v1"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/collections"
 )
 
-// podCommandExecutor is capable of executing a command in a container in a pod.
-type podCommandExecutor interface {
-	// executePodCommand executes a command in a container in a pod. If the command takes longer than
+const defaultTimeout = 30 * time.Second
+
+// PodCommandExecutor is capable of executing a command in a container in a pod.
+type PodCommandExecutor interface {
+	// ExecutePodCommand executes a command in a container in a pod. If the command takes longer than
 	// the specified timeout, an error is returned.
-	executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error
+	ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error
 }
 
 type poster interface {
@@ -49,8 +53,8 @@ type defaultPodCommandExecutor struct {
 	streamExecutorFactory streamExecutorFactory
 }
 
-// NewPodCommandExecutor creates a new podCommandExecutor.
-func NewPodCommandExecutor(restClientConfig *rest.Config, restClient poster) podCommandExecutor {
+// NewPodCommandExecutor creates a new PodCommandExecutor.
+func NewPodCommandExecutor(restClientConfig *rest.Config, restClient poster) PodCommandExecutor {
 	return &defaultPodCommandExecutor{
 		restClientConfig: restClientConfig,
 		restClient:       restClient,
@@ -59,11 +63,11 @@ func NewPodCommandExecutor(restClientConfig *rest.Config, restClient poster) pod
 	}
 }
 
-// executePodCommand uses the pod exec API to execute a command in a container in a pod. If the
+// ExecutePodCommand uses the pod exec API to execute a command in a container in a pod. If the
 // command takes longer than the specified timeout, an error is returned (NOTE: it is not currently
 // possible to ensure the command is terminated when the timeout occurs, so it may continue to run
 // in the background).
-func (e *defaultPodCommandExecutor) executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error {
+func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *api.ExecHook) error {
 	if item == nil {
 		return errors.New("item is required")
 	}
@@ -101,7 +105,7 @@ func (e *defaultPodCommandExecutor) executePodCommand(log logrus.FieldLogger, it
 	}
 
 	if hook.Timeout.Duration == 0 {
-		hook.Timeout.Duration = defaultHookTimeout
+		hook.Timeout.Duration = defaultTimeout
 	}
 
 	hookLog := log.WithFields(

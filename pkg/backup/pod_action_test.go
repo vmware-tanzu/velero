@@ -46,7 +46,7 @@ func TestPodActionExecute(t *testing.T) {
 	}{
 		{
 			name: "no spec.volumes",
-			pod: unstructuredOrDie(`
+			pod: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",
@@ -59,7 +59,7 @@ func TestPodActionExecute(t *testing.T) {
 		},
 		{
 			name: "persistentVolumeClaim without claimName",
-			pod: unstructuredOrDie(`
+			pod: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",
@@ -79,7 +79,7 @@ func TestPodActionExecute(t *testing.T) {
 		},
 		{
 			name: "full test, mix of volume types",
-			pod: unstructuredOrDie(`
+			pod: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",

@@ -19,8 +19,10 @@ package backup
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -34,6 +36,8 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
@@ -48,11 +52,13 @@ type Backupper interface {
 
 // kubernetesBackupper implements Backupper.
 type kubernetesBackupper struct {
-	dynamicFactory        client.DynamicFactory
-	discoveryHelper       discovery.Helper
-	podCommandExecutor    podCommandExecutor
-	groupBackupperFactory groupBackupperFactory
-	snapshotService       cloudprovider.SnapshotService
+	dynamicFactory         client.DynamicFactory
+	discoveryHelper        discovery.Helper
+	podCommandExecutor     podexec.PodCommandExecutor
+	groupBackupperFactory  groupBackupperFactory
+	snapshotService        cloudprovider.SnapshotService
+	resticBackupperFactory restic.BackupperFactory
+	resticTimeout          time.Duration
 }
 
 type itemKey struct {
@@ -87,15 +93,19 @@ func cohabitatingResources() map[string]*cohabitatingResource {
 func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	podCommandExecutor podCommandExecutor,
+	podCommandExecutor podexec.PodCommandExecutor,
 	snapshotService cloudprovider.SnapshotService,
+	resticBackupperFactory restic.BackupperFactory,
+	resticTimeout time.Duration,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
-		discoveryHelper:       discoveryHelper,
-		dynamicFactory:        dynamicFactory,
-		podCommandExecutor:    podCommandExecutor,
-		groupBackupperFactory: &defaultGroupBackupperFactory{},
-		snapshotService:       snapshotService,
+		discoveryHelper:        discoveryHelper,
+		dynamicFactory:         dynamicFactory,
+		podCommandExecutor:     podCommandExecutor,
+		groupBackupperFactory:  &defaultGroupBackupperFactory{},
+		snapshotService:        snapshotService,
+		resticBackupperFactory: resticBackupperFactory,
+		resticTimeout:          resticTimeout,
 	}, nil
 }
 
@@ -232,11 +242,6 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		return err
 	}
 
-	var labelSelector string
-	if backup.Spec.LabelSelector != nil {
-		labelSelector = metav1.FormatLabelSelector(backup.Spec.LabelSelector)
-	}
-
 	backedUpItems := make(map[itemKey]struct{})
 	var errs []error
 
@@ -245,12 +250,32 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		return err
 	}
 
+	podVolumeTimeout := kb.resticTimeout
+	if val := backup.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+		parsed, err := time.ParseDuration(val)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
+		} else {
+			podVolumeTimeout = parsed
+		}
+	}
+
+	ctx, cancelFunc := context.WithTimeout(context.Background(), podVolumeTimeout)
+	defer cancelFunc()
+
+	var resticBackupper restic.Backupper
+	if kb.resticBackupperFactory != nil {
+		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backup)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
 	gb := kb.groupBackupperFactory.newGroupBackupper(
 		log,
 		backup,
 		namespaceIncludesExcludes,
 		resourceIncludesExcludes,
-		labelSelector,
 		kb.dynamicFactory,
 		kb.discoveryHelper,
 		backedUpItems,
@@ -260,6 +285,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		tw,
 		resourceHooks,
 		kb.snapshotService,
+		resticBackupper,
 	)
 
 	for _, group := range kb.discoveryHelper.Resources() {

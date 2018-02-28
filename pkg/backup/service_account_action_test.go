@@ -66,7 +66,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 	}{
 		{
 			name: "no crbs",
-			serviceAccount: unstructuredOrDie(`
+			serviceAccount: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "ServiceAccount",
@@ -81,7 +81,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 		},
 		{
 			name: "no matching crbs",
-			serviceAccount: unstructuredOrDie(`
+			serviceAccount: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "ServiceAccount",
@@ -124,7 +124,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 		},
 		{
 			name: "some matching crbs",
-			serviceAccount: unstructuredOrDie(`
+			serviceAccount: arktest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "ServiceAccount",

@@ -99,7 +99,7 @@ func TestBackupItemSkips(t *testing.T) {
 				backedUpItems: test.backedUpItems,
 			}
 
-			u := unstructuredOrDie(fmt.Sprintf(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"%s","name":"%s"}}`, test.namespace, test.name))
+			u := arktest.UnstructuredOrDie(fmt.Sprintf(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"%s","name":"%s"}}`, test.namespace, test.name))
 			err := ib.backupItem(arktest.NewLogger(), u, test.groupResource)
 			assert.NoError(t, err)
 		})
@@ -118,7 +118,7 @@ func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t 
 		resources:  collections.NewIncludesExcludes(),
 	}
 
-	u := unstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
+	u := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
 	err := ib.backupItem(arktest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
 	assert.NoError(t, err)
 }
@@ -219,8 +219,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 				},
 			},
 			customActionAdditionalItems: []runtime.Unstructured{
-				unstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				unstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
 			},
 		},
 		{
@@ -245,8 +245,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 				},
 			},
 			customActionAdditionalItems: []runtime.Unstructured{
-				unstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				unstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
 			},
 			additionalItemError: errors.New("foo"),
 		},
@@ -300,7 +300,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				groupResource = schema.ParseGroupResource(test.groupResource)
 			}
 
-			item, err := getAsMap(test.item)
+			item, err := arktest.GetAsMap(test.item)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -333,7 +333,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			resourceHooks := []resourceHook{}
 
-			podCommandExecutor := &mockPodCommandExecutor{}
+			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			dynamicFactory := &arktest.FakeDynamicFactory{}
@@ -352,7 +352,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 				resourceHooks,
 				dynamicFactory,
 				discoveryHelper,
-				nil,
+				nil, // snapshot service
+				nil, // restic backupper
 			).(*defaultItemBackupper)
 
 			var snapshotService *arktest.FakeSnapshotService
@@ -426,7 +427,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			assert.False(t, w.headers[0].ModTime.IsZero(), "header.modTime set")
 			assert.Equal(t, 1, len(w.data), "# of data")
 
-			actual, err := getAsMap(string(w.data[0]))
+			actual, err := arktest.GetAsMap(string(w.data[0]))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -572,7 +573,7 @@ func TestTakePVSnapshot(t *testing.T) {
 
 			ib := &defaultItemBackupper{snapshotService: snapshotService}
 
-			pv, err := getAsMap(test.pv)
+			pv, err := arktest.GetAsMap(test.pv)
 			if err != nil {
 				t.Fatal(err)
 			}

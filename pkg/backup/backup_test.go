@@ -19,7 +19,6 @@ package backup
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
 	"io"
 	"reflect"
 	"sort"
@@ -43,6 +42,8 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -505,7 +506,7 @@ func TestBackup(t *testing.T) {
 
 			dynamicFactory := &arktest.FakeDynamicFactory{}
 
-			podCommandExecutor := &mockPodCommandExecutor{}
+			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			b, err := NewKubernetesBackupper(
@@ -513,6 +514,8 @@ func TestBackup(t *testing.T) {
 				dynamicFactory,
 				podCommandExecutor,
 				nil,
+				nil, // restic backupper factory
+				0,   // restic timeout
 			)
 			require.NoError(t, err)
 			kb := b.(*kubernetesBackupper)
@@ -529,7 +532,6 @@ func TestBackup(t *testing.T) {
 				test.backup,
 				test.expectedNamespaces,
 				test.expectedResources,
-				test.expectedLabelSelector,
 				dynamicFactory,
 				discoveryHelper,
 				map[itemKey]struct{}{}, // backedUpItems
@@ -539,6 +541,7 @@ func TestBackup(t *testing.T) {
 				mock.Anything, // tarWriter
 				test.expectedHooks,
 				mock.Anything,
+				mock.Anything, // restic backupper
 			).Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
@@ -578,7 +581,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		},
 	}
 
-	b, err := NewKubernetesBackupper(discoveryHelper, nil, nil, nil)
+	b, err := NewKubernetesBackupper(discoveryHelper, nil, nil, nil, nil, 0)
 	require.NoError(t, err)
 
 	kb := b.(*kubernetesBackupper)
@@ -594,10 +597,10 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
 		discoveryHelper,
 		mock.Anything,
 		firstCohabitatingResources,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -625,10 +628,10 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
 		discoveryHelper,
 		mock.Anything,
 		secondCohabitatingResources,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -652,23 +655,22 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 	log logrus.FieldLogger,
 	backup *v1.Backup,
 	namespaces, resources *collections.IncludesExcludes,
-	labelSelector string,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
 	actions []resolvedAction,
-	podCommandExecutor podCommandExecutor,
+	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
+	resticBackupper restic.Backupper,
 ) groupBackupper {
 	args := f.Called(
 		log,
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
@@ -678,6 +680,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 		tarWriter,
 		resourceHooks,
 		snapshotService,
+		resticBackupper,
 	)
 	return args.Get(0).(groupBackupper)
 }
@@ -691,24 +694,10 @@ func (gb *mockGroupBackupper) backupGroup(group *metav1.APIResourceList) error {
 	return args.Error(0)
 }
 
-func getAsMap(j string) (map[string]interface{}, error) {
-	m := make(map[string]interface{})
-	err := json.Unmarshal([]byte(j), &m)
-	return m, err
-}
-
 func toRuntimeObject(t *testing.T, data string) runtime.Object {
 	o, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(data), nil, nil)
 	require.NoError(t, err)
 	return o
-}
-
-func unstructuredOrDie(data string) *unstructured.Unstructured {
-	o, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(data), nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	return o.(*unstructured.Unstructured)
 }
 
 func TestGetResourceHook(t *testing.T) {

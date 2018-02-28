@@ -106,6 +106,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 					action = restore.NewPodAction(logger)
 				case "svc":
 					action = restore.NewServiceAction(logger)
+				case "restic":
+					action = restore.NewResticRestoreAction(logger)
 				default:
 					logger.Fatal("Unrecognized plugin name")
 				}

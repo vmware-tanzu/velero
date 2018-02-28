@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
+package podexec
 
 import (
 	"bytes"
@@ -27,7 +27,6 @@ import (
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -82,7 +81,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name:         "container not found",
-			item:         unstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			item:         arktest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -92,7 +91,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name:         "command missing",
-			item:         unstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			item:         arktest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -105,7 +104,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			e := &defaultPodCommandExecutor{}
-			err := e.executePodCommand(arktest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
+			err := e.ExecutePodCommand(arktest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
 			assert.Error(t, err)
 		})
 	}
@@ -161,7 +160,7 @@ func TestExecutePodCommand(t *testing.T) {
 				Timeout:   metav1.Duration{Duration: test.timeout},
 			}
 
-			pod, err := getAsMap(`
+			pod, err := arktest.GetAsMap(`
 {
 	"metadata": {
 		"namespace": "namespace",
@@ -209,7 +208,7 @@ func TestExecutePodCommand(t *testing.T) {
 			}
 			streamExecutor.On("Stream", expectedStreamOptions).Return(test.hookError)
 
-			err = podCommandExecutor.executePodCommand(arktest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
+			err = podCommandExecutor.ExecutePodCommand(arktest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 				return
@@ -264,13 +263,4 @@ type mockPoster struct {
 func (p *mockPoster) Post() *rest.Request {
 	args := p.Called()
 	return args.Get(0).(*rest.Request)
-}
-
-type mockPodCommandExecutor struct {
-	mock.Mock
-}
-
-func (e *mockPodCommandExecutor) executePodCommand(log logrus.FieldLogger, item map[string]interface{}, namespace, name, hookName string, hook *v1.ExecHook) error {
-	args := e.Called(log, item, namespace, name, hookName, hook)
-	return args.Error(0)
 }
