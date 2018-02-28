@@ -65,6 +65,7 @@ func NewCommand() *cobra.Command {
 	var (
 		sortedLogLevels = getSortedLogLevels()
 		logLevelFlag    = flag.NewEnum(logrus.InfoLevel.String(), sortedLogLevels...)
+		pluginDir       = "/plugins"
 	)
 
 	var command = &cobra.Command{
@@ -101,7 +102,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, logger)
 
 			cmd.CheckError(err)
 
@@ -110,6 +111,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(sortedLogLevels, ", ")))
+	command.Flags().StringVar(&pluginDir, "plugin-dir", pluginDir, "directory containing Ark plugins")
 
 	return command
 }
@@ -175,7 +177,7 @@ type server struct {
 	pluginManager         plugin.Manager
 }
 
-func newServer(namespace, baseName string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -191,7 +193,7 @@ func newServer(namespace, baseName string, logger *logrus.Logger) (*server, erro
 		return nil, errors.WithStack(err)
 	}
 
-	pluginManager, err := plugin.NewManager(logger, logger.Level)
+	pluginManager, err := plugin.NewManager(logger, logger.Level, pluginDir)
 	if err != nil {
 		return nil, err
 	}

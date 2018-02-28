@@ -74,8 +74,6 @@ const (
 	// PluginKindRestoreItemAction is the Kind string for
 	// a Restore ItemAction plugin.
 	PluginKindRestoreItemAction PluginKind = "restoreitemaction"
-
-	pluginDir = "/plugins"
 )
 
 var AllPluginKinds = []PluginKind{
@@ -132,15 +130,17 @@ type manager struct {
 	logLevel       logrus.Level
 	pluginRegistry *registry
 	clientStore    *clientStore
+	pluginDir      string
 }
 
 // NewManager constructs a manager for getting plugin implementations.
-func NewManager(logger logrus.FieldLogger, level logrus.Level) (Manager, error) {
+func NewManager(logger logrus.FieldLogger, level logrus.Level, pluginDir string) (Manager, error) {
 	m := &manager{
 		logger:         logger,
 		logLevel:       level,
 		pluginRegistry: newRegistry(),
 		clientStore:    newClientStore(),
+		pluginDir:      pluginDir,
 	}
 
 	if err := m.registerPlugins(); err != nil {
@@ -176,26 +176,28 @@ func getPluginInstance(client *plugin.Client, kind PluginKind) (interface{}, err
 }
 
 func (m *manager) registerPlugins() error {
+	arkCommand := os.Args[0]
+
 	// first, register internal plugins
 	for _, provider := range []string{"aws", "gcp", "azure"} {
-		m.pluginRegistry.register(provider, "/ark", []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
+		m.pluginRegistry.register(provider, arkCommand, []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
 	}
-	m.pluginRegistry.register("pv", "/ark", []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
-	m.pluginRegistry.register("backup-pod", "/ark", []string{"run-plugin", string(PluginKindBackupItemAction), "pod"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("pv", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("backup-pod", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pod"}, PluginKindBackupItemAction)
 
-	m.pluginRegistry.register("job", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("restore-pod", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("svc", "/ark", []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("job", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("restore-pod", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("svc", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
 
 	// second, register external plugins (these will override internal plugins, if applicable)
-	if _, err := os.Stat(pluginDir); err != nil {
+	if _, err := os.Stat(m.pluginDir); err != nil {
 		if os.IsNotExist(err) {
 			return nil
 		}
 		return err
 	}
 
-	files, err := ioutil.ReadDir(pluginDir)
+	files, err := ioutil.ReadDir(m.pluginDir)
 	if err != nil {
 		return err
 	}
@@ -207,9 +209,9 @@ func (m *manager) registerPlugins() error {
 		}
 
 		if kind == PluginKindCloudProvider {
-			m.pluginRegistry.register(name, filepath.Join(pluginDir, file.Name()), nil, PluginKindObjectStore, PluginKindBlockStore)
+			m.pluginRegistry.register(name, filepath.Join(m.pluginDir, file.Name()), nil, PluginKindObjectStore, PluginKindBlockStore)
 		} else {
-			m.pluginRegistry.register(name, filepath.Join(pluginDir, file.Name()), nil, kind)
+			m.pluginRegistry.register(name, filepath.Join(m.pluginDir, file.Name()), nil, kind)
 		}
 	}
 
