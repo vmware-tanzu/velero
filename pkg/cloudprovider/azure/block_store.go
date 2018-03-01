@@ -25,7 +25,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
 	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
-	"github.com/Azure/azure-sdk-for-go/arm/resources/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
@@ -45,7 +44,6 @@ const (
 	azureStorageKeyKey       string = "AZURE_STORAGE_KEY"
 	azureResourceGroupKey    string = "AZURE_RESOURCE_GROUP"
 
-	locationKey   = "location"
 	apiTimeoutKey = "apiTimeout"
 )
 
@@ -54,7 +52,6 @@ type blockStore struct {
 	snaps         *disk.SnapshotsClient
 	subscription  string
 	resourceGroup string
-	location      string
 	apiTimeout    time.Duration
 }
 
@@ -82,15 +79,10 @@ func NewBlockStore() cloudprovider.BlockStore {
 
 func (b *blockStore) Init(config map[string]string) error {
 	var (
-		location      = config[locationKey]
 		apiTimeoutVal = config[apiTimeoutKey]
 		apiTimeout    time.Duration
 		err           error
 	)
-
-	if location == "" {
-		return errors.Errorf("missing %s in azure configuration", locationKey)
-	}
 
 	if apiTimeout, err = time.ParseDuration(apiTimeoutVal); err != nil {
 		return errors.Wrapf(err, "could not parse %s (expected time.Duration)", apiTimeoutKey)
@@ -114,48 +106,28 @@ func (b *blockStore) Init(config map[string]string) error {
 	disksClient.Authorizer = authorizer
 	snapsClient.Authorizer = authorizer
 
-	// validate the location
-	groupClient := subscriptions.NewGroupClient()
-	groupClient.Authorizer = authorizer
-
-	locs, err := groupClient.ListLocations(cfg[azureSubscriptionIDKey])
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if locs.Value == nil {
-		return errors.New("no locations returned from Azure API")
-	}
-
-	locationExists := false
-	for _, loc := range *locs.Value {
-		if (loc.Name != nil && *loc.Name == location) || (loc.DisplayName != nil && *loc.DisplayName == location) {
-			locationExists = true
-			break
-		}
-	}
-
-	if !locationExists {
-		return errors.Errorf("location %q not found", location)
-	}
-
 	b.disks = &disksClient
 	b.snaps = &snapsClient
 	b.subscription = cfg[azureSubscriptionIDKey]
 	b.resourceGroup = cfg[azureResourceGroupKey]
-	b.location = location
 	b.apiTimeout = apiTimeout
 
 	return nil
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	// Lookup snapshot info for its Location
+	snapshotInfo, err := b.snaps.Get(b.resourceGroup, snapshotID)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
 	fullSnapshotName := getFullSnapshotName(b.subscription, b.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
 	disk := disk.Model{
 		Name:     &diskName,
-		Location: &b.location,
+		Location: snapshotInfo.Location,
 		Properties: &disk.Properties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
@@ -170,7 +142,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 
 	_, errChan := b.disks.CreateOrUpdate(b.resourceGroup, *disk.Name, disk, ctx.Done())
 
-	err := <-errChan
+	err = <-errChan
 
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -201,6 +173,12 @@ func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err e
 }
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+	// Lookup disk info for its Location
+	diskInfo, err := b.disks.Get(b.resourceGroup, volumeID)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
 	fullDiskName := getFullDiskName(b.subscription, b.resourceGroup, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
@@ -221,7 +199,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 			},
 		},
 		Tags:     &map[string]*string{},
-		Location: &b.location,
+		Location: diskInfo.Location,
 	}
 
 	for k, v := range tags {
@@ -234,7 +212,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 
 	_, errChan := b.snaps.CreateOrUpdate(b.resourceGroup, *snap.Name, snap, ctx.Done())
 
-	err := <-errChan
+	err = <-errChan
 
 	if err != nil {
 		return "", errors.WithStack(err)

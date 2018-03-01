@@ -98,17 +98,14 @@ No parameters required.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `location` | string | Required Field | *Example*: "Canada East"<br><br>See [the list of available locations][5] (note that this particular page refers to them as "Regions"). |
 | `apiTimeout` | metav1.Duration | 2m0s | How long to wait for an Azure API request to complete before timeout. |
 
 [0]: #aws
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
-[5]: https://azure.microsoft.com/en-us/regions/
 [6]: #parameter-reference
 [7]: #main-config-parameters
 [8]: #overview
 [9]: #example
 [10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
-
