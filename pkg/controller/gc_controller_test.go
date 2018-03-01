@@ -348,7 +348,7 @@ func TestHandleFinalizer(t *testing.T) {
 			}
 
 			// METHOD UNDER TEST
-			controller.handleFinalizer(nil, test.backup)
+			controller.handleFinalizer(test.backup)
 
 			// VERIFY
 			backupService.AssertExpectations(t)
