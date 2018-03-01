@@ -107,7 +107,7 @@ Make sure that you install somewhere in your `$PATH`.
 1. Run:
 
     ```
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 1. Run:
