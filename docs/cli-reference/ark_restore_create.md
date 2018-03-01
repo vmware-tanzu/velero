@@ -8,7 +8,17 @@ Create a restore
 Create a restore
 
 ```
-ark restore create BACKUP [flags]
+ark restore create [RESTORE_NAME] --from-backup BACKUP_NAME [flags]
+```
+
+### Examples
+
+```
+  # create a restore named "restore-1" from backup "backup-1"
+  ark restore create restore-1 --from-backup backup-1
+
+  # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
+  ark restore create --from-backup backup-1
 ```
 
 ### Options
@@ -16,6 +26,7 @@ ark restore create BACKUP [flags]
 ```
       --exclude-namespaces stringArray                  namespaces to exclude from the restore
       --exclude-resources stringArray                   resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io
+      --from-backup string                              backup to restore from
   -h, --help                                            help for create
       --include-cluster-resources optionalBool[=true]   include cluster-scoped resources in the restore
       --include-namespaces stringArray                  namespaces to include in the restore (use '*' for all namespaces) (default *)
