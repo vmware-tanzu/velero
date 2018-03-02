@@ -29,7 +29,7 @@ type SnapshotService interface {
 	// CreateSnapshot triggers a snapshot for the specified cloud volume and tags it with metadata.
 	// it returns the cloud snapshot ID, or an error if a problem is encountered triggering the snapshot via
 	// the cloud API.
-	CreateSnapshot(volumeID, volumeAZ string) (string, error)
+	CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error)
 
 	// CreateVolumeFromSnapshot triggers a restore operation to create a new cloud volume from the specified
 	// snapshot and volume characteristics. Returns the cloud volume ID, or an error if a problem is
@@ -53,8 +53,6 @@ type SnapshotService interface {
 const (
 	volumeCreateWaitTimeout  = 30 * time.Second
 	volumeCreatePollInterval = 1 * time.Second
-	snapshotTagKey           = "tag-key"
-	snapshotTagVal           = "ark-snapshot"
 )
 
 type snapshotService struct {
@@ -94,11 +92,7 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 	}
 }
 
-func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, error) {
-	tags := map[string]string{
-		snapshotTagKey: snapshotTagVal,
-	}
-
+func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	return sr.blockStore.CreateSnapshot(volumeID, volumeAZ, tags)
 }
 
