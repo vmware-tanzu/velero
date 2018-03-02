@@ -17,6 +17,10 @@ limitations under the License.
 package gcp
 
 import (
+	"encoding/json"
+	"io/ioutil"
+	"os"
+
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/oauth2"
@@ -41,10 +45,9 @@ func NewBlockStore() cloudprovider.BlockStore {
 }
 
 func (b *blockStore) Init(config map[string]string) error {
-	project := config[projectKey]
-
-	if project == "" {
-		return errors.Errorf("missing %s in gcp configuration", projectKey)
+	project, err := extractProjectFromCreds()
+	if err != nil {
+		return err
 	}
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
@@ -57,7 +60,7 @@ func (b *blockStore) Init(config map[string]string) error {
 		return errors.WithStack(err)
 	}
 
-	// validate project
+	// validate connection
 	res, err := gce.Projects.Get(project).Do()
 	if err != nil {
 		return errors.WithStack(err)
@@ -71,6 +74,28 @@ func (b *blockStore) Init(config map[string]string) error {
 	b.project = project
 
 	return nil
+}
+
+func extractProjectFromCreds() (string, error) {
+	credsBytes, err := ioutil.ReadFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	type credentials struct {
+		ProjectID string `json:"project_id"`
+	}
+
+	var creds credentials
+	if err := json.Unmarshal(credsBytes, &creds); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if creds.ProjectID == "" {
+		return "", errors.New("cannot fetch project_id from GCP credentials file")
+	}
+
+	return creds.ProjectID, nil
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {

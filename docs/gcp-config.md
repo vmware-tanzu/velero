@@ -82,7 +82,7 @@ Specify the following values in the example files:
 
 * In file `examples/gcp/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_PROJECT>`. See the [Config definition][7] for details.
+  * Replace `<YOUR_BUCKET>`. See the [Config definition][7] for details.
 
 * In file `examples/common/10-deployment.yaml`:
 
