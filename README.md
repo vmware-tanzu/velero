@@ -64,7 +64,7 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
 1. Check to see that both the Ark and nginx deployments are successfully created:
 
     ```
-    kubectl get deployments -l component=ark --namespace=heptio-ark
+    kubectl get deployments -l component=ark --namespace=heptio-ark-server
     kubectl get deployments --namespace=nginx-example
     ```
 
