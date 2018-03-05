@@ -87,7 +87,7 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
     az group list --query '[].{ ResourceGroup: name, Location:location }'
     ```
 
-    Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`. (Also note the `Location` value in the response -- this is later used in the Azure-specific portion of the Ark Config).
+    Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
 
 1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
 
@@ -129,7 +129,7 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
 * In file `examples/azure/10-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>`, `<YOUR_LOCATION>`, and `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
+  * Replace `<YOUR_BUCKET>` and `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
 
 Here is an example of a completed file.
 
@@ -142,7 +142,6 @@ metadata:
 persistentVolumeProvider:
   name: azure
   config:
-    location: "West US"
     apiTimeout: 15m
 backupStorageProvider:
   name: azure
@@ -151,12 +150,6 @@ backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m
 restoreOnlyMode: false
-```
-
-You can get a complete list of Azure locations with the following command:
-
-```bash
-az account list-locations --query "sort([].displayName)" -o tsv
 ```
 
 ## Start the server

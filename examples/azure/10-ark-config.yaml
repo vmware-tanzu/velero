@@ -21,7 +21,6 @@ metadata:
 persistentVolumeProvider:
   name: azure
   config:
-    location: <YOUR_LOCATION>
     apiTimeout: <YOUR_TIMEOUT>
 backupStorageProvider:
   name: azure
