@@ -86,9 +86,7 @@ No parameters required.
 
 #### persistentVolumeProvider/config
 
-| Key | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `project` | string | Required Field | *Example*: "project-example-3jsn23"<br><br> See the [Project ID documentation][4] for details. |
+No parameters required.
 
 ### Azure
 
@@ -107,7 +105,6 @@ No parameters required.
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
-[4]: https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects
 [5]: https://azure.microsoft.com/en-us/regions/
 [6]: #parameter-reference
 [7]: #main-config-parameters
