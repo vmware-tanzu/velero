@@ -99,7 +99,7 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 	var err error
 	o.client, err = f.Client()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	o.namespace = f.Namespace()
