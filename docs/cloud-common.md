@@ -37,7 +37,7 @@ After you set up the Ark server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 ### Snapshot example (with PersistentVolumes)
@@ -67,7 +67,7 @@ After you set up the Ark server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 [0]: aws-config.md

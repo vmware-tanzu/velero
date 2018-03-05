@@ -38,8 +38,13 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
 	c := &cobra.Command{
-		Use:   use + " BACKUP",
+		Use:   use + " [RESTORE_NAME] --from-backup BACKUP_NAME",
 		Short: "Create a restore",
+		Example: `  # create a restore named "restore-1" from backup "backup-1"
+  ark restore create restore-1 --from-backup backup-1
+
+  # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
+  ark restore create --from-backup backup-1`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args))
@@ -56,6 +61,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
 type CreateOptions struct {
 	BackupName              string
+	RestoreName             string
 	RestoreVolumes          flag.OptionalBool
 	Labels                  flag.Map
 	IncludeNamespaces       flag.StringArray
@@ -80,6 +86,7 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
+	flags.StringVar(&o.BackupName, "from-backup", "", "backup to restore from")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the restore (use '*' for all namespaces)")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the restore")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
@@ -97,8 +104,12 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if len(args) != 1 {
-		return errors.New("you must specify only one argument, the backup's name")
+	if len(o.BackupName) == 0 {
+		return errors.New("--from-backup is required")
+	}
+
+	if len(args) > 1 {
+		return errors.New("you may specify at most one argument, the restore's name")
 	}
 
 	if err := output.ValidateFlags(c); err != nil {
@@ -111,7 +122,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 	o.client = client
 
-	_, err = o.client.ArkV1().Backups(f.Namespace()).Get(args[0], metav1.GetOptions{})
+	_, err = o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -120,7 +131,12 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 }
 
 func (o *CreateOptions) Complete(args []string) error {
-	o.BackupName = args[0]
+	if len(args) == 1 {
+		o.RestoreName = args[0]
+	} else {
+		o.RestoreName = fmt.Sprintf("%s-%s", o.BackupName, time.Now().Format("20060102150405"))
+	}
+
 	return nil
 }
 
@@ -133,7 +149,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
-			Name:      fmt.Sprintf("%s-%s", o.BackupName, time.Now().Format("20060102150405")),
+			Name:      o.RestoreName,
 			Labels:    o.Labels.Data(),
 		},
 		Spec: api.RestoreSpec{

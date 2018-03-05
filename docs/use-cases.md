@@ -23,7 +23,7 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 4. Create a restore with your most recent Ark Backup:
     ```
-    ark restore create <SCHEDULE NAME>-<TIMESTAMP>
+    ark restore create --from-backup <SCHEDULE NAME>-<TIMESTAMP>
     ```
 
 ## Cluster migration
@@ -45,7 +45,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
 
 4. *(Cluster 2)* Once you have confirmed that the right Backup (`<BACKUP-NAME>`) is now present, you can restore everything with:
 ```
-ark restore create <BACKUP-NAME>
+ark restore create --from-backup <BACKUP-NAME>
 ```
 
 [0]: #disaster-recovery
