@@ -111,3 +111,96 @@ func TestGetComputeResourceName(t *testing.T) {
 
 	assert.Equal(t, "/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.Compute/snapshots/snap-1", getComputeResourceName("sub-1", "rg-1", snapshotsResource, "snap-1"))
 }
+
+func TestGetSnapshotTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		arkTags  map[string]string
+		diskTags *map[string]*string
+		expected *map[string]*string
+	}{
+		{
+			name:     "degenerate case (no tags)",
+			arkTags:  nil,
+			diskTags: nil,
+			expected: nil,
+		},
+		{
+			name: "ark tags only get applied",
+			arkTags: map[string]string{
+				"ark-key1": "ark-val1",
+				"ark-key2": "ark-val2",
+			},
+			diskTags: nil,
+			expected: &map[string]*string{
+				"ark-key1": stringPtr("ark-val1"),
+				"ark-key2": stringPtr("ark-val2"),
+			},
+		},
+		{
+			name: "slashes in ark tag keys get replaces with dashes",
+			arkTags: map[string]string{
+				"ark/key1":  "ark-val1",
+				"ark/key/2": "ark-val2",
+			},
+			diskTags: nil,
+			expected: &map[string]*string{
+				"ark-key1":  stringPtr("ark-val1"),
+				"ark-key-2": stringPtr("ark-val2"),
+			},
+		},
+		{
+			name:    "volume tags only get applied",
+			arkTags: nil,
+			diskTags: &map[string]*string{
+				"azure-key1": stringPtr("azure-val1"),
+				"azure-key2": stringPtr("azure-val2"),
+			},
+			expected: &map[string]*string{
+				"azure-key1": stringPtr("azure-val1"),
+				"azure-key2": stringPtr("azure-val2"),
+			},
+		},
+		{
+			name:     "non-overlapping ark and volume tags both get applied",
+			arkTags:  map[string]string{"ark-key": "ark-val"},
+			diskTags: &map[string]*string{"azure-key": stringPtr("azure-val")},
+			expected: &map[string]*string{
+				"ark-key":   stringPtr("ark-val"),
+				"azure-key": stringPtr("azure-val"),
+			},
+		},
+		{
+			name: "when tags overlap, ark tags take precedence",
+			arkTags: map[string]string{
+				"ark-key":         "ark-val",
+				"overlapping-key": "ark-val",
+			},
+			diskTags: &map[string]*string{
+				"azure-key":       stringPtr("azure-val"),
+				"overlapping-key": stringPtr("azure-val"),
+			},
+			expected: &map[string]*string{
+				"ark-key":         stringPtr("ark-val"),
+				"azure-key":       stringPtr("azure-val"),
+				"overlapping-key": stringPtr("ark-val"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := getSnapshotTags(test.arkTags, test.diskTags)
+
+			if test.expected == nil {
+				assert.Nil(t, res)
+				return
+			}
+
+			assert.Equal(t, len(*test.expected), len(*res))
+			for k, v := range *test.expected {
+				assert.Equal(t, v, (*res)[k])
+			}
+		})
+	}
+}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
@@ -129,7 +130,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		return "", err
 	}
 
-	// Lookup snapshot info for its Location
+	// Lookup snapshot info for its Location & Tags so we can apply them to the volume
 	snapshotInfo, err := b.snaps.Get(snapshotIdentifier.resourceGroup, snapshotIdentifier.name)
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -147,6 +148,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 			},
 			AccountType: disk.StorageAccountTypes(volumeType),
 		},
+		Tags: snapshotInfo.Tags,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
@@ -210,13 +212,8 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 				SourceResourceID: &fullDiskName,
 			},
 		},
-		Tags:     &map[string]*string{},
+		Tags:     getSnapshotTags(tags, diskInfo.Tags),
 		Location: diskInfo.Location,
-	}
-
-	for k, v := range tags {
-		val := v
-		(*snap.Tags)[k] = &val
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
@@ -230,6 +227,37 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	}
 
 	return getComputeResourceName(b.subscription, b.resourceGroup, snapshotsResource, snapshotName), nil
+}
+
+func getSnapshotTags(arkTags map[string]string, diskTags *map[string]*string) *map[string]*string {
+	if diskTags == nil && len(arkTags) == 0 {
+		return nil
+	}
+
+	snapshotTags := make(map[string]*string)
+
+	// copy tags from disk to snapshot
+	if diskTags != nil {
+		for k, v := range *diskTags {
+			snapshotTags[k] = stringPtr(*v)
+		}
+	}
+
+	// merge Ark-assigned tags with the disk's tags (note that we want current
+	// Ark-assigned tags to overwrite any older versions of them that may exist
+	// due to prior snapshots/restores)
+	for k, v := range arkTags {
+		// Azure does not allow slashes in tag keys, so replace
+		// with dash (inline with what Kubernetes does)
+		key := strings.Replace(k, "/", "-", -1)
+		snapshotTags[key] = stringPtr(v)
+	}
+
+	return &snapshotTags
+}
+
+func stringPtr(s string) *string {
+	return &s
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
