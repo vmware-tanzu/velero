@@ -99,7 +99,10 @@ func NewGCController(
 
 	backupInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: c.handleFinalizer,
+			AddFunc: c.handleFinalizer,
+			UpdateFunc: func(_, upd interface{}) {
+				c.handleFinalizer(upd)
+			},
 		},
 	)
 
@@ -108,9 +111,9 @@ func NewGCController(
 
 // handleFinalizer runs garbage-collection on a backup that has the Ark GC
 // finalizer and a deletionTimestamp.
-func (c *gcController) handleFinalizer(_, newObj interface{}) {
+func (c *gcController) handleFinalizer(obj interface{}) {
 	var (
-		backup = newObj.(*api.Backup)
+		backup = obj.(*api.Backup)
 		log    = c.logger.WithField("backup", kube.NamespaceAndName(backup))
 	)
 
