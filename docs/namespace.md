@@ -52,6 +52,12 @@ For Azure, edit:
 * `https://github.com/heptio/ark/blob/master/examples/azure/00-ark-deployment.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/azure/10-ark-config.yaml`
 
+### IBM
+
+For IBM, edit:
+
+* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/ibm/00-ark-config.yaml`
 
 ## Specify the namespace in client commands
 
