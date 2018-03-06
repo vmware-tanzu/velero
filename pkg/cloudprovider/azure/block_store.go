@@ -102,6 +102,9 @@ func (b *blockStore) Init(config map[string]string) error {
 	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
 	snapsClient := disk.NewSnapshotsClient(cfg[azureSubscriptionIDKey])
 
+	disksClient.PollingDelay = 5 * time.Second
+	snapsClient.PollingDelay = 5 * time.Second
+
 	authorizer := autorest.NewBearerAuthorizer(spt)
 	disksClient.Authorizer = authorizer
 	snapsClient.Authorizer = authorizer
