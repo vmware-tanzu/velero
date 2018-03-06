@@ -53,7 +53,10 @@ func TestGetVolumeID(t *testing.T) {
 }
 
 func TestSetVolumeID(t *testing.T) {
-	b := &blockStore{}
+	b := &blockStore{
+		resourceGroup: "rg",
+		subscription:  "sub",
+	}
 
 	pv := &unstructured.Unstructured{}
 
@@ -71,7 +74,9 @@ func TestSetVolumeID(t *testing.T) {
 	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
 	require.NoError(t, err)
 	assert.Equal(t, "updated", actual)
-	assert.NotContains(t, azure, "diskURI")
+	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
+	require.NoError(t, err)
+	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", actual)
 
 	// with diskURI
 	azure["diskURI"] = "/foo/bar/updated/blarg"
@@ -82,5 +87,27 @@ func TestSetVolumeID(t *testing.T) {
 	assert.Equal(t, "revised", actual)
 	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
 	require.NoError(t, err)
-	assert.Equal(t, "/foo/bar/revised/blarg", actual)
+	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", actual)
+}
+
+func TestParseFullSnapshotName(t *testing.T) {
+	// invalid name
+	fullName := "foo/bar"
+	_, err := parseFullSnapshotName(fullName)
+	assert.Error(t, err)
+
+	// valid name
+	fullName = "/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.Compute/snapshots/snap-1"
+	snap, err := parseFullSnapshotName(fullName)
+	require.NoError(t, err)
+
+	assert.Equal(t, "sub-1", snap.subscription)
+	assert.Equal(t, "rg-1", snap.resourceGroup)
+	assert.Equal(t, "snap-1", snap.name)
+}
+
+func TestGetComputeResourceName(t *testing.T) {
+	assert.Equal(t, "/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.Compute/disks/disk-1", getComputeResourceName("sub-1", "rg-1", disksResource, "disk-1"))
+
+	assert.Equal(t, "/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.Compute/snapshots/snap-1", getComputeResourceName("sub-1", "rg-1", snapshotsResource, "snap-1"))
 }

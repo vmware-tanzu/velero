@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
@@ -29,6 +29,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
+
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -36,15 +37,16 @@ import (
 )
 
 const (
-	azureClientIDKey         string = "AZURE_CLIENT_ID"
-	azureClientSecretKey     string = "AZURE_CLIENT_SECRET"
-	azureSubscriptionIDKey   string = "AZURE_SUBSCRIPTION_ID"
-	azureTenantIDKey         string = "AZURE_TENANT_ID"
-	azureStorageAccountIDKey string = "AZURE_STORAGE_ACCOUNT_ID"
-	azureStorageKeyKey       string = "AZURE_STORAGE_KEY"
-	azureResourceGroupKey    string = "AZURE_RESOURCE_GROUP"
-
-	apiTimeoutKey = "apiTimeout"
+	azureClientIDKey         = "AZURE_CLIENT_ID"
+	azureClientSecretKey     = "AZURE_CLIENT_SECRET"
+	azureSubscriptionIDKey   = "AZURE_SUBSCRIPTION_ID"
+	azureTenantIDKey         = "AZURE_TENANT_ID"
+	azureStorageAccountIDKey = "AZURE_STORAGE_ACCOUNT_ID"
+	azureStorageKeyKey       = "AZURE_STORAGE_KEY"
+	azureResourceGroupKey    = "AZURE_RESOURCE_GROUP"
+	apiTimeoutKey            = "apiTimeout"
+	snapshotsResource        = "snapshots"
+	disksResource            = "disks"
 )
 
 type blockStore struct {
@@ -53,6 +55,12 @@ type blockStore struct {
 	subscription  string
 	resourceGroup string
 	apiTimeout    time.Duration
+}
+
+type snapshotIdentifier struct {
+	subscription  string
+	resourceGroup string
+	name          string
 }
 
 func getConfig() map[string]string {
@@ -116,13 +124,17 @@ func (b *blockStore) Init(config map[string]string) error {
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	snapshotIdentifier, err := parseFullSnapshotName(snapshotID)
+	if err != nil {
+		return "", err
+	}
+
 	// Lookup snapshot info for its Location
-	snapshotInfo, err := b.snaps.Get(b.resourceGroup, snapshotID)
+	snapshotInfo, err := b.snaps.Get(snapshotIdentifier.resourceGroup, snapshotIdentifier.name)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	fullSnapshotName := getFullSnapshotName(b.subscription, b.resourceGroup, snapshotID)
 	diskName := "restore-" + uuid.NewV4().String()
 
 	disk := disk.Model{
@@ -131,7 +143,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		Properties: &disk.Properties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
-				SourceResourceID: &fullSnapshotName,
+				SourceResourceID: &snapshotID,
 			},
 			AccountType: disk.StorageAccountTypes(volumeType),
 		},
@@ -179,7 +191,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 		return "", errors.WithStack(err)
 	}
 
-	fullDiskName := getFullDiskName(b.subscription, b.resourceGroup, volumeID)
+	fullDiskName := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
 	suffix := "-" + uuid.NewV4().String()
@@ -211,14 +223,13 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	defer cancel()
 
 	_, errChan := b.snaps.CreateOrUpdate(b.resourceGroup, *snap.Name, snap, ctx.Done())
-
 	err = <-errChan
 
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	return snapshotName, nil
+	return getComputeResourceName(b.subscription, b.resourceGroup, snapshotsResource, snapshotName), nil
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
@@ -232,12 +243,39 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	return errors.WithStack(err)
 }
 
-func getFullDiskName(subscription string, resourceGroup string, diskName string) string {
-	return fmt.Sprintf("/subscriptions/%v/resourceGroups/%v/providers/Microsoft.Compute/disks/%v", subscription, resourceGroup, diskName)
+func getComputeResourceName(subscription, resourceGroup, resource, name string) string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/%s/%s", subscription, resourceGroup, resource, name)
 }
 
-func getFullSnapshotName(subscription string, resourceGroup string, snapshotName string) string {
-	return fmt.Sprintf("/subscriptions/%v/resourceGroups/%v/providers/Microsoft.Compute/snapshots/%v", subscription, resourceGroup, snapshotName)
+var snapshotURIRegexp = regexp.MustCompile(
+	`^\/subscriptions\/(?P<subscription>.*)\/resourceGroups\/(?P<resourceGroup>.*)\/providers\/Microsoft.Compute\/snapshots\/(?P<snapshotName>.*)$`)
+
+// parseFullSnapshotName takes a snapshot URI and returns a snapshot identifier
+// or an error if the URI does not match the regexp.
+func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
+	submatches := snapshotURIRegexp.FindStringSubmatch(name)
+	if len(submatches) != len(snapshotURIRegexp.SubexpNames()) {
+		return nil, errors.New("snapshot URI could not be parsed")
+	}
+
+	snapshotID := &snapshotIdentifier{}
+
+	// capture names start at index 1 to line up with the corresponding indexes
+	// of submatches (see godoc on SubexpNames())
+	for i, names := 1, snapshotURIRegexp.SubexpNames(); i < len(names); i++ {
+		switch names[i] {
+		case "subscription":
+			snapshotID.subscription = submatches[i]
+		case "resourceGroup":
+			snapshotID.resourceGroup = submatches[i]
+		case "snapshotName":
+			snapshotID.name = submatches[i]
+		default:
+			return nil, errors.New("unexpected named capture from snapshot URI regex")
+		}
+	}
+
+	return snapshotID, nil
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
@@ -259,16 +297,8 @@ func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runt
 		return nil, err
 	}
 
-	if uri, err := collections.GetString(azure, "diskURI"); err == nil {
-		previousVolumeID, err := collections.GetString(azure, "diskName")
-		if err != nil {
-			return nil, err
-		}
-
-		azure["diskURI"] = strings.Replace(uri, previousVolumeID, volumeID, -1)
-	}
-
 	azure["diskName"] = volumeID
+	azure["diskURI"] = getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
 
 	return pv, nil
 }
