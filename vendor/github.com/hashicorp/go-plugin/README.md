@@ -55,7 +55,7 @@ message is shown to the end user.
 **Stdout/Stderr Syncing.** While plugins are subprocesses, they can continue
 to use stdout/stderr as usual and the output will get mirrored back to
 the host process. The host process can control what `io.Writer` these
-streams go to to prevent this from happening.
+streams go to prevent this from happening.
 
 **TTY Preservation.** Plugin subprocesses are connected to the identical
 stdin file descriptor as the host process, allowing software that requires
