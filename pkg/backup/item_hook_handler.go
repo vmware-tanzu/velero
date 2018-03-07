@@ -90,6 +90,7 @@ func (h *defaultItemHookHandler) handleHooks(
 			logrus.Fields{
 				"hookSource": "annotation",
 				"hookType":   "exec",
+				"hookPhase":  phase,
 			},
 		)
 		if err := h.podCommandExecutor.executePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, "<from-annotation>", hookFromAnnotations); err != nil {
@@ -122,6 +123,7 @@ func (h *defaultItemHookHandler) handleHooks(
 						logrus.Fields{
 							"hookSource": "backupSpec",
 							"hookType":   "exec",
+							"hookPhase":  phase,
 						},
 					)
 					err := h.podCommandExecutor.executePodCommand(hookLog, obj.UnstructuredContent(), namespace, name, resourceHook.name, hook.Exec)
