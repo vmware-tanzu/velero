@@ -40,12 +40,52 @@ For more information, see [the AWS documentation on IAM users][14].
 2. Attach policies to give `heptio-ark` the necessary permissions:
 
     ```bash
-    aws iam attach-user-policy \
-        --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
-        --user-name heptio-ark
-    aws iam attach-user-policy \
-        --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess \
-        --user-name heptio-ark
+    BUCKET=<YOUR_BUCKET>
+    cat > heptio-ark-policy.json <<EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:DescribeVolumes",
+                    "ec2:CreateTags",
+                    "ec2:CreateVolume",
+                    "ec2:CreateSnapshot",
+                    "ec2:DeleteSnapshot"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:PutObject"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::${BUCKET}/*"
+                ]
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:ListBucket",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListMultipartUploadParts"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::${BUCKET}"
+                ]
+            }
+        ]
+    }
+    EOF
+    
+    aws iam put-user-policy \
+      --user-name heptio-ark \
+      --policy-name heptio-ark \
+      --policy-document file://heptio-ark-policy.json
     ```
 
 3. Create an access key for the user:
