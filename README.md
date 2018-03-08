@@ -1,7 +1,7 @@
 ---
 permalink: /
 redirect_to:
-- /master/
+- LATEST
 ---
 
 # ark - Docs Branch

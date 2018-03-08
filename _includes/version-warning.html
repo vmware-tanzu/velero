@@ -1,10 +1,19 @@
-{% if page.version != 'master' and page.version != site.latest %}
+{% if page.version == 'master' %}
+  <div class="version-warning">
+    <p>
+    <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+    This is the documentation for the latest development version of Ark. Both code and docs may be
+    unstable, and these docs are not guaranteed to be up to date or correct. See the
+    <a href="{{latest_url}}">latest version</a>.
+    </p>
+  </div>
+{% elsif page.version != site.latest %}
   <div class="version-warning">
     <p>
     <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
     Documentation for version {{ page.version }} is no longer actively maintained.
     The version you are currently viewing is a static snapshot.
-    For up-to-date documentation, see the <a href="{{master_url}}">latest version</a>.
+    For up-to-date documentation, see the <a href="{{latest_url}}">latest version</a>.
     </p>
   </div>
 {% endif %}
