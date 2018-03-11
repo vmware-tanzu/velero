@@ -34,7 +34,7 @@ Namespaces:
 
 Resources:
   Included:        serviceaccounts
-  Excluded:        nodes
+  Excluded:        nodes, events, events.events.k8s.io
   Cluster-scoped:  auto
 
 Namespace mappings:  <none>

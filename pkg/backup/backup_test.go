@@ -527,6 +527,7 @@ func TestBackup(t *testing.T) {
 			cohabitatingResources := map[string]*cohabitatingResource{
 				"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
 				"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
+				"events":          newCohabitatingResource("events", "", "events.k8s.io"),
 			}
 
 			groupBackupperFactory.On("newGroupBackupper",

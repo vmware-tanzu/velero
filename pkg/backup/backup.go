@@ -233,6 +233,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 	cohabitatingResources := map[string]*cohabitatingResource{
 		"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
 		"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
+		"events":          newCohabitatingResource("events", "", "events.k8s.io"),
 	}
 
 	resolvedActions, err := resolveActions(actions, kb.discoveryHelper)
