@@ -164,30 +164,34 @@ func (b *blockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 }
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
-	res, err := b.ec2.CreateSnapshot(&ec2.CreateSnapshotInput{VolumeId: &volumeID})
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
 	// describe the volume so we can copy its tags to the snapshot
 	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
 		return "", err
 	}
 
-	_, err = b.ec2.CreateTags(getCreateTagsInput(*res.SnapshotId, tags, volumeInfo.Tags))
+	res, err := b.ec2.CreateSnapshot(&ec2.CreateSnapshotInput{
+		VolumeId: &volumeID,
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeSnapshot),
+				Tags:         getTags(tags, volumeInfo.Tags),
+			},
+		},
+	})
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
 
-	return *res.SnapshotId, errors.WithStack(err)
+	return *res.SnapshotId, nil
 }
 
-func getCreateTagsInput(snapshotID string, arkTags map[string]string, volumeTags []*ec2.Tag) *ec2.CreateTagsInput {
-	tagsInput := &ec2.CreateTagsInput{
-		Resources: []*string{&snapshotID},
-	}
+func getTags(arkTags map[string]string, volumeTags []*ec2.Tag) []*ec2.Tag {
+	var result []*ec2.Tag
 
 	// set Ark-assigned tags
 	for k, v := range arkTags {
-		tagsInput.Tags = append(tagsInput.Tags, ec2Tag(k, v))
+		result = append(result, ec2Tag(k, v))
 	}
 
 	// copy tags from volume to snapshot
@@ -198,10 +202,10 @@ func getCreateTagsInput(snapshotID string, arkTags map[string]string, volumeTags
 			continue
 		}
 
-		tagsInput.Tags = append(tagsInput.Tags, ec2Tag(*tag.Key, *tag.Value))
+		result = append(result, ec2Tag(*tag.Key, *tag.Value))
 	}
 
-	return tagsInput
+	return result
 }
 
 func ec2Tag(key, val string) *ec2.Tag {

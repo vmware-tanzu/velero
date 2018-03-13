@@ -20,7 +20,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
@@ -88,72 +87,54 @@ func TestSetVolumeID(t *testing.T) {
 	assert.Equal(t, "vol-updated", actual)
 }
 
-func TestGetCreateTagsInput(t *testing.T) {
+func TestGetTags(t *testing.T) {
 	tests := []struct {
 		name       string
-		snapshotID string
 		arkTags    map[string]string
 		volumeTags []*ec2.Tag
-		expected   *ec2.CreateTagsInput
+		expected   []*ec2.Tag
 	}{
 		{
 			name:       "degenerate case (no tags)",
-			snapshotID: "foo",
 			arkTags:    nil,
 			volumeTags: nil,
-			expected: &ec2.CreateTagsInput{
-				Resources: []*string{aws.String("foo")},
-				Tags:      nil,
-			},
+			expected:   nil,
 		},
 		{
-			name:       "ark tags only get applied",
-			snapshotID: "foo",
+			name: "ark tags only get applied",
 			arkTags: map[string]string{
 				"ark-key1": "ark-val1",
 				"ark-key2": "ark-val2",
 			},
 			volumeTags: nil,
-			expected: &ec2.CreateTagsInput{
-				Resources: []*string{aws.String("foo")},
-				Tags: []*ec2.Tag{
-					ec2Tag("ark-key1", "ark-val1"),
-					ec2Tag("ark-key2", "ark-val2"),
-				},
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key1", "ark-val1"),
+				ec2Tag("ark-key2", "ark-val2"),
 			},
 		},
 		{
-			name:       "volume tags only get applied",
-			snapshotID: "foo",
-			arkTags:    nil,
+			name:    "volume tags only get applied",
+			arkTags: nil,
 			volumeTags: []*ec2.Tag{
 				ec2Tag("aws-key1", "aws-val1"),
 				ec2Tag("aws-key2", "aws-val2"),
 			},
-			expected: &ec2.CreateTagsInput{
-				Resources: []*string{aws.String("foo")},
-				Tags: []*ec2.Tag{
-					ec2Tag("aws-key1", "aws-val1"),
-					ec2Tag("aws-key2", "aws-val2"),
-				},
+			expected: []*ec2.Tag{
+				ec2Tag("aws-key1", "aws-val1"),
+				ec2Tag("aws-key2", "aws-val2"),
 			},
 		},
 		{
 			name:       "non-overlapping ark and volume tags both get applied",
-			snapshotID: "foo",
 			arkTags:    map[string]string{"ark-key": "ark-val"},
 			volumeTags: []*ec2.Tag{ec2Tag("aws-key", "aws-val")},
-			expected: &ec2.CreateTagsInput{
-				Resources: []*string{aws.String("foo")},
-				Tags: []*ec2.Tag{
-					ec2Tag("ark-key", "ark-val"),
-					ec2Tag("aws-key", "aws-val"),
-				},
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key", "ark-val"),
+				ec2Tag("aws-key", "aws-val"),
 			},
 		},
 		{
-			name:       "when tags overlap, ark tags take precedence",
-			snapshotID: "foo",
+			name: "when tags overlap, ark tags take precedence",
 			arkTags: map[string]string{
 				"ark-key":         "ark-val",
 				"overlapping-key": "ark-val",
@@ -162,27 +143,24 @@ func TestGetCreateTagsInput(t *testing.T) {
 				ec2Tag("aws-key", "aws-val"),
 				ec2Tag("overlapping-key", "aws-val"),
 			},
-			expected: &ec2.CreateTagsInput{
-				Resources: []*string{aws.String("foo")},
-				Tags: []*ec2.Tag{
-					ec2Tag("ark-key", "ark-val"),
-					ec2Tag("overlapping-key", "ark-val"),
-					ec2Tag("aws-key", "aws-val"),
-				},
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key", "ark-val"),
+				ec2Tag("overlapping-key", "ark-val"),
+				ec2Tag("aws-key", "aws-val"),
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getCreateTagsInput(test.snapshotID, test.arkTags, test.volumeTags)
+			res := getTags(test.arkTags, test.volumeTags)
 
-			sort.Slice(res.Tags, func(i, j int) bool {
-				return *res.Tags[i].Key < *res.Tags[j].Key
+			sort.Slice(res, func(i, j int) bool {
+				return *res[i].Key < *res[j].Key
 			})
 
-			sort.Slice(test.expected.Tags, func(i, j int) bool {
-				return *test.expected.Tags[i].Key < *test.expected.Tags[j].Key
+			sort.Slice(test.expected, func(i, j int) bool {
+				return *test.expected[i].Key < *test.expected[j].Key
 			})
 
 			assert.Equal(t, test.expected, res)
