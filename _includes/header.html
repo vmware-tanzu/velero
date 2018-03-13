@@ -13,6 +13,7 @@
           <ul>
           {% assign original_version = page.version | prepend: '/' | append: '/' %}
           {% assign master_url = page.url | replace: original_version, '/master/' | relative_url %}
+          {% assign latest_url = page.url | replace: original_version, site.latest | relative_url %}
           <li><a href="{{ master_url }}">master</a></li>
           {% for version in site.versions %}
             {% assign new_version = version | prepend: '/' | append: '/' %}
