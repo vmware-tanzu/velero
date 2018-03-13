@@ -229,8 +229,30 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
-				"nodes are a non-restorable resource",
+				"nodes are non-restorable resources",
 				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: nodes",
+			},
+		},
+		{
+			name:          "restoration of events is not supported",
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events", api.RestorePhaseNew).Restore,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:   false,
+			expectedPhase: string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{
+				"events are non-restorable resources",
+				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: events",
+			},
+		},
+		{
+			name:          "restoration of events.events.k8s.io is not supported",
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events.events.k8s.io", api.RestorePhaseNew).Restore,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:   false,
+			expectedPhase: string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{
+				"events.events.k8s.io are non-restorable resources",
+				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: events.events.k8s.io",
 			},
 		},
 	}

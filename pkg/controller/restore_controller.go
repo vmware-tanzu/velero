@@ -51,7 +51,7 @@ import (
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
 // included here are explicitly excluded from the restoration process.
-var nonRestorableResources = []string{"nodes"}
+var nonRestorableResources = []string{"nodes", "events", "events.events.k8s.io"}
 
 type restoreController struct {
 	namespace           string
@@ -304,7 +304,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 	includedResources := sets.NewString(itm.Spec.IncludedResources...)
 	for _, nonRestorableResource := range nonRestorableResources {
 		if includedResources.Has(nonRestorableResource) {
-			validationErrors = append(validationErrors, fmt.Sprintf("%v are a non-restorable resource", nonRestorableResource))
+			validationErrors = append(validationErrors, fmt.Sprintf("%v are non-restorable resources", nonRestorableResource))
 		}
 	}
 
