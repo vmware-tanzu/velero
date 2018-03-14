@@ -19,6 +19,8 @@ type BackupExpansion interface{}
 
 type ConfigExpansion interface{}
 
+type DeleteBackupRequestExpansion interface{}
+
 type DownloadRequestExpansion interface{}
 
 type RestoreExpansion interface{}

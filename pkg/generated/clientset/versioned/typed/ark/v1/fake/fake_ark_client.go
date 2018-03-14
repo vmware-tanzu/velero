@@ -33,6 +33,10 @@ func (c *FakeArkV1) Configs(namespace string) v1.ConfigInterface {
 	return &FakeConfigs{c, namespace}
 }
 
+func (c *FakeArkV1) DeleteBackupRequests(namespace string) v1.DeleteBackupRequestInterface {
+	return &FakeDeleteBackupRequests{c, namespace}
+}
+
 func (c *FakeArkV1) DownloadRequests(namespace string) v1.DownloadRequestInterface {
 	return &FakeDownloadRequests{c, namespace}
 }

@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -35,6 +36,8 @@ import (
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -57,8 +60,8 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/kube"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
 func NewCommand() *cobra.Command {
@@ -471,7 +474,7 @@ func (s *server) runControllers(config *api.Config) error {
 	)
 
 	if config.RestoreOnlyMode {
-		s.logger.Info("Restore only mode - not starting the backup, schedule or GC controllers")
+		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 	} else {
 		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService, s.kubeClientConfig, s.kubeClient.CoreV1())
 		cmd.CheckError(err)
@@ -505,31 +508,35 @@ func (s *server) runControllers(config *api.Config) error {
 			wg.Done()
 		}()
 
-		serverVersion, err := kubeutil.ServerVersion(s.kubeClient.Discovery())
-		if err != nil {
-			return err
-		}
+		gcController := controller.NewGCController(
+			s.logger,
+			s.sharedInformerFactory.Ark().V1().Backups(),
+			s.arkClient.ArkV1(),
+			config.GCSyncPeriod.Duration,
+		)
+		wg.Add(1)
+		go func() {
+			gcController.Run(ctx, 1)
+			wg.Done()
+		}()
 
-		if !serverVersion.AtLeast(controller.MinVersionForDelete) {
-			s.logger.Errorf("Garbage-collection is disabled because it requires the Kubernetes server version to be at least %s", controller.MinVersionForDelete)
-		} else {
-			gcController := controller.NewGCController(
-				s.backupService,
-				s.snapshotService,
-				config.BackupStorageProvider.Bucket,
-				config.GCSyncPeriod.Duration,
-				s.sharedInformerFactory.Ark().V1().Backups(),
-				s.arkClient.ArkV1(),
-				s.sharedInformerFactory.Ark().V1().Restores(),
-				s.arkClient.ArkV1(),
-				s.logger,
-			)
-			wg.Add(1)
-			go func() {
-				gcController.Run(ctx, 1)
-				wg.Done()
-			}()
-		}
+		backupDeletionController := controller.NewBackupDeletionController(
+			s.logger,
+			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
+			s.arkClient.ArkV1(), // deleteBackupRequestClient
+			s.arkClient.ArkV1(), // backupClient
+			s.snapshotService,
+			s.backupService,
+			config.BackupStorageProvider.Bucket,
+			s.sharedInformerFactory.Ark().V1().Restores(),
+			s.arkClient.ArkV1(), // restoreClient
+		)
+		wg.Add(1)
+		go func() {
+			backupDeletionController.Run(ctx, 1)
+			wg.Done()
+		}()
+
 	}
 
 	restorer, err := newRestorer(
@@ -579,6 +586,10 @@ func (s *server) runControllers(config *api.Config) error {
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 
+	// Remove this sometime after v0.8.0
+	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Ark().V1().Backups().Informer().HasSynced)
+	s.removeDeprecatedGCFinalizer()
+
 	s.logger.Info("Server started successfully")
 
 	<-ctx.Done()
@@ -587,6 +598,45 @@ func (s *server) runControllers(config *api.Config) error {
 	wg.Wait()
 
 	return nil
+}
+
+const gcFinalizer = "gc.ark.heptio.com"
+
+func (s *server) removeDeprecatedGCFinalizer() {
+	backups, err := s.sharedInformerFactory.Ark().V1().Backups().Lister().List(labels.Everything())
+	if err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
+		return
+	}
+
+	for _, backup := range backups {
+		log := s.logger.WithField("backup", kube.NamespaceAndName(backup))
+
+		if !stringslice.Has(backup.Finalizers, gcFinalizer) {
+			log.Debug("backup doesn't have deprecated finalizer - skipping")
+			continue
+		}
+
+		log.Info("removing deprecated finalizer from backup")
+
+		patch := map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"finalizers":      stringslice.Except(backup.Finalizers, gcFinalizer),
+				"resourceVersion": backup.ResourceVersion,
+			},
+		}
+
+		patchBytes, err := json.Marshal(patch)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
+			continue
+		}
+
+		_, err = s.arkClient.ArkV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
+		}
+	}
 }
 
 func newBackupper(

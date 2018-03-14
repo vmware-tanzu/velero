@@ -34,6 +34,14 @@ type ConfigListerExpansion interface{}
 // ConfigNamespaceLister.
 type ConfigNamespaceListerExpansion interface{}
 
+// DeleteBackupRequestListerExpansion allows custom methods to be added to
+// DeleteBackupRequestLister.
+type DeleteBackupRequestListerExpansion interface{}
+
+// DeleteBackupRequestNamespaceListerExpansion allows custom methods to be added to
+// DeleteBackupRequestNamespaceLister.
+type DeleteBackupRequestNamespaceListerExpansion interface{}
+
 // DownloadRequestListerExpansion allows custom methods to be added to
 // DownloadRequestLister.
 type DownloadRequestListerExpansion interface{}

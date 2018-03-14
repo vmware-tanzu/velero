@@ -28,6 +28,8 @@ type Interface interface {
 	Backups() BackupInformer
 	// Configs returns a ConfigInformer.
 	Configs() ConfigInformer
+	// DeleteBackupRequests returns a DeleteBackupRequestInformer.
+	DeleteBackupRequests() DeleteBackupRequestInformer
 	// DownloadRequests returns a DownloadRequestInformer.
 	DownloadRequests() DownloadRequestInformer
 	// Restores returns a RestoreInformer.
@@ -55,6 +57,11 @@ func (v *version) Backups() BackupInformer {
 // Configs returns a ConfigInformer.
 func (v *version) Configs() ConfigInformer {
 	return &configInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// DeleteBackupRequests returns a DeleteBackupRequestInformer.
+func (v *version) DeleteBackupRequests() DeleteBackupRequestInformer {
+	return &deleteBackupRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DownloadRequests returns a DownloadRequestInformer.

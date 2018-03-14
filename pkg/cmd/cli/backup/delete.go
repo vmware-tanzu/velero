@@ -18,22 +18,16 @@ package backup
 
 import (
 	"bufio"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/controller"
+	"github.com/heptio/ark/pkg/backup"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/stringslice"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
@@ -60,7 +54,6 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 
 type DeleteOptions struct {
 	Name    string
-	Force   bool
 	Confirm bool
 
 	client    clientset.Interface
@@ -68,23 +61,17 @@ type DeleteOptions struct {
 }
 
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.Force, "force", o.Force, "Forcefully delete the backup, potentially leaving orphaned cloud resources")
-	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm forceful deletion")
+	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
 }
 
 func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	kubeClient, err := f.KubeClient()
-	if err != nil {
-		return err
+	if o.client == nil {
+		return errors.New("Ark client is not set; unable to proceed")
 	}
 
-	serverVersion, err := kubeutil.ServerVersion(kubeClient.Discovery())
+	_, err := o.client.ArkV1().Backups(f.Namespace()).Get(args[0], metav1.GetOptions{})
 	if err != nil {
 		return err
-	}
-
-	if !serverVersion.AtLeast(controller.MinVersionForDelete) {
-		return errors.Errorf("this command requires the Kubernetes server version to be at least %s", controller.MinVersionForDelete)
 	}
 
 	return nil
@@ -93,27 +80,26 @@ func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Facto
 func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 	o.Name = args[0]
 
-	var err error
-	o.client, err = f.Client()
+	o.namespace = f.Namespace()
+
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}
-
-	o.namespace = f.Namespace()
+	o.client = client
 
 	return nil
 }
 
 func (o *DeleteOptions) Run() error {
-	if o.Force {
-		return o.forceDelete()
+	if !o.Confirm && !getConfirmation() {
+		// Don't do anything unless we get confirmation
+		return nil
 	}
 
-	return o.normalDelete()
-}
+	deleteRequest := backup.NewDeleteBackupRequest(o.Name)
 
-func (o *DeleteOptions) normalDelete() error {
-	if err := o.client.ArkV1().Backups(o.namespace).Delete(o.Name, nil); err != nil {
+	if _, err := o.client.ArkV1().DeleteBackupRequests(o.namespace).Create(deleteRequest); err != nil {
 		return err
 	}
 
@@ -121,55 +107,10 @@ func (o *DeleteOptions) normalDelete() error {
 	return nil
 }
 
-func (o *DeleteOptions) forceDelete() error {
-	backup, err := o.client.ArkV1().Backups(o.namespace).Get(o.Name, metav1.GetOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if !o.Confirm {
-		// If the user didn't specify --confirm, we need to prompt for it
-		if !getConfirmation() {
-			return nil
-		}
-	}
-
-	// Step 1: patch to remove our finalizer, if it's there
-	if stringslice.Has(backup.Finalizers, v1.GCFinalizer) {
-		patchMap := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers":      stringslice.Except(backup.Finalizers, v1.GCFinalizer),
-				"resourceVersion": backup.ResourceVersion,
-			},
-		}
-
-		patchBytes, err := json.Marshal(patchMap)
-		if err != nil {
-			return errors.WithStack(err)
-		}
-
-		if _, err = o.client.ArkV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
-			return errors.WithStack(err)
-		}
-	}
-
-	// Step 2: issue the delete ONLY if it has never been issued before
-	if backup.DeletionTimestamp == nil {
-		if err = o.client.ArkV1().Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
-			return errors.WithStack(err)
-		}
-	}
-
-	fmt.Printf("Backup %q force-deleted.\n", backup.Name)
-
-	return nil
-}
-
 func getConfirmation() bool {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Println("WARNING: forcing deletion of a backup may result in resources in the cloud (disk snapshots, backup files) becoming orphaned.")
 		fmt.Printf("Are you sure you want to continue (Y/N)? ")
 
 		confirmation, err := reader.ReadString('\n')

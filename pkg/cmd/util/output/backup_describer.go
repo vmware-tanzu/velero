@@ -24,19 +24,36 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func DescribeBackup(backup *v1.Backup) string {
+// DescribeBackup describes a backup in human-readable format.
+func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
+
+		d.Println()
+		phase := backup.Status.Phase
+		if phase == "" {
+			phase = v1.BackupPhaseNew
+		}
+		d.Printf("Phase:\t%s", phase)
+		if count := failedDeletionCount(deleteRequests); count > 0 {
+			d.Printf(" (%d failed attempt(s))", count)
+		}
+		d.Println()
 
 		d.Println()
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		deleting := backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero()
-		DescribeBackupStatus(d, backup.Status, deleting)
+		DescribeBackupStatus(d, backup.Status)
+
+		if len(deleteRequests) > 0 {
+			d.Println()
+			DescribeDeleteBackupRequests(d, deleteRequests)
+		}
 	})
 }
 
+// DescribeBackupSpec describes a backup spec in human-readable format.
 func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
 	// TODO make a helper for this and use it in all the describers.
 	d.Printf("Namespaces:\n")
@@ -144,17 +161,8 @@ func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
 
 }
 
-func DescribeBackupStatus(d *Describer, status v1.BackupStatus, deleting bool) {
-	phase := status.Phase
-	if phase == "" {
-		phase = v1.BackupPhaseNew
-	}
-	if deleting {
-		phase = "Deleting"
-	}
-	d.Printf("Phase:\t%s\n", phase)
-
-	d.Println()
+// DescribeBackupStatus describes a backup status in human-readable format.
+func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
 
 	d.Println()
@@ -187,4 +195,36 @@ func DescribeBackupStatus(d *Describer, status v1.BackupStatus, deleting bool) {
 			d.Printf("\t\tIOPS:\t%s\n", iops)
 		}
 	}
+}
+
+// DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
+func DescribeDeleteBackupRequests(d *Describer, requests []v1.DeleteBackupRequest) {
+	d.Printf("Deletion Attempts:\n")
+
+	started := false
+	for _, req := range requests {
+		if !started {
+			started = true
+		} else {
+			d.Println()
+		}
+
+		d.Printf("\t%s: %s\n", req.CreationTimestamp.String(), req.Status.Phase)
+		if len(req.Status.Errors) > 0 {
+			d.Printf("\tErrors:\n")
+			for _, err := range req.Status.Errors {
+				d.Printf("\t\t%s\n", err)
+			}
+		}
+	}
+}
+
+func failedDeletionCount(requests []v1.DeleteBackupRequest) int {
+	var count int
+	for _, req := range requests {
+		if req.Status.Phase == v1.DeleteBackupRequestPhaseProcessed && len(req.Status.Errors) > 0 {
+			count++
+		}
+	}
+	return count
 }

@@ -120,11 +120,6 @@ func (b *TestBackup) WithDeletionTimestamp(time time.Time) *TestBackup {
 	return b
 }
 
-func (b *TestBackup) WithFinalizers(finalizers ...string) *TestBackup {
-	b.Finalizers = finalizers
-	return b
-}
-
 func (b *TestBackup) WithResourceVersion(version string) *TestBackup {
 	b.ResourceVersion = version
 	return b

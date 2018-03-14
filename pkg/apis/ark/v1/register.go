@@ -53,6 +53,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ConfigList{},
 		&DownloadRequest{},
 		&DownloadRequestList{},
+		&DeleteBackupRequest{},
+		&DeleteBackupRequestList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
