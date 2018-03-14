@@ -233,12 +233,17 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+	snapshotInfo, err := parseFullSnapshotName(snapshotID)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.snaps.Delete(b.resourceGroup, snapshotID, ctx.Done())
+	_, errChan := b.snaps.Delete(snapshotInfo.resourceGroup, snapshotInfo.name, ctx.Done())
 
-	err := <-errChan
+	err = <-errChan
 
 	return errors.WithStack(err)
 }
