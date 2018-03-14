@@ -31,6 +31,11 @@ required = [
   "k8s.io/code-generator/cmd/informer-gen",
 ]
 
+[prune]
+  unused-packages = true
+  non-go = true
+  go-tests = true
+
 [[constraint]]
   name = "cloud.google.com/go"
   version = "0.11.0"
