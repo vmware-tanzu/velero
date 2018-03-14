@@ -55,8 +55,6 @@ endif
 
 IMAGE := $(REGISTRY)/$(BIN)
 
-BUILD_IMAGE ?= gcr.io/heptio-images/golang:1.9-alpine3.6
-
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
@@ -92,20 +90,21 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 
 TTY := $(shell tty -s && echo "-t")
 
+BUILDER_IMAGE := ark-builder
+
 # Example: make shell CMD="date > datefile"
-shell: build-dirs
+shell: build-dirs build-image
 	@docker run \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
 		-v "$$(pwd)/.go/pkg:/go/pkg" \
-		-v "$$(pwd)/.go/src:/go/src" \
 		-v "$$(pwd)/.go/std:/go/std" \
 		-v "$$(pwd):/go/src/$(PKG)" \
 		-v "$$(pwd)/_output/bin:/output" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static" \
 		-w /go/src/$(PKG) \
-		$(BUILD_IMAGE) \
+		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
@@ -173,15 +172,12 @@ build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH)
 
-clean: container-clean bin-clean
+build-image:
+	cd hack/build-image && docker build -t $(BUILDER_IMAGE) .
 
-container-clean:
+clean:
 	rm -rf .container-* _output/.dockerfile-* .push-*
-
-bin-clean:
 	rm -rf .go _output
+	docker rmi $(BUILDER_IMAGE)
 
-ci:
-	hack/verify-all.sh
-	hack/test.sh $(SRC_DIRS)
-	GOOS=$(GOOS) GOARCH=$(GOARCH) VERSION=$(VERSION) PKG=$(PKG) BIN=$(BIN) ./hack/build.sh
+ci: build verify test

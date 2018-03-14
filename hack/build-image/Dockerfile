@@ -1,6 +1,4 @@
-#!/bin/bash
-#
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2018 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,26 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
-set -o xtrace
+FROM gcr.io/heptio-images/golang:1.9-alpine3.6
 
-if [[ -z "${GOPATH}" ]]; then
-  GOPATH=~/go
-fi
-
-if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
-  echo "k8s.io/code-generator missing from GOPATH"
-  exit 1
-fi
-
-cd ${GOPATH}/src/k8s.io/code-generator
-
-./generate-groups.sh \
-  all \
-  github.com/heptio/ark/pkg/generated \
-  github.com/heptio/ark/pkg/apis \
-  ark:v1 \
-  --go-header-file ${GOPATH}/src/github.com/heptio/ark/hack/boilerplate.go.txt \
-  $@
+RUN mkdir -p /go/src/k8s.io && \
+    cd /go/src/k8s.io && \
+    git clone -b kubernetes-1.9.0 https://github.com/kubernetes/code-generator && \
+    git clone -b kubernetes-1.9.0 https://github.com/kubernetes/apimachinery && \
+    echo chmod -R a+w /go

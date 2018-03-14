@@ -3,4 +3,9 @@ language: go
 go:
   - 1.9.x
 
+sudo: required
+
+services:
+  - docker
+
 script: make ci
