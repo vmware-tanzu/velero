@@ -16,7 +16,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark-server
+  namespace: heptio-ark
   name: minio
   labels:
     component: minio
@@ -53,7 +53,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: heptio-ark-server
+  namespace: heptio-ark
   name: minio
   labels:
     component: minio
@@ -70,7 +70,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  namespace: heptio-ark-server
+  namespace: heptio-ark
   name: cloud-credentials
   labels:
     component: minio
@@ -84,7 +84,7 @@ stringData:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  namespace: heptio-ark-server
+  namespace: heptio-ark
   name: minio-setup
   labels:
     component: minio

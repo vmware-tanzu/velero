@@ -47,7 +47,7 @@ Create a Secret. In the directory of the credentials file you just created, run:
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_SERVER_NAMESPACE> \
+    --namespace <ARK_NAMESPACE> \
     --from-file cloud=credentials-ark
 ```
 
