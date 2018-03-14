@@ -310,8 +310,13 @@ func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *
 
 	log = log.WithField("volumeID", volumeID)
 
+	tags := map[string]string{
+		"ark.heptio.com/backup": backup.Name,
+		"ark.heptio.com/pv":     metadata.GetName(),
+	}
+
 	log.Info("Snapshotting PersistentVolume")
-	snapshotID, err := ib.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone)
+	snapshotID, err := ib.snapshotService.CreateSnapshot(volumeID, pvFailureDomainZone, tags)
 	if err != nil {
 		// log+error on purpose - log goes to the per-backup log file, error goes to the backup
 		log.WithError(err).Error("error creating snapshot")

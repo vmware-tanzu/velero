@@ -23,6 +23,7 @@ import (
 
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
@@ -38,10 +39,11 @@ const projectKey = "project"
 type blockStore struct {
 	gce     *compute.Service
 	project string
+	log     logrus.FieldLogger
 }
 
-func NewBlockStore() cloudprovider.BlockStore {
-	return &blockStore{}
+func NewBlockStore(log logrus.FieldLogger) cloudprovider.BlockStore {
+	return &blockStore{log: log}
 }
 
 func (b *blockStore) Init(config map[string]string) error {
@@ -99,15 +101,22 @@ func extractProjectFromCreds() (string, error) {
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	// get the snapshot so we can apply its tags to the volume
 	res, err := b.gce.Snapshots.Get(b.project, snapshotID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
+	// Kubernetes uses the description field of GCP disks to store a JSON doc containing
+	// tags.
+	//
+	// use the snapshot's description (which contains tags from the snapshotted disk
+	// plus Ark-specific tags) to set the new disk's description.
 	disk := &compute.Disk{
 		Name:           "restore-" + uuid.NewV4().String(),
 		SourceSnapshot: res.SelfLink,
 		Type:           volumeType,
+		Description:    res.Description,
 	}
 
 	if _, err = b.gce.Disks.Insert(b.project, volumeAZ, disk).Do(); err != nil {
@@ -148,17 +157,56 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 		snapshotName = volumeID[0:63-len(suffix)] + suffix
 	}
 
-	gceSnap := compute.Snapshot{
-		Name:   snapshotName,
-		Labels: tags,
+	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
+	if err != nil {
+		return "", errors.WithStack(err)
 	}
 
-	_, err := b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
+	gceSnap := compute.Snapshot{
+		Name:        snapshotName,
+		Description: getSnapshotTags(tags, disk.Description, b.log),
+	}
+
+	_, err = b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	return gceSnap.Name, nil
+}
+
+func getSnapshotTags(arkTags map[string]string, diskDescription string, log logrus.FieldLogger) string {
+	// Kubernetes uses the description field of GCP disks to store a JSON doc containing
+	// tags.
+	//
+	// use the tags in the disk's description (if a valid JSON doc) plus the tags arg
+	// to set the snapshot's description.
+	var snapshotTags map[string]string
+	if err := json.Unmarshal([]byte(diskDescription), &snapshotTags); err != nil {
+		// error decoding the disk's description, so just use the Ark-assigned tags
+		log.WithError(err).
+			Error("unable to decode disk's description as JSON, so only applying Ark-assigned tags to snapshot")
+		snapshotTags = arkTags
+	} else {
+		// merge Ark-assigned tags with the disk's tags (note that we want current
+		// Ark-assigned tags to overwrite any older versions of them that may exist
+		// due to prior snapshots/restores)
+		for k, v := range arkTags {
+			snapshotTags[k] = v
+		}
+	}
+
+	if len(snapshotTags) == 0 {
+		return ""
+	}
+
+	tagsJSON, err := json.Marshal(snapshotTags)
+	if err != nil {
+		log.WithError(err).Error("unable to encode snapshot's tags to JSON, so not tagging snapshot")
+		return ""
+	}
+
+	return string(tagsJSON)
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {

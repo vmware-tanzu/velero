@@ -39,7 +39,7 @@ type FakeSnapshotService struct {
 	VolumeIDSet string
 }
 
-func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string) (string, error) {
+func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	if _, exists := s.SnapshottableVolumes[volumeID]; !exists {
 		return "", errors.New("snapshottable volume not found")
 	}

@@ -49,6 +49,7 @@ For more information, see [the AWS documentation on IAM users][14].
                 "Effect": "Allow",
                 "Action": [
                     "ec2:DescribeVolumes",
+                    "ec2:DescribeSnapshots",
                     "ec2:CreateTags",
                     "ec2:CreateVolume",
                     "ec2:CreateSnapshot",

@@ -17,8 +17,10 @@ limitations under the License.
 package aws
 
 import (
+	"sort"
 	"testing"
 
+	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,4 +85,85 @@ func TestSetVolumeID(t *testing.T) {
 	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
 	require.NoError(t, err)
 	assert.Equal(t, "vol-updated", actual)
+}
+
+func TestGetTags(t *testing.T) {
+	tests := []struct {
+		name       string
+		arkTags    map[string]string
+		volumeTags []*ec2.Tag
+		expected   []*ec2.Tag
+	}{
+		{
+			name:       "degenerate case (no tags)",
+			arkTags:    nil,
+			volumeTags: nil,
+			expected:   nil,
+		},
+		{
+			name: "ark tags only get applied",
+			arkTags: map[string]string{
+				"ark-key1": "ark-val1",
+				"ark-key2": "ark-val2",
+			},
+			volumeTags: nil,
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key1", "ark-val1"),
+				ec2Tag("ark-key2", "ark-val2"),
+			},
+		},
+		{
+			name:    "volume tags only get applied",
+			arkTags: nil,
+			volumeTags: []*ec2.Tag{
+				ec2Tag("aws-key1", "aws-val1"),
+				ec2Tag("aws-key2", "aws-val2"),
+			},
+			expected: []*ec2.Tag{
+				ec2Tag("aws-key1", "aws-val1"),
+				ec2Tag("aws-key2", "aws-val2"),
+			},
+		},
+		{
+			name:       "non-overlapping ark and volume tags both get applied",
+			arkTags:    map[string]string{"ark-key": "ark-val"},
+			volumeTags: []*ec2.Tag{ec2Tag("aws-key", "aws-val")},
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key", "ark-val"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+		},
+		{
+			name: "when tags overlap, ark tags take precedence",
+			arkTags: map[string]string{
+				"ark-key":         "ark-val",
+				"overlapping-key": "ark-val",
+			},
+			volumeTags: []*ec2.Tag{
+				ec2Tag("aws-key", "aws-val"),
+				ec2Tag("overlapping-key", "aws-val"),
+			},
+			expected: []*ec2.Tag{
+				ec2Tag("ark-key", "ark-val"),
+				ec2Tag("overlapping-key", "ark-val"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := getTags(test.arkTags, test.volumeTags)
+
+			sort.Slice(res, func(i, j int) bool {
+				return *res[i].Key < *res[j].Key
+			})
+
+			sort.Slice(test.expected, func(i, j int) bool {
+				return *test.expected[i].Key < *test.expected[j].Key
+			})
+
+			assert.Equal(t, test.expected, res)
+		})
+	}
 }

@@ -17,9 +17,12 @@ limitations under the License.
 package gcp
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/heptio/ark/pkg/util/collections"
+	arktest "github.com/heptio/ark/pkg/util/test"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -71,4 +74,78 @@ func TestSetVolumeID(t *testing.T) {
 	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
 	require.NoError(t, err)
 	assert.Equal(t, "123abc", actual)
+}
+
+func TestGetSnapshotTags(t *testing.T) {
+	tests := []struct {
+		name            string
+		arkTags         map[string]string
+		diskDescription string
+		expected        string
+	}{
+		{
+			name:            "degenerate case (no tags)",
+			arkTags:         nil,
+			diskDescription: "",
+			expected:        "",
+		},
+		{
+			name: "ark tags only get applied",
+			arkTags: map[string]string{
+				"ark-key1": "ark-val1",
+				"ark-key2": "ark-val2",
+			},
+			diskDescription: "",
+			expected:        `{"ark-key1":"ark-val1","ark-key2":"ark-val2"}`,
+		},
+		{
+			name:            "disk tags only get applied",
+			arkTags:         nil,
+			diskDescription: `{"aws-key1":"aws-val1","aws-key2":"aws-val2"}`,
+			expected:        `{"aws-key1":"aws-val1","aws-key2":"aws-val2"}`,
+		},
+		{
+			name:            "non-overlapping ark and disk tags both get applied",
+			arkTags:         map[string]string{"ark-key": "ark-val"},
+			diskDescription: `{"aws-key":"aws-val"}`,
+			expected:        `{"ark-key":"ark-val","aws-key":"aws-val"}`,
+		},
+		{
+			name: "when tags overlap, ark tags take precedence",
+			arkTags: map[string]string{
+				"ark-key":         "ark-val",
+				"overlapping-key": "ark-val",
+			},
+			diskDescription: `{"aws-key":"aws-val","overlapping-key":"aws-val"}`,
+			expected:        `{"ark-key":"ark-val","aws-key":"aws-val","overlapping-key":"ark-val"}`,
+		},
+		{
+			name:            "if disk description is invalid JSON, apply just ark tags",
+			arkTags:         map[string]string{"ark-key": "ark-val"},
+			diskDescription: `THIS IS INVALID JSON`,
+			expected:        `{"ark-key":"ark-val"}`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res := getSnapshotTags(test.arkTags, test.diskDescription, arktest.NewLogger())
+
+			if test.expected == "" {
+				assert.Equal(t, test.expected, res)
+				return
+			}
+
+			var actualMap map[string]interface{}
+			require.NoError(t, json.Unmarshal([]byte(res), &actualMap))
+
+			var expectedMap map[string]interface{}
+			require.NoError(t, json.Unmarshal([]byte(test.expected), &expectedMap))
+
+			assert.Equal(t, len(expectedMap), len(actualMap))
+			for k, v := range expectedMap {
+				assert.Equal(t, v, actualMap[k])
+			}
+		})
+	}
 }

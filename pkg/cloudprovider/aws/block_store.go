@@ -78,10 +78,30 @@ func (b *blockStore) Init(config map[string]string) error {
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	// describe the snapshot so we can apply its tags to the volume
+	snapReq := &ec2.DescribeSnapshotsInput{
+		SnapshotIds: []*string{&snapshotID},
+	}
+
+	snapRes, err := b.ec2.DescribeSnapshots(snapReq)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if count := len(snapRes.Snapshots); count != 1 {
+		return "", errors.Errorf("expected 1 snapshot from DescribeSnapshots for %s, got %v", snapshotID, count)
+	}
+
 	req := &ec2.CreateVolumeInput{
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeVolume),
+				Tags:         snapRes.Snapshots[0].Tags,
+			},
+		},
 	}
 
 	if iopsVolumeTypes.Has(volumeType) && iops != nil {
@@ -97,81 +117,99 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 }
 
 func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	req := &ec2.DescribeVolumesInput{
-		VolumeIds: []*string{&volumeID},
-	}
-
-	res, err := b.ec2.DescribeVolumes(req)
+	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
-		return "", nil, errors.WithStack(err)
+		return "", nil, err
 	}
-
-	if len(res.Volumes) != 1 {
-		return "", nil, errors.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
-	}
-
-	vol := res.Volumes[0]
 
 	var (
 		volumeType string
 		iops       *int64
 	)
 
-	if vol.VolumeType != nil {
-		volumeType = *vol.VolumeType
+	if volumeInfo.VolumeType != nil {
+		volumeType = *volumeInfo.VolumeType
 	}
 
-	if iopsVolumeTypes.Has(volumeType) && vol.Iops != nil {
-		iops = vol.Iops
+	if iopsVolumeTypes.Has(volumeType) && volumeInfo.Iops != nil {
+		iops = volumeInfo.Iops
 	}
 
 	return volumeType, iops, nil
 }
 
 func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
+	volumeInfo, err := b.describeVolume(volumeID)
+	if err != nil {
+		return false, err
+	}
+
+	return *volumeInfo.State == ec2.VolumeStateAvailable, nil
+}
+
+func (b *blockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
 
 	res, err := b.ec2.DescribeVolumes(req)
 	if err != nil {
-		return false, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
-	if len(res.Volumes) != 1 {
-		return false, errors.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, len(res.Volumes))
+	if count := len(res.Volumes); count != 1 {
+		return nil, errors.Errorf("Expected one volume from DescribeVolumes for volume ID %v, got %v", volumeID, count)
 	}
 
-	return *res.Volumes[0].State == ec2.VolumeStateAvailable, nil
+	return res.Volumes[0], nil
 }
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
-	req := &ec2.CreateSnapshotInput{
-		VolumeId: &volumeID,
+	// describe the volume so we can copy its tags to the snapshot
+	volumeInfo, err := b.describeVolume(volumeID)
+	if err != nil {
+		return "", err
 	}
 
-	res, err := b.ec2.CreateSnapshot(req)
+	res, err := b.ec2.CreateSnapshot(&ec2.CreateSnapshotInput{
+		VolumeId: &volumeID,
+		TagSpecifications: []*ec2.TagSpecification{
+			{
+				ResourceType: aws.String(ec2.ResourceTypeSnapshot),
+				Tags:         getTags(tags, volumeInfo.Tags),
+			},
+		},
+	})
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	tagsReq := &ec2.CreateTagsInput{}
-	tagsReq.SetResources([]*string{res.SnapshotId})
+	return *res.SnapshotId, nil
+}
 
-	ec2Tags := make([]*ec2.Tag, 0, len(tags))
+func getTags(arkTags map[string]string, volumeTags []*ec2.Tag) []*ec2.Tag {
+	var result []*ec2.Tag
 
-	for k, v := range tags {
-		key := k
-		val := v
-
-		tag := &ec2.Tag{Key: &key, Value: &val}
-		ec2Tags = append(ec2Tags, tag)
+	// set Ark-assigned tags
+	for k, v := range arkTags {
+		result = append(result, ec2Tag(k, v))
 	}
 
-	tagsReq.SetTags(ec2Tags)
+	// copy tags from volume to snapshot
+	for _, tag := range volumeTags {
+		// we want current Ark-assigned tags to overwrite any older versions
+		// of them that may exist due to prior snapshots/restores
+		if _, found := arkTags[*tag.Key]; found {
+			continue
+		}
 
-	_, err = b.ec2.CreateTags(tagsReq)
+		result = append(result, ec2Tag(*tag.Key, *tag.Value))
+	}
 
-	return *res.SnapshotId, errors.WithStack(err)
+	return result
+}
+
+func ec2Tag(key, val string) *ec2.Tag {
+	return &ec2.Tag{Key: &key, Value: &val}
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
