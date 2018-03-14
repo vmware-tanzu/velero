@@ -586,8 +586,6 @@
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
-    "pkg/apimachinery",
-    "pkg/apimachinery/registered",
     "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
@@ -703,41 +701,6 @@
   version = "v6.0.0"
 
 [[projects]]
-  name = "k8s.io/code-generator"
-  packages = [
-    "cmd/client-gen",
-    "cmd/client-gen/args",
-    "cmd/client-gen/generators",
-    "cmd/client-gen/generators/fake",
-    "cmd/client-gen/generators/scheme",
-    "cmd/client-gen/generators/util",
-    "cmd/client-gen/path",
-    "cmd/client-gen/types",
-    "cmd/deepcopy-gen",
-    "cmd/defaulter-gen",
-    "cmd/informer-gen",
-    "cmd/informer-gen/generators",
-    "cmd/lister-gen",
-    "cmd/lister-gen/generators"
-  ]
-  revision = "fef8bcdbaf36ac6a1a18c9ef7d85200b249fad30"
-  version = "kubernetes-1.9.0"
-
-[[projects]]
-  name = "k8s.io/gengo"
-  packages = [
-    "args",
-    "examples/deepcopy-gen/generators",
-    "examples/defaulter-gen/generators",
-    "examples/set-gen/sets",
-    "generator",
-    "namer",
-    "parser",
-    "types"
-  ]
-  revision = "b58fc7edb82e0c6ffc9b8aef61813c7261b785d4"
-
-[[projects]]
   branch = "master"
   name = "k8s.io/kube-openapi"
   packages = [
@@ -758,6 +721,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "99dc2ee46b7dc9b2e81f0d63b3f478554bed2e767e8cc1703684cde80ccff0df"
+  inputs-digest = "4b39ff1fb04dedf398ef1e5695bb6b34491b312c55a2626f153f25a6ce3ffc95"
   solver-name = "gps-cdcl"
   solver-version = 1
