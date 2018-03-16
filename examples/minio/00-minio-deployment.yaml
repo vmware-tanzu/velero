@@ -30,8 +30,7 @@ spec:
     spec:
       volumes:
       - name: storage
-        hostPath:
-          path: /tmp/minio
+        emptyDir: {}
       containers:
       - name: minio
         image: minio/minio:latest
