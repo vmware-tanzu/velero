@@ -122,7 +122,7 @@ Loop:
 	if resp.StatusCode != http.StatusOK {
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return errors.Wrapf(err, "request failed; unable to decode response body")
+			return errors.Wrapf(err, "request failed: unable to decode response body")
 		}
 
 		return errors.Errorf("request failed: %v", string(body))
