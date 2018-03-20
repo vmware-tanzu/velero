@@ -304,6 +304,7 @@ var defaultResourcePriorities = []string{
 	"secrets",
 	"configmaps",
 	"serviceaccounts",
+	"limitranges",
 }
 
 func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
