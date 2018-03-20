@@ -130,7 +130,7 @@ func (rb *defaultResourceBackupper) backupResource(
 
 	clusterScoped := !resource.Namespaced
 
-	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
+	// If the resource we are backing up is NOT namespaced, and it is cluster-scoped, check to see if
 	// we should include it based on the IncludeClusterResources setting.
 	if gr != namespacesGroupResource && clusterScoped {
 		if rb.backup.Spec.IncludeClusterResources == nil {
