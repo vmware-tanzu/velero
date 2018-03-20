@@ -14,9 +14,11 @@ ark delete backup NAME [flags]
 ### Options
 
 ```
-      --confirm   Confirm forceful deletion
-      --force     Forcefully delete the backup, potentially leaving orphaned cloud resources
-  -h, --help      help for backup
+      --all                      Delete all backups
+      --confirm                  Confirm forceful deletion
+      --force                    Forcefully delete the backup, potentially leaving orphaned cloud resources
+  -h, --help                     help for backup
+  -l, --selector labelSelector   Delete all backups matching this label selector (default <none>)
 ```
 
 ### Options inherited from parent commands
