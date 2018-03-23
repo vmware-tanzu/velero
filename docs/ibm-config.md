@@ -69,7 +69,7 @@ In the root of your Ark directory, run:
 
   ```bash
   kubectl apply -f examples/ibm/00-ark-config.yaml
-  kubectl apply -f examples/common/10-deployment.yaml
+  kubectl apply -f examples/ibm/10-deployment.yaml
   ```
 
   [0]: namespace.md

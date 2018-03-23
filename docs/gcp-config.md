@@ -84,10 +84,6 @@ Specify the following values in the example files:
 
   * Replace `<YOUR_BUCKET>`. See the [Config definition][7] for details.
 
-* In file `examples/common/10-deployment.yaml`:
-
-  * Change `spec.template.spec.containers[*].env.name` to "GOOGLE_APPLICATION_CREDENTIALS".
-
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
@@ -98,7 +94,7 @@ In the root of your Ark directory, run:
 
   ```bash
   kubectl apply -f examples/gcp/00-ark-config.yaml
-  kubectl apply -f examples/common/10-deployment.yaml
+  kubectl apply -f examples/gcp/10-deployment.yaml
   ```
 
   [0]: namespace.md
