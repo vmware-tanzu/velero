@@ -28,19 +28,19 @@ type BackupService struct {
 }
 
 // CreateSignedURL provides a mock function with given fields: target, bucket, ttl
-func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket string, ttl time.Duration) (string, error) {
-	ret := _m.Called(target, bucket, ttl)
+func (_m *BackupService) CreateSignedURL(target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
+	ret := _m.Called(target, bucket, directory, ttl)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(v1.DownloadTarget, string, time.Duration) string); ok {
-		r0 = rf(target, bucket, ttl)
+	if rf, ok := ret.Get(0).(func(v1.DownloadTarget, string, string, time.Duration) string); ok {
+		r0 = rf(target, bucket, directory, ttl)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(v1.DownloadTarget, string, time.Duration) error); ok {
-		r1 = rf(target, bucket, ttl)
+	if rf, ok := ret.Get(1).(func(v1.DownloadTarget, string, string, time.Duration) error); ok {
+		r1 = rf(target, bucket, directory, ttl)
 	} else {
 		r1 = ret.Error(1)
 	}
