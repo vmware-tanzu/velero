@@ -20,7 +20,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -35,12 +34,8 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "logs BACKUP",
 		Short: "Get backup logs",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				err := errors.New("backup name is required")
-				cmd.CheckError(err)
-			}
-
 			arkClient, err := f.Client()
 			cmd.CheckError(err)
 

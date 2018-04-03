@@ -45,9 +45,10 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
   # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
   ark restore create --from-backup backup-1`,
+		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -106,10 +107,6 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if len(o.BackupName) == 0 {
 		return errors.New("--from-backup is required")
-	}
-
-	if len(args) > 1 {
-		return errors.New("you may specify at most one argument, the restore's name")
 	}
 
 	if err := output.ValidateFlags(c); err != nil {

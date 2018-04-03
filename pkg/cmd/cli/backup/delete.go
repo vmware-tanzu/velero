@@ -45,9 +45,10 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s NAME", use),
 		Short: "Delete a backup",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(f, args))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run())
 		},
 	}
@@ -72,10 +73,6 @@ func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if len(args) != 1 {
-		return errors.New("you must specify only one argument, the backup's name")
-	}
-
 	kubeClient, err := f.KubeClient()
 	if err != nil {
 		return err

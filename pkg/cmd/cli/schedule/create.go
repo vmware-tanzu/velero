@@ -49,10 +49,10 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 5                  | Day of Week      | 0-7,*             |`,
 
 		Example: `ark create schedule NAME --schedule="0 */6 * * *"`,
-
+		Args:    cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -83,9 +83,6 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("you must specify only one argument, the schedule's name")
-	}
 	if len(o.Schedule) == 0 {
 		return errors.New("--schedule is required")
 	}

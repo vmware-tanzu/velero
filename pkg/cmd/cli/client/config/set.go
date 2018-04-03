@@ -23,7 +23,6 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -31,11 +30,8 @@ func NewSetCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "set KEY=VALUE [KEY=VALUE]...",
 		Short: "Set client configuration file values",
+		Args:  cobra.MinimumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) < 1 {
-				cmd.CheckError(errors.Errorf("At least one KEY=VALUE argument is required"))
-			}
-
 			config, err := client.LoadConfig()
 			cmd.CheckError(err)
 

@@ -37,9 +37,10 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "download NAME",
 		Short: "Download a backup",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -70,10 +71,6 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("backup name is required")
-	}
-
 	return nil
 }
 

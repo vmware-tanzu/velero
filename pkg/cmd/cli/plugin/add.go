@@ -50,11 +50,8 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "add IMAGE",
 		Short: "Add a plugin",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.CheckError(errors.New("you must specify only one argument, the plugin container image"))
-			}
-
 			kubeClient, err := f.KubeClient()
 			if err != nil {
 				cmd.CheckError(err)
