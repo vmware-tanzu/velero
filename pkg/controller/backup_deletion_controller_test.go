@@ -33,7 +33,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
@@ -63,6 +65,9 @@ func TestBackupDeletionControllerControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
 	).(*backupDeletionController)
+
+	// disable resync handler since we don't want to test it here
+	controller.resyncFunc = nil
 
 	keys := make(chan string)
 
@@ -388,4 +393,150 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.snapshotService.SnapshotsTaken.Len())
 	})
+}
+
+func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
+	now := time.Date(2018, 4, 4, 12, 0, 0, 0, time.UTC)
+	unexpired1 := time.Date(2018, 4, 4, 11, 0, 0, 0, time.UTC)
+	unexpired2 := time.Date(2018, 4, 3, 12, 0, 1, 0, time.UTC)
+	expired1 := time.Date(2018, 4, 3, 12, 0, 0, 0, time.UTC)
+	expired2 := time.Date(2018, 4, 3, 2, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name              string
+		requests          []*v1.DeleteBackupRequest
+		expectedDeletions []string
+	}{
+		{
+			name: "no requests",
+		},
+		{
+			name: "older than max age, phase = '', don't delete",
+			requests: []*v1.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "name",
+						CreationTimestamp: metav1.Time{Time: expired1},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: "",
+					},
+				},
+			},
+		},
+		{
+			name: "older than max age, phase = New, don't delete",
+			requests: []*v1.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "name",
+						CreationTimestamp: metav1.Time{Time: expired1},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseNew,
+					},
+				},
+			},
+		},
+		{
+			name: "older than max age, phase = InProcess, don't delete",
+			requests: []*v1.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "name",
+						CreationTimestamp: metav1.Time{Time: expired1},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseInProgress,
+					},
+				},
+			},
+		},
+		{
+			name: "some expired, some not",
+			requests: []*v1.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "unexpired-1",
+						CreationTimestamp: metav1.Time{Time: unexpired1},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseProcessed,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "expired-1",
+						CreationTimestamp: metav1.Time{Time: expired1},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseProcessed,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "unexpired-2",
+						CreationTimestamp: metav1.Time{Time: unexpired2},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseProcessed,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace:         "ns",
+						Name:              "expired-2",
+						CreationTimestamp: metav1.Time{Time: expired2},
+					},
+					Status: v1.DeleteBackupRequestStatus{
+						Phase: v1.DeleteBackupRequestPhaseProcessed,
+					},
+				},
+			},
+			expectedDeletions: []string{"expired-1", "expired-2"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(client, 0)
+
+			controller := NewBackupDeletionController(
+				arktest.NewLogger(),
+				sharedInformers.Ark().V1().DeleteBackupRequests(),
+				client.ArkV1(), // deleteBackupRequestClient
+				client.ArkV1(), // backupClient
+				nil,            // snapshotService
+				nil,            // backupService
+				"bucket",
+				sharedInformers.Ark().V1().Restores(),
+				client.ArkV1(), // restoreClient
+			).(*backupDeletionController)
+
+			fakeClock := &clock.FakeClock{}
+			fakeClock.SetTime(now)
+			controller.clock = fakeClock
+
+			for i := range test.requests {
+				sharedInformers.Ark().V1().DeleteBackupRequests().Informer().GetStore().Add(test.requests[i])
+			}
+
+			controller.deleteExpiredRequests()
+
+			expectedActions := []core.Action{}
+			for _, name := range test.expectedDeletions {
+				expectedActions = append(expectedActions, core.NewDeleteAction(v1.SchemeGroupVersion.WithResource("deletebackuprequests"), "ns", name))
+			}
+
+			assert.Equal(t, expectedActions, client.Actions())
+		})
+
+	}
 }

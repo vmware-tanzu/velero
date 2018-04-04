@@ -18,6 +18,7 @@ package controller
 
 import (
 	"encoding/json"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -49,6 +51,7 @@ type backupDeletionController struct {
 	restoreClient             arkv1client.RestoresGetter
 
 	processRequestFunc func(*v1.DeleteBackupRequest) error
+	clock              clock.Clock
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -73,6 +76,7 @@ func NewBackupDeletionController(
 		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
+		clock:                     &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -85,6 +89,9 @@ func NewBackupDeletionController(
 			UpdateFunc: func(_, obj interface{}) { c.enqueue(obj) },
 		},
 	)
+
+	c.resyncPeriod = time.Hour
+	c.resyncFunc = c.deleteExpiredRequests
 
 	return c
 }
@@ -234,6 +241,39 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	return nil
+}
+
+const deleteBackupRequestMaxAge = 24 * time.Hour
+
+func (c *backupDeletionController) deleteExpiredRequests() {
+	c.logger.Info("Checking for expired DeleteBackupRequests")
+	defer c.logger.Info("Done checking for expired DeleteBackupRequests")
+
+	// Our shared informer factory filters on a single namespace, so asking for all is ok here.
+	requests, err := c.deleteBackupRequestLister.List(labels.Everything())
+	if err != nil {
+		c.logger.WithError(err).Error("unable to check for expired DeleteBackupRequests")
+		return
+	}
+
+	now := c.clock.Now()
+
+	for _, req := range requests {
+		if req.Status.Phase != v1.DeleteBackupRequestPhaseProcessed {
+			continue
+		}
+
+		age := now.Sub(req.CreationTimestamp.Time)
+		if age >= deleteBackupRequestMaxAge {
+			reqLog := c.logger.WithFields(logrus.Fields{"namespace": req.Namespace, "name": req.Name})
+			reqLog.Info("Deleting expired DeleteBackupRequest")
+
+			err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(req.Name, nil)
+			if err != nil {
+				reqLog.WithError(err).Error("Error deleting DeleteBackupRequest")
+			}
+		}
+	}
 }
 
 func (c *backupDeletionController) patchDeleteBackupRequest(req *v1.DeleteBackupRequest, mutate func(*v1.DeleteBackupRequest)) (*v1.DeleteBackupRequest, error) {
