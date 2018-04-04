@@ -60,11 +60,8 @@ func NewCommand() *cobra.Command {
 		Use:    "run-plugin [KIND] [NAME]",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
+		Args:   cobra.ExactArgs(2),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 2 {
-				logger.Fatal("You must specify exactly two arguments, the plugin kind and the plugin name")
-			}
-
 			kind := args[0]
 			name := args[1]
 

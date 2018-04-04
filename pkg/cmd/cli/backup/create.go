@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -39,9 +38,10 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " NAME",
 		Short: "Create a backup",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Validate(c, args))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -94,10 +94,6 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("you must specify only one argument, the backup's name")
-	}
-
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}

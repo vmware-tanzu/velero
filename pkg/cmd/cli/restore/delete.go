@@ -18,7 +18,6 @@ package restore
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -30,12 +29,8 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s NAME", use),
 		Short: "Delete a restore",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				c.Usage()
-				os.Exit(1)
-			}
-
 			arkClient, err := f.Client()
 			cmd.CheckError(err)
 

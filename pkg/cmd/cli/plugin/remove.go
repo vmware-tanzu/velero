@@ -35,11 +35,8 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "remove [NAME | IMAGE]",
 		Short: "Remove a plugin",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			if len(args) != 1 {
-				cmd.CheckError(errors.New("you must specify only one argument, the plugin container's name or image"))
-			}
-
 			kubeClient, err := f.KubeClient()
 			if err != nil {
 				cmd.CheckError(err)
