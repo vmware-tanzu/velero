@@ -47,7 +47,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
   ark restore create --from-backup backup-1`,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
@@ -113,26 +113,30 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	client, err := f.Client()
-	if err != nil {
-		return err
+	if o.client == nil {
+		// This should never happen
+		return errors.New("Ark client is not set; unable to proceed")
 	}
-	o.client = client
 
-	_, err = o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{})
-	if err != nil {
+	if _, err := o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (o *CreateOptions) Complete(args []string) error {
+func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 	if len(args) == 1 {
 		o.RestoreName = args[0]
 	} else {
 		o.RestoreName = fmt.Sprintf("%s-%s", o.BackupName, time.Now().Format("20060102150405"))
 	}
+
+	client, err := f.Client()
+	if err != nil {
+		return err
+	}
+	o.client = client
 
 	return nil
 }
