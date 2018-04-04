@@ -14,8 +14,7 @@ ark backup delete NAME [flags]
 ### Options
 
 ```
-      --confirm   Confirm forceful deletion
-      --force     Forcefully delete the backup, potentially leaving orphaned cloud resources
+      --confirm   Confirm deletion
   -h, --help      help for delete
 ```
 
