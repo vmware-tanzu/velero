@@ -23,6 +23,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	"github.com/spf13/cobra"
@@ -33,6 +34,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd"
 )
 
+// NewDeleteCommand creates a new command that deletes a backup.
 func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	o := &DeleteOptions{}
 
@@ -52,31 +54,22 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	return c
 }
 
+// DeleteOptions contains parameters for deleting a backup.
 type DeleteOptions struct {
 	Name    string
 	Confirm bool
 
 	client    clientset.Interface
 	namespace string
+	backup    *v1.Backup
 }
 
+// BindFlags binds options for this command to flags.
 func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
 }
 
-func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if o.client == nil {
-		return errors.New("Ark client is not set; unable to proceed")
-	}
-
-	_, err := o.client.ArkV1().Backups(f.Namespace()).Get(args[0], metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
+// Complete fills out the remainder of the parameters based on user input.
 func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 	o.Name = args[0]
 
@@ -88,22 +81,42 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 	}
 	o.client = client
 
+	backup, err := o.client.ArkV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	o.backup = backup
+
 	return nil
 }
 
+// Validate ensures all of the parameters have been filled in correctly.
+func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	if o.client == nil {
+		return errors.New("Ark client is not set; unable to proceed")
+	}
+
+	if o.backup == nil {
+		return errors.New("backup is not set; unable to proceed")
+	}
+
+	return nil
+}
+
+// Run performs the delete backup operation.
 func (o *DeleteOptions) Run() error {
 	if !o.Confirm && !getConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
 	}
 
-	deleteRequest := backup.NewDeleteBackupRequest(o.Name)
+	deleteRequest := backup.NewDeleteBackupRequest(o.backup.Name, string(o.backup.UID))
 
 	if _, err := o.client.ArkV1().DeleteBackupRequests(o.namespace).Create(deleteRequest); err != nil {
 		return err
 	}
 
-	fmt.Printf("Request to delete backup %q submitted successfully.\nThe backup will be fully deleted after all associated data (disk snapshots, backup files, restores) are removed.\n", o.Name)
+	fmt.Printf("Request to delete backup %q submitted successfully.\nThe backup will be fully deleted after all associated data (disk snapshots, backup files, restores) are removed.\n", o.backup.Name)
 	return nil
 }
 

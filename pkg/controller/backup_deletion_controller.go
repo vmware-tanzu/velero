@@ -232,7 +232,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// Everything deleted correctly, so we can delete all DeleteBackupRequests for this backup
 	if len(errs) == 0 {
-		listOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name)
+		listOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
 		err = c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).DeleteCollection(nil, listOptions)
 		if err != nil {
 			// If this errors, all we can do is log it.

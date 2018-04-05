@@ -55,17 +55,13 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 			first := true
 			for _, backup := range backups.Items {
-				var deleteRequests []v1.DeleteBackupRequest
-				if backup.Status.Phase == v1.BackupPhaseDeleting {
-					deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name)
-					deleteRequestList, err := arkClient.ArkV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
-					}
-					deleteRequests = deleteRequestList.Items
+				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
+				deleteRequestList, err := arkClient.ArkV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequests)
+				s := output.DescribeBackup(&backup, deleteRequestList.Items)
 				if first {
 					first = false
 					fmt.Print(s)

@@ -132,7 +132,7 @@ func (c *gcController) processQueueItem(key string) error {
 
 	log.Info("Backup has expired. Creating a DeleteBackupRequest.")
 
-	req := pkgbackup.NewDeleteBackupRequest(name)
+	req := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 
 	_, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(req)
 	if err != nil {

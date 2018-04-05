@@ -23,13 +23,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewDeleteBackupRequest creates a DeleteBackupRequest for the backup identified by name.
-func NewDeleteBackupRequest(name string) *v1.DeleteBackupRequest {
+// NewDeleteBackupRequest creates a DeleteBackupRequest for the backup identified by name and uid.
+func NewDeleteBackupRequest(name string, uid string) *v1.DeleteBackupRequest {
 	return &v1.DeleteBackupRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name + "-",
 			Labels: map[string]string{
 				v1.BackupNameLabel: name,
+				v1.BackupUIDLabel:  uid,
 			},
 		},
 		Spec: v1.DeleteBackupRequestSpec{
@@ -39,9 +40,9 @@ func NewDeleteBackupRequest(name string) *v1.DeleteBackupRequest {
 }
 
 // NewDeleteBackupRequestListOptions creates a ListOptions with a label selector configured to
-// find DeleteBackupRequests for the backup identified by name.
-func NewDeleteBackupRequestListOptions(name string) metav1.ListOptions {
+// find DeleteBackupRequests for the backup identified by name and uid.
+func NewDeleteBackupRequestListOptions(name, uid string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", v1.BackupNameLabel, name),
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", v1.BackupNameLabel, name, v1.BackupUIDLabel, uid),
 	}
 }

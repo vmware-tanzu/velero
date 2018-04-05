@@ -34,7 +34,10 @@ const (
 	// DeleteBackupRequestPhaseProcessed means the DeleteBackupRequest has been processed.
 	DeleteBackupRequestPhaseProcessed DeleteBackupRequestPhase = "Processed"
 
+	// BackupNameLabel is the label key used by a DeleteBackupRequest to identify its backup by name.
 	BackupNameLabel = "ark.heptio.com/backup-name"
+	// BackupUIDLabel is the label key used by a DeleteBackupRequest to identify its backup by uid.
+	BackupUIDLabel = "ark.heptio.com/backup-uid"
 )
 
 // DeleteBackupRequestStatus is the current status of a DeleteBackupRequest.

@@ -42,7 +42,7 @@ import (
 )
 
 func TestBackupDeletionControllerControllerHasUpdateFunc(t *testing.T) {
-	req := pkgbackup.NewDeleteBackupRequest("foo")
+	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	req.Namespace = "heptio-ark"
 	expected := kube.NamespaceAndName(req)
 
@@ -127,7 +127,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Already processed
-	req := pkgbackup.NewDeleteBackupRequest("foo")
+	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	req.Namespace = "foo"
 	req.Name = "foo-abcde"
 	req.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
@@ -179,7 +179,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
 	backupService := &arktest.BackupService{}
 	snapshotService := &arktest.FakeSnapshotService{SnapshotsTaken: sets.NewString()}
-	req := pkgbackup.NewDeleteBackupRequest("foo")
+	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 
 	data := &backupDeletionControllerTestData{
 		client:          client,
@@ -299,6 +299,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("full delete, no errors", func(t *testing.T) {
 		backup := arktest.NewTestBackup().WithName("foo").WithSnapshot("pv-1", "snap-1").Backup
+		backup.UID = "uid"
 
 		restore1 := arktest.NewTestRestore("heptio-ark", "restore-1", v1.RestorePhaseCompleted).WithBackup("foo").Restore
 		restore2 := arktest.NewTestRestore("heptio-ark", "restore-2", v1.RestorePhaseCompleted).WithBackup("foo").Restore
@@ -372,7 +373,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			core.NewDeleteCollectionAction(
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
-				pkgbackup.NewDeleteBackupRequestListOptions(td.req.Spec.BackupName),
+				pkgbackup.NewDeleteBackupRequestListOptions(td.req.Spec.BackupName, "uid"),
 			),
 		}
 

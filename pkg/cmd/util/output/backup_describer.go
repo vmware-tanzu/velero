@@ -34,11 +34,7 @@ func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest) 
 		if phase == "" {
 			phase = v1.BackupPhaseNew
 		}
-		d.Printf("Phase:\t%s", phase)
-		if count := failedDeletionCount(deleteRequests); count > 0 {
-			d.Printf(" (%d failed attempt(s))", count)
-		}
-		d.Println()
+		d.Printf("Phase:\t%s\n", phase)
 
 		d.Println()
 		DescribeBackupSpec(d, backup.Spec)
@@ -199,7 +195,11 @@ func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
 
 // DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
 func DescribeDeleteBackupRequests(d *Describer, requests []v1.DeleteBackupRequest) {
-	d.Printf("Deletion Attempts:\n")
+	d.Printf("Deletion Attempts")
+	if count := failedDeletionCount(requests); count > 0 {
+		d.Printf(" (%d failed)", count)
+	}
+	d.Println(":")
 
 	started := false
 	for _, req := range requests {
