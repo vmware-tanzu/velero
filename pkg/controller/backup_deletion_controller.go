@@ -133,6 +133,14 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		"backup":    req.Spec.BackupName,
 	})
 
+	if req.Spec.BackupName == "" {
+		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+			r.Status.Errors = []string{"spec.backupName is required"}
+		})
+		return err
+	}
+
 	var err error
 
 	// Update status to InProgress

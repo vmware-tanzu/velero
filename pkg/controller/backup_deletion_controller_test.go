@@ -207,6 +207,27 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 }
 
 func TestBackupDeletionControllerProcessRequest(t *testing.T) {
+	t.Run("missing spec.backupName", func(t *testing.T) {
+		td := setupBackupDeletionControllerTest()
+		defer td.backupService.AssertExpectations(t)
+
+		td.req.Spec.BackupName = ""
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"status":{"errors":["spec.backupName is required"],"phase":"Processed"}}`),
+			),
+		}
+
+		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
 	t.Run("patching to InProgress fails", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
 		defer td.backupService.AssertExpectations(t)
