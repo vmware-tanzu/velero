@@ -133,6 +133,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		"backup":    req.Spec.BackupName,
 	})
 
+	// Make sure we have the backup name
 	if req.Spec.BackupName == "" {
 		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
@@ -143,9 +144,13 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	var err error
 
-	// Update status to InProgress
+	// Update status to InProgress and set backup-name label if needed
 	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
+
+		if req.Labels[v1.BackupNameLabel] == "" {
+			req.Labels[v1.BackupNameLabel] = req.Spec.BackupName
+		}
 	})
 	if err != nil {
 		return err
@@ -164,6 +169,16 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 	if err != nil {
 		return errors.Wrap(err, "error getting Backup")
+	}
+
+	// Set backup-uid label if needed
+	if req.Labels[v1.BackupUIDLabel] == "" {
+		req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+			req.Labels[v1.BackupUIDLabel] = string(backup.UID)
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	// If the backup includes snapshots but we don't currently have a PVProvider, we don't

@@ -334,6 +334,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		defer td.backupService.AssertExpectations(t)
 
+		// Clear out req labels to make sure the controller adds them
+		td.req.Labels = make(map[string]string)
+
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, backup, nil
 		})
@@ -357,12 +360,18 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
-				[]byte(`{"status":{"phase":"InProgress"}}`),
+				[]byte(`{"metadata":{"labels":{"ark.heptio.com/backup-name":"foo"}},"status":{"phase":"InProgress"}}`),
 			),
 			core.NewGetAction(
 				v1.SchemeGroupVersion.WithResource("backups"),
 				td.req.Namespace,
 				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"metadata":{"labels":{"ark.heptio.com/backup-uid":"uid"}}}`),
 			),
 			core.NewPatchAction(
 				v1.SchemeGroupVersion.WithResource("backups"),
@@ -409,6 +418,19 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("missing expected action %#v", e)
+			}
+		}
+
+		for _, a := range td.client.Actions() {
+			found := false
+			for _, e := range expectedActions {
+				if reflect.DeepEqual(e, a) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("unexpected action %#v", a)
 			}
 		}
 
