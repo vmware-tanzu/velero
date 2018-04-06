@@ -22,10 +22,10 @@ import (
 	"time"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kapiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
@@ -167,10 +167,11 @@ func (e *defaultPodCommandExecutor) executePodCommand(log logrus.FieldLogger, it
 }
 
 func ensureContainerExists(pod map[string]interface{}, container string) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
+	containers, found := unstructured.NestedSlice(pod, "spec", "containers")
+	if !found {
+		return errors.New("unable to get spec.containers")
 	}
+
 	for _, obj := range containers {
 		c, ok := obj.(map[string]interface{})
 		if !ok {
@@ -189,9 +190,9 @@ func ensureContainerExists(pod map[string]interface{}, container string) error {
 }
 
 func setDefaultHookContainer(pod map[string]interface{}, hook *api.ExecHook) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
+	containers, found := unstructured.NestedSlice(pod, "spec", "containers")
+	if !found {
+		return errors.New("unable to get spec.containers")
 	}
 
 	if len(containers) < 1 {

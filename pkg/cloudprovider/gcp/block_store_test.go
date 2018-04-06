@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 
 	"github.com/stretchr/testify/assert"
@@ -71,8 +70,8 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "123abc")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
-	require.NoError(t, err)
+	actual, found := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "gcePersistentDisk", "pdName")
+	require.True(t, found)
 	assert.Equal(t, "123abc", actual)
 }
 

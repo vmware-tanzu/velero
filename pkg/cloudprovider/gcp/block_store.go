@@ -28,10 +28,10 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const projectKey = "project"
@@ -216,25 +216,28 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.gcePersistentDisk") {
+	disk, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
+	if !found {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
-	if err != nil {
-		return "", err
+	pdName, found := unstructured.NestedString(disk, "pdName")
+	if !found {
+		return "", errors.New("unable to get spec.gcePersistentDisk.pdName")
 	}
 
-	return volumeID, nil
+	return pdName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	gce, err := collections.GetMap(pv.UnstructuredContent(), "spec.gcePersistentDisk")
-	if err != nil {
-		return nil, err
+	_, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
+	if !found {
+		return nil, errors.New("unable to get spec.gcePersistentDisk")
 	}
 
-	gce["pdName"] = volumeID
+	if !unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "gcePersistentDisk", "pdName") {
+		return nil, errors.New("unable to set spec.gcePersistentDisk.pdName")
+	}
 
 	return pv, nil
 }

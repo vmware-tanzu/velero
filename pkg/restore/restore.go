@@ -689,13 +689,8 @@ func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructur
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, err
-	}
-
-	delete(spec, "claimRef")
-	delete(spec, "storageClassName")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "claimRef")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "storageClassName")
 
 	if boolptr.IsSetToFalse(ctx.backup.Spec.SnapshotVolumes) {
 		// The backup had snapshots disabled, so we can return early
@@ -760,18 +755,15 @@ func objectsAreEqual(fromCluster, fromBackup *unstructured.Unstructured) (bool, 
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
-	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
-	if err != nil {
-		return false
-	}
+	phase, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 
 	return phase == string(v1.VolumeAvailable)
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, err
+	metadata, found := unstructured.NestedMap(obj.UnstructuredContent(), "metadata")
+	if !found {
+		return nil, errors.New("unable to find metadata")
 	}
 
 	for k := range metadata {
@@ -780,6 +772,10 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 		default:
 			delete(metadata, k)
 		}
+	}
+
+	if !unstructured.SetNestedField(obj.UnstructuredContent(), metadata, "metadata") {
+		return nil, errors.New("unable to set metadata")
 	}
 
 	// this should never be backed up anyway, but remove it just

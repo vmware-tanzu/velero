@@ -19,12 +19,13 @@ package restore
 import (
 	"regexp"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type podAction struct {
@@ -48,21 +49,26 @@ var (
 )
 
 func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	a.logger.Debug("getting spec")
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, nil, err
+	a.logger.Debug("deleting spec.NodeName")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "nodeName")
+
+	var newVolumes []interface{}
+
+	a.logger.Debug("iterating over volumes")
+	volumes, found := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "volumes")
+	if !found {
+		return nil, nil, errors.New("unable to get spec.volumes")
 	}
 
-	a.logger.Debug("deleting spec.NodeName")
-	delete(spec, "nodeName")
+	for _, volume := range volumes {
+		volumeMap, ok := volume.(map[string]interface{})
+		if !ok {
+			return nil, nil, errors.New("unable to convert volume to a map[string]interface{}")
+		}
 
-	newVolumes := make([]interface{}, 0)
-	a.logger.Debug("iterating over volumes")
-	err = collections.ForEach(spec, "volumes", func(volume map[string]interface{}) error {
-		name, err := collections.GetString(volume, "name")
-		if err != nil {
-			return err
+		name, found := unstructured.NestedString(volumeMap, "name")
+		if !found {
+			return nil, nil, errors.New("unable to get volume name")
 		}
 
 		a.logger.WithField("volumeName", name).Debug("Checking volume")
@@ -72,46 +78,51 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		} else {
 			a.logger.WithField("volumeName", name).Debug("Excluding volume")
 		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
 	}
 
 	a.logger.Debug("Setting spec.volumes")
-	spec["volumes"] = newVolumes
+	unstructured.SetNestedField(obj.UnstructuredContent(), newVolumes, "spec", "volumes")
 
 	a.logger.Debug("iterating over containers")
-	err = collections.ForEach(spec, "containers", func(container map[string]interface{}) error {
+	containers, found := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "containers")
+	if !found {
+		return nil, nil, errors.New("unable to get spec.containers")
+	}
+	for _, container := range containers {
+		containerMap, ok := container.(map[string]interface{})
+		if !ok {
+			return nil, nil, errors.New("unable to convert container to a map[string]interface{}")
+		}
+
 		var newVolumeMounts []interface{}
-		err := collections.ForEach(container, "volumeMounts", func(volumeMount map[string]interface{}) error {
-			name, err := collections.GetString(volumeMount, "name")
-			if err != nil {
-				return err
+		volumeMounts, found := unstructured.NestedSlice(containerMap, "volumeMounts")
+		if !found {
+			return nil, nil, errors.New("unable to get volume mounts")
+		}
+		for _, volumeMount := range volumeMounts {
+			volumeMountMap, ok := volumeMount.(map[string]interface{})
+			if !ok {
+				return nil, nil, errors.New("unable to convert volume mount to a map[string]interface{}")
+			}
+
+			name, found := unstructured.NestedString(volumeMountMap, "name")
+			if !found {
+				return nil, nil, errors.New("unable to get volume mount name")
 			}
 
 			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
 			if !defaultTokenRegex.MatchString(name) {
 				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
-				newVolumeMounts = append(newVolumeMounts, volumeMount)
+				newVolumeMounts = append(newVolumeMounts, volumeMountMap)
 			} else {
 				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
 			}
-
-			return nil
-		})
-		if err != nil {
-			return err
 		}
 
-		container["volumeMounts"] = newVolumeMounts
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
+		unstructured.SetNestedField(containerMap, newVolumeMounts, "volumeMounts")
 	}
+
+	unstructured.SetNestedField(obj.UnstructuredContent(), containers, "spec", "containers")
 
 	return obj, nil, nil
 }

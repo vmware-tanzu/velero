@@ -19,10 +19,10 @@ package restore
 import (
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type jobAction struct {
@@ -42,20 +42,8 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	fieldDeletions := map[string]string{
-		"spec.selector.matchLabels":     "controller-uid",
-		"spec.template.metadata.labels": "controller-uid",
-	}
-
-	for k, v := range fieldDeletions {
-		a.logger.Debugf("Getting %s", k)
-		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
-		if err != nil {
-			a.logger.WithError(err).Debugf("Unable to get %s", k)
-		} else {
-			delete(labels, v)
-		}
-	}
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "selector", "matchLabels", "controller-uid")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "template", "metadata", "labels", "controller-uid")
 
 	return obj, nil, nil
 }

@@ -31,10 +31,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const (
@@ -345,26 +345,34 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
+	azureDisk, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if !found {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.azureDisk.diskName")
-	if err != nil {
-		return "", err
+	diskName, found := unstructured.NestedString(azureDisk, "diskName")
+	if !found {
+		return "", errors.New("unable to get spec.azureDisk.diskName")
 	}
 
-	return volumeID, nil
+	return diskName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
-	if err != nil {
-		return nil, err
+	_, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if !found {
+		return nil, errors.New("unable to get spec.azureDisk")
 	}
 
-	azure["diskName"] = volumeID
-	azure["diskURI"] = getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	if !unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "azureDisk", "diskName") {
+		return nil, errors.New("unable to set spec.azureDisk.diskName")
+	}
+
+	diskURI := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+
+	if !unstructured.SetNestedField(pv.UnstructuredContent(), diskURI, "spec", "azureDisk", "diskURI") {
+		return nil, errors.New("unable to set spec.azureDisk.diskName")
+	}
 
 	return pv, nil
 }

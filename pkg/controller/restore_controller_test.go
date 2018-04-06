@@ -28,6 +28,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -36,7 +37,6 @@ import (
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -302,9 +302,10 @@ func TestProcessRestore(t *testing.T) {
 						return false, nil, err
 					}
 
-					phase, err := collections.GetString(patchMap, "status.phase")
-					if err != nil {
-						t.Logf("error getting status.phase: %s\n", err)
+					phase, found := unstructured.NestedString(patchMap, "status", "phase")
+					if !found {
+						err := errors.New("unable to get status.phase")
+						t.Log(err.Error())
 						return false, nil, err
 					}
 
@@ -382,11 +383,11 @@ func TestProcessRestore(t *testing.T) {
 
 			expectedStatusKeys := 1
 
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
+			assert.True(t, hasKeyAndVal(patch, test.expectedPhase, "status", "phase"), "patch's status.phase does not match")
 
 			if len(test.expectedValidationErrors) > 0 {
-				errs, err := collections.GetSlice(patch, "status.validationErrors")
-				require.NoError(t, err, "error getting patch's status.validationErrors")
+				errs, found := unstructured.NestedSlice(patch, "status", "validationErrors")
+				require.True(t, found, "error getting patch's status.validationErrors")
 
 				var errStrings []string
 				for _, err := range errs {
@@ -398,7 +399,7 @@ func TestProcessRestore(t *testing.T) {
 				expectedStatusKeys++
 			}
 
-			res, _ := collections.GetMap(patch, "status")
+			res, _ := unstructured.NestedMap(patch, "status")
 			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
 			// if we don't expect a restore, validate it wasn't called and exit the test
@@ -417,13 +418,13 @@ func TestProcessRestore(t *testing.T) {
 
 			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
 
-			res, _ = collections.GetMap(patch, "status")
+			res, _ = unstructured.NestedMap(patch, "status")
 			expectedStatusKeys = 1
 
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(api.RestorePhaseCompleted)), "patch's status.phase does not match")
+			assert.True(t, hasKeyAndVal(patch, string(api.RestorePhaseCompleted), "status", "phase"), "patch's status.phase does not match")
 
 			if test.expectedRestoreErrors != 0 {
-				assert.True(t, collections.HasKeyAndVal(patch, "status.errors", float64(test.expectedRestoreErrors)), "patch's status.errors does not match")
+				assert.True(t, hasKeyAndVal(patch, float64(test.expectedRestoreErrors), "status", "errors"), "patch's status.errors does not match")
 				expectedStatusKeys++
 			}
 

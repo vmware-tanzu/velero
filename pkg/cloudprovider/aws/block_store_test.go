@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -82,8 +81,8 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
-	require.NoError(t, err)
+	actual, found := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "awsElasticBlockStore", "volumeID")
+	require.True(t, found)
 	assert.Equal(t, "vol-updated", actual)
 }
 

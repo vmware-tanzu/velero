@@ -19,11 +19,11 @@ package backup
 import (
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
@@ -51,13 +51,12 @@ func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (
 
 	var additionalItems []ResourceIdentifier
 
-	pvc := item.UnstructuredContent()
+	volumeName, found := unstructured.NestedString(item.UnstructuredContent(), "spec", "volumeName")
 
-	volumeName, err := collections.GetString(pvc, "spec.volumeName")
 	// if there's no volume name, it's not an error, since it's possible
 	// for the PVC not be bound; don't return an additional PV item to
 	// back up.
-	if err != nil || volumeName == "" {
+	if !found || volumeName == "" {
 		a.log.Info("No spec.volumeName found for PersistentVolumeClaim")
 		return nil, nil, nil
 	}
