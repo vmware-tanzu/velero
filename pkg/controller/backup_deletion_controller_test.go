@@ -64,6 +64,7 @@ func TestBackupDeletionControllerControllerHasUpdateFunc(t *testing.T) {
 		"bucket",
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
+		NewBackupTracker(),
 	).(*backupDeletionController)
 
 	// disable resync handler since we don't want to test it here
@@ -116,6 +117,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		"bucket",
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
+		NewBackupTracker(),
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -196,6 +198,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			"bucket",
 			sharedInformers.Ark().V1().Restores(),
 			client.ArkV1(), // restoreClient
+			NewBackupTracker(),
 		).(*backupDeletionController),
 
 		req: req,
@@ -222,6 +225,27 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				td.req.Namespace,
 				td.req.Name,
 				[]byte(`{"status":{"errors":["spec.backupName is required"],"phase":"Processed"}}`),
+			),
+		}
+
+		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
+	t.Run("deleting an in progress backup isn't allowed", func(t *testing.T) {
+		td := setupBackupDeletionControllerTest()
+		defer td.backupService.AssertExpectations(t)
+
+		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"status":{"errors":["backup is still in progress"],"phase":"Processed"}}`),
 			),
 		}
 
@@ -562,6 +586,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				"bucket",
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(), // restoreClient
+				NewBackupTracker(),
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}

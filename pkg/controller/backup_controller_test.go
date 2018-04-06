@@ -167,6 +167,7 @@ func TestProcessBackup(t *testing.T) {
 				test.allowSnapshots,
 				logger,
 				pluginManager,
+				NewBackupTracker(),
 			).(*backupController)
 			c.clock = clock.NewFakeClock(time.Now())
 

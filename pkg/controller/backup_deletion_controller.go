@@ -49,6 +49,7 @@ type backupDeletionController struct {
 	bucket                    string
 	restoreLister             listers.RestoreLister
 	restoreClient             arkv1client.RestoresGetter
+	backupTracker             BackupTracker
 
 	processRequestFunc func(*v1.DeleteBackupRequest) error
 	clock              clock.Clock
@@ -65,6 +66,7 @@ func NewBackupDeletionController(
 	bucket string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
+	backupTracker BackupTracker,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -76,6 +78,7 @@ func NewBackupDeletionController(
 		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
+		backupTracker:             backupTracker,
 		clock:                     &clock.RealClock{},
 	}
 
@@ -133,16 +136,26 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		"backup":    req.Spec.BackupName,
 	})
 
+	var err error
+
 	// Make sure we have the backup name
 	if req.Spec.BackupName == "" {
-		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+		_, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = []string{"spec.backupName is required"}
 		})
 		return err
 	}
 
-	var err error
+	// Don't allow deleting an in-progress backup
+	if c.backupTracker.Contains(req.Namespace, req.Spec.BackupName) {
+		_, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+			r.Status.Errors = []string{"backup is still in progress"}
+		})
+
+		return err
+	}
 
 	// Update status to InProgress and set backup-name label if needed
 	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {

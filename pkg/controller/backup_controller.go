@@ -66,6 +66,7 @@ type backupController struct {
 	clock            clock.Clock
 	logger           logrus.FieldLogger
 	pluginManager    plugin.Manager
+	backupTracker    BackupTracker
 }
 
 func NewBackupController(
@@ -77,6 +78,7 @@ func NewBackupController(
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	pluginManager plugin.Manager,
+	backupTracker BackupTracker,
 ) Interface {
 	c := &backupController{
 		backupper:        backupper,
@@ -90,6 +92,7 @@ func NewBackupController(
 		clock:            &clock.RealClock{},
 		logger:           logger,
 		pluginManager:    pluginManager,
+		backupTracker:    backupTracker,
 	}
 
 	c.syncHandler = c.processBackup
@@ -260,6 +263,9 @@ func (controller *backupController) processBackup(key string) error {
 	if backup.Status.Phase == api.BackupPhaseFailedValidation {
 		return nil
 	}
+
+	controller.backupTracker.Add(backup.Namespace, backup.Name)
+	defer controller.backupTracker.Delete(backup.Namespace, backup.Name)
 
 	logContext.Debug("Running backup")
 	// execution & upload of backup

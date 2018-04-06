@@ -476,6 +476,8 @@ func (s *server) runControllers(config *api.Config) error {
 	if config.RestoreOnlyMode {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 	} else {
+		backupTracker := controller.NewBackupTracker()
+
 		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService, s.kubeClientConfig, s.kubeClient.CoreV1())
 		cmd.CheckError(err)
 		backupController := controller.NewBackupController(
@@ -487,6 +489,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.snapshotService != nil,
 			s.logger,
 			s.pluginManager,
+			backupTracker,
 		)
 		wg.Add(1)
 		go func() {
@@ -530,6 +533,7 @@ func (s *server) runControllers(config *api.Config) error {
 			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
+			backupTracker,
 		)
 		wg.Add(1)
 		go func() {
