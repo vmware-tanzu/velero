@@ -64,7 +64,7 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
 1. Check to see that both the Ark and nginx deployments are successfully created:
 
     ```
-    kubectl get deployments -l component=ark --namespace=heptio-ark-server
+    kubectl get deployments -l component=ark --namespace=heptio-ark
     kubectl get deployments --namespace=nginx-example
     ```
 
@@ -137,19 +137,26 @@ For more information, see [the debugging information][18].
 
 ### Clean up
 
-Delete any backups you created:
+If you want to delete any backups you created, including data in object storage and persistent
+volume snapshots, you can run:
 
 ```
-kubectl delete -n heptio-ark backup --all
+ark backup delete BACKUP_NAME
 ```
 
-Before you continue, wait for the following to show no backups:
+This asks the Ark server to delete all backup data associated with `BACKUP_NAME`.  You need to do
+this for each backup you want to permanently delete. A future version of Ark will allow you to
+delete multiple backups by name or label selector.
+
+Once fully removed, the backup is no longer visible when you run:
 
 ```
-ark backup get
+ark backup get BACKUP_NAME
 ```
 
-To remove the Kubernetes objects for this example from your cluster, run:
+If you want to uninstall Ark but preserve the backup data in object storage and persistent volume
+snapshots, it is safe to remove the `heptio-ark` namespace and everything else created for this
+example:
 
 ```
 kubectl delete -f examples/common/

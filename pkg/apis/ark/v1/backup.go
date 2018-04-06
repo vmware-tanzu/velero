@@ -143,9 +143,12 @@ const (
 	// errors.
 	BackupPhaseCompleted BackupPhase = "Completed"
 
-	// BackupPhaseFailed mean the backup ran but encountered an error that
+	// BackupPhaseFailed means the backup ran but encountered an error that
 	// prevented it from completing successfully.
 	BackupPhaseFailed BackupPhase = "Failed"
+
+	// BackupPhaseDeleting means the backup and all its associated data are being deleted.
+	BackupPhaseDeleting BackupPhase = "Deleting"
 )
 
 // BackupStatus captures the current status of an Ark backup.

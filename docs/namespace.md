@@ -7,14 +7,14 @@ you run Ark client commands.
 ## Edit the example files
 
 The Ark repository includes [a set of examples][0] that you can use to set up your Ark server. The
-examples place the server in the `heptio-ark-server` namespace, and backup/schedule/restore/config
-data in the `heptio-ark` namespace.
+examples place the server and backup/schedule/restore/config data in the `heptio-ark` namespace.
 
-To run the server in another namespace, you edit the relevant files, changing `heptio-ark-server` to
+To run the server in another namespace, you edit the relevant files, changing `heptio-ark` to
 your desired namespace.
 
 To store your backups, schedules, restores, and config in another namespace, you edit the relevant
-files, changing `heptio-ark` to your desired namespace.
+files, changing `heptio-ark` to your desired namespace. You also need to create the
+`cloud-credentials` secret in your desired namespace.
 
 WARNING: It is recommended to run the Ark server in one namespace, and place your backups, schedules,
 restores, and config in a different namespace. You might encounter issues with deleting a single Ark

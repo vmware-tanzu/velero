@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 #
 # Copyright 2017 the Heptio Ark contributors.
 #
@@ -14,13 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HACK_DIR=$(dirname "${BASH_SOURCE}")
-REPO_ROOT=${HACK_DIR}/..
+set -o errexit
+set -o nounset
+set -o pipefail
+set -o xtrace
 
-${REPO_ROOT}/vendor/k8s.io/code-generator/generate-groups.sh \
+if [[ -z "${GOPATH}" ]]; then
+  GOPATH=~/go
+fi
+
+if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
+  echo "k8s.io/code-generator missing from GOPATH"
+  exit 1
+fi
+
+cd ${GOPATH}/src/k8s.io/code-generator
+
+./generate-groups.sh \
   all \
   github.com/heptio/ark/pkg/generated \
   github.com/heptio/ark/pkg/apis \
   ark:v1 \
-  --go-header-file hack/boilerplate.go.txt \
+  --go-header-file ${GOPATH}/src/github.com/heptio/ark/hack/boilerplate.go.txt \
   $@

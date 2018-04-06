@@ -18,7 +18,9 @@ package backup
 
 import (
 	"fmt"
+	"os"
 
+	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -53,7 +55,13 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 			first := true
 			for _, backup := range backups.Items {
-				s := output.DescribeBackup(&backup)
+				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
+				deleteRequestList, err := arkClient.ArkV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
+				}
+
+				s := output.DescribeBackup(&backup, deleteRequestList.Items)
 				if first {
 					first = false
 					fmt.Print(s)
