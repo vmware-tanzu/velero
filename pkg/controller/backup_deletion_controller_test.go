@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -431,32 +430,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			),
 		}
 
-		assert.Len(t, td.client.Actions(), len(expectedActions))
-		for _, e := range expectedActions {
-			found := false
-			for _, a := range td.client.Actions() {
-				if reflect.DeepEqual(e, a) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("missing expected action %#v", e)
-			}
-		}
-
-		for _, a := range td.client.Actions() {
-			found := false
-			for _, e := range expectedActions {
-				if reflect.DeepEqual(e, a) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("unexpected action %#v", a)
-			}
-		}
+		arktest.CompareActions(t, expectedActions, td.client.Actions())
 
 		// Make sure snapshot was deleted
 		assert.Equal(t, 0, td.snapshotService.SnapshotsTaken.Len())
@@ -604,8 +578,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				expectedActions = append(expectedActions, core.NewDeleteAction(v1.SchemeGroupVersion.WithResource("deletebackuprequests"), "ns", name))
 			}
 
-			assert.Equal(t, expectedActions, client.Actions())
+			arktest.CompareActions(t, expectedActions, client.Actions())
 		})
-
 	}
 }
