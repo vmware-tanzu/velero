@@ -43,3 +43,5 @@ spec:
       volumes:
         - name: plugins
           emptyDir: {}
+      nodeSelector:
+        beta.kubernetes.io/os: linux
