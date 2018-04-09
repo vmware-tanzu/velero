@@ -17,10 +17,13 @@ limitations under the License.
 package test
 
 import (
+	"bytes"
+	"encoding/json"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	core "k8s.io/client-go/testing"
 )
@@ -58,4 +61,21 @@ func CompareActions(t *testing.T, expected, actual []core.Action) {
 			t.Errorf("unexpected action %#v", a)
 		}
 	}
+}
+
+// ValidatePatch tests the validity of an action. It checks
+// that the action is a PatchAction, that the patch decodes from JSON
+// with the provided decode func and has no extraneous fields, and that
+// the decoded patch matches the expected.
+func ValidatePatch(t *testing.T, action core.Action, expected interface{}, decodeFunc func(*json.Decoder) (interface{}, error)) {
+	patchAction, ok := action.(core.PatchAction)
+	require.True(t, ok, "action is not a PatchAction")
+
+	decoder := json.NewDecoder(bytes.NewReader(patchAction.GetPatch()))
+	decoder.DisallowUnknownFields()
+
+	actual, err := decodeFunc(decoder)
+	require.NoError(t, err)
+
+	assert.Equal(t, expected, actual)
 }

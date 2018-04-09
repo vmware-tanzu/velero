@@ -181,7 +181,7 @@ func TestProcessRestore(t *testing.T) {
 
 		{
 			name:                        "restore with non-existent backup name fails",
-			restore:                     arktest.NewTestRestore("foo", "bar", api.RestorePhaseNew).WithBackup("backup-1").WithIncludedNamespace("ns-1").Restore,
+			restore:                     NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
 			expectedErr:                 false,
 			expectedPhase:               string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors:    []string{"Error retrieving backup: no backup here"},
@@ -371,35 +371,35 @@ func TestProcessRestore(t *testing.T) {
 				return
 			}
 
+			// structs and func for decoding patch content
+			type StatusPatch struct {
+				Phase            api.RestorePhase `json:"phase"`
+				ValidationErrors []string         `json:"validationErrors"`
+				Errors           int              `json:"errors"`
+			}
+
+			type Patch struct {
+				Status StatusPatch `json:"status"`
+			}
+
+			decode := func(decoder *json.Decoder) (interface{}, error) {
+				actual := new(Patch)
+				err := decoder.Decode(actual)
+
+				return *actual, err
+			}
+
 			// validate Patch call 1 (setting phase, validation errs)
 			require.True(t, len(actions) > 0, "len(actions) is too small")
 
-			patchAction, ok := actions[0].(core.PatchAction)
-			require.True(t, ok, "action is not a PatchAction")
-
-			patch := make(map[string]interface{})
-			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-			expectedStatusKeys := 1
-
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
-
-			if len(test.expectedValidationErrors) > 0 {
-				errs, err := collections.GetSlice(patch, "status.validationErrors")
-				require.NoError(t, err, "error getting patch's status.validationErrors")
-
-				var errStrings []string
-				for _, err := range errs {
-					errStrings = append(errStrings, err.(string))
-				}
-
-				assert.Equal(t, test.expectedValidationErrors, errStrings, "patch's status.validationErrors does not match")
-
-				expectedStatusKeys++
+			expected := Patch{
+				Status: StatusPatch{
+					Phase:            api.RestorePhase(test.expectedPhase),
+					ValidationErrors: test.expectedValidationErrors,
+				},
 			}
 
-			res, _ := collections.GetMap(patch, "status")
-			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+			arktest.ValidatePatch(t, actions[0], expected, decode)
 
 			// if we don't expect a restore, validate it wasn't called and exit the test
 			if test.expectedRestorerCall == nil {
@@ -410,24 +410,15 @@ func TestProcessRestore(t *testing.T) {
 			assert.Equal(t, 1, len(restorer.Calls))
 
 			// validate Patch call 2 (setting phase)
-			patchAction, ok = actions[1].(core.PatchAction)
-			require.True(t, ok, "action is not a PatchAction")
 
-			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
-
-			res, _ = collections.GetMap(patch, "status")
-			expectedStatusKeys = 1
-
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(api.RestorePhaseCompleted)), "patch's status.phase does not match")
-
-			if test.expectedRestoreErrors != 0 {
-				assert.True(t, collections.HasKeyAndVal(patch, "status.errors", float64(test.expectedRestoreErrors)), "patch's status.errors does not match")
-				expectedStatusKeys++
+			expected = Patch{
+				Status: StatusPatch{
+					Phase:  api.RestorePhaseCompleted,
+					Errors: test.expectedRestoreErrors,
+				},
 			}
 
-			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has wrong number of keys")
+			arktest.ValidatePatch(t, actions[1], expected, decode)
 
 			// explicitly capturing the argument passed to Restore myself because
 			// I want to validate the called arg as of the time of calling, but
@@ -449,7 +440,7 @@ func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.R
 	}
 
 	for _, n := range nonRestorableResources {
-		restore.WithExcludedResource(n)
+		restore = restore.WithExcludedResource(n)
 	}
 
 	return restore

@@ -25,12 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	core "k8s.io/client-go/testing"
+	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -109,6 +108,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 				restoresInformer         = sharedInformers.Ark().V1().Restores()
 				backupService            = &arktest.BackupService{}
 				logger                   = arktest.NewLogger()
+				clockTime, _             = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
 			)
 			defer backupService.AssertExpectations(t)
 
@@ -120,6 +120,8 @@ func TestProcessDownloadRequest(t *testing.T) {
 				"bucket",
 				logger,
 			).(*downloadRequestController)
+
+			c.clock = clock.NewFakeClock(clockTime)
 
 			var downloadRequest *v1.DownloadRequest
 
@@ -168,26 +170,33 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 			// otherwise, we should get exactly 1 patch
 			require.Equal(t, 1, len(actions))
-			patchAction, ok := actions[0].(core.PatchAction)
-			require.True(t, ok, "action is not a PatchAction")
 
-			patch := make(map[string]interface{})
-			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
+			type PatchStatus struct {
+				DownloadURL string                  `json:"downloadURL"`
+				Phase       v1.DownloadRequestPhase `json:"phase"`
+				Expiration  time.Time               `json:"expiration"`
+			}
 
-			// check the URL
-			assert.True(t, collections.HasKeyAndVal(patch, "status.downloadURL", tc.expectedURL), "patch's status.downloadURL does not match")
+			type Patch struct {
+				Status PatchStatus `json:"status"`
+			}
 
-			// check the Phase
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(tc.expectedPhase)), "patch's status.phase does not match")
+			decode := func(decoder *json.Decoder) (interface{}, error) {
+				actual := new(Patch)
+				err := decoder.Decode(actual)
 
-			// check that Expiration exists
-			// TODO pass a fake clock to the controller and verify
-			// the expiration value
-			assert.True(t, collections.Exists(patch, "status.expiration"), "patch's status.expiration does not exist")
+				return *actual, err
+			}
 
-			// we expect 3 total updates.
-			res, _ := collections.GetMap(patch, "status")
-			assert.Equal(t, 3, len(res), "patch's status has the wrong number of keys")
+			expected := Patch{
+				Status: PatchStatus{
+					DownloadURL: tc.expectedURL,
+					Phase:       tc.expectedPhase,
+					Expiration:  clockTime.Add(signedURLTTL),
+				},
+			}
+
+			arktest.ValidatePatch(t, actions[0], expected, decode)
 		})
 	}
 }
