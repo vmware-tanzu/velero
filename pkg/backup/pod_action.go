@@ -54,7 +54,10 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	a.log.Info("Executing podAction")
 	defer a.log.Info("Done executing podAction")
 
-	volumes, found := unstructured.NestedSlice(item.UnstructuredContent(), "spec", "volumes")
+	volumes, found, err := unstructured.NestedSlice(item.UnstructuredContent(), "spec", "volumes")
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
 	if !found {
 		a.log.Info("pod has no volumes")
 		return item, nil, nil
@@ -77,7 +80,10 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 			continue
 		}
 
-		claimName, found := unstructured.NestedString(volume, "persistentVolumeClaim", "claimName")
+		claimName, found, err := unstructured.NestedString(volume, "persistentVolumeClaim", "claimName")
+		if err != nil {
+			errs = append(errs, errors.WithStack(err))
+		}
 		if !found {
 			continue
 		}

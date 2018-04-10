@@ -70,10 +70,12 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "updated")
 	require.NoError(t, err)
-	actual, found := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	actual, found, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	require.Nil(t, err)
 	require.True(t, found)
 	assert.Equal(t, "updated", actual)
-	actual, found = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
+	require.Nil(t, err)
 	require.True(t, found)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", actual)
 
@@ -81,11 +83,13 @@ func TestSetVolumeID(t *testing.T) {
 	azure["diskURI"] = "/foo/bar/updated/blarg"
 	updatedPV, err = b.SetVolumeID(pv, "revised")
 	require.NoError(t, err)
-	actual, found = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	require.Nil(t, err)
 	require.True(t, found)
 	assert.Equal(t, "revised", actual)
-	actual, found = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
 	require.True(t, found)
+	require.Nil(t, err)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", actual)
 }
 

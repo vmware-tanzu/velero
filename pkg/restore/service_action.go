@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 type serviceAction struct {
@@ -44,13 +45,13 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 
 func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
 	// Since clusterIP is an optional key, we can ignore 'not found' errors.
-	if val, _ := unstructured.NestedString(obj.UnstructuredContent(), "spec", "clusterIP"); val != "None" {
+	if val, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "spec", "clusterIP"); val != "None" {
 		unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "clusterIP")
 	}
 
-	ports, found := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "ports")
-	if !found {
-		return nil, nil, errors.New("unable to find spec.ports")
+	ports, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "ports")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to find spec.ports"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	for _, port := range ports {
@@ -58,8 +59,8 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		delete(p, "nodePort")
 	}
 
-	if !unstructured.SetNestedSlice(obj.UnstructuredContent(), ports, "spec", "ports") {
-		return nil, nil, errors.New("unable to set spec.ports")
+	if err := unstructured.SetNestedSlice(obj.UnstructuredContent(), ports, "spec", "ports"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	return obj, nil, nil

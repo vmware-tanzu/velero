@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 const (
@@ -345,33 +346,33 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	azureDisk, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
-	if !found {
-		return "", nil
+	azureDisk, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if err != nil || !found {
+		return "", errors.WithStack(err)
 	}
 
-	diskName, found := unstructured.NestedString(azureDisk, "diskName")
-	if !found {
-		return "", errors.New("unable to get spec.azureDisk.diskName")
+	diskName, found, err := unstructured.NestedString(azureDisk, "diskName")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.azureDisk.diskName"); err != nil {
+		return "", errors.WithStack(err)
 	}
 
 	return diskName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	_, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
-	if !found {
-		return nil, errors.New("unable to get spec.azureDisk")
+	_, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.azureDisk"); err != nil {
+		return nil, err
 	}
 
-	if !unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "azureDisk", "diskName") {
-		return nil, errors.New("unable to set spec.azureDisk.diskName")
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "azureDisk", "diskName"); err != nil {
+		return nil, errors.Wrap(err, "unable to set spec.azureDisk.diskName")
 	}
 
 	diskURI := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
 
-	if !unstructured.SetNestedField(pv.UnstructuredContent(), diskURI, "spec", "azureDisk", "diskURI") {
-		return nil, errors.New("unable to set spec.azureDisk.diskName")
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), diskURI, "spec", "azureDisk", "diskURI"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	return pv, nil

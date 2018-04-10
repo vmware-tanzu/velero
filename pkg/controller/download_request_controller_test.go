@@ -183,11 +183,14 @@ func TestProcessDownloadRequest(t *testing.T) {
 			// check that Expiration exists
 			// TODO pass a fake clock to the controller and verify
 			// the expiration value
-			_, found := unstructured.NestedString(patch, "status", "expiration")
+			_, found, err := unstructured.NestedString(patch, "status", "expiration")
+			assert.Nil(t, err)
 			assert.True(t, found, "patch's status.expiration does not exist")
 
 			// we expect 3 total updates.
-			res, _ := unstructured.NestedMap(patch, "status")
+			res, found, err := unstructured.NestedMap(patch, "status")
+			assert.Nil(t, err)
+			assert.True(t, found)
 			assert.Equal(t, 3, len(res), "patch's status has the wrong number of keys")
 		})
 	}

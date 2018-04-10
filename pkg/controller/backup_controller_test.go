@@ -22,12 +22,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/heptio/ark/pkg/util/errcheck"
+
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -214,9 +215,8 @@ func TestProcessBackup(t *testing.T) {
 					return false, nil, err
 				}
 
-				phase, found := unstructured.NestedString(patchMap, "status", "phase")
-				if !found {
-					err := errors.New("unable to get status.phase")
+				phase, found, err := unstructured.NestedString(patchMap, "status", "phase")
+				if err := errcheck.ErrOrNotFound(found, err, "unable to get status.phase"); err != nil {
 					t.Log(err.Error())
 					return false, nil, err
 				}
@@ -269,7 +269,9 @@ func TestProcessBackup(t *testing.T) {
 			assert.True(t, hasKeyAndVal(patch, float64(1), "status", "version"))
 			assert.True(t, hasKeyAndVal(patch, string(v1.BackupPhaseInProgress), "status", "phase"), "patch's status.phase does not match")
 
-			res, _ := unstructured.NestedMap(patch, "status")
+			res, found, err := unstructured.NestedMap(patch, "status")
+			assert.Nil(t, err)
+			assert.True(t, found)
 			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
 			// validate Patch call 2 (setting phase)
@@ -281,7 +283,9 @@ func TestProcessBackup(t *testing.T) {
 
 			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
 
-			res, _ = unstructured.NestedMap(patch, "status")
+			res, found, err = unstructured.NestedMap(patch, "status")
+			assert.Nil(t, err)
+			assert.True(t, found)
 			assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
 			assert.True(t, hasKeyAndVal(patch, string(v1.BackupPhaseCompleted), "status", "phase"), "patch's status.phase does not match")
 		})
@@ -289,7 +293,7 @@ func TestProcessBackup(t *testing.T) {
 }
 
 func hasKeyAndVal(obj map[string]interface{}, val interface{}, fields ...string) bool {
-	actual, found := unstructured.NestedFieldCopy(obj, fields...)
+	actual, found, _ := unstructured.NestedFieldCopy(obj, fields...)
 
 	return found && actual == val
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 type podAction struct {
@@ -55,9 +56,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 	var newVolumes []interface{}
 
 	a.logger.Debug("iterating over volumes")
-	volumes, found := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "volumes")
-	if !found {
-		return nil, nil, errors.New("unable to get spec.volumes")
+	volumes, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "volumes")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.volumes"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	for _, volume := range volumes {
@@ -66,9 +67,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 			return nil, nil, errors.New("unable to convert volume to a map[string]interface{}")
 		}
 
-		name, found := unstructured.NestedString(volumeMap, "name")
-		if !found {
-			return nil, nil, errors.New("unable to get volume name")
+		name, found, err := unstructured.NestedString(volumeMap, "name")
+		if err := errcheck.ErrOrNotFound(found, err, "unable to get volume name"); err != nil {
+			return nil, nil, errors.WithStack(err)
 		}
 
 		a.logger.WithField("volumeName", name).Debug("Checking volume")
@@ -84,9 +85,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 	unstructured.SetNestedField(obj.UnstructuredContent(), newVolumes, "spec", "volumes")
 
 	a.logger.Debug("iterating over containers")
-	containers, found := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "containers")
-	if !found {
-		return nil, nil, errors.New("unable to get spec.containers")
+	containers, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "containers")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.containers"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 	for _, container := range containers {
 		containerMap, ok := container.(map[string]interface{})
@@ -95,9 +96,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		}
 
 		var newVolumeMounts []interface{}
-		volumeMounts, found := unstructured.NestedSlice(containerMap, "volumeMounts")
-		if !found {
-			return nil, nil, errors.New("unable to get volume mounts")
+		volumeMounts, found, err := unstructured.NestedSlice(containerMap, "volumeMounts")
+		if err := errcheck.ErrOrNotFound(found, err, "unable to get volume mounts"); err != nil {
+			return nil, nil, errors.WithStack(err)
 		}
 		for _, volumeMount := range volumeMounts {
 			volumeMountMap, ok := volumeMount.(map[string]interface{})
@@ -105,9 +106,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 				return nil, nil, errors.New("unable to convert volume mount to a map[string]interface{}")
 			}
 
-			name, found := unstructured.NestedString(volumeMountMap, "name")
-			if !found {
-				return nil, nil, errors.New("unable to get volume mount name")
+			name, found, err := unstructured.NestedString(volumeMountMap, "name")
+			if err := errcheck.ErrOrNotFound(found, err, "unable to get volume mount name"); err != nil {
+				return nil, nil, errors.WithStack(err)
 			}
 
 			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")

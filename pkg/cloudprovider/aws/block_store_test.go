@@ -81,7 +81,8 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
 	require.NoError(t, err)
-	actual, found := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "awsElasticBlockStore", "volumeID")
+	actual, found, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "awsElasticBlockStore", "volumeID")
+	require.Nil(t, err)
 	require.True(t, found)
 	assert.Equal(t, "vol-updated", actual)
 }

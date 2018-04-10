@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 const projectKey = "project"
@@ -216,27 +217,27 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	disk, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
-	if !found {
-		return "", nil
+	disk, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
+	if err != nil || !found {
+		return "", errors.WithStack(err)
 	}
 
-	pdName, found := unstructured.NestedString(disk, "pdName")
-	if !found {
-		return "", errors.New("unable to get spec.gcePersistentDisk.pdName")
+	pdName, found, err := unstructured.NestedString(disk, "pdName")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.gcePersistentDisk.pdName"); err != nil {
+		return "", errors.WithStack(err)
 	}
 
 	return pdName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	_, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
-	if !found {
-		return nil, errors.New("unable to get spec.gcePersistentDisk")
+	_, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "gcePersistentDisk")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.gcePersistentDisk"); err != nil {
+		return nil, err
 	}
 
-	if !unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "gcePersistentDisk", "pdName") {
-		return nil, errors.New("unable to set spec.gcePersistentDisk.pdName")
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "gcePersistentDisk", "pdName"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	return pv, nil

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 const regionKey = "region"
@@ -225,27 +226,27 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	ebs, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "awsElasticBlockStore")
-	if !found {
-		return "", nil
+	ebs, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "awsElasticBlockStore")
+	if err != nil || !found {
+		return "", errors.WithStack(err)
 	}
 
-	volumeID, found := unstructured.NestedString(ebs, "volumeID")
-	if !found {
-		return "", errors.New("unable to get spec.awsElasticBlockStore.volumeID")
+	volumeID, found, err := unstructured.NestedString(ebs, "volumeID")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.awsElasticBlockStore.volumeID"); err != nil {
+		return "", errors.WithStack(err)
 	}
 
 	return ebsVolumeIDRegex.FindString(volumeID), nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	_, found := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "awsElasticBlockStore")
-	if !found {
-		return nil, errors.New("unable to get spec.awsElasticBlockStore")
+	_, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "awsElasticBlockStore")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.awsElasticBlockStore"); err != nil {
+		return nil, err
 	}
 
-	if !unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID") {
-		return nil, errors.New("unable to set spec.awsElasticBlockStore.volumeID")
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	return pv, nil

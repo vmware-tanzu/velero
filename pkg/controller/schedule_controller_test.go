@@ -159,11 +159,11 @@ func TestProcessSchedule(t *testing.T) {
 					}
 
 					// these are the fields that may be updated by the controller
-					if phase, found := unstructured.NestedString(patchMap, "status", "phase"); found {
+					if phase, found, _ := unstructured.NestedString(patchMap, "status", "phase"); found {
 						res.Status.Phase = api.SchedulePhase(phase)
 					}
 
-					if lastBackupStr, found := unstructured.NestedString(patchMap, "status", "lastBackup"); found {
+					if lastBackupStr, found, _ := unstructured.NestedString(patchMap, "status", "lastBackup"); found {
 						parsed, err := time.Parse(time.RFC3339, lastBackupStr)
 						if err != nil {
 							t.Logf("error parsing status.lastBackup: %s\n", err)
@@ -205,8 +205,9 @@ func TestProcessSchedule(t *testing.T) {
 				assert.True(t, hasKeyAndVal(patch, test.expectedPhase, "status", "phase"), "patch's status.phase does not match")
 
 				if test.expectedValidationError != "" {
-					errs, found := unstructured.NestedSlice(patch, "status", "validationErrors")
+					errs, found, err := unstructured.NestedSlice(patch, "status", "validationErrors")
 					require.True(t, found, "error getting patch's status.validationErrors")
+					require.Nil(t, err)
 
 					require.Equal(t, 1, len(errs))
 
@@ -215,7 +216,9 @@ func TestProcessSchedule(t *testing.T) {
 					expectedStatusKeys++
 				}
 
-				res, _ := unstructured.NestedMap(patch, "status")
+				res, found, err := unstructured.NestedMap(patch, "status")
+				require.True(t, found)
+				require.Nil(t, err)
 				assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
 				index++
@@ -245,7 +248,7 @@ func TestProcessSchedule(t *testing.T) {
 
 				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
 
-				lastBackup, _ := unstructured.NestedString(patch, "status", "lastBackup")
+				lastBackup, _, _ := unstructured.NestedString(patch, "status", "lastBackup")
 				fmt.Println(lastBackup)
 
 				assert.True(
@@ -254,7 +257,9 @@ func TestProcessSchedule(t *testing.T) {
 					"patch's status.lastBackup does not match",
 				)
 
-				res, _ := unstructured.NestedMap(patch, "status")
+				res, found, err := unstructured.NestedMap(patch, "status")
+				require.True(t, found)
+				require.Nil(t, err)
 				assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
 
 				index++

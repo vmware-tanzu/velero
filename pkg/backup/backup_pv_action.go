@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -51,7 +52,10 @@ func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (
 
 	var additionalItems []ResourceIdentifier
 
-	volumeName, found := unstructured.NestedString(item.UnstructuredContent(), "spec", "volumeName")
+	volumeName, found, err := unstructured.NestedString(item.UnstructuredContent(), "spec", "volumeName")
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
 
 	// if there's no volume name, it's not an error, since it's possible
 	// for the PVC not be bound; don't return an additional PV item to

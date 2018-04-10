@@ -1212,7 +1212,7 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	labels, found := unstructured.NestedMap(obj.UnstructuredContent(), "metadata", "labels")
+	labels, found, _ := unstructured.NestedMap(obj.UnstructuredContent(), "metadata", "labels")
 	if !found {
 		val := map[string]interface{}{"fake-restorer": "foo"}
 		unstructured.SetNestedField(obj.UnstructuredContent(), val, "metadata", "labels")

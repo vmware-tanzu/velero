@@ -48,6 +48,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/errcheck"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 )
@@ -755,15 +756,15 @@ func objectsAreEqual(fromCluster, fromBackup *unstructured.Unstructured) (bool, 
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
-	phase, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
+	phase, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 
 	return phase == string(v1.VolumeAvailable)
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	metadata, found := unstructured.NestedMap(obj.UnstructuredContent(), "metadata")
-	if !found {
-		return nil, errors.New("unable to find metadata")
+	metadata, found, err := unstructured.NestedMap(obj.UnstructuredContent(), "metadata")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to find metadata"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	for k := range metadata {
@@ -774,8 +775,8 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 		}
 	}
 
-	if !unstructured.SetNestedField(obj.UnstructuredContent(), metadata, "metadata") {
-		return nil, errors.New("unable to set metadata")
+	if err := unstructured.SetNestedField(obj.UnstructuredContent(), metadata, "metadata"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	// this should never be backed up anyway, but remove it just

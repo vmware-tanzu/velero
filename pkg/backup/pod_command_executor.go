@@ -22,6 +22,7 @@ import (
 	"time"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/errcheck"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kapiv1 "k8s.io/api/core/v1"
@@ -167,9 +168,9 @@ func (e *defaultPodCommandExecutor) executePodCommand(log logrus.FieldLogger, it
 }
 
 func ensureContainerExists(pod map[string]interface{}, container string) error {
-	containers, found := unstructured.NestedSlice(pod, "spec", "containers")
-	if !found {
-		return errors.New("unable to get spec.containers")
+	containers, found, err := unstructured.NestedSlice(pod, "spec", "containers")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.containers"); err != nil {
+		return errors.WithStack(err)
 	}
 
 	for _, obj := range containers {
@@ -190,9 +191,9 @@ func ensureContainerExists(pod map[string]interface{}, container string) error {
 }
 
 func setDefaultHookContainer(pod map[string]interface{}, hook *api.ExecHook) error {
-	containers, found := unstructured.NestedSlice(pod, "spec", "containers")
-	if !found {
-		return errors.New("unable to get spec.containers")
+	containers, found, err := unstructured.NestedSlice(pod, "spec", "containers")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.containers"); err != nil {
+		return errors.WithStack(err)
 	}
 
 	if len(containers) < 1 {

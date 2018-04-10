@@ -24,6 +24,8 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/heptio/ark/pkg/util/errcheck"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -302,9 +304,8 @@ func TestProcessRestore(t *testing.T) {
 						return false, nil, err
 					}
 
-					phase, found := unstructured.NestedString(patchMap, "status", "phase")
-					if !found {
-						err := errors.New("unable to get status.phase")
+					phase, found, err := unstructured.NestedString(patchMap, "status", "phase")
+					if err := errcheck.ErrOrNotFound(found, err, "unable to get status.phase"); err != nil {
 						t.Log(err.Error())
 						return false, nil, err
 					}
@@ -386,7 +387,8 @@ func TestProcessRestore(t *testing.T) {
 			assert.True(t, hasKeyAndVal(patch, test.expectedPhase, "status", "phase"), "patch's status.phase does not match")
 
 			if len(test.expectedValidationErrors) > 0 {
-				errs, found := unstructured.NestedSlice(patch, "status", "validationErrors")
+				errs, found, err := unstructured.NestedSlice(patch, "status", "validationErrors")
+				require.Nil(t, err)
 				require.True(t, found, "error getting patch's status.validationErrors")
 
 				var errStrings []string
@@ -399,7 +401,9 @@ func TestProcessRestore(t *testing.T) {
 				expectedStatusKeys++
 			}
 
-			res, _ := unstructured.NestedMap(patch, "status")
+			res, found, err := unstructured.NestedMap(patch, "status")
+			require.True(t, found)
+			require.Nil(t, err)
 			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
 			// if we don't expect a restore, validate it wasn't called and exit the test
@@ -418,7 +422,9 @@ func TestProcessRestore(t *testing.T) {
 
 			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
 
-			res, _ = unstructured.NestedMap(patch, "status")
+			res, found, err = unstructured.NestedMap(patch, "status")
+			require.True(t, found)
+			require.Nil(t, err)
 			expectedStatusKeys = 1
 
 			assert.True(t, hasKeyAndVal(patch, string(api.RestorePhaseCompleted), "status", "phase"), "patch's status.phase does not match")
