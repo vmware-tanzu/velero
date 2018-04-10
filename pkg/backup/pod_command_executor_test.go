@@ -190,7 +190,7 @@ func TestExecutePodCommand(t *testing.T) {
 			contentConfig := rest.ContentConfig{
 				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
 			}
-			postRequest := rest.NewRequest(nil, "POST", baseUrl, "/api/v1", contentConfig, rest.Serializers{}, nil, nil)
+			postRequest := rest.NewRequest(nil, "POST", baseUrl, "/api/v1", contentConfig, rest.Serializers{}, nil, nil, 0)
 			poster.On("Post").Return(postRequest)
 
 			streamExecutor := &mockStreamExecutor{}
