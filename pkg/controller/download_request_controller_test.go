@@ -41,7 +41,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 		phase         v1.DownloadRequestPhase
 		targetKind    v1.DownloadTargetKind
 		targetName    string
+		restore       *v1.Restore
 		expectedError string
+		expectedDir   string
 		expectedPhase v1.DownloadRequestPhase
 		expectedURL   string
 	}{
@@ -60,6 +62,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			phase:         "",
 			targetKind:    v1.DownloadTargetKindBackupLog,
 			targetName:    "backup1",
+			expectedDir:   "backup1",
 			expectedPhase: v1.DownloadRequestPhaseProcessed,
 			expectedURL:   "signedURL",
 		},
@@ -69,6 +72,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			phase:         v1.DownloadRequestPhaseNew,
 			targetKind:    v1.DownloadTargetKindBackupLog,
 			targetName:    "backup1",
+			expectedDir:   "backup1",
 			expectedPhase: v1.DownloadRequestPhaseProcessed,
 			expectedURL:   "signedURL",
 		},
@@ -78,6 +82,8 @@ func TestProcessDownloadRequest(t *testing.T) {
 			phase:         "",
 			targetKind:    v1.DownloadTargetKindRestoreLog,
 			targetName:    "backup1-20170912150214",
+			restore:       arktest.NewTestRestore(v1.DefaultNamespace, "backup1-20170912150214", v1.RestorePhaseCompleted).WithBackup("backup1").Restore,
+			expectedDir:   "backup1",
 			expectedPhase: v1.DownloadRequestPhaseProcessed,
 			expectedURL:   "signedURL",
 		},
@@ -87,6 +93,8 @@ func TestProcessDownloadRequest(t *testing.T) {
 			phase:         v1.DownloadRequestPhaseNew,
 			targetKind:    v1.DownloadTargetKindRestoreLog,
 			targetName:    "backup1-20170912150214",
+			restore:       arktest.NewTestRestore(v1.DefaultNamespace, "backup1-20170912150214", v1.RestorePhaseCompleted).WithBackup("backup1").Restore,
+			expectedDir:   "backup1",
 			expectedPhase: v1.DownloadRequestPhaseProcessed,
 			expectedURL:   "signedURL",
 		},
@@ -98,6 +106,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 				client                   = fake.NewSimpleClientset()
 				sharedInformers          = informers.NewSharedInformerFactory(client, 0)
 				downloadRequestsInformer = sharedInformers.Ark().V1().DownloadRequests()
+				restoresInformer         = sharedInformers.Ark().V1().Restores()
 				backupService            = &arktest.BackupService{}
 				logger                   = arktest.NewLogger()
 			)
@@ -106,6 +115,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			c := NewDownloadRequestController(
 				client.ArkV1(),
 				downloadRequestsInformer,
+				restoresInformer,
 				backupService,
 				"bucket",
 				logger,
@@ -130,7 +140,11 @@ func TestProcessDownloadRequest(t *testing.T) {
 				}
 				downloadRequestsInformer.Informer().GetStore().Add(downloadRequest)
 
-				backupService.On("CreateSignedURL", target, "bucket", 10*time.Minute).Return("signedURL", nil)
+				if tc.restore != nil {
+					restoresInformer.Informer().GetStore().Add(tc.restore)
+				}
+
+				backupService.On("CreateSignedURL", target, "bucket", tc.expectedDir, 10*time.Minute).Return("signedURL", nil)
 			}
 
 			// method under test

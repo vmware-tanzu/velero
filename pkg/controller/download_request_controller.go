@@ -47,6 +47,8 @@ type downloadRequestController struct {
 	downloadRequestClient       arkv1client.DownloadRequestsGetter
 	downloadRequestLister       listers.DownloadRequestLister
 	downloadRequestListerSynced cache.InformerSynced
+	restoreLister               listers.RestoreLister
+	restoreListerSynced         cache.InformerSynced
 	backupService               cloudprovider.BackupService
 	bucket                      string
 	syncHandler                 func(key string) error
@@ -59,6 +61,7 @@ type downloadRequestController struct {
 func NewDownloadRequestController(
 	downloadRequestClient arkv1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
+	restoreInformer informers.RestoreInformer,
 	backupService cloudprovider.BackupService,
 	bucket string,
 	logger logrus.FieldLogger,
@@ -67,6 +70,8 @@ func NewDownloadRequestController(
 		downloadRequestClient:       downloadRequestClient,
 		downloadRequestLister:       downloadRequestInformer.Lister(),
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
+		restoreLister:               restoreInformer.Lister(),
+		restoreListerSynced:         restoreInformer.Informer().HasSynced,
 		backupService:               backupService,
 		bucket:                      bucket,
 		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
@@ -118,7 +123,7 @@ func (c *downloadRequestController) Run(ctx context.Context, numWorkers int) err
 	defer c.logger.Info("Shutting down DownloadRequestController")
 
 	c.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced, c.restoreListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
 	c.logger.Info("Caches are synced")
@@ -214,8 +219,24 @@ const signedURLTTL = 10 * time.Minute
 func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest) error {
 	update := downloadRequest.DeepCopy()
 
-	var err error
-	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, signedURLTTL)
+	var (
+		directory string
+		err       error
+	)
+
+	switch downloadRequest.Spec.Target.Kind {
+	case v1.DownloadTargetKindRestoreLog, v1.DownloadTargetKindRestoreResults:
+		restore, err := c.restoreLister.Restores(downloadRequest.Namespace).Get(downloadRequest.Spec.Target.Name)
+		if err != nil {
+			return errors.Wrap(err, "error getting Restore")
+		}
+
+		directory = restore.Spec.BackupName
+	default:
+		directory = downloadRequest.Spec.Target.Name
+	}
+
+	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -55,7 +54,7 @@ type BackupService interface {
 
 	// CreateSignedURL creates a pre-signed URL that can be used to download a file from object
 	// storage. The URL expires after ttl.
-	CreateSignedURL(target api.DownloadTarget, bucket string, ttl time.Duration) (string, error)
+	CreateSignedURL(target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error)
 
 	// UploadRestoreLog uploads the restore's log file to object storage.
 	UploadRestoreLog(bucket, backup, restore string, log io.Reader) error
@@ -78,24 +77,24 @@ const (
 	restoreResultsFileFormatString = "%s/restore-%s-results.gz"
 )
 
-func getMetadataKey(backup string) string {
-	return fmt.Sprintf(metadataFileFormatString, backup)
+func getMetadataKey(directory string) string {
+	return fmt.Sprintf(metadataFileFormatString, directory)
 }
 
-func getBackupContentsKey(backup string) string {
-	return fmt.Sprintf(backupFileFormatString, backup, backup)
+func getBackupContentsKey(directory, backup string) string {
+	return fmt.Sprintf(backupFileFormatString, directory, backup)
 }
 
-func getBackupLogKey(backup string) string {
-	return fmt.Sprintf(backupLogFileFormatString, backup, backup)
+func getBackupLogKey(directory, backup string) string {
+	return fmt.Sprintf(backupLogFileFormatString, directory, backup)
 }
 
-func getRestoreLogKey(backup, restore string) string {
-	return fmt.Sprintf(restoreLogFileFormatString, backup, restore)
+func getRestoreLogKey(directory, restore string) string {
+	return fmt.Sprintf(restoreLogFileFormatString, directory, restore)
 }
 
-func getRestoreResultsKey(backup, restore string) string {
-	return fmt.Sprintf(restoreResultsFileFormatString, backup, restore)
+func getRestoreResultsKey(directory, restore string) string {
+	return fmt.Sprintf(restoreResultsFileFormatString, directory, restore)
 }
 
 type backupService struct {
@@ -141,7 +140,7 @@ func (br *backupService) seekAndPutObject(bucket, key string, file io.Reader) er
 func (br *backupService) UploadBackup(bucket, backupName string, metadata, backup, log io.Reader) error {
 	// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 	// backup's status.
-	logKey := getBackupLogKey(backupName)
+	logKey := getBackupLogKey(backupName, backupName)
 	if err := br.seekAndPutObject(bucket, logKey, log); err != nil {
 		br.logger.WithError(err).WithFields(logrus.Fields{
 			"bucket": bucket,
@@ -165,7 +164,7 @@ func (br *backupService) UploadBackup(bucket, backupName string, metadata, backu
 
 	if backup != nil {
 		// upload tar file
-		if err := br.seekAndPutObject(bucket, getBackupContentsKey(backupName), backup); err != nil {
+		if err := br.seekAndPutObject(bucket, getBackupContentsKey(backupName, backupName), backup); err != nil {
 			// try to delete the metadata file since the data upload failed
 			deleteErr := br.objectStore.DeleteObject(bucket, metadataKey)
 
@@ -177,7 +176,7 @@ func (br *backupService) UploadBackup(bucket, backupName string, metadata, backu
 }
 
 func (br *backupService) DownloadBackup(bucket, backupName string) (io.ReadCloser, error) {
-	return br.objectStore.GetObject(bucket, getBackupContentsKey(backupName))
+	return br.objectStore.GetObject(bucket, getBackupContentsKey(backupName, backupName))
 }
 
 func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
@@ -251,30 +250,19 @@ func (br *backupService) DeleteBackupDir(bucket, backupName string) error {
 	return errors.WithStack(kerrors.NewAggregate(errs))
 }
 
-func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket string, ttl time.Duration) (string, error) {
+func (br *backupService) CreateSignedURL(target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
 	switch target.Kind {
 	case api.DownloadTargetKindBackupContents:
-		return br.objectStore.CreateSignedURL(bucket, getBackupContentsKey(target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getBackupContentsKey(directory, target.Name), ttl)
 	case api.DownloadTargetKindBackupLog:
-		return br.objectStore.CreateSignedURL(bucket, getBackupLogKey(target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getBackupLogKey(directory, target.Name), ttl)
 	case api.DownloadTargetKindRestoreLog:
-		backup := extractBackupName(target.Name)
-		return br.objectStore.CreateSignedURL(bucket, getRestoreLogKey(backup, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getRestoreLogKey(directory, target.Name), ttl)
 	case api.DownloadTargetKindRestoreResults:
-		backup := extractBackupName(target.Name)
-		return br.objectStore.CreateSignedURL(bucket, getRestoreResultsKey(backup, target.Name), ttl)
+		return br.objectStore.CreateSignedURL(bucket, getRestoreResultsKey(directory, target.Name), ttl)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
-}
-
-func extractBackupName(s string) string {
-	// restore name is formatted as <backup name>-<timestamp>
-	i := strings.LastIndex(s, "-")
-	if i < 0 {
-		i = len(s)
-	}
-	return s[0:i]
 }
 
 func (br *backupService) UploadRestoreLog(bucket, backup, restore string, log io.Reader) error {

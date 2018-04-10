@@ -270,66 +270,56 @@ func TestCreateSignedURL(t *testing.T) {
 		name        string
 		targetKind  api.DownloadTargetKind
 		targetName  string
+		directory   string
 		expectedKey string
 	}{
 		{
 			name:        "backup contents",
 			targetKind:  api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup",
+			directory:   "my-backup",
 			expectedKey: "my-backup/my-backup.tar.gz",
 		},
 		{
 			name:        "backup log",
 			targetKind:  api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup",
+			directory:   "my-backup",
 			expectedKey: "my-backup/my-backup-logs.gz",
 		},
 		{
 			name:        "scheduled backup contents",
 			targetKind:  api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup-20170913154901",
+			directory:   "my-backup-20170913154901",
 			expectedKey: "my-backup-20170913154901/my-backup-20170913154901.tar.gz",
 		},
 		{
 			name:        "scheduled backup log",
 			targetKind:  api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup-20170913154901",
+			directory:   "my-backup-20170913154901",
 			expectedKey: "my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 		},
 		{
-			name:        "restore log - backup has no dash",
+			name:        "restore log",
 			targetKind:  api.DownloadTargetKindRestoreLog,
 			targetName:  "b-20170913154901",
+			directory:   "b",
 			expectedKey: "b/restore-b-20170913154901-logs.gz",
 		},
 		{
-			name:        "restore log - backup has 1 dash",
-			targetKind:  api.DownloadTargetKindRestoreLog,
-			targetName:  "b-cool-20170913154901",
-			expectedKey: "b-cool/restore-b-cool-20170913154901-logs.gz",
-		},
-		{
-			name:        "restore log - backup has multiple dashes (e.g. restore of scheduled backup)",
-			targetKind:  api.DownloadTargetKindRestoreLog,
-			targetName:  "b-cool-20170913154901-20170913154902",
-			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-logs.gz",
-		},
-		{
-			name:        "restore results - backup has no dash",
+			name:        "restore results",
 			targetKind:  api.DownloadTargetKindRestoreResults,
 			targetName:  "b-20170913154901",
+			directory:   "b",
 			expectedKey: "b/restore-b-20170913154901-results.gz",
-		},
-		{
-			name:        "restore results - backup has 1 dash",
-			targetKind:  api.DownloadTargetKindRestoreResults,
-			targetName:  "b-cool-20170913154901",
-			expectedKey: "b-cool/restore-b-cool-20170913154901-results.gz",
 		},
 		{
 			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
 			targetKind:  api.DownloadTargetKindRestoreResults,
 			targetName:  "b-cool-20170913154901-20170913154902",
+			directory:   "b-cool-20170913154901",
 			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-results.gz",
 		},
 	}
@@ -347,7 +337,7 @@ func TestCreateSignedURL(t *testing.T) {
 				Name: test.targetName,
 			}
 			objectStorage.On("CreateSignedURL", "bucket", test.expectedKey, time.Duration(0)).Return("url", nil)
-			url, err := backupService.CreateSignedURL(target, "bucket", 0)
+			url, err := backupService.CreateSignedURL(target, "bucket", test.directory, 0)
 			require.NoError(t, err)
 			assert.Equal(t, "url", url)
 			objectStorage.AssertExpectations(t)
