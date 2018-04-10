@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -111,8 +112,8 @@ func humanReadableTimeFromNow(when time.Time) string {
 	now := time.Now()
 	switch {
 	case when == now || when.After(now):
-		return printers.ShortHumanDuration(when.Sub(now))
+		return duration.ShortHumanDuration(when.Sub(now))
 	default:
-		return fmt.Sprintf("%s ago", printers.ShortHumanDuration(now.Sub(when)))
+		return fmt.Sprintf("%s ago", duration.ShortHumanDuration(now.Sub(when)))
 	}
 }
