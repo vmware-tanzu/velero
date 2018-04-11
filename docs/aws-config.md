@@ -62,7 +62,9 @@ For more information, see [the AWS documentation on IAM users][14].
                 "Action": [
                     "s3:GetObject",
                     "s3:DeleteObject",
-                    "s3:PutObject"
+                    "s3:PutObject",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListMultipartUploadParts"
                 ],
                 "Resource": [
                     "arn:aws:s3:::${BUCKET}/*"
@@ -71,9 +73,7 @@ For more information, see [the AWS documentation on IAM users][14].
             {
                 "Effect": "Allow",
                 "Action": [
-                    "s3:ListBucket",
-                    "s3:AbortMultipartUpload",
-                    "s3:ListMultipartUploadParts"
+                    "s3:ListBucket"
                 ],
                 "Resource": [
                     "arn:aws:s3:::${BUCKET}"
