@@ -171,7 +171,23 @@ header {
 }
 
 header img {
+  display: none;
   margin-left: 20px;
+}
+
+header {
+  .icon--menu {
+    width: 32px;
+    display: block;
+    margin-left: 12px;
+    cursor: pointer;
+    transition: opacity 200ms;
+
+    &:hover {
+      opacity: 0.8;
+      transition: opacity 200ms;
+    }
+  }
 }
 
 header h1 {
@@ -215,14 +231,25 @@ nav {
   position: fixed;
   left: 0;
   top: 48px;
-  height: 100vh;
+  height: calc(100vh - 78px);
   width: 230px;
   font-size: 14px;
   background: #FAFAFA;
   border-right: 1px solid #E8E8E8;
+  overflow-y: scroll;
   padding-left: 20px;
   padding-top: 32px;
 	z-index: 5;
+}
+
+.navigation {
+  transform: translateX(-270px);
+  transition: all 300ms;
+}
+
+.navigation--open {
+  transform: translate(0px);
+  transition: all 300ms;
 }
 
 nav h3 {
@@ -254,15 +281,35 @@ nav a:hover {
 }
 
 section {
-  margin-left: 250px;
+  // margin-left: 250px;
   margin-top: 90px;
-  max-width: 50%;
+  max-width: 95%;
   padding-bottom: 60px;
 }
 
 @media screen and (min-width: 1100px) {
   section {
     max-width: 800px;
+  }
+}
+
+@media screen and (min-width: 700px) {
+
+
+  section {
+    max-width: 50%;
+    margin-left: 250px;
+  }
+  header {
+    img {
+      display: block;
+    }
+    .icon--menu {
+      display: none;
+    }
+  }
+  .navigation {
+    transform: translateX(0px);
   }
 }
 
