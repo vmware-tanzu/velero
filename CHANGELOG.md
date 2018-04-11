@@ -1,5 +1,39 @@
 # Changelog
 
+#### [v0.8.0-rc.1](https://github.com/heptio/ark/releases/tag/v0.8.0-rc.1) - 2018-04-11
+
+Highlights:
+  * Backup deletion has been completely revamped to make it simpler and less error-prone. As a user, you still use the `ark backup delete` command to request deletion of a backup and its associated cloud
+  resources; behind the scenes, we've switched to using a new `DeleteBackupRequest` Custom Resource and associated controller for processing deletion requests.
+  * We've reduced the number of required fields in the Ark config. For Azure, `location` is no longer required, and for GCP, `project` is not needed.
+  * Ark now copies tags from volumes to snapshots during backup, and from snapshots to new volumes during restore. 
+
+Breaking Changes:
+  * Ark has moved back to a single namespace (`heptio-ark` by default) as part of #383.
+
+All New Features:
+  * Add global `--kubecontext` flag to Ark CLI (#296, @blakebarnett)
+  * Azure: support cross-resource group restores of volumes (#356 #378, @skriss)
+  * AWS/Azure/GCP: copy tags from volumes to snapshots, and from snapshots to volumes (#341, @skriss)
+  * Replace finalizer for backup deletion with `DeleteBackupRequest` custom resource & controller (#383, @ncdc)
+  * Don't log warnings during restore if an identical object already exists in the cluster (#405, @nrb)
+  
+Bug Fixes / Other Changes:
+  * Error from the Ark CLI if attempting to restore a non-existent backup (#302, @ncdc)
+  * Enable running the Ark server locally for development purposes (#334, @ncdc)
+  * Add examples to `ark schedule create` documentation (#331, @lypht)
+  * GCP: Remove `project` requirement from Ark config (#345, @skriss)
+  * Add `--from-backup` flag to `ark restore create` and allow custom restore names (#342 #409, @skriss)
+  * Azure: remove `location` requirement from Ark config (#344, @skriss)
+  * Add documentation/examples for storing backups in IBM Cloud Object Storage (#321, @roytman)
+  * Reduce verbosity of hooks logging (#362, @skriss)
+  * AWS: Add minimal IAM policy to documentation (#363, @hopkinsth)
+  * Don't restore events (#374, @sanketjpatel)
+  * Azure: reduce API polling interval from 60s to 5s (#359, @skriss)
+  * Switch from hostPath to emptyDir volume type for minio example (#386, @containscaffeine)
+  * Add limit ranges as a prioritized resource for restores (@392, @containscaffeine)
+
+
 #### [v0.7.1](https://github.com/heptio/ark/releases/tag/v0.7.1) - 2018-02-22
 
 Bug Fixes:
