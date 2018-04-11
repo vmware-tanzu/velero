@@ -19,12 +19,14 @@ package restore
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,6 +37,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -528,6 +531,15 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
+		{
+			name:                    "serviceaccounts are restored",
+			namespace:               "ns-1",
+			resourcePath:            "serviceaccounts",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: nil,
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
+			expectedObjs:            toUnstructured(newTestServiceAccount().WithArkLabel("my-restore").ServiceAccount),
+		},
 	}
 
 	for _, test := range tests {
@@ -546,6 +558,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
 			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
+
+			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
 
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
@@ -571,6 +586,90 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, test.expectedErrors, errors)
+		})
+	}
+}
+
+func TestRestoringExistingServiceAccount(t *testing.T) {
+	fromCluster := newTestServiceAccount()
+	fromClusterUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fromCluster.ServiceAccount)
+	require.NoError(t, err)
+
+	different := newTestServiceAccount().WithImagePullSecret("image-secret").WithSecret("secret")
+	differentUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(different.ServiceAccount)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		expectedPatch []byte
+		fromBackup    *unstructured.Unstructured
+	}{
+		{
+			name:       "fromCluster and fromBackup are exactly the same",
+			fromBackup: &unstructured.Unstructured{Object: fromClusterUnstructured},
+		},
+		{
+			name:          "fromCluster and fromBackup are different",
+			fromBackup:    &unstructured.Unstructured{Object: differentUnstructured},
+			expectedPatch: []byte(`{"imagePullSecrets":[{"name":"image-secret"}],"secrets":[{"name":"secret"}]}`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resourceClient := &arktest.FakeDynamicClient{}
+			defer resourceClient.AssertExpectations(t)
+			name := fromCluster.GetName()
+
+			// restoreResource will add the restore label to object provided to create, so we need to make a copy to provide to our expected call
+			m := make(map[string]interface{})
+			for k, v := range test.fromBackup.Object {
+				m[k] = v
+			}
+			fromBackupWithLabel := &unstructured.Unstructured{Object: m}
+			l := map[string]string{api.RestoreLabelKey: "my-restore"}
+			fromBackupWithLabel.SetLabels(l)
+			// resetMetadataAndStatus will strip the creationTimestamp before calling Create
+			fromBackupWithLabel.SetCreationTimestamp(metav1.Time{Time: time.Time{}})
+
+			resourceClient.On("Create", fromBackupWithLabel).Return(new(unstructured.Unstructured), k8serrors.NewAlreadyExists(kuberesource.ServiceAccounts, name))
+			resourceClient.On("Get", name, metav1.GetOptions{}).Return(&unstructured.Unstructured{Object: fromClusterUnstructured}, nil)
+
+			if len(test.expectedPatch) > 0 {
+				resourceClient.On("Patch", name, test.expectedPatch).Return(test.fromBackup, nil)
+			}
+
+			dynamicFactory := &arktest.FakeDynamicFactory{}
+			gv := schema.GroupVersion{Group: "", Version: "v1"}
+
+			resource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, "ns-1").Return(resourceClient, nil)
+			fromBackupJSON, err := json.Marshal(test.fromBackup)
+			require.NoError(t, err)
+			ctx := &context{
+				dynamicFactory: dynamicFactory,
+				actions:        []resolvedAction{},
+				fileSystem: arktest.NewFakeFileSystem().
+					WithFile("foo/resources/serviceaccounts/namespaces/ns-1/sa-1.json", fromBackupJSON),
+				selector: labels.NewSelector(),
+				restore: &api.Restore{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "my-restore",
+					},
+					Spec: api.RestoreSpec{
+						IncludeClusterResources: nil,
+					},
+				},
+				backup: &api.Backup{},
+				logger: arktest.NewLogger(),
+			}
+			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
+
+			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Cluster)
+			assert.Empty(t, warnings.Namespaces)
+			assert.Equal(t, api.RestoreResult{}, errors)
 		})
 	}
 }
@@ -747,61 +846,6 @@ func TestIsCompleted(t *testing.T) {
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expected, backup)
-			}
-		})
-	}
-}
-
-func TestObjectsAreEqual(t *testing.T) {
-	tests := []struct {
-		name        string
-		backupObj   *unstructured.Unstructured
-		clusterObj  *unstructured.Unstructured
-		expectedErr bool
-		expectedRes bool
-	}{
-		{
-			name:        "objects are already equal",
-			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
-			clusterObj:  NewTestUnstructured().WithName("obj").Unstructured,
-			expectedErr: false,
-			expectedRes: true,
-		},
-		{
-			name:        "objects reset correctly",
-			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
-			clusterObj:  NewTestUnstructured().WithMetadata("blah", "foo").WithName("obj").Unstructured,
-			expectedErr: false,
-			expectedRes: true,
-		},
-		{
-			name:        "cluster object has no metadata to reset",
-			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
-			clusterObj:  NewTestUnstructured().Unstructured,
-			expectedErr: true,
-			expectedRes: false,
-		},
-		{
-			name:        "Test JSON objects",
-			backupObj:   arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-xhjjc"}]}`),
-			clusterObj:  arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
-			expectedErr: false,
-			expectedRes: true,
-		},
-		{
-			name:        "Test ServiceAccount secrets mismatch",
-			backupObj:   arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-abcde"}]}`),
-			clusterObj:  arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
-			expectedErr: false,
-			expectedRes: false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			res, err := objectsAreEqual(test.clusterObj, test.backupObj)
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
 			}
 		})
 	}
@@ -1090,6 +1134,51 @@ func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
 	}
 
 	return res
+}
+
+type testServiceAccount struct {
+	*v1.ServiceAccount
+}
+
+func newTestServiceAccount() *testServiceAccount {
+	return &testServiceAccount{
+		ServiceAccount: &v1.ServiceAccount{
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: "v1",
+				Kind:       "ServiceAccount",
+			},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:         "ns-1",
+				Name:              "test-sa",
+				CreationTimestamp: metav1.Time{Time: time.Now()},
+			},
+		},
+	}
+}
+
+func (sa *testServiceAccount) WithArkLabel(restoreName string) *testServiceAccount {
+	if sa.Labels == nil {
+		sa.Labels = make(map[string]string)
+	}
+	sa.Labels[api.RestoreLabelKey] = restoreName
+	return sa
+}
+
+func (sa *testServiceAccount) WithImagePullSecret(name string) *testServiceAccount {
+	secret := v1.LocalObjectReference{Name: name}
+	sa.ImagePullSecrets = append(sa.ImagePullSecrets, secret)
+	return sa
+}
+
+func (sa *testServiceAccount) WithSecret(name string) *testServiceAccount {
+	secret := v1.ObjectReference{Name: name}
+	sa.Secrets = append(sa.Secrets, secret)
+	return sa
+}
+
+func (sa *testServiceAccount) ToJSON() []byte {
+	bytes, _ := json.Marshal(sa.ServiceAccount)
+	return bytes
 }
 
 type testPersistentVolume struct {

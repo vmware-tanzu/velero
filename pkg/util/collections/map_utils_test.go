@@ -16,7 +16,9 @@ limitations under the License.
 
 package collections
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestGetString(t *testing.T) {
 	var testCases = []struct {

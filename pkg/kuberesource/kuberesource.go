@@ -28,4 +28,5 @@ var (
 	PersistentVolumeClaims = schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"}
 	PersistentVolumes      = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
 	Pods                   = schema.GroupResource{Group: "", Resource: "pods"}
+	ServiceAccounts        = schema.GroupResource{Group: "", Resource: "serviceaccounts"}
 )

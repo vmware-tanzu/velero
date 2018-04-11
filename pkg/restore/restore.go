@@ -732,19 +732,57 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, obj.GetName())
 		createdObj, restoreErr := resourceClient.Create(obj)
 		if apierrors.IsAlreadyExists(restoreErr) {
-			equal := false
-			if fromCluster, err := resourceClient.Get(obj.GetName(), metav1.GetOptions{}); err == nil {
-				equal, err = objectsAreEqual(fromCluster, obj)
-				// Log any errors trying to check equality
-				if err != nil {
-					ctx.infof("error checking %s against cluster: %v", obj.GetName(), err)
-				}
-			} else {
-				ctx.infof("Error retrieving cluster version of %s: %v", obj.GetName(), err)
+			fromCluster, err := resourceClient.Get(obj.GetName(), metav1.GetOptions{})
+			if err != nil {
+				ctx.infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
+				addToResult(&warnings, namespace, err)
+				continue
 			}
-			if !equal {
-				e := errors.Errorf("not restored: %s and is different from backed up version.", restoreErr)
-				addToResult(&warnings, namespace, e)
+			// Remove insubstantial metadata
+			fromCluster, err = resetMetadataAndStatus(fromCluster)
+			if err != nil {
+				ctx.infof("Error trying to reset metadata for %s: %v", kube.NamespaceAndName(obj), err)
+				addToResult(&warnings, namespace, err)
+				continue
+			}
+
+			// We know the cluster won't have the restore name label, so
+			// copy it over from the backup
+			restoreName := obj.GetLabels()[api.RestoreLabelKey]
+			addLabel(fromCluster, api.RestoreLabelKey, restoreName)
+
+			if !equality.Semantic.DeepEqual(fromCluster, obj) {
+				switch groupResource {
+				case kuberesource.ServiceAccounts:
+					desired, err := mergeServiceAccounts(fromCluster, obj)
+					if err != nil {
+						ctx.infof("error merging secrets for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
+						addToResult(&warnings, namespace, err)
+						continue
+					}
+
+					patchBytes, err := generatePatch(fromCluster, desired)
+					if err != nil {
+						ctx.infof("error generating patch for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
+						addToResult(&warnings, namespace, err)
+						continue
+					}
+
+					if patchBytes == nil {
+						// In-cluster and desired state are the same, so move on to the next item
+						continue
+					}
+
+					_, err = resourceClient.Patch(obj.GetName(), patchBytes)
+					if err != nil {
+						addToResult(&warnings, namespace, err)
+					} else {
+						ctx.infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
+					}
+				default:
+					e := errors.Errorf("not restored: %s and is different from backed up version.", restoreErr)
+					addToResult(&warnings, namespace, e)
+				}
 			}
 			continue
 		}
@@ -875,25 +913,6 @@ func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructur
 	}
 
 	return updated2, nil
-}
-
-// objectsAreEqual takes two unstructured objects and checks for equality.
-// The fromCluster object is mutated to remove any insubstantial runtime
-// information that won't match
-func objectsAreEqual(fromCluster, fromBackup *unstructured.Unstructured) (bool, error) {
-	// Remove insubstantial metadata
-	fromCluster, err := resetMetadataAndStatus(fromCluster)
-	if err != nil {
-		return false, err
-	}
-
-	// We know the cluster won't have the restore name label, so
-	// copy it over from the backup
-	restoreName := fromBackup.GetLabels()[api.RestoreLabelKey]
-	addLabel(fromCluster, api.RestoreLabelKey, restoreName)
-
-	// If there are no specific actions needed based on the type, simply check for equality.
-	return equality.Semantic.DeepEqual(fromBackup, fromCluster), nil
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
