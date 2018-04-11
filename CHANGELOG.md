@@ -30,8 +30,8 @@ Bug Fixes / Other Changes:
   * AWS: Add minimal IAM policy to documentation (#363, @hopkinsth)
   * Don't restore events (#374, @sanketjpatel)
   * Azure: reduce API polling interval from 60s to 5s (#359, @skriss)
-  * Switch from hostPath to emptyDir volume type for minio example (#386, @containscaffeine)
-  * Add limit ranges as a prioritized resource for restores (@392, @containscaffeine)
+  * Switch from hostPath to emptyDir volume type for minio example (#386, @containscafeine)
+  * Add limit ranges as a prioritized resource for restores (#392, @containscafeine)
 
 
 #### [v0.7.1](https://github.com/heptio/ark/releases/tag/v0.7.1) - 2018-02-22
