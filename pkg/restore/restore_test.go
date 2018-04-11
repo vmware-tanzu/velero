@@ -676,6 +676,61 @@ func TestResetMetadataAndStatus(t *testing.T) {
 	}
 }
 
+func TestObjectsAreEqual(t *testing.T) {
+	tests := []struct {
+		name        string
+		backupObj   *unstructured.Unstructured
+		clusterObj  *unstructured.Unstructured
+		expectedErr bool
+		expectedRes bool
+	}{
+		{
+			name:        "objects are already equal",
+			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
+			clusterObj:  NewTestUnstructured().WithName("obj").Unstructured,
+			expectedErr: false,
+			expectedRes: true,
+		},
+		{
+			name:        "objects reset correctly",
+			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
+			clusterObj:  NewTestUnstructured().WithMetadata("blah", "foo").WithName("obj").Unstructured,
+			expectedErr: false,
+			expectedRes: true,
+		},
+		{
+			name:        "cluster object has no metadata to reset",
+			backupObj:   NewTestUnstructured().WithName("obj").WithArkLabel("test").Unstructured,
+			clusterObj:  NewTestUnstructured().Unstructured,
+			expectedErr: true,
+			expectedRes: false,
+		},
+		{
+			name:        "Test JSON objects",
+			backupObj:   unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			clusterObj:  unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			expectedErr: false,
+			expectedRes: true,
+		},
+		{
+			name:        "Test ServiceAccount secrets mismatch",
+			backupObj:   unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-abcde"}]}`),
+			clusterObj:  unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			expectedErr: false,
+			expectedRes: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := objectsAreEqual(test.clusterObj, test.backupObj)
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
 func TestExecutePVAction(t *testing.T) {
 	iops := int64(1000)
 
@@ -844,6 +899,16 @@ func TestIsPVReady(t *testing.T) {
 	}
 }
 
+// Copied from backup/backup_test.go for JSON testing.
+// TODO: move this into util/test for re-use.
+func unstructuredOrDie(data string) *unstructured.Unstructured {
+	o, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(data), nil, nil)
+	if err != nil {
+		panic(err)
+	}
+	return o.(*unstructured.Unstructured)
+}
+
 type testUnstructured struct {
 	*unstructured.Unstructured
 }
@@ -897,6 +962,17 @@ func (obj *testUnstructured) WithName(name string) *testUnstructured {
 	return obj.WithMetadataField("name", name)
 }
 
+func (obj *testUnstructured) WithArkLabel(restoreName string) *testUnstructured {
+	ls := obj.GetLabels()
+	if ls == nil {
+		ls = make(map[string]string)
+	}
+	ls[api.RestoreLabelKey] = restoreName
+	obj.SetLabels(ls)
+
+	return obj
+}
+
 func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
 	m := make(map[string]interface{})
 	obj.Object[name] = m
@@ -941,10 +1017,6 @@ func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
 		metadata := unstructuredObj.Object["metadata"].(map[string]interface{})
 
 		delete(metadata, "creationTimestamp")
-
-		if _, exists := metadata["namespace"]; !exists {
-			metadata["namespace"] = ""
-		}
 
 		delete(unstructuredObj.Object, "status")
 

@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -634,20 +635,37 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		// necessary because we may have remapped the namespace
-		obj.SetNamespace(namespace)
+		// if the namespace is blank, don't create the key
+		if namespace != "" {
+			obj.SetNamespace(namespace)
+		}
 
 		// add an ark-restore label to each resource for easy ID
 		addLabel(obj, api.RestoreLabelKey, ctx.restore.Name)
 
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, obj.GetName())
-		_, err = resourceClient.Create(obj)
-		if apierrors.IsAlreadyExists(err) {
-			addToResult(&warnings, namespace, err)
+		_, restoreErr := resourceClient.Create(obj)
+		if apierrors.IsAlreadyExists(restoreErr) {
+			equal := false
+			if fromCluster, err := resourceClient.Get(obj.GetName(), metav1.GetOptions{}); err == nil {
+				equal, err = objectsAreEqual(fromCluster, obj)
+				// Log any errors trying to check equality
+				if err != nil {
+					ctx.infof("error checking %s against cluster: %v", obj.GetName(), err)
+				}
+			} else {
+				ctx.infof("Error retrieving cluster version of %s: %v", obj.GetName(), err)
+			}
+			if !equal {
+				e := errors.Errorf("not restored: %s and is different from backed up version.", restoreErr)
+				addToResult(&warnings, namespace, e)
+			}
 			continue
 		}
-		if err != nil {
+		// Error was something other than an AlreadyExists
+		if restoreErr != nil {
 			ctx.infof("error restoring %s: %v", obj.GetName(), err)
-			addToResult(&errs, namespace, fmt.Errorf("error restoring %s: %v", fullPath, err))
+			addToResult(&errs, namespace, fmt.Errorf("error restoring %s: %v", fullPath, restoreErr))
 			continue
 		}
 
@@ -720,6 +738,25 @@ func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructur
 	}
 
 	return updated2, nil
+}
+
+// objectsAreEqual takes two unstructured objects and checks for equality.
+// The fromCluster object is mutated to remove any insubstantial runtime
+// information that won't match
+func objectsAreEqual(fromCluster, fromBackup *unstructured.Unstructured) (bool, error) {
+	// Remove insubstantial metadata
+	fromCluster, err := resetMetadataAndStatus(fromCluster)
+	if err != nil {
+		return false, err
+	}
+
+	// We know the cluster won't have the restore name label, so
+	// copy it over from the backup
+	restoreName := fromBackup.GetLabels()[api.RestoreLabelKey]
+	addLabel(fromCluster, api.RestoreLabelKey, restoreName)
+
+	// If there are no specific actions needed based on the type, simply check for equality.
+	return equality.Semantic.DeepEqual(fromBackup, fromCluster), nil
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
