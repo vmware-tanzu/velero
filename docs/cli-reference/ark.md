@@ -32,6 +32,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 ### SEE ALSO
 * [ark backup](ark_backup.md)	 - Work with backups
 * [ark client](ark_client.md)	 - Ark client related commands
+* [ark completion](ark_completion.md)	 - Output shell completion code for the specified shell (bash or zsh)
 * [ark create](ark_create.md)	 - Create ark resources
 * [ark delete](ark_delete.md)	 - Delete ark resources
 * [ark describe](ark_describe.md)	 - Describe ark resources
