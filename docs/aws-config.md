@@ -82,7 +82,7 @@ For more information, see [the AWS documentation on IAM users][14].
         ]
     }
     EOF
-    
+
     aws iam put-user-policy \
       --user-name heptio-ark \
       --policy-name heptio-ark \
@@ -239,7 +239,7 @@ It can be set up for Ark by creating a role that will have required permissions,
         ]
     }
     EOF
-    
+
     aws iam put-role-policy \
       --role-name heptio-ark \
       --policy-name heptio-ark-policy \
@@ -252,7 +252,7 @@ It can be set up for Ark by creating a role that will have required permissions,
     apiVersion: apps/v1beta1
     kind: Deployment
     metadata:
-        namespace: heptio-ark-server
+        namespace: heptio-ark
         name: ark
     spec:
         replicas: 1
@@ -270,4 +270,3 @@ It can be set up for Ark by creating a role that will have required permissions,
   [0]: namespace.md
   [6]: config-definition.md#aws
   [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
-
