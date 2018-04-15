@@ -50,7 +50,6 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
     ```bash
     kubectl apply -f examples/common/00-prereqs.yaml
     kubectl apply -f examples/minio/
-    kubectl apply -f examples/common/10-deployment.yaml
     ```
 
     NOTE: If you get an error about Config creation, wait for a minute, then run the commands again.
