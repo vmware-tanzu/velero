@@ -44,12 +44,29 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
 3. Attach policies to give `heptio-ark` the necessary permissions to function:
 
     ```bash
+    BUCKET=<YOUR_BUCKET>
+    
+    ROLE_PERMISSIONS=(
+        compute.disks.get
+        compute.disks.create
+        compute.disks.createSnapshot
+        compute.snapshots.get
+        compute.snapshots.create
+        compute.snapshots.useReadOnly
+        compute.snapshots.delete
+        compute.projects.get
+    )
+
+    gcloud iam roles create heptio_ark.server \
+        --project $PROJECT_ID \
+        --title "Heptio Ark Server" \
+        --permissions "$(IFS=","; echo "${ROLE_PERMISSIONS[*]}")"    
+
     gcloud projects add-iam-policy-binding $PROJECT_ID \
         --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
-        --role roles/compute.storageAdmin
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
-        --role roles/storage.admin
+        --role projects/$PROJECT_ID/roles/heptio_ark.server
+
+    gsutil iam ch serviceAccount:$SERVICE_ACCOUNT_EMAIL:objectAdmin gs://${BUCKET}
     ```
 
 4. Create a service account key, specifying an output file (`credentials-ark`) in your local directory:
