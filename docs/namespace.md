@@ -33,7 +33,7 @@ For all cloud providers, edit `https://github.com/heptio/ark/blob/master/example
 
 For AWS, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/aws/10-deployment.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/aws/00-ark-config.yaml`
 
 
@@ -41,7 +41,7 @@ For AWS, edit:
 
 For GCP, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/gcp/10-deployment.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/gcp/00-ark-config.yaml`
 
 
@@ -56,7 +56,7 @@ For Azure, edit:
 
 For IBM, edit:
 
-* `https://github.com/heptio/ark/blob/master/examples/common/10-deployment.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/ibm/10-deployment.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/ibm/00-ark-config.yaml`
 
 ## Specify the namespace in client commands
