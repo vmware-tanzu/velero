@@ -103,6 +103,7 @@ shell: build-dirs build-image
 		-v "$$(pwd):/go/src/$(PKG)" \
 		-v "$$(pwd)/_output/bin:/output" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static" \
+		-v "$$(pwd)/.go/go-build:/.cache/go-build" \
 		-w /go/src/$(PKG) \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
@@ -171,7 +172,7 @@ tar-bin: build
 
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH)
+	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build
 
 build-image:
 	cd hack/build-image && docker build -t $(BUILDER_IMAGE) .
