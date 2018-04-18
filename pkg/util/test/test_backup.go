@@ -124,3 +124,9 @@ func (b *TestBackup) WithResourceVersion(version string) *TestBackup {
 	b.ResourceVersion = version
 	return b
 }
+
+func (b *TestBackup) WithFinalizers(finalizers ...string) *TestBackup {
+	b.ObjectMeta.Finalizers = append(b.ObjectMeta.Finalizers, finalizers...)
+
+	return b
+}

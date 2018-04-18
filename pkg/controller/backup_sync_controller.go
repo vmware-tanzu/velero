@@ -29,6 +29,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
 type backupSyncController struct {
@@ -68,6 +69,8 @@ func (c *backupSyncController) Run(ctx context.Context, workers int) error {
 	return nil
 }
 
+const gcFinalizer = "gc.ark.heptio.com"
+
 func (c *backupSyncController) run() {
 	c.logger.Info("Syncing backups from object storage")
 	backups, err := c.backupService.GetAllBackups(c.bucket)
@@ -80,6 +83,10 @@ func (c *backupSyncController) run() {
 	for _, cloudBackup := range backups {
 		logContext := c.logger.WithField("backup", kube.NamespaceAndName(cloudBackup))
 		logContext.Info("Syncing backup")
+
+		// If we're syncing backups made by pre-0.8.0 versions, the server removes all finalizers
+		// faster than the sync finishes. Just process them as we find them.
+		cloudBackup.Finalizers = stringslice.Except(cloudBackup.Finalizers, gcFinalizer)
 
 		cloudBackup.ResourceVersion = ""
 		if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !kuberrs.IsAlreadyExists(err) {
