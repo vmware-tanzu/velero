@@ -27,6 +27,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	"github.com/heptio/ark/pkg/util/stringslice"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -49,6 +50,18 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
 				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
 				arktest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
+			},
+		},
+		{
+			name: "Finalizer gets removed on sync",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithFinalizers(gcFinalizer).Backup,
+			},
+		},
+		{
+			name: "Only target finalizer is removed",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithFinalizers(gcFinalizer, "blah").Backup,
 			},
 		},
 	}
@@ -77,6 +90,8 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			// we only expect creates for items within the target bucket
 			for _, cloudBackup := range test.cloudBackups {
+				// Verify that the run function stripped the GC finalizer
+				assert.False(t, stringslice.Has(cloudBackup.Finalizers, gcFinalizer))
 				action := core.NewCreateAction(
 					v1.SchemeGroupVersion.WithResource("backups"),
 					cloudBackup.Namespace,
