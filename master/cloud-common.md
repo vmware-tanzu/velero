@@ -7,6 +7,7 @@ The Ark repository includes a set of example YAML files that specify the setting
 * [Run Ark on AWS][0]
 * [Run Ark on GCP][1]
 * [Run Ark on Azure][2]
+* [Use IBM Cloud Object Store as Ark's storage destination][4]
 
 ## Examples
 
@@ -37,7 +38,7 @@ After you set up the Ark server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 ### Snapshot example (with PersistentVolumes)
@@ -67,11 +68,12 @@ After you set up the Ark server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 [0]: aws-config.md
 [1]: gcp-config.md
 [2]: azure-config.md
 [3]: namespace.md
+[4]: ibm-config.md
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming

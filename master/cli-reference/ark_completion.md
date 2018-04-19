@@ -1,21 +1,29 @@
-## ark backup logs
+## ark completion
 
-Get backup logs
+Output shell completion code for the specified shell (bash or zsh)
 
 ### Synopsis
 
 
-Get backup logs
+Generate shell completion code.
+
+Auto completion supports both bash and zsh. Output is to STDOUT.
+
+Load the ark completion code for bash into the current shell -
+source <(ark completion bash)
+
+Load the ark completion code for zsh into the current shell -
+source <(ark completion zsh)
+
 
 ```
-ark backup logs BACKUP [flags]
+ark completion SHELL [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help               help for logs
-      --timeout duration   how long to wait to receive logs (default 1m0s)
+  -h, --help   help for completion
 ```
 
 ### Options inherited from parent commands
@@ -34,5 +42,5 @@ ark backup logs BACKUP [flags]
 ```
 
 ### SEE ALSO
-* [ark backup](ark_backup.md)	 - Work with backups
+* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 

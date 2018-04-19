@@ -44,12 +44,29 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
 3. Attach policies to give `heptio-ark` the necessary permissions to function:
 
     ```bash
+    BUCKET=<YOUR_BUCKET>
+    
+    ROLE_PERMISSIONS=(
+        compute.disks.get
+        compute.disks.create
+        compute.disks.createSnapshot
+        compute.snapshots.get
+        compute.snapshots.create
+        compute.snapshots.useReadOnly
+        compute.snapshots.delete
+        compute.projects.get
+    )
+
+    gcloud iam roles create heptio_ark.server \
+        --project $PROJECT_ID \
+        --title "Heptio Ark Server" \
+        --permissions "$(IFS=","; echo "${ROLE_PERMISSIONS[*]}")"    
+
     gcloud projects add-iam-policy-binding $PROJECT_ID \
         --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
-        --role roles/compute.storageAdmin
-    gcloud projects add-iam-policy-binding $PROJECT_ID \
-        --member serviceAccount:$SERVICE_ACCOUNT_EMAIL \
-        --role roles/storage.admin
+        --role projects/$PROJECT_ID/roles/heptio_ark.server
+
+    gsutil iam ch serviceAccount:$SERVICE_ACCOUNT_EMAIL:objectAdmin gs://${BUCKET}
     ```
 
 4. Create a service account key, specifying an output file (`credentials-ark`) in your local directory:
@@ -74,7 +91,7 @@ Create a Secret. In the directory of the credentials file you just created, run:
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_SERVER_NAMESPACE> \
+    --namespace <ARK_NAMESPACE> \
     --from-file cloud=credentials-ark
 ```
 
@@ -82,11 +99,7 @@ Specify the following values in the example files:
 
 * In file `examples/gcp/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_PROJECT>`. See the [Config definition][7] for details.
-
-* In file `examples/common/10-deployment.yaml`:
-
-  * Change `spec.template.spec.containers[*].env.name` to "GOOGLE_APPLICATION_CREDENTIALS".
+  * Replace `<YOUR_BUCKET>`. See the [Config definition][7] for details.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
@@ -98,7 +111,7 @@ In the root of your Ark directory, run:
 
   ```bash
   kubectl apply -f examples/gcp/00-ark-config.yaml
-  kubectl apply -f examples/common/10-deployment.yaml
+  kubectl apply -f examples/gcp/10-deployment.yaml
   ```
 
   [0]: namespace.md

@@ -50,7 +50,6 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
     ```bash
     kubectl apply -f examples/common/00-prereqs.yaml
     kubectl apply -f examples/minio/
-    kubectl apply -f examples/common/10-deployment.yaml
     ```
 
     NOTE: If you get an error about Config creation, wait for a minute, then run the commands again.
@@ -107,7 +106,7 @@ Make sure that you install somewhere in your `$PATH`.
 1. Run:
 
     ```
-    ark restore create nginx-backup
+    ark restore create --from-backup nginx-backup
     ```
 
 1. Run:
@@ -137,19 +136,26 @@ For more information, see [the debugging information][18].
 
 ### Clean up
 
-Delete any backups you created:
+If you want to delete any backups you created, including data in object storage and persistent
+volume snapshots, you can run:
 
 ```
-kubectl delete -n heptio-ark backup --all
+ark backup delete BACKUP_NAME
 ```
 
-Before you continue, wait for the following to show no backups:
+This asks the Ark server to delete all backup data associated with `BACKUP_NAME`.  You need to do
+this for each backup you want to permanently delete. A future version of Ark will allow you to
+delete multiple backups by name or label selector.
+
+Once fully removed, the backup is no longer visible when you run:
 
 ```
-ark backup get
+ark backup get BACKUP_NAME
 ```
 
-To remove the Kubernetes objects for this example from your cluster, run:
+If you want to uninstall Ark but preserve the backup data in object storage and persistent volume
+snapshots, it is safe to remove the `heptio-ark` namespace and everything else created for this
+example:
 
 ```
 kubectl delete -f examples/common/
