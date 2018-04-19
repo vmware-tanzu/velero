@@ -8,7 +8,17 @@ Create a restore
 Create a restore
 
 ```
-ark create restore BACKUP [flags]
+ark create restore [RESTORE_NAME] --from-backup BACKUP_NAME [flags]
+```
+
+### Examples
+
+```
+  # create a restore named "restore-1" from backup "backup-1"
+  ark restore create restore-1 --from-backup backup-1
+
+  # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
+  ark restore create --from-backup backup-1
 ```
 
 ### Options
@@ -16,6 +26,7 @@ ark create restore BACKUP [flags]
 ```
       --exclude-namespaces stringArray                  namespaces to exclude from the restore
       --exclude-resources stringArray                   resources to exclude from the restore, formatted as resource.group, such as storageclasses.storage.k8s.io
+      --from-backup string                              backup to restore from
   -h, --help                                            help for restore
       --include-cluster-resources optionalBool[=true]   include cluster-scoped resources in the restore
       --include-namespaces stringArray                  namespaces to include in the restore (use '*' for all namespaces) (default *)
@@ -34,6 +45,7 @@ ark create restore BACKUP [flags]
 ```
       --alsologtostderr                  log to standard error as well as files
       --kubeconfig string                Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration
+      --kubecontext string               The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)
       --log_backtrace_at traceLocation   when logging hits line file:N, emit a stack trace (default :0)
       --log_dir string                   If non-empty, write log files in this directory
       --logtostderr                      log to standard error instead of files
