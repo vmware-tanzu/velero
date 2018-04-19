@@ -121,6 +121,11 @@ container-name:
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
 	@docker push $(IMAGE):$(VERSION)
+	@if git describe --tags --exact-match >/dev/null 2>&1; \
+	then \
+		docker tag $(IMAGE):$(VERSION) $(IMAGE):latest; \
+		docker push $(IMAGE):latest; \
+	fi
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
 push-name:
