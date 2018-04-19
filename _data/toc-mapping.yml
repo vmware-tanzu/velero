@@ -9,6 +9,7 @@
 # v0.11.0: default
 # v0.12.0: default
 
-master: v7-1-toc
+master: v8-toc
+v0.8.0: v8-toc
 v0.7.1: v7-1-toc
 v0.7.0: v7-toc
