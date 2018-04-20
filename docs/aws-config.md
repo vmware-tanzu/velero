@@ -267,6 +267,7 @@ It can be set up for Ark by creating a role that will have required permissions,
 
 5. Run Ark deployment using the file `examples/aws/10-deployment-kube2iam.yaml`.
 
-  [0]: namespace.md
-  [6]: config-definition.md#aws
-  [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+[0]: namespace.md
+[5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
+[6]: config-definition.md#aws
+[14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
