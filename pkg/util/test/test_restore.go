@@ -65,6 +65,11 @@ func (r *TestRestore) WithBackup(name string) *TestRestore {
 	return r
 }
 
+func (r *TestRestore) WithSchedule(name string) *TestRestore {
+	r.Spec.ScheduleName = name
+	return r
+}
+
 func (r *TestRestore) WithErrors(i int) *TestRestore {
 	r.Status.Errors = i
 	return r

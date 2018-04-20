@@ -24,6 +24,11 @@ type RestoreSpec struct {
 	// from.
 	BackupName string `json:"backupName"`
 
+	// ScheduleName is the unique name of the Ark schedule to restore
+	// from. If specified, and BackupName is empty, Ark will restore
+	// from the most recent successful backup created from this schedule.
+	ScheduleName string `json:"scheduleName,omitempty"`
+
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
 	IncludedNamespaces []string `json:"includedNamespaces"`
