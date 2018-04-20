@@ -16,10 +16,6 @@ To store your backups, schedules, restores, and config in another namespace, you
 files, changing `heptio-ark` to your desired namespace. You also need to create the
 `cloud-credentials` secret in your desired namespace.
 
-WARNING: It is recommended to run the Ark server in one namespace, and place your backups, schedules,
-restores, and config in a different namespace. You might encounter issues with deleting a single Ark
-namespace that contains everything.
-
 For all cloud providers, edit `https://github.com/heptio/ark/blob/master/examples/common/00-prereqs.yaml`. This file defines:
 
 * CustomResourceDefinitions for the Ark objects (backups, schedules, restores, configs, downloadrequests)
