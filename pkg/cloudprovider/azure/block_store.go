@@ -128,7 +128,7 @@ func (b *blockStore) Init(config map[string]string) error {
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
-	snapshotIdentifier, err := parseFullSnapshotName(snapshotID)
+	snapshotIdentifier, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return "", err
 	}
@@ -264,7 +264,7 @@ func stringPtr(s string) *string {
 }
 
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
-	snapshotInfo, err := parseFullSnapshotName(snapshotID)
+	snapshotInfo, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return err
 	}
@@ -286,8 +286,34 @@ func getComputeResourceName(subscription, resourceGroup, resource, name string) 
 var snapshotURIRegexp = regexp.MustCompile(
 	`^\/subscriptions\/(?P<subscription>.*)\/resourceGroups\/(?P<resourceGroup>.*)\/providers\/Microsoft.Compute\/snapshots\/(?P<snapshotName>.*)$`)
 
-// parseFullSnapshotName takes a snapshot URI and returns a snapshot identifier
-// or an error if the URI does not match the regexp.
+// parseSnapshotName takes a snapshot name, either fully-qualified or not, and returns
+// a snapshot identifier or an error if the name is not in a valid format. If the name
+// is not fully-qualified, the subscription and resource group are assumed to be the
+// ones that the block store is configured with.
+//
+// TODO(1.0) remove this function and replace usage with `parseFullSnapshotName` since
+// we won't support the legacy snapshot name format for 1.0.
+func (b *blockStore) parseSnapshotName(name string) (*snapshotIdentifier, error) {
+	switch {
+	// legacy format - name only (not fully-qualified)
+	case !strings.Contains(name, "/"):
+		return &snapshotIdentifier{
+			subscription:  b.subscription,
+			resourceGroup: b.resourceGroup,
+			name:          name,
+		}, nil
+	// current format - fully qualified
+	case snapshotURIRegexp.MatchString(name):
+		return parseFullSnapshotName(name)
+	// unrecognized format
+	default:
+		return nil, errors.New("snapshot name is not in a valid format")
+	}
+}
+
+// parseFullSnapshotName takes a fully-qualified snapshot name and returns
+// a snapshot identifier or an error if the snapshot name does not match the
+// regexp.
 func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 	submatches := snapshotURIRegexp.FindStringSubmatch(name)
 	if len(submatches) != len(snapshotURIRegexp.SubexpNames()) {
