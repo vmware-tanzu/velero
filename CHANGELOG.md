@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.8.1](https://github.com/heptio/ark/releases/tag/v0.8.1) - 2018-04-23
+
+##### Bug Fixes:
+  * Azure: allow pre-v0.8.0 backups with disk snapshots to be restored and deleted (#446 #449, @skriss)
+
 #### [v0.8.0](https://github.com/heptio/ark/releases/tag/v0.8.0) - 2018-04-19
 
 ##### Highlights:
