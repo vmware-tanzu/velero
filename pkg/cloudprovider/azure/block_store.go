@@ -64,6 +64,10 @@ type snapshotIdentifier struct {
 	name          string
 }
 
+func (si *snapshotIdentifier) String() string {
+	return getComputeResourceName(si.subscription, si.resourceGroup, snapshotsResource, si.name)
+}
+
 func getConfig() map[string]string {
 	cfg := map[string]string{
 		azureClientIDKey:         "",
@@ -147,7 +151,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		Properties: &disk.Properties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
-				SourceResourceID: &snapshotID,
+				SourceResourceID: stringPtr(snapshotIdentifier.String()),
 			},
 			AccountType: disk.StorageAccountTypes(volumeType),
 		},
