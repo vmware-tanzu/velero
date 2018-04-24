@@ -135,3 +135,36 @@ func TestValidateIncludesExcludes(t *testing.T) {
 		})
 	}
 }
+
+func TestIncludeExcludeString(t *testing.T) {
+	tests := []struct {
+		name             string
+		includes         []string
+		excludes         []string
+		expectedIncludes string
+		expectedExcludes string
+	}{
+		{
+			name:             "unspecified includes/excludes should return '*'/'<none>'",
+			includes:         nil,
+			excludes:         nil,
+			expectedIncludes: "*",
+			expectedExcludes: "<none>",
+		},
+		{
+			name:             "specific resources should result in sorted joined string",
+			includes:         []string{"foo", "bar"},
+			excludes:         []string{"baz", "xyz"},
+			expectedIncludes: "bar, foo",
+			expectedExcludes: "baz, xyz",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ie := NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
+			assert.Equal(t, test.expectedIncludes, ie.IncludesString())
+			assert.Equal(t, test.expectedExcludes, ie.ExcludesString())
+		})
+	}
+}
