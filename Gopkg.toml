@@ -49,10 +49,12 @@
   name = "github.com/robfig/cron"
   revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 
-[[constraint]]
-  name = "github.com/satori/go.uuid"
-  version = "1.1.0"
-
+# TODO(1.0) this repo is a redirect to github.com/satori/go.uuid. Our
+# current version of azure-sdk-for-go references this redirect, so
+# use it so we don't get a duplicate copy of this dependency. 
+# Once our azure-sdk-for-go is updated to a newer version (where
+# their dependency has changed to .../go.uuid), switch this to 
+# github.com/satori/go.uuid
 [[constraint]]
   name = "github.com/satori/uuid"
   version = "1.1.0"
