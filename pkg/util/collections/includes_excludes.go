@@ -79,18 +79,18 @@ func (ie *IncludesExcludes) ShouldInclude(s string) bool {
 // IncludesString returns a string containing all of the includes, separated by commas, or * if the
 // list is empty.
 func (ie *IncludesExcludes) IncludesString() string {
-	return asString(ie.GetIncludes())
+	return asString(ie.GetIncludes(), "*")
 }
 
-// ExcludesString returns a string containing all of the excludes, separated by commas, or * if the
+// ExcludesString returns a string containing all of the excludes, separated by commas, or <none> if the
 // list is empty.
 func (ie *IncludesExcludes) ExcludesString() string {
-	return asString(ie.GetExcludes())
+	return asString(ie.GetExcludes(), "<none>")
 }
 
-func asString(in []string) string {
+func asString(in []string, empty string) string {
 	if len(in) == 0 {
-		return "*"
+		return empty
 	}
 	return strings.Join(in, ", ")
 }
