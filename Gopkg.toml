@@ -83,23 +83,19 @@
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "~1.9"
+  version = "~1.10"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "~6.0"
+  version = "~7.0"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.9.0"
+  version = "kubernetes-1.10.0"
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.9.0"
-
-[[override]]
-  name = "github.com/russross/blackfriday"
-  revision = "93622da34e54fb6529bfb7c57e710f37a8d9cbd8"
+  version = "kubernetes-1.10.0"
 
 [[constraint]]
   branch = "master"
