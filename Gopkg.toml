@@ -25,64 +25,9 @@
   non-go = true
   go-tests = true
 
-[[constraint]]
-  name = "cloud.google.com/go"
-  version = "0.11.0"
-
-[[constraint]]
-  name = "github.com/Azure/azure-sdk-for-go"
-  version = "~10.2.1-beta"
-
-[[constraint]]
-  name = "github.com/Azure/go-autorest"
-  version = "~8.1.x"
-
-[[constraint]]
-  name = "github.com/aws/aws-sdk-go"
-  version = "1.13.12"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/golang/glog"
-
-[[constraint]]
-  name = "github.com/robfig/cron"
-  revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
-
-# TODO(1.0) this repo is a redirect to github.com/satori/go.uuid. Our
-# current version of azure-sdk-for-go references this redirect, so
-# use it so we don't get a duplicate copy of this dependency. 
-# Once our azure-sdk-for-go is updated to a newer version (where
-# their dependency has changed to .../go.uuid), switch this to 
-# github.com/satori/go.uuid
-[[constraint]]
-  name = "github.com/satori/uuid"
-  version = "1.1.0"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/spf13/afero"
-
-[[constraint]]
-  branch = "master"
-  name = "github.com/spf13/cobra"
-
-[[constraint]]
-  name = "github.com/spf13/pflag"
-  version = "1.0.0"
-
-[[constraint]]
-  name = "github.com/stretchr/testify"
-  branch = "master"
-
-[[constraint]]
-  branch = "master"
-  name = "golang.org/x/oauth2"
-
-[[constraint]]
-  branch = "master"
-  name = "google.golang.org/api"
-
+#
+# Kubernetes packages
+#
 [[constraint]]
   name = "k8s.io/kubernetes"
   version = "~1.10"
@@ -99,6 +44,71 @@
   name = "k8s.io/api"
   version = "kubernetes-1.10.0"
 
+#
+# Cloud provider packages
+#
 [[constraint]]
+  name = "github.com/aws/aws-sdk-go"
+  version = "1.13.12"
+
+[[constraint]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  version = "~10.2.1-beta"
+
+[[constraint]]
+  name = "github.com/Azure/go-autorest"
+  version = "~8.1.x"
+
+
+[[constraint]]
+  name = "cloud.google.com/go"
+  version = "0.11.0"
+
+[[constraint]]
+  name = "google.golang.org/api"
   branch = "master"
+
+[[constraint]]
+  name = "golang.org/x/oauth2"
+  branch = "master"
+
+#
+# Third party packages
+#
+[[constraint]]
+  name = "github.com/golang/glog"
+  branch = "master"
+
+[[constraint]]
+  name = "github.com/robfig/cron"
+  revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
+
+# TODO(1.0) this repo is a redirect to github.com/satori/go.uuid. Our
+# current version of azure-sdk-for-go references this redirect, so
+# use it so we don't get a duplicate copy of this dependency. 
+# Once our azure-sdk-for-go is updated to a newer version (where
+# their dependency has changed to .../go.uuid), switch this to 
+# github.com/satori/go.uuid
+[[constraint]]
+  name = "github.com/satori/uuid"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/spf13/afero"
+  branch = "master"
+  
+[[constraint]]
+  name = "github.com/spf13/cobra"
+  branch = "master"
+  
+[[constraint]]
+  name = "github.com/spf13/pflag"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  branch = "master"
+
+[[constraint]]
   name = "github.com/hashicorp/go-plugin"
+  branch = "master"
