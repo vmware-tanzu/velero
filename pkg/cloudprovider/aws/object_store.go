@@ -17,12 +17,14 @@ limitations under the License.
 package aws
 
 import (
+	"context"
 	"io"
 	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
@@ -34,6 +36,7 @@ const (
 	s3URLKey            = "s3Url"
 	kmsKeyIDKey         = "kmsKeyId"
 	s3ForcePathStyleKey = "s3ForcePathStyle"
+	bucketKey           = "bucket"
 )
 
 type objectStore struct {
@@ -46,23 +49,60 @@ func NewObjectStore() cloudprovider.ObjectStore {
 	return &objectStore{}
 }
 
+func getBucketRegion(bucket string) (string, error) {
+	var region string
+
+	session, err := session.NewSession()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	for _, partition := range endpoints.DefaultPartitions() {
+		for regionHint := range partition.Regions() {
+			region, _ = s3manager.GetBucketRegion(context.Background(), session, bucket, regionHint)
+
+			// we only need to try a single region hint per partition, so break after the first
+			break
+		}
+
+		if region != "" {
+			return region, nil
+		}
+	}
+
+	return "", errors.New("unable to determine bucket's region")
+}
+
 func (o *objectStore) Init(config map[string]string) error {
 	var (
 		region              = config[regionKey]
 		s3URL               = config[s3URLKey]
 		kmsKeyID            = config[kmsKeyIDKey]
 		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
-		s3ForcePathStyle    bool
-		err                 error
-	)
 
-	if region == "" {
-		return errors.Errorf("missing %s in aws configuration", regionKey)
-	}
+		// note that bucket is automatically added to the config map
+		// by the server from the ObjectStorageProviderConfig so
+		// doesn't need to be explicitly set by the user within
+		// config.
+		bucket           = config[bucketKey]
+		s3ForcePathStyle bool
+		err              error
+	)
 
 	if s3ForcePathStyleVal != "" {
 		if s3ForcePathStyle, err = strconv.ParseBool(s3ForcePathStyleVal); err != nil {
 			return errors.Wrapf(err, "could not parse %s (expected bool)", s3ForcePathStyleKey)
+		}
+	}
+
+	// AWS (not an alternate S3-compatible API) and region not
+	// explicitly specified: determine the bucket's region
+	if s3URL == "" && region == "" {
+		var err error
+
+		region, err = getBucketRegion(bucket)
+		if err != nil {
+			return err
 		}
 	}
 

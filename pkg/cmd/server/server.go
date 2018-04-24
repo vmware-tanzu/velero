@@ -329,6 +329,15 @@ func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
 	} else {
 		logger.WithField("priorities", c.ResourcePriorities).Info("Using resource priorities from config")
 	}
+
+	if c.BackupStorageProvider.Config == nil {
+		c.BackupStorageProvider.Config = make(map[string]string)
+	}
+
+	// add the bucket name to the config map so that object stores can use
+	// it when initializing. The AWS object store uses this to determine the
+	// bucket's region when setting up its client.
+	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // watchConfig adds an update event handler to the Config shared informer, invoking s.cancelFunc
