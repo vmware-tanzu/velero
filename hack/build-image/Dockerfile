@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM gcr.io/heptio-images/golang:1.9-alpine3.6
+FROM golang:1.9-alpine3.6
 
-RUN mkdir -p /go/src/k8s.io && \
+RUN apk add --update --no-cache git bash && \
+    mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
     git clone -b kubernetes-1.9.0 https://github.com/kubernetes/code-generator && \
     git clone -b kubernetes-1.9.0 https://github.com/kubernetes/apimachinery && \
