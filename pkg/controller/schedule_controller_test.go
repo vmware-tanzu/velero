@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
@@ -35,7 +36,6 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -159,13 +159,11 @@ func TestProcessSchedule(t *testing.T) {
 					}
 
 					// these are the fields that may be updated by the controller
-					phase, err := collections.GetString(patchMap, "status.phase")
-					if err == nil {
+					if phase, found, _ := unstructured.NestedString(patchMap, "status", "phase"); found {
 						res.Status.Phase = api.SchedulePhase(phase)
 					}
 
-					lastBackupStr, err := collections.GetString(patchMap, "status.lastBackup")
-					if err == nil {
+					if lastBackupStr, found, _ := unstructured.NestedString(patchMap, "status", "lastBackup"); found {
 						parsed, err := time.Parse(time.RFC3339, lastBackupStr)
 						if err != nil {
 							t.Logf("error parsing status.lastBackup: %s\n", err)
@@ -204,11 +202,12 @@ func TestProcessSchedule(t *testing.T) {
 
 				expectedStatusKeys := 1
 
-				assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
+				assert.True(t, hasKeyAndVal(patch, test.expectedPhase, "status", "phase"), "patch's status.phase does not match")
 
 				if test.expectedValidationError != "" {
-					errs, err := collections.GetSlice(patch, "status.validationErrors")
-					require.NoError(t, err, "error getting patch's status.validationErrors")
+					errs, found, err := unstructured.NestedSlice(patch, "status", "validationErrors")
+					require.True(t, found, "error getting patch's status.validationErrors")
+					require.Nil(t, err)
 
 					require.Equal(t, 1, len(errs))
 
@@ -217,7 +216,9 @@ func TestProcessSchedule(t *testing.T) {
 					expectedStatusKeys++
 				}
 
-				res, _ := collections.GetMap(patch, "status")
+				res, found, err := unstructured.NestedMap(patch, "status")
+				require.True(t, found)
+				require.Nil(t, err)
 				assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
 
 				index++
@@ -247,16 +248,18 @@ func TestProcessSchedule(t *testing.T) {
 
 				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
 
-				lastBackup, _ := collections.GetValue(patch, "status.lastBackup")
+				lastBackup, _, _ := unstructured.NestedString(patch, "status", "lastBackup")
 				fmt.Println(lastBackup)
 
 				assert.True(
 					t,
-					collections.HasKeyAndVal(patch, "status.lastBackup", parseTime(test.expectedLastBackup).UTC().Format(time.RFC3339)),
+					hasKeyAndVal(patch, parseTime(test.expectedLastBackup).UTC().Format(time.RFC3339), "status", "lastBackup"),
 					"patch's status.lastBackup does not match",
 				)
 
-				res, _ := collections.GetMap(patch, "status")
+				res, found, err := unstructured.NestedMap(patch, "status")
+				require.True(t, found)
+				require.Nil(t, err)
 				assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
 
 				index++

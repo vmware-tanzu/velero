@@ -21,11 +21,11 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // podAction implements ItemAction.
@@ -54,8 +54,11 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	a.log.Info("Executing podAction")
 	defer a.log.Info("Done executing podAction")
 
-	pod := item.UnstructuredContent()
-	if !collections.Exists(pod, "spec.volumes") {
+	volumes, found, err := unstructured.NestedSlice(item.UnstructuredContent(), "spec", "volumes")
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+	if !found {
 		a.log.Info("pod has no volumes")
 		return item, nil, nil
 	}
@@ -65,13 +68,10 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		return nil, nil, errors.Wrap(err, "unable to access pod metadata")
 	}
 
-	volumes, err := collections.GetSlice(pod, "spec.volumes")
-	if err != nil {
-		return nil, nil, errors.WithMessage(err, "error getting spec.volumes")
-	}
-
-	var errs []error
-	var additionalItems []ResourceIdentifier
+	var (
+		errs            []error
+		additionalItems []ResourceIdentifier
+	)
 
 	for i := range volumes {
 		volume, ok := volumes[i].(map[string]interface{})
@@ -79,13 +79,12 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 			errs = append(errs, errors.Errorf("unexpected type %T", volumes[i]))
 			continue
 		}
-		if !collections.Exists(volume, "persistentVolumeClaim.claimName") {
-			continue
-		}
 
-		claimName, err := collections.GetString(volume, "persistentVolumeClaim.claimName")
+		claimName, found, err := unstructured.NestedString(volume, "persistentVolumeClaim", "claimName")
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.WithStack(err))
+		}
+		if !found {
 			continue
 		}
 

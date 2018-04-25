@@ -25,12 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -175,18 +175,22 @@ func TestProcessDownloadRequest(t *testing.T) {
 			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
 
 			// check the URL
-			assert.True(t, collections.HasKeyAndVal(patch, "status.downloadURL", tc.expectedURL), "patch's status.downloadURL does not match")
+			assert.True(t, hasKeyAndVal(patch, tc.expectedURL, "status", "downloadURL"), "patch's status.downloadURL does not match")
 
 			// check the Phase
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(tc.expectedPhase)), "patch's status.phase does not match")
+			assert.True(t, hasKeyAndVal(patch, string(tc.expectedPhase), "status", "phase"), "patch's status.phase does not match")
 
 			// check that Expiration exists
 			// TODO pass a fake clock to the controller and verify
 			// the expiration value
-			assert.True(t, collections.Exists(patch, "status.expiration"), "patch's status.expiration does not exist")
+			_, found, err := unstructured.NestedString(patch, "status", "expiration")
+			assert.Nil(t, err)
+			assert.True(t, found, "patch's status.expiration does not exist")
 
 			// we expect 3 total updates.
-			res, _ := collections.GetMap(patch, "status")
+			res, found, err := unstructured.NestedMap(patch, "status")
+			assert.Nil(t, err)
+			assert.True(t, found)
 			assert.Equal(t, 3, len(res), "patch's status has the wrong number of keys")
 		})
 	}

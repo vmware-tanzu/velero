@@ -48,6 +48,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/errcheck"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 )
@@ -689,13 +690,8 @@ func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructur
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, err
-	}
-
-	delete(spec, "claimRef")
-	delete(spec, "storageClassName")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "claimRef")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "storageClassName")
 
 	if boolptr.IsSetToFalse(ctx.backup.Spec.SnapshotVolumes) {
 		// The backup had snapshots disabled, so we can return early
@@ -760,18 +756,15 @@ func objectsAreEqual(fromCluster, fromBackup *unstructured.Unstructured) (bool, 
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
-	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
-	if err != nil {
-		return false
-	}
+	phase, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 
 	return phase == string(v1.VolumeAvailable)
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, err
+	metadata, found, err := unstructured.NestedMap(obj.UnstructuredContent(), "metadata")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to find metadata"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	for k := range metadata {
@@ -780,6 +773,10 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 		default:
 			delete(metadata, k)
 		}
+	}
+
+	if err := unstructured.SetNestedField(obj.UnstructuredContent(), metadata, "metadata"); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	// this should never be backed up anyway, but remove it just

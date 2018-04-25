@@ -31,10 +31,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 const (
@@ -345,26 +346,34 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
-		return "", nil
+	azureDisk, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if err != nil || !found {
+		return "", errors.WithStack(err)
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.azureDisk.diskName")
-	if err != nil {
-		return "", err
+	diskName, found, err := unstructured.NestedString(azureDisk, "diskName")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.azureDisk.diskName"); err != nil {
+		return "", errors.WithStack(err)
 	}
 
-	return volumeID, nil
+	return diskName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
-	if err != nil {
+	_, found, err := unstructured.NestedMap(pv.UnstructuredContent(), "spec", "azureDisk")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to get spec.azureDisk"); err != nil {
 		return nil, err
 	}
 
-	azure["diskName"] = volumeID
-	azure["diskURI"] = getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "azureDisk", "diskName"); err != nil {
+		return nil, errors.Wrap(err, "unable to set spec.azureDisk.diskName")
+	}
+
+	diskURI := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), diskURI, "spec", "azureDisk", "diskURI"); err != nil {
+		return nil, errors.WithStack(err)
+	}
 
 	return pv, nil
 }

@@ -17,12 +17,14 @@ limitations under the License.
 package restore
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/errcheck"
 )
 
 type serviceAction struct {
@@ -42,24 +44,23 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, nil, err
+	// Since clusterIP is an optional key, we can ignore 'not found' errors.
+	if val, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "spec", "clusterIP"); val != "None" {
+		unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "clusterIP")
 	}
 
-	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
-	if val, _ := collections.GetString(spec, "clusterIP"); val != "None" {
-		delete(spec, "clusterIP")
-	}
-
-	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
-	if err != nil {
-		return nil, nil, err
+	ports, found, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "ports")
+	if err := errcheck.ErrOrNotFound(found, err, "unable to find spec.ports"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	for _, port := range ports {
 		p := port.(map[string]interface{})
 		delete(p, "nodePort")
+	}
+
+	if err := unstructured.SetNestedSlice(obj.UnstructuredContent(), ports, "spec", "ports"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	return obj, nil, nil

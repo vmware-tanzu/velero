@@ -753,12 +753,6 @@ func TestExecutePVAction(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "no spec should error",
-			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
-			restore:     arktest.NewDefaultTestRestore().Restore,
-			expectedErr: true,
-		},
-		{
 			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
@@ -1218,16 +1212,14 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, nil, err
+	labels, found, _ := unstructured.NestedMap(obj.UnstructuredContent(), "metadata", "labels")
+	if !found {
+		val := map[string]interface{}{"fake-restorer": "foo"}
+		unstructured.SetNestedField(obj.UnstructuredContent(), val, "metadata", "labels")
+	} else {
+		labels["fake-restorer"] = "foo"
+		unstructured.SetNestedField(obj.UnstructuredContent(), labels, "metadata", "labels")
 	}
-
-	if _, found := metadata["labels"]; !found {
-		metadata["labels"] = make(map[string]interface{})
-	}
-
-	metadata["labels"].(map[string]interface{})["fake-restorer"] = "foo"
 
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {

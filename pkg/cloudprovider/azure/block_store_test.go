@@ -19,7 +19,6 @@ package azure
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -71,22 +70,26 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
-	require.NoError(t, err)
+	actual, found, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	require.Nil(t, err)
+	require.True(t, found)
 	assert.Equal(t, "updated", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
-	require.NoError(t, err)
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
+	require.Nil(t, err)
+	require.True(t, found)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", actual)
 
 	// with diskURI
 	azure["diskURI"] = "/foo/bar/updated/blarg"
 	updatedPV, err = b.SetVolumeID(pv, "revised")
 	require.NoError(t, err)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
-	require.NoError(t, err)
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
+	require.Nil(t, err)
+	require.True(t, found)
 	assert.Equal(t, "revised", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
-	require.NoError(t, err)
+	actual, found, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
+	require.True(t, found)
+	require.Nil(t, err)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", actual)
 }
 
