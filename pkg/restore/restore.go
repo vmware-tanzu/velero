@@ -559,6 +559,16 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			continue
 		}
 
+		complete, err := isCompleted(obj, groupResource)
+		if err != nil {
+			addToResult(&errs, namespace, fmt.Errorf("error checking completion %q: %v", fullPath, err))
+			continue
+		}
+		if complete {
+			ctx.infof("%s is complete - skipping", kube.NamespaceAndName(obj))
+			continue
+		}
+
 		if resourceClient == nil {
 			// initialize client for this Resource. we need
 			// metadata from an object to do this.
@@ -782,8 +792,7 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 		}
 	}
 
-	// this should never be backed up anyway, but remove it just
-	// in case.
+	// Never restore status
 	delete(obj.UnstructuredContent(), "status")
 
 	return obj, nil
@@ -812,6 +821,37 @@ func hasControllerOwner(refs []metav1.OwnerReference) bool {
 		}
 	}
 	return false
+}
+
+// TODO(0.9): These are copied from backup/item_backupper. Definititions should be moved
+// to a shared package and imported here and in the backup package.
+var podsGroupResource = schema.GroupResource{Group: "", Resource: "pods"}
+var jobsGroupResource = schema.GroupResource{Group: "batch", Resource: "jobs"}
+
+// isCompleted returns whether or not an object is considered completed.
+// Used to identify whether or not an object should be restored. Only Jobs or Pods are considered
+func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResource) (bool, error) {
+	switch groupResource {
+	case podsGroupResource:
+		phase, _, err := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
+		if err != nil {
+			return false, errors.WithStack(err)
+		}
+		if phase == string(v1.PodFailed) || phase == string(v1.PodSucceeded) {
+			return true, nil
+		}
+
+	case jobsGroupResource:
+		ct, found, err := unstructured.NestedString(obj.UnstructuredContent(), "status", "completionTime")
+		if err != nil {
+			return false, errors.WithStack(err)
+		}
+		if found && ct != "" {
+			return true, nil
+		}
+	}
+	// Assume any other resource isn't complete and can be restored
+	return false, nil
 }
 
 // unmarshal reads the specified file, unmarshals the JSON contained within it

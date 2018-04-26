@@ -164,13 +164,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
 		},
 		{
-			name:                  "make sure status is deleted",
-			item:                  `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
-			expectError:           false,
-			expectExcluded:        false,
-			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
-		},
-		{
 			name:                "tar header write error",
 			item:                `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
 			expectError:         true,
@@ -376,17 +369,14 @@ func TestBackupItemNoSkips(t *testing.T) {
 				return
 			}
 
-			// we have to delete status as that's what backupItem does,
-			// and this ensures that we're verifying the right data
-			delete(item, "status")
-			itemWithoutStatus, err := json.Marshal(&item)
+			// Convert to JSON for comparing number of bytes to the tar header
+			itemJSON, err := json.Marshal(&item)
 			if err != nil {
 				t.Fatal(err)
 			}
-
 			require.Equal(t, 1, len(w.headers), "headers")
 			assert.Equal(t, test.expectedTarHeaderName, w.headers[0].Name, "header.name")
-			assert.Equal(t, int64(len(itemWithoutStatus)), w.headers[0].Size, "header.size")
+			assert.Equal(t, int64(len(itemJSON)), w.headers[0].Size, "header.size")
 			assert.Equal(t, byte(tar.TypeReg), w.headers[0].Typeflag, "header.typeflag")
 			assert.Equal(t, int64(0755), w.headers[0].Mode, "header.mode")
 			assert.False(t, w.headers[0].ModTime.IsZero(), "header.modTime set")

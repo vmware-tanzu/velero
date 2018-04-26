@@ -162,9 +162,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	log.Info("Backing up resource")
 
-	// Never save status
-	delete(obj.UnstructuredContent(), "status")
-
 	log.Debug("Executing pre hooks")
 	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePre); err != nil {
 		return err

@@ -18,6 +18,7 @@ package restore
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -671,6 +672,75 @@ func TestResetMetadataAndStatus(t *testing.T) {
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestIsCompleted(t *testing.T) {
+	tests := []struct {
+		name          string
+		expected      bool
+		content       string
+		groupResource schema.GroupResource
+		expectedErr   bool
+	}{
+		{
+			name:          "Failed pods are complete",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Failed"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Succeeded pods are complete",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Succeeded"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Pending pods aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Pending"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Running pods aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Running"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Jobs without a completion time aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Jobs with a completion time are completed",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"completionTime": "bar"}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Jobs with an empty completion time are not completed",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"completionTime": ""}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Something not a pod or a job may actually be complete, but we're not concerned with that",
+			expected:      false,
+			content:       `{"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "ns"}, "status": {"completionTime": "bar", "phase":"Completed"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "namespaces"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u := unstructuredOrDie(fmt.Sprintf(test.content))
+			backup, err := isCompleted(u, test.groupResource)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expected, backup)
 			}
 		})
 	}
