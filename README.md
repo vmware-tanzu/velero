@@ -165,7 +165,7 @@ kubectl delete -f examples/nginx-app/base.yaml
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
 
 ## Contributing
 
@@ -210,7 +210,7 @@ See [the list of releases][6] to find out about feature changes.
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
 [24]: http://j.hept.io/ark-list
-[25]: http://slack.kubernetes.io/
+[25]: https://kubernetes.slack.com/messages/ark-dr
 [26]: https://github.com/heptio/ark/releases
 [27]: /docs/hooks.md
 [28]: /docs/plugins.md
