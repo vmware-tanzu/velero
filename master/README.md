@@ -165,7 +165,7 @@ kubectl delete -f examples/nginx-app/base.yaml
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [Kubernetes Slack team][25] channel `#ark-dr`.
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
 
 ## Contributing
 
@@ -189,30 +189,30 @@ See [the list of releases][6] to find out about feature changes.
 [0]: https://github.com/heptio
 [1]: https://travis-ci.org/heptio/ark.svg?branch=master
 [2]: https://travis-ci.org/heptio/ark
-[3]: /cloud-common.md
+[3]: /docs/cloud-common.md
 [4]: https://github.com/heptio/ark/issues
 [5]: https://github.com/heptio/ark/blob/master/CONTRIBUTING.md
 [6]: https://github.com/heptio/ark/releases
-[7]: /build-from-scratch.md
+[7]: /docs/build-from-scratch.md
 [8]: https://github.com/heptio/ark/blob/master/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
-[13]: /output-file-format.md
+[13]: /docs/output-file-format.md
 [14]: https://github.com/kubernetes/kubernetes
 [15]: https://aws.amazon.com/
 [16]: https://cloud.google.com/
 [17]: https://azure.microsoft.com/
-[18]: /debugging-restores.md
-[19]: /img/backup-process.png
+[18]: /docs/debugging-restores.md
+[19]: /docs/img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
 [24]: http://j.hept.io/ark-list
-[25]: http://slack.kubernetes.io/
+[25]: https://kubernetes.slack.com/messages/ark-dr
 [26]: https://github.com/heptio/ark/releases
-[27]: /hooks.md
-[28]: /plugins.md
+[27]: /docs/hooks.md
+[28]: /docs/plugins.md
 [29]: https://heptio.github.io/ark/
-[30]: /troubleshooting.md
+[30]: /docs/troubleshooting.md
