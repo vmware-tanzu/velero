@@ -451,6 +451,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.backupService,
 		config.BackupStorageProvider.Bucket,
 		config.BackupSyncPeriod.Duration,
+		s.namespace,
 		s.logger,
 	)
 	wg.Add(1)
