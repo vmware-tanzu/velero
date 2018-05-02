@@ -62,7 +62,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		get.NewCommand(f),
 		describe.NewCommand(f),
 		create.NewCommand(f),
-		runplugin.NewCommand(),
+		runplugin.NewCommand(f),
 		plugin.NewCommand(f),
 		delete.NewCommand(f),
 		cliclient.NewCommand(),

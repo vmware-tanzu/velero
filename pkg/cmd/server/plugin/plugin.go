@@ -22,39 +22,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cloudprovider/aws"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
+	"github.com/heptio/ark/pkg/cmd"
 	arkplugin "github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 )
 
-func NewCommand() *cobra.Command {
+func NewCommand(f client.Factory) *cobra.Command {
 	logger := arkplugin.NewLogger()
-
-	objectStores := map[string]cloudprovider.ObjectStore{
-		"aws":   aws.NewObjectStore(),
-		"gcp":   gcp.NewObjectStore(),
-		"azure": azure.NewObjectStore(),
-	}
-
-	blockStores := map[string]cloudprovider.BlockStore{
-		"aws":   aws.NewBlockStore(),
-		"gcp":   gcp.NewBlockStore(logger),
-		"azure": azure.NewBlockStore(),
-	}
-
-	backupItemActions := map[string]backup.ItemAction{
-		"pv":  backup.NewBackupPVAction(logger),
-		"pod": backup.NewPodAction(logger),
-	}
-
-	restoreItemActions := map[string]restore.ItemAction{
-		"job": restore.NewJobAction(logger),
-		"pod": restore.NewPodAction(logger),
-		"svc": restore.NewServiceAction(logger),
-	}
 
 	c := &cobra.Command{
 		Use:    "run-plugin [KIND] [NAME]",
@@ -72,18 +51,24 @@ func NewCommand() *cobra.Command {
 				GRPCServer:      plugin.DefaultGRPCServer,
 			}
 
-			logger.Debugf("Executing run-plugin command")
+			logger.Debug("Executing run-plugin command")
 
 			switch kind {
 			case "cloudprovider":
-				objectStore, found := objectStores[name]
-				if !found {
-					logger.Fatalf("Unrecognized plugin name")
-				}
+				var (
+					objectStore cloudprovider.ObjectStore
+					blockStore  cloudprovider.BlockStore
+				)
 
-				blockStore, found := blockStores[name]
-				if !found {
-					logger.Fatalf("Unrecognized plugin name")
+				switch name {
+				case "aws":
+					objectStore, blockStore = aws.NewObjectStore(), aws.NewBlockStore()
+				case "azure":
+					objectStore, blockStore = azure.NewObjectStore(), azure.NewBlockStore()
+				case "gcp":
+					objectStore, blockStore = gcp.NewObjectStore(), gcp.NewBlockStore(logger)
+				default:
+					logger.Fatal("Unrecognized plugin name")
 				}
 
 				serveConfig.Plugins = map[string]plugin.Plugin{
@@ -91,25 +76,45 @@ func NewCommand() *cobra.Command {
 					string(arkplugin.PluginKindBlockStore):  arkplugin.NewBlockStorePlugin(blockStore),
 				}
 			case arkplugin.PluginKindBackupItemAction.String():
-				action, found := backupItemActions[name]
-				if !found {
-					logger.Fatalf("Unrecognized plugin name")
+				var action backup.ItemAction
+
+				switch name {
+				case "pv":
+					action = backup.NewBackupPVAction(logger)
+				case "pod":
+					action = backup.NewPodAction(logger)
+				case "serviceaccount":
+					clientset, err := f.KubeClient()
+					cmd.CheckError(err)
+
+					action, err = backup.NewServiceAccountAction(logger, clientset.RbacV1().ClusterRoleBindings())
+					cmd.CheckError(err)
+				default:
+					logger.Fatal("Unrecognized plugin name")
 				}
 
 				serveConfig.Plugins = map[string]plugin.Plugin{
 					kind: arkplugin.NewBackupItemActionPlugin(action),
 				}
 			case arkplugin.PluginKindRestoreItemAction.String():
-				action, found := restoreItemActions[name]
-				if !found {
-					logger.Fatalf("Unrecognized plugin name")
+				var action restore.ItemAction
+
+				switch name {
+				case "job":
+					action = restore.NewJobAction(logger)
+				case "pod":
+					action = restore.NewPodAction(logger)
+				case "svc":
+					action = restore.NewServiceAction(logger)
+				default:
+					logger.Fatal("Unrecognized plugin name")
 				}
 
 				serveConfig.Plugins = map[string]plugin.Plugin{
 					kind: arkplugin.NewRestoreItemActionPlugin(action),
 				}
 			default:
-				logger.Fatalf("Unsupported plugin kind")
+				logger.Fatal("Unsupported plugin kind")
 			}
 
 			plugin.Serve(serveConfig)
