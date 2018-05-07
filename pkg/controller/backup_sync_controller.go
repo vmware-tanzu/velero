@@ -37,6 +37,7 @@ type backupSyncController struct {
 	backupService cloudprovider.BackupService
 	bucket        string
 	syncPeriod    time.Duration
+	namespace     string
 	logger        logrus.FieldLogger
 }
 
@@ -45,6 +46,7 @@ func NewBackupSyncController(
 	backupService cloudprovider.BackupService,
 	bucket string,
 	syncPeriod time.Duration,
+	namespace string,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {
@@ -56,6 +58,7 @@ func NewBackupSyncController(
 		backupService: backupService,
 		bucket:        bucket,
 		syncPeriod:    syncPeriod,
+		namespace:     namespace,
 		logger:        logger,
 	}
 }
@@ -88,6 +91,7 @@ func (c *backupSyncController) run() {
 		// faster than the sync finishes. Just process them as we find them.
 		cloudBackup.Finalizers = stringslice.Except(cloudBackup.Finalizers, gcFinalizer)
 
+		cloudBackup.Namespace = c.namespace
 		cloudBackup.ResourceVersion = ""
 		if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !kuberrs.IsAlreadyExists(err) {
 			logContext.WithError(errors.WithStack(err)).Error("Error syncing backup from object storage")

@@ -36,6 +36,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		name               string
 		getAllBackupsError error
 		cloudBackups       []*v1.Backup
+		namespace          string
 	}{
 		{
 			name: "no cloud backups",
@@ -49,20 +50,31 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			cloudBackups: []*v1.Backup{
 				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
 				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
-				arktest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
 			},
+			namespace: "ns-1",
 		},
 		{
 			name: "Finalizer gets removed on sync",
 			cloudBackups: []*v1.Backup{
 				arktest.NewTestBackup().WithNamespace("ns-1").WithFinalizers(gcFinalizer).Backup,
 			},
+			namespace: "ns-1",
 		},
 		{
 			name: "Only target finalizer is removed",
 			cloudBackups: []*v1.Backup{
 				arktest.NewTestBackup().WithNamespace("ns-1").WithFinalizers(gcFinalizer, "blah").Backup,
 			},
+			namespace: "ns-1",
+		},
+		{
+			name: "backups get created in Ark server's namespace",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-2").WithName("backup-2").Backup,
+			},
+			namespace: "heptio-ark",
 		},
 	}
 
@@ -79,6 +91,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				bs,
 				"bucket",
 				time.Duration(0),
+				test.namespace,
 				logger,
 			).(*backupSyncController)
 
@@ -92,9 +105,10 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			for _, cloudBackup := range test.cloudBackups {
 				// Verify that the run function stripped the GC finalizer
 				assert.False(t, stringslice.Has(cloudBackup.Finalizers, gcFinalizer))
+				assert.Equal(t, test.namespace, cloudBackup.Namespace)
 				action := core.NewCreateAction(
 					v1.SchemeGroupVersion.WithResource("backups"),
-					cloudBackup.Namespace,
+					test.namespace,
 					cloudBackup,
 				)
 
