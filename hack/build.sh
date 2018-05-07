@@ -61,7 +61,7 @@ if [[ "${GOOS}" = "windows" ]]; then
   OUTPUT="${OUTPUT}.exe"
 fi
 
-go build -i \
+go build \
     -o ${OUTPUT} \
     -installsuffix "static" \
     -ldflags "${LDFLAGS}" \
