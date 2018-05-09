@@ -98,12 +98,12 @@ shell: build-dirs build-image
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd)/.go/pkg:/go/pkg" \
-		-v "$$(pwd)/.go/std:/go/std" \
-		-v "$$(pwd):/go/src/$(PKG)" \
-		-v "$$(pwd)/_output/bin:/output" \
-		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static" \
-		-v "$$(pwd)/.go/go-build:/.cache/go-build" \
+		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
+		-v "$$(pwd)/.go/std:/go/std:delegated" \
+		-v "$$(pwd):/go/src/$(PKG):delegated" \
+		-v "$$(pwd)/_output/bin:/output:delegated" \
+		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
+		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
 		-w /go/src/$(PKG) \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
