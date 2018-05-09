@@ -18,7 +18,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -41,15 +40,15 @@ import (
 
 func TestProcessSchedule(t *testing.T) {
 	tests := []struct {
-		name                    string
-		scheduleKey             string
-		schedule                *api.Schedule
-		fakeClockTime           string
-		expectedErr             bool
-		expectedPhase           string
-		expectedValidationError string
-		expectedBackupCreate    *api.Backup
-		expectedLastBackup      string
+		name                     string
+		scheduleKey              string
+		schedule                 *api.Schedule
+		fakeClockTime            string
+		expectedErr              bool
+		expectedPhase            string
+		expectedValidationErrors []string
+		expectedBackupCreate     *api.Backup
+		expectedLastBackup       string
 	}{
 		{
 			name:        "invalid key returns error",
@@ -67,25 +66,25 @@ func TestProcessSchedule(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name:                    "schedule with phase New gets validated and failed if invalid",
-			schedule:                arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
-			expectedErr:             false,
-			expectedPhase:           string(api.SchedulePhaseFailedValidation),
-			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
+			name:                     "schedule with phase New gets validated and failed if invalid",
+			schedule:                 arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
+			expectedErr:              false,
+			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
-			name:                    "schedule with phase <blank> gets validated and failed if invalid",
-			schedule:                arktest.NewTestSchedule("ns", "name").Schedule,
-			expectedErr:             false,
-			expectedPhase:           string(api.SchedulePhaseFailedValidation),
-			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
+			name:                     "schedule with phase <blank> gets validated and failed if invalid",
+			schedule:                 arktest.NewTestSchedule("ns", "name").Schedule,
+			expectedErr:              false,
+			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
-			name:                    "schedule with phase Enabled gets re-validated and failed if invalid",
-			schedule:                arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
-			expectedErr:             false,
-			expectedPhase:           string(api.SchedulePhaseFailedValidation),
-			expectedValidationError: "Schedule must be a non-empty valid Cron expression",
+			name:                     "schedule with phase Enabled gets re-validated and failed if invalid",
+			schedule:                 arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
+			expectedErr:              false,
+			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                 "schedule with phase New gets validated and triggers a backup",
@@ -191,34 +190,34 @@ func TestProcessSchedule(t *testing.T) {
 			actions := client.Actions()
 			index := 0
 
+			type PatchStatus struct {
+				ValidationErrors []string          `json:"validationErrors"`
+				Phase            api.SchedulePhase `json:"phase"`
+				LastBackup       time.Time         `json:"lastBackup"`
+			}
+
+			type Patch struct {
+				Status PatchStatus `json:"status"`
+			}
+
+			decode := func(decoder *json.Decoder) (interface{}, error) {
+				actual := new(Patch)
+				err := decoder.Decode(actual)
+
+				return *actual, err
+			}
+
 			if test.expectedPhase != "" {
 				require.True(t, len(actions) > index, "len(actions) is too small")
 
-				patchAction, ok := actions[index].(core.PatchAction)
-				require.True(t, ok, "action is not a PatchAction")
-
-				patch := make(map[string]interface{})
-				require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
-
-				expectedStatusKeys := 1
-
-				assert.True(t, collections.HasKeyAndVal(patch, "status.phase", test.expectedPhase), "patch's status.phase does not match")
-
-				if test.expectedValidationError != "" {
-					errs, err := collections.GetSlice(patch, "status.validationErrors")
-					require.NoError(t, err, "error getting patch's status.validationErrors")
-
-					require.Equal(t, 1, len(errs))
-
-					assert.Equal(t, test.expectedValidationError, errs[0].(string), "patch's status.validationErrors does not match")
-
-					expectedStatusKeys++
+				expected := Patch{
+					Status: PatchStatus{
+						ValidationErrors: test.expectedValidationErrors,
+						Phase:            api.SchedulePhase(test.expectedPhase),
+					},
 				}
 
-				res, _ := collections.GetMap(patch, "status")
-				assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+				arktest.ValidatePatch(t, actions[index], expected, decode)
 
 				index++
 			}
@@ -239,27 +238,13 @@ func TestProcessSchedule(t *testing.T) {
 			if test.expectedLastBackup != "" {
 				require.True(t, len(actions) > index, "len(actions) is too small")
 
-				patchAction, ok := actions[index].(core.PatchAction)
-				require.True(t, ok, "action is not a PatchAction")
+				expected := Patch{
+					Status: PatchStatus{
+						LastBackup: parseTime(test.expectedLastBackup),
+					},
+				}
 
-				patch := make(map[string]interface{})
-				require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-				assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
-
-				lastBackup, _ := collections.GetValue(patch, "status.lastBackup")
-				fmt.Println(lastBackup)
-
-				assert.True(
-					t,
-					collections.HasKeyAndVal(patch, "status.lastBackup", parseTime(test.expectedLastBackup).UTC().Format(time.RFC3339)),
-					"patch's status.lastBackup does not match",
-				)
-
-				res, _ := collections.GetMap(patch, "status")
-				assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
-
-				index++
+				arktest.ValidatePatch(t, actions[index], expected, decode)
 			}
 		})
 	}

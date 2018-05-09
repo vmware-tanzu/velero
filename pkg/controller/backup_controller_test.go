@@ -156,6 +156,7 @@ func TestProcessBackup(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
 				pluginManager   = &MockManager{}
+				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
 			)
 
 			c := NewBackupController(
@@ -169,7 +170,8 @@ func TestProcessBackup(t *testing.T) {
 				pluginManager,
 				NewBackupTracker(),
 			).(*backupController)
-			c.clock = clock.NewFakeClock(time.Now())
+
+			c.clock = clock.NewFakeClock(clockTime)
 
 			var expiration time.Time
 
@@ -248,40 +250,43 @@ func TestProcessBackup(t *testing.T) {
 			actions := client.Actions()
 			require.Equal(t, 2, len(actions))
 
-			// validate Patch call 1 (setting version, expiration, and phase)
-			patchAction, ok := actions[0].(core.PatchAction)
-			require.True(t, ok, "action is not a PatchAction")
-
-			patch := make(map[string]interface{})
-			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-			// should have status
-			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
-
-			expectedStatusKeys := 2
-			if test.backup.Spec.TTL.Duration > 0 {
-				assert.True(t, collections.HasKeyAndVal(patch, "status.expiration", expiration.UTC().Format(time.RFC3339)), "patch's status.expiration does not match")
-				expectedStatusKeys = 3
+			// structs and func for decoding patch content
+			type StatusPatch struct {
+				Expiration time.Time      `json:"expiration"`
+				Version    int            `json:"version"`
+				Phase      v1.BackupPhase `json:"phase"`
 			}
 
-			assert.True(t, collections.HasKeyAndVal(patch, "status.version", float64(1)))
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(v1.BackupPhaseInProgress)), "patch's status.phase does not match")
+			type Patch struct {
+				Status StatusPatch `json:"status"`
+			}
 
-			res, _ := collections.GetMap(patch, "status")
-			assert.Equal(t, expectedStatusKeys, len(res), "patch's status has the wrong number of keys")
+			decode := func(decoder *json.Decoder) (interface{}, error) {
+				actual := new(Patch)
+				err := decoder.Decode(actual)
+
+				return *actual, err
+			}
+
+			// validate Patch call 1 (setting version, expiration, and phase)
+			expected := Patch{
+				Status: StatusPatch{
+					Version:    1,
+					Phase:      v1.BackupPhaseInProgress,
+					Expiration: expiration,
+				},
+			}
+
+			arktest.ValidatePatch(t, actions[0], expected, decode)
 
 			// validate Patch call 2 (setting phase)
-			patchAction, ok = actions[1].(core.PatchAction)
-			require.True(t, ok, "action is not a PatchAction")
+			expected = Patch{
+				Status: StatusPatch{
+					Phase: v1.BackupPhaseCompleted,
+				},
+			}
 
-			patch = make(map[string]interface{})
-			require.NoError(t, json.Unmarshal(patchAction.GetPatch(), &patch), "cannot unmarshal patch")
-
-			assert.Equal(t, 1, len(patch), "patch has wrong number of keys")
-
-			res, _ = collections.GetMap(patch, "status")
-			assert.Equal(t, 1, len(res), "patch's status has the wrong number of keys")
-			assert.True(t, collections.HasKeyAndVal(patch, "status.phase", string(v1.BackupPhaseCompleted)), "patch's status.phase does not match")
+			arktest.ValidatePatch(t, actions[1], expected, decode)
 		})
 	}
 }
