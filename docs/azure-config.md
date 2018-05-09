@@ -28,10 +28,11 @@ The storage account can be created in the same Resource Group as your Kubernetes
 separated into its own Resource Group. The example below shows the storage account created in a
 separate `Ark_Backups` Resource Group.
 
-The storage account needs to be created with a globally unique id since this is used for dns. The
-random function ensures you don't have to come up with a unique name. The storage account is
-created with encryption at rest capabilities (Microsoft managed keys) and is configured to only
-allow access via https.
+The storage account needs to be created with a globally unique id since this is used for dns. In
+the sample script below, we're generating a random name using `uuidgen`, but you can come up with 
+this name however you'd like, following the [Azure naming rules for storage accounts][19]. The 
+storage account is created with encryption at rest capabilities (Microsoft managed keys) and is 
+configured to only allow access via https.
 
 ```bash
 # Create a resource group for the backups storage account. Change the location as needed.
@@ -39,7 +40,7 @@ AZURE_BACKUP_RESOURCE_GROUP=Ark_Backups
 az group create -n $AZURE_BACKUP_RESOURCE_GROUP --location WestUS
 
 # Create the storage account
-AZURE_STORAGE_ACCOUNT_ID="ark`cat /proc/sys/kernel/random/uuid | cut -d '-' -f5`"
+AZURE_STORAGE_ACCOUNT_ID="ark$(uuidgen | cut -d '-' -f5 | tr '[A-Z]' '[a-z]')"
 az storage account create \
     --name $AZURE_STORAGE_ACCOUNT_ID \
     --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
@@ -57,7 +58,7 @@ az storage container create -n ark --public-access off --account-name $AZURE_STO
 AZURE_STORAGE_KEY=`az storage account keys list \
     --account-name $AZURE_STORAGE_ACCOUNT_ID \
     --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
-    --query [0].value \
+    --query '[0].value' \
     -o tsv`
 ```
 
@@ -164,3 +165,4 @@ In the root of your Ark directory, run:
   [8]: config-definition.md#azure
   [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
   [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+  [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
