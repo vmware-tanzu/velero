@@ -21,8 +21,9 @@ package cmd
 
 import (
 	"bytes"
-	"github.com/spf13/cobra"
 	"io"
+
+	"github.com/spf13/cobra"
 )
 
 func GenZshCompletion(out io.Writer, ark *cobra.Command) {
