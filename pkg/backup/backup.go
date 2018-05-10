@@ -73,6 +73,14 @@ func (i *itemKey) String() string {
 	return fmt.Sprintf("resource=%s,namespace=%s,name=%s", i.resource, i.namespace, i.name)
 }
 
+var cohabitatingResources = map[string]*cohabitatingResource{
+	"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
+	"daemonsets":      newCohabitatingResource("daemonsets", "extensions", "apps"),
+	"replicasets":     newCohabitatingResource("replicasets", "extensions", "apps"),
+	"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
+	"events":          newCohabitatingResource("events", "", "events.k8s.io"),
+}
+
 // NewKubernetesBackupper creates a new kubernetesBackupper.
 func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
@@ -229,12 +237,6 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 
 	backedUpItems := make(map[itemKey]struct{})
 	var errs []error
-
-	cohabitatingResources := map[string]*cohabitatingResource{
-		"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
-		"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
-		"events":          newCohabitatingResource("events", "", "events.k8s.io"),
-	}
 
 	resolvedActions, err := resolveActions(actions, kb.discoveryHelper)
 	if err != nil {
