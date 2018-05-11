@@ -415,3 +415,9 @@ func (_m *MockManager) GetObjectStore(name string) (cloudprovider.ObjectStore, e
 
 	return r0, r1
 }
+
+// CleanupClients provides a mock function
+func (_m *MockManager) CleanupClients() {
+	_ = _m.Called()
+	return
+}

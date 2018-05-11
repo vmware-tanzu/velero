@@ -224,6 +224,9 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 }
 
 func (s *server) run() error {
+	defer s.pluginManager.CleanupClients()
+	s.handleShutdownSignals()
+
 	if err := s.ensureArkNamespace(); err != nil {
 		return err
 	}
@@ -239,8 +242,6 @@ func (s *server) run() error {
 	applyConfigDefaults(config, s.logger)
 
 	s.watchConfig(originalConfig)
-
-	s.handleShutdownSignals()
 
 	if err := s.initBackupService(config); err != nil {
 		return err
