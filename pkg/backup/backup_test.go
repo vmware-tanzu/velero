@@ -533,7 +533,7 @@ func TestBackup(t *testing.T) {
 				dynamicFactory,
 				discoveryHelper,
 				map[itemKey]struct{}{}, // backedUpItems
-				cohabitatingResources,
+				cohabitatingResources(),
 				mock.Anything,
 				kb.podCommandExecutor,
 				mock.Anything, // tarWriter
