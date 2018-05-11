@@ -524,12 +524,6 @@ func TestBackup(t *testing.T) {
 			groupBackupper := &mockGroupBackupper{}
 			defer groupBackupper.AssertExpectations(t)
 
-			cohabitatingResources := map[string]*cohabitatingResource{
-				"deployments":     newCohabitatingResource("deployments", "extensions", "apps"),
-				"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
-				"events":          newCohabitatingResource("events", "", "events.k8s.io"),
-			}
-
 			groupBackupperFactory.On("newGroupBackupper",
 				mock.Anything, // log
 				test.backup,
