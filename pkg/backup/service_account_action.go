@@ -24,11 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/kuberesource"
 )
 
 // serviceAccountAction implements ItemAction.
@@ -56,11 +56,6 @@ func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
 }
-
-var (
-	crbGroupResource = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}
-	crGroupResource  = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}
-)
 
 // Execute checks for any ClusterRoleBindings that have this service account as a subject, and
 // adds the ClusterRoleBinding and associated ClusterRole to the list of additional items to
@@ -97,14 +92,14 @@ func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Bac
 	var additionalItems []ResourceIdentifier
 	for binding := range bindings {
 		additionalItems = append(additionalItems, ResourceIdentifier{
-			GroupResource: crbGroupResource,
+			GroupResource: kuberesource.ClusterRoleBindings,
 			Name:          binding,
 		})
 	}
 
 	for role := range roles {
 		additionalItems = append(additionalItems, ResourceIdentifier{
-			GroupResource: crGroupResource,
+			GroupResource: kuberesource.ClusterRoles,
 			Name:          role,
 		})
 	}

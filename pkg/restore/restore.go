@@ -46,6 +46,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -344,7 +345,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	for _, resource := range ctx.prioritizedResources {
 		// we don't want to explicitly restore namespace API objs because we'll handle
 		// them as a special case prior to restoring anything into them
-		if resource.Group == "" && resource.Resource == "namespaces" {
+		if resource == kuberesource.Namespaces {
 			continue
 		}
 
@@ -587,7 +588,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 		}
 
-		if groupResource.Group == "" && groupResource.Resource == "persistentvolumes" {
+		if groupResource == kuberesource.PersistentVolumes {
 			// restore the PV from snapshot (if applicable)
 			updatedObj, err := ctx.executePVAction(obj)
 			if err != nil {
@@ -823,16 +824,11 @@ func hasControllerOwner(refs []metav1.OwnerReference) bool {
 	return false
 }
 
-// TODO(0.9): These are copied from backup/item_backupper. Definititions should be moved
-// to a shared package and imported here and in the backup package.
-var podsGroupResource = schema.GroupResource{Group: "", Resource: "pods"}
-var jobsGroupResource = schema.GroupResource{Group: "batch", Resource: "jobs"}
-
 // isCompleted returns whether or not an object is considered completed.
 // Used to identify whether or not an object should be restored. Only Jobs or Pods are considered
 func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResource) (bool, error) {
 	switch groupResource {
-	case podsGroupResource:
+	case kuberesource.Pods:
 		phase, _, err := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 		if err != nil {
 			return false, errors.WithStack(err)
@@ -841,7 +837,7 @@ func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResou
 			return true, nil
 		}
 
-	case jobsGroupResource:
+	case kuberesource.Jobs:
 		ct, found, err := unstructured.NestedString(obj.UnstructuredContent(), "status", "completionTime")
 		if err != nil {
 			return false, errors.WithStack(err)

@@ -18,7 +18,6 @@ package restore
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -736,7 +735,7 @@ func TestIsCompleted(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			u := unstructuredOrDie(fmt.Sprintf(test.content))
+			u := unstructuredOrDie(test.content)
 			backup, err := isCompleted(u, test.groupResource)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {

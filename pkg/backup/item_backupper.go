@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/heptio/ark/pkg/kuberesource"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -110,9 +111,6 @@ type defaultItemBackupper struct {
 	additionalItemBackupper ItemBackupper
 }
 
-var podsGroupResource = schema.GroupResource{Group: "", Resource: "pods"}
-var namespacesGroupResource = schema.GroupResource{Group: "", Resource: "namespaces"}
-
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
 func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
@@ -138,7 +136,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
 	// false.
-	if namespace == "" && groupResource != namespacesGroupResource && ib.backup.Spec.IncludeClusterResources != nil && !*ib.backup.Spec.IncludeClusterResources {
+	if namespace == "" && groupResource != kuberesource.Namespaces && ib.backup.Spec.IncludeClusterResources != nil && !*ib.backup.Spec.IncludeClusterResources {
 		log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
 		return nil
 	}
@@ -220,7 +218,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
-	if groupResource == pvGroupResource {
+	if groupResource == kuberesource.PersistentVolumes {
 		if ib.snapshotService == nil {
 			log.Debug("Skipping Persistent Volume snapshot because they're not enabled.")
 		} else {

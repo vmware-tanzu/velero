@@ -19,6 +19,7 @@ package backup
 import (
 	"testing"
 
+	"github.com/heptio/ark/pkg/kuberesource"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -108,8 +109,8 @@ func TestPodActionExecute(t *testing.T) {
 			}
 			`),
 			expected: []ResourceIdentifier{
-				{GroupResource: pvcGroupResource, Namespace: "foo", Name: "claim1"},
-				{GroupResource: pvcGroupResource, Namespace: "foo", Name: "claim2"},
+				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim1"},
+				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim2"},
 			},
 		},
 	}

@@ -21,6 +21,7 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -132,7 +133,7 @@ func (rb *defaultResourceBackupper) backupResource(
 
 	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
 	// we should include it based on the IncludeClusterResources setting.
-	if gr != namespacesGroupResource && clusterScoped {
+	if gr != kuberesource.Namespaces && clusterScoped {
 		if rb.backup.Spec.IncludeClusterResources == nil {
 			if !rb.namespaces.IncludeEverything() {
 				// when IncludeClusterResources == nil (auto), only directly
@@ -186,7 +187,7 @@ func (rb *defaultResourceBackupper) backupResource(
 	namespacesToList := getNamespacesToList(rb.namespaces)
 
 	// Check if we're backing up namespaces, and only certain ones
-	if gr == namespacesGroupResource && namespacesToList[0] != "" {
+	if gr == kuberesource.Namespaces && namespacesToList[0] != "" {
 		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
 		if err != nil {
 			return err
@@ -260,7 +261,7 @@ func (rb *defaultResourceBackupper) backupResource(
 				continue
 			}
 
-			if gr == namespacesGroupResource && !rb.namespaces.ShouldInclude(metadata.GetName()) {
+			if gr == kuberesource.Namespaces && !rb.namespaces.ShouldInclude(metadata.GetName()) {
 				log.WithField("name", metadata.GetName()).Info("skipping namespace because it is excluded")
 				continue
 			}
