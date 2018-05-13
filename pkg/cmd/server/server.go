@@ -180,6 +180,7 @@ type server struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
+	pluginRegistry        plugin.Registry
 	pluginManager         plugin.Manager
 }
 
@@ -199,7 +200,11 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 		return nil, errors.WithStack(err)
 	}
 
-	pluginManager, err := plugin.NewManager(logger, logger.Level, pluginDir)
+	pluginRegistry := plugin.NewRegistry(pluginDir, logger)
+	if err := pluginRegistry.DiscoverPlugins(); err != nil {
+		return nil, err
+	}
+	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -214,10 +219,11 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
-		ctx:           ctx,
-		cancelFunc:    cancelFunc,
-		logger:        logger,
-		pluginManager: pluginManager,
+		ctx:            ctx,
+		cancelFunc:     cancelFunc,
+		logger:         logger,
+		pluginRegistry: pluginRegistry,
+		pluginManager:  pluginManager,
 	}
 
 	return s, nil
@@ -506,7 +512,7 @@ func (s *server) runControllers(config *api.Config) error {
 			config.BackupStorageProvider.Bucket,
 			s.snapshotService != nil,
 			s.logger,
-			s.pluginManager,
+			s.pluginRegistry,
 			backupTracker,
 		)
 		wg.Add(1)
@@ -584,7 +590,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
 		s.logger,
-		s.pluginManager,
+		s.pluginRegistry,
 	)
 	wg.Add(1)
 	go func() {

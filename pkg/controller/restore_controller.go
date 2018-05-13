@@ -68,7 +68,7 @@ type restoreController struct {
 	syncHandler         func(restoreName string) error
 	queue               workqueue.RateLimitingInterface
 	logger              logrus.FieldLogger
-	pluginManager       plugin.Manager
+	pluginRegistry      plugin.Registry
 }
 
 func NewRestoreController(
@@ -82,7 +82,7 @@ func NewRestoreController(
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
-	pluginManager plugin.Manager,
+	pluginRegistry plugin.Registry,
 ) Interface {
 	c := &restoreController{
 		namespace:           namespace,
@@ -98,7 +98,7 @@ func NewRestoreController(
 		restoreListerSynced: restoreInformer.Informer().HasSynced,
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 		logger:              logger,
-		pluginManager:       pluginManager,
+		pluginRegistry:      pluginRegistry,
 	}
 
 	c.syncHandler = c.processRestore
@@ -408,12 +408,14 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		}
 	}()
 
-	actions, err := controller.pluginManager.GetRestoreItemActions(restore.Name)
+	pluginManager := plugin.NewManager(logContext, logContext.Level, controller.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
+	actions, err := pluginManager.GetRestoreItemActions()
 	if err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
-	defer controller.pluginManager.CloseRestoreItemActions(restore.Name)
 
 	logContext.Info("starting restore")
 	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile, actions)

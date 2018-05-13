@@ -16,7 +16,14 @@ limitations under the License.
 
 package plugin
 
-import plugin "github.com/hashicorp/go-plugin"
+import (
+	"os"
+
+	plugin "github.com/hashicorp/go-plugin"
+	"github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/restore"
+)
 
 // Handshake is configuration information that allows go-plugin
 // clients and servers to perform a handshake.
@@ -26,12 +33,87 @@ var Handshake = plugin.HandshakeConfig{
 	MagicCookieValue: "hello",
 }
 
+type SimpleServer interface {
+	RegisterBackupItemActions(map[string]func() backup.ItemAction) SimpleServer
+	RegisterBlockStores(map[string]func() cloudprovider.BlockStore) SimpleServer
+	RegisterObjectStores(map[string]func() cloudprovider.ObjectStore) SimpleServer
+	RegisterRestoreItemActions(map[string]func() restore.ItemAction) SimpleServer
+	Serve()
+}
+
+type simpleServer struct {
+	backupItemAction  *BackupItemActionPlugin
+	blockStore        *BlockStorePlugin
+	objectStore       *ObjectStorePlugin
+	restoreItemAction *RestoreItemActionPlugin
+}
+
+func NewSimpleServer() SimpleServer {
+	return &simpleServer{
+		backupItemAction:  NewBackupItemActionPlugin(),
+		blockStore:        NewBlockStorePlugin(),
+		objectStore:       NewObjectStorePlugin(),
+		restoreItemAction: NewRestoreItemActionPlugin(),
+	}
+}
+
+func (s *simpleServer) RegisterBackupItemActions(m map[string]func() backup.ItemAction) SimpleServer {
+	for name := range m {
+		s.backupItemAction.Add(name, m[name])
+	}
+	return s
+}
+
+func (s *simpleServer) RegisterBlockStores(m map[string]func() cloudprovider.BlockStore) SimpleServer {
+	for name := range m {
+		s.blockStore.Add(name, m[name])
+	}
+	return s
+}
+
+func (s *simpleServer) RegisterObjectStores(m map[string]func() cloudprovider.ObjectStore) SimpleServer {
+	for name := range m {
+		s.objectStore.Add(name, m[name])
+	}
+	return s
+}
+
+func (s *simpleServer) RegisterRestoreItemActions(m map[string]func() restore.ItemAction) SimpleServer {
+	for name := range m {
+		s.restoreItemAction.Add(name, m[name])
+	}
+	return s
+}
+
+func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
+	var pluginIdentifiers []PluginIdentifier
+	for _, name := range plugin.Names() {
+		id := PluginIdentifier{Command: command, Kind: kind, Name: name}
+		pluginIdentifiers = append(pluginIdentifiers, id)
+	}
+	return pluginIdentifiers
+}
+
 // Serve serves the plugin p.
-func Serve(p Interface) {
+func (s *simpleServer) Serve() {
+	command := os.Args[0]
+
+	var pluginIdentifiers []PluginIdentifier
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindBackupItemAction, s.backupItemAction)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindBlockStore, s.blockStore)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
+
+	pluginLister := NewPluginLister(pluginIdentifiers...)
+
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: Handshake,
 		Plugins: map[string]plugin.Plugin{
-			string(p.Kind()): p,
+			string(PluginKindBackupItemAction):  s.backupItemAction,
+			string(PluginKindBlockStore):        s.blockStore,
+			string(PluginKindObjectStore):       s.objectStore,
+			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
+			string(PluginKindRestoreItemAction): s.restoreItemAction,
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})

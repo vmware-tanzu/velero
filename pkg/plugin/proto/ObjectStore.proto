@@ -4,14 +4,16 @@ package generated;
 import "Shared.proto";
 
 message PutObjectRequest {
-    string bucket = 1;
-    string key = 2;
-    bytes body = 3;
+    string plugin = 1;
+    string bucket = 2;
+    string key = 3;
+    bytes body = 4;
 }
 
 message GetObjectRequest {
-    string bucket = 1;
-    string key = 2;
+    string plugin = 1;
+    string bucket = 2;
+    string key = 3;
 }
 
 message Bytes {
@@ -19,8 +21,9 @@ message Bytes {
 }
 
 message ListCommonPrefixesRequest {
-    string bucket = 1;
-    string delimiter = 2;
+    string plugin = 1;
+    string bucket = 2;
+    string delimiter = 3;
 }
 
 message ListCommonPrefixesResponse {
@@ -28,8 +31,9 @@ message ListCommonPrefixesResponse {
 }
 
 message ListObjectsRequest {
-    string bucket = 1;
-    string prefix = 2;
+    string plugin = 1;
+    string bucket = 2;
+    string prefix = 3;
 }
 
 message ListObjectsResponse {
@@ -37,15 +41,17 @@ message ListObjectsResponse {
 }
 
 message DeleteObjectRequest {
-    string bucket = 1;  
-    string key = 2;
+    string plugin = 1;
+    string bucket = 2;  
+    string key = 3;
 }
 
 
 message CreateSignedURLRequest {
-    string bucket = 1;
-    string key = 2;
-    int64 ttl = 3;
+    string plugin = 1;
+    string bucket = 2;
+    string key = 3;
+    int64 ttl = 4;
 }
 
 message CreateSignedURLResponse {

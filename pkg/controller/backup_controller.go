@@ -65,7 +65,7 @@ type backupController struct {
 	queue            workqueue.RateLimitingInterface
 	clock            clock.Clock
 	logger           logrus.FieldLogger
-	pluginManager    plugin.Manager
+	pluginRegistry   plugin.Registry
 	backupTracker    BackupTracker
 }
 
@@ -77,7 +77,7 @@ func NewBackupController(
 	bucket string,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
-	pluginManager plugin.Manager,
+	pluginRegistry plugin.Registry,
 	backupTracker BackupTracker,
 ) Interface {
 	c := &backupController{
@@ -91,7 +91,7 @@ func NewBackupController(
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
 		clock:            &clock.RealClock{},
 		logger:           logger,
-		pluginManager:    pluginManager,
+		pluginRegistry:   pluginRegistry,
 		backupTracker:    backupTracker,
 	}
 
@@ -328,6 +328,9 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	log := controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
+	pluginManager := plugin.NewManager(log, log.Level, controller.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup log")
@@ -340,11 +343,10 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	}
 	defer closeAndRemoveFile(backupFile, log)
 
-	actions, err := controller.pluginManager.GetBackupItemActions(backup.Name)
+	actions, err := pluginManager.GetBackupItemActions()
 	if err != nil {
 		return err
 	}
-	defer controller.pluginManager.CloseBackupItemActions(backup.Name)
 
 	var errs []error
 

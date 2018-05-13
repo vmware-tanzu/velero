@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
@@ -38,30 +39,40 @@ import (
 // interface.
 type RestoreItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	impl restore.ItemAction
-	log  *logrusAdapter
+
+	mux map[string]func() restore.ItemAction
+	log *logrusAdapter
 }
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
-func NewRestoreItemActionPlugin(itemAction restore.ItemAction) *RestoreItemActionPlugin {
+func NewRestoreItemActionPlugin() *RestoreItemActionPlugin {
 	return &RestoreItemActionPlugin{
-		impl: itemAction,
+		mux: make(map[string]func() restore.ItemAction),
 	}
 }
 
-func (p *RestoreItemActionPlugin) Kind() PluginKind {
-	return PluginKindRestoreItemAction
+func (p *RestoreItemActionPlugin) Add(name string, f func() restore.ItemAction) *RestoreItemActionPlugin {
+	p.mux[name] = f
+	return p
+}
+
+func (p *RestoreItemActionPlugin) Names() []string {
+	return sets.StringKeySet(p.mux).List()
 }
 
 // GRPCServer registers a RestoreItemAction gRPC server.
 func (p *RestoreItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{impl: p.impl})
+	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{mux: p.mux, impls: make(map[string]restore.ItemAction)})
 	return nil
 }
 
 // GRPCClient returns a RestoreItemAction gRPC client.
 func (p *RestoreItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return &RestoreItemActionGRPCClient{grpcClient: proto.NewRestoreItemActionClient(c), log: p.log}, nil
+	return &restoreItemClientMux{
+		grpcClient: proto.NewRestoreItemActionClient(c),
+		log:        p.log,
+		clients:    make(map[string]*RestoreItemActionGRPCClient),
+	}, nil
 }
 
 // RestoreItemActionGRPCClient implements the backup/ItemAction interface and uses a
@@ -69,10 +80,30 @@ func (p *RestoreItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, e
 type RestoreItemActionGRPCClient struct {
 	grpcClient proto.RestoreItemActionClient
 	log        *logrusAdapter
+	plugin     string
+}
+
+type restoreItemClientMux struct {
+	grpcClient proto.RestoreItemActionClient
+	log        *logrusAdapter
+	clients    map[string]*RestoreItemActionGRPCClient
+}
+
+func (m *restoreItemClientMux) GetByName(name string) interface{} {
+	if client, found := m.clients[name]; found {
+		return client
+	}
+	client := &RestoreItemActionGRPCClient{
+		plugin:     name,
+		grpcClient: m.grpcClient,
+		log:        m.log,
+	}
+	m.clients[name] = client
+	return client
 }
 
 func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, error) {
-	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.Empty{})
+	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
 	if err != nil {
 		return restore.ResourceSelector{}, err
 	}
@@ -98,6 +129,7 @@ func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore
 	}
 
 	req := &proto.RestoreExecuteRequest{
+		Plugin:  c.plugin,
 		Item:    itemJSON,
 		Restore: restoreJSON,
 	}
@@ -127,11 +159,22 @@ func (c *RestoreItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
 // RestoreItemActionGRPCServer implements the proto-generated RestoreItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type RestoreItemActionGRPCServer struct {
-	impl restore.ItemAction
+	mux   map[string]func() restore.ItemAction
+	impls map[string]restore.ItemAction
 }
 
-func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.Empty) (*proto.AppliesToResponse, error) {
-	appliesTo, err := s.impl.AppliesTo()
+func (s *RestoreItemActionGRPCServer) getImpl(name string) restore.ItemAction {
+	if impl, found := s.impls[name]; found {
+		return impl
+	}
+	f := s.mux[name]
+	s.impls[name] = f()
+	return s.impls[name]
+}
+
+func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (*proto.AppliesToResponse, error) {
+	impl := s.getImpl(req.Plugin)
+	appliesTo, err := impl.AppliesTo()
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +202,8 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, err
 	}
 
-	res, warning, err := s.impl.Execute(&item, &restore)
+	impl := s.getImpl(req.Plugin)
+	res, warning, err := impl.Execute(&item, &restore)
 	if err != nil {
 		return nil, err
 	}

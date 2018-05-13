@@ -22,6 +22,9 @@ import plugin "github.com/hashicorp/go-plugin"
 type Interface interface {
 	plugin.Plugin
 
-	// Kind returns the PluginKind for the plugin.
-	Kind() PluginKind
+	Names() []string
+}
+
+type GetByNamer interface {
+	GetByName(name string) interface{}
 }

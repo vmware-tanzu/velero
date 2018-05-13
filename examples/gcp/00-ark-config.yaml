@@ -22,8 +22,8 @@ persistentVolumeProvider:
   name: gcp
 backupStorageProvider:
   name: gcp
-  bucket: <YOUR_BUCKET>
-backupSyncPeriod: 30m
+  bucket: andy-heptio-ark-data
+backupSyncPeriod: 1m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m
 restoreOnlyMode: false

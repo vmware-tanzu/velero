@@ -26,6 +26,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -36,13 +37,16 @@ import (
 const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 
 type objectStore struct {
+	log            logrus.FieldLogger
 	client         *storage.Client
 	googleAccessID string
 	privateKey     []byte
 }
 
-func NewObjectStore() cloudprovider.ObjectStore {
-	return &objectStore{}
+func NewObjectStore(log logrus.FieldLogger) cloudprovider.ObjectStore {
+	return &objectStore{
+		log: log,
+	}
 }
 
 func (o *objectStore) Init(config map[string]string) error {
