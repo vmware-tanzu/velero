@@ -26,6 +26,7 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -50,14 +51,15 @@ func (w *writer) getWriteCloser(bucket, key string) io.WriteCloser {
 }
 
 type objectStore struct {
+	log            logrus.FieldLogger
 	client         *storage.Client
 	googleAccessID string
 	privateKey     []byte
 	bucketWriter   bucketWriter
 }
 
-func NewObjectStore() cloudprovider.ObjectStore {
-	return &objectStore{}
+func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
+	return &objectStore{log: logger}
 }
 
 func (o *objectStore) Init(config map[string]string) error {

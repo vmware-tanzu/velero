@@ -27,6 +27,7 @@ import (
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/util/stringslice"
@@ -37,18 +38,18 @@ import (
 
 func TestBackupSyncControllerRun(t *testing.T) {
 	tests := []struct {
-		name               string
-		getAllBackupsError error
-		cloudBackups       []*v1.Backup
-		namespace          string
-		existingBackups    sets.String
+		name             string
+		listBackupsError error
+		cloudBackups     []*v1.Backup
+		namespace        string
+		existingBackups  sets.String
 	}{
 		{
 			name: "no cloud backups",
 		},
 		{
-			name:               "backup service returns error on GetAllBackups",
-			getAllBackupsError: errors.New("getAllBackups"),
+			name:             "backup lister returns error on ListBackups",
+			listBackupsError: errors.New("listBackups"),
 		},
 		{
 			name: "normal case",
@@ -96,7 +97,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bs              = &arktest.BackupService{}
+				backupLister    = &cloudprovidermocks.BackupLister{}
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
@@ -104,7 +105,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
-				bs,
+				backupLister,
 				"bucket",
 				time.Duration(0),
 				test.namespace,
@@ -112,7 +113,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				logger,
 			).(*backupSyncController)
 
-			bs.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)
+			backupLister.On("ListBackups", "bucket").Return(test.cloudBackups, test.listBackupsError)
 
 			expectedActions := make([]core.Action, 0)
 
@@ -154,7 +155,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedActions, client.Actions())
-			bs.AssertExpectations(t)
 		})
 	}
 }
@@ -217,7 +217,7 @@ func TestDeleteUnused(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bs              = &arktest.BackupService{}
+				backupLister    = &cloudprovidermocks.BackupLister{}
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
@@ -225,7 +225,7 @@ func TestDeleteUnused(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
-				bs,
+				backupLister,
 				"bucket",
 				time.Duration(0),
 				test.namespace,

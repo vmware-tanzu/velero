@@ -30,9 +30,7 @@ type jobAction struct {
 }
 
 func NewJobAction(logger logrus.FieldLogger) ItemAction {
-	return &jobAction{
-		logger: logger,
-	}
+	return &jobAction{logger: logger}
 }
 
 func (a *jobAction) AppliesTo() (ResourceSelector, error) {

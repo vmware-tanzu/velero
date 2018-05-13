@@ -57,14 +57,13 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
 	arksync "github.com/heptio/ark/pkg/util/sync"
 )
 
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer, actions []ItemAction) (api.RestoreResult, api.RestoreResult)
+	Restore(log logrus.FieldLogger, restore *api.Restore, backup *api.Backup, backupReader io.Reader, actions []ItemAction) (api.RestoreResult, api.RestoreResult)
 }
 
 type gvString string
@@ -74,7 +73,6 @@ type kindString string
 type kubernetesRestorer struct {
 	discoveryHelper       discovery.Helper
 	dynamicFactory        client.DynamicFactory
-	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	backupClient          arkv1client.BackupsGetter
 	namespaceClient       corev1.NamespaceInterface
@@ -147,7 +145,6 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
@@ -159,7 +156,6 @@ func NewKubernetesRestorer(
 	return &kubernetesRestorer{
 		discoveryHelper:       discoveryHelper,
 		dynamicFactory:        dynamicFactory,
-		backupService:         backupService,
 		snapshotService:       snapshotService,
 		backupClient:          backupClient,
 		namespaceClient:       namespaceClient,
@@ -175,7 +171,7 @@ func NewKubernetesRestorer(
 // Restore executes a restore into the target Kubernetes cluster according to the restore spec
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
-func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, backupReader io.Reader, logFile io.Writer, actions []ItemAction) (api.RestoreResult, api.RestoreResult) {
+func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Restore, backup *api.Backup, backupReader io.Reader, actions []ItemAction) (api.RestoreResult, api.RestoreResult) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -189,14 +185,6 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 	if err != nil {
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
-
-	gzippedLog := gzip.NewWriter(logFile)
-	defer gzippedLog.Close()
-
-	log := logrus.New()
-	log.Out = gzippedLog
-	log.Hooks.Add(&logging.ErrorLocationHook{})
-	log.Hooks.Add(&logging.LogLocationHook{})
 
 	// get resource includes-excludes
 	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
@@ -741,10 +729,6 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 
 			ctx.infof("Executing item action for %v", &groupResource)
-
-			if logSetter, ok := action.ItemAction.(logging.LogSetter); ok {
-				logSetter.SetLog(ctx.logger)
-			}
 
 			updatedObj, warning, err := action.Execute(obj, ctx.restore)
 			if warning != nil {

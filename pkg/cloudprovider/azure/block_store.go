@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
+	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -52,6 +53,7 @@ const (
 )
 
 type blockStore struct {
+	log           logrus.FieldLogger
 	disks         *disk.DisksClient
 	snaps         *disk.SnapshotsClient
 	subscription  string
@@ -87,8 +89,8 @@ func getConfig() map[string]string {
 	return cfg
 }
 
-func NewBlockStore() cloudprovider.BlockStore {
-	return &blockStore{}
+func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
+	return &blockStore{log: logger}
 }
 
 func (b *blockStore) Init(config map[string]string) error {

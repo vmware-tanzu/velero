@@ -25,13 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/util/test"
 )
 
 func TestNewBackupCache(t *testing.T) {
-
 	var (
-		delegate    = &test.FakeBackupService{}
+		delegate    = &cloudprovidermocks.BackupLister{}
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 		logger      = test.NewLogger()
 	)
@@ -44,32 +44,32 @@ func TestNewBackupCache(t *testing.T) {
 		test.NewTestBackup().WithName("backup1").Backup,
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(bucket1, nil).Once()
+	delegate.On("ListBackups", "bucket1").Return(bucket1, nil).Once()
 
 	// should be updated via refresh
 	updatedBucket1 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(updatedBucket1, nil)
+	delegate.On("ListBackups", "bucket1").Return(updatedBucket1, nil)
 
 	// nothing in cache, live lookup
 	bucket2 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup5").Backup,
 		test.NewTestBackup().WithName("backup6").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket2").Return(bucket2, nil).Once()
+	delegate.On("ListBackups", "bucket2").Return(bucket2, nil).Once()
 
 	// should be updated via refresh
 	updatedBucket2 := []*v1.Backup{
 		test.NewTestBackup().WithName("backup7").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket2").Return(updatedBucket2, nil)
+	delegate.On("ListBackups", "bucket2").Return(updatedBucket2, nil)
 
-	backups, err := c.GetAllBackups("bucket1")
+	backups, err := c.ListBackups("bucket1")
 	assert.Equal(t, bucket1, backups)
 	assert.NoError(t, err)
 
-	backups, err = c.GetAllBackups("bucket2")
+	backups, err = c.ListBackups("bucket2")
 	assert.Equal(t, bucket2, backups)
 	assert.NoError(t, err)
 
@@ -84,14 +84,14 @@ func TestNewBackupCache(t *testing.T) {
 			}
 		}
 
-		backups, err = c.GetAllBackups("bucket1")
+		backups, err = c.ListBackups("bucket1")
 		if len(backups) == 1 {
 			if assert.Equal(t, updatedBucket1[0], backups[0]) {
 				done1 = true
 			}
 		}
 
-		backups, err = c.GetAllBackups("bucket2")
+		backups, err = c.ListBackups("bucket2")
 		if len(backups) == 1 {
 			if assert.Equal(t, updatedBucket2[0], backups[0]) {
 				done2 = true
@@ -103,7 +103,7 @@ func TestNewBackupCache(t *testing.T) {
 
 func TestBackupCacheRefresh(t *testing.T) {
 	var (
-		delegate = &test.FakeBackupService{}
+		delegate = &cloudprovidermocks.BackupLister{}
 		logger   = test.NewLogger()
 	)
 
@@ -120,9 +120,9 @@ func TestBackupCacheRefresh(t *testing.T) {
 		test.NewTestBackup().WithName("backup1").Backup,
 		test.NewTestBackup().WithName("backup2").Backup,
 	}
-	delegate.On("GetAllBackups", "bucket1").Return(bucket1, nil)
+	delegate.On("ListBackups", "bucket1").Return(bucket1, nil)
 
-	delegate.On("GetAllBackups", "bucket2").Return(nil, errors.New("bad"))
+	delegate.On("ListBackups", "bucket2").Return(nil, errors.New("bad"))
 
 	c.refresh()
 
@@ -135,7 +135,7 @@ func TestBackupCacheRefresh(t *testing.T) {
 
 func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 	var (
-		delegate = &test.FakeBackupService{}
+		delegate = &cloudprovidermocks.BackupLister{}
 		logger   = test.NewLogger()
 		bucket1  = []*v1.Backup{
 			test.NewTestBackup().WithName("backup1").Backup,
@@ -158,13 +158,13 @@ func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 		test.NewTestBackup().WithName("backup4").Backup,
 	}
 
-	delegate.On("GetAllBackups", "bucket2").Return(bucket2, nil)
+	delegate.On("ListBackups", "bucket2").Return(bucket2, nil)
 
-	backups, err := c.GetAllBackups("bucket1")
+	backups, err := c.ListBackups("bucket1")
 	assert.Equal(t, bucket1, backups)
 	assert.NoError(t, err)
 
-	backups, err = c.GetAllBackups("bucket2")
+	backups, err = c.ListBackups("bucket2")
 	assert.Equal(t, bucket2, backups)
 	assert.NoError(t, err)
 }

@@ -41,7 +41,6 @@ import (
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/logging"
 )
 
 type itemBackupperFactory interface {
@@ -319,10 +318,6 @@ func (ib *defaultItemBackupper) executeActions(
 		}
 
 		log.Info("Executing custom action")
-
-		if logSetter, ok := action.ItemAction.(logging.LogSetter); ok {
-			logSetter.SetLog(log)
-		}
 
 		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backup)
 		if err != nil {

@@ -22,6 +22,7 @@ import plugin "github.com/hashicorp/go-plugin"
 type Interface interface {
 	plugin.Plugin
 
-	// Kind returns the PluginKind for the plugin.
-	Kind() PluginKind
+	// names returns a list of all the registered implementations for this plugin (such as "pod" and "pvc" for
+	// BackupItemAction).
+	names() []string
 }

@@ -32,8 +32,8 @@ type backupPVAction struct {
 	log logrus.FieldLogger
 }
 
-func NewBackupPVAction(log logrus.FieldLogger) ItemAction {
-	return &backupPVAction{log: log}
+func NewBackupPVAction(logger logrus.FieldLogger) ItemAction {
+	return &backupPVAction{log: logger}
 }
 
 func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {

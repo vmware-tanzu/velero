@@ -51,6 +51,7 @@ import (
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -74,7 +75,7 @@ type restoreController struct {
 	restoreClient       arkv1client.RestoresGetter
 	backupClient        arkv1client.BackupsGetter
 	restorer            restore.Restorer
-	backupService       cloudprovider.BackupService
+	objectStoreConfig   api.CloudProviderConfig
 	bucket              string
 	pvProviderExists    bool
 	backupLister        listers.BackupLister
@@ -84,8 +85,15 @@ type restoreController struct {
 	syncHandler         func(restoreName string) error
 	queue               workqueue.RateLimitingInterface
 	logger              logrus.FieldLogger
-	pluginManager       plugin.Manager
+	logLevel            logrus.Level
+	pluginRegistry      plugin.Registry
 	metrics             *metrics.ServerMetrics
+
+	getBackup            cloudprovider.GetBackupFunc
+	downloadBackup       cloudprovider.DownloadBackupFunc
+	uploadRestoreLog     cloudprovider.UploadRestoreLogFunc
+	uploadRestoreResults cloudprovider.UploadRestoreResultsFunc
+	newPluginManager     func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
 }
 
 func NewRestoreController(
@@ -94,20 +102,22 @@ func NewRestoreController(
 	restoreClient arkv1client.RestoresGetter,
 	backupClient arkv1client.BackupsGetter,
 	restorer restore.Restorer,
-	backupService cloudprovider.BackupService,
+	objectStoreConfig api.CloudProviderConfig,
 	bucket string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
-	pluginManager plugin.Manager,
+	logLevel logrus.Level,
+	pluginRegistry plugin.Registry,
 	metrics *metrics.ServerMetrics,
+
 ) Interface {
 	c := &restoreController{
 		namespace:           namespace,
 		restoreClient:       restoreClient,
 		backupClient:        backupClient,
 		restorer:            restorer,
-		backupService:       backupService,
+		objectStoreConfig:   objectStoreConfig,
 		bucket:              bucket,
 		pvProviderExists:    pvProviderExists,
 		backupLister:        backupInformer.Lister(),
@@ -116,8 +126,17 @@ func NewRestoreController(
 		restoreListerSynced: restoreInformer.Informer().HasSynced,
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 		logger:              logger,
-		pluginManager:       pluginManager,
+		logLevel:            logLevel,
+		pluginRegistry:      pluginRegistry,
 		metrics:             metrics,
+
+		getBackup:            cloudprovider.GetBackup,
+		downloadBackup:       cloudprovider.DownloadBackup,
+		uploadRestoreLog:     cloudprovider.UploadRestoreLog,
+		uploadRestoreResults: cloudprovider.UploadRestoreResults,
+		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
 	}
 
 	c.syncHandler = c.processRestore
@@ -230,7 +249,9 @@ func (c *restoreController) processRestore(key string) error {
 	logContext.Debug("Running processRestore")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		logContext.WithError(err).Error("unable to process restore: error splitting queue key")
+		// Return nil here so we don't try to process the key any more
+		return nil
 	}
 
 	logContext.Debug("Getting Restore")
@@ -259,8 +280,21 @@ func (c *restoreController) processRestore(key string) error {
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
-	// validation
-	if restore.Status.ValidationErrors = c.completeAndValidate(restore); len(restore.Status.ValidationErrors) > 0 {
+	pluginManager := c.newPluginManager(logContext, logContext.Level, c.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
+	objectStore, err := getObjectStore(c.objectStoreConfig, pluginManager)
+	if err != nil {
+		return errors.Wrap(err, "error initializing object store")
+	}
+
+	actions, err := pluginManager.GetRestoreItemActions()
+	if err != nil {
+		return errors.Wrap(err, "error initializing restore item actions")
+	}
+
+	// complete & validate restore
+	if restore.Status.ValidationErrors = c.completeAndValidate(objectStore, restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
@@ -285,7 +319,11 @@ func (c *restoreController) processRestore(key string) error {
 	}
 	logContext.Debug("Running restore")
 	// execution & upload of restore
-	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(restore, c.bucket)
+	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(
+		restore,
+		actions,
+		objectStore,
+	)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
@@ -317,7 +355,7 @@ func (c *restoreController) processRestore(key string) error {
 	return nil
 }
 
-func (c *restoreController) completeAndValidate(restore *api.Restore) []string {
+func (c *restoreController) completeAndValidate(objectStore cloudprovider.ObjectStore, restore *api.Restore) []string {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -381,7 +419,7 @@ func (c *restoreController) completeAndValidate(restore *api.Restore) []string {
 		backup *api.Backup
 		err    error
 	)
-	if backup, err = c.fetchBackup(c.bucket, restore.Spec.BackupName); err != nil {
+	if backup, err = c.fetchBackup(objectStore, restore.Spec.BackupName); err != nil {
 		return append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
 	}
 
@@ -424,7 +462,7 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	return nil
 }
 
-func (c *restoreController) fetchBackup(bucket, name string) (*api.Backup, error) {
+func (c *restoreController) fetchBackup(objectStore cloudprovider.ObjectStore, name string) (*api.Backup, error) {
 	backup, err := c.backupLister.Backups(c.namespace).Get(name)
 	if err == nil {
 		return backup, nil
@@ -437,7 +475,7 @@ func (c *restoreController) fetchBackup(bucket, name string) (*api.Backup, error
 	logContext := c.logger.WithField("backupName", name)
 
 	logContext.Debug("Backup not found in backupLister, checking object storage directly")
-	backup, err = c.backupService.GetBackup(bucket, name)
+	backup, err = c.getBackup(objectStore, c.bucket, name)
 	if err != nil {
 		return nil, err
 	}
@@ -457,39 +495,56 @@ func (c *restoreController) fetchBackup(bucket, name string) (*api.Backup, error
 	return backup, nil
 }
 
-func (c *restoreController) runRestore(restore *api.Restore, bucket string) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
-	logContext := c.logger.WithFields(
+func (c *restoreController) runRestore(
+	restore *api.Restore,
+	actions []restore.ItemAction,
+	objectStore cloudprovider.ObjectStore,
+) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
+	logFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		c.logger.
+			WithFields(
+				logrus.Fields{
+					"restore": kubeutil.NamespaceAndName(restore),
+					"backup":  restore.Spec.BackupName,
+				},
+			).
+			WithError(errors.WithStack(err)).
+			Error("Error creating log temp file")
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		return
+	}
+	gzippedLogFile := gzip.NewWriter(logFile)
+	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
+	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
+	defer gzippedLogFile.Close()
+	defer closeAndRemoveFile(logFile, c.logger)
+
+	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
+	// backup log failed for whatever reason.
+	logger := logging.DefaultLogger(c.logLevel)
+	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
+	logContext := logger.WithFields(
 		logrus.Fields{
 			"restore": kubeutil.NamespaceAndName(restore),
 			"backup":  restore.Spec.BackupName,
 		})
 
-	backup, err := c.fetchBackup(bucket, restore.Spec.BackupName)
+	backup, err := c.fetchBackup(objectStore, restore.Spec.BackupName)
 	if err != nil {
 		logContext.WithError(err).Error("Error getting backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		return
 	}
 
-	var tempFiles []*os.File
-
-	backupFile, err := downloadToTempFile(restore.Spec.BackupName, c.backupService, bucket, c.logger)
+	backupFile, err := downloadToTempFile(objectStore, c.bucket, restore.Spec.BackupName, c.downloadBackup, c.logger)
 	if err != nil {
 		logContext.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
 		return
 	}
-	tempFiles = append(tempFiles, backupFile)
-
-	logFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error creating log temp file")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		restoreFailure = err
-		return
-	}
-	tempFiles = append(tempFiles, logFile)
+	defer closeAndRemoveFile(backupFile, c.logger)
 
 	resultsFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -498,44 +553,25 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string) (res
 		restoreFailure = err
 		return
 	}
-	tempFiles = append(tempFiles, resultsFile)
-
-	defer func() {
-		for _, file := range tempFiles {
-			if err := file.Close(); err != nil {
-				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error closing file")
-				restoreFailure = err
-			}
-
-			if err := os.Remove(file.Name()); err != nil {
-				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error removing file")
-				restoreFailure = err
-			}
-		}
-	}()
-
-	actions, err := c.pluginManager.GetRestoreItemActions(restore.Name)
-	if err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		return
-	}
-	defer c.pluginManager.CloseRestoreItemActions(restore.Name)
+	defer closeAndRemoveFile(resultsFile, c.logger)
 
 	// Any return statement above this line means a total restore failure
 	// Some failures after this line *may* be a total restore failure
 	logContext.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(restore, backup, backupFile, logFile, actions)
+	restoreWarnings, restoreErrors = c.restorer.Restore(logContext, restore, backup, backupFile, actions)
 	logContext.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
-
+	if err := gzippedLogFile.Close(); err != nil {
+		c.logger.WithError(err).Error("error closing gzippedLogFile")
+	}
 	// Reset the offset to 0 for reading
 	if _, err = logFile.Seek(0, 0); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
 		return
 	}
 
-	if err := c.backupService.UploadRestoreLog(bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
+	if err := c.uploadRestoreLog(objectStore, c.bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
 	}
 
@@ -556,15 +592,20 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string) (res
 		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
 		return
 	}
-	if err := c.backupService.UploadRestoreResults(bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
+	if err := c.uploadRestoreResults(objectStore, c.bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
 	}
 
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger logrus.FieldLogger) (*os.File, error) {
-	readCloser, err := backupService.DownloadBackup(bucket, backupName)
+func downloadToTempFile(
+	objectStore cloudprovider.ObjectStore,
+	bucket, backupName string,
+	downloadBackup cloudprovider.DownloadBackupFunc,
+	logger logrus.FieldLogger,
+) (*os.File, error) {
+	readCloser, err := downloadBackup(objectStore, bucket, backupName)
 	if err != nil {
 		return nil, err
 	}

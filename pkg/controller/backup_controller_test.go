@@ -19,28 +19,31 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/logging"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -48,8 +51,8 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(backup *v1.Backup, data, log io.Writer, actions []backup.ItemAction) error {
-	args := b.Called(backup, data, log, actions)
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *v1.Backup, backupFile io.Writer, actions []backup.ItemAction) error {
+	args := b.Called(logger, backup, backupFile, actions)
 	return args.Error(0)
 }
 
@@ -156,27 +159,35 @@ func TestProcessBackup(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				backupper       = &fakeBackupper{}
-				cloudBackups    = &arktest.BackupService{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = arktest.NewLogger()
-				pluginManager   = &MockManager{}
+				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				pluginRegistry  = plugin.NewRegistry("/dir", logger, logrus.InfoLevel)
 				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
+				objectStore     = &arktest.ObjectStore{}
+				pluginManager   = &pluginmocks.Manager{}
 			)
+			defer backupper.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
+			defer pluginManager.AssertExpectations(t)
 
 			c := NewBackupController(
 				sharedInformers.Ark().V1().Backups(),
 				client.ArkV1(),
 				backupper,
-				cloudBackups,
+				v1.CloudProviderConfig{Name: "myCloud"},
 				"bucket",
 				test.allowSnapshots,
 				logger,
-				pluginManager,
+				logrus.InfoLevel,
+				pluginRegistry,
 				NewBackupTracker(),
 				metrics.NewServerMetrics(),
 			).(*backupController)
 
 			c.clock = clock.NewFakeClock(clockTime)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
 
 			var expiration, startTime time.Time
 
@@ -190,6 +201,11 @@ func TestProcessBackup(t *testing.T) {
 				if test.backup.Spec.TTL.Duration > 0 {
 					expiration = c.clock.Now().Add(test.backup.Spec.TTL.Duration)
 				}
+			}
+
+			if test.expectBackup {
+				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
+				objectStore.On("Init", mock.Anything).Return(nil)
 
 				// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 				backup := test.backup.DeepCopy()
@@ -201,7 +217,14 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Expiration.Time = expiration
 				backup.Status.StartTimestamp.Time = startTime
 				backup.Status.Version = 1
-				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				backupper.On("Backup",
+					mock.Anything, // logger
+					backup,
+					mock.Anything, // backup file
+					mock.Anything, // actions
+				).Return(nil)
+
+				pluginManager.On("GetBackupItemActions").Return(nil, nil)
 
 				// Ensure we have a CompletionTimestamp when uploading.
 				// Failures will display the bytes in buf.
@@ -211,10 +234,11 @@ func TestProcessBackup(t *testing.T) {
 
 					return strings.Contains(json, timeString)
 				}
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything).Return(nil)
+				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/%s-logs.gz", test.backup.Name, test.backup.Name), mock.Anything).Return(nil)
+				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/ark-backup.json", test.backup.Name), mock.MatchedBy(completionTimestampIsPresent)).Return(nil)
+				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/%s.tar.gz", test.backup.Name, test.backup.Name), mock.Anything).Return(nil)
 
-				pluginManager.On("GetBackupItemActions", backup.Name).Return(nil, nil)
-				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
+				pluginManager.On("CleanupClients")
 			}
 
 			// this is necessary so the Patch() call returns the appropriate object
@@ -273,8 +297,7 @@ func TestProcessBackup(t *testing.T) {
 			require.NoError(t, err, "processBackup unexpected error: %v", err)
 
 			if !test.expectBackup {
-				assert.Empty(t, backupper.Calls)
-				assert.Empty(t, cloudBackups.Calls)
+				// the AssertExpectations calls above make sure we aren't running anything we shouldn't be
 				return
 			}
 
@@ -323,135 +346,4 @@ func TestProcessBackup(t *testing.T) {
 			arktest.ValidatePatch(t, actions[1], expected, decode)
 		})
 	}
-}
-
-// MockManager is an autogenerated mock type for the Manager type
-type MockManager struct {
-	mock.Mock
-}
-
-// CloseBackupItemActions provides a mock function with given fields: backupName
-func (_m *MockManager) CloseBackupItemActions(backupName string) error {
-	ret := _m.Called(backupName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(backupName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// GetBackupItemActions provides a mock function with given fields: backupName, logger, level
-func (_m *MockManager) GetBackupItemActions(backupName string) ([]backup.ItemAction, error) {
-	ret := _m.Called(backupName)
-
-	var r0 []backup.ItemAction
-	if rf, ok := ret.Get(0).(func(string) []backup.ItemAction); ok {
-		r0 = rf(backupName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]backup.ItemAction)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(backupName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// CloseRestoreItemActions provides a mock function with given fields: restoreName
-func (_m *MockManager) CloseRestoreItemActions(restoreName string) error {
-	ret := _m.Called(restoreName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(restoreName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// GetRestoreItemActions provides a mock function with given fields: restoreName, logger, level
-func (_m *MockManager) GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error) {
-	ret := _m.Called(restoreName)
-
-	var r0 []restore.ItemAction
-	if rf, ok := ret.Get(0).(func(string) []restore.ItemAction); ok {
-		r0 = rf(restoreName)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]restore.ItemAction)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(restoreName)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetBlockStore provides a mock function with given fields: name
-func (_m *MockManager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
-	ret := _m.Called(name)
-
-	var r0 cloudprovider.BlockStore
-	if rf, ok := ret.Get(0).(func(string) cloudprovider.BlockStore); ok {
-		r0 = rf(name)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(cloudprovider.BlockStore)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetObjectStore provides a mock function with given fields: name
-func (_m *MockManager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
-	ret := _m.Called(name)
-
-	var r0 cloudprovider.ObjectStore
-	if rf, ok := ret.Get(0).(func(string) cloudprovider.ObjectStore); ok {
-		r0 = rf(name)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(cloudprovider.ObjectStore)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// CleanupClients provides a mock function
-func (_m *MockManager) CleanupClients() {
-	_ = _m.Called()
-	return
 }
