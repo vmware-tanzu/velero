@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -33,12 +34,39 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
+
+type mockBackupDownloader struct {
+	mock.Mock
+}
+
+func (m *mockBackupDownloader) downloadBackup(backupName string) (io.ReadCloser, error) {
+	args := m.Called(backupName)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+type mockRestoreUploader struct {
+	mock.Mock
+}
+
+func (m *mockRestoreUploader) uploadRestoreLog(backupName, restoreName string, logFile io.Reader) error {
+	args := m.Called(backupName, restoreName, logFile)
+	return args.Error(0)
+}
+
+func (m *mockRestoreUploader) uploadRestoreResults(backupName, restoreName string, resultsFile io.Reader) error {
+	args := m.Called(backupName, restoreName, resultsFile)
+	return args.Error(0)
+}
 
 func TestFetchBackup(t *testing.T) {
 	tests := []struct {
@@ -76,10 +104,10 @@ func TestFetchBackup(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &arktest.BackupService{}
 				logger          = arktest.NewLogger()
-				pluginManager   = &MockManager{}
+				backupGetter    = &cloudprovidermocks.XXXBackupGetter{}
 			)
+			defer backupGetter.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -87,33 +115,123 @@ func TestFetchBackup(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				backupSvc,
+				api.CloudProviderConfig{},
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				false,
 				logger,
-				pluginManager,
+				logrus.InfoLevel,
+				nil, //pluginRegistry
 			).(*restoreController)
+			c.newBackupGetter = func(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore) cloudprovider.XXXBackupGetter {
+				return backupGetter
+			}
 
 			for _, itm := range test.informerBackups {
 				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(itm)
 			}
 
 			if test.backupServiceBackup != nil || test.backupServiceError != nil {
-				backupSvc.On("GetBackup", "bucket", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
+				backupGetter.On("GetBackup", "bucket", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
 			}
 
-			backup, err := c.fetchBackup("bucket", test.backupName)
+			backup, err := c.fetchBackup(backupGetter, test.backupName)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, backup)
 			}
-
-			backupSvc.AssertExpectations(t)
 		})
 	}
 }
 
+func TestProcessRestoreSkips(t *testing.T) {
+	tests := []struct {
+		name        string
+		restoreKey  string
+		restore     *api.Restore
+		expectError bool
+	}{
+		{
+			name:       "invalid key returns error",
+			restoreKey: "invalid/key/value",
+		},
+		{
+			name:        "missing restore returns error",
+			restoreKey:  "foo/bar",
+			expectError: true,
+		},
+		{
+			name:       "restore with phase InProgress does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
+		},
+		{
+			name:       "restore with phase Completed does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
+		},
+		{
+			name:       "restore with phase FailedValidation does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				client               = fake.NewSimpleClientset()
+				restorer             = &fakeRestorer{}
+				sharedInformers      = informers.NewSharedInformerFactory(client, 0)
+				logger               = arktest.NewLogger()
+				pluginManager        = &pluginmocks.Manager{}
+				backupGetter         = &cloudprovidermocks.XXXBackupGetter{}
+				mockBackupDownloader = &mockBackupDownloader{}
+				mockRestoreUploader  = &mockRestoreUploader{}
+				objectStore          = &arktest.ObjectStore{}
+			)
+			defer restorer.AssertExpectations(t)
+			defer backupGetter.AssertExpectations(t)
+			defer mockBackupDownloader.AssertExpectations(t)
+			defer mockRestoreUploader.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
+
+			c := NewRestoreController(
+				api.DefaultNamespace,
+				sharedInformers.Ark().V1().Restores(),
+				client.ArkV1(),
+				client.ArkV1(),
+				restorer,
+				api.CloudProviderConfig{Name: "myCloud"},
+				"bucket",
+				sharedInformers.Ark().V1().Backups(),
+				false, // pvProviderExists
+				logger,
+				logrus.InfoLevel,
+				nil, // pluginRegistry
+			).(*restoreController)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
+			c.newBackupGetter = func(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore) cloudprovider.XXXBackupGetter {
+				return backupGetter
+			}
+			c.newBackupDownloader = func(objectStore cloudprovider.ObjectStore, bucket string) backupDownloader {
+				return mockBackupDownloader
+			}
+			c.newRestoreUploader = func(objectStore cloudprovider.ObjectStore, bucket string) restoreUploader {
+				return mockRestoreUploader
+			}
+
+			if test.restore != nil {
+				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
+			}
+
+			err := c.processRestore(test.restoreKey)
+			assert.Equal(t, test.expectError, err != nil)
+		})
+	}
+}
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
 		name                        string
@@ -130,31 +248,6 @@ func TestProcessRestore(t *testing.T) {
 		backupServiceGetBackupError error
 		uploadLogError              error
 	}{
-		{
-			name:        "invalid key returns error",
-			restoreKey:  "invalid/key/value",
-			expectedErr: true,
-		},
-		{
-			name:        "missing restore returns error",
-			restoreKey:  "foo/bar",
-			expectedErr: true,
-		},
-		{
-			name:        "restore with phase InProgress does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
-			expectedErr: false,
-		},
-		{
-			name:        "restore with phase Completed does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
-			expectedErr: false,
-		},
-		{
-			name:        "restore with phase FailedValidation does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
-			expectedErr: false,
-		},
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
 			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
@@ -260,16 +353,21 @@ func TestProcessRestore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client          = fake.NewSimpleClientset()
-				restorer        = &fakeRestorer{}
-				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &arktest.BackupService{}
-				logger          = arktest.NewLogger()
-				pluginManager   = &MockManager{}
+				client               = fake.NewSimpleClientset()
+				restorer             = &fakeRestorer{}
+				sharedInformers      = informers.NewSharedInformerFactory(client, 0)
+				logger               = arktest.NewLogger()
+				pluginManager        = &pluginmocks.Manager{}
+				backupGetter         = &cloudprovidermocks.XXXBackupGetter{}
+				mockBackupDownloader = &mockBackupDownloader{}
+				mockRestoreUploader  = &mockRestoreUploader{}
+				objectStore          = &arktest.ObjectStore{}
 			)
-
 			defer restorer.AssertExpectations(t)
-			defer backupSvc.AssertExpectations(t)
+			defer backupGetter.AssertExpectations(t)
+			defer mockBackupDownloader.AssertExpectations(t)
+			defer mockRestoreUploader.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -277,15 +375,31 @@ func TestProcessRestore(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				backupSvc,
+				api.CloudProviderConfig{Name: "myCloud"},
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				test.allowRestoreSnapshots,
 				logger,
-				pluginManager,
+				logrus.InfoLevel,
+				nil, // pluginRegistry
 			).(*restoreController)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
+			c.newBackupGetter = func(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore) cloudprovider.XXXBackupGetter {
+				return backupGetter
+			}
+			c.newBackupDownloader = func(objectStore cloudprovider.ObjectStore, bucket string) backupDownloader {
+				return mockBackupDownloader
+			}
+			c.newRestoreUploader = func(objectStore cloudprovider.ObjectStore, bucket string) restoreUploader {
+				return mockRestoreUploader
+			}
 
 			if test.restore != nil {
+				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
+				objectStore.On("Init", mock.Anything).Return(nil)
+
 				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
 
 				// this is necessary so the Patch() call returns the appropriate object
@@ -332,10 +446,10 @@ func TestProcessRestore(t *testing.T) {
 			}
 			if test.expectedRestorerCall != nil {
 				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
-				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
-				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
-				backupSvc.On("UploadRestoreLog", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
-				backupSvc.On("UploadRestoreResults", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(nil)
+				mockBackupDownloader.On("downloadBackup", test.restore.Spec.BackupName).Return(downloadedBackup, nil)
+				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+				mockRestoreUploader.On("uploadRestoreLog", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
+				mockRestoreUploader.On("uploadRestoreResults", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(nil)
 			}
 
 			var (
@@ -350,17 +464,15 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			if test.backupServiceGetBackupError != nil {
-				backupSvc.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
+				backupGetter.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
 			}
 
 			if test.restore != nil {
-				pluginManager.On("GetRestoreItemActions", test.restore.Name).Return(nil, nil)
-				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return(nil)
+				pluginManager.On("GetRestoreItemActions").Return(nil, nil)
+				pluginManager.On("CleanupClients")
 			}
 
 			err = c.processRestore(key)
-			backupSvc.AssertExpectations(t)
-			restorer.AssertExpectations(t)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 
@@ -452,13 +564,13 @@ type fakeRestorer struct {
 }
 
 func (r *fakeRestorer) Restore(
+	log logrus.FieldLogger,
 	restore *api.Restore,
 	backup *api.Backup,
 	backupReader io.Reader,
-	logger io.Writer,
 	actions []restore.ItemAction,
 ) (api.RestoreResult, api.RestoreResult) {
-	res := r.Called(restore, backup, backupReader, logger)
+	res := r.Called(log, restore, backup, backupReader, actions)
 
 	r.calledWithArg = *restore
 

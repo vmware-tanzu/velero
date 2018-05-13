@@ -28,6 +28,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -40,13 +41,14 @@ const (
 )
 
 type objectStore struct {
+	log        logrus.FieldLogger
 	s3         *s3.S3
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
 }
 
-func NewObjectStore() cloudprovider.ObjectStore {
-	return &objectStore{}
+func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
+	return &objectStore{log: logger}
 }
 
 func getBucketRegion(bucket string) (string, error) {

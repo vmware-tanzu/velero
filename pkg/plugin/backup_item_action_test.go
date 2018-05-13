@@ -24,6 +24,7 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/backup/mocks"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
+	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -151,9 +152,15 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 				itemAction.On("Execute", &validItemObject, &validBackupObject).Return(test.implUpdatedItem, test.implAdditionalItems, test.implError)
 			}
 
-			s := &BackupItemActionGRPCServer{impl: itemAction}
+			s := &BackupItemActionGRPCServer{mux: &serverMux{
+				serverLog: arktest.NewLogger(),
+				instances: map[string]interface{}{
+					"xyz": itemAction,
+				},
+			}}
 
 			req := &proto.ExecuteRequest{
+				Plugin: "xyz",
 				Item:   test.item,
 				Backup: test.backup,
 			}
@@ -162,9 +169,10 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 
 			// Verify error
 			assert.Equal(t, test.expectError, err != nil)
-			if test.expectError {
+			if err != nil {
 				return
 			}
+			require.NotNil(t, resp)
 
 			// Verify updated item
 			updatedItem := test.implUpdatedItem

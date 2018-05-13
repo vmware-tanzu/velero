@@ -26,6 +26,7 @@ import (
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/ark/pkg/util/stringslice"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -81,21 +82,21 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bs     = &arktest.BackupService{}
-				client = fake.NewSimpleClientset()
-				logger = arktest.NewLogger()
+				backupGetter = &cloudprovidermocks.BackupGetter{}
+				client       = fake.NewSimpleClientset()
+				logger       = arktest.NewLogger()
 			)
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
-				bs,
+				backupGetter,
 				"bucket",
 				time.Duration(0),
 				test.namespace,
 				logger,
 			).(*backupSyncController)
 
-			bs.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)
+			backupGetter.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)
 
 			c.run()
 
@@ -116,7 +117,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			}
 
 			assert.Equal(t, expectedActions, client.Actions())
-			bs.AssertExpectations(t)
 		})
 	}
 }

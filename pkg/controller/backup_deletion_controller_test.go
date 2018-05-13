@@ -29,7 +29,9 @@ import (
 	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -170,26 +172,34 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 	}
 }
 
+type mockBackupStorageDeleter struct {
+	mock.Mock
+}
+
+func (m *mockBackupStorageDeleter) deleteBackupStorage(log logrus.FieldLogger, backupName string) error {
+	args := m.Called(log, backupName)
+	return args.Error(0)
+}
+
 type backupDeletionControllerTestData struct {
-	client          *fake.Clientset
-	sharedInformers informers.SharedInformerFactory
-	backupService   *arktest.BackupService
-	snapshotService *arktest.FakeSnapshotService
-	controller      *backupDeletionController
-	req             *v1.DeleteBackupRequest
+	client               *fake.Clientset
+	sharedInformers      informers.SharedInformerFactory
+	snapshotService      *arktest.FakeSnapshotService
+	controller           *backupDeletionController
+	req                  *v1.DeleteBackupRequest
+	backupStorageDeleter *mockBackupStorageDeleter
 }
 
 func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
 	client := fake.NewSimpleClientset(objects...)
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	backupService := &arktest.BackupService{}
 	snapshotService := &arktest.FakeSnapshotService{SnapshotsTaken: sets.NewString()}
+	backupStorageDeleter := &mockBackupStorageDeleter{}
 	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 
 	data := &backupDeletionControllerTestData{
 		client:          client,
 		sharedInformers: sharedInformers,
-		backupService:   backupService,
 		snapshotService: snapshotService,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
@@ -197,7 +207,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
 			snapshotService,
-			backupService,
+			nil, // objectStore
 			"bucket",
 			sharedInformers.Ark().V1().Restores(),
 			client.ArkV1(), // restoreClient
@@ -206,10 +216,13 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Ark().V1().PodVolumeBackups(),
 		).(*backupDeletionController),
 
-		req: req,
+		req:                  req,
+		backupStorageDeleter: backupStorageDeleter,
 	}
 	req.Namespace = "heptio-ark"
 	req.Name = "foo-abcde"
+
+	data.controller.backupStorageDeleter = backupStorageDeleter
 
 	return data
 }
@@ -217,7 +230,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("missing spec.backupName", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.req.Spec.BackupName = ""
 
@@ -238,7 +251,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("deleting an in progress backup isn't allowed", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName)
 
@@ -259,7 +272,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("patching to InProgress fails", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, errors.New("bad")
@@ -272,7 +285,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("patching backup to Deleting fails", func(t *testing.T) {
 		backup := arktest.NewTestBackup().WithName("foo").WithSnapshot("pv-1", "snap-1").Backup
 		td := setupBackupDeletionControllerTest(backup)
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -287,7 +300,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("unable to find backup", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("backups").GroupResource(), "foo")
@@ -326,7 +339,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("no snapshot service, backup has snapshots", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
 		td.controller.snapshotService = nil
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			backup := arktest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap-1").Backup
@@ -377,7 +390,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore3)
 
-		defer td.backupService.AssertExpectations(t)
+		defer td.backupStorageDeleter.AssertExpectations(t)
 
 		// Clear out req labels to make sure the controller adds them
 		td.req.Labels = make(map[string]string)
@@ -395,7 +408,10 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
-		td.backupService.On("DeleteBackupDir", td.controller.bucket, td.req.Spec.BackupName).Return(nil)
+		td.backupStorageDeleter.On("deleteBackupStorage",
+			mock.Anything, // logger
+			td.req.Spec.BackupName,
+		).Return(nil)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)

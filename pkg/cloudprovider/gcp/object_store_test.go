@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -87,7 +88,7 @@ func TestPutObject(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			wc := newMockWriteCloser(test.writeErr, test.closeErr)
-			o := NewObjectStore().(*objectStore)
+			o := NewObjectStore(arktest.NewLogger()).(*objectStore)
 			o.bucketWriter = newFakeWriter(wc)
 
 			err := o.PutObject("bucket", "key", strings.NewReader("contents"))

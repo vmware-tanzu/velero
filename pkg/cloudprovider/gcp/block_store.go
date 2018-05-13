@@ -42,8 +42,8 @@ type blockStore struct {
 	log     logrus.FieldLogger
 }
 
-func NewBlockStore(log logrus.FieldLogger) cloudprovider.BlockStore {
-	return &blockStore{log: log}
+func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
+	return &blockStore{log: logger}
 }
 
 func (b *blockStore) Init(config map[string]string) error {

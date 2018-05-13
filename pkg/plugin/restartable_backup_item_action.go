@@ -1,0 +1,71 @@
+package plugin
+
+import (
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/backup"
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+)
+
+// restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with
+// a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
+// call, the restartableBackupItemAction asks its restartableProcess to restart itself if needed (e.g. if the
+// process terminated for any reason), then it proceeds with the actual call.
+type restartableBackupItemAction struct {
+	key                 kindAndName
+	sharedPluginProcess *restartableProcess
+}
+
+// newRestartableBackupItemAction returns a new resumableBackupItemAction.
+func newRestartableBackupItemAction(name string, sharedPluginProcess *restartableProcess) *restartableBackupItemAction {
+	r := &restartableBackupItemAction{
+		key:                 kindAndName{kind: PluginKindBackupItemAction, name: name},
+		sharedPluginProcess: sharedPluginProcess,
+	}
+	return r
+}
+
+// getBackupItemAction returns the backup item action for this restartableBackupItemAction. It does *not* restart the
+// plugin process.
+func (r *restartableBackupItemAction) getBackupItemAction() (backup.ItemAction, error) {
+	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
+	if err != nil {
+		return nil, err
+	}
+
+	backupItemAction, ok := plugin.(backup.ItemAction)
+	if !ok {
+		return nil, errors.Errorf("%T is not a backup.ItemAction!", plugin)
+	}
+
+	return backupItemAction, nil
+}
+
+// getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableBackupItemAction.
+func (r *restartableBackupItemAction) getDelegate() (backup.ItemAction, error) {
+	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
+		return nil, err
+	}
+
+	return r.getBackupItemAction()
+}
+
+// AppliesTo restarts the plugin's process if needed, then delegates the call.
+func (r *restartableBackupItemAction) AppliesTo() (backup.ResourceSelector, error) {
+	delegate, err := r.getDelegate()
+	if err != nil {
+		return backup.ResourceSelector{}, err
+	}
+
+	return delegate.AppliesTo()
+}
+
+// Execute restarts the plugin's process if needed, then delegates the call.
+func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []backup.ResourceIdentifier, error) {
+	delegate, err := r.getDelegate()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return delegate.Execute(item, backup)
+}

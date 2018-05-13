@@ -1,43 +1,50 @@
 package plugin
 
 import (
+	"os"
 	"os/exec"
 
 	"github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
+	"github.com/sirupsen/logrus"
 )
 
+// clientBuilder builds go-plugin Clients.
 type clientBuilder struct {
-	config *hcplugin.ClientConfig
+	logger      hclog.Logger
+	commandName string
+	commandArgs []string
 }
 
-func newClientBuilder(baseConfig *hcplugin.ClientConfig) *clientBuilder {
-	return &clientBuilder{
-		config: baseConfig,
+// newClientBuilder returns a new clientBuilder with commandName to name. If the command matches the currently running
+// process (i.e. ark), this also sets commandArgs to the internal Ark command to run plugins.
+func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus.Level) *clientBuilder {
+	b := &clientBuilder{
+		commandName: command,
+		logger:      &logrusAdapter{impl: logger, level: logLevel},
 	}
-}
-
-func (b *clientBuilder) withPlugin(kind PluginKind, plugin hcplugin.Plugin) *clientBuilder {
-	if b.config.Plugins == nil {
-		b.config.Plugins = make(map[string]hcplugin.Plugin)
+	if command == os.Args[0] {
+		// For plugins compiled into the ark executable, we need to run "ark run-plugin"
+		b.commandArgs = []string{"run-plugin"}
 	}
-	b.config.Plugins[string(kind)] = plugin
-
 	return b
 }
 
-func (b *clientBuilder) withLogger(logger hclog.Logger) *clientBuilder {
-	b.config.Logger = logger
-
-	return b
-}
-
-func (b *clientBuilder) withCommand(name string, args ...string) *clientBuilder {
-	b.config.Cmd = exec.Command(name, args...)
-
-	return b
-}
-
+// client creates a new go-plugin Client with support for all of Ark's plugin kinds (BackupItemAction, BlockStore,
+// ObjectStore, PluginLister, RestoreItemAction).
 func (b *clientBuilder) client() *hcplugin.Client {
-	return hcplugin.NewClient(b.config)
+	config := &hcplugin.ClientConfig{
+		HandshakeConfig:  Handshake,
+		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
+		Plugins: map[string]hcplugin.Plugin{
+			string(PluginKindBackupItemAction):  NewBackupItemActionPlugin(),
+			string(PluginKindBlockStore):        NewBlockStorePlugin(),
+			string(PluginKindObjectStore):       NewObjectStorePlugin(),
+			string(PluginKindPluginLister):      &PluginListerPlugin{},
+			string(PluginKindRestoreItemAction): NewRestoreItemActionPlugin(),
+		},
+		Logger: b.logger,
+		Cmd:    exec.Command(b.commandName, b.commandArgs...),
+	}
+	return hcplugin.NewClient(config)
 }

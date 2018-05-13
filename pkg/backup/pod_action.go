@@ -34,8 +34,8 @@ type podAction struct {
 }
 
 // NewPodAction creates a new ItemAction for pods.
-func NewPodAction(log logrus.FieldLogger) ItemAction {
-	return &podAction{log: log}
+func NewPodAction(logger logrus.FieldLogger) ItemAction {
+	return &podAction{log: logger}
 }
 
 // AppliesTo returns a ResourceSelector that applies only to pods.

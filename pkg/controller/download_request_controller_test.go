@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,15 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
+
+type mockSignedURLCreator struct {
+	mock.Mock
+}
+
+func (m *mockSignedURLCreator) createSignedURL(target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
+	args := m.Called(target, bucket, directory, ttl)
+	return args.String(0), args.Error(1)
+}
 
 func TestProcessDownloadRequest(t *testing.T) {
 	tests := []struct {
@@ -106,22 +116,22 @@ func TestProcessDownloadRequest(t *testing.T) {
 				sharedInformers          = informers.NewSharedInformerFactory(client, 0)
 				downloadRequestsInformer = sharedInformers.Ark().V1().DownloadRequests()
 				restoresInformer         = sharedInformers.Ark().V1().Restores()
-				backupService            = &arktest.BackupService{}
 				logger                   = arktest.NewLogger()
 				clockTime, _             = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
+				signedURLCreator         = &mockSignedURLCreator{}
 			)
-			defer backupService.AssertExpectations(t)
 
 			c := NewDownloadRequestController(
 				client.ArkV1(),
 				downloadRequestsInformer,
 				restoresInformer,
-				backupService,
+				nil, // objectStore
 				"bucket",
 				logger,
 			).(*downloadRequestController)
 
 			c.clock = clock.NewFakeClock(clockTime)
+			c.signedURLCreator = signedURLCreator
 
 			var downloadRequest *v1.DownloadRequest
 
@@ -146,7 +156,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 					restoresInformer.Informer().GetStore().Add(tc.restore)
 				}
 
-				backupService.On("CreateSignedURL", target, "bucket", tc.expectedDir, 10*time.Minute).Return("signedURL", nil)
+				signedURLCreator.On("createSignedURL", target, "bucket", tc.expectedDir, 10*time.Minute).Return("signedURL", nil)
 			}
 
 			// method under test
