@@ -571,6 +571,79 @@ func TestBackup(t *testing.T) {
 	}
 }
 
+func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
+	discoveryHelper := &arktest.FakeDiscoveryHelper{
+		Mapper: &arktest.FakeMapper{
+			Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{},
+		},
+	}
+
+	b, err := NewKubernetesBackupper(discoveryHelper, nil, nil, nil)
+	require.NoError(t, err)
+
+	kb := b.(*kubernetesBackupper)
+	groupBackupperFactory := &mockGroupBackupperFactory{}
+	kb.groupBackupperFactory = groupBackupperFactory
+
+	// assert that newGroupBackupper() is called with the result of cohabitatingResources()
+	// passed as an argument.
+	firstCohabitatingResources := cohabitatingResources()
+	groupBackupperFactory.On("newGroupBackupper",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		discoveryHelper,
+		mock.Anything,
+		firstCohabitatingResources,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(&mockGroupBackupper{})
+
+	assert.NoError(t, b.Backup(&v1.Backup{}, &bytes.Buffer{}, &bytes.Buffer{}, nil))
+	groupBackupperFactory.AssertExpectations(t)
+
+	// mutate the cohabitatingResources map that was used in the first backup to simulate
+	// the first backup process having done so.
+	for _, value := range firstCohabitatingResources {
+		value.seen = true
+	}
+
+	// assert that on a second backup, newGroupBackupper() is called with the result of
+	// cohabitatingResources() passed as an argument, that the value is not the
+	// same as the mutated firstCohabitatingResources value, and that all of the `seen`
+	// flags are false as they should be for a new instance
+	secondCohabitatingResources := cohabitatingResources()
+	groupBackupperFactory.On("newGroupBackupper",
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		discoveryHelper,
+		mock.Anything,
+		secondCohabitatingResources,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+	).Return(&mockGroupBackupper{})
+
+	assert.NoError(t, b.Backup(&v1.Backup{}, &bytes.Buffer{}, &bytes.Buffer{}, nil))
+	assert.NotEqual(t, firstCohabitatingResources, secondCohabitatingResources)
+	for _, resource := range secondCohabitatingResources {
+		assert.False(t, resource.seen)
+	}
+	groupBackupperFactory.AssertExpectations(t)
+}
+
 type mockGroupBackupperFactory struct {
 	mock.Mock
 }
