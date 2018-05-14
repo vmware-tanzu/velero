@@ -27,13 +27,13 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -497,9 +497,9 @@ func patchRestore(original, updated *api.Restore, client arkv1client.RestoresGet
 		return nil, errors.Wrap(err, "error marshalling updated restore")
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Restore{})
+	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating two-way merge patch for restore")
+		return nil, errors.Wrap(err, "error creating json merge patch for restore")
 	}
 
 	res, err := client.Restores(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)

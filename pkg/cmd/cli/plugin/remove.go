@@ -19,13 +19,12 @@ package plugin
 import (
 	"encoding/json"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/apps/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
@@ -71,10 +70,10 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 			updated, err := json.Marshal(arkDeploy)
 			cmd.CheckError(err)
 
-			patchBytes, err := strategicpatch.CreateTwoWayMergePatch(original, updated, v1beta1.Deployment{})
+			patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(arkDeploy.Namespace).Patch(arkDeploy.Name, types.StrategicMergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1beta1().Deployments(arkDeploy.Namespace).Patch(arkDeploy.Name, types.MergePatchType, patchBytes)
 			cmd.CheckError(err)
 		},
 	}
