@@ -36,3 +36,5 @@ debug
 .push-*
 .vscode
 *.diff
+
+_site/
