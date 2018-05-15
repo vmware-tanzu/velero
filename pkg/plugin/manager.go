@@ -44,6 +44,7 @@ func baseConfig() *plugin.ClientConfig {
 	return &plugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		Managed:          true,
 	}
 }
 
@@ -123,6 +124,9 @@ type Manager interface {
 	// CloseRestoreItemActions terminates the plugin sub-processes that
 	// are hosting RestoreItemAction plugins for the given restore name.
 	CloseRestoreItemActions(restoreName string) error
+
+	// CleanupClients kills all plugin subprocesses.
+	CleanupClients()
 }
 
 type manager struct {
@@ -410,4 +414,8 @@ func closeAll(store *clientStore, kind PluginKind, scope string) error {
 	store.deleteAll(kind, scope)
 
 	return nil
+}
+
+func (m *manager) CleanupClients() {
+	plugin.CleanupClients()
 }

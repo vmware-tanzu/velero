@@ -21,10 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/signal"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/heptio/ark/pkg/buildinfo"
@@ -221,6 +224,9 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 }
 
 func (s *server) run() error {
+	defer s.pluginManager.CleanupClients()
+	s.handleShutdownSignals()
+
 	if err := s.ensureArkNamespace(); err != nil {
 		return err
 	}
@@ -362,6 +368,17 @@ func (s *server) watchConfig(config *api.Config) {
 			}
 		},
 	})
+}
+
+func (s *server) handleShutdownSignals() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigs
+		s.logger.Infof("Received signal %s, gracefully shutting down", sig)
+		s.cancelFunc()
+	}()
 }
 
 func (s *server) initBackupService(config *api.Config) error {
