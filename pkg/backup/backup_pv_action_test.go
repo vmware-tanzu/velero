@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/kuberesource"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,5 +57,5 @@ func TestBackupPVAction(t *testing.T) {
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Len(t, additional, 1)
-	assert.Equal(t, ResourceIdentifier{GroupResource: pvGroupResource, Name: "myVolume"}, additional[0])
+	assert.Equal(t, ResourceIdentifier{GroupResource: kuberesource.PersistentVolumes, Name: "myVolume"}, additional[0])
 }

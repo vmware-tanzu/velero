@@ -20,9 +20,9 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
 )
 
@@ -35,8 +35,6 @@ type backupPVAction struct {
 func NewBackupPVAction(log logrus.FieldLogger) ItemAction {
 	return &backupPVAction{log: log}
 }
-
-var pvGroupResource = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
 
 func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
 	return ResourceSelector{
@@ -63,7 +61,7 @@ func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (
 	}
 
 	additionalItems = append(additionalItems, ResourceIdentifier{
-		GroupResource: pvGroupResource,
+		GroupResource: kuberesource.PersistentVolumes,
 		Name:          volumeName,
 	})
 

@@ -23,6 +23,7 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
@@ -645,7 +646,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 	}
 	client.On("List", metav1.ListOptions{LabelSelector: labelSelector}).Return(list, nil)
 
-	itemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), ns2, namespacesGroupResource).Return(nil)
+	itemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), ns2, kuberesource.Namespaces).Return(nil)
 
 	err := rb.backupResource(v1Group, namespacesResource)
 	require.NoError(t, err)

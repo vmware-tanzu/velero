@@ -22,6 +22,7 @@ import (
 	"time"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -67,7 +68,7 @@ func (h *defaultItemHookHandler) handleHooks(
 	phase hookPhase,
 ) error {
 	// We only support hooks on pods right now
-	if groupResource != podsGroupResource {
+	if groupResource != kuberesource.Pods {
 		return nil
 	}
 
@@ -117,7 +118,7 @@ func (h *defaultItemHookHandler) handleHooks(
 			hooks = resourceHook.post
 		}
 		for _, hook := range hooks {
-			if groupResource == podsGroupResource {
+			if groupResource == kuberesource.Pods {
 				if hook.Exec != nil {
 					hookLog := log.WithFields(
 						logrus.Fields{

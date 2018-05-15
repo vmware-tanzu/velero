@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
 
+	"github.com/heptio/ark/pkg/kuberesource"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -207,27 +208,27 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			},
 			expectedAdditionalItems: []ResourceIdentifier{
 				{
-					GroupResource: crbGroupResource,
+					GroupResource: kuberesource.ClusterRoleBindings,
 					Name:          "crb-2",
 				},
 				{
-					GroupResource: crbGroupResource,
+					GroupResource: kuberesource.ClusterRoleBindings,
 					Name:          "crb-3",
 				},
 				{
-					GroupResource: crbGroupResource,
+					GroupResource: kuberesource.ClusterRoleBindings,
 					Name:          "crb-4",
 				},
 				{
-					GroupResource: crGroupResource,
+					GroupResource: kuberesource.ClusterRoles,
 					Name:          "role-2",
 				},
 				{
-					GroupResource: crGroupResource,
+					GroupResource: kuberesource.ClusterRoles,
 					Name:          "role-3",
 				},
 				{
-					GroupResource: crGroupResource,
+					GroupResource: kuberesource.ClusterRoles,
 					Name:          "role-4",
 				},
 			},
