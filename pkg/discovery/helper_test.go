@@ -84,3 +84,60 @@ func TestSortResources(t *testing.T) {
 		})
 	}
 }
+
+func TestFilteringByVerbs(t *testing.T) {
+	tests := []struct {
+		name         string
+		groupVersion string
+		res          *metav1.APIResource
+		expected     bool
+	}{
+		{
+			name:         "resource that supports list, create, get, delete",
+			groupVersion: "v1",
+			res: &metav1.APIResource{
+				Verbs: metav1.Verbs{"list", "create", "get", "delete"},
+			},
+			expected: true,
+		},
+		{
+			name:         "resource that supports list, create, get, delete in a different order",
+			groupVersion: "v1",
+			res: &metav1.APIResource{
+				Verbs: metav1.Verbs{"delete", "get", "create", "list"},
+			},
+			expected: true,
+		},
+		{
+			name:         "resource that supports list, create, get, delete, and more",
+			groupVersion: "v1",
+			res: &metav1.APIResource{
+				Verbs: metav1.Verbs{"list", "create", "get", "delete", "update", "patch", "deletecollection"},
+			},
+			expected: true,
+		},
+		{
+			name:         "resource that supports only list and create",
+			groupVersion: "v1",
+			res: &metav1.APIResource{
+				Verbs: metav1.Verbs{"list", "create"},
+			},
+			expected: false,
+		},
+		{
+			name:         "resource that supports only get and delete",
+			groupVersion: "v1",
+			res: &metav1.APIResource{
+				Verbs: metav1.Verbs{"get", "delete"},
+			},
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			out := filterByVerbs(test.groupVersion, test.res)
+			assert.Equal(t, test.expected, out)
+		})
+	}
+}

@@ -108,9 +108,7 @@ func (h *helper) Refresh() error {
 	}
 
 	h.resources = discovery.FilteredBy(
-		discovery.ResourcePredicateFunc(func(groupVersion string, r *metav1.APIResource) bool {
-			return discovery.SupportsAllVerbs{Verbs: []string{"list", "create"}}.Match(groupVersion, r)
-		}),
+		discovery.ResourcePredicateFunc(filterByVerbs),
 		preferredResources,
 	)
 
@@ -130,6 +128,10 @@ func (h *helper) Refresh() error {
 	}
 
 	return nil
+}
+
+func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {
+	return discovery.SupportsAllVerbs{Verbs: []string{"list", "create", "get", "delete"}}.Match(groupVersion, r)
 }
 
 // sortResources sources resources by moving extensions to the end of the slice. The order of all
