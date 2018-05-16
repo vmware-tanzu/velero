@@ -20,6 +20,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,6 +83,12 @@ func (l *LogsOptions) Validate(f client.Factory) error {
 	}
 	l.client = c
 
-	_, err = l.client.ArkV1().Restores(f.Namespace()).Get(l.RestoreName, metav1.GetOptions{})
-	return err
+	r, err := l.client.ArkV1().Restores(f.Namespace()).Get(l.RestoreName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if r.Status.Phase != v1.RestorePhaseCompleted {
+		return errors.Errorf("unable to retrieve logs because restore is not complete")
+	}
+	return nil
 }
