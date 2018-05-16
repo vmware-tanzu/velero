@@ -90,7 +90,8 @@ type backupItemClientMux struct {
 	clients    map[string]*BackupItemActionGRPCClient
 }
 
-func (m *backupItemClientMux) GetByName(name string) interface{} {
+// clientFor returns a BackupItemActionGRPCClient for the BackupItemAction with the given name.
+func (m *backupItemClientMux) clientFor(name string) interface{} {
 	if client, found := m.clients[name]; found {
 		return client
 	}
