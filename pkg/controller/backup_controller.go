@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -293,9 +293,9 @@ func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter
 		return nil, errors.Wrap(err, "error marshalling updated backup")
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Backup{})
+	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating two-way merge patch for backup")
+		return nil, errors.Wrap(err, "error creating json merge patch for backup")
 	}
 
 	res, err := client.Backups(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)

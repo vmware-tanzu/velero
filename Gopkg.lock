@@ -526,19 +526,16 @@
     "pkg/util/httpstream/spdy",
     "pkg/util/intstr",
     "pkg/util/json",
-    "pkg/util/mergepatch",
     "pkg/util/net",
     "pkg/util/remotecommand",
     "pkg/util/runtime",
     "pkg/util/sets",
-    "pkg/util/strategicpatch",
     "pkg/util/validation",
     "pkg/util/validation/field",
     "pkg/util/wait",
     "pkg/util/yaml",
     "pkg/version",
     "pkg/watch",
-    "third_party/forked/golang/json",
     "third_party/forked/golang/netutil",
     "third_party/forked/golang/reflect"
   ]
@@ -618,12 +615,6 @@
   version = "v7.0.0"
 
 [[projects]]
-  branch = "master"
-  name = "k8s.io/kube-openapi"
-  packages = ["pkg/util/proto"]
-  revision = "61b46af70dfed79c6d24530cd23b41440a7f22a5"
-
-[[projects]]
   name = "k8s.io/kubernetes"
   packages = ["pkg/printers"]
   revision = "fc32d2f3698e36b93322a3465f63a14e9f0eaead"
@@ -632,6 +623,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ae537b14a6c7d8b1d160c764469d02c4fe830fcb3426395c739047a72bcc81a4"
+  inputs-digest = "2f16c6e2f4e0289f8daa9b9f5b22949703e6a3c71ff06fc0aee4312c270f26a6"
   solver-name = "gps-cdcl"
   solver-version = 1

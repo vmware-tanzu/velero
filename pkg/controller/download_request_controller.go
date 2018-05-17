@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -30,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -292,9 +292,9 @@ func patchDownloadRequest(original, updated *v1.DownloadRequest, client arkv1cli
 		return nil, errors.Wrap(err, "error marshalling updated download request")
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, v1.DownloadRequest{})
+	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating two-way merge patch for download request")
+		return nil, errors.Wrap(err, "error creating json merge patch for download request")
 	}
 
 	res, err := client.DownloadRequests(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)

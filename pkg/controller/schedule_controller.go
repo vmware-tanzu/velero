@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
@@ -386,9 +386,9 @@ func patchSchedule(original, updated *api.Schedule, client arkv1client.Schedules
 		return nil, errors.Wrap(err, "error marshalling updated schedule")
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(origBytes, updatedBytes, api.Schedule{})
+	patchBytes, err := jsonpatch.CreateMergePatch(origBytes, updatedBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating two-way merge patch for schedule")
+		return nil, errors.Wrap(err, "error creating json merge patch for schedule")
 	}
 
 	res, err := client.Schedules(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
