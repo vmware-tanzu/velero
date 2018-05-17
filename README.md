@@ -83,6 +83,12 @@ Make sure that you install somewhere in your `$PATH`.
     ark backup create nginx-backup --selector app=nginx
     ```
 
+   Alternatively if you want to backup all objects *except* those matching the label `backup=ignore` :
+
+   ```
+   ark backup create nginx-backup --selector '(backup notin ignore)'
+   ```
+
 1. Simulate a disaster:
 
     ```
