@@ -263,6 +263,22 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		assert.EqualError(t, err, "error patching DeleteBackupRequest: bad")
 	})
 
+	t.Run("patching backup to Deleting fails", func(t *testing.T) {
+		backup := arktest.NewTestBackup().WithName("foo").WithSnapshot("pv-1", "snap-1").Backup
+		td := setupBackupDeletionControllerTest(backup)
+		defer td.backupService.AssertExpectations(t)
+
+		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
+			return true, td.req, nil
+		})
+		td.client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, nil, errors.New("bad")
+		})
+
+		err := td.controller.processRequest(td.req)
+		assert.EqualError(t, err, "error patching Backup: bad")
+	})
+
 	t.Run("unable to find backup", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
 		defer td.backupService.AssertExpectations(t)
