@@ -211,6 +211,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	})
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error setting backup phase to deleting")
+		return err
 	}
 
 	var errs []string
