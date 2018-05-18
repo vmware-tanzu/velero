@@ -492,6 +492,18 @@
   version = "kubernetes-1.10.0"
 
 [[projects]]
+  branch = "master"
+  name = "k8s.io/apiextensions-apiserver"
+  packages = [
+    "pkg/apis/apiextensions",
+    "pkg/apis/apiextensions/v1beta1",
+    "pkg/client/clientset/clientset",
+    "pkg/client/clientset/clientset/scheme",
+    "pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+  ]
+  revision = "07bbbb7a28a34c56bf9d1b192a88cc9b2350095e"
+
+[[projects]]
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
