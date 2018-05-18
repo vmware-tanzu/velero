@@ -25,7 +25,6 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
@@ -37,64 +36,38 @@ import (
 type BlockStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	mux map[string]func() cloudprovider.BlockStore
+	*serverImplFactoryMux
 }
 
 // NewBlockStorePlugin constructs a BlockStorePlugin.
 func NewBlockStorePlugin() *BlockStorePlugin {
 	return &BlockStorePlugin{
-		mux: make(map[string]func() cloudprovider.BlockStore),
+		serverImplFactoryMux: newServerImplFactoryMux(),
 	}
 }
 
-func (p *BlockStorePlugin) Add(name string, f func() cloudprovider.BlockStore) *BlockStorePlugin {
-	p.mux[name] = f
-	return p
-}
-
-func (p *BlockStorePlugin) Names() []string {
-	return sets.StringKeySet(p.mux).List()
-}
-
-// GRPCServer registers a BlockStore gRPC server.
-func (p *BlockStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{mux: p.mux, impls: make(map[string]cloudprovider.BlockStore)})
-	return nil
-}
+//////////////////////////////////////////////////////////////////////////////
+// client code
+//////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns a BlockStore gRPC client.
 func (p *BlockStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return &blockStoreClientMux{
-		grpcClient: proto.NewBlockStoreClient(c),
-		clients:    make(map[string]*BlockStoreGRPCClient),
-	}, nil
-}
-
-type blockStoreClientMux struct {
-	grpcClient proto.BlockStoreClient
-	log        *logrusAdapter
-	clients    map[string]*BlockStoreGRPCClient
-}
-
-func (m *blockStoreClientMux) GetByName(name string) interface{} {
-	if client, found := m.clients[name]; found {
-		return client
-	}
-	client := &BlockStoreGRPCClient{
-		plugin:     name,
-		grpcClient: m.grpcClient,
-		log:        m.log,
-	}
-	m.clients[name] = client
-	return client
+	return newClientMux(c, newBlockStoreGRPCClient), nil
 }
 
 // BlockStoreGRPCClient implements the cloudprovider.BlockStore interface and uses a
 // gRPC client to make calls to the plugin server.
 type BlockStoreGRPCClient struct {
+	*xxxBase
 	grpcClient proto.BlockStoreClient
-	log        *logrusAdapter
-	plugin     string
+}
+
+func newBlockStoreGRPCClient() xxx {
+	return &BlockStoreGRPCClient{xxxBase: &xxxBase{}}
+}
+
+func (c *BlockStoreGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+	c.grpcClient = proto.NewBlockStoreClient(clientConn)
 }
 
 // Init prepares the BlockStore for usage using the provided map of
@@ -226,26 +199,34 @@ func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID str
 	return &updatedPV, nil
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// server code
+//////////////////////////////////////////////////////////////////////////////
+
+// GRPCServer registers a BlockStore gRPC server.
+func (p *BlockStorePlugin) GRPCServer(s *grpc.Server) error {
+	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{mux: p.serverImplFactoryMux})
+	return nil
+}
+
 // BlockStoreGRPCServer implements the proto-generated BlockStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BlockStoreGRPCServer struct {
-	mux   map[string]func() cloudprovider.BlockStore
-	impls map[string]cloudprovider.BlockStore
+	mux *serverImplFactoryMux
 }
 
 func (s *BlockStoreGRPCServer) getImpl(name string) (cloudprovider.BlockStore, error) {
-	if impl, found := s.impls[name]; found {
-		return impl, nil
+	impl, err := s.mux.getImpl(name)
+	if err != nil {
+		return nil, err
 	}
 
-	f, found := s.mux[name]
-	if !found {
-		return nil, errors.Errorf("unable to find BlockStore %s", name)
+	blockStore, ok := impl.(cloudprovider.BlockStore)
+	if !ok {
+		return nil, errors.Errorf("%T is not a block store", impl)
 	}
 
-	s.impls[name] = f()
-
-	return s.impls[name], nil
+	return blockStore, nil
 }
 
 // Init prepares the BlockStore for usage using the provided map of
@@ -256,6 +237,7 @@ func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := impl.Init(req.Config); err != nil {
 		return nil, err
 	}
@@ -266,6 +248,11 @@ func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest)
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
 func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (*proto.CreateVolumeResponse, error) {
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
 	snapshotID := req.SnapshotID
 	volumeType := req.VolumeType
 	volumeAZ := req.VolumeAZ
@@ -275,10 +262,6 @@ func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req
 		iops = &req.Iops
 	}
 
-	impl, err := s.getImpl(req.Plugin)
-	if err != nil {
-		return nil, err
-	}
 	volumeID, err := impl.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 	if err != nil {
 		return nil, err
@@ -294,6 +277,7 @@ func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.Get
 	if err != nil {
 		return nil, err
 	}
+
 	volumeType, iops, err := impl.GetVolumeInfo(req.VolumeID, req.VolumeAZ)
 	if err != nil {
 		return nil, err
@@ -316,6 +300,7 @@ func (s *BlockStoreGRPCServer) IsVolumeReady(ctx context.Context, req *proto.IsV
 	if err != nil {
 		return nil, err
 	}
+
 	ready, err := impl.IsVolumeReady(req.VolumeID, req.VolumeAZ)
 	if err != nil {
 		return nil, err
@@ -331,6 +316,7 @@ func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.Cr
 	if err != nil {
 		return nil, err
 	}
+
 	snapshotID, err := impl.CreateSnapshot(req.VolumeID, req.VolumeAZ, req.Tags)
 	if err != nil {
 		return nil, err
@@ -345,6 +331,7 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 	if err != nil {
 		return nil, err
 	}
+
 	if err := impl.DeleteSnapshot(req.SnapshotID); err != nil {
 		return nil, err
 	}
@@ -353,16 +340,17 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 }
 
 func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (*proto.GetVolumeIDResponse, error) {
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
 	var pv unstructured.Unstructured
 
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
 		return nil, err
 	}
 
-	impl, err := s.getImpl(req.Plugin)
-	if err != nil {
-		return nil, err
-	}
 	volumeID, err := impl.GetVolumeID(&pv)
 	if err != nil {
 		return nil, err
@@ -372,16 +360,17 @@ func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVo
 }
 
 func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (*proto.SetVolumeIDResponse, error) {
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
 	var pv unstructured.Unstructured
 
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
 		return nil, err
 	}
 
-	impl, err := s.getImpl(req.Plugin)
-	if err != nil {
-		return nil, err
-	}
 	updatedPV, err := impl.SetVolumeID(&pv, req.VolumeID)
 	if err != nil {
 		return nil, err

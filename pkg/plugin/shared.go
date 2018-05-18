@@ -20,9 +20,7 @@ import (
 	"os"
 
 	plugin "github.com/hashicorp/go-plugin"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/restore"
+	"github.com/sirupsen/logrus"
 )
 
 // Handshake is configuration information that allows go-plugin
@@ -34,60 +32,102 @@ var Handshake = plugin.HandshakeConfig{
 }
 
 type SimpleServer interface {
-	RegisterBackupItemActions(map[string]func() backup.ItemAction) SimpleServer
-	RegisterBlockStores(map[string]func() cloudprovider.BlockStore) SimpleServer
-	RegisterObjectStores(map[string]func() cloudprovider.ObjectStore) SimpleServer
-	RegisterRestoreItemActions(map[string]func() restore.ItemAction) SimpleServer
+	RegisterBackupItemAction(name string, factory ServerImplFactory) SimpleServer
+	RegisterBackupItemActions(map[string]ServerImplFactory) SimpleServer
+
+	RegisterBlockStore(name string, factory ServerImplFactory) SimpleServer
+	RegisterBlockStores(map[string]ServerImplFactory) SimpleServer
+
+	RegisterObjectStore(name string, factory ServerImplFactory) SimpleServer
+	RegisterObjectStores(map[string]ServerImplFactory) SimpleServer
+
+	RegisterRestoreItemAction(name string, factory ServerImplFactory) SimpleServer
+	RegisterRestoreItemActions(map[string]ServerImplFactory) SimpleServer
+
 	Serve()
 }
 
 type simpleServer struct {
+	log               logrus.FieldLogger
 	backupItemAction  *BackupItemActionPlugin
 	blockStore        *BlockStorePlugin
 	objectStore       *ObjectStorePlugin
 	restoreItemAction *RestoreItemActionPlugin
 }
 
-func NewSimpleServer() SimpleServer {
+func NewSimpleServer(log logrus.FieldLogger) SimpleServer {
+	backupItemAction := NewBackupItemActionPlugin()
+	backupItemAction.setServerLog(log)
+
+	blockStore := NewBlockStorePlugin()
+	blockStore.setServerLog(log)
+
+	objectStore := NewObjectStorePlugin()
+	objectStore.setServerLog(log)
+
+	restoreItemAction := NewRestoreItemActionPlugin()
+	restoreItemAction.setServerLog(log)
+
 	return &simpleServer{
-		backupItemAction:  NewBackupItemActionPlugin(),
-		blockStore:        NewBlockStorePlugin(),
-		objectStore:       NewObjectStorePlugin(),
-		restoreItemAction: NewRestoreItemActionPlugin(),
+		log:               log,
+		backupItemAction:  backupItemAction,
+		blockStore:        blockStore,
+		objectStore:       objectStore,
+		restoreItemAction: restoreItemAction,
 	}
 }
 
-func (s *simpleServer) RegisterBackupItemActions(m map[string]func() backup.ItemAction) SimpleServer {
+func (s *simpleServer) RegisterBackupItemAction(name string, factory ServerImplFactory) SimpleServer {
+	s.backupItemAction.register(name, factory)
+	return s
+}
+
+func (s *simpleServer) RegisterBackupItemActions(m map[string]ServerImplFactory) SimpleServer {
 	for name := range m {
-		s.backupItemAction.Add(name, m[name])
+		s.RegisterBackupItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterBlockStores(m map[string]func() cloudprovider.BlockStore) SimpleServer {
+func (s *simpleServer) RegisterBlockStore(name string, factory ServerImplFactory) SimpleServer {
+	s.blockStore.register(name, factory)
+	return s
+}
+
+func (s *simpleServer) RegisterBlockStores(m map[string]ServerImplFactory) SimpleServer {
 	for name := range m {
-		s.blockStore.Add(name, m[name])
+		s.RegisterBlockStore(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterObjectStores(m map[string]func() cloudprovider.ObjectStore) SimpleServer {
+func (s *simpleServer) RegisterObjectStore(name string, factory ServerImplFactory) SimpleServer {
+	s.objectStore.register(name, factory)
+	return s
+}
+
+func (s *simpleServer) RegisterObjectStores(m map[string]ServerImplFactory) SimpleServer {
 	for name := range m {
-		s.objectStore.Add(name, m[name])
+		s.RegisterObjectStore(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterRestoreItemActions(m map[string]func() restore.ItemAction) SimpleServer {
+func (s *simpleServer) RegisterRestoreItemAction(name string, factory ServerImplFactory) SimpleServer {
+	s.restoreItemAction.register(name, factory)
+	return s
+}
+
+func (s *simpleServer) RegisterRestoreItemActions(m map[string]ServerImplFactory) SimpleServer {
 	for name := range m {
-		s.restoreItemAction.Add(name, m[name])
+		s.RegisterRestoreItemAction(name, m[name])
 	}
 	return s
 }
 
 func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
-	for _, name := range plugin.Names() {
+	for _, name := range plugin.names() {
 		id := PluginIdentifier{Command: command, Kind: kind, Name: name}
 		pluginIdentifiers = append(pluginIdentifiers, id)
 	}
@@ -96,6 +136,10 @@ func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentif
 
 // Serve serves the plugin p.
 func (s *simpleServer) Serve() {
+	defer func() {
+		s.log.Error("ANDY ANDY ANDY")
+	}()
+
 	command := os.Args[0]
 
 	var pluginIdentifiers []PluginIdentifier

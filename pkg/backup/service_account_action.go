@@ -38,16 +38,19 @@ type serviceAccountAction struct {
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(log logrus.FieldLogger, client rbacclient.ClusterRoleBindingInterface) (ItemAction, error) {
+func NewServiceAccountAction(client rbacclient.ClusterRoleBindingInterface) (ItemAction, error) {
 	clusterRoleBindings, err := client.List(metav1.ListOptions{})
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	return &serviceAccountAction{
-		log:                 log,
 		clusterRoleBindings: clusterRoleBindings.Items,
 	}, nil
+}
+
+func (a *serviceAccountAction) SetLog(log logrus.FieldLogger) {
+	a.log = log
 }
 
 // AppliesTo returns a ResourceSelector that applies only to service accounts.

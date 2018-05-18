@@ -19,9 +19,8 @@ package plugin
 import (
 	"encoding/json"
 
-	"k8s.io/apimachinery/pkg/util/sets"
-
 	"github.com/hashicorp/go-plugin"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -41,67 +40,40 @@ import (
 type BackupItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	mux map[string]func() arkbackup.ItemAction
+	*serverImplFactoryMux
+
 	log *logrusAdapter
 }
 
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.
 func NewBackupItemActionPlugin() *BackupItemActionPlugin {
 	return &BackupItemActionPlugin{
-		mux: make(map[string]func() arkbackup.ItemAction),
+		serverImplFactoryMux: newServerImplFactoryMux(),
 	}
 }
 
-func (p *BackupItemActionPlugin) Add(name string, f func() arkbackup.ItemAction) *BackupItemActionPlugin {
-	p.mux[name] = f
-	return p
-}
-
-func (p *BackupItemActionPlugin) Names() []string {
-	return sets.StringKeySet(p.mux).List()
-}
-
-// GRPCServer registers a BackupItemAction gRPC server.
-func (p *BackupItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{mux: p.mux, impls: make(map[string]arkbackup.ItemAction)})
-	return nil
-}
+//////////////////////////////////////////////////////////////////////////////
+// client code
+//////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns a BackupItemAction gRPC client.
 func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return &backupItemClientMux{
-		grpcClient: proto.NewBackupItemActionClient(c),
-		log:        p.log,
-		clients:    make(map[string]*BackupItemActionGRPCClient),
-	}, nil
+	return newClientMux(c, newBackupItemActionGRPCClient), nil
 }
 
 // BackupItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type BackupItemActionGRPCClient struct {
+	*xxxBase
 	grpcClient proto.BackupItemActionClient
-	log        *logrusAdapter
-	plugin     string
 }
 
-type backupItemClientMux struct {
-	grpcClient proto.BackupItemActionClient
-	log        *logrusAdapter
-	clients    map[string]*BackupItemActionGRPCClient
+func newBackupItemActionGRPCClient() xxx {
+	return &BackupItemActionGRPCClient{xxxBase: &xxxBase{}}
 }
 
-// clientFor returns a BackupItemActionGRPCClient for the BackupItemAction with the given name.
-func (m *backupItemClientMux) clientFor(name string) interface{} {
-	if client, found := m.clients[name]; found {
-		return client
-	}
-	client := &BackupItemActionGRPCClient{
-		plugin:     name,
-		grpcClient: m.grpcClient,
-		log:        m.log,
-	}
-	m.clients[name] = client
-	return client
+func (c *BackupItemActionGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+	c.grpcClient = proto.NewBackupItemActionClient(clientConn)
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (arkbackup.ResourceSelector, error) {
@@ -168,24 +140,42 @@ func (c *BackupItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
 	c.log.impl = log
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// server code
+//////////////////////////////////////////////////////////////////////////////
+
+// GRPCServer registers a BackupItemAction gRPC server.
+func (p *BackupItemActionPlugin) GRPCServer(s *grpc.Server) error {
+	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{mux: p.serverImplFactoryMux})
+	return nil
+}
+
 // BackupItemActionGRPCServer implements the proto-generated BackupItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BackupItemActionGRPCServer struct {
-	mux   map[string]func() arkbackup.ItemAction
-	impls map[string]arkbackup.ItemAction
+	mux *serverImplFactoryMux
 }
 
-func (s *BackupItemActionGRPCServer) getImpl(name string) arkbackup.ItemAction {
-	if impl, found := s.impls[name]; found {
-		return impl
+func (s *BackupItemActionGRPCServer) getImpl(name string) (arkbackup.ItemAction, error) {
+	impl, err := s.mux.getImpl(name)
+	if err != nil {
+		return nil, err
 	}
-	f := s.mux[name]
-	s.impls[name] = f()
-	return s.impls[name]
+
+	itemAction, ok := impl.(arkbackup.ItemAction)
+	if !ok {
+		return nil, errors.Errorf("%T is not a backup item action", impl)
+	}
+
+	return itemAction, nil
 }
 
 func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (*proto.AppliesToResponse, error) {
-	impl := s.getImpl(req.Plugin)
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
 		return nil, err
@@ -201,6 +191,11 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.A
 }
 
 func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.ExecuteRequest) (*proto.ExecuteResponse, error) {
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
 	var item unstructured.Unstructured
 	var backup api.Backup
 
@@ -211,7 +206,6 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 		return nil, err
 	}
 
-	impl := s.getImpl(req.Plugin)
 	updatedItem, additionalItems, err := impl.Execute(&item, &backup)
 	if err != nil {
 		return nil, err

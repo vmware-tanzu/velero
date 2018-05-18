@@ -45,7 +45,7 @@ type backupDeletionController struct {
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	backupClient              arkv1client.BackupsGetter
 	snapshotService           cloudprovider.SnapshotService
-	backupService             cloudprovider.BackupService
+	objectStore               cloudprovider.ObjectStore
 	bucket                    string
 	restoreLister             listers.RestoreLister
 	restoreClient             arkv1client.RestoresGetter
@@ -62,7 +62,7 @@ func NewBackupDeletionController(
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
 	snapshotService cloudprovider.SnapshotService,
-	backupService cloudprovider.BackupService,
+	objectStore cloudprovider.ObjectStore,
 	bucket string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
@@ -74,7 +74,7 @@ func NewBackupDeletionController(
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
 		snapshotService:           snapshotService,
-		backupService:             backupService,
+		objectStore:               objectStore,
 		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
@@ -226,7 +226,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// Try to delete backup from object storage
 	log.Info("Removing backup from object storage")
-	if err := c.backupService.DeleteBackupDir(c.bucket, backup.Name); err != nil {
+	if err := cloudprovider.DeleteBackupDir(log, c.objectStore, c.bucket, backup.Name); err != nil {
 		errs = append(errs, errors.Wrap(err, "error deleting backup from object storage").Error())
 	}
 

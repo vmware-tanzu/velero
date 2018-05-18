@@ -29,10 +29,12 @@ type jobAction struct {
 	logger logrus.FieldLogger
 }
 
-func NewJobAction(logger logrus.FieldLogger) ItemAction {
-	return &jobAction{
-		logger: logger,
-	}
+func NewJobAction() ItemAction {
+	return &jobAction{}
+}
+
+func (a *jobAction) SetLog(log logrus.FieldLogger) {
+	a.logger = log
 }
 
 func (a *jobAction) AppliesTo() (ResourceSelector, error) {

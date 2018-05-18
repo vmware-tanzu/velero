@@ -7,6 +7,7 @@ import (
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 // wrapper encapsulates the lifecycle for all plugins contained in a single executable file. It is able to restart a
@@ -158,7 +159,7 @@ func (w *wrapper) dispenseLH(key kindAndName) (interface{}, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	if mux, ok := dispensed.(clientMux); ok {
+	if mux, ok := dispensed.(*clientMuxImpl); ok {
 		dispensed = mux.clientFor(key.name)
 	}
 
@@ -169,11 +170,60 @@ func (w *wrapper) dispenseLH(key kindAndName) (interface{}, error) {
 }
 
 // clientMux allows a dispensed plugin to support multiple implementations, such as AWS and GCP object stores.
-type clientMux interface {
-	// clientFor returns a gRPC client for the plugin named name. Note, the return type is interface{} because there
-	// isn't an interface for a gRPC client itself; the returned object must implement one of our plugin interfaces,
-	// such as ObjectStore.
-	clientFor(name string) interface{}
+// type clientMux interface {
+// 	// clientFor returns a gRPC client for the plugin named name. Note, the return type is interface{} because there
+// 	// isn't an interface for a gRPC client itself; the returned object must implement one of our plugin interfaces,
+// 	// such as ObjectStore.
+// 	clientFor(name string) interface{}
+// }
+
+type xxx interface {
+	setPlugin(name string)
+	setGrpcClient(clientConn *grpc.ClientConn)
+	setLog(log *logrusAdapter)
+}
+
+type xxxBase struct {
+	plugin string
+	log    *logrusAdapter
+}
+
+func (x *xxxBase) setPlugin(name string) {
+	x.plugin = name
+}
+
+func (x *xxxBase) setLog(log *logrusAdapter) {
+	x.log = log
+}
+
+type clientMuxImpl struct {
+	clientConn *grpc.ClientConn
+	log        *logrusAdapter
+	initFunc   func() xxx
+	clients    map[string]xxx
+}
+
+func newClientMux(clientConn *grpc.ClientConn, initFunc func() xxx) *clientMuxImpl {
+	m := &clientMuxImpl{
+		clientConn: clientConn,
+		initFunc:   initFunc,
+		clients:    make(map[string]xxx),
+	}
+
+	return m
+}
+
+func (m *clientMuxImpl) clientFor(name string) interface{} {
+	if client, found := m.clients[name]; found {
+		return client
+	}
+
+	client := m.initFunc()
+	client.setPlugin(name)
+	client.setGrpcClient(m.clientConn)
+	client.setLog(m.log)
+	m.clients[name] = client
+	return client
 }
 
 // stop terminates the plugin process.

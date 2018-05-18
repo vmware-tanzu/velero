@@ -31,10 +31,12 @@ type podAction struct {
 	logger logrus.FieldLogger
 }
 
-func NewPodAction(logger logrus.FieldLogger) ItemAction {
-	return &podAction{
-		logger: logger,
-	}
+func NewPodAction() ItemAction {
+	return &podAction{}
+}
+
+func (a *podAction) SetLog(log logrus.FieldLogger) {
+	a.logger = log
 }
 
 func (a *podAction) AppliesTo() (ResourceSelector, error) {

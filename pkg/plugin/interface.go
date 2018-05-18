@@ -22,7 +22,7 @@ import plugin "github.com/hashicorp/go-plugin"
 type Interface interface {
 	plugin.Plugin
 
-	Names() []string
+	names() []string
 }
 
 type GetByNamer interface {

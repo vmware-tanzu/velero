@@ -64,9 +64,9 @@ type kindString string
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
 type kubernetesRestorer struct {
-	discoveryHelper    discovery.Helper
-	dynamicFactory     client.DynamicFactory
-	backupService      cloudprovider.BackupService
+	discoveryHelper discovery.Helper
+	dynamicFactory  client.DynamicFactory
+	// backupService      cloudprovider.BackupService
 	snapshotService    cloudprovider.SnapshotService
 	backupClient       arkv1client.BackupsGetter
 	namespaceClient    corev1.NamespaceInterface
@@ -137,7 +137,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	backupService cloudprovider.BackupService,
+	// backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
@@ -147,7 +147,6 @@ func NewKubernetesRestorer(
 	return &kubernetesRestorer{
 		discoveryHelper:    discoveryHelper,
 		dynamicFactory:     dynamicFactory,
-		backupService:      backupService,
 		snapshotService:    snapshotService,
 		backupClient:       backupClient,
 		namespaceClient:    namespaceClient,

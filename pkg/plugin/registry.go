@@ -11,6 +11,7 @@ import (
 )
 
 type Registry interface {
+	SkipInternalDiscovery()
 	DiscoverPlugins() error
 	List(kind PluginKind) []PluginIdentifier
 	Get(kind PluginKind, name string) (PluginIdentifier, error)
@@ -25,39 +26,74 @@ type kindAndName struct {
 // is registered as supporting multiple PluginKinds, it will be
 // gettable/listable for all of those kinds.
 type registry struct {
-	dir    string
-	logger logrus.FieldLogger
-	// logLevel      logrus.Level
-	pluginsByID   map[kindAndName]PluginIdentifier
-	pluginsByKind map[PluginKind][]PluginIdentifier
+	dir                   string
+	skipInternalDiscovery bool
+	logger                logrus.FieldLogger
+	logLevel              logrus.Level
+	pluginsByID           map[kindAndName]PluginIdentifier
+	pluginsByKind         map[PluginKind][]PluginIdentifier
 }
 
-func NewRegistry(dir string, logger logrus.FieldLogger /*, logLevel logrus.Level*/) Registry {
+func NewRegistry(dir string, logger logrus.FieldLogger, logLevel logrus.Level) Registry {
 	return &registry{
-		dir:    dir,
-		logger: logger,
-		// logLevel:      logLevel,
+		dir:           dir,
+		logger:        logger,
+		logLevel:      logLevel,
 		pluginsByID:   make(map[kindAndName]PluginIdentifier),
 		pluginsByKind: make(map[PluginKind][]PluginIdentifier),
 	}
 }
 
+func (r *registry) SkipInternalDiscovery() {
+	r.skipInternalDiscovery = true
+}
+
 func (r *registry) readPluginsDir() ([]string, error) {
-	if _, err := os.Stat(r.dir); err != nil {
+	return readPluginsDir(r.dir)
+}
+
+func readPluginsDir(dir string) ([]string, error) {
+	if _, err := os.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
 		return nil, errors.WithStack(err)
 	}
 
-	files, err := ioutil.ReadDir(r.dir)
+	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	fullPaths := make([]string, 0, len(files))
 	for _, file := range files {
-		fullPaths = append(fullPaths, filepath.Join(r.dir, file.Name()))
+		fullPath := filepath.Join(dir, file.Name())
+
+		stat, err := os.Stat(fullPath)
+		if err != nil {
+			//TODO(ncdc) log or remove
+			//fmt.Printf("ERROR STATTING %s: %v\n", fullPath, err)
+			continue
+		}
+
+		if stat.IsDir() {
+			subDirPaths, err := readPluginsDir(fullPath)
+			if err != nil {
+				return nil, err
+			}
+			fullPaths = append(fullPaths, subDirPaths...)
+			continue
+		}
+
+		mode := stat.Mode()
+		// fmt.Printf("MODE: %v\n", mode)
+		if (mode & 0111) == 0 {
+			//TODO(ncdc) log or remove
+			// fmt.Printf("NOT EXECUTABLE: %s\n", fullPath)
+			continue
+		}
+
+		fullPaths = append(fullPaths, fullPath)
 	}
 	return fullPaths, nil
 }
@@ -68,7 +104,11 @@ func (r *registry) DiscoverPlugins() error {
 		return err
 	}
 
-	commands := []string{os.Args[0]} // ark itself
+	var commands []string
+	if !r.skipInternalDiscovery {
+		// ark's internal plugins
+		commands = append(commands, os.Args[0])
+	}
 	commands = append(commands, plugins...)
 
 	for _, command := range commands {
@@ -91,7 +131,7 @@ func (r *registry) DiscoverPlugins() error {
 }
 
 func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
-	// logger := &logrusAdapter{impl: r.logger, level: r.logLevel}
+	logger := &logrusAdapter{impl: r.logger, level: r.logLevel}
 
 	var args []string
 	if command == os.Args[0] {
@@ -99,8 +139,8 @@ func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
 	}
 
 	builder := newClientBuilder().
-		withCommand(command, args...)
-		// withLogger(logger)
+		withCommand(command, args...).
+		withLogger(logger)
 
 	client := builder.client()
 

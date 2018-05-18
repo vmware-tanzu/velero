@@ -44,10 +44,12 @@ type objectStore struct {
 	kmsKeyID   string
 }
 
-func NewObjectStore(log logrus.FieldLogger) cloudprovider.ObjectStore {
-	return &objectStore{
-		log: log,
-	}
+func NewObjectStore() cloudprovider.ObjectStore {
+	return &objectStore{}
+}
+
+func (o *objectStore) SetLog(log logrus.FieldLogger) {
+	o.log = log
 }
 
 func (o *objectStore) Init(config map[string]string) error {

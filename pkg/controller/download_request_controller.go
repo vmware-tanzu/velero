@@ -49,7 +49,7 @@ type downloadRequestController struct {
 	downloadRequestListerSynced cache.InformerSynced
 	restoreLister               listers.RestoreLister
 	restoreListerSynced         cache.InformerSynced
-	backupService               cloudprovider.BackupService
+	objectStore                 cloudprovider.ObjectStore
 	bucket                      string
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
@@ -62,7 +62,7 @@ func NewDownloadRequestController(
 	downloadRequestClient arkv1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
 	restoreInformer informers.RestoreInformer,
-	backupService cloudprovider.BackupService,
+	objectStore cloudprovider.ObjectStore,
 	bucket string,
 	logger logrus.FieldLogger,
 ) Interface {
@@ -72,7 +72,7 @@ func NewDownloadRequestController(
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
 		restoreLister:               restoreInformer.Lister(),
 		restoreListerSynced:         restoreInformer.Informer().HasSynced,
-		backupService:               backupService,
+		objectStore:                 objectStore,
 		bucket:                      bucket,
 		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
 		clock:                       &clock.RealClock{},
@@ -236,7 +236,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		directory = downloadRequest.Spec.Target.Name
 	}
 
-	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
+	update.Status.DownloadURL, err = cloudprovider.CreateSignedURL(c.objectStore, downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
 	if err != nil {
 		return err
 	}

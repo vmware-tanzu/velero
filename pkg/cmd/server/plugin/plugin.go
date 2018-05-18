@@ -21,7 +21,6 @@ import (
 
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cloudprovider/aws"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
@@ -39,58 +38,83 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			logger.Debug("Executing run-plugin command")
 
-			arkplugin.NewSimpleServer().
-				RegisterObjectStores(map[string]func() cloudprovider.ObjectStore{
-					"aws": func() cloudprovider.ObjectStore {
-						return aws.NewObjectStore(logger)
-					},
-					"azure": azure.NewObjectStore,
-					"gcp": func() cloudprovider.ObjectStore {
-						return gcp.NewObjectStore(logger)
-					},
-				}).
-				RegisterBlockStores(map[string]func() cloudprovider.BlockStore{
-					"aws":   aws.NewBlockStore,
-					"azure": azure.NewBlockStore,
-					"gcp": func() cloudprovider.BlockStore {
-						return gcp.NewBlockStore(logger)
-					},
-				}).
-				RegisterBackupItemActions(map[string]func() backup.ItemAction{
-					"pv": func() backup.ItemAction {
-						return backup.NewBackupPVAction(logger)
-					},
-					"pod": func() backup.ItemAction {
-						return backup.NewPodAction(logger)
-					},
-					"serviceaccount": func() backup.ItemAction {
-						clientset, err := f.KubeClient()
-						if err != nil {
-							panic(err)
-						}
-
-						action, err := backup.NewServiceAccountAction(logger, clientset.RbacV1().ClusterRoleBindings())
-						if err != nil {
-							panic(err)
-						}
-
-						return action
-					},
-				}).
-				RegisterRestoreItemActions(map[string]func() restore.ItemAction{
-					"job": func() restore.ItemAction {
-						return restore.NewJobAction(logger)
-					},
-					"pod": func() restore.ItemAction {
-						return restore.NewPodAction(logger)
-					},
-					"service": func() restore.ItemAction {
-						return restore.NewServiceAction(logger)
-					},
-				}).
+			arkplugin.NewSimpleServer(logger).
+				RegisterObjectStore("aws", newAwsObjectStore).
+				RegisterObjectStore("azure", newAzureObjectStore).
+				RegisterObjectStore("gcp", newGcpObjectStore).
+				RegisterBlockStore("aws", newAwsBlockStore).
+				RegisterBlockStore("azure", newAzureBlockStore).
+				RegisterBlockStore("gcp", newGcpBlockStore).
+				RegisterBackupItemAction("pv", newPVBackupItemAction).
+				RegisterBackupItemAction("pod", newPodBackupItemAction).
+				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
+				RegisterRestoreItemAction("job", newJobRestoreItemAction).
+				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
+				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
 				Serve()
 		},
 	}
 
 	return c
+}
+
+func newAwsObjectStore() (interface{}, error) {
+	return aws.NewObjectStore(), nil
+}
+
+func newAzureObjectStore() (interface{}, error) {
+	return azure.NewObjectStore(), nil
+}
+
+func newGcpObjectStore() (interface{}, error) {
+	return gcp.NewObjectStore(), nil
+}
+
+func newAwsBlockStore() (interface{}, error) {
+	return aws.NewBlockStore(), nil
+}
+
+func newAzureBlockStore() (interface{}, error) {
+	return azure.NewBlockStore(), nil
+}
+
+func newGcpBlockStore() (interface{}, error) {
+	return gcp.NewBlockStore(), nil
+}
+
+func newPVBackupItemAction() (interface{}, error) {
+	return backup.NewBackupPVAction(), nil
+}
+
+func newPodBackupItemAction() (interface{}, error) {
+	return backup.NewPodAction(), nil
+}
+
+func newServiceAccountBackupItemAction(f client.Factory) arkplugin.ServerImplFactory {
+	return func() (interface{}, error) {
+		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		action, err := backup.NewServiceAccountAction(clientset.RbacV1().ClusterRoleBindings())
+		if err != nil {
+			return nil, err
+		}
+
+		return action, nil
+	}
+}
+
+func newJobRestoreItemAction() (interface{}, error) {
+	return restore.NewJobAction(), nil
+}
+
+func newPodRestoreItemAction() (interface{}, error) {
+	return restore.NewPodAction(), nil
+}
+
+func newServiceRestoreItemAction() (interface{}, error) {
+	return restore.NewServiceAction(), nil
 }

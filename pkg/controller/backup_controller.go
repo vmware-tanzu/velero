@@ -54,26 +54,26 @@ import (
 const backupVersion = 1
 
 type backupController struct {
-	backupper        backup.Backupper
-	backupService    cloudprovider.BackupService
-	bucket           string
-	pvProviderExists bool
-	lister           listers.BackupLister
-	listerSynced     cache.InformerSynced
-	client           arkv1client.BackupsGetter
-	syncHandler      func(backupName string) error
-	queue            workqueue.RateLimitingInterface
-	clock            clock.Clock
-	logger           logrus.FieldLogger
-	pluginRegistry   plugin.Registry
-	backupTracker    BackupTracker
+	backupper         backup.Backupper
+	objectStoreConfig api.CloudProviderConfig
+	bucket            string
+	pvProviderExists  bool
+	lister            listers.BackupLister
+	listerSynced      cache.InformerSynced
+	client            arkv1client.BackupsGetter
+	syncHandler       func(backupName string) error
+	queue             workqueue.RateLimitingInterface
+	clock             clock.Clock
+	logger            logrus.FieldLogger
+	pluginRegistry    plugin.Registry
+	backupTracker     BackupTracker
 }
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
 	client arkv1client.BackupsGetter,
 	backupper backup.Backupper,
-	backupService cloudprovider.BackupService,
+	objectStoreConfig api.CloudProviderConfig,
 	bucket string,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
@@ -81,18 +81,18 @@ func NewBackupController(
 	backupTracker BackupTracker,
 ) Interface {
 	c := &backupController{
-		backupper:        backupper,
-		backupService:    backupService,
-		bucket:           bucket,
-		pvProviderExists: pvProviderExists,
-		lister:           backupInformer.Lister(),
-		listerSynced:     backupInformer.Informer().HasSynced,
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
-		clock:            &clock.RealClock{},
-		logger:           logger,
-		pluginRegistry:   pluginRegistry,
-		backupTracker:    backupTracker,
+		backupper:         backupper,
+		objectStoreConfig: objectStoreConfig,
+		bucket:            bucket,
+		pvProviderExists:  pvProviderExists,
+		lister:            backupInformer.Lister(),
+		listerSynced:      backupInformer.Informer().HasSynced,
+		client:            client,
+		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
+		clock:             &clock.RealClock{},
+		logger:            logger,
+		pluginRegistry:    pluginRegistry,
+		backupTracker:     backupTracker,
 	}
 
 	c.syncHandler = c.processBackup
@@ -348,6 +348,11 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return err
 	}
 
+	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	if err != nil {
+		return err
+	}
+
 	var errs []error
 
 	var backupJsonToUpload, backupFileToUpload io.Reader
@@ -370,13 +375,55 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		backupFileToUpload = backupFile
 	}
 
-	if err := controller.backupService.UploadBackup(bucket, backup.Name, backupJsonToUpload, backupFileToUpload, logFile); err != nil {
+	if err := controller.UploadBackup(log, objectStore, bucket, backup.Name, backupJsonToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
+}
+
+func (controller *backupController) UploadBackup(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string, metadata, backup, log io.Reader) error {
+	if err := cloudprovider.UploadBackupLog(objectStore, bucket, backupName, log); err != nil {
+		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
+		// backup's status.
+		logger.WithError(err).WithField("bucket", bucket).Error("Error uploading log file")
+	}
+
+	if metadata == nil {
+		// If we don't have metadata, something failed, and there's no point in continuing. An object
+		// storage bucket that is missing the metadata file can't be restored, nor can its logs be
+		// viewed.
+		return nil
+	}
+
+	// upload metadata file
+	if err := cloudprovider.UploadBackupMetadata(objectStore, bucket, backupName, metadata); err != nil {
+		// failure to upload metadata file is a hard-stop
+		return err
+	}
+
+	// upload tar file
+	return cloudprovider.UploadBackup(objectStore, bucket, backupName, backup)
+}
+
+// TODO(ncdc): move this to a better location that isn't backup specific
+func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("object storage provider name must not be empty")
+	}
+
+	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := objectStore.Init(cloudConfig.Config); err != nil {
+		return nil, err
+	}
+
+	return objectStore, nil
 }
 
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {

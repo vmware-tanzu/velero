@@ -32,8 +32,13 @@ type backupPVAction struct {
 	log logrus.FieldLogger
 }
 
-func NewBackupPVAction(log logrus.FieldLogger) ItemAction {
-	return &backupPVAction{log: log}
+func NewBackupPVAction() ItemAction {
+	return &backupPVAction{}
+}
+
+// SetLog is called when this is initialized as part of the server half of a plugin.
+func (a *backupPVAction) SetLog(log logrus.FieldLogger) {
+	a.log = log
 }
 
 func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {

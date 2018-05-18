@@ -172,7 +172,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	discoveryClient       discovery.DiscoveryInterface
 	clientPool            dynamic.ClientPool
@@ -249,9 +248,9 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
-	if err := s.initBackupService(config); err != nil {
-		return err
-	}
+	// if err := s.initBackupService(config); err != nil {
+	// 	return err
+	// }
 
 	if err := s.initSnapshotService(config); err != nil {
 		return err
@@ -387,16 +386,16 @@ func (s *server) handleShutdownSignals() {
 	}()
 }
 
-func (s *server) initBackupService(config *api.Config) error {
-	s.logger.Info("Configuring cloud provider for backup service")
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
-	if err != nil {
-		return err
-	}
+// func (s *server) initBackupService(config *api.Config) error {
+// 	s.logger.Info("Configuring cloud provider for backup service")
+// 	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
-	return nil
-}
+// 	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
+// 	return nil
+// }
 
 func (s *server) initSnapshotService(config *api.Config) error {
 	if config.PersistentVolumeProvider == nil {

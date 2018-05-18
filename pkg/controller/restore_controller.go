@@ -58,7 +58,7 @@ type restoreController struct {
 	restoreClient       arkv1client.RestoresGetter
 	backupClient        arkv1client.BackupsGetter
 	restorer            restore.Restorer
-	backupService       cloudprovider.BackupService
+	objectStoreConfig   api.CloudProviderConfig
 	bucket              string
 	pvProviderExists    bool
 	backupLister        listers.BackupLister
@@ -77,7 +77,7 @@ func NewRestoreController(
 	restoreClient arkv1client.RestoresGetter,
 	backupClient arkv1client.BackupsGetter,
 	restorer restore.Restorer,
-	backupService cloudprovider.BackupService,
+	objectStoreConfig api.CloudProviderConfig,
 	bucket string,
 	backupInformer informers.BackupInformer,
 	pvProviderExists bool,
@@ -89,7 +89,7 @@ func NewRestoreController(
 		restoreClient:       restoreClient,
 		backupClient:        backupClient,
 		restorer:            restorer,
-		backupService:       backupService,
+		objectStoreConfig:   objectStoreConfig,
 		bucket:              bucket,
 		pvProviderExists:    pvProviderExists,
 		backupLister:        backupInformer.Lister(),
@@ -211,7 +211,9 @@ func (controller *restoreController) processRestore(key string) error {
 	logContext.Debug("Running processRestore")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		logContext.WithError(err).Error("unable to process restore: error splitting queue key")
+		// Return nil here so we don't try to process the key any more
+		return nil
 	}
 
 	logContext.Debug("Getting Restore")
@@ -247,8 +249,21 @@ func (controller *restoreController) processRestore(key string) error {
 		}
 	}
 
+	pluginManager := plugin.NewManager(logContext, logContext.Level, controller.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
+	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	if err != nil {
+		return errors.Wrap(err, "error initializing object store")
+	}
+
+	actions, err := pluginManager.GetRestoreItemActions()
+	if err != nil {
+		return errors.Wrap(err, "error initializing restore item actions")
+	}
+
 	// validation
-	if restore.Status.ValidationErrors = controller.getValidationErrors(restore); len(restore.Status.ValidationErrors) > 0 {
+	if restore.Status.ValidationErrors = controller.getValidationErrors(objectStore, restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
@@ -269,7 +284,7 @@ func (controller *restoreController) processRestore(key string) error {
 
 	logContext.Debug("Running restore")
 	// execution & upload of restore
-	restoreWarnings, restoreErrors := controller.runRestore(restore, controller.bucket)
+	restoreWarnings, restoreErrors := controller.runRestore(restore, actions, objectStore, controller.bucket)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
@@ -292,12 +307,12 @@ func (controller *restoreController) processRestore(key string) error {
 	return nil
 }
 
-func (controller *restoreController) getValidationErrors(itm *api.Restore) []string {
+func (controller *restoreController) getValidationErrors(objectStore cloudprovider.ObjectStore, itm *api.Restore) []string {
 	var validationErrors []string
 
 	if itm.Spec.BackupName == "" {
 		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
-	} else if _, err := controller.fetchBackup(controller.bucket, itm.Spec.BackupName); err != nil {
+	} else if _, err := controller.fetchBackup(objectStore, controller.bucket, itm.Spec.BackupName); err != nil {
 		validationErrors = append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
 	}
 
@@ -323,7 +338,7 @@ func (controller *restoreController) getValidationErrors(itm *api.Restore) []str
 	return validationErrors
 }
 
-func (controller *restoreController) fetchBackup(bucket, name string) (*api.Backup, error) {
+func (controller *restoreController) fetchBackup(objectStore cloudprovider.ObjectStore, bucket, name string) (*api.Backup, error) {
 	backup, err := controller.backupLister.Backups(controller.namespace).Get(name)
 	if err == nil {
 		return backup, nil
@@ -336,7 +351,7 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	logContext := controller.logger.WithField("backupName", name)
 
 	logContext.Debug("Backup not found in backupLister, checking object storage directly")
-	backup, err = controller.backupService.GetBackup(bucket, name)
+	backup, err = cloudprovider.GetBackup(objectStore, bucket, name)
 	if err != nil {
 		return nil, err
 	}
@@ -356,14 +371,14 @@ func (controller *restoreController) fetchBackup(bucket, name string) (*api.Back
 	return backup, nil
 }
 
-func (controller *restoreController) runRestore(restore *api.Restore, bucket string) (restoreWarnings, restoreErrors api.RestoreResult) {
+func (controller *restoreController) runRestore(restore *api.Restore, actions []restore.ItemAction, objectStore cloudprovider.ObjectStore, bucket string) (restoreWarnings, restoreErrors api.RestoreResult) {
 	logContext := controller.logger.WithFields(
 		logrus.Fields{
 			"restore": kubeutil.NamespaceAndName(restore),
 			"backup":  restore.Spec.BackupName,
 		})
 
-	backup, err := controller.fetchBackup(bucket, restore.Spec.BackupName)
+	backup, err := controller.fetchBackup(objectStore, bucket, restore.Spec.BackupName)
 	if err != nil {
 		logContext.WithError(err).Error("Error getting backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
@@ -372,7 +387,7 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 
 	var tempFiles []*os.File
 
-	backupFile, err := downloadToTempFile(restore.Spec.BackupName, controller.backupService, bucket, controller.logger)
+	backupFile, err := downloadToTempFile(restore.Spec.BackupName, objectStore, bucket, controller.logger)
 	if err != nil {
 		logContext.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
@@ -408,15 +423,6 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		}
 	}()
 
-	pluginManager := plugin.NewManager(logContext, logContext.Level, controller.pluginRegistry)
-	defer pluginManager.CleanupClients()
-
-	actions, err := pluginManager.GetRestoreItemActions()
-	if err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		return
-	}
-
 	logContext.Info("starting restore")
 	restoreWarnings, restoreErrors = controller.restorer.Restore(restore, backup, backupFile, logFile, actions)
 	logContext.Info("restore completed")
@@ -429,7 +435,7 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		return
 	}
 
-	if err := controller.backupService.UploadRestoreLog(bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
+	if err := cloudprovider.UploadRestoreLog(objectStore, bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
 	}
 
@@ -450,15 +456,15 @@ func (controller *restoreController) runRestore(restore *api.Restore, bucket str
 		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
 		return
 	}
-	if err := controller.backupService.UploadRestoreResults(bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
+	if err := cloudprovider.UploadRestoreResults(objectStore, bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
 	}
 
 	return
 }
 
-func downloadToTempFile(backupName string, backupService cloudprovider.BackupService, bucket string, logger logrus.FieldLogger) (*os.File, error) {
-	readCloser, err := backupService.DownloadBackup(bucket, backupName)
+func downloadToTempFile(backupName string, objectStore cloudprovider.ObjectStore, bucket string, logger logrus.FieldLogger) (*os.File, error) {
+	readCloser, err := cloudprovider.DownloadBackup(objectStore, bucket, backupName)
 	if err != nil {
 		return nil, err
 	}

@@ -29,10 +29,12 @@ type serviceAction struct {
 	log logrus.FieldLogger
 }
 
-func NewServiceAction(log logrus.FieldLogger) ItemAction {
-	return &serviceAction{
-		log: log,
-	}
+func NewServiceAction() ItemAction {
+	return &serviceAction{}
+}
+
+func (a *serviceAction) SetLog(log logrus.FieldLogger) {
+	a.log = log
 }
 
 func (a *serviceAction) AppliesTo() (ResourceSelector, error) {

@@ -44,6 +44,8 @@ type Manager interface {
 	// CloseBackupItemActions().
 	GetBackupItemActions() ([]backup.ItemAction, error)
 
+	GetBackupItemAction(name string) (backup.ItemAction, error)
+
 	// GetRestoreItemActions returns all restore.ItemAction plugins.
 	// These plugin instances should ONLY be used for a single restore
 	// (mainly because each one outputs to a per-restore log),
@@ -159,16 +161,26 @@ func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 
 	for i := range list {
 		id := list[i]
-		wrapper, err := m.getWrapper(PluginKindBackupItemAction, id.Name)
+
+		r, err := m.GetBackupItemAction(id.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		r := newResumableBackupItemAction(id.Name, wrapper)
 		actions = append(actions, r)
 	}
 
 	return actions, nil
+}
+
+func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
+	wrapper, err := m.getWrapper(PluginKindBackupItemAction, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newResumableBackupItemAction(name, wrapper)
+	return r, nil
 }
 
 func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
