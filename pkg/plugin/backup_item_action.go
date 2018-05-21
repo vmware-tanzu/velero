@@ -40,15 +40,13 @@ import (
 type BackupItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	*serverImplFactoryMux
-
-	log *logrusAdapter
+	*serverMux
 }
 
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.
 func NewBackupItemActionPlugin() *BackupItemActionPlugin {
 	return &BackupItemActionPlugin{
-		serverImplFactoryMux: newServerImplFactoryMux(),
+		serverMux: newServerMux(),
 	}
 }
 
@@ -56,7 +54,7 @@ func NewBackupItemActionPlugin() *BackupItemActionPlugin {
 // client code
 //////////////////////////////////////////////////////////////////////////////
 
-// GRPCClient returns a BackupItemAction gRPC client.
+// GRPCClient returns a clientMux for BackupItemAction gRPC clients.
 func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
 	return newClientMux(c, newBackupItemActionGRPCClient), nil
 }
@@ -64,15 +62,15 @@ func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, er
 // BackupItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type BackupItemActionGRPCClient struct {
-	*xxxBase
+	*clientBase
 	grpcClient proto.BackupItemActionClient
 }
 
-func newBackupItemActionGRPCClient() xxx {
-	return &BackupItemActionGRPCClient{xxxBase: &xxxBase{}}
+func newBackupItemActionGRPCClient() client {
+	return &BackupItemActionGRPCClient{clientBase: &clientBase{}}
 }
 
-func (c *BackupItemActionGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+func (c *BackupItemActionGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
 	c.grpcClient = proto.NewBackupItemActionClient(clientConn)
 }
 
@@ -146,18 +144,18 @@ func (c *BackupItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
 
 // GRPCServer registers a BackupItemAction gRPC server.
 func (p *BackupItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{mux: p.serverImplFactoryMux})
+	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }
 
 // BackupItemActionGRPCServer implements the proto-generated BackupItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BackupItemActionGRPCServer struct {
-	mux *serverImplFactoryMux
+	mux *serverMux
 }
 
 func (s *BackupItemActionGRPCServer) getImpl(name string) (arkbackup.ItemAction, error) {
-	impl, err := s.mux.getImpl(name)
+	impl, err := s.mux.getInstance(name)
 	if err != nil {
 		return nil, err
 	}

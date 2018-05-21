@@ -38,7 +38,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			logger.Debug("Executing run-plugin command")
 
-			arkplugin.NewSimpleServer(logger).
+			arkplugin.NewServer(logger).
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
@@ -90,7 +90,7 @@ func newPodBackupItemAction() (interface{}, error) {
 	return backup.NewPodAction(), nil
 }
 
-func newServiceAccountBackupItemAction(f client.Factory) arkplugin.ServerImplFactory {
+func newServiceAccountBackupItemAction(f client.Factory) arkplugin.ServerInitializer {
 	return func() (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
 		clientset, err := f.KubeClient()

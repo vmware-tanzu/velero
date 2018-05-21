@@ -8,32 +8,31 @@ import (
 // the kind of an Ark-supported plugin.
 type PluginKind string
 
+// String returns the string for k.
 func (k PluginKind) String() string {
 	return string(k)
 }
 
 const (
-	// PluginKindObjectStore is the Kind string for
-	// an Object Store plugin.
+	// PluginKindObjectStore represents an object store plugin.
 	PluginKindObjectStore PluginKind = "ObjectStore"
 
-	// PluginKindBlockStore is the Kind string for
-	// a Block Store plugin.
+	// PluginKindBlockStore represents a block store plugin.
 	PluginKindBlockStore PluginKind = "BlockStore"
 
-	// PluginKindBackupItemAction is the Kind string for
-	// a Backup ItemAction plugin.
+	// PluginKindBackupItemAction represents a backup item action plugin.
 	PluginKindBackupItemAction PluginKind = "BackupItemAction"
 
-	// PluginKindRestoreItemAction is the Kind string for
-	// a Restore ItemAction plugin.
+	// PluginKindRestoreItemAction represents a restore item action plugin.
 	PluginKindRestoreItemAction PluginKind = "RestoreItemAction"
 
 	// PluginKindPluginLister represents a plugin lister plugin.
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
 
-var AllPluginKinds = sets.NewString(
+// allPluginKinds contains all the valid plugin kinds that Ark supports, excluding PluginLister because that is not a
+// kind that a developer would ever need to implement (it's handled by Ark and the Ark plugin library code).
+var allPluginKinds = sets.NewString(
 	PluginKindObjectStore.String(),
 	PluginKindBlockStore.String(),
 	PluginKindBackupItemAction.String(),

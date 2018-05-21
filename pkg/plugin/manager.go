@@ -26,32 +26,25 @@ import (
 	"github.com/heptio/ark/pkg/restore"
 )
 
-// Manager exposes functions for getting implementations of the pluggable
-// Ark interfaces.
+// Manager manages the lifecycles of plugins.
 type Manager interface {
-	// GetObjectStore returns the plugin implementation of the
-	// cloudprovider.ObjectStore interface with the specified name.
+	// GetObjectStore returns the ObjectStore plugin for name.
 	GetObjectStore(name string) (cloudprovider.ObjectStore, error)
 
-	// GetBlockStore returns the plugin implementation of the
-	// cloudprovider.BlockStore interface with the specified name.
+	// GetBlockStore returns the BlockStore plugin for name.
 	GetBlockStore(name string) (cloudprovider.BlockStore, error)
 
-	// GetBackupItemActions returns all backup.ItemAction plugins.
-	// These plugin instances should ONLY be used for a single backup
-	// (mainly because each one outputs to a per-backup log),
-	// and should be terminated upon completion of the backup with
-	// CloseBackupItemActions().
+	// GetBackupItemActions returns all backup item action plugins.
 	GetBackupItemActions() ([]backup.ItemAction, error)
 
+	// GetBackupItemAction returns the backup item action plugin for name.
 	GetBackupItemAction(name string) (backup.ItemAction, error)
 
-	// GetRestoreItemActions returns all restore.ItemAction plugins.
-	// These plugin instances should ONLY be used for a single restore
-	// (mainly because each one outputs to a per-restore log),
-	// and should be terminated upon completion of the restore with
-	// CloseRestoreItemActions().
+	// GetRestoreItemActions returns all restore item action plugins.
 	GetRestoreItemActions() ([]restore.ItemAction, error)
+
+	// GetRestoreItemAction returns the restore item action plugin for name.
+	GetRestoreItemAction(name string) (restore.ItemAction, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -63,40 +56,42 @@ type manager struct {
 	logLevel logrus.Level
 	registry Registry
 
-	// lock guards wrappers
-	lock     sync.Mutex
-	wrappers map[string]*wrapper
+	// lock guards restartablePluginProcesses
+	lock                       sync.Mutex
+	restartablePluginProcesses map[string]*restartablePluginProcess
 }
 
 // NewManager constructs a manager for getting plugins.
 func NewManager(logger logrus.FieldLogger, level logrus.Level, registry Registry) Manager {
 	return &manager{
-		logger:   logger,
-		logLevel: level,
-		registry: registry,
-		wrappers: make(map[string]*wrapper),
+		logger:                     logger,
+		logLevel:                   level,
+		registry:                   registry,
+		restartablePluginProcesses: make(map[string]*restartablePluginProcess),
 	}
 }
 
 func (m *manager) CleanupClients() {
 	m.lock.Lock()
 
-	for _, wrapper := range m.wrappers {
+	for _, wrapper := range m.restartablePluginProcesses {
 		wrapper.stop()
 	}
 
 	m.lock.Unlock()
 }
 
-func (m *manager) getWrapper(kind PluginKind, name string) (*wrapper, error) {
+// getWrapper returns a wrapper for a plugin identified by kind and name, creating a wrapper if it is the first time it
+// has been requested.
+func (m *manager) getWrapper(kind PluginKind, name string) (*restartablePluginProcess, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger := m.logger.WithFields(logrus.Fields{
-		"kind": string(PluginKindObjectStore),
+		"kind": PluginKindObjectStore.String(),
 		"name": name,
 	})
-	logger.Debug("looking for plugin")
+	logger.Debug("looking for plugin in registry")
 
 	info, err := m.registry.Get(kind, name)
 	if err != nil {
@@ -105,7 +100,7 @@ func (m *manager) getWrapper(kind PluginKind, name string) (*wrapper, error) {
 
 	logger = logger.WithField("command", info.Command)
 
-	wrapper, found := m.wrappers[info.Command]
+	wrapper, found := m.restartablePluginProcesses[info.Command]
 	if found {
 		logger.Debug("found preexisting plugin wrapper")
 		return wrapper, nil
@@ -113,47 +108,41 @@ func (m *manager) getWrapper(kind PluginKind, name string) (*wrapper, error) {
 
 	logger.Debug("creating new plugin wrapper")
 
-	wrapper, err = newWrapper(info.Command, withLog(m.logger, m.logLevel))
+	wrapper, err = newRestartablePluginProcess(info.Command, withLog(m.logger, m.logLevel))
 	if err != nil {
 		return nil, err
 	}
 
-	m.wrappers[info.Command] = wrapper
+	m.restartablePluginProcesses[info.Command] = wrapper
 
 	return wrapper, nil
 }
 
-// GetObjectStore returns the plugin implementation of the cloudprovider.ObjectStore
-// interface with the specified name.
+// GetObjectStore returns a resumableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
 	wrapper, err := m.getWrapper(PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newResumableObjectStore(name, wrapper)
+	r := newRestartableObjectStore(name, wrapper)
 
 	return r, nil
 }
 
-// GetBlockStore returns the plugin implementation of the cloudprovider.BlockStore
-// interface with the specified name.
+// GetBlockStore returns a resumableBlockStore for name.
 func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
 	wrapper, err := m.getWrapper(PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newResumableBlockStore(name, wrapper)
+	r := newRestartableBlockStore(name, wrapper)
 
 	return r, nil
 }
 
-// GetBackupActions returns all backup.BackupAction plugins.
-// These plugin instances should ONLY be used for a single backup
-// (mainly because each one outputs to a per-backup log),
-// and should be terminated upon completion of the backup with
-// CloseBackupActions().
+// GetBackupItemActions returns all backup item actions as resumableBackupItemActions.
 func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 	list := m.registry.List(PluginKindBackupItemAction)
 
@@ -173,16 +162,18 @@ func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 	return actions, nil
 }
 
+// GetBackupItemAction returns a resumableBackupItemAction for name.
 func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
 	wrapper, err := m.getWrapper(PluginKindBackupItemAction, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newResumableBackupItemAction(name, wrapper)
+	r := newRestartableBackupItemAction(name, wrapper)
 	return r, nil
 }
 
+// GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
 func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
 	list := m.registry.List(PluginKindRestoreItemAction)
 
@@ -190,14 +181,25 @@ func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
 
 	for i := range list {
 		id := list[i]
-		wrapper, err := m.getWrapper(PluginKindRestoreItemAction, id.Name)
+
+		r, err := m.GetRestoreItemAction(id.Name)
 		if err != nil {
 			return nil, err
 		}
 
-		r := newResumableRestoreItemAction(id.Name, wrapper)
 		actions = append(actions, r)
 	}
 
 	return actions, nil
+}
+
+// GetRestoreItemAction returns a restartableRestoreItemAction for name.
+func (m *manager) GetRestoreItemAction(name string) (restore.ItemAction, error) {
+	wrapper, err := m.getWrapper(PluginKindRestoreItemAction, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableRestoreItemAction(name, wrapper)
+	return r, nil
 }

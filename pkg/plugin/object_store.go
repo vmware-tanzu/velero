@@ -38,7 +38,7 @@ const byteChunkSize = 16384
 type ObjectStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	*serverImplFactoryMux
+	*serverMux
 
 	log *logrusAdapter
 }
@@ -46,7 +46,7 @@ type ObjectStorePlugin struct {
 // NewObjectStorePlugin construct an ObjectStorePlugin.
 func NewObjectStorePlugin() *ObjectStorePlugin {
 	return &ObjectStorePlugin{
-		serverImplFactoryMux: newServerImplFactoryMux(),
+		serverMux: newServerMux(),
 	}
 }
 
@@ -63,15 +63,15 @@ func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) 
 // ObjectStoreGRPCClient implements the cloudprovider.ObjectStore interface and uses a
 // gRPC client to make calls to the plugin server.
 type ObjectStoreGRPCClient struct {
-	*xxxBase
+	*clientBase
 	grpcClient proto.ObjectStoreClient
 }
 
-func newObjectStoreGRPCClient() xxx {
-	return &ObjectStoreGRPCClient{xxxBase: &xxxBase{}}
+func newObjectStoreGRPCClient() client {
+	return &ObjectStoreGRPCClient{clientBase: &clientBase{}}
 }
 
-func (c *ObjectStoreGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+func (c *ObjectStoreGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
 	c.grpcClient = proto.NewObjectStoreClient(clientConn)
 }
 
@@ -191,18 +191,18 @@ func (c *ObjectStoreGRPCClient) SetLog(log logrus.FieldLogger) {
 
 // GRPCServer registers an ObjectStore gRPC server.
 func (p *ObjectStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{mux: p.serverImplFactoryMux})
+	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{mux: p.serverMux})
 	return nil
 }
 
 // ObjectStoreGRPCServer implements the proto-generated ObjectStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type ObjectStoreGRPCServer struct {
-	mux *serverImplFactoryMux
+	mux *serverMux
 }
 
 func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore, error) {
-	impl, err := s.mux.getImpl(name)
+	impl, err := s.mux.getInstance(name)
 	if err != nil {
 		return nil, err
 	}

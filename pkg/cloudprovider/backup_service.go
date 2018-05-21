@@ -116,6 +116,22 @@ func DownloadBackup(objectStore ObjectStore, bucket, backupName string) (io.Read
 	return objectStore.GetObject(bucket, getBackupContentsKey(backupName, backupName))
 }
 
+type liveBackupGetter struct {
+	logger      logrus.FieldLogger
+	objectStore ObjectStore
+}
+
+func NewLiveBackupGetter(logger logrus.FieldLogger, objectStore ObjectStore) BackupGetter {
+	return &liveBackupGetter{
+		logger:      logger,
+		objectStore: objectStore,
+	}
+}
+
+func (l *liveBackupGetter) GetAllBackups(bucket string) ([]*api.Backup, error) {
+	return GetAllBackups(l.logger, l.objectStore, bucket)
+}
+
 func GetAllBackups(logger logrus.FieldLogger, objectStore ObjectStore, bucket string) ([]*api.Backup, error) {
 	prefixes, err := objectStore.ListCommonPrefixes(bucket, "/")
 	if err != nil {

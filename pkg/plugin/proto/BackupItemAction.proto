@@ -10,9 +10,8 @@ message ExecuteRequest {
 }
 
 message ExecuteResponse {
-    string plugin = 1;
-    bytes item = 2;
-    repeated ResourceIdentifier additionalItems = 3;
+    bytes item = 1;
+    repeated ResourceIdentifier additionalItems = 2;
 }
 
 message ResourceIdentifier {

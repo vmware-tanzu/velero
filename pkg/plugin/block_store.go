@@ -36,13 +36,13 @@ import (
 type BlockStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	*serverImplFactoryMux
+	*serverMux
 }
 
 // NewBlockStorePlugin constructs a BlockStorePlugin.
 func NewBlockStorePlugin() *BlockStorePlugin {
 	return &BlockStorePlugin{
-		serverImplFactoryMux: newServerImplFactoryMux(),
+		serverMux: newServerMux(),
 	}
 }
 
@@ -58,15 +58,15 @@ func (p *BlockStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
 // BlockStoreGRPCClient implements the cloudprovider.BlockStore interface and uses a
 // gRPC client to make calls to the plugin server.
 type BlockStoreGRPCClient struct {
-	*xxxBase
+	*clientBase
 	grpcClient proto.BlockStoreClient
 }
 
-func newBlockStoreGRPCClient() xxx {
-	return &BlockStoreGRPCClient{xxxBase: &xxxBase{}}
+func newBlockStoreGRPCClient() client {
+	return &BlockStoreGRPCClient{clientBase: &clientBase{}}
 }
 
-func (c *BlockStoreGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+func (c *BlockStoreGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
 	c.grpcClient = proto.NewBlockStoreClient(clientConn)
 }
 
@@ -205,18 +205,18 @@ func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID str
 
 // GRPCServer registers a BlockStore gRPC server.
 func (p *BlockStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{mux: p.serverImplFactoryMux})
+	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{mux: p.serverMux})
 	return nil
 }
 
 // BlockStoreGRPCServer implements the proto-generated BlockStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type BlockStoreGRPCServer struct {
-	mux *serverImplFactoryMux
+	mux *serverMux
 }
 
 func (s *BlockStoreGRPCServer) getImpl(name string) (cloudprovider.BlockStore, error) {
-	impl, err := s.mux.getImpl(name)
+	impl, err := s.mux.getInstance(name)
 	if err != nil {
 		return nil, err
 	}

@@ -199,7 +199,7 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 		return nil, errors.WithStack(err)
 	}
 
-	pluginRegistry := plugin.NewRegistry(pluginDir, logger)
+	pluginRegistry := plugin.NewRegistry(pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
@@ -461,16 +461,14 @@ func (s *server) runControllers(config *api.Config) error {
 
 	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
 	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
-	s.backupService = cloudprovider.NewBackupServiceWithCachedBackupGetter(
-		ctx,
-		s.backupService,
-		cloudBackupCacheResyncPeriod,
-		s.logger,
-	)
+
+	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
+	liveBackupGetter := cloudprovider.NewLiveBackupGetter(s.logger, objectStore)
+	cachedBackupGetter := cloudprovider.NewBackupCache(ctx, liveBackupGetter, cloudBackupCacheResyncPeriod, s.logger)
 
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
-		s.backupService,
+		cachedBackupGetter,
 		config.BackupStorageProvider.Bucket,
 		config.BackupSyncPeriod.Duration,
 		s.namespace,
@@ -501,13 +499,19 @@ func (s *server) runControllers(config *api.Config) error {
 	} else {
 		backupTracker := controller.NewBackupTracker()
 
-		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService, s.kubeClientConfig, s.kubeClient.CoreV1())
+		backupper, err := newBackupper(
+			discoveryHelper,
+			s.clientPool,
+			s.snapshotService,
+			s.kubeClientConfig,
+			s.kubeClient.CoreV1(),
+		)
 		cmd.CheckError(err)
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			s.backupService,
+			config.BackupStorageProvider.CloudProviderConfig,
 			config.BackupStorageProvider.Bucket,
 			s.snapshotService != nil,
 			s.logger,
@@ -552,7 +556,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
 			s.snapshotService,
-			s.backupService,
+			objectStore,
 			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
@@ -569,7 +573,6 @@ func (s *server) runControllers(config *api.Config) error {
 	restorer, err := newRestorer(
 		discoveryHelper,
 		s.clientPool,
-		s.backupService,
 		s.snapshotService,
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
@@ -584,7 +587,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		restorer,
-		s.backupService,
+		config.BackupStorageProvider.CloudProviderConfig,
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
@@ -601,7 +604,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.backupService,
+		objectStore,
 		config.BackupStorageProvider.Bucket,
 		s.logger,
 	)
@@ -670,7 +673,6 @@ func (s *server) removeDeprecatedGCFinalizer() {
 func newBackupper(
 	discoveryHelper arkdiscovery.Helper,
 	clientPool dynamic.ClientPool,
-	backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
 	kubeClientConfig *rest.Config,
 	kubeCoreV1Client kcorev1client.CoreV1Interface,
@@ -686,7 +688,6 @@ func newBackupper(
 func newRestorer(
 	discoveryHelper arkdiscovery.Helper,
 	clientPool dynamic.ClientPool,
-	backupService cloudprovider.BackupService,
 	snapshotService cloudprovider.SnapshotService,
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
@@ -696,7 +697,6 @@ func newRestorer(
 	return restore.NewKubernetesRestorer(
 		discoveryHelper,
 		client.NewDynamicFactory(clientPool),
-		backupService,
 		snapshotService,
 		resourcePriorities,
 		backupClient,

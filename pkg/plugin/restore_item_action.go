@@ -39,7 +39,7 @@ import (
 type RestoreItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 
-	*serverImplFactoryMux
+	*serverMux
 
 	log *logrusAdapter
 }
@@ -47,7 +47,7 @@ type RestoreItemActionPlugin struct {
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin() *RestoreItemActionPlugin {
 	return &RestoreItemActionPlugin{
-		serverImplFactoryMux: newServerImplFactoryMux(),
+		serverMux: newServerMux(),
 	}
 }
 
@@ -63,15 +63,15 @@ func (p *RestoreItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, e
 // RestoreItemActionGRPCClient implements the backup/ItemAction interface and uses a
 // gRPC client to make calls to the plugin server.
 type RestoreItemActionGRPCClient struct {
-	*xxxBase
+	*clientBase
 	grpcClient proto.RestoreItemActionClient
 }
 
-func newRestoreItemActionGRPCClient() xxx {
-	return &RestoreItemActionGRPCClient{xxxBase: &xxxBase{}}
+func newRestoreItemActionGRPCClient() client {
+	return &RestoreItemActionGRPCClient{clientBase: &clientBase{}}
 }
 
-func (c *RestoreItemActionGRPCClient) setGrpcClient(clientConn *grpc.ClientConn) {
+func (c *RestoreItemActionGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
 	c.grpcClient = proto.NewRestoreItemActionClient(clientConn)
 }
 
@@ -135,18 +135,18 @@ func (c *RestoreItemActionGRPCClient) SetLog(log logrus.FieldLogger) {
 
 // GRPCServer registers a RestoreItemAction gRPC server.
 func (p *RestoreItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{mux: p.serverImplFactoryMux})
+	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }
 
 // RestoreItemActionGRPCServer implements the proto-generated RestoreItemActionServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type RestoreItemActionGRPCServer struct {
-	mux *serverImplFactoryMux
+	mux *serverMux
 }
 
 func (s *RestoreItemActionGRPCServer) getImpl(name string) (restore.ItemAction, error) {
-	impl, err := s.mux.getImpl(name)
+	impl, err := s.mux.getInstance(name)
 	if err != nil {
 		return nil, err
 	}

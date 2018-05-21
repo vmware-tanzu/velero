@@ -23,31 +23,48 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Handshake is configuration information that allows go-plugin
-// clients and servers to perform a handshake.
+// Handshake is configuration information that allows go-plugin clients and servers to perform a handshake.
+//
+// TODO(ncdc): this should probably be a function so it can't be mutated, and we should probably move it to
+// handshake.go.
 var Handshake = plugin.HandshakeConfig{
 	ProtocolVersion:  1,
 	MagicCookieKey:   "ARK_PLUGIN",
 	MagicCookieValue: "hello",
 }
 
-type SimpleServer interface {
-	RegisterBackupItemAction(name string, factory ServerImplFactory) SimpleServer
-	RegisterBackupItemActions(map[string]ServerImplFactory) SimpleServer
+// Server serves registered plugin implementations.
+type Server interface {
+	// RegisterBackupItemAction registers a backup item action.
+	RegisterBackupItemAction(name string, factory ServerInitializer) Server
 
-	RegisterBlockStore(name string, factory ServerImplFactory) SimpleServer
-	RegisterBlockStores(map[string]ServerImplFactory) SimpleServer
+	// RegisterBackupItemActions registers multiple backup item actions.
+	RegisterBackupItemActions(map[string]ServerInitializer) Server
 
-	RegisterObjectStore(name string, factory ServerImplFactory) SimpleServer
-	RegisterObjectStores(map[string]ServerImplFactory) SimpleServer
+	// RegisterBlockStore registers a block store.
+	RegisterBlockStore(name string, factory ServerInitializer) Server
 
-	RegisterRestoreItemAction(name string, factory ServerImplFactory) SimpleServer
-	RegisterRestoreItemActions(map[string]ServerImplFactory) SimpleServer
+	// RegisterBlockStores registers multiple block stores.
+	RegisterBlockStores(map[string]ServerInitializer) Server
 
+	// RegisterObjectStore registers an object store.
+	RegisterObjectStore(name string, factory ServerInitializer) Server
+
+	// RegisterObjectStores registers multiple object stores.
+	RegisterObjectStores(map[string]ServerInitializer) Server
+
+	// RegisterRestoreItemAction registers a restore item action.
+	RegisterRestoreItemAction(name string, factory ServerInitializer) Server
+
+	// RegisterRestoreItemActions registers multiple restore item actions.
+	RegisterRestoreItemActions(map[string]ServerInitializer) Server
+
+	// Server runs the plugin server.
 	Serve()
 }
 
-type simpleServer struct {
+// server implements Server.
+type server struct {
 	log               logrus.FieldLogger
 	backupItemAction  *BackupItemActionPlugin
 	blockStore        *BlockStorePlugin
@@ -55,7 +72,8 @@ type simpleServer struct {
 	restoreItemAction *RestoreItemActionPlugin
 }
 
-func NewSimpleServer(log logrus.FieldLogger) SimpleServer {
+// NewServer returns a new Server
+func NewServer(log logrus.FieldLogger) Server {
 	backupItemAction := NewBackupItemActionPlugin()
 	backupItemAction.setServerLog(log)
 
@@ -68,7 +86,7 @@ func NewSimpleServer(log logrus.FieldLogger) SimpleServer {
 	restoreItemAction := NewRestoreItemActionPlugin()
 	restoreItemAction.setServerLog(log)
 
-	return &simpleServer{
+	return &server{
 		log:               log,
 		backupItemAction:  backupItemAction,
 		blockStore:        blockStore,
@@ -77,69 +95,67 @@ func NewSimpleServer(log logrus.FieldLogger) SimpleServer {
 	}
 }
 
-func (s *simpleServer) RegisterBackupItemAction(name string, factory ServerImplFactory) SimpleServer {
+func (s *server) RegisterBackupItemAction(name string, factory ServerInitializer) Server {
 	s.backupItemAction.register(name, factory)
 	return s
 }
 
-func (s *simpleServer) RegisterBackupItemActions(m map[string]ServerImplFactory) SimpleServer {
+func (s *server) RegisterBackupItemActions(m map[string]ServerInitializer) Server {
 	for name := range m {
 		s.RegisterBackupItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterBlockStore(name string, factory ServerImplFactory) SimpleServer {
+func (s *server) RegisterBlockStore(name string, factory ServerInitializer) Server {
 	s.blockStore.register(name, factory)
 	return s
 }
 
-func (s *simpleServer) RegisterBlockStores(m map[string]ServerImplFactory) SimpleServer {
+func (s *server) RegisterBlockStores(m map[string]ServerInitializer) Server {
 	for name := range m {
 		s.RegisterBlockStore(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterObjectStore(name string, factory ServerImplFactory) SimpleServer {
+func (s *server) RegisterObjectStore(name string, factory ServerInitializer) Server {
 	s.objectStore.register(name, factory)
 	return s
 }
 
-func (s *simpleServer) RegisterObjectStores(m map[string]ServerImplFactory) SimpleServer {
+func (s *server) RegisterObjectStores(m map[string]ServerInitializer) Server {
 	for name := range m {
 		s.RegisterObjectStore(name, m[name])
 	}
 	return s
 }
 
-func (s *simpleServer) RegisterRestoreItemAction(name string, factory ServerImplFactory) SimpleServer {
+func (s *server) RegisterRestoreItemAction(name string, factory ServerInitializer) Server {
 	s.restoreItemAction.register(name, factory)
 	return s
 }
 
-func (s *simpleServer) RegisterRestoreItemActions(m map[string]ServerImplFactory) SimpleServer {
+func (s *server) RegisterRestoreItemActions(m map[string]ServerInitializer) Server {
 	for name := range m {
 		s.RegisterRestoreItemAction(name, m[name])
 	}
 	return s
 }
 
+// getNames returns a list of PluginIdentifiers registered with plugin.
 func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentifier {
 	var pluginIdentifiers []PluginIdentifier
+
 	for _, name := range plugin.names() {
 		id := PluginIdentifier{Command: command, Kind: kind, Name: name}
 		pluginIdentifiers = append(pluginIdentifiers, id)
 	}
+
 	return pluginIdentifiers
 }
 
-// Serve serves the plugin p.
-func (s *simpleServer) Serve() {
-	defer func() {
-		s.log.Error("ANDY ANDY ANDY")
-	}()
-
+func (s *server) Serve() {
 	command := os.Args[0]
 
 	var pluginIdentifiers []PluginIdentifier
