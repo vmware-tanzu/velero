@@ -179,7 +179,7 @@ func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
 
 	lister, ok := plugin.(PluginLister)
 	if !ok {
-		return nil, errors.Errorf("%T is not a PluginLister")
+		return nil, errors.Errorf("%T is not a PluginLister", plugin)
 	}
 
 	return lister.ListPlugins()
