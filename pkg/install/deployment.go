@@ -8,27 +8,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type deploymentOption func(*config)
+type deploymentOption func(*deploymentConfig)
 
-type config struct {
+type deploymentConfig struct {
 	image                    string
 	withoutCredentialsVolume bool
 }
 
 func WithImage(image string) deploymentOption {
-	return func(c *config) {
+	return func(c *deploymentConfig) {
 		c.image = image
 	}
 }
 
 func WithoutCredentialsVolume() deploymentOption {
-	return func(c *config) {
+	return func(c *deploymentConfig) {
 		c.withoutCredentialsVolume = true
 	}
 }
 
 func Deployment(namespace string, opts ...deploymentOption) *appsv1beta1.Deployment {
-	c := &config{
+	c := &deploymentConfig{
 		image: "gcr.io/heptio-images/ark:latest",
 	}
 
