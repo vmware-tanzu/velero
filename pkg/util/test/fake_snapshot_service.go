@@ -37,9 +37,15 @@ type FakeSnapshotService struct {
 
 	VolumeID    string
 	VolumeIDSet string
+
+	Error error
 }
 
 func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+	if s.Error != nil {
+		return "", s.Error
+	}
+
 	if _, exists := s.SnapshottableVolumes[volumeID]; !exists {
 		return "", errors.New("snapshottable volume not found")
 	}
@@ -53,6 +59,10 @@ func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map
 }
 
 func (s *FakeSnapshotService) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	if s.Error != nil {
+		return "", s.Error
+	}
+
 	key := api.VolumeBackupInfo{
 		SnapshotID:       snapshotID,
 		Type:             volumeType,
@@ -64,6 +74,10 @@ func (s *FakeSnapshotService) CreateVolumeFromSnapshot(snapshotID, volumeType, v
 }
 
 func (s *FakeSnapshotService) DeleteSnapshot(snapshotID string) error {
+	if s.Error != nil {
+		return s.Error
+	}
+
 	if !s.SnapshotsTaken.Has(snapshotID) {
 		return errors.New("snapshot not found")
 	}
@@ -74,6 +88,10 @@ func (s *FakeSnapshotService) DeleteSnapshot(snapshotID string) error {
 }
 
 func (s *FakeSnapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	if s.Error != nil {
+		return "", nil, s.Error
+	}
+
 	if volumeInfo, exists := s.SnapshottableVolumes[volumeID]; !exists {
 		return "", nil, errors.New("VolumeID not found")
 	} else {
@@ -82,10 +100,14 @@ func (s *FakeSnapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, 
 }
 
 func (s *FakeSnapshotService) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	if s.Error != nil {
+		return "", s.Error
+	}
+
 	return s.VolumeID, nil
 }
 
 func (s *FakeSnapshotService) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	s.VolumeIDSet = volumeID
-	return pv, nil
+	return pv, s.Error
 }
