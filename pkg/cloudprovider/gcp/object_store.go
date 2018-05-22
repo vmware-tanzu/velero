@@ -35,10 +35,25 @@ import (
 
 const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 
+// bucketWriter wraps the GCP SDK functions for accessing object store so they can be faked for testing.
+type bucketWriter interface {
+	// getWriteCloser returns an io.WriteCloser that can be used to upload data to the specified bucket for the specified key.
+	getWriteCloser(bucket, key string) io.WriteCloser
+}
+
+type writer struct {
+	client *storage.Client
+}
+
+func (w *writer) getWriteCloser(bucket, key string) io.WriteCloser {
+	return w.client.Bucket(bucket).Object(key).NewWriter(context.Background())
+}
+
 type objectStore struct {
 	client         *storage.Client
 	googleAccessID string
 	privateKey     []byte
+	bucketWriter   bucketWriter
 }
 
 func NewObjectStore() cloudprovider.ObjectStore {
@@ -76,16 +91,25 @@ func (o *objectStore) Init(config map[string]string) error {
 	}
 	o.client = client
 
+	o.bucketWriter = &writer{client: o.client}
+
 	return nil
 }
 
 func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
-	w := o.client.Bucket(bucket).Object(key).NewWriter(context.Background())
-	defer w.Close()
+	w := o.bucketWriter.getWriteCloser(bucket, key)
 
-	_, err := io.Copy(w, body)
+	// The writer returned by NewWriter is asynchronous, so errors aren't guaranteed
+	// until Close() is called
+	_, copyErr := io.Copy(w, body)
 
-	return errors.WithStack(err)
+	// Ensure we close w and report errors properly
+	closeErr := w.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+
+	return closeErr
 }
 
 func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
