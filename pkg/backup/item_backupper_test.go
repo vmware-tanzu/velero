@@ -378,10 +378,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			obj := &unstructured.Unstructured{Object: item}
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePre).Return(nil)
-			if test.snapshotError == nil && test.additionalItemError == nil {
-				// TODO: Remove if-clause when #511 is resolved.
-				itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
-			}
+			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
 
 			for i, item := range test.customActionAdditionalItemIdentifiers {
 				if test.additionalItemError != nil && i > 0 {

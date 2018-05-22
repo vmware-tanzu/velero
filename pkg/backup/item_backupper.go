@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
@@ -165,6 +166,64 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return err
 	}
 
+	backupErrs := make([]error, 0)
+	err = ib.executeActions(log, obj, groupResource, name, namespace, metadata)
+	if err != nil {
+		log.WithError(err).Error("Error executing item actions")
+		backupErrs = append(backupErrs, err)
+	}
+
+	if groupResource == kuberesource.PersistentVolumes {
+		if ib.snapshotService == nil {
+			log.Debug("Skipping Persistent Volume snapshot because they're not enabled.")
+		} else {
+			if err := ib.takePVSnapshot(obj, ib.backup, log); err != nil {
+				backupErrs = append(backupErrs, err)
+			}
+		}
+	}
+
+	log.Debug("Executing post hooks")
+	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePost); err != nil {
+		backupErrs = append(backupErrs, err)
+	}
+
+	if len(backupErrs) != 0 {
+		return kuberrs.NewAggregate(backupErrs)
+	}
+
+	var filePath string
+	if namespace != "" {
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
+	} else {
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
+	}
+
+	itemBytes, err := json.Marshal(obj.UnstructuredContent())
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	hdr := &tar.Header{
+		Name:     filePath,
+		Size:     int64(len(itemBytes)),
+		Typeflag: tar.TypeReg,
+		Mode:     0755,
+		ModTime:  time.Now(),
+	}
+
+	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+		return errors.WithStack(err)
+	}
+
+	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
+}
+
+func (ib *defaultItemBackupper) executeActions(log logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, name, namespace string, metadata metav1.Object) error {
 	for _, action := range ib.actions {
 		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 			log.Debug("Skipping action because it does not apply to this resource")
@@ -218,49 +277,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 			return errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
 		}
-	}
-
-	if groupResource == kuberesource.PersistentVolumes {
-		if ib.snapshotService == nil {
-			log.Debug("Skipping Persistent Volume snapshot because they're not enabled.")
-		} else {
-			if err := ib.takePVSnapshot(obj, ib.backup, log); err != nil {
-				return err
-			}
-		}
-	}
-
-	log.Debug("Executing post hooks")
-	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePost); err != nil {
-		return err
-	}
-
-	var filePath string
-	if namespace != "" {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
-	} else {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
-	}
-
-	itemBytes, err := json.Marshal(obj.UnstructuredContent())
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	hdr := &tar.Header{
-		Name:     filePath,
-		Size:     int64(len(itemBytes)),
-		Typeflag: tar.TypeReg,
-		Mode:     0755,
-		ModTime:  time.Now(),
-	}
-
-	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
-		return errors.WithStack(err)
-	}
-
-	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-		return errors.WithStack(err)
 	}
 
 	return nil
