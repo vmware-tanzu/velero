@@ -139,7 +139,7 @@ Specify the following values in the example files:
 
 * In `examples/aws/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>`. See the [Config definition][6] for details.
+  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3, region is optional and will be queried from the AWS S3 API if not provided). See the [Config definition][6] for details.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
