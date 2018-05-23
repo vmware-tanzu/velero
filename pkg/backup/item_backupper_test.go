@@ -139,6 +139,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 		customActionAdditionalItems           []runtime.Unstructured
 		groupResource                         string
 		snapshottableVolumes                  map[string]api.VolumeBackupInfo
+		snapshotError                         error
+		additionalItemError                   error
 	}{
 		{
 			name: "explicit namespace include",
@@ -222,6 +224,33 @@ func TestBackupItemNoSkips(t *testing.T) {
 			},
 		},
 		{
+			name: "action invoked - additional items - error",
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			item:                  `{"metadata":{"namespace": "myns", "name":"bar"}}`,
+			expectError:           true,
+			expectExcluded:        false,
+			expectedTarHeaderName: "resources/resource.group/namespaces/myns/bar.json",
+			customAction:          true,
+			expectedActionID:      "myns/bar",
+			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+				{
+					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
+					Namespace:     "ns1",
+					Name:          "n1",
+				},
+				{
+					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
+					Namespace:     "ns2",
+					Name:          "n2",
+				},
+			},
+			customActionAdditionalItems: []runtime.Unstructured{
+				unstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				unstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+			},
+			additionalItemError: errors.New("foo"),
+		},
+		{
 			name: "takePVSnapshot is not invoked for PVs when snapshotService == nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                  `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
@@ -241,6 +270,17 @@ func TestBackupItemNoSkips(t *testing.T) {
 			snapshottableVolumes: map[string]api.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
+		},
+		{
+			name: "backup fails when takePVSnapshot fails",
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			item:          `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
+			expectError:   true,
+			groupResource: "persistentvolumes",
+			snapshottableVolumes: map[string]api.VolumeBackupInfo{
+				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
+			},
+			snapshotError: fmt.Errorf("failure"),
 		},
 	}
 
@@ -320,6 +360,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				snapshotService = &arktest.FakeSnapshotService{
 					SnapshottableVolumes: test.snapshottableVolumes,
 					VolumeID:             "vol-abc123",
+					Error:                test.snapshotError,
 				}
 				b.snapshotService = snapshotService
 			}
@@ -337,9 +378,15 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			obj := &unstructured.Unstructured{Object: item}
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePre).Return(nil)
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
+			if test.snapshotError == nil && test.additionalItemError == nil {
+				// TODO: Remove if-clause when #511 is resolved.
+				itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
+			}
 
 			for i, item := range test.customActionAdditionalItemIdentifiers {
+				if test.additionalItemError != nil && i > 0 {
+					break
+				}
 				itemClient := &arktest.FakeDynamicClient{}
 				defer itemClient.AssertExpectations(t)
 
@@ -347,7 +394,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 				itemClient.On("Get", item.Name, metav1.GetOptions{}).Return(test.customActionAdditionalItems[i], nil)
 
-				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(nil)
+				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(test.additionalItemError)
 			}
 
 			err = b.backupItem(arktest.NewLogger(), obj, groupResource)

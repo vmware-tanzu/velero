@@ -206,7 +206,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 					return err
 				}
 
-				ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource())
+				if err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
+					return err
+				}
 			}
 		} else {
 			// We want this to show up in the log file at the place where the error occurs. When we return
