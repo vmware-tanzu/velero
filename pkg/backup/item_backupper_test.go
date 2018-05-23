@@ -140,6 +140,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 		groupResource                         string
 		snapshottableVolumes                  map[string]api.VolumeBackupInfo
 		snapshotError                         error
+		additionalItemError                   error
 	}{
 		{
 			name: "explicit namespace include",
@@ -221,6 +222,33 @@ func TestBackupItemNoSkips(t *testing.T) {
 				unstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
 				unstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
 			},
+		},
+		{
+			name: "action invoked - additional items - error",
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			item:                  `{"metadata":{"namespace": "myns", "name":"bar"}}`,
+			expectError:           true,
+			expectExcluded:        false,
+			expectedTarHeaderName: "resources/resource.group/namespaces/myns/bar.json",
+			customAction:          true,
+			expectedActionID:      "myns/bar",
+			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+				{
+					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
+					Namespace:     "ns1",
+					Name:          "n1",
+				},
+				{
+					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
+					Namespace:     "ns2",
+					Name:          "n2",
+				},
+			},
+			customActionAdditionalItems: []runtime.Unstructured{
+				unstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				unstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+			},
+			additionalItemError: errors.New("foo"),
 		},
 		{
 			name: "takePVSnapshot is not invoked for PVs when snapshotService == nil",
@@ -350,12 +378,15 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			obj := &unstructured.Unstructured{Object: item}
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePre).Return(nil)
-			if test.snapshotError == nil {
+			if test.snapshotError == nil && test.additionalItemError == nil {
 				// TODO: Remove if-clause when #511 is resolved.
 				itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
 			}
 
 			for i, item := range test.customActionAdditionalItemIdentifiers {
+				if test.additionalItemError != nil && i > 0 {
+					break
+				}
 				itemClient := &arktest.FakeDynamicClient{}
 				defer itemClient.AssertExpectations(t)
 
@@ -363,7 +394,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 				itemClient.On("Get", item.Name, metav1.GetOptions{}).Return(test.customActionAdditionalItems[i], nil)
 
-				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(nil)
+				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(test.additionalItemError)
 			}
 
 			err = b.backupItem(arktest.NewLogger(), obj, groupResource)
