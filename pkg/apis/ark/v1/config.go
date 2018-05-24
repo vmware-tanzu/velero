@@ -44,7 +44,7 @@ type Config struct {
 	// BackupStorageProvider is the configuration information for the cloud where
 	// Ark backups are stored in object storage. This may be a different cloud than
 	// where the cluster is running.
-	BackupStorageProvider ObjectStorageProviderConfig `json:"backupStorageProvider"`
+	BackupStorageProvider BackupStorageProviderConfig `json:"backupStorageProvider"`
 
 	// BackupSyncPeriod is how often the BackupSyncController runs to ensure all
 	// Ark backups in object storage exist as Backup API objects in the cluster.
@@ -81,9 +81,19 @@ type CloudProviderConfig struct {
 type ObjectStorageProviderConfig struct {
 	// CloudProviderConfig is the configuration information for the cloud where
 	// Ark backups are stored in object storage.
-	CloudProviderConfig `json:",inline"`
+	CloudProviderConfig `json:",inline,omitempty"`
 
 	// Bucket is the name of the bucket in object storage where Ark backups
 	// are stored.
-	Bucket string `json:"bucket"`
+	Bucket string `json:"bucket,omitempty"`
+	Prefix string `json:"prefix,omitempty"`
+}
+
+type BackupStorageProviderConfig struct {
+	ObjectStore *ObjectStorageProviderConfig `json:"objectStore,omitempty"`
+	Git         *GitStorageProviderConfig    `json:"git,omitempty"`
+}
+
+type GitStorageProviderConfig struct {
+	Repo string `json:"repo,omitempty"`
 }

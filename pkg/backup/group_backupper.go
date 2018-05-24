@@ -46,7 +46,7 @@ type groupBackupperFactory interface {
 		cohabitatingResources map[string]*cohabitatingResource,
 		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
-		tarWriter tarWriter,
+		backupWriter Writer,
 		resourceHooks []resourceHook,
 		snapshotService cloudprovider.SnapshotService,
 	) groupBackupper
@@ -65,7 +65,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	cohabitatingResources map[string]*cohabitatingResource,
 	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
-	tarWriter tarWriter,
+	backupWriter Writer,
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 ) groupBackupper {
@@ -81,7 +81,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 		cohabitatingResources:    cohabitatingResources,
 		actions:                  actions,
 		podCommandExecutor:       podCommandExecutor,
-		tarWriter:                tarWriter,
+		backupWriter:             backupWriter,
 		resourceHooks:            resourceHooks,
 		snapshotService:          snapshotService,
 		resourceBackupperFactory: &defaultResourceBackupperFactory{},
@@ -103,7 +103,7 @@ type defaultGroupBackupper struct {
 	cohabitatingResources    map[string]*cohabitatingResource
 	actions                  []resolvedAction
 	podCommandExecutor       podCommandExecutor
-	tarWriter                tarWriter
+	backupWriter             Writer
 	resourceHooks            []resourceHook
 	snapshotService          cloudprovider.SnapshotService
 	resourceBackupperFactory resourceBackupperFactory
@@ -126,7 +126,7 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 			gb.cohabitatingResources,
 			gb.actions,
 			gb.podCommandExecutor,
-			gb.tarWriter,
+			gb.backupWriter,
 			gb.resourceHooks,
 			gb.snapshotService,
 		)

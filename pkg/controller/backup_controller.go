@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -47,52 +46,48 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/encode"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
 const backupVersion = 1
 
 type backupController struct {
-	backupper         backup.Backupper
-	objectStoreConfig api.CloudProviderConfig
-	bucket            string
-	pvProviderExists  bool
-	lister            listers.BackupLister
-	listerSynced      cache.InformerSynced
-	client            arkv1client.BackupsGetter
-	syncHandler       func(backupName string) error
-	queue             workqueue.RateLimitingInterface
-	clock             clock.Clock
-	logger            logrus.FieldLogger
-	pluginRegistry    plugin.Registry
-	backupTracker     BackupTracker
+	backupper                   backup.Backupper
+	backupStorageProviderConfig api.BackupStorageProviderConfig
+	pvProviderExists            bool
+	lister                      listers.BackupLister
+	listerSynced                cache.InformerSynced
+	client                      arkv1client.BackupsGetter
+	syncHandler                 func(backupName string) error
+	queue                       workqueue.RateLimitingInterface
+	clock                       clock.Clock
+	logger                      logrus.FieldLogger
+	pluginRegistry              plugin.Registry
+	backupTracker               BackupTracker
 }
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
 	client arkv1client.BackupsGetter,
 	backupper backup.Backupper,
-	objectStoreConfig api.CloudProviderConfig,
-	bucket string,
+	backupStorageProviderConfig api.BackupStorageProviderConfig,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	pluginRegistry plugin.Registry,
 	backupTracker BackupTracker,
 ) Interface {
 	c := &backupController{
-		backupper:         backupper,
-		objectStoreConfig: objectStoreConfig,
-		bucket:            bucket,
-		pvProviderExists:  pvProviderExists,
-		lister:            backupInformer.Lister(),
-		listerSynced:      backupInformer.Informer().HasSynced,
-		client:            client,
-		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
-		clock:             &clock.RealClock{},
-		logger:            logger,
-		pluginRegistry:    pluginRegistry,
-		backupTracker:     backupTracker,
+		backupper:                   backupper,
+		backupStorageProviderConfig: backupStorageProviderConfig,
+		pvProviderExists:            pvProviderExists,
+		lister:                      backupInformer.Lister(),
+		listerSynced:                backupInformer.Informer().HasSynced,
+		client:                      client,
+		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
+		clock:                       &clock.RealClock{},
+		logger:                      logger,
+		pluginRegistry:              pluginRegistry,
+		backupTracker:               backupTracker,
 	}
 
 	c.syncHandler = c.processBackup
@@ -269,7 +264,7 @@ func (controller *backupController) processBackup(key string) error {
 
 	logContext.Debug("Running backup")
 	// execution & upload of backup
-	if err := controller.runBackup(backup, controller.bucket); err != nil {
+	if err := controller.runBackup(backup); err != nil {
 		logContext.WithError(err).Error("backup failed")
 		backup.Status.Phase = api.BackupPhaseFailed
 	}
@@ -324,7 +319,7 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 	return validationErrors
 }
 
-func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
+func (controller *backupController) runBackup(backup *api.Backup) error {
 	log := controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
@@ -337,28 +332,27 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	}
 	defer closeAndRemoveFile(logFile, log)
 
-	backupFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		return errors.Wrap(err, "error creating temp file for backup")
-	}
-	defer closeAndRemoveFile(backupFile, log)
-
 	actions, err := pluginManager.GetBackupItemActions()
 	if err != nil {
 		return err
 	}
 
-	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	// objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	// if err != nil {
+	// 	return err
+	// }
+
+	backupWriter, err := controller.getBackupWriter(pluginManager)
 	if err != nil {
 		return err
 	}
 
 	var errs []error
 
-	var backupJsonToUpload, backupFileToUpload io.Reader
+	// var backupJsonToUpload, backupFileToUpload io.Reader
 
 	// Do the actual backup
-	if err := controller.backupper.Backup(backup, backupFile, logFile, actions); err != nil {
+	if err := controller.backupper.Backup(backup, backupWriter, logFile, actions); err != nil {
 		errs = append(errs, err)
 
 		backup.Status.Phase = api.BackupPhaseFailed
@@ -366,22 +360,42 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		backup.Status.Phase = api.BackupPhaseCompleted
 	}
 
-	backupJson := new(bytes.Buffer)
-	if err := encode.EncodeTo(backup, "json", backupJson); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding backup"))
-	} else {
-		// Only upload the json and backup tarball if encoding to json succeeded.
-		backupJsonToUpload = backupJson
-		backupFileToUpload = backupFile
-	}
+	// backupJson := new(bytes.Buffer)
+	// if err := encode.EncodeTo(backup, "json", backupJson); err != nil {
+	// 	errs = append(errs, errors.Wrap(err, "error encoding backup"))
+	// } else {
+	// 	// Only upload the json and backup tarball if encoding to json succeeded.
+	// 	backupJsonToUpload = backupJson
+	// 	backupFileToUpload = backupFile
+	// }
 
-	if err := controller.UploadBackup(log, objectStore, bucket, backup.Name, backupJsonToUpload, backupFileToUpload, logFile); err != nil {
-		errs = append(errs, err)
-	}
+	// if err := controller.UploadBackup(log, objectStore, bucket, backup.Name, backupJsonToUpload, backupFileToUpload, logFile); err != nil {
+	// 	errs = append(errs, err)
+	// }
 
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
+}
+
+func (c *backupController) getBackupWriter(pluginManager plugin.Manager) (backup.Writer, error) {
+	switch {
+	case c.backupStorageProviderConfig.ObjectStore != nil:
+		return c.getObjectStoreBackupWriter(pluginManager)
+	}
+
+	return nil, errors.New("backupStorageProvider is not set")
+}
+
+func (c *backupController) getObjectStoreBackupWriter(pluginManager plugin.Manager) (backup.Writer, error) {
+	objectStore, err := getObjectStore(c.backupStorageProviderConfig.ObjectStore.CloudProviderConfig, pluginManager)
+	if err != nil {
+		return nil, err
+	}
+
+	bucket := c.backupStorageProviderConfig.ObjectStore.Bucket
+	prefix := c.backupStorageProviderConfig.ObjectStore.Prefix
+	return backup.NewObjectStoreBackupWriter(objectStore, bucket, prefix), nil
 }
 
 func (controller *backupController) UploadBackup(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string, metadata, backup, log io.Reader) error {

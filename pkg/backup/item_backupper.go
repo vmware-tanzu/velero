@@ -17,10 +17,7 @@ limitations under the License.
 package backup
 
 import (
-	"archive/tar"
 	"encoding/json"
-	"path/filepath"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -47,7 +44,7 @@ type itemBackupperFactory interface {
 		backedUpItems map[itemKey]struct{},
 		actions []resolvedAction,
 		podCommandExecutor podCommandExecutor,
-		tarWriter tarWriter,
+		backupWriter Writer,
 		resourceHooks []resourceHook,
 		dynamicFactory client.DynamicFactory,
 		discoveryHelper discovery.Helper,
@@ -63,7 +60,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	backedUpItems map[itemKey]struct{},
 	actions []resolvedAction,
 	podCommandExecutor podCommandExecutor,
-	tarWriter tarWriter,
+	backupWriter Writer,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
@@ -75,7 +72,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 		resources:       resources,
 		backedUpItems:   backedUpItems,
 		actions:         actions,
-		tarWriter:       tarWriter,
+		backupWriter:    backupWriter,
 		resourceHooks:   resourceHooks,
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
@@ -101,7 +98,7 @@ type defaultItemBackupper struct {
 	resources       *collections.IncludesExcludes
 	backedUpItems   map[itemKey]struct{}
 	actions         []resolvedAction
-	tarWriter       tarWriter
+	backupWriter    Writer
 	resourceHooks   []resourceHook
 	dynamicFactory  client.DynamicFactory
 	discoveryHelper discovery.Helper
@@ -233,35 +230,12 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return err
 	}
 
-	var filePath string
-	if namespace != "" {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
-	} else {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
-	}
-
 	itemBytes, err := json.Marshal(obj.UnstructuredContent())
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	hdr := &tar.Header{
-		Name:     filePath,
-		Size:     int64(len(itemBytes)),
-		Typeflag: tar.TypeReg,
-		Mode:     0755,
-		ModTime:  time.Now(),
-	}
-
-	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
-		return errors.WithStack(err)
-	}
-
-	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
+	return ib.backupWriter.WriteResource(groupResource.String(), namespace, name, itemBytes)
 }
 
 // zoneLabel is the label that stores availability-zone info

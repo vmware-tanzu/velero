@@ -289,6 +289,12 @@ func (s *server) loadConfig() (*api.Config, error) {
 		err    error
 	)
 	for {
+		select {
+		case <-s.ctx.Done():
+			return nil, errors.New("shutting down")
+		default:
+		}
+
 		config, err = s.arkClient.ArkV1().Configs(s.namespace).Get("default", metav1.GetOptions{})
 		if err == nil {
 			break
@@ -462,14 +468,14 @@ func (s *server) runControllers(config *api.Config) error {
 	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
 	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
 
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
+	objectStore, err := getObjectStore(config.BackupStorageProvider.ObjectStore.CloudProviderConfig, s.pluginManager)
 	liveBackupGetter := cloudprovider.NewLiveBackupGetter(s.logger, objectStore)
 	cachedBackupGetter := cloudprovider.NewBackupCache(ctx, liveBackupGetter, cloudBackupCacheResyncPeriod, s.logger)
 
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
 		cachedBackupGetter,
-		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.ObjectStore.Bucket,
 		config.BackupSyncPeriod.Duration,
 		s.namespace,
 		s.logger,
@@ -511,8 +517,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			config.BackupStorageProvider.CloudProviderConfig,
-			config.BackupStorageProvider.Bucket,
+			config.BackupStorageProvider,
 			s.snapshotService != nil,
 			s.logger,
 			s.pluginRegistry,
@@ -557,7 +562,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(), // backupClient
 			s.snapshotService,
 			objectStore,
-			config.BackupStorageProvider.Bucket,
+			config.BackupStorageProvider.ObjectStore.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
@@ -587,8 +592,8 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		restorer,
-		config.BackupStorageProvider.CloudProviderConfig,
-		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.ObjectStore.CloudProviderConfig,
+		config.BackupStorageProvider.ObjectStore.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
 		s.logger,
@@ -605,7 +610,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
 		objectStore,
-		config.BackupStorageProvider.Bucket,
+		config.BackupStorageProvider.ObjectStore.Bucket,
 		s.logger,
 	)
 	wg.Add(1)

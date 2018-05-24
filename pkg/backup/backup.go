@@ -43,7 +43,7 @@ import (
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(backup *api.Backup, backupFile, logFile io.Writer, actions []ItemAction) error
+	Backup(backup *api.Backup, backupWriter Writer, logFile io.Writer, actions []ItemAction) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -202,13 +202,7 @@ func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discov
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io.Writer, actions []ItemAction) error {
-	gzippedData := gzip.NewWriter(backupFile)
-	defer gzippedData.Close()
-
-	tw := tar.NewWriter(gzippedData)
-	defer tw.Close()
-
+func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupWriter Writer, logFile io.Writer, actions []ItemAction) error {
 	gzippedLog := gzip.NewWriter(logFile)
 	defer gzippedLog.Close()
 
@@ -245,6 +239,10 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		return err
 	}
 
+	if err := backupWriter.PrepareBackup(backup); err != nil {
+		return err
+	}
+
 	gb := kb.groupBackupperFactory.newGroupBackupper(
 		log,
 		backup,
@@ -257,7 +255,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		cohabitatingResources(),
 		resolvedActions,
 		kb.podCommandExecutor,
-		tw,
+		backupWriter,
 		resourceHooks,
 		kb.snapshotService,
 	)
@@ -266,6 +264,10 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		if err := gb.backupGroup(group); err != nil {
 			errs = append(errs, err)
 		}
+	}
+
+	if err := backupWriter.FinalizeBackup(backup); err != nil {
+		errs = append(errs, err)
 	}
 
 	err = kuberrs.Flatten(kuberrs.NewAggregate(errs))
