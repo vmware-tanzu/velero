@@ -56,7 +56,7 @@ The configurable parameters are as follows:
 | `backupSyncPeriod` | metav1.Duration | 60m0s | How frequently Ark queries the object storage to make sure that the appropriate Backup resources have been created for existing backup files. |
 | `gcSyncPeriod` | metav1.Duration | 60m0s | How frequently Ark queries the object storage to delete backup files that have passed their TTL. |
 | `scheduleSyncPeriod` | metav1.Duration | 1m0s | How frequently Ark checks its Schedule resource objects to see if a backup needs to be initiated. |
-| `resourcePriorities` | []string | `[namespaces, persistentvolumes, persistentvolumeclaims, secrets, configmaps]` | An ordered list that describes the order in which Kubernetes resource objects should be restored (also specified with the `<RESOURCE>.<GROUP>` format.<br><br>If a resource is not in this list, it is restored after all other prioritized resources. |
+| `resourcePriorities` | []string | `[namespaces, persistentvolumes, persistentvolumeclaims, secrets, configmaps, serviceaccounts, limitranges]` | An ordered list that describes the order in which Kubernetes resource objects should be restored (also specified with the `<RESOURCE>.<GROUP>` format.<br><br>If a resource is not in this list, it is restored after all other prioritized resources. |
 | `restoreOnlyMode` | bool | `false` | When RestoreOnly mode is on, functionality for backups, schedules, and expired backup deletion is *turned off*. Restores are made from existing backup files in object storage. |
 
 ### AWS
