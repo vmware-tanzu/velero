@@ -17,8 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"encoding/json"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -230,12 +228,12 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return err
 	}
 
-	itemBytes, err := json.Marshal(obj.UnstructuredContent())
-	if err != nil {
-		return errors.WithStack(err)
+	id := ResourceIdentifier{
+		GroupResource: groupResource,
+		Namespace:     namespace,
+		Name:          name,
 	}
-
-	return ib.backupWriter.WriteResource(groupResource.String(), namespace, name, itemBytes)
+	return ib.backupWriter.WriteResource(id, obj)
 }
 
 // zoneLabel is the label that stores availability-zone info
