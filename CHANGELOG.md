@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.8.2](https://github.com/heptio/ark/releases/tag/v0.8.2) - 2018-06-01
+
+##### Bug Fixes:
+  * Don't crash when a PVC is missing spec.volumeName (#520, @ncdc)
+
 #### [v0.8.1](https://github.com/heptio/ark/releases/tag/v0.8.1) - 2018-04-23
 
 ##### Bug Fixes:
