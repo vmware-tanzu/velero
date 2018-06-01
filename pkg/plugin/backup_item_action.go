@@ -171,24 +171,34 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 		return nil, err
 	}
 
-	updatedItemJSON, err := json.Marshal(updatedItem.UnstructuredContent())
-	if err != nil {
-		return nil, err
+	// If the plugin implementation returned a nil updatedItem (meaning no modifications), reset updatedItem to the
+	// original item.
+	var updatedItemJSON []byte
+	if updatedItem == nil {
+		updatedItemJSON = req.Item
+	} else {
+		updatedItemJSON, err = json.Marshal(updatedItem.UnstructuredContent())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	res := &proto.ExecuteResponse{
 		Item: updatedItemJSON,
 	}
 
-	for _, itm := range additionalItems {
-		val := proto.ResourceIdentifier{
-			Group:     itm.Group,
-			Resource:  itm.Resource,
-			Namespace: itm.Namespace,
-			Name:      itm.Name,
-		}
-		res.AdditionalItems = append(res.AdditionalItems, &val)
+	for _, item := range additionalItems {
+		res.AdditionalItems = append(res.AdditionalItems, backupResourceIdentifierToProto(item))
 	}
 
 	return res, nil
+}
+
+func backupResourceIdentifierToProto(id arkbackup.ResourceIdentifier) *proto.ResourceIdentifier {
+	return &proto.ResourceIdentifier{
+		Group:     id.Group,
+		Resource:  id.Resource,
+		Namespace: id.Namespace,
+		Name:      id.Name,
+	}
 }
