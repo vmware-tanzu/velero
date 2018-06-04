@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,6 +49,7 @@ func TestBackupItemSkips(t *testing.T) {
 		namespaces    *collections.IncludesExcludes
 		groupResource schema.GroupResource
 		resources     *collections.IncludesExcludes
+		terminating   bool
 		backedUpItems map[itemKey]struct{}
 	}{
 		{
@@ -89,17 +91,37 @@ func TestBackupItemSkips(t *testing.T) {
 				{resource: "bar.foo", namespace: "ns", name: "foo"}: {},
 			},
 		},
+		{
+			testName:      "terminating resource",
+			namespace:     "ns",
+			name:          "foo",
+			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
+			namespaces:    collections.NewIncludesExcludes(),
+			resources:     collections.NewIncludesExcludes(),
+			terminating:   true,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
+
 			ib := &defaultItemBackupper{
 				namespaces:    test.namespaces,
 				resources:     test.resources,
 				backedUpItems: test.backedUpItems,
 			}
 
-			u := arktest.UnstructuredOrDie(fmt.Sprintf(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"%s","name":"%s"}}`, test.namespace, test.name))
+			pod := &corev1api.Pod{
+				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+				ObjectMeta: metav1.ObjectMeta{Namespace: test.namespace, Name: test.name},
+			}
+
+			if test.terminating {
+				pod.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			}
+			unstructuredObj, unmarshalErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+			require.NoError(t, unmarshalErr)
+			u := &unstructured.Unstructured{Object: unstructuredObj}
 			err := ib.backupItem(arktest.NewLogger(), u, test.groupResource)
 			assert.NoError(t, err)
 		})
