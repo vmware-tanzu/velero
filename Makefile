@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # The binary to build (just the basename).
-BIN := ark
+BIN ?= ark
 
 # This repo's root import path (under GOPATH).
 PKG := github.com/heptio/ark
@@ -44,7 +44,7 @@ GOARCH = $(word 2, $(platform_temp))
 # TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
-		DOCKERFILE ?= Dockerfile.alpine
+		DOCKERFILE ?= Dockerfile-$(BIN).alpine
 endif
 #ifeq ($(GOARCH),arm)
 #		DOCKERFILE ?= Dockerfile.arm #armel/busybox
@@ -58,7 +58,9 @@ IMAGE := $(REGISTRY)/$(BIN)
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all: build
+all: 
+	@$(MAKE) build
+	@$(MAKE) build BIN=restic-init-container
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
@@ -94,10 +96,13 @@ BUILDER_IMAGE := ark-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
+	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
+	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
 	@docker run \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
+		-v "$$(pwd)/vendor/k8s.io/api:/go/src/k8s.io/api:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd):/go/src/$(PKG):delegated" \
@@ -110,14 +115,24 @@ shell: build-dirs build-image
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
+all-containers:
+	$(MAKE) container
+	$(MAKE) container BIN=restic-init-container
+
 container: verify test .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
-	@cp $(DOCKERFILE) _output/.dockerfile-$(GOOS)-$(GOARCH)
-	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(GOOS)-$(GOARCH) _output
+	@# TODO this is ugly
+	@cp restic/complete-restore.sh _output/
+	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
+	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
 container-name:
 	@echo "container: $(IMAGE):$(VERSION)"
+
+all-push:
+	$(MAKE) push
+	$(MAKE) push BIN=restic-init-container
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
@@ -182,4 +197,4 @@ clean:
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
-ci: build verify test
+ci: all verify test

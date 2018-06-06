@@ -22,15 +22,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/signal"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
-	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -44,23 +40,25 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	kcorev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
+	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
@@ -69,9 +67,8 @@ import (
 
 func NewCommand() *cobra.Command {
 	var (
-		sortedLogLevels = getSortedLogLevels()
-		logLevelFlag    = flag.NewEnum(logrus.InfoLevel.String(), sortedLogLevels...)
-		pluginDir       = "/plugins"
+		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
+		pluginDir    = "/plugins"
 	)
 
 	var command = &cobra.Command{
@@ -79,19 +76,10 @@ func NewCommand() *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
-			logLevel := logrus.InfoLevel
-
-			if parsed, err := logrus.ParseLevel(logLevelFlag.String()); err == nil {
-				logLevel = parsed
-			} else {
-				// This should theoretically never happen assuming the enum flag
-				// is constructed correctly because the enum flag will not allow
-				//  an invalid value to be set.
-				logrus.Errorf("log-level flag has invalid value %s", strings.ToUpper(logLevelFlag.String()))
-			}
+			logLevel := logLevelFlag.Parse()
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := newLogger(logLevel, &logging.ErrorLocationHook{}, &logging.LogLocationHook{})
+			logger := logging.DefaultLogger(logLevel)
 			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
 			// NOTE: the namespace flag is bound to ark's persistent flags when the root ark command
@@ -109,14 +97,13 @@ func NewCommand() *cobra.Command {
 			namespace := getServerNamespace(namespaceFlag)
 
 			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, logger)
-
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
 		},
 	}
 
-	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(sortedLogLevels, ", ")))
+	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&pluginDir, "plugin-dir", pluginDir, "directory containing Ark plugins")
 
 	return command
@@ -136,42 +123,12 @@ func getServerNamespace(namespaceFlag *pflag.Flag) string {
 	return api.DefaultNamespace
 }
 
-func newLogger(level logrus.Level, hooks ...logrus.Hook) *logrus.Logger {
-	logger := logrus.New()
-	logger.Level = level
-
-	for _, hook := range hooks {
-		logger.Hooks.Add(hook)
-	}
-
-	return logger
-}
-
-// getSortedLogLevels returns a string slice containing all of the valid logrus
-// log levels (based on logrus.AllLevels), sorted in ascending order of severity.
-func getSortedLogLevels() []string {
-	var (
-		sortedLogLevels  = make([]logrus.Level, len(logrus.AllLevels))
-		logLevelsStrings []string
-	)
-
-	copy(sortedLogLevels, logrus.AllLevels)
-
-	// logrus.Panic has the lowest value, so the compare function uses ">"
-	sort.Slice(sortedLogLevels, func(i, j int) bool { return sortedLogLevels[i] > sortedLogLevels[j] })
-
-	for _, level := range sortedLogLevels {
-		logLevelsStrings = append(logLevelsStrings, level.String())
-	}
-
-	return logLevelsStrings
-}
-
 type server struct {
 	namespace             string
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
+	objectStore           cloudprovider.ObjectStore
 	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	discoveryClient       discovery.DiscoveryInterface
@@ -181,6 +138,7 @@ type server struct {
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
 	pluginManager         plugin.Manager
+	resticManager         restic.RepositoryManager
 }
 
 func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*server, error) {
@@ -225,7 +183,8 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 
 func (s *server) run() error {
 	defer s.pluginManager.CleanupClients()
-	s.handleShutdownSignals()
+
+	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
 	if err := s.ensureArkNamespace(); err != nil {
 		return err
@@ -251,11 +210,40 @@ func (s *server) run() error {
 		return err
 	}
 
+	if config.BackupStorageProvider.ResticLocation != "" {
+		if err := s.initRestic(config.BackupStorageProvider); err != nil {
+			return err
+		}
+		s.runResticMaintenance()
+
+		// warn if restic daemonset does not exist
+		_, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get("restic", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			s.logger.Warn("Ark restic DaemonSet not found; restic backups will fail until it's created")
+		} else if err != nil {
+			return errors.WithStack(err)
+		}
+	}
+
 	if err := s.runControllers(config); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func (s *server) runResticMaintenance() {
+	go func() {
+		interval := time.Hour
+
+		<-time.After(interval)
+
+		wait.Forever(func() {
+			if err := s.resticManager.PruneAllRepos(); err != nil {
+				s.logger.WithError(err).Error("error pruning repos")
+			}
+		}, interval)
+	}()
 }
 
 func (s *server) ensureArkNamespace() error {
@@ -301,11 +289,21 @@ func (s *server) loadConfig() (*api.Config, error) {
 }
 
 const (
-	defaultGCSyncPeriod       = 60 * time.Minute
-	defaultBackupSyncPeriod   = 60 * time.Minute
-	defaultScheduleSyncPeriod = time.Minute
+	defaultGCSyncPeriod              = 60 * time.Minute
+	defaultBackupSyncPeriod          = 60 * time.Minute
+	defaultScheduleSyncPeriod        = time.Minute
+	defaultPodVolumeOperationTimeout = 60 * time.Minute
 )
 
+// - Namespaces go first because all namespaced resources depend on them.
+// - PVs go before PVCs because PVCs depend on them.
+// - PVCs go before pods or controllers so they can be mounted as volumes.
+// - Secrets and config maps go before pods or controllers so they can be mounted
+// 	 as volumes.
+// - Service accounts go before pods or controllers so pods can use them.
+// - Limit ranges go before pods or controllers so pods can use them.
+// - Pods go before controllers so they can be explicitly restored and potentially
+//	 have restic restores run before controllers adopt the pods.
 var defaultResourcePriorities = []string{
 	"namespaces",
 	"persistentvolumes",
@@ -314,6 +312,7 @@ var defaultResourcePriorities = []string{
 	"configmaps",
 	"serviceaccounts",
 	"limitranges",
+	"pods",
 }
 
 func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
@@ -327,6 +326,10 @@ func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
 
 	if c.ScheduleSyncPeriod.Duration == 0 {
 		c.ScheduleSyncPeriod.Duration = defaultScheduleSyncPeriod
+	}
+
+	if c.PodVolumeOperationTimeout.Duration == 0 {
+		c.PodVolumeOperationTimeout.Duration = defaultPodVolumeOperationTimeout
 	}
 
 	if len(c.ResourcePriorities) == 0 {
@@ -379,17 +382,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func (s *server) handleShutdownSignals() {
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		sig := <-sigs
-		s.logger.Infof("Received signal %s, gracefully shutting down", sig)
-		s.cancelFunc()
-	}()
-}
-
 func (s *server) initBackupService(config *api.Config) error {
 	s.logger.Info("Configuring cloud provider for backup service")
 	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
@@ -397,6 +389,7 @@ func (s *server) initBackupService(config *api.Config) error {
 		return err
 	}
 
+	s.objectStore = objectStore
 	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
 	return nil
 }
@@ -457,6 +450,42 @@ func durationMin(a, b time.Duration) time.Duration {
 	return b
 }
 
+func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
+	// set the env vars that restic uses for creds purposes
+	if config.Name == string(restic.AzureBackend) {
+		os.Setenv("AZURE_ACCOUNT_NAME", os.Getenv("AZURE_STORAGE_ACCOUNT_ID"))
+		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
+	}
+
+	secretsInformer := corev1informers.NewFilteredSecretInformer(
+		s.kubeClient,
+		"",
+		0,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		func(opts *metav1.ListOptions) {
+			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", restic.CredentialsSecretName)
+		},
+	)
+	go secretsInformer.Run(s.ctx.Done())
+
+	res, err := restic.NewRepositoryManager(
+		s.ctx,
+		s.objectStore,
+		config,
+		s.arkClient,
+		secretsInformer,
+		s.kubeClient.CoreV1(),
+		s.logger,
+	)
+	if err != nil {
+		return err
+	}
+	s.resticManager = res
+
+	s.logger.Info("Checking restic repositories")
+	return s.resticManager.CheckAllRepos()
+}
+
 func (s *server) runControllers(config *api.Config) error {
 	s.logger.Info("Starting controllers")
 
@@ -505,8 +534,16 @@ func (s *server) runControllers(config *api.Config) error {
 	} else {
 		backupTracker := controller.NewBackupTracker()
 
-		backupper, err := newBackupper(discoveryHelper, s.clientPool, s.backupService, s.snapshotService, s.kubeClientConfig, s.kubeClient.CoreV1())
+		backupper, err := backup.NewKubernetesBackupper(
+			discoveryHelper,
+			client.NewDynamicFactory(s.clientPool),
+			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
+			s.snapshotService,
+			s.resticManager,
+			config.PodVolumeOperationTimeout.Duration,
+		)
 		cmd.CheckError(err)
+
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
@@ -561,6 +598,8 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
+			s.resticManager,
+			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
 		)
 		wg.Add(1)
 		go func() {
@@ -570,14 +609,16 @@ func (s *server) runControllers(config *api.Config) error {
 
 	}
 
-	restorer, err := newRestorer(
+	restorer, err := restore.NewKubernetesRestorer(
 		discoveryHelper,
-		s.clientPool,
+		client.NewDynamicFactory(s.clientPool),
 		s.backupService,
 		s.snapshotService,
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
-		s.kubeClient,
+		s.kubeClient.CoreV1().Namespaces(),
+		s.resticManager,
+		config.PodVolumeOperationTimeout.Duration,
 		s.logger,
 	)
 	cmd.CheckError(err)
@@ -669,42 +710,4 @@ func (s *server) removeDeprecatedGCFinalizer() {
 			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
 		}
 	}
-}
-
-func newBackupper(
-	discoveryHelper arkdiscovery.Helper,
-	clientPool dynamic.ClientPool,
-	backupService cloudprovider.BackupService,
-	snapshotService cloudprovider.SnapshotService,
-	kubeClientConfig *rest.Config,
-	kubeCoreV1Client kcorev1client.CoreV1Interface,
-) (backup.Backupper, error) {
-	return backup.NewKubernetesBackupper(
-		discoveryHelper,
-		client.NewDynamicFactory(clientPool),
-		backup.NewPodCommandExecutor(kubeClientConfig, kubeCoreV1Client.RESTClient()),
-		snapshotService,
-	)
-}
-
-func newRestorer(
-	discoveryHelper arkdiscovery.Helper,
-	clientPool dynamic.ClientPool,
-	backupService cloudprovider.BackupService,
-	snapshotService cloudprovider.SnapshotService,
-	resourcePriorities []string,
-	backupClient arkv1client.BackupsGetter,
-	kubeClient kubernetes.Interface,
-	logger logrus.FieldLogger,
-) (restore.Restorer, error) {
-	return restore.NewKubernetesRestorer(
-		discoveryHelper,
-		client.NewDynamicFactory(clientPool),
-		backupService,
-		snapshotService,
-		resourcePriorities,
-		backupClient,
-		kubeClient.CoreV1().Namespaces(),
-		logger,
-	)
 }

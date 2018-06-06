@@ -19,6 +19,7 @@ package restore
 import (
 	"archive/tar"
 	"compress/gzip"
+	go_context "context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,6 +27,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -38,7 +41,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -47,10 +52,12 @@ import (
 	"github.com/heptio/ark/pkg/discovery"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
+	arksync "github.com/heptio/ark/pkg/util/sync"
 )
 
 // Restorer knows how to restore a backup.
@@ -64,15 +71,17 @@ type kindString string
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
 type kubernetesRestorer struct {
-	discoveryHelper    discovery.Helper
-	dynamicFactory     client.DynamicFactory
-	backupService      cloudprovider.BackupService
-	snapshotService    cloudprovider.SnapshotService
-	backupClient       arkv1client.BackupsGetter
-	namespaceClient    corev1.NamespaceInterface
-	resourcePriorities []string
-	fileSystem         FileSystem
-	logger             logrus.FieldLogger
+	discoveryHelper       discovery.Helper
+	dynamicFactory        client.DynamicFactory
+	backupService         cloudprovider.BackupService
+	snapshotService       cloudprovider.SnapshotService
+	backupClient          arkv1client.BackupsGetter
+	namespaceClient       corev1.NamespaceInterface
+	resticRestorerFactory restic.RestorerFactory
+	resticTimeout         time.Duration
+	resourcePriorities    []string
+	fileSystem            FileSystem
+	logger                logrus.FieldLogger
 }
 
 // prioritizeResources returns an ordered, fully-resolved list of resources to restore based on
@@ -142,18 +151,22 @@ func NewKubernetesRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
+	resticRestorerFactory restic.RestorerFactory,
+	resticTimeout time.Duration,
 	logger logrus.FieldLogger,
 ) (Restorer, error) {
 	return &kubernetesRestorer{
-		discoveryHelper:    discoveryHelper,
-		dynamicFactory:     dynamicFactory,
-		backupService:      backupService,
-		snapshotService:    snapshotService,
-		backupClient:       backupClient,
-		namespaceClient:    namespaceClient,
-		resourcePriorities: resourcePriorities,
-		fileSystem:         &osFileSystem{},
-		logger:             logger,
+		discoveryHelper:       discoveryHelper,
+		dynamicFactory:        dynamicFactory,
+		backupService:         backupService,
+		snapshotService:       snapshotService,
+		backupClient:          backupClient,
+		namespaceClient:       namespaceClient,
+		resticRestorerFactory: resticRestorerFactory,
+		resticTimeout:         resticTimeout,
+		resourcePriorities:    resourcePriorities,
+		fileSystem:            &osFileSystem{},
+		logger:                logger,
 	}, nil
 }
 
@@ -195,7 +208,28 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
 	}
 
-	ctx := &context{
+	podVolumeTimeout := kr.resticTimeout
+	if val := restore.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+		parsed, err := time.ParseDuration(val)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
+		} else {
+			podVolumeTimeout = parsed
+		}
+	}
+
+	ctx, cancelFunc := go_context.WithTimeout(go_context.Background(), podVolumeTimeout)
+	defer cancelFunc()
+
+	var resticRestorer restic.Restorer
+	if kr.resticRestorerFactory != nil {
+		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, restore)
+		if err != nil {
+			return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+		}
+	}
+
+	restoreCtx := &context{
 		backup:               backup,
 		backupReader:         backupReader,
 		restore:              restore,
@@ -207,10 +241,10 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		namespaceClient:      kr.namespaceClient,
 		actions:              resolvedActions,
 		snapshotService:      kr.snapshotService,
-		waitForPVs:           true,
+		resticRestorer:       resticRestorer,
 	}
 
-	return ctx.execute()
+	return restoreCtx.execute()
 }
 
 // getResourceIncludesExcludes takes the lists of resources to include and exclude, uses the
@@ -286,7 +320,10 @@ type context struct {
 	namespaceClient      corev1.NamespaceInterface
 	actions              []resolvedAction
 	snapshotService      cloudprovider.SnapshotService
-	waitForPVs           bool
+	resticRestorer       restic.Restorer
+	globalWaitGroup      arksync.ErrorGroup
+	resourceWaitGroup    sync.WaitGroup
+	resourceWatches      []watch.Interface
 }
 
 func (ctx *context) infof(msg string, args ...interface{}) {
@@ -341,6 +378,16 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	}
 
 	existingNamespaces := sets.NewString()
+
+	// TODO this is not optimal since it'll keep watches open for all resources/namespaces
+	// until the very end of the restore. This should be done per resource type. Deferring
+	// refactoring for now since this may be able to be removed entirely if we eliminate
+	// waiting for PV snapshot restores.
+	defer func() {
+		for _, watch := range ctx.resourceWatches {
+			watch.Stop()
+		}
+	}()
 
 	for _, resource := range ctx.prioritizedResources {
 		// we don't want to explicitly restore namespace API objs because we'll handle
@@ -424,6 +471,23 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 			merge(&warnings, &w)
 			merge(&errs, &e)
 		}
+
+		// TODO timeout?
+		ctx.logger.Debugf("Waiting on resource wait group for resource=%s", resource.String())
+		ctx.resourceWaitGroup.Wait()
+		ctx.logger.Debugf("Done waiting on resource wait group for resource=%s", resource.String())
+	}
+
+	// TODO timeout?
+	ctx.logger.Debug("Waiting on global wait group")
+	waitErrs := ctx.globalWaitGroup.Wait()
+	ctx.logger.Debug("Done waiting on global wait group")
+
+	for _, err := range waitErrs {
+		// TODO not ideal to be adding these to Ark-level errors
+		// rather than a specific namespace, but don't have a way
+		// to track the namespace right now.
+		errs.Ark = append(errs.Ark, err.Error())
 	}
 
 	return warnings, errs
@@ -524,9 +588,9 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 	var (
 		resourceClient    client.Dynamic
-		waiter            *resourceWaiter
 		groupResource     = schema.ParseGroupResource(resource)
 		applicableActions []resolvedAction
+		resourceWatch     watch.Interface
 	)
 
 	// pre-filter the actions based on namespace & resource includes/excludes since
@@ -556,8 +620,12 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if hasControllerOwner(obj.GetOwnerReferences()) {
-			ctx.infof("%s/%s has a controller owner - skipping", obj.GetNamespace(), obj.GetName())
-			continue
+			// non-pods with controller owners shouldn't be restored; pods with controller
+			// owners should only be restored if they have restic snapshots to restore
+			if groupResource != kuberesource.Pods || !restic.PodHasSnapshotAnnotation(obj) {
+				ctx.infof("%s has a controller owner - skipping", kube.NamespaceAndName(obj))
+				continue
+			}
 		}
 
 		complete, err := isCompleted(obj, groupResource)
@@ -597,16 +665,23 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 			obj = updatedObj
 
-			// wait for the PV to be ready
-			if ctx.waitForPVs {
-				pvWatch, err := resourceClient.Watch(metav1.ListOptions{})
+			if resourceWatch == nil {
+				resourceWatch, err = resourceClient.Watch(metav1.ListOptions{})
 				if err != nil {
 					addToResult(&errs, namespace, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
 					return warnings, errs
 				}
+				ctx.resourceWatches = append(ctx.resourceWatches, resourceWatch)
 
-				waiter = newResourceWaiter(pvWatch, isPVReady)
-				defer waiter.Stop()
+				ctx.resourceWaitGroup.Add(1)
+				go func() {
+					defer ctx.resourceWaitGroup.Done()
+
+					if _, err := waitForReady(resourceWatch.ResultChan(), obj.GetName(), isPVReady, time.Minute, ctx.logger); err != nil {
+						ctx.logger.Warnf("Timeout reached waiting for persistent volume %s to become ready", obj.GetName())
+						addArkError(&warnings, fmt.Errorf("timeout reached waiting for persistent volume %s to become ready", obj.GetName()))
+					}
+				}()
 			}
 		}
 
@@ -655,7 +730,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		addLabel(obj, api.RestoreLabelKey, ctx.restore.Name)
 
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, obj.GetName())
-		_, restoreErr := resourceClient.Create(obj)
+		createdObj, restoreErr := resourceClient.Create(obj)
 		if apierrors.IsAlreadyExists(restoreErr) {
 			equal := false
 			if fromCluster, err := resourceClient.Get(obj.GetName(), metav1.GetOptions{}); err == nil {
@@ -680,18 +755,69 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			continue
 		}
 
-		if waiter != nil {
-			waiter.RegisterItem(obj.GetName())
-		}
-	}
+		if groupResource == kuberesource.Pods && len(restic.GetPodSnapshotAnnotations(obj)) > 0 {
+			if ctx.resticRestorer == nil {
+				ctx.logger.Warn("No restic restorer, not restoring pod's volumes")
+			} else {
+				ctx.globalWaitGroup.GoErrorSlice(func() []error {
+					pod := new(v1.Pod)
+					if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
+						ctx.logger.WithError(err).Error("error converting unstructured pod")
+						return []error{err}
+					}
 
-	if waiter != nil {
-		if err := waiter.Wait(); err != nil {
-			addArkError(&errs, fmt.Errorf("error waiting for all %v resources to be created in namespace %s: %v", &groupResource, namespace, err))
+					if errs := ctx.resticRestorer.RestorePodVolumes(ctx.restore, pod, ctx.logger); errs != nil {
+						ctx.logger.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete restic restores of pod's volumes")
+						return errs
+					}
+
+					return nil
+				})
+			}
 		}
 	}
 
 	return warnings, errs
+}
+
+func waitForReady(
+	watchChan <-chan watch.Event,
+	name string,
+	ready func(runtime.Unstructured) bool,
+	timeout time.Duration,
+	log logrus.FieldLogger,
+) (*unstructured.Unstructured, error) {
+	var timeoutChan <-chan time.Time
+	if timeout != 0 {
+		timeoutChan = time.After(timeout)
+	} else {
+		timeoutChan = make(chan time.Time)
+	}
+
+	for {
+		select {
+		case event := <-watchChan:
+			if event.Type != watch.Added && event.Type != watch.Modified {
+				continue
+			}
+
+			obj, ok := event.Object.(*unstructured.Unstructured)
+			switch {
+			case !ok:
+				log.Errorf("Unexpected type %T", event.Object)
+				continue
+			case obj.GetName() != name:
+				continue
+			case !ready(obj):
+				log.Debugf("Item %s is not ready yet", name)
+				continue
+			default:
+				return obj, nil
+			}
+		case <-timeoutChan:
+			return nil, errors.New("failed to observe item becoming ready within the timeout")
+		}
+	}
 }
 
 func (ctx *context) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {

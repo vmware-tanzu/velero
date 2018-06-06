@@ -24,6 +24,8 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
@@ -74,8 +76,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "", Resource: "pods"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"myns","name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"myns","name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"myns","name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"myns","name":"myname2"}}`),
 				},
 			},
 		},
@@ -90,12 +92,12 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "", Resource: "pods"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"a","name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"a","name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"a","name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"a","name":"myname2"}}`),
 				},
 				{
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"b","name":"myname3"}}`),
-					unstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"b","name":"myname4"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"b","name":"myname3"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"b","name":"myname4"}}`),
 				},
 			},
 		},
@@ -110,8 +112,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "certificates.k8s.io", Resource: "certificatesigningrequests"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
 				},
 			},
 		},
@@ -127,8 +129,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "certificates.k8s.io", Resource: "certificatesigningrequests"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
 				},
 			},
 		},
@@ -166,8 +168,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "certificates.k8s.io", Resource: "certificatesigningrequests"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
 				},
 			},
 		},
@@ -194,8 +196,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "certificates.k8s.io", Resource: "certificatesigningrequests"},
 			listResponses: [][]*unstructured.Unstructured{
 				{
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
-					unstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname1"}}`),
+					arktest.UnstructuredOrDie(`{"apiVersion":"certificates.k8s.io/v1beta1","kind":"CertificateSigningRequest","metadata":{"name":"myname2"}}`),
 				},
 			},
 		},
@@ -211,8 +213,8 @@ func TestBackupResource(t *testing.T) {
 			groupResource:            schema.GroupResource{Group: "", Resource: "namespaces"},
 			expectSkip:               false,
 			getResponses: []*unstructured.Unstructured{
-				unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`),
-				unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-2"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`),
+				arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-2"}}`),
 			},
 		},
 	}
@@ -223,8 +225,6 @@ func TestBackupResource(t *testing.T) {
 				IncludeClusterResources: test.includeClusterResources,
 			},
 		}
-
-		labelSelector := "foo=bar"
 
 		dynamicFactory := &arktest.FakeDynamicFactory{}
 		defer dynamicFactory.AssertExpectations(t)
@@ -251,7 +251,7 @@ func TestBackupResource(t *testing.T) {
 			{name: "myhook"},
 		}
 
-		podCommandExecutor := &mockPodCommandExecutor{}
+		podCommandExecutor := &arktest.MockPodCommandExecutor{}
 		defer podCommandExecutor.AssertExpectations(t)
 
 		tarWriter := &fakeTarWriter{}
@@ -262,7 +262,6 @@ func TestBackupResource(t *testing.T) {
 				backup,
 				test.namespaces,
 				test.resources,
-				labelSelector,
 				dynamicFactory,
 				discoveryHelper,
 				backedUpItems,
@@ -271,7 +270,8 @@ func TestBackupResource(t *testing.T) {
 				podCommandExecutor,
 				tarWriter,
 				resourceHooks,
-				nil,
+				nil, // snapshot service
+				nil, // restic backupper
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -294,6 +294,7 @@ func TestBackupResource(t *testing.T) {
 					dynamicFactory,
 					discoveryHelper,
 					mock.Anything,
+					mock.Anything,
 				).Return(itemBackupper)
 
 				if len(test.listResponses) > 0 {
@@ -310,7 +311,7 @@ func TestBackupResource(t *testing.T) {
 							list.Items = append(list.Items, *item)
 							itemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), item, test.groupResource).Return(nil)
 						}
-						client.On("List", metav1.ListOptions{LabelSelector: labelSelector}).Return(list, nil)
+						client.On("List", metav1.ListOptions{}).Return(list, nil)
 					}
 				}
 
@@ -379,12 +380,18 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			backup := &v1.Backup{}
+			backup := &v1.Backup{
+				Spec: v1.BackupSpec{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"foo": "bar",
+						},
+					},
+				},
+			}
 
 			namespaces := collections.NewIncludesExcludes().Includes("*")
 			resources := collections.NewIncludesExcludes().Includes("*")
-
-			labelSelector := "foo=bar"
 
 			dynamicFactory := &arktest.FakeDynamicFactory{}
 			defer dynamicFactory.AssertExpectations(t)
@@ -411,7 +418,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				{name: "myhook"},
 			}
 
-			podCommandExecutor := &mockPodCommandExecutor{}
+			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			tarWriter := &fakeTarWriter{}
@@ -421,7 +428,6 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				backup,
 				namespaces,
 				resources,
-				labelSelector,
 				dynamicFactory,
 				discoveryHelper,
 				backedUpItems,
@@ -430,7 +436,8 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				podCommandExecutor,
 				tarWriter,
 				resourceHooks,
-				nil,
+				nil, // snapshot service
+				nil, // restic backupper
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -451,7 +458,8 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				resourceHooks,
 				dynamicFactory,
 				discoveryHelper,
-				mock.Anything,
+				mock.Anything, // snapshot service
+				mock.Anything, // restic backupper
 			).Return(itemBackupper)
 
 			client := &arktest.FakeDynamicClient{}
@@ -459,7 +467,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 			// STEP 1: make sure the initial backup goes through
 			dynamicFactory.On("ClientForGroupVersionResource", test.groupVersion1, test.apiResource, "").Return(client, nil)
-			client.On("List", metav1.ListOptions{LabelSelector: labelSelector}).Return(&unstructured.UnstructuredList{}, nil)
+			client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(backup.Spec.LabelSelector)}).Return(&unstructured.UnstructuredList{}, nil)
 
 			// STEP 2: do the backup
 			err := rb.backupResource(test.apiGroup1, test.apiResource)
@@ -478,7 +486,6 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 	namespaces := collections.NewIncludesExcludes().Includes("ns-1")
 	resources := collections.NewIncludesExcludes().Includes("*")
 
-	labelSelector := "foo=bar"
 	backedUpItems := map[itemKey]struct{}{}
 
 	dynamicFactory := &arktest.FakeDynamicFactory{}
@@ -492,7 +499,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 
 	resourceHooks := []resourceHook{}
 
-	podCommandExecutor := &mockPodCommandExecutor{}
+	podCommandExecutor := &arktest.MockPodCommandExecutor{}
 	defer podCommandExecutor.AssertExpectations(t)
 
 	tarWriter := &fakeTarWriter{}
@@ -502,7 +509,6 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
@@ -511,7 +517,8 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
-		nil,
+		nil, // snapshot service
+		nil, // restic backupper
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -547,6 +554,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		dynamicFactory,
 		discoveryHelper,
 		mock.Anything,
+		mock.Anything,
 	).Return(itemBackupper)
 
 	client := &arktest.FakeDynamicClient{}
@@ -554,7 +562,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 
 	coreV1Group := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", coreV1Group, namespacesResource, "").Return(client, nil)
-	ns1 := unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
+	ns1 := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
 	client.On("Get", "ns-1", metav1.GetOptions{}).Return(ns1, nil)
 
 	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks, hookPhasePre).Return(nil)
@@ -568,12 +576,19 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 }
 
 func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
-	backup := &v1.Backup{}
+	backup := &v1.Backup{
+		Spec: v1.BackupSpec{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"foo": "bar",
+				},
+			},
+		},
+	}
 
 	namespaces := collections.NewIncludesExcludes().Excludes("ns-1")
 	resources := collections.NewIncludesExcludes().Includes("*")
 
-	labelSelector := "foo=bar"
 	backedUpItems := map[itemKey]struct{}{}
 
 	dynamicFactory := &arktest.FakeDynamicFactory{}
@@ -587,7 +602,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 
 	resourceHooks := []resourceHook{}
 
-	podCommandExecutor := &mockPodCommandExecutor{}
+	podCommandExecutor := &arktest.MockPodCommandExecutor{}
 	defer podCommandExecutor.AssertExpectations(t)
 
 	tarWriter := &fakeTarWriter{}
@@ -597,7 +612,6 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
@@ -606,7 +620,8 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
-		nil,
+		nil, // snapshot service
+		nil, // restic backupper
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -631,6 +646,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		dynamicFactory,
 		discoveryHelper,
 		mock.Anything,
+		mock.Anything,
 	).Return(itemBackupper)
 
 	client := &arktest.FakeDynamicClient{}
@@ -639,12 +655,12 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 	coreV1Group := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", coreV1Group, namespacesResource, "").Return(client, nil)
 
-	ns1 := unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
-	ns2 := unstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-2"}}`)
+	ns1 := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
+	ns2 := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-2"}}`)
 	list := &unstructured.UnstructuredList{
 		Items: []unstructured.Unstructured{*ns1, *ns2},
 	}
-	client.On("List", metav1.ListOptions{LabelSelector: labelSelector}).Return(list, nil)
+	client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(backup.Spec.LabelSelector)}).Return(list, nil)
 
 	itemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), ns2, kuberesource.Namespaces).Return(nil)
 
@@ -661,12 +677,13 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	namespaces, resources *collections.IncludesExcludes,
 	backedUpItems map[itemKey]struct{},
 	actions []resolvedAction,
-	podCommandExecutor podCommandExecutor,
+	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	snapshotService cloudprovider.SnapshotService,
+	resticBackupper restic.Backupper,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
@@ -680,6 +697,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		dynamicFactory,
 		discoveryHelper,
 		snapshotService,
+		resticBackupper,
 	)
 	return args.Get(0).(ItemBackupper)
 }

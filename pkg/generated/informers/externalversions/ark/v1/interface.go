@@ -32,6 +32,10 @@ type Interface interface {
 	DeleteBackupRequests() DeleteBackupRequestInformer
 	// DownloadRequests returns a DownloadRequestInformer.
 	DownloadRequests() DownloadRequestInformer
+	// PodVolumeBackups returns a PodVolumeBackupInformer.
+	PodVolumeBackups() PodVolumeBackupInformer
+	// PodVolumeRestores returns a PodVolumeRestoreInformer.
+	PodVolumeRestores() PodVolumeRestoreInformer
 	// Restores returns a RestoreInformer.
 	Restores() RestoreInformer
 	// Schedules returns a ScheduleInformer.
@@ -67,6 +71,16 @@ func (v *version) DeleteBackupRequests() DeleteBackupRequestInformer {
 // DownloadRequests returns a DownloadRequestInformer.
 func (v *version) DownloadRequests() DownloadRequestInformer {
 	return &downloadRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PodVolumeBackups returns a PodVolumeBackupInformer.
+func (v *version) PodVolumeBackups() PodVolumeBackupInformer {
+	return &podVolumeBackupInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// PodVolumeRestores returns a PodVolumeRestoreInformer.
+func (v *version) PodVolumeRestores() PodVolumeRestoreInformer {
+	return &podVolumeRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Restores returns a RestoreInformer.

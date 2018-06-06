@@ -1,0 +1,130 @@
+/*
+Copyright 2018 the Heptio Ark contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package install
+
+import (
+	"strings"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
+	c := &podTemplateConfig{
+		image: "gcr.io/heptio-images/ark:latest",
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	pullPolicy := corev1.PullAlways
+	imageParts := strings.Split(c.image, ":")
+	if len(imageParts) == 2 && imageParts[1] != "latest" {
+		pullPolicy = corev1.PullIfNotPresent
+
+	}
+
+	daemonSet := &appsv1.DaemonSet{
+		ObjectMeta: objectMeta(namespace, "restic"),
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"name": "restic",
+				},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"name": "restic",
+					},
+				},
+				Spec: corev1.PodSpec{
+					ServiceAccountName: "ark",
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-pods",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: "/var/lib/kubelet/pods",
+								},
+							},
+						},
+					},
+					Containers: []corev1.Container{
+						{
+							Name:            "restic",
+							Image:           c.image,
+							ImagePullPolicy: pullPolicy,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "host-pods",
+									MountPath: "/host_pods",
+								},
+							},
+							Env: []corev1.EnvVar{
+								{
+									Name: "NODE_NAME",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "spec.nodeName",
+										},
+									},
+								},
+								{
+									Name: "HEPTIO_ARK_NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.namespace",
+										},
+									},
+								},
+								{
+									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+									Value: "/credentials/cloud",
+								},
+								{
+									Name:  "AWS_SHARED_CREDENTIALS_FILE",
+									Value: "/credentials/cloud",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if !c.withoutCredentialsVolume {
+		daemonSet.Spec.Template.Spec.Volumes = append(
+			daemonSet.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: "cloud-credentials",
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: "cloud-credentials",
+					},
+				},
+			},
+		)
+	}
+
+	daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, c.envVars...)
+
+	return daemonSet
+}

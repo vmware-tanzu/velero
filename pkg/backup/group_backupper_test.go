@@ -23,6 +23,8 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/sirupsen/logrus"
@@ -38,7 +40,6 @@ func TestBackupGroup(t *testing.T) {
 
 	namespaces := collections.NewIncludesExcludes().Includes("a")
 	resources := collections.NewIncludesExcludes().Includes("b")
-	labelSelector := "foo=bar"
 
 	dynamicFactory := &arktest.FakeDynamicFactory{}
 	defer dynamicFactory.AssertExpectations(t)
@@ -64,7 +65,7 @@ func TestBackupGroup(t *testing.T) {
 		},
 	}
 
-	podCommandExecutor := &mockPodCommandExecutor{}
+	podCommandExecutor := &arktest.MockPodCommandExecutor{}
 	defer podCommandExecutor.AssertExpectations(t)
 
 	tarWriter := &fakeTarWriter{}
@@ -78,7 +79,6 @@ func TestBackupGroup(t *testing.T) {
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
@@ -87,7 +87,8 @@ func TestBackupGroup(t *testing.T) {
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
-		nil,
+		nil, // snapshot service
+		nil, // restic backupper
 	).(*defaultGroupBackupper)
 
 	resourceBackupperFactory := &mockResourceBackupperFactory{}
@@ -102,7 +103,6 @@ func TestBackupGroup(t *testing.T) {
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
@@ -112,6 +112,7 @@ func TestBackupGroup(t *testing.T) {
 		tarWriter,
 		resourceHooks,
 		nil,
+		mock.Anything, // restic backupper
 	).Return(resourceBackupper)
 
 	group := &metav1.APIResourceList{
@@ -150,23 +151,22 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	backup *v1.Backup,
 	namespaces *collections.IncludesExcludes,
 	resources *collections.IncludesExcludes,
-	labelSelector string,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
 	actions []resolvedAction,
-	podCommandExecutor podCommandExecutor,
+	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
+	resticBackupper restic.Backupper,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
 		backup,
 		namespaces,
 		resources,
-		labelSelector,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,

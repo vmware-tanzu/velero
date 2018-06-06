@@ -57,7 +57,7 @@ func TestHandleHooksSkips(t *testing.T) {
 		},
 		{
 			name: "pod without annotation / no spec hooks",
-			item: unstructuredOrDie(
+			item: arktest.UnstructuredOrDie(
 				`
 				{
 					"apiVersion": "v1",
@@ -73,7 +73,7 @@ func TestHandleHooksSkips(t *testing.T) {
 		{
 			name:          "spec hooks not applicable",
 			groupResource: "pods",
-			item: unstructuredOrDie(
+			item: arktest.UnstructuredOrDie(
 				`
 				{
 					"apiVersion": "v1",
@@ -114,7 +114,7 @@ func TestHandleHooksSkips(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			podCommandExecutor := &mockPodCommandExecutor{}
+			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			h := &defaultItemHookHandler{
@@ -144,7 +144,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, no annotation, spec (multiple pre hooks) = run spec",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -194,7 +194,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, no annotation, spec (multiple post hooks) = run spec",
 			phase:         hookPhasePost,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -244,7 +244,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (legacy), no spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -266,7 +266,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (pre), no spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -288,7 +288,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (post), no spec = run annotation",
 			phase:         hookPhasePost,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -310,7 +310,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation & spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -345,7 +345,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation, onError=fail = return error",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -371,7 +371,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation, onError=continue = return nil",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -397,7 +397,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, spec, onError=fail = don't run other hooks",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: unstructuredOrDie(`
+			item: arktest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -459,7 +459,7 @@ func TestHandleHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			podCommandExecutor := &mockPodCommandExecutor{}
+			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			h := &defaultItemHookHandler{
@@ -467,20 +467,20 @@ func TestHandleHooks(t *testing.T) {
 			}
 
 			if test.expectedPodHook != nil {
-				podCommandExecutor.On("executePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", "<from-annotation>", test.expectedPodHook).Return(test.expectedPodHookError)
+				podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", "<from-annotation>", test.expectedPodHook).Return(test.expectedPodHookError)
 			} else {
 			hookLoop:
 				for _, resourceHook := range test.hooks {
 					for _, hook := range resourceHook.pre {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
-						podCommandExecutor.On("executePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
+						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
 						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
 							break hookLoop
 						}
 					}
 					for _, hook := range resourceHook.post {
 						hookError := test.hookErrorsByContainer[hook.Exec.Container]
-						podCommandExecutor.On("executePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
+						podCommandExecutor.On("ExecutePodCommand", mock.Anything, test.item.UnstructuredContent(), "ns", "name", resourceHook.name, hook.Exec).Return(hookError)
 						if hookError != nil && hook.Exec.OnError == v1.HookErrorModeFail {
 							break hookLoop
 						}

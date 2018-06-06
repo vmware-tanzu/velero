@@ -31,6 +31,8 @@ type ArkV1Interface interface {
 	ConfigsGetter
 	DeleteBackupRequestsGetter
 	DownloadRequestsGetter
+	PodVolumeBackupsGetter
+	PodVolumeRestoresGetter
 	RestoresGetter
 	SchedulesGetter
 }
@@ -54,6 +56,14 @@ func (c *ArkV1Client) DeleteBackupRequests(namespace string) DeleteBackupRequest
 
 func (c *ArkV1Client) DownloadRequests(namespace string) DownloadRequestInterface {
 	return newDownloadRequests(c, namespace)
+}
+
+func (c *ArkV1Client) PodVolumeBackups(namespace string) PodVolumeBackupInterface {
+	return newPodVolumeBackups(c, namespace)
+}
+
+func (c *ArkV1Client) PodVolumeRestores(namespace string) PodVolumeRestoreInterface {
+	return newPodVolumeRestores(c, namespace)
 }
 
 func (c *ArkV1Client) Restores(namespace string) RestoreInterface {

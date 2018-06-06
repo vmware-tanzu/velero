@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -547,6 +548,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
+			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
 
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
@@ -574,6 +576,14 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			assert.Equal(t, test.expectedErrors, errors)
 		})
 	}
+}
+
+type fakeWatch struct{}
+
+func (w *fakeWatch) Stop() {}
+
+func (w *fakeWatch) ResultChan() <-chan watch.Event {
+	return make(chan watch.Event)
 }
 
 func TestHasControllerOwner(t *testing.T) {
@@ -735,7 +745,7 @@ func TestIsCompleted(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			u := unstructuredOrDie(test.content)
+			u := arktest.UnstructuredOrDie(test.content)
 			backup, err := isCompleted(u, test.groupResource)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
@@ -776,15 +786,15 @@ func TestObjectsAreEqual(t *testing.T) {
 		},
 		{
 			name:        "Test JSON objects",
-			backupObj:   unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-xhjjc"}]}`),
-			clusterObj:  unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			backupObj:   arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			clusterObj:  arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
 			expectedErr: false,
 			expectedRes: true,
 		},
 		{
 			name:        "Test ServiceAccount secrets mismatch",
-			backupObj:   unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-abcde"}]}`),
-			clusterObj:  unstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
+			backupObj:   arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"name":"default","namespace":"nginx-example", "labels": {"ark-restore": "test"}},"secrets":[{"name":"default-token-abcde"}]}`),
+			clusterObj:  arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"ServiceAccount","metadata":{"creationTimestamp":"2018-04-05T20:12:21Z","name":"default","namespace":"nginx-example","resourceVersion":"650","selfLink":"/api/v1/namespaces/nginx-example/serviceaccounts/default","uid":"a5a3d2a2-390d-11e8-9644-42010a960002"},"secrets":[{"name":"default-token-xhjjc"}]}`),
 			expectedErr: false,
 			expectedRes: false,
 		},
@@ -966,16 +976,6 @@ func TestIsPVReady(t *testing.T) {
 			assert.Equal(t, test.expected, isPVReady(test.obj))
 		})
 	}
-}
-
-// Copied from backup/backup_test.go for JSON testing.
-// TODO: move this into util/test for re-use.
-func unstructuredOrDie(data string) *unstructured.Unstructured {
-	o, _, err := unstructured.UnstructuredJSONScheme.Decode([]byte(data), nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	return o.(*unstructured.Unstructured)
 }
 
 type testUnstructured struct {

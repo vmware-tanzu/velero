@@ -21,10 +21,11 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 )
 
 // NamespaceAndName returns a string in the format <namespace>/<name>
@@ -39,7 +40,7 @@ func NamespaceAndName(objMeta metav1.Object) string {
 // a bool indicating whether or not the namespace was created, and an error if the create failed
 // for a reason other than that the namespace already exists. Note that in the case where the
 // namespace already exists, this function will return (false, nil).
-func EnsureNamespaceExists(namespace *v1.Namespace, client corev1.NamespaceInterface) (bool, error) {
+func EnsureNamespaceExists(namespace *corev1api.Namespace, client corev1client.NamespaceInterface) (bool, error) {
 	if _, err := client.Create(namespace); err == nil {
 		return true, nil
 	} else if apierrors.IsAlreadyExists(err) {
@@ -47,4 +48,32 @@ func EnsureNamespaceExists(namespace *v1.Namespace, client corev1.NamespaceInter
 	} else {
 		return false, errors.Wrapf(err, "error creating namespace %s", namespace.Name)
 	}
+}
+
+// GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
+// where the specified volume lives.
+func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister) (string, error) {
+	var volume *corev1api.Volume
+
+	for _, item := range pod.Spec.Volumes {
+		if item.Name == volumeName {
+			volume = &item
+			break
+		}
+	}
+
+	if volume == nil {
+		return "", errors.New("volume not found in pod")
+	}
+
+	if volume.VolumeSource.PersistentVolumeClaim == nil {
+		return volume.Name, nil
+	}
+
+	pvc, err := pvcLister.PersistentVolumeClaims(pod.Namespace).Get(volume.VolumeSource.PersistentVolumeClaim.ClaimName)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	return pvc.Spec.VolumeName, nil
 }

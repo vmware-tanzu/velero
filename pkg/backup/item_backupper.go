@@ -25,18 +25,22 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/kuberesource"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/logging"
 )
@@ -47,12 +51,13 @@ type itemBackupperFactory interface {
 		namespaces, resources *collections.IncludesExcludes,
 		backedUpItems map[itemKey]struct{},
 		actions []resolvedAction,
-		podCommandExecutor podCommandExecutor,
+		podCommandExecutor podexec.PodCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
 		dynamicFactory client.DynamicFactory,
 		discoveryHelper discovery.Helper,
 		snapshotService cloudprovider.SnapshotService,
+		resticBackupper restic.Backupper,
 	) ItemBackupper
 }
 
@@ -63,12 +68,13 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	namespaces, resources *collections.IncludesExcludes,
 	backedUpItems map[itemKey]struct{},
 	actions []resolvedAction,
-	podCommandExecutor podCommandExecutor,
+	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	snapshotService cloudprovider.SnapshotService,
+	resticBackupper restic.Backupper,
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
 		backup:          backup,
@@ -84,6 +90,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 		itemHookHandler: &defaultItemHookHandler{
 			podCommandExecutor: podCommandExecutor,
 		},
+		resticBackupper: resticBackupper,
 	}
 
 	// this is for testing purposes
@@ -107,6 +114,7 @@ type defaultItemBackupper struct {
 	dynamicFactory  client.DynamicFactory
 	discoveryHelper discovery.Helper
 	snapshotService cloudprovider.SnapshotService
+	resticBackupper restic.Backupper
 
 	itemHookHandler         itemHookHandler
 	additionalItemBackupper ItemBackupper
@@ -183,13 +191,26 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
+	if groupResource == kuberesource.Pods && len(restic.GetVolumesToBackup(metadata)) > 0 {
+		var (
+			updatedObj runtime.Unstructured
+			errs       []error
+		)
+
+		if updatedObj, errs = backupPodVolumes(log, ib.backup, obj, ib.resticBackupper); len(errs) > 0 {
+			backupErrs = append(backupErrs, errs...)
+		} else {
+			obj = updatedObj
+		}
+	}
+
 	log.Debug("Executing post hooks")
 	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePost); err != nil {
 		backupErrs = append(backupErrs, err)
 	}
 
 	if len(backupErrs) != 0 {
-		return kuberrs.NewAggregate(backupErrs)
+		return kubeerrs.NewAggregate(backupErrs)
 	}
 
 	var filePath string
@@ -221,6 +242,39 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 
 	return nil
+}
+
+func backupPodVolumes(log logrus.FieldLogger, backup *api.Backup, obj runtime.Unstructured, backupper restic.Backupper) (runtime.Unstructured, []error) {
+	if backupper == nil {
+		log.Warn("No restic backupper, not backing up pod's volumes")
+		return obj, nil
+	}
+
+	pod := new(corev1api.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+		return nil, []error{errors.WithStack(err)}
+	}
+
+	volumeSnapshots, errs := backupper.BackupPodVolumes(backup, pod, log)
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	if len(volumeSnapshots) == 0 {
+		return obj, nil
+	}
+
+	// annotate the pod with the successful volume snapshots
+	for volume, snapshot := range volumeSnapshots {
+		restic.SetPodSnapshotAnnotation(pod, volume, snapshot)
+	}
+
+	// convert annotated pod back to unstructured to return
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+	if err != nil {
+		return nil, []error{errors.WithStack(err)}
+	}
+
+	return &unstructured.Unstructured{Object: unstructuredObj}, nil
 }
 
 func (ib *defaultItemBackupper) executeActions(log logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, name, namespace string, metadata metav1.Object) error {

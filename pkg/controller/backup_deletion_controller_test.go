@@ -64,6 +64,8 @@ func TestBackupDeletionControllerControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
 		NewBackupTracker(),
+		nil, // restic repository manager
+		sharedInformers.Ark().V1().PodVolumeBackups(),
 	).(*backupDeletionController)
 
 	// disable resync handler since we don't want to test it here
@@ -117,6 +119,8 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
 		NewBackupTracker(),
+		nil, // restic repository manager
+		sharedInformers.Ark().V1().PodVolumeBackups(),
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -198,6 +202,8 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Ark().V1().Restores(),
 			client.ArkV1(), // restoreClient
 			NewBackupTracker(),
+			nil, // restic repository manager
+			sharedInformers.Ark().V1().PodVolumeBackups(),
 		).(*backupDeletionController),
 
 		req: req,
@@ -577,6 +583,8 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(), // restoreClient
 				NewBackupTracker(),
+				nil,
+				sharedInformers.Ark().V1().PodVolumeBackups(),
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}
