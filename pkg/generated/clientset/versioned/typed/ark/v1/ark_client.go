@@ -33,6 +33,7 @@ type ArkV1Interface interface {
 	DownloadRequestsGetter
 	PodVolumeBackupsGetter
 	PodVolumeRestoresGetter
+	ResticRepositoriesGetter
 	RestoresGetter
 	SchedulesGetter
 }
@@ -64,6 +65,10 @@ func (c *ArkV1Client) PodVolumeBackups(namespace string) PodVolumeBackupInterfac
 
 func (c *ArkV1Client) PodVolumeRestores(namespace string) PodVolumeRestoreInterface {
 	return newPodVolumeRestores(c, namespace)
+}
+
+func (c *ArkV1Client) ResticRepositories(namespace string) ResticRepositoryInterface {
+	return newResticRepositories(c, namespace)
 }
 
 func (c *ArkV1Client) Restores(namespace string) RestoreInterface {

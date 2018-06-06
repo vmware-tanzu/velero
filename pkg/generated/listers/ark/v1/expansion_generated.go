@@ -66,6 +66,14 @@ type PodVolumeRestoreListerExpansion interface{}
 // PodVolumeRestoreNamespaceLister.
 type PodVolumeRestoreNamespaceListerExpansion interface{}
 
+// ResticRepositoryListerExpansion allows custom methods to be added to
+// ResticRepositoryLister.
+type ResticRepositoryListerExpansion interface{}
+
+// ResticRepositoryNamespaceListerExpansion allows custom methods to be added to
+// ResticRepositoryNamespaceLister.
+type ResticRepositoryNamespaceListerExpansion interface{}
+
 // RestoreListerExpansion allows custom methods to be added to
 // RestoreLister.
 type RestoreListerExpansion interface{}

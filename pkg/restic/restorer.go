@@ -91,7 +91,7 @@ func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.P
 		r.repoManager.repoLocker.Lock(pod.Namespace)
 		defer r.repoManager.repoLocker.Unlock(pod.Namespace)
 
-		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, r.repoManager.config.repoPrefix)
+		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, r.repoManager.repoPrefix)
 
 		if err := errorOnly(r.repoManager.arkClient.ArkV1().PodVolumeRestores(volumeRestore.Namespace).Create(volumeRestore)); err != nil {
 			errs = append(errs, errors.WithStack(err))

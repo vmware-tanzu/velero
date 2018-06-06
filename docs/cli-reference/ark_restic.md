@@ -30,6 +30,6 @@ Work with restic repositories
 
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark restic init-repository](ark_restic_init-repository.md)	 - create an encryption key for a restic repository
+* [ark restic init-repository](ark_restic_init-repository.md)	 - initialize a restic repository for a specified namespace
 * [ark restic server](ark_restic_server.md)	 - Run the ark restic server
 

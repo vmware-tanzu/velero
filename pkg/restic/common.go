@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -32,7 +33,8 @@ import (
 )
 
 const (
-	InitContainer = "restic-wait"
+	InitContainer               = "restic-wait"
+	DefaultMaintenanceFrequency = 24 * time.Hour
 
 	podAnnotationPrefix       = "snapshot.ark.heptio.com/"
 	volumesToBackupAnnotation = "backup.ark.heptio.com/backup-volumes"

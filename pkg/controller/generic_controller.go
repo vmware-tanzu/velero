@@ -151,3 +151,7 @@ func (c *genericController) enqueue(obj interface{}) {
 
 	c.queue.Add(key)
 }
+
+func (c *genericController) enqueueSecond(_, obj interface{}) {
+	c.enqueue(obj)
+}

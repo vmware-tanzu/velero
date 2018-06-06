@@ -1,14 +1,14 @@
 ## ark restic init-repository
 
-create an encryption key for a restic repository
+initialize a restic repository for a specified namespace
 
 ### Synopsis
 
 
-create an encryption key for a restic repository
+initialize a restic repository for a specified namespace
 
 ```
-ark restic init-repository [flags]
+ark restic init-repository NAMESPACE [flags]
 ```
 
 ### Options
