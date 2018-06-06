@@ -24,6 +24,9 @@ PKG := github.com/heptio/ark
 REGISTRY ?= gcr.io/heptio-images
 
 # Which architecture to build - see $(ALL_ARCH) for options.
+# if the 'local' rule is being run, detect the ARCH from 'go env'
+# if it wasn't specified by the caller.
+local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
 
 VERSION ?= master
@@ -78,6 +81,15 @@ all-build: $(addprefix build-, $(CLI_PLATFORMS))
 #all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
 
 #all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+
+local: build-dirs
+	GOOS=$(GOOS) \
+	GOARCH=$(GOARCH) \
+	VERSION=$(VERSION) \
+	PKG=$(PKG) \
+	BIN=$(BIN) \
+	OUTPUT_DIR=$$(pwd)/_output/bin/$(GOOS)/$(GOARCH) \
+	./hack/build.sh
 
 build: _output/bin/$(GOOS)/$(GOARCH)/$(BIN)
 
@@ -151,6 +163,11 @@ SKIP_TESTS ?=
 test: build-dirs
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/test.sh $(SRC_DIRS)'"
+endif
+
+test-local: build-dirs
+ifneq ($(SKIP_TESTS), 1)
+	hack/test.sh $(SRC_DIRS)
 endif
 
 verify:
