@@ -26,6 +26,9 @@ spec:
         component: ark
       annotations:
         iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<HEPTIO_ARK_ROLE_NAME>
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
     spec:
       restartPolicy: Always
       serviceAccountName: ark

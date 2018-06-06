@@ -35,6 +35,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -169,6 +170,7 @@ func TestProcessBackup(t *testing.T) {
 				logger,
 				pluginManager,
 				NewBackupTracker(),
+				metrics.NewServerMetrics(),
 			).(*backupController)
 
 			c.clock = clock.NewFakeClock(clockTime)

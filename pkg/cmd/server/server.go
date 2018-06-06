@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"reflect"
 	"strings"
@@ -56,6 +57,7 @@ import (
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
@@ -63,12 +65,19 @@ import (
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 	"github.com/heptio/ark/pkg/util/stringslice"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const (
+	// the port where prometheus metrics are exposed
+	defaultMetricsAddress = ":8085"
 )
 
 func NewCommand() *cobra.Command {
 	var (
-		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
-		pluginDir    = "/plugins"
+		logLevelFlag   = logging.LogLevelFlag(logrus.InfoLevel)
+		pluginDir      = "/plugins"
+		metricsAddress = defaultMetricsAddress
 	)
 
 	var command = &cobra.Command{
@@ -96,7 +105,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, metricsAddress, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -105,6 +114,7 @@ func NewCommand() *cobra.Command {
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&pluginDir, "plugin-dir", pluginDir, "directory containing Ark plugins")
+	command.Flags().StringVar(&metricsAddress, "metrics-address", metricsAddress, "the address to expose prometheus metrics")
 
 	return command
 }
@@ -125,6 +135,7 @@ func getServerNamespace(namespaceFlag *pflag.Flag) string {
 
 type server struct {
 	namespace             string
+	metricsAddress        string
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
@@ -139,9 +150,10 @@ type server struct {
 	logger                logrus.FieldLogger
 	pluginManager         plugin.Manager
 	resticManager         restic.RepositoryManager
+	metrics               *metrics.ServerMetrics
 }
 
-func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -166,6 +178,7 @@ func newServer(namespace, baseName, pluginDir string, logger *logrus.Logger) (*s
 
 	s := &server{
 		namespace:             namespace,
+		metricsAddress:        metricsAddr,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
 		arkClient:             arkClient,
@@ -501,6 +514,17 @@ func (s *server) runControllers(config *api.Config) error {
 		s.logger,
 	)
 
+	go func() {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		s.logger.Infof("Starting metric server at address [%s]", s.metricsAddress)
+		if err := http.ListenAndServe(s.metricsAddress, metricsMux); err != nil {
+			s.logger.Fatalf("Failed to start metric server at [%s]: %v", s.metricsAddress, err)
+		}
+	}()
+	s.metrics = metrics.NewServerMetrics()
+	s.metrics.RegisterAllMetrics()
+
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
 		s.backupService,
@@ -554,6 +578,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.logger,
 			s.pluginManager,
 			backupTracker,
+			s.metrics,
 		)
 		wg.Add(1)
 		go func() {

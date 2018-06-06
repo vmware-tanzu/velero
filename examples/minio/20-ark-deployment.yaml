@@ -24,6 +24,10 @@ spec:
     metadata:
       labels:
         component: ark
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8085"
+        prometheus.io/path: "/metrics"
     spec:
       restartPolicy: Always
       serviceAccountName: ark
