@@ -18,11 +18,11 @@ package restic
 
 import (
 	"crypto/rand"
-	"io/ioutil"
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/restic"
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -55,15 +55,22 @@ type InitRepositoryOptions struct {
 	KeyData   string
 	KeySize   int
 
+	fileSystem filesystem.Interface
 	kubeClient kclientset.Interface
 	keyBytes   []byte
 }
 
 func NewInitRepositoryOptions() *InitRepositoryOptions {
 	return &InitRepositoryOptions{
-		KeySize: 1024,
+		KeySize:    1024,
+		fileSystem: filesystem.NewFileSystem(),
 	}
 }
+
+var (
+	errKeyFileAndKeyDataProvided = errors.Errorf("only one of --key-file and --key-data may be specified")
+	errKeySizeTooSmall           = errors.Errorf("--key-size must be at least 1")
+)
 
 func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KeyFile, "key-file", o.KeyFile, "Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
@@ -73,27 +80,28 @@ func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 
 func (o *InitRepositoryOptions) Complete(f client.Factory) error {
 	if o.KeyFile != "" && o.KeyData != "" {
-		return errors.Errorf("only one of --key-file and --key-data may be specified")
+		return errKeyFileAndKeyDataProvided
 	}
 
 	if o.KeyFile == "" && o.KeyData == "" && o.KeySize < 1 {
-		return errors.Errorf("--key-size must be at least 1")
+		return errKeySizeTooSmall
 	}
 
 	o.Namespace = f.Namespace()
 
-	if o.KeyFile != "" {
-		data, err := ioutil.ReadFile(o.KeyFile)
+	switch {
+	case o.KeyFile != "":
+		data, err := o.fileSystem.ReadFile(o.KeyFile)
 		if err != nil {
 			return err
 		}
 		o.keyBytes = data
-	}
-
-	if len(o.KeyData) == 0 {
+	case o.KeyData != "":
+		o.keyBytes = []byte(o.KeyData)
+	case o.KeySize > 0:
 		o.keyBytes = make([]byte, o.KeySize)
 		// rand.Reader always returns a nil error
-		_, _ = rand.Read(o.keyBytes)
+		rand.Read(o.keyBytes)
 	}
 
 	return nil
