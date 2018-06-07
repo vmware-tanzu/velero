@@ -18,11 +18,11 @@ package restic
 
 import (
 	"crypto/rand"
-	"io/ioutil"
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/restic"
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -55,13 +55,15 @@ type InitRepositoryOptions struct {
 	KeyData   string
 	KeySize   int
 
+	fileSystem filesystem.Interface
 	kubeClient kclientset.Interface
 	keyBytes   []byte
 }
 
 func NewInitRepositoryOptions() *InitRepositoryOptions {
 	return &InitRepositoryOptions{
-		KeySize: 1024,
+		KeySize:    1024,
+		fileSystem: filesystem.NewFileSystem(),
 	}
 }
 
@@ -89,7 +91,7 @@ func (o *InitRepositoryOptions) Complete(f client.Factory) error {
 
 	switch {
 	case o.KeyFile != "":
-		data, err := ioutil.ReadFile(o.KeyFile)
+		data, err := o.fileSystem.ReadFile(o.KeyFile)
 		if err != nil {
 			return err
 		}

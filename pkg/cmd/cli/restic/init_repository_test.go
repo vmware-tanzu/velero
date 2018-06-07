@@ -10,6 +10,7 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 type fakeFactory struct{}
@@ -46,10 +47,14 @@ func TestComplete(t *testing.T) {
 	err = o.Complete(&fakeFactory{})
 	assert.EqualError(t, err, errKeyFileAndKeyDataProvided.Error())
 
-	// TODO test that if KeyFile is provided, the data is used
-	// (should move the pkg/restore/FileSystem interface to
-	// a common location and use it here so ioutil.ReadFile
-	// can be easily mocked)
+	// if KeyFile is provided, its contents are used
+	fileContents := []byte("bar")
+	o = &InitRepositoryOptions{
+		KeyFile:    "/foo",
+		fileSystem: arktest.NewFakeFileSystem().WithFile("/foo", fileContents),
+	}
+	assert.NoError(t, o.Complete(&fakeFactory{}))
+	assert.Equal(t, fileContents, o.keyBytes)
 
 	// if KeyData is provided, it's used
 	o = &InitRepositoryOptions{

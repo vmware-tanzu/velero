@@ -18,12 +18,9 @@ package restore
 
 import (
 	"encoding/json"
-	"io"
-	"os"
 	"testing"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -120,7 +117,7 @@ func TestPrioritizeResources(t *testing.T) {
 func TestRestoreNamespaceFiltering(t *testing.T) {
 	tests := []struct {
 		name                 string
-		fileSystem           *fakeFileSystem
+		fileSystem           *arktest.FakeFileSystem
 		baseDir              string
 		restore              *api.Restore
 		expectedReadDirs     []string
@@ -128,7 +125,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 	}{
 		{
 			name:             "namespacesToRestore having * restores all namespaces",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -139,7 +136,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:             "namespacesToRestore properly filters",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -150,7 +147,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:             "namespacesToRestore properly filters with exclusion filter",
-			fileSystem:       newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -161,7 +158,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:       "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem: newFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem: arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:    "bak",
 			restore: &api.Restore{
 				Spec: api.RestoreSpec{
@@ -197,7 +194,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 			assert.Empty(t, errors.Ark)
 			assert.Empty(t, errors.Cluster)
 			assert.Empty(t, errors.Namespaces)
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.readDirCalls)
+			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
 		})
 	}
 }
@@ -205,7 +202,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 func TestRestorePriority(t *testing.T) {
 	tests := []struct {
 		name                 string
-		fileSystem           *fakeFileSystem
+		fileSystem           *arktest.FakeFileSystem
 		restore              *api.Restore
 		baseDir              string
 		prioritizedResources []schema.GroupResource
@@ -214,7 +211,7 @@ func TestRestorePriority(t *testing.T) {
 	}{
 		{
 			name:       "cluster test",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
 			baseDir:    "bak",
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			prioritizedResources: []schema.GroupResource{
@@ -226,7 +223,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name:       "resource priorities are applied",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
@@ -238,7 +235,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name:       "basic namespace",
-			fileSystem: newFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
+			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
@@ -250,7 +247,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name: "error in a single resource doesn't terminate restore immediately, but is returned",
-			fileSystem: newFakeFileSystem().
+			fileSystem: arktest.NewFakeFileSystem().
 				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
 				WithDirectory("bak/resources/c/namespaces/ns-1"),
 			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
@@ -288,7 +285,7 @@ func TestRestorePriority(t *testing.T) {
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, test.expectedErrors, errors)
 
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.readDirCalls)
+			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
 		})
 	}
 }
@@ -299,7 +296,7 @@ func TestNamespaceRemapping(t *testing.T) {
 		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
 		prioritizedResources = []schema.GroupResource{{Resource: "namespaces"}, {Resource: "configmaps"}}
 		labelSelector        = labels.NewSelector()
-		fileSystem           = newFakeFileSystem().
+		fileSystem           = arktest.NewFakeFileSystem().
 					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
 					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
 		expectedNS   = "ns-2"
@@ -363,7 +360,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		resourcePath            string
 		labelSelector           labels.Selector
 		includeClusterResources *bool
-		fileSystem              *fakeFileSystem
+		fileSystem              *arktest.FakeFileSystem
 		actions                 []resolvedAction
 		expectedErrors          api.RestoreResult
 		expectedObjs            []unstructured.Unstructured
@@ -373,7 +370,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem: newFakeFileSystem().
+			fileSystem: arktest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedObjs: toUnstructured(
@@ -385,7 +382,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			name:         "no such directory causes error",
 			namespace:    "ns-1",
 			resourcePath: "configmaps",
-			fileSystem:   newFakeFileSystem(),
+			fileSystem:   arktest.NewFakeFileSystem(),
 			expectedErrors: api.RestoreResult{
 				Namespaces: map[string][]string{
 					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
@@ -396,14 +393,14 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			name:         "empty directory is no-op",
 			namespace:    "ns-1",
 			resourcePath: "configmaps",
-			fileSystem:   newFakeFileSystem().WithDirectory("configmaps"),
+			fileSystem:   arktest.NewFakeFileSystem().WithDirectory("configmaps"),
 		},
 		{
 			name:          "unmarshall failure does not cause immediate return",
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem: newFakeFileSystem().
+			fileSystem: arktest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedErrors: api.RestoreResult{
@@ -418,7 +415,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "bar"})),
-			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
+			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).WithArkLabel("my-restore").ConfigMap),
 		},
 		{
@@ -426,14 +423,14 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "not-bar"})),
-			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
+			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 		},
 		{
 			name:          "items with controller owner are skipped",
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem: newFakeFileSystem().
+			fileSystem: arktest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1.json", newTestConfigMap().WithControllerOwner().ToJSON()).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").WithArkLabel("my-restore").ConfigMap),
@@ -443,7 +440,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-2",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
+			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
 			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("my-restore").ConfigMap),
 		},
 		{
@@ -451,7 +448,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
 					ItemAction:                newFakeAction("configmaps"),
@@ -467,7 +464,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
 					ItemAction:                newFakeAction("foo-resource"),
@@ -484,7 +481,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: falsePtr,
-			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 		},
 		{
 			name:                    "namespaced resources are not skipped when IncludeClusterResources=false",
@@ -492,7 +489,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: falsePtr,
-			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
 		{
@@ -501,7 +498,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
-			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
 		},
 		{
@@ -510,7 +507,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
-			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
 		{
@@ -519,7 +516,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem:              newFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
 		},
 		{
@@ -528,7 +525,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem:              newFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
 		},
 	}
@@ -1208,68 +1205,6 @@ func (cm *testConfigMap) WithControllerOwner() *testConfigMap {
 func (cm *testConfigMap) ToJSON() []byte {
 	bytes, _ := json.Marshal(cm.ConfigMap)
 	return bytes
-}
-
-type fakeFileSystem struct {
-	fs afero.Fs
-
-	readDirCalls []string
-}
-
-func newFakeFileSystem() *fakeFileSystem {
-	return &fakeFileSystem{
-		fs: afero.NewMemMapFs(),
-	}
-}
-
-func (fs *fakeFileSystem) WithFile(path string, data []byte) *fakeFileSystem {
-	file, _ := fs.fs.Create(path)
-	file.Write(data)
-	file.Close()
-
-	return fs
-}
-
-func (fs *fakeFileSystem) WithDirectory(path string) *fakeFileSystem {
-	fs.fs.MkdirAll(path, 0755)
-	return fs
-}
-
-func (fs *fakeFileSystem) WithDirectories(path ...string) *fakeFileSystem {
-	for _, dir := range path {
-		fs = fs.WithDirectory(dir)
-	}
-
-	return fs
-}
-
-func (fs *fakeFileSystem) TempDir(dir, prefix string) (string, error) {
-	return afero.TempDir(fs.fs, dir, prefix)
-}
-
-func (fs *fakeFileSystem) MkdirAll(path string, perm os.FileMode) error {
-	return fs.fs.MkdirAll(path, perm)
-}
-
-func (fs *fakeFileSystem) Create(name string) (io.WriteCloser, error) {
-	return fs.fs.Create(name)
-}
-
-func (fs *fakeFileSystem) RemoveAll(path string) error {
-	return fs.fs.RemoveAll(path)
-}
-
-func (fs *fakeFileSystem) ReadDir(dirname string) ([]os.FileInfo, error) {
-	fs.readDirCalls = append(fs.readDirCalls, dirname)
-	return afero.ReadDir(fs.fs, dirname)
-}
-
-func (fs *fakeFileSystem) ReadFile(filename string) ([]byte, error) {
-	return afero.ReadFile(fs.fs, filename)
-}
-
-func (fs *fakeFileSystem) DirExists(path string) (bool, error) {
-	return afero.DirExists(fs.fs, path)
 }
 
 type fakeAction struct {
