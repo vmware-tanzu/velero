@@ -121,8 +121,6 @@ all-containers:
 
 container: verify test .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
-	@# TODO this is ugly
-	@cp restic/complete-restore.sh _output/
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
 	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
 	@docker images -q $(IMAGE):$(VERSION) > $@
