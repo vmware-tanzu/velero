@@ -65,6 +65,11 @@ func NewInitRepositoryOptions() *InitRepositoryOptions {
 	}
 }
 
+var (
+	errKeyFileAndKeyDataProvided = errors.Errorf("only one of --key-file and --key-data may be specified")
+	errKeySizeTooSmall           = errors.Errorf("--key-size must be at least 1")
+)
+
 func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KeyFile, "key-file", o.KeyFile, "Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
 	flags.StringVar(&o.KeyData, "key-data", o.KeyData, "Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
@@ -73,27 +78,28 @@ func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 
 func (o *InitRepositoryOptions) Complete(f client.Factory) error {
 	if o.KeyFile != "" && o.KeyData != "" {
-		return errors.Errorf("only one of --key-file and --key-data may be specified")
+		return errKeyFileAndKeyDataProvided
 	}
 
 	if o.KeyFile == "" && o.KeyData == "" && o.KeySize < 1 {
-		return errors.Errorf("--key-size must be at least 1")
+		return errKeySizeTooSmall
 	}
 
 	o.Namespace = f.Namespace()
 
-	if o.KeyFile != "" {
+	switch {
+	case o.KeyFile != "":
 		data, err := ioutil.ReadFile(o.KeyFile)
 		if err != nil {
 			return err
 		}
 		o.keyBytes = data
-	}
-
-	if len(o.KeyData) == 0 {
+	case o.KeyData != "":
+		o.keyBytes = []byte(o.KeyData)
+	case o.KeySize > 0:
 		o.keyBytes = make([]byte, o.KeySize)
 		// rand.Reader always returns a nil error
-		_, _ = rand.Read(o.keyBytes)
+		rand.Read(o.keyBytes)
 	}
 
 	return nil
