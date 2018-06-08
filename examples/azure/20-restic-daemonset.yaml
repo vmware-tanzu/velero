@@ -39,7 +39,8 @@ spec:
           command:
             - /ark
           args:
-            - daemonset
+            - restic 
+            - server
           volumeMounts:
             - name: host-pods
               mountPath: /host_pods
