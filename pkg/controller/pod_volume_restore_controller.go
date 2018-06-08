@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -329,8 +330,13 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	// giving errors about renames not being allowed across filesystem layers in a container. This is occurring
 	// whether /restores is part of the writeable container layer, or is an emptyDir volume mount. This may
 	// be solvable but using the shell works so not investigating further.
-	if _, stderr, err := runCommand(exec.Command("/bin/sh", "-c", fmt.Sprintf("mv %s/* %s/", restorePath, volumePath))); err != nil {
-		return errors.Wrapf(err, "error moving contents of restore staging directory into volume, stderr=%s", stderr)
+	//
+	// Glob patterns:
+	// 	[^.]*  : any non-dot character followed by anything (regular files)
+	// 	.[^.]* : a dot followed by a non-dot and anything else (dotfiles starting with a single dot, excluding '.')
+	// 	..?*   : two dots followed by any single character and anything else (dotfiles starting with two dots, excluding '..')
+	if err := moveMatchingFiles(restorePath, volumePath, "[^.]*", ".[^.]*", "..?*"); err != nil {
+		return errors.Wrapf(err, "error moving files from restore staging directory into volume")
 	}
 
 	// The staging directory should be empty at this point since we moved everything, but
@@ -360,6 +366,38 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	// for this file to exist in each restored volume before completing.
 	if err := ioutil.WriteFile(filepath.Join(volumePath, ".ark", string(restoreUID)), nil, 0644); err != nil {
 		return errors.Wrap(err, "error writing done file")
+	}
+
+	return nil
+}
+
+func moveMatchingFiles(sourceDir, destinationDir string, patterns ...string) error {
+	// find the patterns that match at least one file
+	var matchingPatterns []string
+
+	for _, pattern := range patterns {
+		fullPattern := fmt.Sprintf("%s/%s", sourceDir, pattern)
+		files, err := filepath.Glob(fullPattern)
+		if err != nil {
+			return errors.Wrapf(err, "error finding matches for pattern %s", pattern)
+		}
+
+		if len(files) > 0 {
+			matchingPatterns = append(matchingPatterns, fullPattern)
+		}
+	}
+
+	// if no patterns matched any files, we're done
+	if len(matchingPatterns) == 0 {
+		return nil
+	}
+
+	// we only use patterns that matched 1+ file(s) because mv returns an error on a pattern
+	// that doesn't match anything.
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("mv %s %s", strings.Join(matchingPatterns, " "), destinationDir+"/"))
+
+	if _, stderr, err := runCommand(cmd); err != nil {
+		return errors.Wrapf(err, "error moving files from restore staging directory into volume, stderr=%s", stderr)
 	}
 
 	return nil
