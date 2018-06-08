@@ -155,6 +155,10 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return nil
 	}
 
+	if metadata.GetDeletionTimestamp() != nil {
+		log.Info("Skipping item because it's being deleted.")
+		return nil
+	}
 	key := itemKey{
 		resource:  groupResource.String(),
 		namespace: namespace,
