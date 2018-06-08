@@ -191,3 +191,7 @@ func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName,
 		},
 	}
 }
+
+func errorOnly(_ interface{}, err error) error {
+	return err
+}

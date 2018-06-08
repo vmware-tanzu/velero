@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -34,6 +33,7 @@ import (
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	arkv1informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	arkexec "github.com/heptio/ark/pkg/util/exec"
 )
 
 // RepositoryManager executes commands against restic repositories.
@@ -163,7 +163,7 @@ func (rm *repositoryManager) InitRepo(name string) error {
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	return errorOnly(rm.exec(InitCommand(rm.repoPrefix, name)))
+	return rm.exec(InitCommand(rm.repoPrefix, name))
 }
 
 func (rm *repositoryManager) CheckRepo(name string) error {
@@ -172,7 +172,7 @@ func (rm *repositoryManager) CheckRepo(name string) error {
 
 	cmd := CheckCommand(rm.repoPrefix, name)
 
-	return errorOnly(rm.exec(cmd))
+	return rm.exec(cmd)
 }
 
 func (rm *repositoryManager) PruneRepo(name string) error {
@@ -181,7 +181,7 @@ func (rm *repositoryManager) PruneRepo(name string) error {
 
 	cmd := PruneCommand(rm.repoPrefix, name)
 
-	return errorOnly(rm.exec(cmd))
+	return rm.exec(cmd)
 }
 
 func (rm *repositoryManager) Forget(snapshot SnapshotIdentifier) error {
@@ -190,31 +190,29 @@ func (rm *repositoryManager) Forget(snapshot SnapshotIdentifier) error {
 
 	cmd := ForgetCommand(rm.repoPrefix, snapshot.Repo, snapshot.SnapshotID)
 
-	return errorOnly(rm.exec(cmd))
+	return rm.exec(cmd)
 }
 
-func (rm *repositoryManager) exec(cmd *Command) ([]byte, error) {
+func (rm *repositoryManager) exec(cmd *Command) error {
 	file, err := TempCredentialsFile(rm.secretsLister, cmd.Repo)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// ignore error since there's nothing we can do and it's a temp file.
 	defer os.Remove(file)
 
 	cmd.PasswordFile = file
 
-	output, err := cmd.Cmd().Output()
-	rm.log.WithField("repository", cmd.Repo).Debugf("Ran restic command=%q, output=%s", cmd.String(), output)
+	stdout, stderr, err := arkexec.RunCommand(cmd.Cmd())
+	rm.log.WithFields(logrus.Fields{
+		"repository": cmd.Repo,
+		"command":    cmd.String(),
+		"stdout":     stdout,
+		"stderr":     stderr,
+	}).Debugf("Ran restic command")
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, errors.Wrapf(err, "error running command, stderr=%s", exitErr.Stderr)
-		}
-		return nil, errors.Wrap(err, "error running command")
+		return errors.Wrapf(err, "error running command=%s, stdout=%s, stderr=%s", cmd.String(), stdout, stderr)
 	}
 
-	return output, nil
-}
-
-func errorOnly(_ interface{}, err error) error {
-	return err
+	return nil
 }
