@@ -339,10 +339,11 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 		return errors.Wrapf(err, "error moving files from restore staging directory into volume")
 	}
 
-	// The staging directory should be empty at this point since we moved everything, but
-	// make sure.
+	// Remove staging directory (which should be empty at this point) from daemonset pod.
+	// Don't fail the restore if this returns an error, since the actual directory content
+	// has already successfully been moved into the pod volume.
 	if err := os.RemoveAll(restorePath); err != nil {
-		return errors.Wrap(err, "error removing restore staging directory and its contents")
+		log.WithError(err).Warnf("error removing staging directory %s for pod volume restore %s/%s", restorePath, req.Namespace, req.Name)
 	}
 
 	var restoreUID types.UID
