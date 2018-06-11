@@ -65,8 +65,11 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 	log.Info("Restic snapshot ID annotations found")
 
 	initContainer := corev1.Container{
-		Name:  restic.InitContainer,
-		Image: "gcr.io/heptio-images/restic-init-container:latest",
+		Name: restic.InitContainer,
+		// TODO don't hardcode the tag as "latest". We should probably be defaulting
+		// to a tag that matches the Ark binary version, and possibly allowing it to
+		// be overriden via cmd-line flag to Ark.
+		Image: "gcr.io/heptio-images/ark-restic-restore-helper:latest",
 		Args:  []string{string(restore.UID)},
 		Env: []corev1.EnvVar{
 			{
