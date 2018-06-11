@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -25,18 +27,31 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type resticRestoreAction struct {
-	logger logrus.FieldLogger
+	logger             logrus.FieldLogger
+	initContainerImage string
 }
 
 func NewResticRestoreAction(logger logrus.FieldLogger) ItemAction {
 	return &resticRestoreAction{
-		logger: logger,
+		logger:             logger,
+		initContainerImage: initContainerImage(),
 	}
+}
+
+func initContainerImage() string {
+	tag := buildinfo.Version
+	if tag == "" {
+		tag = "latest"
+	}
+
+	// TODO allow full image URL to be overriden via CLI flag.
+	return fmt.Sprintf("gcr.io/heptio-images/ark-restic-restore-helper:%s", tag)
 }
 
 func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {
@@ -66,7 +81,7 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 
 	initContainer := corev1.Container{
 		Name:  restic.InitContainer,
-		Image: "gcr.io/heptio-images/restic-init-container:latest",
+		Image: a.initContainerImage,
 		Args:  []string{string(restore.UID)},
 		Env: []corev1.EnvVar{
 			{

@@ -60,7 +60,7 @@ IMAGE := $(REGISTRY)/$(BIN)
 # If you want to build AND push all containers, see the 'all-push' rule.
 all: 
 	@$(MAKE) build
-	@$(MAKE) build BIN=restic-init-container
+	@$(MAKE) build BIN=ark-restic-restore-helper
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
@@ -117,7 +117,7 @@ DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
 all-containers:
 	$(MAKE) container
-	$(MAKE) container BIN=restic-init-container
+	$(MAKE) container BIN=ark-restic-restore-helper
 
 container: verify test .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
@@ -130,7 +130,7 @@ container-name:
 
 all-push:
 	$(MAKE) push
-	$(MAKE) push BIN=restic-init-container
+	$(MAKE) push BIN=ark-restic-restore-helper
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)

@@ -16,8 +16,8 @@ FROM alpine:3.7
 
 MAINTAINER Steve Kriss <steve@heptio.com>
 
-ADD /bin/linux/amd64/restic-init-container .
+ADD /bin/linux/amd64/ark-restic-restore-helper .
 
 USER nobody:nobody
 
-ENTRYPOINT [ "/restic-init-container" ]
+ENTRYPOINT [ "/ark-restic-restore-helper" ]
