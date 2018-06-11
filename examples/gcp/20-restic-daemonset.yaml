@@ -42,7 +42,8 @@ spec:
           command:
             - /ark
           args:
-            - daemonset
+            - restic 
+            - server
           volumeMounts:
             - name: cloud-credentials
               mountPath: /credentials

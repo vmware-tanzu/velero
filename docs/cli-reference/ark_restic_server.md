@@ -1,20 +1,20 @@
-## ark daemonset
+## ark restic server
 
-Run the ark daemonset
+Run the ark restic server
 
 ### Synopsis
 
 
-Run the ark daemonset
+Run the ark restic server
 
 ```
-ark daemonset [flags]
+ark restic server [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help        help for daemonset
+  -h, --help        help for server
       --log-level   the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
 ```
 
@@ -34,5 +34,5 @@ ark daemonset [flags]
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
+* [ark restic](ark_restic.md)	 - Work with restic repositories
 

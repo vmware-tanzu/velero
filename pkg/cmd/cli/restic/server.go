@@ -1,4 +1,4 @@
-package daemonset
+package restic
 
 import (
 	"context"
@@ -27,21 +27,21 @@ import (
 	"github.com/heptio/ark/pkg/util/logging"
 )
 
-func NewCommand(f client.Factory) *cobra.Command {
+func NewServerCommand(f client.Factory) *cobra.Command {
 	var logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
 
 	var command = &cobra.Command{
-		Use:   "daemonset",
-		Short: "Run the ark daemonset",
-		Long:  "Run the ark daemonset",
+		Use:   "server",
+		Short: "Run the ark restic server",
+		Long:  "Run the ark restic server",
 		Run: func(c *cobra.Command, args []string) {
 			logLevel := logLevelFlag.Parse()
-			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
+			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := logging.DefaultLogger(logLevel)
-			logger.Infof("Starting Ark restic daemonset %s", buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Ark restic server %s", buildinfo.FormattedGitSHA())
 
-			s, err := newDaemonServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			cmd.CheckError(err)
 
 			s.run()
@@ -53,7 +53,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	return command
 }
 
-type daemonServer struct {
+type resticServer struct {
 	kubeClient          kubernetes.Interface
 	arkClient           clientset.Interface
 	arkInformerFactory  informers.SharedInformerFactory
@@ -64,7 +64,7 @@ type daemonServer struct {
 	cancelFunc          context.CancelFunc
 }
 
-func newDaemonServer(logger logrus.FieldLogger, baseName string) (*daemonServer, error) {
+func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ func newDaemonServer(logger logrus.FieldLogger, baseName string) (*daemonServer,
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	return &daemonServer{
+	return &resticServer{
 		kubeClient:          kubeClient,
 		arkClient:           arkClient,
 		arkInformerFactory:  informers.NewFilteredSharedInformerFactory(arkClient, 0, os.Getenv("HEPTIO_ARK_NAMESPACE"), nil),
@@ -106,7 +106,7 @@ func newDaemonServer(logger logrus.FieldLogger, baseName string) (*daemonServer,
 	}, nil
 }
 
-func (s *daemonServer) run() {
+func (s *resticServer) run() {
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
 	s.logger.Info("Starting controllers")
