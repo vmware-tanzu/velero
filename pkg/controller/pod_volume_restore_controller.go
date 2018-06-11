@@ -19,8 +19,10 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -250,39 +252,99 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	pod, err := c.podLister.Pods(req.Spec.Pod.Namespace).Get(req.Spec.Pod.Name)
 	if err != nil {
 		log.WithError(err).Errorf("Error getting pod %s/%s", req.Spec.Pod.Namespace, req.Spec.Pod.Name)
-		return c.fail(req, errors.Wrap(err, "error getting pod").Error(), log)
+		return c.failRestore(req, errors.Wrap(err, "error getting pod").Error(), log)
 	}
 
 	volumeDir, err := kube.GetVolumeDirectory(pod, req.Spec.Volume, c.pvcLister)
 	if err != nil {
 		log.WithError(err).Error("Error getting volume directory name")
-		return c.fail(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
+		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	// temp creds
-	file, err := restic.TempCredentialsFile(c.secretLister, req.Spec.Pod.Namespace)
+	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Spec.Pod.Namespace)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
-		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
+		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
 	}
 	// ignore error since there's nothing we can do and it's a temp file.
-	defer os.Remove(file)
+	defer os.Remove(credsFile)
 
+	// execute the restore process
+	if err := restorePodVolume(req, credsFile, volumeDir, log); err != nil {
+		log.WithError(err).Error("Error restoring volume")
+		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
+	}
+
+	// update status to Completed
+	if _, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(arkv1api.PodVolumeRestorePhaseCompleted)); err != nil {
+		log.WithError(err).Error("Error setting phase to Completed")
+		return err
+	}
+
+	return nil
+}
+
+func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
 	resticCmd := restic.RestoreCommand(
 		req.Spec.RepoPrefix,
 		req.Spec.Pod.Namespace,
-		file,
+		credsFile,
 		string(req.Spec.Pod.UID),
 		req.Spec.SnapshotID,
 	)
 
-	var stdout, stderr string
+	var (
+		stdout, stderr string
+		err            error
+	)
 
+	// First restore the backed-up volume into a staging area, under /restores. This is necessary because restic backups
+	// are stored with the absolute path of the backed-up directory, and restic doesn't allow you to adjust this path
+	// when restoring, only to choose a different parent directory. So, for example, if you backup /foo/bar/volume, when
+	// restoring, you can't restore to /baz/volume. You may restore to /baz/foo/bar/volume, though. The net result of
+	// all this is that we can't restore directly into the new volume's directory, because the path is entirely different
+	// than the backed-up one.
 	if stdout, stderr, err = runCommand(resticCmd.Cmd()); err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-		return c.fail(req, fmt.Sprintf("error running restic restore, stderr=%s: %s", stderr, err.Error()), log)
+		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+
+	// Now, get the full path of the restored volume in the staging directory, which will
+	// look like:
+	// 		/restores/<new-pod-uid>/host_pods/<backed-up-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
+	restorePath, err := singlePathMatch(fmt.Sprintf("/restores/%s/host_pods/*/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
+	if err != nil {
+		return errors.Wrap(err, "error identifying path of restore staging directory")
+	}
+
+	// Also get the full path of the new volume's directory (as mounted in the daemonset pod), which
+	// will look like:
+	// 		/host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
+	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
+	if err != nil {
+		return errors.Wrap(err, "error identifying path of volume")
+	}
+
+	// Move the contents of the staging directory into the new volume directory to finalize the restore. This
+	// is being executed through a shell because attempting to do the same thing in go (via os.Rename()) is
+	// giving errors about renames not being allowed across filesystem layers in a container. This is occurring
+	// whether /restores is part of the writeable container layer, or is an emptyDir volume mount. This may
+	// be solvable but using the shell works so not investigating further.
+	//
+	// Glob patterns:
+	// 	[^.]*  : any non-dot character followed by anything (regular files)
+	// 	.[^.]* : a dot followed by a non-dot and anything else (dotfiles starting with a single dot, excluding '.')
+	// 	..?*   : two dots followed by any single character and anything else (dotfiles starting with two dots, excluding '..')
+	if err := moveMatchingFiles(restorePath, volumePath, "[^.]*", ".[^.]*", "..?*"); err != nil {
+		return errors.Wrapf(err, "error moving files from restore staging directory into volume")
+	}
+
+	// Remove staging directory (which should be empty at this point) from daemonset pod.
+	// Don't fail the restore if this returns an error, since the actual directory content
+	// has already successfully been moved into the pod volume.
+	if err := os.RemoveAll(restorePath); err != nil {
+		log.WithError(err).Warnf("error removing staging directory %s for pod volume restore %s/%s", restorePath, req.Namespace, req.Name)
+	}
 
 	var restoreUID types.UID
 	for _, owner := range req.OwnerReferences {
@@ -292,18 +354,51 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 		}
 	}
 
-	cmd := exec.Command("/bin/sh", "-c", strings.Join([]string{"/complete-restore.sh", string(req.Spec.Pod.UID), volumeDir, string(restoreUID)}, " "))
-
-	if stdout, stderr, err = runCommand(cmd); err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-		return c.fail(req, fmt.Sprintf("error running restic restore, stderr=%s: %s", stderr, err.Error()), log)
+	// Create the .ark directory within the volume dir so we can write a done file
+	// for this restore.
+	if err := os.MkdirAll(filepath.Join(volumePath, ".ark"), 0755); err != nil {
+		return errors.Wrap(err, "error creating .ark directory for done file")
 	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
-	// update status to Completed
-	if _, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(arkv1api.PodVolumeRestorePhaseCompleted)); err != nil {
-		log.WithError(err).Error("Error setting phase to Completed")
-		return err
+	// TODO remove any done files from previous ark restores from .ark
+
+	// Write a done file with name=<restore-uid> into the just-created .ark dir
+	// within the volume. The ark restic init container on the pod is waiting
+	// for this file to exist in each restored volume before completing.
+	if err := ioutil.WriteFile(filepath.Join(volumePath, ".ark", string(restoreUID)), nil, 0644); err != nil {
+		return errors.Wrap(err, "error writing done file")
+	}
+
+	return nil
+}
+
+func moveMatchingFiles(sourceDir, destinationDir string, patterns ...string) error {
+	// find the patterns that match at least one file
+	var matchingPatterns []string
+
+	for _, pattern := range patterns {
+		fullPattern := fmt.Sprintf("%s/%s", sourceDir, pattern)
+		files, err := filepath.Glob(fullPattern)
+		if err != nil {
+			return errors.Wrapf(err, "error finding matches for pattern %s", pattern)
+		}
+
+		if len(files) > 0 {
+			matchingPatterns = append(matchingPatterns, fullPattern)
+		}
+	}
+
+	// if no patterns matched any files, we're done
+	if len(matchingPatterns) == 0 {
+		return nil
+	}
+
+	// we only use patterns that matched 1+ file(s) because mv returns an error on a pattern
+	// that doesn't match anything.
+	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("mv %s %s", strings.Join(matchingPatterns, " "), destinationDir+"/"))
+
+	if _, stderr, err := runCommand(cmd); err != nil {
+		return errors.Wrapf(err, "error moving files from restore staging directory into volume, stderr=%s", stderr)
 	}
 
 	return nil
@@ -338,7 +433,7 @@ func (c *podVolumeRestoreController) patchPodVolumeRestore(req *arkv1api.PodVolu
 	return req, nil
 }
 
-func (c *podVolumeRestoreController) fail(req *arkv1api.PodVolumeRestore, msg string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) failRestore(req *arkv1api.PodVolumeRestore, msg string, log logrus.FieldLogger) error {
 	if _, err := c.patchPodVolumeRestore(req, func(pvr *arkv1api.PodVolumeRestore) {
 		pvr.Status.Phase = arkv1api.PodVolumeRestorePhaseFailed
 		pvr.Status.Message = msg

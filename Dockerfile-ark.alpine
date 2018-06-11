@@ -26,8 +26,6 @@ RUN apk add --update --no-cache bzip2 && \
 
 ADD /bin/linux/amd64/ark /ark
 
-ADD /complete-restore.sh /complete-restore.sh
-
 USER nobody:nobody
 
 ENTRYPOINT ["/ark"]
