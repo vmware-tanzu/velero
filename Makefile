@@ -28,6 +28,8 @@ ARCH ?= linux-amd64
 
 VERSION ?= master
 
+TAG_LATEST ?= false
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -132,11 +134,11 @@ all-push:
 	$(MAKE) push
 	$(MAKE) push BIN=restic-init-container
 
+
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
 	@docker push $(IMAGE):$(VERSION)
-	@if git describe --tags --exact-match >/dev/null 2>&1; \
-	then \
+	@if [[ "$(TAG_LATEST)" == "true" ]]; then \
 		docker tag $(IMAGE):$(VERSION) $(IMAGE):latest; \
 		docker push $(IMAGE):latest; \
 	fi
