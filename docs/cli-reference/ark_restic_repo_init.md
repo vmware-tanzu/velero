@@ -1,4 +1,4 @@
-## ark restic init-repository
+## ark restic repo init
 
 initialize a restic repository for a specified namespace
 
@@ -8,13 +8,13 @@ initialize a restic repository for a specified namespace
 initialize a restic repository for a specified namespace
 
 ```
-ark restic init-repository NAMESPACE [flags]
+ark restic repo init NAMESPACE [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help              help for init-repository
+  -h, --help              help for init
       --key-data string   Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
       --key-file string   Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
       --key-size int      Size of the generated key for the restic repository (default 1024)
@@ -36,5 +36,5 @@ ark restic init-repository NAMESPACE [flags]
 ```
 
 ### SEE ALSO
-* [ark restic](ark_restic.md)	 - Work with restic repositories
+* [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 

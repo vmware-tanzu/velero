@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repo
 
 import (
 	"crypto/rand"
@@ -34,11 +34,11 @@ import (
 	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
-func NewInitRepositoryCommand(f client.Factory) *cobra.Command {
+func NewInitCommand(f client.Factory) *cobra.Command {
 	o := NewInitRepositoryOptions()
 
 	c := &cobra.Command{
-		Use:   "init-repository NAMESPACE",
+		Use:   "init NAMESPACE",
 		Short: "initialize a restic repository for a specified namespace",
 		Long:  "initialize a restic repository for a specified namespace",
 		Args:  cobra.ExactArgs(1),

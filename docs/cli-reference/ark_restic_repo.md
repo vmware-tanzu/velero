@@ -1,21 +1,16 @@
-## ark restic server
+## ark restic repo
 
-Run the ark restic server
+Work with restic repositories
 
 ### Synopsis
 
 
-Run the ark restic server
-
-```
-ark restic server [flags]
-```
+Work with restic repositories
 
 ### Options
 
 ```
-  -h, --help        help for server
-      --log-level   the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
+  -h, --help   help for repo
 ```
 
 ### Options inherited from parent commands
@@ -35,4 +30,6 @@ ark restic server [flags]
 
 ### SEE ALSO
 * [ark restic](ark_restic.md)	 - Work with restic
+* [ark restic repo get](ark_restic_repo_get.md)	 - Get restic repositories
+* [ark restic repo init](ark_restic_repo_init.md)	 - initialize a restic repository for a specified namespace
 
