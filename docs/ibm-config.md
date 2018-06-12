@@ -3,7 +3,7 @@ You can deploy Ark on IBM [Public][5] or [Private][4] clouds, or even on any oth
 
 To set up IBM Cloud Object Storage (COS) as Ark's destination, you:
 
-* Create your COS instance 
+* Create your COS instance
 * Create an S3 bucket
 * Define a service that can store data in the bucket
 * Configure and start the Ark server
@@ -15,8 +15,8 @@ If you don’t have a COS instance, you can create a new one, according to the d
 ## Create an S3 bucket
 Heptio Ark requires an object storage bucket to store backups in. See instructions in [Create some buckets to store your data][2].
 
-## Define a service that can store data in the bucket. 
-The process of creating service credentials is described in [Service credentials][3]. 
+## Define a service that can store data in the bucket.
+The process of creating service credentials is described in [Service credentials][3].
 Several comments:
 
 1. The Ark service will write its backup into the bucket, so it requires the “Writer” access role.
