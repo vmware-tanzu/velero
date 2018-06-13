@@ -19,7 +19,7 @@ minor differences to account for the fact that a new pod/volume is being created
 
 This setup guide assumes you already have a working Ark v0.8.1+ installation. If not, go [here][2] for instructions.
 
-1. Download an updated Ark client from the [v0.9.0-alpha.1 release][3], and move it to a location within your PATH.
+1. Download an updated Ark client from the [latest release][3], and move it to a location within your PATH.
 
 1. From the Ark root directory, run the following to create new custom resource definitions:
     ```bash
@@ -33,10 +33,10 @@ This setup guide assumes you already have a working Ark v0.8.1+ installation. If
     - GCP: `kubectl apply -f examples/gcp/20-restic-daemonset.yaml`
     - Minio: `kubectl apply -f examples/minio/30-restic-daemonset.yaml`
 
-1. Use the `v0.9.0-alpha.1` image tag for both the Ark deployment and daemonset:
+1. Update the image tag on the Ark daemonset and deployment to match the release version you used in Step 1 (e.g. `v0.9.0-alpha.2`):
     ```bash
-    kubectl -n heptio-ark set image deployment/ark ark=gcr.io/heptio-images/ark:v0.9.0-alpha.1
-    kubectl -n heptio-ark set image daemonset/restic ark=gcr.io/heptio-images/ark:v0.9.0-alpha.1
+    kubectl -n heptio-ark set image deployment/ark ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
+    kubectl -n heptio-ark set image daemonset/restic ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
     ```
 
 1. Create a new bucket for restic to store its data in, and give the `heptio-ark` IAM user access to it, similarly to
@@ -92,4 +92,4 @@ one of the following commands:
 
 [1]: https://github.com/restic/restic
 [2]: https://heptio.github.io/ark/v0.8.1/cloud-common
-[3]: https://github.com/heptio/ark/releases/tag/v0.9.0-alpha.1
+[3]: https://github.com/heptio/ark/releases/
