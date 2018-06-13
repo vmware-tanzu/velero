@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -325,18 +324,13 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
-	// Move the contents of the staging directory into the new volume directory to finalize the restore. This
-	// is being executed through a shell because attempting to do the same thing in go (via os.Rename()) is
-	// giving errors about renames not being allowed across filesystem layers in a container. This is occurring
-	// whether /restores is part of the writeable container layer, or is an emptyDir volume mount. This may
-	// be solvable but using the shell works so not investigating further.
-	//
-	// Glob patterns:
-	// 	[^.]*  : any non-dot character followed by anything (regular files)
-	// 	.[^.]* : a dot followed by a non-dot and anything else (dotfiles starting with a single dot, excluding '.')
-	// 	..?*   : two dots followed by any single character and anything else (dotfiles starting with two dots, excluding '..')
-	if err := moveMatchingFiles(restorePath, volumePath, "[^.]*", ".[^.]*", "..?*"); err != nil {
-		return errors.Wrapf(err, "error moving files from restore staging directory into volume")
+	// Move the contents of the staging directory into the new volume directory to finalize the restore. Trailing
+	// slashes are needed so the *contents* of restorePath/ are moved into volumePath/. --delete removes files/dirs
+	// in the destination that aren't in source, and --archive copies recursively while retaining perms, owners,
+	// timestamps, symlinks.
+	cmd := exec.Command("rsync", "--delete", "--archive", restorePath+"/", volumePath+"/")
+	if _, stderr, err := runCommand(cmd); err != nil {
+		return errors.Wrapf(err, "error moving files from restore staging directory into volume, stderr=%s", stderr)
 	}
 
 	// Remove staging directory (which should be empty at this point) from daemonset pod.
@@ -367,38 +361,6 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	// for this file to exist in each restored volume before completing.
 	if err := ioutil.WriteFile(filepath.Join(volumePath, ".ark", string(restoreUID)), nil, 0644); err != nil {
 		return errors.Wrap(err, "error writing done file")
-	}
-
-	return nil
-}
-
-func moveMatchingFiles(sourceDir, destinationDir string, patterns ...string) error {
-	// find the patterns that match at least one file
-	var matchingPatterns []string
-
-	for _, pattern := range patterns {
-		fullPattern := fmt.Sprintf("%s/%s", sourceDir, pattern)
-		files, err := filepath.Glob(fullPattern)
-		if err != nil {
-			return errors.Wrapf(err, "error finding matches for pattern %s", pattern)
-		}
-
-		if len(files) > 0 {
-			matchingPatterns = append(matchingPatterns, fullPattern)
-		}
-	}
-
-	// if no patterns matched any files, we're done
-	if len(matchingPatterns) == 0 {
-		return nil
-	}
-
-	// we only use patterns that matched 1+ file(s) because mv returns an error on a pattern
-	// that doesn't match anything.
-	cmd := exec.Command("/bin/sh", "-c", fmt.Sprintf("mv %s %s", strings.Join(matchingPatterns, " "), destinationDir+"/"))
-
-	if _, stderr, err := runCommand(cmd); err != nil {
-		return errors.Wrapf(err, "error moving files from restore staging directory into volume, stderr=%s", stderr)
 	}
 
 	return nil
