@@ -81,7 +81,8 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 		Spec: appsv1beta1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels(),
+					Labels:      labels(),
+					Annotations: podAnnotations(),
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,

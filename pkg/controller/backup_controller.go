@@ -45,6 +45,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
@@ -67,6 +68,7 @@ type backupController struct {
 	logger           logrus.FieldLogger
 	pluginManager    plugin.Manager
 	backupTracker    BackupTracker
+	metrics          *metrics.ServerMetrics
 }
 
 func NewBackupController(
@@ -79,6 +81,7 @@ func NewBackupController(
 	logger logrus.FieldLogger,
 	pluginManager plugin.Manager,
 	backupTracker BackupTracker,
+	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupController{
 		backupper:        backupper,
@@ -93,6 +96,7 @@ func NewBackupController(
 		logger:           logger,
 		pluginManager:    pluginManager,
 		backupTracker:    backupTracker,
+		metrics:          metrics,
 	}
 
 	c.syncHandler = c.processBackup
@@ -269,9 +273,15 @@ func (controller *backupController) processBackup(key string) error {
 
 	logContext.Debug("Running backup")
 	// execution & upload of backup
+	backupScheduleName := backup.GetLabels()["ark-schedule"]
+	controller.metrics.RegisterBackupAttempt(backupScheduleName)
+
 	if err := controller.runBackup(backup, controller.bucket); err != nil {
 		logContext.WithError(err).Error("backup failed")
 		backup.Status.Phase = api.BackupPhaseFailed
+		controller.metrics.RegisterBackupFailed(backupScheduleName)
+	} else {
+		controller.metrics.RegisterBackupSuccess(backupScheduleName)
 	}
 
 	logContext.Debug("Updating backup's final status")
@@ -348,7 +358,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 
 	var errs []error
 
-	var backupJsonToUpload, backupFileToUpload io.Reader
+	var backupJSONToUpload, backupFileToUpload io.Reader
 
 	// Do the actual backup
 	if err := controller.backupper.Backup(backup, backupFile, logFile, actions); err != nil {
@@ -359,18 +369,28 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		backup.Status.Phase = api.BackupPhaseCompleted
 	}
 
-	backupJson := new(bytes.Buffer)
-	if err := encode.EncodeTo(backup, "json", backupJson); err != nil {
+	backupJSON := new(bytes.Buffer)
+	if err := encode.EncodeTo(backup, "json", backupJSON); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding backup"))
 	} else {
 		// Only upload the json and backup tarball if encoding to json succeeded.
-		backupJsonToUpload = backupJson
+		backupJSONToUpload = backupJSON
 		backupFileToUpload = backupFile
 	}
 
-	if err := controller.backupService.UploadBackup(bucket, backup.Name, backupJsonToUpload, backupFileToUpload, logFile); err != nil {
+	var backupSizeBytes int64
+	if backupFileStat, err := backupFile.Stat(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error getting file info"))
+	} else {
+		backupSizeBytes = backupFileStat.Size()
+	}
+
+	if err := controller.backupService.UploadBackup(bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
+
+	backupScheduleName := backup.GetLabels()["ark-schedule"]
+	controller.metrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
 
 	log.Info("Backup completed")
 

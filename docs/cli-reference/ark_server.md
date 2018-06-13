@@ -14,9 +14,10 @@ ark server [flags]
 ### Options
 
 ```
-  -h, --help                help for server
-      --log-level           the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
-      --plugin-dir string   directory containing Ark plugins (default "/plugins")
+  -h, --help                     help for server
+      --log-level                the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
+      --metrics-address string   the address to expose prometheus metrics (default ":8085")
+      --plugin-dir string        directory containing Ark plugins (default "/plugins")
 ```
 
 ### Options inherited from parent commands

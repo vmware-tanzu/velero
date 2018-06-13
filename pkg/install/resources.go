@@ -28,6 +28,14 @@ func labels() map[string]string {
 	}
 }
 
+func podAnnotations() map[string]string {
+	return map[string]string{
+		"prometheus.io/scrape": "true",
+		"prometheus.io/port":   "8085",
+		"prometheus.io/path":   "/metrics",
+	}
+}
+
 func objectMeta(namespace, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,
