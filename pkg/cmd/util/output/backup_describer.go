@@ -18,6 +18,7 @@ package output
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -25,7 +26,7 @@ import (
 )
 
 // DescribeBackup describes a backup in human-readable format.
-func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest) string {
+func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest, podVolumeBackups []v1.PodVolumeBackup, volumeDetails bool) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
 
@@ -45,6 +46,11 @@ func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest) 
 		if len(deleteRequests) > 0 {
 			d.Println()
 			DescribeDeleteBackupRequests(d, deleteRequests)
+		}
+
+		if len(podVolumeBackups) > 0 {
+			d.Println()
+			DescribePodVolumeBackups(d, podVolumeBackups, volumeDetails)
 		}
 	})
 }
@@ -240,4 +246,112 @@ func failedDeletionCount(requests []v1.DeleteBackupRequest) int {
 		}
 	}
 	return count
+}
+
+// DescribePodVolumeBackups describes pod volume backups in human-readable format.
+func DescribePodVolumeBackups(d *Describer, backups []v1.PodVolumeBackup, details bool) {
+	if details {
+		d.Printf("Restic Backups:\n")
+	} else {
+		d.Printf("Restic Backups (specify --volume-details for more information):\n")
+	}
+
+	// separate backups by phase (combining <none> and New into a single group)
+	backupsByPhase := groupByPhase(backups)
+
+	// go through phases in a specific order
+	for _, phase := range []string{
+		string(v1.PodVolumeBackupPhaseCompleted),
+		string(v1.PodVolumeBackupPhaseFailed),
+		"In Progress",
+		string(v1.PodVolumeBackupPhaseNew),
+	} {
+		if len(backupsByPhase[phase]) == 0 {
+			continue
+		}
+
+		// if we're not printing details, just report the phase and count
+		if !details {
+			d.Printf("\t%s:\t%d\n", phase, len(backupsByPhase[phase]))
+			continue
+		}
+
+		// group the backups in the current phase by pod (i.e. "ns/name")
+		backupsByPod := new(volumesByPod)
+
+		for _, backup := range backupsByPhase[phase] {
+			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume)
+		}
+
+		d.Printf("\t%s:\n", phase)
+		for _, backupGroup := range backupsByPod.Sorted() {
+			sort.Strings(backupGroup.volumes)
+
+			// print volumes backed up for this pod
+			d.Printf("\t\t%s: %s\n", backupGroup.label, strings.Join(backupGroup.volumes, ", "))
+		}
+	}
+}
+
+func groupByPhase(backups []v1.PodVolumeBackup) map[string][]v1.PodVolumeBackup {
+	backupsByPhase := make(map[string][]v1.PodVolumeBackup)
+
+	phaseToGroup := map[v1.PodVolumeBackupPhase]string{
+		v1.PodVolumeBackupPhaseCompleted:  string(v1.PodVolumeBackupPhaseCompleted),
+		v1.PodVolumeBackupPhaseFailed:     string(v1.PodVolumeBackupPhaseFailed),
+		v1.PodVolumeBackupPhaseInProgress: "In Progress",
+		v1.PodVolumeBackupPhaseNew:        string(v1.PodVolumeBackupPhaseNew),
+		"": string(v1.PodVolumeBackupPhaseNew),
+	}
+
+	for _, backup := range backups {
+		group := phaseToGroup[backup.Status.Phase]
+		backupsByPhase[group] = append(backupsByPhase[group], backup)
+	}
+
+	return backupsByPhase
+}
+
+type podVolumeGroup struct {
+	label   string
+	volumes []string
+}
+
+// volumesByPod stores podVolumeGroups, where the grouping
+// label is "namespace/name".
+type volumesByPod struct {
+	volumesByPodMap   map[string]*podVolumeGroup
+	volumesByPodSlice []*podVolumeGroup
+}
+
+// Add adds a pod volume with the specified pod namespace, name
+// and volume to the appropriate group.
+func (v *volumesByPod) Add(namespace, name, volume string) {
+	if v.volumesByPodMap == nil {
+		v.volumesByPodMap = make(map[string]*podVolumeGroup)
+	}
+
+	key := fmt.Sprintf("%s/%s", namespace, name)
+
+	if group, ok := v.volumesByPodMap[key]; !ok {
+		group := &podVolumeGroup{
+			label:   key,
+			volumes: []string{volume},
+		}
+
+		v.volumesByPodMap[key] = group
+		v.volumesByPodSlice = append(v.volumesByPodSlice, group)
+	} else {
+		group.volumes = append(group.volumes, volume)
+	}
+}
+
+// Sorted returns a slice of all pod volume groups, ordered by
+// label.
+func (v *volumesByPod) Sorted() []*podVolumeGroup {
+	sort.Slice(v.volumesByPodSlice, func(i, j int) bool {
+		return v.volumesByPodSlice[i].label <= v.volumesByPodSlice[j].label
+	})
+
+	return v.volumesByPodSlice
 }

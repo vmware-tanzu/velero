@@ -16,6 +16,7 @@ ark restore describe [NAME1] [NAME2] [NAME...] [flags]
 ```
   -h, --help              help for describe
   -l, --selector string   only show items matching this label selector
+      --volume-details    display details of restic volume restores
 ```
 
 ### Options inherited from parent commands
