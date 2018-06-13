@@ -18,7 +18,7 @@ MAINTAINER Andy Goldstein <andy@heptio.com>
 
 RUN apk add --no-cache ca-certificates
 
-RUN apk add --update --no-cache bzip2 && \
+RUN apk add --update --no-cache bzip2 rsync && \
     wget --quiet https://github.com/restic/restic/releases/download/v0.9.1/restic_0.9.1_linux_amd64.bz2 && \
     bunzip2 restic_0.9.1_linux_amd64.bz2 && \
     mv restic_0.9.1_linux_amd64 /restic && \
