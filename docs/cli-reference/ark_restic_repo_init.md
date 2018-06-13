@@ -14,10 +14,11 @@ ark restic repo init NAMESPACE [flags]
 ### Options
 
 ```
-  -h, --help              help for init
-      --key-data string   Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
-      --key-file string   Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
-      --key-size int      Size of the generated key for the restic repository (default 1024)
+  -h, --help                             help for init
+      --key-data string                  Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
+      --key-file string                  Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
+      --key-size int                     Size of the generated key for the restic repository (default 1024)
+      --maintenance-frequency duration   How often maintenance (i.e. restic prune & check) is run on the repository (default 24h0m0s)
 ```
 
 ### Options inherited from parent commands

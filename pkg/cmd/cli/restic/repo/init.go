@@ -18,6 +18,7 @@ package repo
 
 import (
 	"crypto/rand"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -55,10 +56,11 @@ func NewInitCommand(f client.Factory) *cobra.Command {
 }
 
 type InitRepositoryOptions struct {
-	Namespace string
-	KeyFile   string
-	KeyData   string
-	KeySize   int
+	Namespace            string
+	KeyFile              string
+	KeyData              string
+	KeySize              int
+	MaintenanceFrequency time.Duration
 
 	fileSystem filesystem.Interface
 	kubeClient kclientset.Interface
@@ -68,8 +70,9 @@ type InitRepositoryOptions struct {
 
 func NewInitRepositoryOptions() *InitRepositoryOptions {
 	return &InitRepositoryOptions{
-		KeySize:    1024,
-		fileSystem: filesystem.NewFileSystem(),
+		KeySize:              1024,
+		MaintenanceFrequency: restic.DefaultMaintenanceFrequency,
+		fileSystem:           filesystem.NewFileSystem(),
 	}
 }
 
@@ -82,6 +85,7 @@ func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KeyFile, "key-file", o.KeyFile, "Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
 	flags.StringVar(&o.KeyData, "key-data", o.KeyData, "Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
 	flags.IntVar(&o.KeySize, "key-size", o.KeySize, "Size of the generated key for the restic repository")
+	flags.DurationVar(&o.MaintenanceFrequency, "maintenance-frequency", o.MaintenanceFrequency, "How often maintenance (i.e. restic prune & check) is run on the repository")
 }
 
 func (o *InitRepositoryOptions) Complete(f client.Factory, args []string) error {
@@ -118,6 +122,10 @@ func (o *InitRepositoryOptions) Validate(f client.Factory) error {
 		return errors.Errorf("keyBytes is required")
 	}
 
+	if o.MaintenanceFrequency <= 0 {
+		return errors.Errorf("--maintenance-frequency must be greater than zero")
+	}
+
 	kubeClient, err := f.KubeClient()
 	if err != nil {
 		return err
@@ -146,6 +154,9 @@ func (o *InitRepositoryOptions) Run(f client.Factory) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
 			Name:      o.Namespace,
+		},
+		Spec: v1.ResticRepositorySpec{
+			MaintenanceFrequency: metav1.Duration{Duration: o.MaintenanceFrequency},
 		},
 	}
 
