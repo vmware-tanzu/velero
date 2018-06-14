@@ -36,6 +36,15 @@ func podAnnotations() map[string]string {
 	}
 }
 
+func containerPorts() []corev1.ContainerPort {
+	return []corev1.ContainerPort{
+		{
+			Name:          "metrics",
+			ContainerPort: 8085,
+		},
+	}
+}
+
 func objectMeta(namespace, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Name:      name,

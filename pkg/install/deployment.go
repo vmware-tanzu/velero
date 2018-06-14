@@ -91,6 +91,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 						{
 							Name:            "ark",
 							Image:           c.image,
+							Ports:           containerPorts(),
 							ImagePullPolicy: pullPolicy,
 							Command: []string{
 								"/ark",
