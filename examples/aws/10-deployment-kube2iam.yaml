@@ -35,6 +35,9 @@ spec:
       containers:
         - name: ark
           image: gcr.io/heptio-images/ark:latest
+          ports:
+            - name: metrics
+              containerPort: 8085
           command:
             - /ark
           args:
