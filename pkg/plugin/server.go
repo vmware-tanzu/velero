@@ -36,28 +36,28 @@ var Handshake = plugin.HandshakeConfig{
 // Server serves registered plugin implementations.
 type Server interface {
 	// RegisterBackupItemAction registers a backup item action.
-	RegisterBackupItemAction(name string, factory ServerInitializer) Server
+	RegisterBackupItemAction(name string, initializer HandlerInitializer) Server
 
 	// RegisterBackupItemActions registers multiple backup item actions.
-	RegisterBackupItemActions(map[string]ServerInitializer) Server
+	RegisterBackupItemActions(map[string]HandlerInitializer) Server
 
 	// RegisterBlockStore registers a block store.
-	RegisterBlockStore(name string, factory ServerInitializer) Server
+	RegisterBlockStore(name string, initializer HandlerInitializer) Server
 
 	// RegisterBlockStores registers multiple block stores.
-	RegisterBlockStores(map[string]ServerInitializer) Server
+	RegisterBlockStores(map[string]HandlerInitializer) Server
 
 	// RegisterObjectStore registers an object store.
-	RegisterObjectStore(name string, factory ServerInitializer) Server
+	RegisterObjectStore(name string, initializer HandlerInitializer) Server
 
 	// RegisterObjectStores registers multiple object stores.
-	RegisterObjectStores(map[string]ServerInitializer) Server
+	RegisterObjectStores(map[string]HandlerInitializer) Server
 
 	// RegisterRestoreItemAction registers a restore item action.
-	RegisterRestoreItemAction(name string, factory ServerInitializer) Server
+	RegisterRestoreItemAction(name string, initializer HandlerInitializer) Server
 
 	// RegisterRestoreItemActions registers multiple restore item actions.
-	RegisterRestoreItemActions(map[string]ServerInitializer) Server
+	RegisterRestoreItemActions(map[string]HandlerInitializer) Server
 
 	// Server runs the plugin server.
 	Serve()
@@ -95,48 +95,48 @@ func NewServer(log logrus.FieldLogger) Server {
 	}
 }
 
-func (s *server) RegisterBackupItemAction(name string, factory ServerInitializer) Server {
-	s.backupItemAction.register(name, factory)
+func (s *server) RegisterBackupItemAction(name string, initializer HandlerInitializer) Server {
+	s.backupItemAction.register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterBackupItemActions(m map[string]ServerInitializer) Server {
+func (s *server) RegisterBackupItemActions(m map[string]HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterBackupItemAction(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterBlockStore(name string, factory ServerInitializer) Server {
-	s.blockStore.register(name, factory)
+func (s *server) RegisterBlockStore(name string, initializer HandlerInitializer) Server {
+	s.blockStore.register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterBlockStores(m map[string]ServerInitializer) Server {
+func (s *server) RegisterBlockStores(m map[string]HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterBlockStore(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterObjectStore(name string, factory ServerInitializer) Server {
-	s.objectStore.register(name, factory)
+func (s *server) RegisterObjectStore(name string, initializer HandlerInitializer) Server {
+	s.objectStore.register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterObjectStores(m map[string]ServerInitializer) Server {
+func (s *server) RegisterObjectStores(m map[string]HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterObjectStore(name, m[name])
 	}
 	return s
 }
 
-func (s *server) RegisterRestoreItemAction(name string, factory ServerInitializer) Server {
-	s.restoreItemAction.register(name, factory)
+func (s *server) RegisterRestoreItemAction(name string, initializer HandlerInitializer) Server {
+	s.restoreItemAction.register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterRestoreItemActions(m map[string]ServerInitializer) Server {
+func (s *server) RegisterRestoreItemActions(m map[string]HandlerInitializer) Server {
 	for name := range m {
 		s.RegisterRestoreItemAction(name, m[name])
 	}

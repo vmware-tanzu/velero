@@ -92,7 +92,7 @@ func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return backup.NewPodAction(logger), nil
 }
 
-func newServiceAccountBackupItemAction(f client.Factory) arkplugin.ServerInitializer {
+func newServiceAccountBackupItemAction(f client.Factory) arkplugin.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
 		clientset, err := f.KubeClient()

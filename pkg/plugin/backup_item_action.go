@@ -150,7 +150,7 @@ type BackupItemActionGRPCServer struct {
 }
 
 func (s *BackupItemActionGRPCServer) getImpl(name string) (arkbackup.ItemAction, error) {
-	impl, err := s.mux.getInstance(name)
+	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}

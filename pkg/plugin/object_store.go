@@ -197,7 +197,7 @@ type ObjectStoreGRPCServer struct {
 }
 
 func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore, error) {
-	impl, err := s.mux.getInstance(name)
+	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}

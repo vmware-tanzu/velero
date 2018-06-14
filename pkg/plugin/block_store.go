@@ -216,7 +216,7 @@ type BlockStoreGRPCServer struct {
 }
 
 func (s *BlockStoreGRPCServer) getImpl(name string) (cloudprovider.BlockStore, error) {
-	impl, err := s.mux.getInstance(name)
+	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}

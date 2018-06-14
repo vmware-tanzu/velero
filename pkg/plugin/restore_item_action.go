@@ -141,7 +141,7 @@ type RestoreItemActionGRPCServer struct {
 }
 
 func (s *RestoreItemActionGRPCServer) getImpl(name string) (restore.ItemAction, error) {
-	impl, err := s.mux.getInstance(name)
+	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}

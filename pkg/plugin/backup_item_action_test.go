@@ -154,7 +154,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 
 			s := &BackupItemActionGRPCServer{mux: &serverMux{
 				serverLog: arktest.NewLogger(),
-				instances: map[string]interface{}{
+				handlers: map[string]interface{}{
 					"xyz": itemAction,
 				},
 			}}

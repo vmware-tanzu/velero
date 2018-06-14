@@ -6,28 +6,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// ServerInitializer is a function that initializes and returns a new instance of one of Ark's plugin interfaces
+// HandlerInitializer is a function that initializes and returns a new instance of one of Ark's plugin interfaces
 // (ObjectStore, BlockStore, BackupItemAction, RestoreItemAction).
-type ServerInitializer func(logger logrus.FieldLogger) (interface{}, error)
+type HandlerInitializer func(logger logrus.FieldLogger) (interface{}, error)
 
 // serverMux manages multiple implementations of a single plugin kind, such as pod and pvc BackupItemActions.
 type serverMux struct {
 	kind         PluginKind
-	initializers map[string]ServerInitializer
-	instances    map[string]interface{}
+	initializers map[string]HandlerInitializer
+	handlers     map[string]interface{}
 	serverLog    logrus.FieldLogger
 }
 
 // newServerMux returns a new serverMux.
 func newServerMux() *serverMux {
 	return &serverMux{
-		initializers: make(map[string]ServerInitializer),
-		instances:    make(map[string]interface{}),
+		initializers: make(map[string]HandlerInitializer),
+		handlers:     make(map[string]interface{}),
 	}
 }
 
 // register registers the initializer for name.
-func (m *serverMux) register(name string, f ServerInitializer) {
+func (m *serverMux) register(name string, f HandlerInitializer) {
 	// TODO(ncdc): return an error on duplicate registrations for the same name.
 	m.initializers[name] = f
 }
@@ -42,10 +42,10 @@ func (m *serverMux) setServerLog(log logrus.FieldLogger) {
 	m.serverLog = log
 }
 
-// getInstance returns the instance for a plugin with the given name. If an instance has already been initialized,
+// getHandler returns the instance for a plugin with the given name. If an instance has already been initialized,
 // that is returned. Otherwise, the instance is initialized by calling its initialization function.
-func (m *serverMux) getInstance(name string) (interface{}, error) {
-	if instance, found := m.instances[name]; found {
+func (m *serverMux) getHandler(name string) (interface{}, error) {
+	if instance, found := m.handlers[name]; found {
 		return instance, nil
 	}
 
@@ -59,7 +59,7 @@ func (m *serverMux) getInstance(name string) (interface{}, error) {
 		return nil, err
 	}
 
-	m.instances[name] = instance
+	m.handlers[name] = instance
 
-	return m.instances[name], nil
+	return m.handlers[name], nil
 }
