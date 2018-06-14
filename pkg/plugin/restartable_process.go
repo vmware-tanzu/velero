@@ -18,6 +18,7 @@ package plugin
 import (
 	"sync"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,7 +35,7 @@ type restartableProcess struct {
 	process        *process
 	plugins        map[kindAndName]interface{}
 	reinitializers map[kindAndName]reinitializer
-	retryCount     int
+	resetFailures  int
 }
 
 // reinitializer is capable of reinitializing a restartable plugin instance using the newly dispensed plugin.
@@ -80,8 +81,13 @@ func (p *restartableProcess) reset() error {
 //
 // Callers of resetLH *must* acquire the lock before calling it.
 func (p *restartableProcess) resetLH() error {
+	if p.resetFailures > 10 {
+		return errors.Errorf("unable to restart plugin process: execeeded maximum number of reset failures")
+	}
+
 	process, err := newProcess(p.command, p.logger, p.logLevel)
 	if err != nil {
+		p.resetFailures++
 		return err
 	}
 	p.process = process
@@ -93,6 +99,7 @@ func (p *restartableProcess) resetLH() error {
 		// Re-dispense
 		dispensed, err := p.process.dispense(key)
 		if err != nil {
+			p.resetFailures++
 			return err
 		}
 		// Store in the new map
@@ -101,6 +108,7 @@ func (p *restartableProcess) resetLH() error {
 		// Reinitialize
 		if r, found := p.reinitializers[key]; found {
 			if err := r.reinitialize(dispensed); err != nil {
+				p.resetFailures++
 				return err
 			}
 		}
@@ -108,6 +116,8 @@ func (p *restartableProcess) resetLH() error {
 
 	// Make sure we update p's plugins!
 	p.plugins = newPlugins
+
+	p.resetFailures = 0
 
 	return nil
 }
