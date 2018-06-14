@@ -12,7 +12,8 @@ func BackupCommand(repoPrefix, repo, passwordFile, path string, tags map[string]
 		RepoPrefix:   repoPrefix,
 		Repo:         repo,
 		PasswordFile: passwordFile,
-		Args:         []string{path},
+		Dir:          path,
+		Args:         []string{"."},
 		ExtraFlags:   backupTagFlags(tags),
 	}
 }
@@ -26,14 +27,15 @@ func backupTagFlags(tags map[string]string) []string {
 }
 
 // RestoreCommand returns a Command for running a restic restore.
-func RestoreCommand(repoPrefix, repo, passwordFile, podUID, snapshotID string) *Command {
+func RestoreCommand(repoPrefix, repo, passwordFile, snapshotID, target string) *Command {
 	return &Command{
 		Command:      "restore",
 		RepoPrefix:   repoPrefix,
 		Repo:         repo,
 		PasswordFile: passwordFile,
+		Dir:          target,
 		Args:         []string{snapshotID},
-		ExtraFlags:   []string{fmt.Sprintf("--target=/restores/%s", podUID)},
+		ExtraFlags:   []string{"--target=."},
 	}
 }
 
