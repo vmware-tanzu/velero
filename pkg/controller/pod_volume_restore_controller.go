@@ -324,6 +324,14 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
+	// Remove the .ark directory from the staging directory (it may contain done files from previous restores
+	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
+	// this is non-essential cleanup (the done files are named based on restore UID and the init container looks
+	// for the one specific to the restore being executed).
+	if err := os.RemoveAll(filepath.Join(restorePath, ".ark")); err != nil {
+		log.WithError(err).Warnf("error removing .ark directory from staging directory %s", restorePath)
+	}
+
 	// Move the contents of the staging directory into the new volume directory to finalize the restore. Trailing
 	// slashes are needed so the *contents* of restorePath/ are moved into volumePath/. --delete removes files/dirs
 	// in the destination that aren't in source, and --archive copies recursively while retaining perms, owners,
@@ -337,7 +345,7 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	// Don't fail the restore if this returns an error, since the actual directory content
 	// has already successfully been moved into the pod volume.
 	if err := os.RemoveAll(restorePath); err != nil {
-		log.WithError(err).Warnf("error removing staging directory %s for pod volume restore %s/%s", restorePath, req.Namespace, req.Name)
+		log.WithError(err).Warnf("error removing staging directory %s", restorePath)
 	}
 
 	var restoreUID types.UID
@@ -353,8 +361,6 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	if err := os.MkdirAll(filepath.Join(volumePath, ".ark"), 0755); err != nil {
 		return errors.Wrap(err, "error creating .ark directory for done file")
 	}
-
-	// TODO remove any done files from previous ark restores from .ark
 
 	// Write a done file with name=<restore-uid> into the just-created .ark dir
 	// within the volume. The ark restic init container on the pod is waiting
