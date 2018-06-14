@@ -18,32 +18,18 @@ package logging
 
 import (
 	"os"
+	"testing"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
-// DefaultHooks returns a slice of the default
-// logrus hooks to be used by a logger.
-func DefaultHooks() []logrus.Hook {
-	return []logrus.Hook{
-		&LogLocationHook{},
-		&ErrorLocationHook{},
+func TestDefaultLogger(t *testing.T) {
+	logger := DefaultLogger(logrus.InfoLevel)
+	assert.Equal(t, logrus.InfoLevel, logger.Level)
+	assert.Equal(t, os.Stdout, logger.Out)
+
+	for _, level := range logrus.AllLevels {
+		assert.Equal(t, DefaultHooks(), logger.Hooks[level])
 	}
-}
-
-// DefaultLogger returns a Logger with the default properties
-// and hooks.
-func DefaultLogger(level logrus.Level) *logrus.Logger {
-	logger := logrus.New()
-
-	// Make sure the output is set to stdout so log messages don't show up as errors in cloud log dashboards.
-	logger.Out = os.Stdout
-
-	logger.Level = level
-
-	for _, hook := range DefaultHooks() {
-		logger.Hooks.Add(hook)
-	}
-
-	return logger
 }

@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"reflect"
@@ -85,9 +86,16 @@ func NewCommand() *cobra.Command {
 		Short: "Run the ark server",
 		Long:  "Run the ark server",
 		Run: func(c *cobra.Command, args []string) {
+			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
+			// set its output to stdout.
+			log.SetOutput(os.Stdout)
+
 			logLevel := logLevelFlag.Parse()
+			// Make sure we log to stdout so cloud log dashboards don't show this as an error.
+			logrus.SetOutput(os.Stdout)
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
+			// Ark's DefaultLogger logs to stdout, so all is good there.
 			logger := logging.DefaultLogger(logLevel)
 			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
 
