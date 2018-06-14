@@ -24,23 +24,18 @@ import (
 
 // Command represents a restic command.
 type Command struct {
-	BaseName     string
 	Command      string
 	RepoPrefix   string
 	Repo         string
 	PasswordFile string
+	Dir          string
 	Args         []string
 	ExtraFlags   []string
 }
 
 // StringSlice returns the command as a slice of strings.
 func (c *Command) StringSlice() []string {
-	var res []string
-	if c.BaseName != "" {
-		res = append(res, c.BaseName)
-	} else {
-		res = append(res, "/restic")
-	}
+	res := []string{"/restic"}
 
 	res = append(res, c.Command, repoFlag(c.RepoPrefix, c.Repo))
 	if c.PasswordFile != "" {
@@ -60,7 +55,10 @@ func (c *Command) String() string {
 // Cmd returns an exec.Cmd for the command.
 func (c *Command) Cmd() *exec.Cmd {
 	parts := c.StringSlice()
-	return exec.Command(parts[0], parts[1:]...)
+	cmd := exec.Command(parts[0], parts[1:]...)
+	cmd.Dir = c.Dir
+
+	return cmd
 }
 
 func repoFlag(prefix, repo string) string {

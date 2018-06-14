@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -139,7 +138,7 @@ func shouldProcessPod(pod *corev1api.Pod, nodeName string, log logrus.FieldLogge
 	}
 
 	// only process items for pods that have the restic initContainer running
-	if !isPodWaiting(pod) {
+	if !resticInitContainerRunning(pod) {
 		log.Debugf("Pod is not running restic initContainer, not enqueueing.")
 		return false
 	}
@@ -202,11 +201,19 @@ func shouldEnqueuePVR(pvr *arkv1api.PodVolumeRestore, podLister corev1listers.Po
 	return true
 }
 
-func isPodWaiting(pod *corev1api.Pod) bool {
-	return len(pod.Spec.InitContainers) == 0 ||
-		pod.Spec.InitContainers[0].Name != restic.InitContainer ||
-		len(pod.Status.InitContainerStatuses) == 0 ||
-		pod.Status.InitContainerStatuses[0].State.Running == nil
+func resticInitContainerRunning(pod *corev1api.Pod) bool {
+	// no init containers, or the first one is not the ark restic one: return false
+	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
+		return false
+	}
+
+	// status hasn't been created yet, or the first one is not yet running: return false
+	if len(pod.Status.InitContainerStatuses) == 0 || pod.Status.InitContainerStatuses[0].State.Running == nil {
+		return false
+	}
+
+	// else, it's running
+	return true
 }
 
 func (c *podVolumeRestoreController) processQueueItem(key string) error {
@@ -284,68 +291,34 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 }
 
 func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
-	resticCmd := restic.RestoreCommand(
-		req.Spec.RepoPrefix,
-		req.Spec.Pod.Namespace,
-		credsFile,
-		string(req.Spec.Pod.UID),
-		req.Spec.SnapshotID,
-	)
-
-	var (
-		stdout, stderr string
-		err            error
-	)
-
-	// First restore the backed-up volume into a staging area, under /restores. This is necessary because restic backups
-	// are stored with the absolute path of the backed-up directory, and restic doesn't allow you to adjust this path
-	// when restoring, only to choose a different parent directory. So, for example, if you backup /foo/bar/volume, when
-	// restoring, you can't restore to /baz/volume. You may restore to /baz/foo/bar/volume, though. The net result of
-	// all this is that we can't restore directly into the new volume's directory, because the path is entirely different
-	// than the backed-up one.
-	if stdout, stderr, err = runCommand(resticCmd.Cmd()); err != nil {
-		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-	}
-	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-
-	// Now, get the full path of the restored volume in the staging directory, which will
-	// look like:
-	// 		/restores/<new-pod-uid>/host_pods/<backed-up-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
-	restorePath, err := singlePathMatch(fmt.Sprintf("/restores/%s/host_pods/*/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
-	if err != nil {
-		return errors.Wrap(err, "error identifying path of restore staging directory")
-	}
-
-	// Also get the full path of the new volume's directory (as mounted in the daemonset pod), which
-	// will look like:
-	// 		/host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
+	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
+	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
 	if err != nil {
 		return errors.Wrap(err, "error identifying path of volume")
 	}
 
-	// Remove the .ark directory from the staging directory (it may contain done files from previous restores
+	resticCmd := restic.RestoreCommand(
+		req.Spec.RepoPrefix,
+		req.Spec.Pod.Namespace,
+		credsFile,
+		req.Spec.SnapshotID,
+		volumePath,
+	)
+
+	var stdout, stderr string
+
+	if stdout, stderr, err = runCommand(resticCmd.Cmd()); err != nil {
+		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+	}
+	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+
+	// Remove the .ark directory from the restored volume (it may contain done files from previous restores
 	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
 	// this is non-essential cleanup (the done files are named based on restore UID and the init container looks
 	// for the one specific to the restore being executed).
-	if err := os.RemoveAll(filepath.Join(restorePath, ".ark")); err != nil {
-		log.WithError(err).Warnf("error removing .ark directory from staging directory %s", restorePath)
-	}
-
-	// Move the contents of the staging directory into the new volume directory to finalize the restore. Trailing
-	// slashes are needed so the *contents* of restorePath/ are moved into volumePath/. --delete removes files/dirs
-	// in the destination that aren't in source, and --archive copies recursively while retaining perms, owners,
-	// timestamps, symlinks.
-	cmd := exec.Command("rsync", "--delete", "--archive", restorePath+"/", volumePath+"/")
-	if _, stderr, err := runCommand(cmd); err != nil {
-		return errors.Wrapf(err, "error moving files from restore staging directory into volume, stderr=%s", stderr)
-	}
-
-	// Remove staging directory (which should be empty at this point) from daemonset pod.
-	// Don't fail the restore if this returns an error, since the actual directory content
-	// has already successfully been moved into the pod volume.
-	if err := os.RemoveAll(restorePath); err != nil {
-		log.WithError(err).Warnf("error removing staging directory %s", restorePath)
+	if err := os.RemoveAll(filepath.Join(volumePath, ".ark")); err != nil {
+		log.WithError(err).Warnf("error removing .ark directory from directory %s", volumePath)
 	}
 
 	var restoreUID types.UID
