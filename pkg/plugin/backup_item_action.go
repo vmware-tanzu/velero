@@ -53,9 +53,9 @@ func NewBackupItemActionPlugin() *BackupItemActionPlugin {
 // client code
 //////////////////////////////////////////////////////////////////////////////
 
-// GRPCClient returns a clientMux for BackupItemAction gRPC clients.
+// GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
 func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientMux(c, newBackupItemActionGRPCClient), nil
+	return newClientDispenser(c, newBackupItemActionGRPCClient), nil
 }
 
 // BackupItemActionGRPCClient implements the backup/ItemAction interface and uses a

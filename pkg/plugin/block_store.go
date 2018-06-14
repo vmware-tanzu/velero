@@ -52,7 +52,7 @@ func NewBlockStorePlugin() *BlockStorePlugin {
 
 // GRPCClient returns a BlockStore gRPC client.
 func (p *BlockStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientMux(c, newBlockStoreGRPCClient), nil
+	return newClientDispenser(c, newBlockStoreGRPCClient), nil
 }
 
 // BlockStoreGRPCClient implements the cloudprovider.BlockStore interface and uses a

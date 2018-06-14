@@ -56,7 +56,7 @@ func NewRestoreItemActionPlugin() *RestoreItemActionPlugin {
 
 // GRPCClient returns a RestoreItemAction gRPC client.
 func (p *RestoreItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientMux(c, newRestoreItemActionGRPCClient), nil
+	return newClientDispenser(c, newRestoreItemActionGRPCClient), nil
 }
 
 // RestoreItemActionGRPCClient implements the backup/ItemAction interface and uses a

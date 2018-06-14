@@ -38,8 +38,8 @@ func (r *process) dispense(key kindAndName) (interface{}, error) {
 		return nil, errors.WithStack(err)
 	}
 
-	// Currently all plugins except for PluginLister dispense clientMux instances.
-	if mux, ok := dispensed.(*clientMux); ok {
+	// Currently all plugins except for PluginLister dispense clientDispenser instances.
+	if mux, ok := dispensed.(*clientDispenser); ok {
 		if key.name == "" {
 			return nil, errors.Errorf("%s plugin requested but name is missing", key.kind.String())
 		}

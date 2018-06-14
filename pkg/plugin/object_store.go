@@ -55,7 +55,7 @@ func NewObjectStorePlugin() *ObjectStorePlugin {
 
 // GRPCClient returns an ObjectStore gRPC client.
 func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientMux(c, newObjectStoreGRPCClient), nil
+	return newClientDispenser(c, newObjectStoreGRPCClient), nil
 
 }
 

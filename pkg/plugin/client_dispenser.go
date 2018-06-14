@@ -26,9 +26,9 @@ func (c *clientBase) setLog(log *logrusAdapter) {
 	c.log = log
 }
 
-// clientMux supports the initialization and retrieval of multiple implementations for a single plugin kind, such as
+// clientDispenser supports the initialization and retrieval of multiple implementations for a single plugin kind, such as
 // "aws" and "azure" implementations of the object store plugin.
-type clientMux struct {
+type clientDispenser struct {
 	// clienConn is shared among all implementations for this client.
 	clientConn *grpc.ClientConn
 	// log is the log the plugin should use.
@@ -39,9 +39,9 @@ type clientMux struct {
 	clients map[string]client
 }
 
-// newClientMux creates a new clientMux.
-func newClientMux(clientConn *grpc.ClientConn, initFunc func() client) *clientMux {
-	m := &clientMux{
+// newClientDispenser creates a new clientDispenser.
+func newClientDispenser(clientConn *grpc.ClientConn, initFunc func() client) *clientDispenser {
+	m := &clientDispenser{
 		clientConn: clientConn,
 		initFunc:   initFunc,
 		clients:    make(map[string]client),
@@ -52,7 +52,7 @@ func newClientMux(clientConn *grpc.ClientConn, initFunc func() client) *clientMu
 
 // clientFor returns a gRPC client stub for the implementation of a plugin named name. If the client stub does not
 // currently exist, clientFor creates it.
-func (m *clientMux) clientFor(name string) interface{} {
+func (m *clientDispenser) clientFor(name string) interface{} {
 	if client, found := m.clients[name]; found {
 		return client
 	}
