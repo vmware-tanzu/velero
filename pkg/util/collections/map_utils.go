@@ -122,3 +122,14 @@ func Exists(root map[string]interface{}, path string) bool {
 	_, err := GetValue(root, path)
 	return err == nil
 }
+
+// MergeMaps takes two map[string]string and merges missing keys from the second into the first.
+// If a key already exists, its value is not overwritten.
+func MergeMaps(first, second map[string]string) {
+	for k, v := range second {
+		_, ok := first[k]
+		if !ok {
+			first[k] = v
+		}
+	}
+}

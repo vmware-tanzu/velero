@@ -64,3 +64,8 @@ func (c *FakeDynamicClient) Get(name string, opts metav1.GetOptions) (*unstructu
 	args := c.Called(name, opts)
 	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
 }
+
+func (c *FakeDynamicClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
+	args := c.Called(name, data)
+	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
+}

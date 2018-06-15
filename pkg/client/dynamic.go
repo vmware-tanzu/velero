@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 )
@@ -82,12 +83,20 @@ type Getter interface {
 	Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error)
 }
 
+// Patcher patches an object.
+type Patcher interface {
+	//Patch patches the named object using the provided patch bytes, which are expected to be in JSON merge patch format. The patched object is returned.
+
+	Patch(name string, data []byte) (*unstructured.Unstructured, error)
+}
+
 // Dynamic contains client methods that Ark needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
 	Lister
 	Watcher
 	Getter
+	Patcher
 }
 
 // dynamicResourceClient implements Dynamic.
@@ -111,4 +120,8 @@ func (d *dynamicResourceClient) Watch(options metav1.ListOptions) (watch.Interfa
 
 func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstructured.Unstructured, error) {
 	return d.resourceClient.Get(name, opts)
+}
+
+func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
+	return d.resourceClient.Patch(name, types.MergePatchType, data)
 }
