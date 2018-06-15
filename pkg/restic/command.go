@@ -46,7 +46,10 @@ func (c *Command) RepoName() string {
 func (c *Command) StringSlice() []string {
 	res := []string{"restic"}
 
-	res = append(res, c.Command, repoFlag(c.RepoIdentifier))
+	// allow for multi-part commands by splitting on whitespace
+	res = append(res, strings.Fields(c.Command)...)
+
+	res = append(res, repoFlag(c.RepoIdentifier))
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
 	}

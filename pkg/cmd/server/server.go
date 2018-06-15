@@ -158,6 +158,7 @@ type server struct {
 	logger                logrus.FieldLogger
 	pluginManager         plugin.Manager
 	resticManager         restic.RepositoryManager
+	resticSecretsInformer cache.SharedIndexInformer
 	metrics               *metrics.ServerMetrics
 }
 
@@ -463,6 +464,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
 	}
 
+	// TODO do we want to use a kube informer factory?
 	secretsInformer := corev1informers.NewFilteredSecretInformer(
 		s.kubeClient,
 		"",
@@ -473,6 +475,8 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 		},
 	)
 	go secretsInformer.Run(s.ctx.Done())
+
+	s.resticSecretsInformer = secretsInformer
 
 	res, err := restic.NewRepositoryManager(
 		s.ctx,
@@ -686,6 +690,21 @@ func (s *server) runControllers(config *api.Config) error {
 			// TODO only having a single worker may be an issue since maintenance
 			// can take a long time.
 			resticRepoController.Run(ctx, 1)
+			wg.Done()
+		}()
+
+		repoKeyChangeController := controller.NewResticKeyChangeController(
+			s.logger,
+			s.namespace,
+			s.resticSecretsInformer,
+			s.kubeClient.CoreV1(),
+			s.sharedInformerFactory.Ark().V1().ResticRepositories(),
+			s.arkClient.ArkV1(),
+			s.resticManager,
+		)
+		wg.Add(1)
+		go func() {
+			repoKeyChangeController.Run(ctx, 1)
 			wg.Done()
 		}()
 	}

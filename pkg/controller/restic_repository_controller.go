@@ -153,8 +153,10 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 	}
 
 	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
+		now := time.Now()
 		req.Status.Phase = v1.ResticRepositoryPhaseReady
-		req.Status.LastMaintenanceTime = metav1.Time{Time: time.Now()}
+		req.Status.LastMaintenanceTime = metav1.Time{Time: now}
+		req.Status.LastKeyChangeTime = metav1.Time{Time: now}
 	})
 }
 

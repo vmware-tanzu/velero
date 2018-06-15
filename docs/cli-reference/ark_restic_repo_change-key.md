@@ -1,16 +1,23 @@
-## ark restic repo
+## ark restic repo change-key
 
-Work with restic repositories
+change the key for a specified restic repository
 
 ### Synopsis
 
 
-Work with restic repositories
+change the key for a specified restic repository
+
+```
+ark restic repo change-key REPOSITORY [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for repo
+  -h, --help              help for change-key
+      --key-data string   Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
+      --key-file string   Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.
+      --key-size int      Size of the generated key for the restic repository (default 1024)
 ```
 
 ### Options inherited from parent commands
@@ -29,8 +36,5 @@ Work with restic repositories
 ```
 
 ### SEE ALSO
-* [ark restic](ark_restic.md)	 - Work with restic
-* [ark restic repo change-key](ark_restic_repo_change-key.md)	 - change the key for a specified restic repository
-* [ark restic repo get](ark_restic_repo_get.md)	 - Get restic repositories
-* [ark restic repo init](ark_restic_repo_init.md)	 - initialize a restic repository for a specified namespace
+* [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 

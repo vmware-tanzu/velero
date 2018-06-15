@@ -51,14 +51,18 @@ func (f *fakeFactory) Namespace() string {
 
 func TestComplete(t *testing.T) {
 	// no key options provided should error
-	o := &InitRepositoryOptions{}
+	o := &InitRepositoryOptions{
+		RepositoryKeyOptions: &RepositoryKeyOptions{},
+	}
 	err := o.Complete(&fakeFactory{}, []string{"ns"})
 	assert.EqualError(t, err, errKeySizeTooSmall.Error())
 
 	// both KeyFile and KeyData provided should error
 	o = &InitRepositoryOptions{
-		KeyFile: "/foo",
-		KeyData: "bar",
+		RepositoryKeyOptions: &RepositoryKeyOptions{
+			KeyFile: "/foo",
+			KeyData: "bar",
+		},
 	}
 	err = o.Complete(&fakeFactory{}, []string{"ns"})
 	assert.EqualError(t, err, errKeyFileAndKeyDataProvided.Error())
@@ -66,22 +70,28 @@ func TestComplete(t *testing.T) {
 	// if KeyFile is provided, its contents are used
 	fileContents := []byte("bar")
 	o = &InitRepositoryOptions{
-		KeyFile:    "/foo",
-		fileSystem: arktest.NewFakeFileSystem().WithFile("/foo", fileContents),
+		RepositoryKeyOptions: &RepositoryKeyOptions{
+			KeyFile:    "/foo",
+			fileSystem: arktest.NewFakeFileSystem().WithFile("/foo", fileContents),
+		},
 	}
 	assert.NoError(t, o.Complete(&fakeFactory{}, []string{"ns"}))
 	assert.Equal(t, fileContents, o.keyBytes)
 
 	// if KeyData is provided, it's used
 	o = &InitRepositoryOptions{
-		KeyData: "bar",
+		RepositoryKeyOptions: &RepositoryKeyOptions{
+			KeyData: "bar",
+		},
 	}
 	assert.NoError(t, o.Complete(&fakeFactory{}, []string{"ns"}))
 	assert.Equal(t, []byte(o.KeyData), o.keyBytes)
 
 	// if KeySize is provided, a random key is generated
 	o = &InitRepositoryOptions{
-		KeySize: 10,
+		RepositoryKeyOptions: &RepositoryKeyOptions{
+			KeySize: 10,
+		},
 	}
 	assert.NoError(t, o.Complete(&fakeFactory{}, []string{"ns"}))
 	assert.Equal(t, o.KeySize, len(o.keyBytes))
