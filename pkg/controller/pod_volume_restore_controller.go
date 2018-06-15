@@ -300,8 +300,7 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	}
 
 	resticCmd := restic.RestoreCommand(
-		req.Spec.RepoPrefix,
-		req.Spec.Pod.Namespace,
+		req.Spec.RepoIdentifier,
 		credsFile,
 		req.Spec.SnapshotID,
 		volumePath,

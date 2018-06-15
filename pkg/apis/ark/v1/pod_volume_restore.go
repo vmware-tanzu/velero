@@ -29,9 +29,8 @@ type PodVolumeRestoreSpec struct {
 	// Volume is the name of the volume within the Pod to be restored.
 	Volume string `json:"volume"`
 
-	// RepoPrefix is the restic repository prefix (i.e. not containing
-	// the repository name itself).
-	RepoPrefix string `json:"repoPrefix"`
+	// RepoIdentifier is the restic repository identifier.
+	RepoIdentifier string `json:"repoIdentifier"`
 
 	// SnapshotID is the ID of the volume snapshot to be restored.
 	SnapshotID string `json:"snapshotID"`

@@ -173,8 +173,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	defer os.Remove(file)
 
 	resticCmd := restic.BackupCommand(
-		req.Spec.RepoPrefix,
-		req.Spec.Pod.Namespace,
+		req.Spec.RepoIdentifier,
 		file,
 		path,
 		req.Spec.Tags,
@@ -188,7 +187,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
-	snapshotID, err := restic.GetSnapshotID(req.Spec.RepoPrefix, req.Spec.Pod.Namespace, file, req.Spec.Tags)
+	snapshotID, err := restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags)
 	if err != nil {
 		log.WithError(err).Error("Error getting SnapshotID")
 		return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)
