@@ -26,6 +26,13 @@ import (
 // Ark plugin.
 func NewLogger() logrus.FieldLogger {
 	logger := logrus.New()
+	/*
+		!!!DO NOT SET THE OUTPUT TO STDOUT!!!
+
+		go-plugin uses stdout for a communications protocol between client and server.
+
+		stderr is used for log messages from server to client. The ark server makes sure they are logged to stdout.
+	*/
 
 	// we use the JSON formatter because go-plugin will parse incoming
 	// JSON on stderr and use it to create structured log entries.
