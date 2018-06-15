@@ -17,7 +17,6 @@ limitations under the License.
 package repo
 
 import (
-	"crypto/rand"
 	"time"
 
 	"github.com/pkg/errors"
@@ -32,7 +31,6 @@ import (
 	"github.com/heptio/ark/pkg/cmd"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
 func NewInitCommand(f client.Factory) *cobra.Command {
@@ -57,73 +55,39 @@ func NewInitCommand(f client.Factory) *cobra.Command {
 
 type InitRepositoryOptions struct {
 	Namespace            string
-	KeyFile              string
-	KeyData              string
-	KeySize              int
 	MaintenanceFrequency time.Duration
+	*RepositoryKeyOptions
 
-	fileSystem filesystem.Interface
 	kubeClient kclientset.Interface
 	arkClient  clientset.Interface
-	keyBytes   []byte
 }
 
 func NewInitRepositoryOptions() *InitRepositoryOptions {
 	return &InitRepositoryOptions{
-		KeySize:              1024,
 		MaintenanceFrequency: restic.DefaultMaintenanceFrequency,
-		fileSystem:           filesystem.NewFileSystem(),
+		RepositoryKeyOptions: NewRepositoryKeyOptions(),
 	}
 }
 
-var (
-	errKeyFileAndKeyDataProvided = errors.Errorf("only one of --key-file and --key-data may be specified")
-	errKeySizeTooSmall           = errors.Errorf("--key-size must be at least 1")
-)
-
 func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.KeyFile, "key-file", o.KeyFile, "Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
-	flags.StringVar(&o.KeyData, "key-data", o.KeyData, "Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
-	flags.IntVar(&o.KeySize, "key-size", o.KeySize, "Size of the generated key for the restic repository")
 	flags.DurationVar(&o.MaintenanceFrequency, "maintenance-frequency", o.MaintenanceFrequency, "How often maintenance (i.e. restic prune & check) is run on the repository")
+
+	o.RepositoryKeyOptions.BindFlags(flags)
 }
 
 func (o *InitRepositoryOptions) Complete(f client.Factory, args []string) error {
-	if o.KeyFile != "" && o.KeyData != "" {
-		return errKeyFileAndKeyDataProvided
-	}
-
-	if o.KeyFile == "" && o.KeyData == "" && o.KeySize < 1 {
-		return errKeySizeTooSmall
-	}
-
 	o.Namespace = args[0]
 
-	switch {
-	case o.KeyFile != "":
-		data, err := o.fileSystem.ReadFile(o.KeyFile)
-		if err != nil {
-			return err
-		}
-		o.keyBytes = data
-	case o.KeyData != "":
-		o.keyBytes = []byte(o.KeyData)
-	case o.KeySize > 0:
-		o.keyBytes = make([]byte, o.KeySize)
-		// rand.Reader always returns a nil error
-		rand.Read(o.keyBytes)
-	}
-
-	return nil
+	return o.RepositoryKeyOptions.Complete(f, args)
 }
 
 func (o *InitRepositoryOptions) Validate(f client.Factory) error {
-	if len(o.keyBytes) == 0 {
-		return errors.Errorf("keyBytes is required")
-	}
-
 	if o.MaintenanceFrequency <= 0 {
 		return errors.Errorf("--maintenance-frequency must be greater than zero")
+	}
+
+	if err := o.RepositoryKeyOptions.Validate(f); err != nil {
+		return err
 	}
 
 	kubeClient, err := f.KubeClient()
