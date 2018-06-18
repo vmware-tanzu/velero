@@ -34,6 +34,7 @@ import (
 	arkv1informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	arkexec "github.com/heptio/ark/pkg/util/exec"
+	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
 // RepositoryManager executes commands against restic repositories.
@@ -79,6 +80,7 @@ type repositoryManager struct {
 	log                logrus.FieldLogger
 	repoLocker         *repoLocker
 	repoEnsurer        *repositoryEnsurer
+	fileSystem         filesystem.Interface
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -101,6 +103,7 @@ func NewRepositoryManager(
 
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
+		fileSystem:  filesystem.NewFileSystem(),
 	}
 
 	if !cache.WaitForCacheSync(ctx.Done(), secretsInformer.HasSynced) {
@@ -198,7 +201,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 }
 
 func (rm *repositoryManager) exec(cmd *Command) error {
-	file, err := TempCredentialsFile(rm.secretsLister, rm.namespace, cmd.RepoName())
+	file, err := TempCredentialsFile(rm.secretsLister, rm.namespace, cmd.RepoName(), rm.fileSystem)
 	if err != nil {
 		return err
 	}
