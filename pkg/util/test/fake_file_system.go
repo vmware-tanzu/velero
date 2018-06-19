@@ -63,8 +63,20 @@ func (fs *FakeFileSystem) DirExists(path string) (bool, error) {
 	return afero.DirExists(fs.fs, path)
 }
 
+func (fs *FakeFileSystem) Stat(path string) (os.FileInfo, error) {
+	return fs.fs.Stat(path)
+}
+
 func (fs *FakeFileSystem) WithFile(path string, data []byte) *FakeFileSystem {
 	file, _ := fs.fs.Create(path)
+	file.Write(data)
+	file.Close()
+
+	return fs
+}
+
+func (fs *FakeFileSystem) WithFileAndMode(path string, data []byte, mode os.FileMode) *FakeFileSystem {
+	file, _ := fs.fs.OpenFile(path, os.O_CREATE|os.O_RDWR, mode)
 	file.Write(data)
 	file.Close()
 

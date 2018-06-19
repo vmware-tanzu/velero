@@ -38,14 +38,13 @@ import (
 // interface.
 type BackupItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-
-	*serverMux
+	*pluginBase
 }
 
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.
-func NewBackupItemActionPlugin() *BackupItemActionPlugin {
+func NewBackupItemActionPlugin(options ...pluginOption) *BackupItemActionPlugin {
 	return &BackupItemActionPlugin{
-		serverMux: newServerMux(),
+		pluginBase: newPluginBase(options...),
 	}
 }
 
@@ -55,7 +54,7 @@ func NewBackupItemActionPlugin() *BackupItemActionPlugin {
 
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
 func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(c, newBackupItemActionGRPCClient), nil
+	return newClientDispenser(p.clientLogger, c, newBackupItemActionGRPCClient), nil
 }
 
 // BackupItemActionGRPCClient implements the backup/ItemAction interface and uses a
@@ -65,12 +64,11 @@ type BackupItemActionGRPCClient struct {
 	grpcClient proto.BackupItemActionClient
 }
 
-func newBackupItemActionGRPCClient() client {
-	return &BackupItemActionGRPCClient{clientBase: &clientBase{}}
-}
-
-func (c *BackupItemActionGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
-	c.grpcClient = proto.NewBackupItemActionClient(clientConn)
+func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &BackupItemActionGRPCClient{
+		clientBase: base,
+		grpcClient: proto.NewBackupItemActionClient(clientConn),
+	}
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (arkbackup.ResourceSelector, error) {

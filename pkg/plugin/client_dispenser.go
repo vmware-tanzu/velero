@@ -15,72 +15,60 @@ limitations under the License.
 */
 package plugin
 
-import "google.golang.org/grpc"
-
-// client represents a gRPC-based client instance.
-type client interface {
-	// setPlugin sets the name of the plugin implementation, for example "aws" for a BlockStore plugin.
-	setPlugin(name string)
-	// setGrpcClientConn allows the client to create a new gRPC client stub using clientConn.
-	setGrpcClientConn(clientConn *grpc.ClientConn)
-	// setLog sets the log the client should use.
-	setLog(log *logrusAdapter)
-}
+import (
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+)
 
 // clientBase implements client and contains shared fields common to all clients.
 type clientBase struct {
 	plugin string
-	log    *logrusAdapter
+	logger logrus.FieldLogger
 }
 
-func (c *clientBase) setPlugin(name string) {
-	c.plugin = name
-}
-
-func (c *clientBase) setLog(log *logrusAdapter) {
-	c.log = log
+type ClientDispenser interface {
+	clientFor(name string) interface{}
 }
 
 // clientDispenser supports the initialization and retrieval of multiple implementations for a single plugin kind, such as
 // "aws" and "azure" implementations of the object store plugin.
 type clientDispenser struct {
+	// logger is the log the plugin should use.
+	logger logrus.FieldLogger
 	// clienConn is shared among all implementations for this client.
 	clientConn *grpc.ClientConn
-	// log is the log the plugin should use.
-	log *logrusAdapter
 	// initFunc returns a client that implements a plugin interface, such as cloudprovider.ObjectStore.
-	initFunc func() client
+	initFunc clientInitFunc
 	// clients keeps track of all the initialized implementations.
-	clients map[string]client
+	clients map[string]interface{}
 }
 
-// newClientDispenser creates a new clientDispenser.
-func newClientDispenser(clientConn *grpc.ClientConn, initFunc func() client) *clientDispenser {
-	m := &clientDispenser{
-		clientConn: clientConn,
-		initFunc:   initFunc,
-		clients:    make(map[string]client),
-	}
+type clientInitFunc func(base *clientBase, clientConn *grpc.ClientConn) interface{}
 
-	return m
+// newClientDispenser creates a new clientDispenser.
+func newClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, initFunc clientInitFunc) *clientDispenser {
+	return &clientDispenser{
+		clientConn: clientConn,
+		logger:     logger,
+		initFunc:   initFunc,
+		clients:    make(map[string]interface{}),
+	}
 }
 
 // clientFor returns a gRPC client stub for the implementation of a plugin named name. If the client stub does not
 // currently exist, clientFor creates it.
-func (m *clientDispenser) clientFor(name string) interface{} {
-	if client, found := m.clients[name]; found {
+func (cd *clientDispenser) clientFor(name string) interface{} {
+	if client, found := cd.clients[name]; found {
 		return client
 	}
 
+	base := &clientBase{
+		plugin: name,
+		logger: cd.logger,
+	}
 	// Initialize the plugin (e.g. newBackupItemActionGRPCClient())
-	client := m.initFunc()
+	client := cd.initFunc(base, cd.clientConn)
+	cd.clients[name] = client
 
-	// Set the implementation name (e.g. "pod")
-	client.setPlugin(name)
-	// Set the gRPC clientConn, so it can create the stub (e.g. proto.NewBackupItemActionClient(clientConn))
-	client.setGrpcClientConn(m.clientConn)
-	// Set the log that the XYZGRPCClient can use
-	client.setLog(m.log)
-	m.clients[name] = client
 	return client
 }

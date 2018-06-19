@@ -27,12 +27,12 @@ import (
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableBlockStore struct {
 	key                 kindAndName
-	sharedPluginProcess *restartableProcess
+	sharedPluginProcess RestartableProcess
 	config              map[string]string
 }
 
 // newRestartableBlockStore returns a new restartableBlockStore.
-func newRestartableBlockStore(name string, sharedPluginProcess *restartableProcess) *restartableBlockStore {
+func newRestartableBlockStore(name string, sharedPluginProcess RestartableProcess) *restartableBlockStore {
 	key := kindAndName{kind: PluginKindBlockStore, name: name}
 	r := &restartableBlockStore{
 		key:                 key,

@@ -22,6 +22,29 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type RestartableProcessFactory interface {
+	newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error)
+}
+
+type restartableProcessFactory struct {
+}
+
+func newRestartableProcessFactory() RestartableProcessFactory {
+	return &restartableProcessFactory{}
+}
+
+func (rpf *restartableProcessFactory) newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
+	return newRestartableProcess(command, logger, logLevel)
+}
+
+type RestartableProcess interface {
+	addReinitializer(key kindAndName, r reinitializer)
+	reset() error
+	resetIfNeeded() error
+	getByKindAndName(key kindAndName) (interface{}, error)
+	stop()
+}
+
 // restartableProcess encapsulates the lifecycle for all plugins contained in a single executable file. It is able
 // to restart a plugin process if it is terminated for any reason. If this happens, all plugins are reinitialized using
 // the original configuration data.
@@ -32,7 +55,7 @@ type restartableProcess struct {
 
 	// lock guards all of the fields below
 	lock           sync.RWMutex
-	process        *process
+	process        Process
 	plugins        map[kindAndName]interface{}
 	reinitializers map[kindAndName]reinitializer
 	resetFailures  int
@@ -40,12 +63,12 @@ type restartableProcess struct {
 
 // reinitializer is capable of reinitializing a restartable plugin instance using the newly dispensed plugin.
 type reinitializer interface {
-	// reinitialize reinitializes a resumable plugin instance using the newly dispensed plugin.
+	// reinitialize reinitializes a restartable plugin instance using the newly dispensed plugin.
 	reinitialize(dispensed interface{}) error
 }
 
 // newRestartableProcess creates a new restartableProcess for the given command and options.
-func newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (*restartableProcess, error) {
+func newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
 	p := &restartableProcess{
 		command:        command,
 		logger:         logger,

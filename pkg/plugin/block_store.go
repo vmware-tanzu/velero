@@ -35,14 +35,13 @@ import (
 // interface.
 type BlockStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-
-	*serverMux
+	*pluginBase
 }
 
 // NewBlockStorePlugin constructs a BlockStorePlugin.
-func NewBlockStorePlugin() *BlockStorePlugin {
+func NewBlockStorePlugin(options ...pluginOption) *BlockStorePlugin {
 	return &BlockStorePlugin{
-		serverMux: newServerMux(),
+		pluginBase: newPluginBase(options...),
 	}
 }
 
@@ -52,7 +51,7 @@ func NewBlockStorePlugin() *BlockStorePlugin {
 
 // GRPCClient returns a BlockStore gRPC client.
 func (p *BlockStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(c, newBlockStoreGRPCClient), nil
+	return newClientDispenser(p.clientLogger, c, newBlockStoreGRPCClient), nil
 }
 
 // BlockStoreGRPCClient implements the cloudprovider.BlockStore interface and uses a
@@ -62,12 +61,11 @@ type BlockStoreGRPCClient struct {
 	grpcClient proto.BlockStoreClient
 }
 
-func newBlockStoreGRPCClient() client {
-	return &BlockStoreGRPCClient{clientBase: &clientBase{}}
-}
-
-func (c *BlockStoreGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
-	c.grpcClient = proto.NewBlockStoreClient(clientConn)
+func newBlockStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &BlockStoreGRPCClient{
+		clientBase: base,
+		grpcClient: proto.NewBlockStoreClient(clientConn),
+	}
 }
 
 // Init prepares the BlockStore for usage using the provided map of

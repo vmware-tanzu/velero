@@ -32,6 +32,7 @@ type Interface interface {
 	ReadDir(dirname string) ([]os.FileInfo, error)
 	ReadFile(filename string) ([]byte, error)
 	DirExists(path string) (bool, error)
+	Stat(path string) (os.FileInfo, error)
 }
 
 func NewFileSystem() Interface {
@@ -73,4 +74,8 @@ func (fs *osFileSystem) DirExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func (fs *osFileSystem) Stat(path string) (os.FileInfo, error) {
+	return os.Stat(path)
 }

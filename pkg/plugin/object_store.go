@@ -36,16 +36,13 @@ const byteChunkSize = 16384
 // interface.
 type ObjectStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-
-	*serverMux
-
-	log *logrusAdapter
+	*pluginBase
 }
 
 // NewObjectStorePlugin construct an ObjectStorePlugin.
-func NewObjectStorePlugin() *ObjectStorePlugin {
+func NewObjectStorePlugin(options ...pluginOption) *ObjectStorePlugin {
 	return &ObjectStorePlugin{
-		serverMux: newServerMux(),
+		pluginBase: newPluginBase(options...),
 	}
 }
 
@@ -55,7 +52,7 @@ func NewObjectStorePlugin() *ObjectStorePlugin {
 
 // GRPCClient returns an ObjectStore gRPC client.
 func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(c, newObjectStoreGRPCClient), nil
+	return newClientDispenser(p.clientLogger, c, newObjectStoreGRPCClient), nil
 
 }
 
@@ -66,12 +63,11 @@ type ObjectStoreGRPCClient struct {
 	grpcClient proto.ObjectStoreClient
 }
 
-func newObjectStoreGRPCClient() client {
-	return &ObjectStoreGRPCClient{clientBase: &clientBase{}}
-}
-
-func (c *ObjectStoreGRPCClient) setGrpcClientConn(clientConn *grpc.ClientConn) {
-	c.grpcClient = proto.NewObjectStoreClient(clientConn)
+func newObjectStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &ObjectStoreGRPCClient{
+		clientBase: base,
+		grpcClient: proto.NewObjectStoreClient(clientConn),
+	}
 }
 
 // Init prepares the ObjectStore for usage using the provided map of

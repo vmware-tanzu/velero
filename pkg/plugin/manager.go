@@ -56,18 +56,23 @@ type manager struct {
 	logLevel logrus.Level
 	registry Registry
 
+	restartableProcessFactory RestartableProcessFactory
+
 	// lock guards restartableProcesses
 	lock                 sync.Mutex
-	restartableProcesses map[string]*restartableProcess
+	restartableProcesses map[string]RestartableProcess
 }
 
 // NewManager constructs a manager for getting plugins.
 func NewManager(logger logrus.FieldLogger, level logrus.Level, registry Registry) Manager {
 	return &manager{
-		logger:               logger,
-		logLevel:             level,
-		registry:             registry,
-		restartableProcesses: make(map[string]*restartableProcess),
+		logger:   logger,
+		logLevel: level,
+		registry: registry,
+
+		restartableProcessFactory: newRestartableProcessFactory(),
+
+		restartableProcesses: make(map[string]RestartableProcess),
 	}
 }
 
@@ -83,7 +88,7 @@ func (m *manager) CleanupClients() {
 
 // getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
 // restartableProcess if it is the first time it has been requested.
-func (m *manager) getRestartableProcess(kind PluginKind, name string) (*restartableProcess, error) {
+func (m *manager) getRestartableProcess(kind PluginKind, name string) (RestartableProcess, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -108,7 +113,7 @@ func (m *manager) getRestartableProcess(kind PluginKind, name string) (*restarta
 
 	logger.Debug("creating new restartable plugin process")
 
-	restartableProcess, err = newRestartableProcess(info.Command, m.logger, m.logLevel)
+	restartableProcess, err = m.restartableProcessFactory.newRestartableProcess(info.Command, m.logger, m.logLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +123,7 @@ func (m *manager) getRestartableProcess(kind PluginKind, name string) (*restarta
 	return restartableProcess, nil
 }
 
-// GetObjectStore returns a resumableObjectStore for name.
+// GetObjectStore returns a restartableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindObjectStore, name)
 	if err != nil {
@@ -130,9 +135,9 @@ func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error)
 	return r, nil
 }
 
-// GetBlockStore returns a resumableBlockStore for name.
+// GetBlockStore returns a restartableBlockStore for name.
 func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
-	restartableProcess, err := m.getRestartableProcess(PluginKindObjectStore, name)
+	restartableProcess, err := m.getRestartableProcess(PluginKindBlockStore, name)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +147,7 @@ func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
 	return r, nil
 }
 
-// GetBackupItemActions returns all backup item actions as resumableBackupItemActions.
+// GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
 func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 	list := m.registry.List(PluginKindBackupItemAction)
 
@@ -162,7 +167,7 @@ func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 	return actions, nil
 }
 
-// GetBackupItemAction returns a resumableBackupItemAction for name.
+// GetBackupItemAction returns a restartableBackupItemAction for name.
 func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindBackupItemAction, name)
 	if err != nil {

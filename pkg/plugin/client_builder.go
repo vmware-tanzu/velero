@@ -26,17 +26,19 @@ import (
 
 // clientBuilder builds go-plugin Clients.
 type clientBuilder struct {
-	logger      hclog.Logger
-	commandName string
-	commandArgs []string
+	commandName  string
+	commandArgs  []string
+	clientLogger logrus.FieldLogger
+	pluginLogger hclog.Logger
 }
 
 // newClientBuilder returns a new clientBuilder with commandName to name. If the command matches the currently running
 // process (i.e. ark), this also sets commandArgs to the internal Ark command to run plugins.
 func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus.Level) *clientBuilder {
 	b := &clientBuilder{
-		commandName: command,
-		logger:      &logrusAdapter{impl: logger, level: logLevel},
+		commandName:  command,
+		clientLogger: logger,
+		pluginLogger: newLogrusAdapter(logger, logLevel),
 	}
 	if command == os.Args[0] {
 		// For plugins compiled into the ark executable, we need to run "ark run-plugin"
@@ -45,21 +47,28 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	return b
 }
 
-// client creates a new go-plugin Client with support for all of Ark's plugin kinds (BackupItemAction, BlockStore,
-// ObjectStore, PluginLister, RestoreItemAction).
-func (b *clientBuilder) client() *hcplugin.Client {
-	config := &hcplugin.ClientConfig{
+func newLogrusAdapter(pluginLogger logrus.FieldLogger, logLevel logrus.Level) *logrusAdapter {
+	return &logrusAdapter{impl: pluginLogger, level: logLevel}
+}
+
+func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
+	return &hcplugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(PluginKindBackupItemAction):  NewBackupItemActionPlugin(),
-			string(PluginKindBlockStore):        NewBlockStorePlugin(),
-			string(PluginKindObjectStore):       NewObjectStorePlugin(),
+			string(PluginKindBackupItemAction):  NewBackupItemActionPlugin(clientLogger(b.clientLogger)),
+			string(PluginKindBlockStore):        NewBlockStorePlugin(clientLogger(b.clientLogger)),
+			string(PluginKindObjectStore):       NewObjectStorePlugin(clientLogger(b.clientLogger)),
 			string(PluginKindPluginLister):      &PluginListerPlugin{},
-			string(PluginKindRestoreItemAction): NewRestoreItemActionPlugin(),
+			string(PluginKindRestoreItemAction): NewRestoreItemActionPlugin(clientLogger(b.clientLogger)),
 		},
-		Logger: b.logger,
+		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...),
 	}
-	return hcplugin.NewClient(config)
+}
+
+// client creates a new go-plugin Client with support for all of Ark's plugin kinds (BackupItemAction, BlockStore,
+// ObjectStore, PluginLister, RestoreItemAction).
+func (b *clientBuilder) client() *hcplugin.Client {
+	return hcplugin.NewClient(b.clientConfig())
 }

@@ -17,10 +17,10 @@ package plugin
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -29,9 +29,6 @@ import (
 type Registry interface {
 	// DiscoverPlugins discovers all available plugins.
 	DiscoverPlugins() error
-	// SkipInternalDiscovery tells the registry not to discover plugins contained in the current executable, which is
-	// typically the Ark server process. This is mainly used for testing and generally should not be needed elsewhere.
-	SkipInternalDiscovery()
 	// List returns all PluginIdentifiers for kind.
 	List(kind PluginKind) []PluginIdentifier
 	// Get returns the PluginIdentifier for kind and name.
@@ -47,48 +44,48 @@ type kindAndName struct {
 // registry implements Registry.
 type registry struct {
 	// dir is the directory to search for plugins.
-	dir string
-	// skipInternalDiscovery prevents the registry from discovering plugins in the current executable. This is mainly
-	// for testing purposes.
-	skipInternalDiscovery bool
-	logger                logrus.FieldLogger
-	logLevel              logrus.Level
-	pluginsByID           map[kindAndName]PluginIdentifier
-	pluginsByKind         map[PluginKind][]PluginIdentifier
+	dir      string
+	logger   logrus.FieldLogger
+	logLevel logrus.Level
+
+	processFactory ProcessFactory
+	fs             filesystem.Interface
+	pluginsByID    map[kindAndName]PluginIdentifier
+	pluginsByKind  map[PluginKind][]PluginIdentifier
 }
 
 // NewRegistry returns a new registry.
 func NewRegistry(dir string, logger logrus.FieldLogger, logLevel logrus.Level) Registry {
 	return &registry{
-		dir:           dir,
-		logger:        logger,
-		logLevel:      logLevel,
-		pluginsByID:   make(map[kindAndName]PluginIdentifier),
-		pluginsByKind: make(map[PluginKind][]PluginIdentifier),
+		dir:      dir,
+		logger:   logger,
+		logLevel: logLevel,
+
+		processFactory: newProcessFactory(),
+		fs:             filesystem.NewFileSystem(),
+		pluginsByID:    make(map[kindAndName]PluginIdentifier),
+		pluginsByKind:  make(map[PluginKind][]PluginIdentifier),
 	}
 }
 
-func (r *registry) SkipInternalDiscovery() {
-	r.skipInternalDiscovery = true
-}
-
 func (r *registry) DiscoverPlugins() error {
-	plugins, err := readPluginsDir(r.dir)
+	plugins, err := r.readPluginsDir(r.dir)
 	if err != nil {
 		return err
 	}
 
-	var commands []string
-	if !r.skipInternalDiscovery {
-		// ark's internal plugins
-		commands = append(commands, os.Args[0])
-	}
+	// Start by adding ark's internal plugins
+	commands := []string{os.Args[0]}
+	// Then add the discovered plugin executables
 	commands = append(commands, plugins...)
 
+	return r.discoverPlugins(commands)
+}
+
+func (r *registry) discoverPlugins(commands []string) error {
 	for _, command := range commands {
 		plugins, err := r.listPlugins(command)
 		if err != nil {
-			// TODO(ncdc): should we log & skip over any errors trying to list plugins for an executable?
 			return err
 		}
 
@@ -99,7 +96,9 @@ func (r *registry) DiscoverPlugins() error {
 				"command": command,
 			}).Info("registering plugin")
 
-			r.register(plugin)
+			if err := r.register(plugin); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -123,15 +122,15 @@ func (r *registry) Get(kind PluginKind, name string) (PluginIdentifier, error) {
 }
 
 // readPluginsDir recursively reads dir looking for plugins.
-func readPluginsDir(dir string) ([]string, error) {
-	if _, err := os.Stat(dir); err != nil {
+func (r *registry) readPluginsDir(dir string) ([]string, error) {
+	if _, err := r.fs.Stat(dir); err != nil {
 		if os.IsNotExist(err) {
 			return []string{}, nil
 		}
 		return nil, errors.WithStack(err)
 	}
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := r.fs.ReadDir(dir)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -141,7 +140,7 @@ func readPluginsDir(dir string) ([]string, error) {
 		fullPath := filepath.Join(dir, file.Name())
 
 		if file.IsDir() {
-			subDirPaths, err := readPluginsDir(fullPath)
+			subDirPaths, err := r.readPluginsDir(fullPath)
 			if err != nil {
 				return nil, err
 			}
@@ -174,7 +173,7 @@ func executable(info os.FileInfo) bool {
 
 // listPlugins executes command, queries it for registered plugins, and returns the list of PluginIdentifiers.
 func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
-	process, err := newProcess(command, r.logger, r.logLevel)
+	process, err := r.processFactory.newProcess(command, r.logger, r.logLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -194,9 +193,16 @@ func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
 }
 
 // register registers a PluginIdentifier with the registry.
-func (r *registry) register(id PluginIdentifier) {
-	r.pluginsByID[kindAndName{kind: PluginKind(id.Kind), name: id.Name}] = id
+func (r *registry) register(id PluginIdentifier) error {
+	key := kindAndName{kind: id.Kind, name: id.Name}
+	if existing, found := r.pluginsByID[key]; found {
+		return newDuplicatePluginRegistrationError(existing, id)
+	}
+
+	r.pluginsByID[key] = id
 	r.pluginsByKind[id.Kind] = append(r.pluginsByKind[id.Kind], id)
+
+	return nil
 }
 
 // pluginNotFoundError indicates a plugin could not be located for kind and name.
@@ -215,4 +221,26 @@ func newPluginNotFoundError(kind PluginKind, name string) *pluginNotFoundError {
 
 func (e *pluginNotFoundError) Error() string {
 	return fmt.Sprintf("unable to locate %v plugin named %s", e.kind, e.name)
+}
+
+type duplicatePluginRegistrationError struct {
+	existing  PluginIdentifier
+	duplicate PluginIdentifier
+}
+
+func newDuplicatePluginRegistrationError(existing, duplicate PluginIdentifier) *duplicatePluginRegistrationError {
+	return &duplicatePluginRegistrationError{
+		existing:  existing,
+		duplicate: duplicate,
+	}
+}
+
+func (e *duplicatePluginRegistrationError) Error() string {
+	return fmt.Sprintf(
+		"unable to register plugin (kind=%s, name=%s, command=%s) because another plugin is already registered for this kind and name (command=%s)",
+		string(e.duplicate.Kind),
+		e.duplicate.Name,
+		e.duplicate.Command,
+		e.existing.Command,
+	)
 }

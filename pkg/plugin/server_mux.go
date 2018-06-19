@@ -34,10 +34,11 @@ type serverMux struct {
 }
 
 // newServerMux returns a new serverMux.
-func newServerMux() *serverMux {
+func newServerMux(logger logrus.FieldLogger) *serverMux {
 	return &serverMux{
 		initializers: make(map[string]HandlerInitializer),
 		handlers:     make(map[string]interface{}),
+		serverLog:    logger,
 	}
 }
 
@@ -50,11 +51,6 @@ func (m *serverMux) register(name string, f HandlerInitializer) {
 // names returns a list of all registered implementations.
 func (m *serverMux) names() []string {
 	return sets.StringKeySet(m.initializers).List()
-}
-
-// setServerLog sets the server log to be used.
-func (m *serverMux) setServerLog(log logrus.FieldLogger) {
-	m.serverLog = log
 }
 
 // getHandler returns the instance for a plugin with the given name. If an instance has already been initialized,

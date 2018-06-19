@@ -29,14 +29,14 @@ import (
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableObjectStore struct {
 	key                 kindAndName
-	sharedPluginProcess *restartableProcess
+	sharedPluginProcess RestartableProcess
 	// config contains the data used to initialize the plugin. It is used to reinitialize the plugin in the event its
 	// sharedPluginProcess gets restarted.
 	config map[string]string
 }
 
 // newRestartableObjectStore returns a new restartableObjectStore.
-func newRestartableObjectStore(name string, sharedPluginProcess *restartableProcess) *restartableObjectStore {
+func newRestartableObjectStore(name string, sharedPluginProcess RestartableProcess) *restartableObjectStore {
 	key := kindAndName{kind: PluginKindObjectStore, name: name}
 	r := &restartableObjectStore{
 		key:                 key,

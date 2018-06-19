@@ -65,7 +65,6 @@ type Server interface {
 
 // server implements Server.
 type server struct {
-	log               logrus.FieldLogger
 	backupItemAction  *BackupItemActionPlugin
 	blockStore        *BlockStorePlugin
 	objectStore       *ObjectStorePlugin
@@ -74,24 +73,11 @@ type server struct {
 
 // NewServer returns a new Server
 func NewServer(log logrus.FieldLogger) Server {
-	backupItemAction := NewBackupItemActionPlugin()
-	backupItemAction.setServerLog(log)
-
-	blockStore := NewBlockStorePlugin()
-	blockStore.setServerLog(log)
-
-	objectStore := NewObjectStorePlugin()
-	objectStore.setServerLog(log)
-
-	restoreItemAction := NewRestoreItemActionPlugin()
-	restoreItemAction.setServerLog(log)
-
 	return &server{
-		log:               log,
-		backupItemAction:  backupItemAction,
-		blockStore:        blockStore,
-		objectStore:       objectStore,
-		restoreItemAction: restoreItemAction,
+		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
+		blockStore:        NewBlockStorePlugin(serverLogger(log)),
+		objectStore:       NewObjectStorePlugin(serverLogger(log)),
+		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
 	}
 }
 

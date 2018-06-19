@@ -28,11 +28,11 @@ import (
 // process terminated for any reason), then it proceeds with the actual call.
 type restartableBackupItemAction struct {
 	key                 kindAndName
-	sharedPluginProcess *restartableProcess
+	sharedPluginProcess RestartableProcess
 }
 
-// newRestartableBackupItemAction returns a new resumableBackupItemAction.
-func newRestartableBackupItemAction(name string, sharedPluginProcess *restartableProcess) *restartableBackupItemAction {
+// newRestartableBackupItemAction returns a new restartableBackupItemAction.
+func newRestartableBackupItemAction(name string, sharedPluginProcess RestartableProcess) *restartableBackupItemAction {
 	r := &restartableBackupItemAction{
 		key:                 kindAndName{kind: PluginKindBackupItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
