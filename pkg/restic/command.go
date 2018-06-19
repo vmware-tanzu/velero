@@ -35,7 +35,7 @@ type Command struct {
 
 // StringSlice returns the command as a slice of strings.
 func (c *Command) StringSlice() []string {
-	res := []string{"/restic"}
+	res := []string{"restic"}
 
 	res = append(res, c.Command, repoFlag(c.RepoPrefix, c.Repo))
 	if c.PasswordFile != "" {
