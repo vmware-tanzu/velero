@@ -1,21 +1,24 @@
-## ark restic server
+## ark restic repo get
 
-Run the ark restic server
+Get restic repositories
 
 ### Synopsis
 
 
-Run the ark restic server
+Get restic repositories
 
 ```
-ark restic server [flags]
+ark restic repo get [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help        help for server
-      --log-level   the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
+  -h, --help                        help for get
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
+  -l, --selector string             only show items matching this label selector
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -34,5 +37,5 @@ ark restic server [flags]
 ```
 
 ### SEE ALSO
-* [ark restic](ark_restic.md)	 - Work with restic
+* [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 

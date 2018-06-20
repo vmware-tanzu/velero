@@ -30,6 +30,8 @@ type PodVolumeBackupExpansion interface{}
 
 type PodVolumeRestoreExpansion interface{}
 
+type ResticRepositoryExpansion interface{}
+
 type RestoreExpansion interface{}
 
 type ScheduleExpansion interface{}

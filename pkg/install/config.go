@@ -31,6 +31,7 @@ type arkConfig struct {
 	gcSyncPeriod              time.Duration
 	podVolumeOperationTimeout time.Duration
 	restoreOnly               bool
+	resticLocation            string
 }
 
 func WithBackupSyncPeriod(t time.Duration) arkConfigOption {
@@ -54,6 +55,12 @@ func WithPodVolumeOperationTimeout(t time.Duration) arkConfigOption {
 func WithRestoreOnly() arkConfigOption {
 	return func(c *arkConfig) {
 		c.restoreOnly = true
+	}
+}
+
+func WithResticLocation(location string) arkConfigOption {
+	return func(c *arkConfig) {
+		c.resticLocation = location
 	}
 }
 
@@ -87,7 +94,8 @@ func Config(
 				Name:   backupCloudProviderName,
 				Config: backupCloudProviderConfig,
 			},
-			Bucket: bucket,
+			Bucket:         bucket,
+			ResticLocation: c.resticLocation,
 		},
 		BackupSyncPeriod: metav1.Duration{
 			Duration: c.backupSyncPeriod,

@@ -17,12 +17,9 @@ limitations under the License.
 package controller
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -40,6 +37,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restic"
+	arkexec "github.com/heptio/ark/pkg/util/exec"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -184,7 +182,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 
 	var stdout, stderr string
 
-	if stdout, stderr, err = runCommand(resticCmd.Cmd()); err != nil {
+	if stdout, stderr, err = arkexec.RunCommand(resticCmd.Cmd()); err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 		return c.fail(req, fmt.Sprintf("error running restic backup, stderr=%s: %s", stderr, err.Error()), log)
 	}
@@ -208,35 +206,6 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	}
 
 	return nil
-}
-
-// runCommand runs a command and returns its stdout, stderr, and its returned
-// error (if any). If there are errors reading stdout or stderr, their return
-// value(s) will contain the error as a string.
-func runCommand(cmd *exec.Cmd) (string, string, error) {
-	stdoutBuf := new(bytes.Buffer)
-	stderrBuf := new(bytes.Buffer)
-
-	cmd.Stdout = stdoutBuf
-	cmd.Stderr = stderrBuf
-
-	runErr := cmd.Run()
-
-	var stdout, stderr string
-
-	if res, readErr := ioutil.ReadAll(stdoutBuf); readErr != nil {
-		stdout = errors.Wrap(readErr, "error reading command's stdout").Error()
-	} else {
-		stdout = string(res)
-	}
-
-	if res, readErr := ioutil.ReadAll(stderrBuf); readErr != nil {
-		stderr = errors.Wrap(readErr, "error reading command's stderr").Error()
-	} else {
-		stderr = string(res)
-	}
-
-	return stdout, stderr, runErr
 }
 
 func (c *podVolumeBackupController) patchPodVolumeBackup(req *arkv1api.PodVolumeBackup, mutate func(*arkv1api.PodVolumeBackup)) (*arkv1api.PodVolumeBackup, error) {

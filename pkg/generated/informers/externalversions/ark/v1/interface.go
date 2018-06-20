@@ -36,6 +36,8 @@ type Interface interface {
 	PodVolumeBackups() PodVolumeBackupInformer
 	// PodVolumeRestores returns a PodVolumeRestoreInformer.
 	PodVolumeRestores() PodVolumeRestoreInformer
+	// ResticRepositories returns a ResticRepositoryInformer.
+	ResticRepositories() ResticRepositoryInformer
 	// Restores returns a RestoreInformer.
 	Restores() RestoreInformer
 	// Schedules returns a ScheduleInformer.
@@ -81,6 +83,11 @@ func (v *version) PodVolumeBackups() PodVolumeBackupInformer {
 // PodVolumeRestores returns a PodVolumeRestoreInformer.
 func (v *version) PodVolumeRestores() PodVolumeRestoreInformer {
 	return &podVolumeRestoreInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ResticRepositories returns a ResticRepositoryInformer.
+func (v *version) ResticRepositories() ResticRepositoryInformer {
+	return &resticRepositoryInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // Restores returns a RestoreInformer.

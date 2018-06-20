@@ -1,11 +1,11 @@
 ## ark restic
 
-Work with restic repositories
+Work with restic
 
 ### Synopsis
 
 
-Work with restic repositories
+Work with restic
 
 ### Options
 
@@ -30,6 +30,6 @@ Work with restic repositories
 
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark restic init-repository](ark_restic_init-repository.md)	 - create an encryption key for a restic repository
+* [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 * [ark restic server](ark_restic_server.md)	 - Run the ark restic server
 
