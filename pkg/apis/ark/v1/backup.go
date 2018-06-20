@@ -170,6 +170,17 @@ type BackupStatus struct {
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable).
 	ValidationErrors []string `json:"validationErrors"`
+
+	// StartTimestamp records the time a backup was started.
+	// Separate from CreationTimestamp, since that value changes
+	// on restores.
+	// The server's time is used for StartTimestamps
+	StartTimestamp metav1.Time `json:"startTimestamp"`
+
+	// CompletionTimestamp records the time a backup was completed.
+	// Completion time is recorded even on failed backups.
+	// The server's time is used for CompletionTimestamps
+	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
 }
 
 // VolumeBackupInfo captures the required information about

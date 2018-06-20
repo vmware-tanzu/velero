@@ -286,6 +286,8 @@ func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	in.StartTimestamp.DeepCopyInto(&out.StartTimestamp)
+	in.CompletionTimestamp.DeepCopyInto(&out.CompletionTimestamp)
 	return
 }
 

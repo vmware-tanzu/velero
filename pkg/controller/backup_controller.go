@@ -337,6 +337,7 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
 	log := controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
+	backup.Status.StartTimestamp.Time = controller.clock.Now()
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -391,6 +392,11 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 
 	backupScheduleName := backup.GetLabels()["ark-schedule"]
 	controller.metrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
+
+	backup.Status.CompletionTimestamp.Time = controller.clock.Now()
+	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
+	backupDurationSeconds := float64(backupDuration / time.Second)
+	controller.metrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
 
 	log.Info("Backup completed")
 
