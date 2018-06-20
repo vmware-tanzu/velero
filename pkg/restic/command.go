@@ -18,7 +18,9 @@ package restic
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -48,6 +50,14 @@ func (c *Command) StringSlice() []string {
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
 	}
+
+	// If ARK_SCRATCH_DIR is defined, put the restic cache within it. If not,
+	// allow restic to choose the location. This makes running either in-cluster
+	// or local (dev) work properly.
+	if scratch := os.Getenv("ARK_SCRATCH_DIR"); scratch != "" {
+		res = append(res, cacheDirFlag(filepath.Join(scratch, ".cache", "restic")))
+	}
+
 	res = append(res, c.Args...)
 	res = append(res, c.ExtraFlags...)
 
@@ -74,4 +84,8 @@ func repoFlag(repoIdentifier string) string {
 
 func passwordFlag(file string) string {
 	return fmt.Sprintf("--password-file=%s", file)
+}
+
+func cacheDirFlag(dir string) string {
+	return fmt.Sprintf("--cache-dir=%s", dir)
 }

@@ -36,6 +36,8 @@ spec:
         - name: host-pods
           hostPath:
             path: /var/lib/kubelet/pods
+        - name: scratch
+          emptyDir: {}
       containers:
         - name: ark
           image: gcr.io/heptio-images/ark:latest
@@ -49,6 +51,8 @@ spec:
               mountPath: /credentials
             - name: host-pods
               mountPath: /host_pods
+            - name: scratch
+              mountPath: /scratch
           env:
             - name: NODE_NAME
               valueFrom:
@@ -60,3 +64,5 @@ spec:
                   fieldPath: metadata.namespace
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
+            - name: ARK_SCRATCH_DIR
+              value: /scratch
