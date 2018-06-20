@@ -107,7 +107,7 @@
 
 [[constraint]]
   name = "github.com/stretchr/testify"
-  branch = "master"
+  version = "~1.2.2"
 
 [[constraint]]
   name = "github.com/hashicorp/go-plugin"
