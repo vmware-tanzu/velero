@@ -19,7 +19,6 @@ package output
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"k8s.io/kubernetes/pkg/printers"
 
@@ -27,7 +26,7 @@ import (
 )
 
 var (
-	resticRepoColumns = []string{"NAME", "STATUS", "LAST MAINTENANCE", "LAST KEY CHANGE"}
+	resticRepoColumns = []string{"NAME", "STATUS", "LAST MAINTENANCE", "KEY AGE"}
 )
 
 func printResticRepoList(list *v1.ResticRepositoryList, w io.Writer, options printers.PrintOptions) error {
@@ -53,13 +52,20 @@ func printResticRepo(repo *v1.ResticRepository, w io.Writer, options printers.Pr
 		status = v1.ResticRepositoryPhaseNew
 	}
 
+	var keyAge string
+	if status == v1.ResticRepositoryPhaseReady {
+		keyAge = humanReadableDurationSince(repo.Status.LastKeyChangeTime.Time, "<unknown>")
+	} else {
+		keyAge = humanReadableDurationSince(repo.Status.LastKeyChangeTime.Time, "<n/a>")
+	}
+
 	if _, err := fmt.Fprintf(
 		w,
 		"%s\t%s\t%s\t%s",
 		name,
 		status,
-		timeOrNever(repo.Status.LastMaintenanceTime.Time),
-		timeOrNever(repo.Status.LastKeyChangeTime.Time),
+		timeOrDefault(repo.Status.LastMaintenanceTime.Time, "<never>"),
+		keyAge,
 	); err != nil {
 		return err
 	}
@@ -70,11 +76,4 @@ func printResticRepo(repo *v1.ResticRepository, w io.Writer, options printers.Pr
 
 	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, repo.Labels))
 	return err
-}
-
-func timeOrNever(t time.Time) string {
-	if t.IsZero() {
-		return "<never>"
-	}
-	return t.String()
 }

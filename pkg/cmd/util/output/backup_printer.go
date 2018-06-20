@@ -21,10 +21,8 @@ import (
 	"io"
 	"regexp"
 	"sort"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
@@ -102,18 +100,4 @@ func printBackup(backup *v1.Backup, w io.Writer, options printers.PrintOptions) 
 
 	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, backup.Labels))
 	return err
-}
-
-func humanReadableTimeFromNow(when time.Time) string {
-	if when.IsZero() {
-		return "n/a"
-	}
-
-	now := time.Now()
-	switch {
-	case when == now || when.After(now):
-		return duration.ShortHumanDuration(when.Sub(now))
-	default:
-		return fmt.Sprintf("%s ago", duration.ShortHumanDuration(now.Sub(when)))
-	}
 }
