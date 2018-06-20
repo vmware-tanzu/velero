@@ -33,6 +33,8 @@ spec:
         - name: host-pods
           hostPath:
             path: /var/lib/kubelet/pods
+        - name: scratch
+          emptyDir: {}
       containers:
         - name: ark
           image: gcr.io/heptio-images/ark:latest
@@ -44,6 +46,8 @@ spec:
           volumeMounts:
             - name: host-pods
               mountPath: /host_pods
+            - name: scratch
+              mountPath: /scratch
           envFrom:
             - secretRef:
                 name: cloud-credentials
@@ -66,4 +70,5 @@ spec:
                 secretKeyRef:
                   name: cloud-credentials
                   key: AZURE_STORAGE_KEY
-            
+            - name: ARK_SCRATCH_DIR
+              value: /scratch
