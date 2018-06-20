@@ -4,7 +4,12 @@ package generated;
 message Empty {}
 
 message InitRequest {
-    map<string, string> config = 1;
+    string plugin = 1;
+    map<string, string> config = 2;
+}
+
+message AppliesToRequest {
+    string plugin = 1;
 }
 
 message AppliesToResponse {

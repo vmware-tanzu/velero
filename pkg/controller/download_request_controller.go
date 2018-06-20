@@ -49,12 +49,31 @@ type downloadRequestController struct {
 	downloadRequestListerSynced cache.InformerSynced
 	restoreLister               listers.RestoreLister
 	restoreListerSynced         cache.InformerSynced
-	backupService               cloudprovider.BackupService
 	bucket                      string
 	syncHandler                 func(key string) error
 	queue                       workqueue.RateLimitingInterface
 	clock                       clock.Clock
 	logger                      logrus.FieldLogger
+
+	signedURLCreator signedURLCreator
+}
+
+type signedURLCreator interface {
+	createSignedURL(target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error)
+}
+
+type objectStoreSignedURLCreator struct {
+	objectStore cloudprovider.ObjectStore
+}
+
+func newObjectStoreSignedURLCreator(objectStore cloudprovider.ObjectStore) signedURLCreator {
+	return &objectStoreSignedURLCreator{
+		objectStore: objectStore,
+	}
+}
+
+func (o *objectStoreSignedURLCreator) createSignedURL(target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
+	return cloudprovider.CreateSignedURL(o.objectStore, target, bucket, directory, ttl)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -62,7 +81,7 @@ func NewDownloadRequestController(
 	downloadRequestClient arkv1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
 	restoreInformer informers.RestoreInformer,
-	backupService cloudprovider.BackupService,
+	objectStore cloudprovider.ObjectStore,
 	bucket string,
 	logger logrus.FieldLogger,
 ) Interface {
@@ -72,11 +91,12 @@ func NewDownloadRequestController(
 		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
 		restoreLister:               restoreInformer.Lister(),
 		restoreListerSynced:         restoreInformer.Informer().HasSynced,
-		backupService:               backupService,
 		bucket:                      bucket,
 		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
 		clock:                       &clock.RealClock{},
 		logger:                      logger,
+
+		signedURLCreator: newObjectStoreSignedURLCreator(objectStore),
 	}
 
 	c.syncHandler = c.processDownloadRequest
@@ -236,7 +256,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		directory = downloadRequest.Spec.Target.Name
 	}
 
-	update.Status.DownloadURL, err = c.backupService.CreateSignedURL(downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
+	update.Status.DownloadURL, err = c.signedURLCreator.createSignedURL(downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
 	if err != nil {
 		return err
 	}

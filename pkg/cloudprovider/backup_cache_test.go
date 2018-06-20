@@ -25,13 +25,13 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/util/test"
 )
 
 func TestNewBackupCache(t *testing.T) {
-
 	var (
-		delegate    = &test.FakeBackupService{}
+		delegate    = &cloudprovidermocks.BackupGetter{}
 		ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 		logger      = test.NewLogger()
 	)
@@ -103,7 +103,7 @@ func TestNewBackupCache(t *testing.T) {
 
 func TestBackupCacheRefresh(t *testing.T) {
 	var (
-		delegate = &test.FakeBackupService{}
+		delegate = &cloudprovidermocks.BackupGetter{}
 		logger   = test.NewLogger()
 	)
 
@@ -135,7 +135,7 @@ func TestBackupCacheRefresh(t *testing.T) {
 
 func TestBackupCacheGetAllBackupsUsesCacheIfPresent(t *testing.T) {
 	var (
-		delegate = &test.FakeBackupService{}
+		delegate = &cloudprovidermocks.BackupGetter{}
 		logger   = test.NewLogger()
 		bucket1  = []*v1.Backup{
 			test.NewTestBackup().WithName("backup1").Backup,

@@ -4,8 +4,9 @@ package generated;
 import "Shared.proto";
 
 message RestoreExecuteRequest {
-    bytes item = 1;
-    bytes restore = 2;
+    string plugin = 1;
+    bytes item = 2;
+    bytes restore = 3;
 }
 
 message RestoreExecuteResponse {
@@ -14,6 +15,6 @@ message RestoreExecuteResponse {
 }
 
 service RestoreItemAction {
-    rpc AppliesTo(Empty) returns (AppliesToResponse);
+    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
     rpc Execute(RestoreExecuteRequest) returns (RestoreExecuteResponse);
 }

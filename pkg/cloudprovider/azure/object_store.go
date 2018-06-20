@@ -23,16 +23,18 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
 type objectStore struct {
 	blobClient *storage.BlobStorageClient
+	log        logrus.FieldLogger
 }
 
-func NewObjectStore() cloudprovider.ObjectStore {
-	return &objectStore{}
+func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
+	return &objectStore{log: logger}
 }
 
 func (o *objectStore) Init(config map[string]string) error {

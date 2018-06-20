@@ -17,17 +17,14 @@ limitations under the License.
 package plugin
 
 import (
-	plugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cloudprovider/aws"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
-	"github.com/heptio/ark/pkg/cmd"
 	arkplugin "github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 )
@@ -36,92 +33,94 @@ func NewCommand(f client.Factory) *cobra.Command {
 	logger := arkplugin.NewLogger()
 
 	c := &cobra.Command{
-		Use:    "run-plugin [KIND] [NAME]",
+		Use:    "run-plugin",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
-		Args:   cobra.ExactArgs(2),
 		Run: func(c *cobra.Command, args []string) {
-			kind := args[0]
-			name := args[1]
-
-			logger = logger.WithFields(logrus.Fields{"kind": kind, "name": name})
-
-			serveConfig := &plugin.ServeConfig{
-				HandshakeConfig: arkplugin.Handshake,
-				GRPCServer:      plugin.DefaultGRPCServer,
-			}
-
 			logger.Debug("Executing run-plugin command")
 
-			switch kind {
-			case "cloudprovider":
-				var (
-					objectStore cloudprovider.ObjectStore
-					blockStore  cloudprovider.BlockStore
-				)
-
-				switch name {
-				case "aws":
-					objectStore, blockStore = aws.NewObjectStore(), aws.NewBlockStore()
-				case "azure":
-					objectStore, blockStore = azure.NewObjectStore(), azure.NewBlockStore()
-				case "gcp":
-					objectStore, blockStore = gcp.NewObjectStore(), gcp.NewBlockStore(logger)
-				default:
-					logger.Fatal("Unrecognized plugin name")
-				}
-
-				serveConfig.Plugins = map[string]plugin.Plugin{
-					string(arkplugin.PluginKindObjectStore): arkplugin.NewObjectStorePlugin(objectStore),
-					string(arkplugin.PluginKindBlockStore):  arkplugin.NewBlockStorePlugin(blockStore),
-				}
-			case arkplugin.PluginKindBackupItemAction.String():
-				var action backup.ItemAction
-
-				switch name {
-				case "pv":
-					action = backup.NewBackupPVAction(logger)
-				case "pod":
-					action = backup.NewPodAction(logger)
-				case "serviceaccount":
-					clientset, err := f.KubeClient()
-					cmd.CheckError(err)
-
-					action, err = backup.NewServiceAccountAction(logger, clientset.RbacV1().ClusterRoleBindings())
-					cmd.CheckError(err)
-				default:
-					logger.Fatal("Unrecognized plugin name")
-				}
-
-				serveConfig.Plugins = map[string]plugin.Plugin{
-					kind: arkplugin.NewBackupItemActionPlugin(action),
-				}
-			case arkplugin.PluginKindRestoreItemAction.String():
-				var action restore.ItemAction
-
-				switch name {
-				case "job":
-					action = restore.NewJobAction(logger)
-				case "pod":
-					action = restore.NewPodAction(logger)
-				case "svc":
-					action = restore.NewServiceAction(logger)
-				case "restic":
-					action = restore.NewResticRestoreAction(logger)
-				default:
-					logger.Fatal("Unrecognized plugin name")
-				}
-
-				serveConfig.Plugins = map[string]plugin.Plugin{
-					kind: arkplugin.NewRestoreItemActionPlugin(action),
-				}
-			default:
-				logger.Fatal("Unsupported plugin kind")
-			}
-
-			plugin.Serve(serveConfig)
+			arkplugin.NewServer(logger).
+				RegisterObjectStore("aws", newAwsObjectStore).
+				RegisterObjectStore("azure", newAzureObjectStore).
+				RegisterObjectStore("gcp", newGcpObjectStore).
+				RegisterBlockStore("aws", newAwsBlockStore).
+				RegisterBlockStore("azure", newAzureBlockStore).
+				RegisterBlockStore("gcp", newGcpBlockStore).
+				RegisterBackupItemAction("pv", newPVBackupItemAction).
+				RegisterBackupItemAction("pod", newPodBackupItemAction).
+				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
+				RegisterRestoreItemAction("job", newJobRestoreItemAction).
+				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
+				RegisterRestoreItemAction("restic", newResticRestoreItemAction).
+				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
+				Serve()
 		},
 	}
 
 	return c
+}
+
+func newAwsObjectStore(logger logrus.FieldLogger) (interface{}, error) {
+	return aws.NewObjectStore(logger), nil
+}
+
+func newAzureObjectStore(logger logrus.FieldLogger) (interface{}, error) {
+	return azure.NewObjectStore(logger), nil
+}
+
+func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
+	return gcp.NewObjectStore(logger), nil
+}
+
+func newAwsBlockStore(logger logrus.FieldLogger) (interface{}, error) {
+	return aws.NewBlockStore(logger), nil
+}
+
+func newAzureBlockStore(logger logrus.FieldLogger) (interface{}, error) {
+	return azure.NewBlockStore(logger), nil
+}
+
+func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
+	return gcp.NewBlockStore(logger), nil
+}
+
+func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return backup.NewBackupPVAction(logger), nil
+}
+
+func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return backup.NewPodAction(logger), nil
+}
+
+func newServiceAccountBackupItemAction(f client.Factory) arkplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		action, err := backup.NewServiceAccountAction(logger, clientset.RbacV1().ClusterRoleBindings())
+		if err != nil {
+			return nil, err
+		}
+
+		return action, nil
+	}
+}
+
+func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewJobAction(logger), nil
+}
+
+func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewPodAction(logger), nil
+}
+
+func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewResticRestoreAction(logger), nil
+}
+
+func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewServiceAction(logger), nil
 }

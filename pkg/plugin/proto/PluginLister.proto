@@ -1,0 +1,18 @@
+syntax = "proto3";
+package generated;
+
+import "Shared.proto";
+
+message PluginIdentifier {
+  string command = 1;
+  string kind = 2;
+  string name = 3;
+}
+
+message ListPluginsResponse {
+  repeated PluginIdentifier plugins = 1;
+}
+
+service PluginLister {
+  rpc ListPlugins(Empty) returns (ListPluginsResponse);
+}

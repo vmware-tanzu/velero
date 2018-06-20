@@ -17,14 +17,8 @@ limitations under the License.
 package plugin
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
+	"sync"
 
-	plugin "github.com/hashicorp/go-plugin"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/backup"
@@ -32,391 +26,185 @@ import (
 	"github.com/heptio/ark/pkg/restore"
 )
 
-// PluginKind is a type alias for a string that describes
-// the kind of an Ark-supported plugin.
-type PluginKind string
-
-func (k PluginKind) String() string {
-	return string(k)
-}
-
-func baseConfig() *plugin.ClientConfig {
-	return &plugin.ClientConfig{
-		HandshakeConfig:  Handshake,
-		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		Managed:          true,
-	}
-}
-
-const (
-	// PluginKindObjectStore is the Kind string for
-	// an Object Store plugin.
-	PluginKindObjectStore PluginKind = "objectstore"
-
-	// PluginKindBlockStore is the Kind string for
-	// a Block Store plugin.
-	PluginKindBlockStore PluginKind = "blockstore"
-
-	// PluginKindCloudProvider is the Kind string for
-	// a CloudProvider plugin (i.e. an Object & Block
-	// store).
-	//
-	// NOTE that it is highly likely that in subsequent
-	// versions of Ark this kind of plugin will be replaced
-	// with a different mechanism for providing multiple
-	// plugin impls within a single binary. This should
-	// probably not be used.
-	PluginKindCloudProvider PluginKind = "cloudprovider"
-
-	// PluginKindBackupItemAction is the Kind string for
-	// a Backup ItemAction plugin.
-	PluginKindBackupItemAction PluginKind = "backupitemaction"
-
-	// PluginKindRestoreItemAction is the Kind string for
-	// a Restore ItemAction plugin.
-	PluginKindRestoreItemAction PluginKind = "restoreitemaction"
-)
-
-var AllPluginKinds = []PluginKind{
-	PluginKindObjectStore,
-	PluginKindBlockStore,
-	PluginKindCloudProvider,
-	PluginKindBackupItemAction,
-	PluginKindRestoreItemAction,
-}
-
-type pluginInfo struct {
-	kinds       []PluginKind
-	name        string
-	commandName string
-	commandArgs []string
-}
-
-// Manager exposes functions for getting implementations of the pluggable
-// Ark interfaces.
+// Manager manages the lifecycles of plugins.
 type Manager interface {
-	// GetObjectStore returns the plugin implementation of the
-	// cloudprovider.ObjectStore interface with the specified name.
+	// GetObjectStore returns the ObjectStore plugin for name.
 	GetObjectStore(name string) (cloudprovider.ObjectStore, error)
 
-	// GetBlockStore returns the plugin implementation of the
-	// cloudprovider.BlockStore interface with the specified name.
+	// GetBlockStore returns the BlockStore plugin for name.
 	GetBlockStore(name string) (cloudprovider.BlockStore, error)
 
-	// GetBackupItemActions returns all backup.ItemAction plugins.
-	// These plugin instances should ONLY be used for a single backup
-	// (mainly because each one outputs to a per-backup log),
-	// and should be terminated upon completion of the backup with
-	// CloseBackupItemActions().
-	GetBackupItemActions(backupName string) ([]backup.ItemAction, error)
+	// GetBackupItemActions returns all backup item action plugins.
+	GetBackupItemActions() ([]backup.ItemAction, error)
 
-	// CloseBackupItemActions terminates the plugin sub-processes that
-	// are hosting BackupItemAction plugins for the given backup name.
-	CloseBackupItemActions(backupName string) error
+	// GetBackupItemAction returns the backup item action plugin for name.
+	GetBackupItemAction(name string) (backup.ItemAction, error)
 
-	// GetRestoreItemActions returns all restore.ItemAction plugins.
-	// These plugin instances should ONLY be used for a single restore
-	// (mainly because each one outputs to a per-restore log),
-	// and should be terminated upon completion of the restore with
-	// CloseRestoreItemActions().
-	GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error)
+	// GetRestoreItemActions returns all restore item action plugins.
+	GetRestoreItemActions() ([]restore.ItemAction, error)
 
-	// CloseRestoreItemActions terminates the plugin sub-processes that
-	// are hosting RestoreItemAction plugins for the given restore name.
-	CloseRestoreItemActions(restoreName string) error
+	// GetRestoreItemAction returns the restore item action plugin for name.
+	GetRestoreItemAction(name string) (restore.ItemAction, error)
 
-	// CleanupClients kills all plugin subprocesses.
+	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
 }
 
+// manager implements Manager.
 type manager struct {
-	logger         logrus.FieldLogger
-	logLevel       logrus.Level
-	pluginRegistry *registry
-	clientStore    *clientStore
-	pluginDir      string
+	logger   logrus.FieldLogger
+	logLevel logrus.Level
+	registry Registry
+
+	restartableProcessFactory RestartableProcessFactory
+
+	// lock guards restartableProcesses
+	lock                 sync.Mutex
+	restartableProcesses map[string]RestartableProcess
 }
 
-// NewManager constructs a manager for getting plugin implementations.
-func NewManager(logger logrus.FieldLogger, level logrus.Level, pluginDir string) (Manager, error) {
-	m := &manager{
-		logger:         logger,
-		logLevel:       level,
-		pluginRegistry: newRegistry(),
-		clientStore:    newClientStore(),
-		pluginDir:      pluginDir,
+// NewManager constructs a manager for getting plugins.
+func NewManager(logger logrus.FieldLogger, level logrus.Level, registry Registry) Manager {
+	return &manager{
+		logger:   logger,
+		logLevel: level,
+		registry: registry,
+
+		restartableProcessFactory: newRestartableProcessFactory(),
+
+		restartableProcesses: make(map[string]RestartableProcess),
 	}
-
-	if err := m.registerPlugins(); err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-func pluginForKind(kind PluginKind) plugin.Plugin {
-	switch kind {
-	case PluginKindObjectStore:
-		return &ObjectStorePlugin{}
-	case PluginKindBlockStore:
-		return &BlockStorePlugin{}
-	default:
-		return nil
-	}
-}
-
-func getPluginInstance(client *plugin.Client, kind PluginKind) (interface{}, error) {
-	protocolClient, err := client.Client()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	plugin, err := protocolClient.Dispense(string(kind))
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return plugin, nil
-}
-
-func (m *manager) registerPlugins() error {
-	arkCommand := os.Args[0]
-
-	// first, register internal plugins
-	for _, provider := range []string{"aws", "gcp", "azure"} {
-		m.pluginRegistry.register(provider, arkCommand, []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
-	}
-	m.pluginRegistry.register("pv", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
-	m.pluginRegistry.register("backup-pod", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pod"}, PluginKindBackupItemAction)
-	m.pluginRegistry.register("serviceaccount", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "serviceaccount"}, PluginKindBackupItemAction)
-
-	m.pluginRegistry.register("job", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("restore-pod", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("svc", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("restic", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "restic"}, PluginKindRestoreItemAction)
-
-	// second, register external plugins (these will override internal plugins, if applicable)
-	if _, err := os.Stat(m.pluginDir); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
-	files, err := ioutil.ReadDir(m.pluginDir)
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		name, kind, err := parse(file.Name())
-		if err != nil {
-			continue
-		}
-
-		if kind == PluginKindCloudProvider {
-			m.pluginRegistry.register(name, filepath.Join(m.pluginDir, file.Name()), nil, PluginKindObjectStore, PluginKindBlockStore)
-		} else {
-			m.pluginRegistry.register(name, filepath.Join(m.pluginDir, file.Name()), nil, kind)
-		}
-	}
-
-	return nil
-}
-
-func parse(filename string) (string, PluginKind, error) {
-	for _, kind := range AllPluginKinds {
-		if prefix := fmt.Sprintf("ark-%s-", kind); strings.Index(filename, prefix) == 0 {
-			return strings.Replace(filename, prefix, "", -1), kind, nil
-		}
-	}
-
-	return "", "", errors.New("invalid file name")
-}
-
-// GetObjectStore returns the plugin implementation of the cloudprovider.ObjectStore
-// interface with the specified name.
-func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
-	pluginObj, err := m.getCloudProviderPlugin(name, PluginKindObjectStore)
-	if err != nil {
-		return nil, err
-	}
-
-	objStore, ok := pluginObj.(cloudprovider.ObjectStore)
-	if !ok {
-		return nil, errors.New("could not convert gRPC client to cloudprovider.ObjectStore")
-	}
-
-	return objStore, nil
-}
-
-// GetBlockStore returns the plugin implementation of the cloudprovider.BlockStore
-// interface with the specified name.
-func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
-	pluginObj, err := m.getCloudProviderPlugin(name, PluginKindBlockStore)
-	if err != nil {
-		return nil, err
-	}
-
-	blockStore, ok := pluginObj.(cloudprovider.BlockStore)
-	if !ok {
-		return nil, errors.New("could not convert gRPC client to cloudprovider.BlockStore")
-	}
-
-	return blockStore, nil
-}
-
-func (m *manager) getCloudProviderPlugin(name string, kind PluginKind) (interface{}, error) {
-	client, err := m.clientStore.get(kind, name, "")
-	if err != nil {
-		pluginInfo, err := m.pluginRegistry.get(kind, name)
-		if err != nil {
-			return nil, err
-		}
-
-		// build a plugin client that can dispense all of the PluginKinds it's registered for
-		clientBuilder := newClientBuilder(baseConfig()).
-			withCommand(pluginInfo.commandName, pluginInfo.commandArgs...).
-			withLogger(&logrusAdapter{impl: m.logger, level: m.logLevel})
-
-		for _, kind := range pluginInfo.kinds {
-			clientBuilder.withPlugin(kind, pluginForKind(kind))
-		}
-
-		client = clientBuilder.client()
-
-		// register the plugin client for the appropriate kinds
-		for _, kind := range pluginInfo.kinds {
-			m.clientStore.add(client, kind, name, "")
-		}
-	}
-
-	pluginObj, err := getPluginInstance(client, kind)
-	if err != nil {
-		return nil, err
-	}
-
-	return pluginObj, nil
-}
-
-// GetBackupActions returns all backup.BackupAction plugins.
-// These plugin instances should ONLY be used for a single backup
-// (mainly because each one outputs to a per-backup log),
-// and should be terminated upon completion of the backup with
-// CloseBackupActions().
-func (m *manager) GetBackupItemActions(backupName string) ([]backup.ItemAction, error) {
-	clients, err := m.clientStore.list(PluginKindBackupItemAction, backupName)
-	if err != nil {
-		pluginInfo, err := m.pluginRegistry.list(PluginKindBackupItemAction)
-		if err != nil {
-			return nil, err
-		}
-
-		// create clients for each
-		for _, plugin := range pluginInfo {
-			logger := &logrusAdapter{impl: m.logger, level: m.logLevel}
-			client := newClientBuilder(baseConfig()).
-				withCommand(plugin.commandName, plugin.commandArgs...).
-				withPlugin(PluginKindBackupItemAction, &BackupItemActionPlugin{log: logger}).
-				withLogger(logger).
-				client()
-
-			m.clientStore.add(client, PluginKindBackupItemAction, plugin.name, backupName)
-
-			clients = append(clients, client)
-		}
-	}
-
-	var backupActions []backup.ItemAction
-	for _, client := range clients {
-		plugin, err := getPluginInstance(client, PluginKindBackupItemAction)
-		if err != nil {
-			m.CloseBackupItemActions(backupName)
-			return nil, err
-		}
-
-		backupAction, ok := plugin.(backup.ItemAction)
-		if !ok {
-			m.CloseBackupItemActions(backupName)
-			return nil, errors.New("could not convert gRPC client to backup.ItemAction")
-		}
-
-		backupActions = append(backupActions, backupAction)
-	}
-
-	return backupActions, nil
-}
-
-// CloseBackupItemActions terminates the plugin sub-processes that
-// are hosting BackupItemAction plugins for the given backup name.
-func (m *manager) CloseBackupItemActions(backupName string) error {
-	return closeAll(m.clientStore, PluginKindBackupItemAction, backupName)
-}
-
-func (m *manager) GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error) {
-	clients, err := m.clientStore.list(PluginKindRestoreItemAction, restoreName)
-	if err != nil {
-		pluginInfo, err := m.pluginRegistry.list(PluginKindRestoreItemAction)
-		if err != nil {
-			return nil, err
-		}
-
-		// create clients for each
-		for _, plugin := range pluginInfo {
-			logger := &logrusAdapter{impl: m.logger, level: m.logLevel}
-			client := newClientBuilder(baseConfig()).
-				withCommand(plugin.commandName, plugin.commandArgs...).
-				withPlugin(PluginKindRestoreItemAction, &RestoreItemActionPlugin{log: logger}).
-				withLogger(logger).
-				client()
-
-			m.clientStore.add(client, PluginKindRestoreItemAction, plugin.name, restoreName)
-
-			clients = append(clients, client)
-		}
-	}
-
-	var itemActions []restore.ItemAction
-	for _, client := range clients {
-		plugin, err := getPluginInstance(client, PluginKindRestoreItemAction)
-		if err != nil {
-			m.CloseRestoreItemActions(restoreName)
-			return nil, err
-		}
-
-		itemAction, ok := plugin.(restore.ItemAction)
-		if !ok {
-			m.CloseRestoreItemActions(restoreName)
-			return nil, errors.New("could not convert gRPC client to restore.ItemAction")
-		}
-
-		itemActions = append(itemActions, itemAction)
-	}
-
-	return itemActions, nil
-}
-
-// CloseRestoreItemActions terminates the plugin sub-processes that
-// are hosting RestoreItemAction plugins for the given restore name.
-func (m *manager) CloseRestoreItemActions(restoreName string) error {
-	return closeAll(m.clientStore, PluginKindRestoreItemAction, restoreName)
-}
-
-func closeAll(store *clientStore, kind PluginKind, scope string) error {
-	clients, err := store.list(kind, scope)
-	if err != nil {
-		return err
-	}
-
-	for _, client := range clients {
-		client.Kill()
-	}
-
-	store.deleteAll(kind, scope)
-
-	return nil
 }
 
 func (m *manager) CleanupClients() {
-	plugin.CleanupClients()
+	m.lock.Lock()
+
+	for _, restartableProcess := range m.restartableProcesses {
+		restartableProcess.stop()
+	}
+
+	m.lock.Unlock()
+}
+
+// getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
+// restartableProcess if it is the first time it has been requested.
+func (m *manager) getRestartableProcess(kind PluginKind, name string) (RestartableProcess, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	logger := m.logger.WithFields(logrus.Fields{
+		"kind": PluginKindObjectStore.String(),
+		"name": name,
+	})
+	logger.Debug("looking for plugin in registry")
+
+	info, err := m.registry.Get(kind, name)
+	if err != nil {
+		return nil, err
+	}
+
+	logger = logger.WithField("command", info.Command)
+
+	restartableProcess, found := m.restartableProcesses[info.Command]
+	if found {
+		logger.Debug("found preexisting restartable plugin process")
+		return restartableProcess, nil
+	}
+
+	logger.Debug("creating new restartable plugin process")
+
+	restartableProcess, err = m.restartableProcessFactory.newRestartableProcess(info.Command, m.logger, m.logLevel)
+	if err != nil {
+		return nil, err
+	}
+
+	m.restartableProcesses[info.Command] = restartableProcess
+
+	return restartableProcess, nil
+}
+
+// GetObjectStore returns a restartableObjectStore for name.
+func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
+	restartableProcess, err := m.getRestartableProcess(PluginKindObjectStore, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableObjectStore(name, restartableProcess)
+
+	return r, nil
+}
+
+// GetBlockStore returns a restartableBlockStore for name.
+func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
+	restartableProcess, err := m.getRestartableProcess(PluginKindBlockStore, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableBlockStore(name, restartableProcess)
+
+	return r, nil
+}
+
+// GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
+func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
+	list := m.registry.List(PluginKindBackupItemAction)
+
+	actions := make([]backup.ItemAction, 0, len(list))
+
+	for i := range list {
+		id := list[i]
+
+		r, err := m.GetBackupItemAction(id.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		actions = append(actions, r)
+	}
+
+	return actions, nil
+}
+
+// GetBackupItemAction returns a restartableBackupItemAction for name.
+func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
+	restartableProcess, err := m.getRestartableProcess(PluginKindBackupItemAction, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableBackupItemAction(name, restartableProcess)
+	return r, nil
+}
+
+// GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
+func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
+	list := m.registry.List(PluginKindRestoreItemAction)
+
+	actions := make([]restore.ItemAction, 0, len(list))
+
+	for i := range list {
+		id := list[i]
+
+		r, err := m.GetRestoreItemAction(id.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		actions = append(actions, r)
+	}
+
+	return actions, nil
+}
+
+// GetRestoreItemAction returns a restartableRestoreItemAction for name.
+func (m *manager) GetRestoreItemAction(name string) (restore.ItemAction, error) {
+	restartableProcess, err := m.getRestartableProcess(PluginKindRestoreItemAction, name)
+	if err != nil {
+		return nil, err
+	}
+
+	r := newRestartableRestoreItemAction(name, restartableProcess)
+	return r, nil
 }

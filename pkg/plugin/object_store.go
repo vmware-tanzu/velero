@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -35,43 +36,45 @@ const byteChunkSize = 16384
 // interface.
 type ObjectStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-
-	impl cloudprovider.ObjectStore
+	*pluginBase
 }
 
 // NewObjectStorePlugin construct an ObjectStorePlugin.
-func NewObjectStorePlugin(objectStore cloudprovider.ObjectStore) *ObjectStorePlugin {
+func NewObjectStorePlugin(options ...pluginOption) *ObjectStorePlugin {
 	return &ObjectStorePlugin{
-		impl: objectStore,
+		pluginBase: newPluginBase(options...),
 	}
 }
 
-func (p *ObjectStorePlugin) Kind() PluginKind {
-	return PluginKindObjectStore
-}
-
-// GRPCServer registers an ObjectStore gRPC server.
-func (p *ObjectStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{impl: p.impl})
-	return nil
-}
+//////////////////////////////////////////////////////////////////////////////
+// client code
+//////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns an ObjectStore gRPC client.
 func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return &ObjectStoreGRPCClient{grpcClient: proto.NewObjectStoreClient(c)}, nil
+	return newClientDispenser(p.clientLogger, c, newObjectStoreGRPCClient), nil
+
 }
 
 // ObjectStoreGRPCClient implements the cloudprovider.ObjectStore interface and uses a
 // gRPC client to make calls to the plugin server.
 type ObjectStoreGRPCClient struct {
+	*clientBase
 	grpcClient proto.ObjectStoreClient
+}
+
+func newObjectStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &ObjectStoreGRPCClient{
+		clientBase: base,
+		grpcClient: proto.NewObjectStoreClient(clientConn),
+	}
 }
 
 // Init prepares the ObjectStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
 func (c *ObjectStoreGRPCClient) Init(config map[string]string) error {
-	_, err := c.grpcClient.Init(context.Background(), &proto.InitRequest{Config: config})
+	_, err := c.grpcClient.Init(context.Background(), &proto.InitRequest{Plugin: c.plugin, Config: config})
 
 	return err
 }
@@ -98,7 +101,7 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 			return err
 		}
 
-		if err := stream.Send(&proto.PutObjectRequest{Bucket: bucket, Key: key, Body: chunk[0:n]}); err != nil {
+		if err := stream.Send(&proto.PutObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key, Body: chunk[0:n]}); err != nil {
 			return err
 		}
 	}
@@ -107,7 +110,7 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
 func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, error) {
-	stream, err := c.grpcClient.GetObject(context.Background(), &proto.GetObjectRequest{Bucket: bucket, Key: key})
+	stream, err := c.grpcClient.GetObject(context.Background(), &proto.GetObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key})
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +135,7 @@ func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, er
 // before the provided delimiter (this is often used to simulate a directory
 // hierarchy in object storage).
 func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, delimiter string) ([]string, error) {
-	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), &proto.ListCommonPrefixesRequest{Bucket: bucket, Delimiter: delimiter})
+	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), &proto.ListCommonPrefixesRequest{Plugin: c.plugin, Bucket: bucket, Delimiter: delimiter})
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +145,7 @@ func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, delimiter string) ([]
 
 // ListObjects gets a list of all objects in bucket that have the same prefix.
 func (c *ObjectStoreGRPCClient) ListObjects(bucket, prefix string) ([]string, error) {
-	res, err := c.grpcClient.ListObjects(context.Background(), &proto.ListObjectsRequest{Bucket: bucket, Prefix: prefix})
+	res, err := c.grpcClient.ListObjects(context.Background(), &proto.ListObjectsRequest{Plugin: c.plugin, Bucket: bucket, Prefix: prefix})
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +156,7 @@ func (c *ObjectStoreGRPCClient) ListObjects(bucket, prefix string) ([]string, er
 // DeleteObject removes object with the specified key from the given
 // bucket.
 func (c *ObjectStoreGRPCClient) DeleteObject(bucket, key string) error {
-	_, err := c.grpcClient.DeleteObject(context.Background(), &proto.DeleteObjectRequest{Bucket: bucket, Key: key})
+	_, err := c.grpcClient.DeleteObject(context.Background(), &proto.DeleteObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key})
 
 	return err
 }
@@ -161,6 +164,7 @@ func (c *ObjectStoreGRPCClient) DeleteObject(bucket, key string) error {
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
 func (c *ObjectStoreGRPCClient) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	res, err := c.grpcClient.CreateSignedURL(context.Background(), &proto.CreateSignedURLRequest{
+		Plugin: c.plugin,
 		Bucket: bucket,
 		Key:    key,
 		Ttl:    int64(ttl),
@@ -172,17 +176,46 @@ func (c *ObjectStoreGRPCClient) CreateSignedURL(bucket, key string, ttl time.Dur
 	return res.Url, nil
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// server code
+//////////////////////////////////////////////////////////////////////////////
+
+// GRPCServer registers an ObjectStore gRPC server.
+func (p *ObjectStorePlugin) GRPCServer(s *grpc.Server) error {
+	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{mux: p.serverMux})
+	return nil
+}
+
 // ObjectStoreGRPCServer implements the proto-generated ObjectStoreServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
 type ObjectStoreGRPCServer struct {
-	impl cloudprovider.ObjectStore
+	mux *serverMux
+}
+
+func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore, error) {
+	impl, err := s.mux.getHandler(name)
+	if err != nil {
+		return nil, err
+	}
+
+	itemAction, ok := impl.(cloudprovider.ObjectStore)
+	if !ok {
+		return nil, errors.Errorf("%T is not an object store", impl)
+	}
+
+	return itemAction, nil
 }
 
 // Init prepares the ObjectStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
 func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (*proto.Empty, error) {
-	if err := s.impl.Init(req.Config); err != nil {
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := impl.Init(req.Config); err != nil {
 		return nil, err
 	}
 
@@ -195,6 +228,11 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 	// we need to read the first chunk ahead of time to get the bucket and key;
 	// in our receive method, we'll use `first` on the first call
 	firstChunk, err := stream.Recv()
+	if err != nil {
+		return err
+	}
+
+	impl, err := s.getImpl(firstChunk.Plugin)
 	if err != nil {
 		return err
 	}
@@ -220,7 +258,7 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 		return nil
 	}
 
-	if err := s.impl.PutObject(bucket, key, &StreamReadCloser{receive: receive, close: close}); err != nil {
+	if err := impl.PutObject(bucket, key, &StreamReadCloser{receive: receive, close: close}); err != nil {
 		return err
 	}
 
@@ -230,7 +268,12 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
 func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) error {
-	rdr, err := s.impl.GetObject(req.Bucket, req.Key)
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return err
+	}
+
+	rdr, err := impl.GetObject(req.Bucket, req.Key)
 	if err != nil {
 		return err
 	}
@@ -255,7 +298,12 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 // before the provided delimiter (this is often used to simulate a directory
 // hierarchy in object storage).
 func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (*proto.ListCommonPrefixesResponse, error) {
-	prefixes, err := s.impl.ListCommonPrefixes(req.Bucket, req.Delimiter)
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
+	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Delimiter)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +313,12 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 
 // ListObjects gets a list of all objects in bucket that have the same prefix.
 func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.ListObjectsRequest) (*proto.ListObjectsResponse, error) {
-	keys, err := s.impl.ListObjects(req.Bucket, req.Prefix)
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
+	keys, err := impl.ListObjects(req.Bucket, req.Prefix)
 	if err != nil {
 		return nil, err
 	}
@@ -276,8 +329,12 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 // DeleteObject removes object with the specified key from the given
 // bucket.
 func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.DeleteObjectRequest) (*proto.Empty, error) {
-	err := s.impl.DeleteObject(req.Bucket, req.Key)
+	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := impl.DeleteObject(req.Bucket, req.Key); err != nil {
 		return nil, err
 	}
 
@@ -286,7 +343,12 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
 func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.CreateSignedURLRequest) (*proto.CreateSignedURLResponse, error) {
-	url, err := s.impl.CreateSignedURL(req.Bucket, req.Key, time.Duration(req.Ttl))
+	impl, err := s.getImpl(req.Plugin)
+	if err != nil {
+		return nil, err
+	}
+
+	url, err := impl.CreateSignedURL(req.Bucket, req.Key, time.Duration(req.Ttl))
 	if err != nil {
 		return nil, err
 	}

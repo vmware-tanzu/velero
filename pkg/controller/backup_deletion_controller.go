@@ -46,7 +46,6 @@ type backupDeletionController struct {
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	backupClient              arkv1client.BackupsGetter
 	snapshotService           cloudprovider.SnapshotService
-	backupService             cloudprovider.BackupService
 	bucket                    string
 	restoreLister             listers.RestoreLister
 	restoreClient             arkv1client.RestoresGetter
@@ -54,8 +53,29 @@ type backupDeletionController struct {
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 
-	processRequestFunc func(*v1.DeleteBackupRequest) error
-	clock              clock.Clock
+	backupStorageDeleter backupStorageDeleter
+	processRequestFunc   func(*v1.DeleteBackupRequest) error
+	clock                clock.Clock
+}
+
+type backupStorageDeleter interface {
+	deleteBackupStorage(log logrus.FieldLogger, backupName string) error
+}
+
+type objectStorageBackupStorageDeleter struct {
+	objectStore cloudprovider.ObjectStore
+	bucket      string
+}
+
+func newObjectStorageBackupStorageDeleter(objectStore cloudprovider.ObjectStore, bucket string) backupStorageDeleter {
+	return &objectStorageBackupStorageDeleter{
+		objectStore: objectStore,
+		bucket:      bucket,
+	}
+}
+
+func (o *objectStorageBackupStorageDeleter) deleteBackupStorage(log logrus.FieldLogger, backupName string) error {
+	return cloudprovider.DeleteBackupDir(log, o.objectStore, o.bucket, backupName)
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -65,7 +85,7 @@ func NewBackupDeletionController(
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
 	snapshotService cloudprovider.SnapshotService,
-	backupService cloudprovider.BackupService,
+	objectStore cloudprovider.ObjectStore,
 	bucket string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
@@ -79,13 +99,14 @@ func NewBackupDeletionController(
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
 		snapshotService:           snapshotService,
-		backupService:             backupService,
 		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
-		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
+
+		backupStorageDeleter:  newObjectStorageBackupStorageDeleter(objectStore, bucket),
+		podvolumeBackupLister: podvolumeBackupInformer.Lister(),
 		clock: &clock.RealClock{},
 	}
 
@@ -249,10 +270,10 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
-	// Try to delete backup from object storage
-	log.Info("Removing backup from object storage")
-	if err := c.backupService.DeleteBackupDir(c.bucket, backup.Name); err != nil {
-		errs = append(errs, errors.Wrap(err, "error deleting backup from object storage").Error())
+	// Try to delete backup from backup storage
+	log.Info("Removing backup from backup storage")
+	if err := c.backupStorageDeleter.deleteBackupStorage(log, backup.Name); err != nil {
+		errs = append(errs, errors.Wrap(err, "error deleting backup from backup storage").Error())
 	}
 
 	// Try to delete restores

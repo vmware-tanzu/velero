@@ -18,8 +18,6 @@ package backup
 
 import (
 	"bytes"
-	"compress/gzip"
-	"io"
 	"reflect"
 	"sort"
 	"testing"
@@ -46,6 +44,7 @@ import (
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -548,22 +547,9 @@ func TestBackup(t *testing.T) {
 				groupBackupper.On("backupGroup", group).Return(err)
 			}
 
-			var backupFile, logFile bytes.Buffer
+			var backupFile bytes.Buffer
 
-			err = b.Backup(test.backup, &backupFile, &logFile, nil)
-			defer func() {
-				// print log if anything failed
-				if t.Failed() {
-					gzr, err := gzip.NewReader(&logFile)
-					require.NoError(t, err)
-					t.Log("Backup log contents:")
-					var buf bytes.Buffer
-					_, err = io.Copy(&buf, gzr)
-					require.NoError(t, err)
-					require.NoError(t, gzr.Close())
-					t.Log(buf.String())
-				}
-			}()
+			err = b.Backup(logging.DefaultLogger(logrus.DebugLevel), test.backup, &backupFile, nil)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
@@ -608,7 +594,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, b.Backup(&v1.Backup{}, &bytes.Buffer{}, &bytes.Buffer{}, nil))
+	assert.NoError(t, b.Backup(arktest.NewLogger(), &v1.Backup{}, &bytes.Buffer{}, nil))
 	groupBackupperFactory.AssertExpectations(t)
 
 	// mutate the cohabitatingResources map that was used in the first backup to simulate
@@ -639,7 +625,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, b.Backup(&v1.Backup{}, &bytes.Buffer{}, &bytes.Buffer{}, nil))
+	assert.NoError(t, b.Backup(arktest.NewLogger(), &v1.Backup{}, &bytes.Buffer{}, nil))
 	assert.NotEqual(t, firstCohabitatingResources, secondCohabitatingResources)
 	for _, resource := range secondCohabitatingResources {
 		assert.False(t, resource.seen)

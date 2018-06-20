@@ -148,7 +148,6 @@ type server struct {
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
 	objectStore           cloudprovider.ObjectStore
-	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	discoveryClient       discovery.DiscoveryInterface
 	clientPool            dynamic.ClientPool
@@ -156,6 +155,8 @@ type server struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
+	logLevel              logrus.Level
+	pluginRegistry        plugin.Registry
 	pluginManager         plugin.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
@@ -177,7 +178,11 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		return nil, errors.WithStack(err)
 	}
 
-	pluginManager, err := plugin.NewManager(logger, logger.Level, pluginDir)
+	pluginRegistry := plugin.NewRegistry(pluginDir, logger, logger.Level)
+	if err := pluginRegistry.DiscoverPlugins(); err != nil {
+		return nil, err
+	}
+	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -193,10 +198,12 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		discoveryClient:       arkClient.Discovery(),
 		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
-		ctx:           ctx,
-		cancelFunc:    cancelFunc,
-		logger:        logger,
-		pluginManager: pluginManager,
+		ctx:            ctx,
+		cancelFunc:     cancelFunc,
+		logger:         logger,
+		logLevel:       logger.Level,
+		pluginRegistry: pluginRegistry,
+		pluginManager:  pluginManager,
 	}
 
 	return s, nil
@@ -223,9 +230,11 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
-	if err := s.initBackupService(config); err != nil {
+	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
+	if err != nil {
 		return err
 	}
+	s.objectStore = objectStore
 
 	if err := s.initSnapshotService(config); err != nil {
 		return err
@@ -403,18 +412,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func (s *server) initBackupService(config *api.Config) error {
-	s.logger.Info("Configuring cloud provider for backup service")
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
-	if err != nil {
-		return err
-	}
-
-	s.objectStore = objectStore
-	s.backupService = cloudprovider.NewBackupService(objectStore, s.logger)
-	return nil
-}
-
 func (s *server) initSnapshotService(config *api.Config) error {
 	if config.PersistentVolumeProvider == nil {
 		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
@@ -515,12 +512,9 @@ func (s *server) runControllers(config *api.Config) error {
 
 	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
 	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
-	s.backupService = cloudprovider.NewBackupServiceWithCachedBackupGetter(
-		ctx,
-		s.backupService,
-		cloudBackupCacheResyncPeriod,
-		s.logger,
-	)
+
+	liveBackupGetter := cloudprovider.NewLiveBackupGetter(s.logger, s.objectStore)
+	cachedBackupGetter := cloudprovider.NewBackupCache(ctx, liveBackupGetter, cloudBackupCacheResyncPeriod, s.logger)
 
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -535,7 +529,7 @@ func (s *server) runControllers(config *api.Config) error {
 
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
-		s.backupService,
+		cachedBackupGetter,
 		config.BackupStorageProvider.Bucket,
 		config.BackupSyncPeriod.Duration,
 		s.namespace,
@@ -580,11 +574,12 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			s.backupService,
+			config.BackupStorageProvider.CloudProviderConfig,
 			config.BackupStorageProvider.Bucket,
 			s.snapshotService != nil,
 			s.logger,
-			s.pluginManager,
+			s.logLevel,
+			s.pluginRegistry,
 			backupTracker,
 			s.metrics,
 		)
@@ -626,7 +621,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
 			s.snapshotService,
-			s.backupService,
+			s.objectStore,
 			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
@@ -645,7 +640,6 @@ func (s *server) runControllers(config *api.Config) error {
 	restorer, err := restore.NewKubernetesRestorer(
 		discoveryHelper,
 		client.NewDynamicFactory(s.clientPool),
-		s.backupService,
 		s.snapshotService,
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
@@ -662,12 +656,13 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		restorer,
-		s.backupService,
+		config.BackupStorageProvider.CloudProviderConfig,
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.snapshotService != nil,
 		s.logger,
-		s.pluginManager,
+		s.logLevel,
+		s.pluginRegistry,
 	)
 	wg.Add(1)
 	go func() {
@@ -679,7 +674,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.backupService,
+		s.objectStore,
 		config.BackupStorageProvider.Bucket,
 		s.logger,
 	)
