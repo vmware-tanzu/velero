@@ -86,17 +86,36 @@ func NewPodVolumeBackupController(
 
 	podVolumeBackupInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.enqueue,
-			UpdateFunc: func(_, obj interface{}) { c.enqueue(obj) },
+			AddFunc:    c.pvbHandler,
+			UpdateFunc: func(_, obj interface{}) { c.pvbHandler(obj) },
 		},
 	)
 
 	return c
 }
 
+func (c *podVolumeBackupController) pvbHandler(obj interface{}) {
+	req := obj.(*arkv1api.PodVolumeBackup)
+
+	// only enqueue items for this node
+	if req.Spec.Node != c.nodeName {
+		return
+	}
+
+	log := loggerForPodVolumeBackup(c.logger, req)
+
+	if req.Status.Phase != "" && req.Status.Phase != arkv1api.PodVolumeBackupPhaseNew {
+		log.Debug("Backup is not new, not enqueuing")
+		return
+	}
+
+	log.Debug("Enqueueing")
+	c.enqueue(obj)
+}
+
 func (c *podVolumeBackupController) processQueueItem(key string) error {
 	log := c.logger.WithField("key", key)
-	log.Debug("Running processItem")
+	log.Debug("Running processQueueItem")
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -120,21 +139,28 @@ func (c *podVolumeBackupController) processQueueItem(key string) error {
 		return nil
 	}
 
-	// only process items for this node
-	if req.Spec.Node != c.nodeName {
-		return nil
-	}
-
 	// Don't mutate the shared cache
 	reqCopy := req.DeepCopy()
 	return c.processBackupFunc(reqCopy)
 }
 
-func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup) error {
-	log := c.logger.WithFields(logrus.Fields{
+func loggerForPodVolumeBackup(baseLogger logrus.FieldLogger, req *arkv1api.PodVolumeBackup) logrus.FieldLogger {
+	log := baseLogger.WithFields(logrus.Fields{
 		"namespace": req.Namespace,
 		"name":      req.Name,
 	})
+
+	if len(req.OwnerReferences) == 1 {
+		log = log.WithField("backup", fmt.Sprintf("%s/%s", req.Namespace, req.OwnerReferences[0].Name))
+	}
+
+	return log
+}
+
+func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup) error {
+	log := loggerForPodVolumeBackup(c.logger, req)
+
+	log.Info("Backup starting")
 
 	var err error
 
@@ -157,11 +183,15 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 		return c.fail(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	path, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
+	pathGlob := fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir)
+	log.WithField("pathGlob", pathGlob).Debug("Looking for path matching glob")
+
+	path, err := singlePathMatch(pathGlob)
 	if err != nil {
 		log.WithError(err).Error("Error uniquely identifying volume path")
 		return c.fail(req, errors.Wrap(err, "error getting volume path on host").Error(), log)
 	}
+	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
 	file, err := restic.TempCredentialsFile(c.secretLister, req.Spec.Pod.Namespace)
@@ -203,6 +233,8 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 		log.WithError(err).Error("Error setting phase to Completed")
 		return err
 	}
+
+	log.Info("Backup completed")
 
 	return nil
 }
