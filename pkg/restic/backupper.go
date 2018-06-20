@@ -84,6 +84,31 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
+func getRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
+	repo, err := repoLister.ResticRepositories(ns).Get(name)
+	if apierrors.IsNotFound(err) {
+		return nil, errors.Wrapf(err, "restic repository not found")
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting restic repository")
+	}
+
+	return repo, nil
+}
+
+func getReadyRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
+	repo, err := getRepo(repoLister, ns, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if repo.Status.Phase != arkv1api.ResticRepositoryPhaseReady {
+		return nil, errors.New("restic repository not ready")
+	}
+
+	return repo, nil
+}
+
 func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
 	// get volumes to backup from pod's annotations
 	volumesToBackup := GetVolumesToBackup(pod)
@@ -91,15 +116,9 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 		return nil, nil
 	}
 
-	repo, err := b.repoLister.ResticRepositories(backup.Namespace).Get(pod.Namespace)
-	if apierrors.IsNotFound(err) {
-		return nil, []error{errors.Wrapf(err, "restic repository not found")}
-	}
+	repo, err := getReadyRepo(b.repoLister, backup.Namespace, pod.Namespace)
 	if err != nil {
-		return nil, []error{errors.Wrapf(err, "error getting restic repository")}
-	}
-	if repo.Status.Phase != arkv1api.ResticRepositoryPhaseReady {
-		return nil, []error{errors.New("restic repository not ready")}
+		return nil, []error{err}
 	}
 
 	resultsChan := make(chan *arkv1api.PodVolumeBackup)
@@ -117,7 +136,7 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 		b.repoManager.repoLocker.Lock(pod.Namespace)
 		defer b.repoManager.repoLocker.Unlock(pod.Namespace)
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, b.repoManager.repoPrefix)
+		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(b.repoManager.arkClient.ArkV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
 			errs = append(errs, err)
@@ -151,7 +170,7 @@ ForEachVolume:
 	return volumeSnapshots, errs
 }
 
-func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoPrefix string) *arkv1api.PodVolumeBackup {
+func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *arkv1api.PodVolumeBackup {
 	return &arkv1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
@@ -187,7 +206,7 @@ func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName,
 				"ns":         pod.Namespace,
 				"volume":     volumeName,
 			},
-			RepoPrefix: repoPrefix,
+			RepoIdentifier: repoIdentifier,
 		},
 	}
 }

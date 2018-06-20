@@ -23,6 +23,14 @@ import (
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
+type BackendType string
+
+const (
+	AWSBackend   BackendType = "aws"
+	AzureBackend BackendType = "azure"
+	GCPBackend   BackendType = "gcp"
+)
+
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
 func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {

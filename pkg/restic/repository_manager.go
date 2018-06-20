@@ -70,16 +70,8 @@ type RestorerFactory interface {
 	NewRestorer(context.Context, *arkv1api.Restore) (Restorer, error)
 }
 
-type BackendType string
-
-const (
-	AWSBackend   BackendType = "aws"
-	AzureBackend BackendType = "azure"
-	GCPBackend   BackendType = "gcp"
-)
-
 type repositoryManager struct {
-	repoPrefix         string
+	namespace          string
 	arkClient          clientset.Interface
 	secretsLister      corev1listers.SecretLister
 	secretsClient      corev1client.SecretsGetter
@@ -92,7 +84,7 @@ type repositoryManager struct {
 // NewRepositoryManager constructs a RepositoryManager.
 func NewRepositoryManager(
 	ctx context.Context,
-	config arkv1api.ObjectStorageProviderConfig,
+	namespace string,
 	arkClient clientset.Interface,
 	secretsInformer cache.SharedIndexInformer,
 	secretsClient corev1client.SecretsGetter,
@@ -100,7 +92,7 @@ func NewRepositoryManager(
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
-		repoPrefix:         getRepoPrefix(config),
+		namespace:          namespace,
 		arkClient:          arkClient,
 		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
 		secretsClient:      secretsClient,
@@ -149,7 +141,7 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *arkv1api.
 		},
 	)
 
-	r := newRestorer(ctx, rm, informer)
+	r := newRestorer(ctx, rm, informer, rm.repoLister)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
@@ -160,41 +152,61 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *arkv1api.
 }
 
 func (rm *repositoryManager) InitRepo(name string) error {
+	repo, err := getRepo(rm.repoLister, rm.namespace, name)
+	if err != nil {
+		return err
+	}
+
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	return rm.exec(InitCommand(rm.repoPrefix, name))
+	return rm.exec(InitCommand(repo.Spec.ResticIdentifier))
 }
 
 func (rm *repositoryManager) CheckRepo(name string) error {
+	repo, err := getRepo(rm.repoLister, rm.namespace, name)
+	if err != nil {
+		return err
+	}
+
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	cmd := CheckCommand(rm.repoPrefix, name)
+	cmd := CheckCommand(repo.Spec.ResticIdentifier)
 
 	return rm.exec(cmd)
 }
 
 func (rm *repositoryManager) PruneRepo(name string) error {
+	repo, err := getReadyRepo(rm.repoLister, rm.namespace, name)
+	if err != nil {
+		return err
+	}
+
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	cmd := PruneCommand(rm.repoPrefix, name)
+	cmd := PruneCommand(repo.Spec.ResticIdentifier)
 
 	return rm.exec(cmd)
 }
 
 func (rm *repositoryManager) Forget(snapshot SnapshotIdentifier) error {
+	repo, err := getReadyRepo(rm.repoLister, rm.namespace, snapshot.Repo)
+	if err != nil {
+		return err
+	}
+
 	rm.repoLocker.LockExclusive(snapshot.Repo)
 	defer rm.repoLocker.UnlockExclusive(snapshot.Repo)
 
-	cmd := ForgetCommand(rm.repoPrefix, snapshot.Repo, snapshot.SnapshotID)
+	cmd := ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID)
 
 	return rm.exec(cmd)
 }
 
 func (rm *repositoryManager) exec(cmd *Command) error {
-	file, err := TempCredentialsFile(rm.secretsLister, cmd.Repo)
+	file, err := TempCredentialsFile(rm.secretsLister, cmd.RepoName())
 	if err != nil {
 		return err
 	}
@@ -205,7 +217,7 @@ func (rm *repositoryManager) exec(cmd *Command) error {
 
 	stdout, stderr, err := arkexec.RunCommand(cmd.Cmd())
 	rm.log.WithFields(logrus.Fields{
-		"repository": cmd.Repo,
+		"repository": cmd.RepoName(),
 		"command":    cmd.String(),
 		"stdout":     stdout,
 		"stderr":     stderr,

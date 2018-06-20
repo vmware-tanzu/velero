@@ -476,7 +476,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 
 	res, err := restic.NewRepositoryManager(
 		s.ctx,
-		config,
+		s.namespace,
 		s.arkClient,
 		secretsInformer,
 		s.kubeClient.CoreV1(),
