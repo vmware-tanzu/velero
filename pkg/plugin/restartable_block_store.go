@@ -49,7 +49,7 @@ func newRestartableBlockStore(name string, sharedPluginProcess RestartableProces
 func (r *restartableBlockStore) reinitialize(dispensed interface{}) error {
 	blockStore, ok := dispensed.(cloudprovider.BlockStore)
 	if !ok {
-		return errors.Errorf("%T is not an BlockStore!", dispensed)
+		return errors.Errorf("%T is not a cloudprovider.BlockStore!", dispensed)
 	}
 	return r.init(blockStore, r.config)
 }
@@ -64,7 +64,7 @@ func (r *restartableBlockStore) getBlockStore() (cloudprovider.BlockStore, error
 
 	blockStore, ok := plugin.(cloudprovider.BlockStore)
 	if !ok {
-		return nil, errors.Errorf("%T is not an BlockStore!", plugin)
+		return nil, errors.Errorf("%T is not a cloudprovider.BlockStore!", plugin)
 	}
 
 	return blockStore, nil
@@ -80,16 +80,20 @@ func (r *restartableBlockStore) getDelegate() (cloudprovider.BlockStore, error) 
 }
 
 // Init initializes the block store instance using config. If this is the first invocation, r stores config for future
-// reinitialization needs. Init does NOT restart the shared plugin process.
+// reinitialization needs. Init does NOT restart the shared plugin process. Init may only be called once.
 func (r *restartableBlockStore) Init(config map[string]string) error {
+	if r.config != nil {
+		return errors.Errorf("already initialized")
+	}
+
 	// Not using getDelegate() to avoid possible infinite recursion
 	delegate, err := r.getBlockStore()
 	if err != nil {
 		return err
 	}
-	if r.config == nil {
-		r.config = config
-	}
+
+	r.config = config
+
 	return r.init(delegate, config)
 }
 
