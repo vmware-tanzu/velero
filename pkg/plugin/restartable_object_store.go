@@ -85,16 +85,20 @@ func (r *restartableObjectStore) getDelegate() (cloudprovider.ObjectStore, error
 }
 
 // Init initializes the object store instance using config. If this is the first invocation, r stores config for future
-// reinitialization needs. Init does NOT restart the shared plugin process.
+// reinitialization needs. Init does NOT restart the shared plugin process. Init may only be called once.
 func (r *restartableObjectStore) Init(config map[string]string) error {
+	if r.config != nil {
+		return errors.Errorf("already initialized")
+	}
+
 	// Not using getDelegate() to avoid possible infinite recursion
 	delegate, err := r.getObjectStore()
 	if err != nil {
 		return err
 	}
-	if r.config == nil {
-		r.config = config
-	}
+
+	r.config = config
+
 	return r.init(delegate, config)
 }
 
