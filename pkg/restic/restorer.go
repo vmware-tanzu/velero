@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/boolptr"
 )
 
@@ -40,16 +41,24 @@ type Restorer interface {
 type restorer struct {
 	ctx         context.Context
 	repoManager *repositoryManager
+	repoLister  arkv1listers.ResticRepositoryLister
 
 	resultsLock sync.Mutex
 	results     map[string]chan *arkv1api.PodVolumeRestore
 }
 
-func newRestorer(ctx context.Context, rm *repositoryManager, podVolumeRestoreInformer cache.SharedIndexInformer) *restorer {
+func newRestorer(
+	ctx context.Context,
+	rm *repositoryManager,
+	podVolumeRestoreInformer cache.SharedIndexInformer,
+	repoLister arkv1listers.ResticRepositoryLister,
+) *restorer {
 	r := &restorer{
 		ctx:         ctx,
 		repoManager: rm,
-		results:     make(map[string]chan *arkv1api.PodVolumeRestore),
+		repoLister:  repoLister,
+
+		results: make(map[string]chan *arkv1api.PodVolumeRestore),
 	}
 
 	podVolumeRestoreInformer.AddEventHandler(
@@ -76,6 +85,11 @@ func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.P
 		return nil
 	}
 
+	repo, err := getReadyRepo(r.repoLister, restore.Namespace, pod.Namespace)
+	if err != nil {
+		return []error{err}
+	}
+
 	resultsChan := make(chan *arkv1api.PodVolumeRestore)
 
 	r.resultsLock.Lock()
@@ -91,7 +105,7 @@ func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.P
 		r.repoManager.repoLocker.Lock(pod.Namespace)
 		defer r.repoManager.repoLocker.Unlock(pod.Namespace)
 
-		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, r.repoManager.config.repoPrefix)
+		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(r.repoManager.arkClient.ArkV1().PodVolumeRestores(volumeRestore.Namespace).Create(volumeRestore)); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -120,7 +134,7 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, snapshot, repoPrefix string) *arkv1api.PodVolumeRestore {
+func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, snapshot, repoIdentifier string) *arkv1api.PodVolumeRestore {
 	return &arkv1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
@@ -147,9 +161,9 @@ func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, 
 				Name:      pod.Name,
 				UID:       pod.UID,
 			},
-			Volume:     volume,
-			SnapshotID: snapshot,
-			RepoPrefix: repoPrefix,
+			Volume:         volume,
+			SnapshotID:     snapshot,
+			RepoIdentifier: repoIdentifier,
 		},
 	}
 }

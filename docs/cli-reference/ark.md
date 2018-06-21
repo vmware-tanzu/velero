@@ -38,7 +38,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 * [ark describe](ark_describe.md)	 - Describe ark resources
 * [ark get](ark_get.md)	 - Get ark resources
 * [ark plugin](ark_plugin.md)	 - Work with plugins
-* [ark restic](ark_restic.md)	 - Work with restic repositories
+* [ark restic](ark_restic.md)	 - Work with restic
 * [ark restore](ark_restore.md)	 - Work with restores
 * [ark schedule](ark_schedule.md)	 - Work with schedules
 * [ark server](ark_server.md)	 - Run the ark server

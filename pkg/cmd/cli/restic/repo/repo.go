@@ -14,25 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repo
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/cli/restic/repo"
 )
 
-func NewCommand(f client.Factory) *cobra.Command {
+func NewRepositoryCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "restic",
-		Short: "Work with restic",
-		Long:  "Work with restic",
+		Use:   "repo",
+		Short: "Work with restic repositories",
+		Long:  "Work with restic repositories",
 	}
 
 	c.AddCommand(
-		repo.NewRepositoryCommand(f),
-		NewServerCommand(f),
+		NewInitCommand(f),
+		NewGetCommand(f, "get"),
 	)
 
 	return c

@@ -41,6 +41,7 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/boolptr"
+	arkexec "github.com/heptio/ark/pkg/util/exec"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -299,8 +300,7 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 	}
 
 	resticCmd := restic.RestoreCommand(
-		req.Spec.RepoPrefix,
-		req.Spec.Pod.Namespace,
+		req.Spec.RepoIdentifier,
 		credsFile,
 		req.Spec.SnapshotID,
 		volumePath,
@@ -308,7 +308,7 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 
 	var stdout, stderr string
 
-	if stdout, stderr, err = runCommand(resticCmd.Cmd()); err != nil {
+	if stdout, stderr, err = arkexec.RunCommand(resticCmd.Cmd()); err != nil {
 		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)

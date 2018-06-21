@@ -36,6 +36,7 @@ func CRDs() []*apiextv1beta1.CustomResourceDefinition {
 		crd("DeleteBackupRequest", "deletebackuprequests"),
 		crd("PodVolumeBackup", "podvolumebackups"),
 		crd("PodVolumeRestore", "podvolumerestores"),
+		crd("ResticRepository", "resticrepositories"),
 	}
 }
 

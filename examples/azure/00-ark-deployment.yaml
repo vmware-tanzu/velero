@@ -44,11 +44,18 @@ spec:
           envFrom:
             - secretRef:
                 name: cloud-credentials
+          env:
+            - name: ARK_SCRATCH_DIR
+              value: /scratch
           volumeMounts:
           - name: plugins
             mountPath: /plugins
+          - name: scratch
+            mountPath: /scratch
       volumes:
         - name: plugins
+          emptyDir: {}
+        - name: scratch
           emptyDir: {}
       nodeSelector:
         beta.kubernetes.io/os: linux

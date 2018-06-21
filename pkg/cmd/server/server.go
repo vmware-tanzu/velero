@@ -235,7 +235,6 @@ func (s *server) run() error {
 		if err := s.initRestic(config.BackupStorageProvider); err != nil {
 			return err
 		}
-		s.runResticMaintenance()
 
 		// warn if restic daemonset does not exist
 		_, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get("restic", metav1.GetOptions{})
@@ -251,20 +250,6 @@ func (s *server) run() error {
 	}
 
 	return nil
-}
-
-func (s *server) runResticMaintenance() {
-	go func() {
-		interval := time.Hour
-
-		<-time.After(interval)
-
-		wait.Forever(func() {
-			if err := s.resticManager.PruneAllRepos(); err != nil {
-				s.logger.WithError(err).Error("error pruning repos")
-			}
-		}, interval)
-	}()
 }
 
 func (s *server) ensureArkNamespace() error {
@@ -491,11 +476,11 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 
 	res, err := restic.NewRepositoryManager(
 		s.ctx,
-		s.objectStore,
-		config,
+		s.namespace,
 		s.arkClient,
 		secretsInformer,
 		s.kubeClient.CoreV1(),
+		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 		s.logger,
 	)
 	if err != nil {
@@ -503,8 +488,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 	}
 	s.resticManager = res
 
-	s.logger.Info("Checking restic repositories")
-	return s.resticManager.CheckAllRepos()
+	return nil
 }
 
 func (s *server) runControllers(config *api.Config) error {
@@ -688,6 +672,23 @@ func (s *server) runControllers(config *api.Config) error {
 		downloadRequestController.Run(ctx, 1)
 		wg.Done()
 	}()
+
+	if s.resticManager != nil {
+		resticRepoController := controller.NewResticRepositoryController(
+			s.logger,
+			s.sharedInformerFactory.Ark().V1().ResticRepositories(),
+			s.arkClient.ArkV1(),
+			config.BackupStorageProvider,
+			s.resticManager,
+		)
+		wg.Add(1)
+		go func() {
+			// TODO only having a single worker may be an issue since maintenance
+			// can take a long time.
+			resticRepoController.Run(ctx, 1)
+			wg.Done()
+		}()
+	}
 
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())

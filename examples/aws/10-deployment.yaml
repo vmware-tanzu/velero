@@ -43,12 +43,18 @@ spec:
               mountPath: /credentials
             - name: plugins
               mountPath: /plugins
+            - name: scratch
+              mountPath: /scratch
           env:
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
+            - name: ARK_SCRATCH_DIR
+              value: /scratch
       volumes:
         - name: cloud-credentials
           secret:
             secretName: cloud-credentials
         - name: plugins
+          emptyDir: {}
+        - name: scratch
           emptyDir: {}

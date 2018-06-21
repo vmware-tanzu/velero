@@ -18,29 +18,46 @@ package restic
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
 // Command represents a restic command.
 type Command struct {
-	Command      string
-	RepoPrefix   string
-	Repo         string
-	PasswordFile string
-	Dir          string
-	Args         []string
-	ExtraFlags   []string
+	Command        string
+	RepoIdentifier string
+	PasswordFile   string
+	Dir            string
+	Args           []string
+	ExtraFlags     []string
+}
+
+func (c *Command) RepoName() string {
+	if c.RepoIdentifier == "" {
+		return ""
+	}
+
+	return c.RepoIdentifier[strings.LastIndex(c.RepoIdentifier, "/")+1:]
 }
 
 // StringSlice returns the command as a slice of strings.
 func (c *Command) StringSlice() []string {
 	res := []string{"restic"}
 
-	res = append(res, c.Command, repoFlag(c.RepoPrefix, c.Repo))
+	res = append(res, c.Command, repoFlag(c.RepoIdentifier))
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
 	}
+
+	// If ARK_SCRATCH_DIR is defined, put the restic cache within it. If not,
+	// allow restic to choose the location. This makes running either in-cluster
+	// or local (dev) work properly.
+	if scratch := os.Getenv("ARK_SCRATCH_DIR"); scratch != "" {
+		res = append(res, cacheDirFlag(filepath.Join(scratch, ".cache", "restic")))
+	}
+
 	res = append(res, c.Args...)
 	res = append(res, c.ExtraFlags...)
 
@@ -61,10 +78,14 @@ func (c *Command) Cmd() *exec.Cmd {
 	return cmd
 }
 
-func repoFlag(prefix, repo string) string {
-	return fmt.Sprintf("--repo=%s/%s", prefix, repo)
+func repoFlag(repoIdentifier string) string {
+	return fmt.Sprintf("--repo=%s", repoIdentifier)
 }
 
 func passwordFlag(file string) string {
 	return fmt.Sprintf("--password-file=%s", file)
+}
+
+func cacheDirFlag(dir string) string {
+	return fmt.Sprintf("--cache-dir=%s", dir)
 }

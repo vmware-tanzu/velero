@@ -33,9 +33,8 @@ type PodVolumeBackupSpec struct {
 	// up.
 	Volume string `json:"volume"`
 
-	// RepoPrefix is the restic repository prefix (i.e. not containing
-	// the repository name itself).
-	RepoPrefix string `json:"repoPrefix"`
+	// RepoIdentifier is the restic repository identifier.
+	RepoIdentifier string `json:"repoIdentifier"`
 
 	// Tags are a map of key-value pairs that should be applied to the
 	// volume backup as tags.

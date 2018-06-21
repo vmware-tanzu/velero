@@ -6,15 +6,14 @@ import (
 )
 
 // BackupCommand returns a Command for running a restic backup.
-func BackupCommand(repoPrefix, repo, passwordFile, path string, tags map[string]string) *Command {
+func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]string) *Command {
 	return &Command{
-		Command:      "backup",
-		RepoPrefix:   repoPrefix,
-		Repo:         repo,
-		PasswordFile: passwordFile,
-		Dir:          path,
-		Args:         []string{"."},
-		ExtraFlags:   backupTagFlags(tags),
+		Command:        "backup",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		Dir:            path,
+		Args:           []string{"."},
+		ExtraFlags:     backupTagFlags(tags),
 	}
 }
 
@@ -27,26 +26,24 @@ func backupTagFlags(tags map[string]string) []string {
 }
 
 // RestoreCommand returns a Command for running a restic restore.
-func RestoreCommand(repoPrefix, repo, passwordFile, snapshotID, target string) *Command {
+func RestoreCommand(repoIdentifier, passwordFile, snapshotID, target string) *Command {
 	return &Command{
-		Command:      "restore",
-		RepoPrefix:   repoPrefix,
-		Repo:         repo,
-		PasswordFile: passwordFile,
-		Dir:          target,
-		Args:         []string{snapshotID},
-		ExtraFlags:   []string{"--target=."},
+		Command:        "restore",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		Dir:            target,
+		Args:           []string{snapshotID},
+		ExtraFlags:     []string{"--target=."},
 	}
 }
 
 // GetSnapshotCommand returns a Command for running a restic (get) snapshots.
-func GetSnapshotCommand(repoPrefix, repo, passwordFile string, tags map[string]string) *Command {
+func GetSnapshotCommand(repoIdentifier, passwordFile string, tags map[string]string) *Command {
 	return &Command{
-		Command:      "snapshots",
-		RepoPrefix:   repoPrefix,
-		Repo:         repo,
-		PasswordFile: passwordFile,
-		ExtraFlags:   []string{"--json", "--last", getSnapshotTagFlag(tags)},
+		Command:        "snapshots",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		ExtraFlags:     []string{"--json", "--last", getSnapshotTagFlag(tags)},
 	}
 }
 
@@ -59,35 +56,31 @@ func getSnapshotTagFlag(tags map[string]string) string {
 	return fmt.Sprintf("--tag=%s", strings.Join(tagFilters, ","))
 }
 
-func InitCommand(repoPrefix, repo string) *Command {
+func InitCommand(repoIdentifier string) *Command {
 	return &Command{
-		Command:    "init",
-		RepoPrefix: repoPrefix,
-		Repo:       repo,
+		Command:        "init",
+		RepoIdentifier: repoIdentifier,
 	}
 }
 
-func CheckCommand(repoPrefix, repo string) *Command {
+func CheckCommand(repoIdentifier string) *Command {
 	return &Command{
-		Command:    "check",
-		RepoPrefix: repoPrefix,
-		Repo:       repo,
+		Command:        "check",
+		RepoIdentifier: repoIdentifier,
 	}
 }
 
-func PruneCommand(repoPrefix, repo string) *Command {
+func PruneCommand(repoIdentifier string) *Command {
 	return &Command{
-		Command:    "prune",
-		RepoPrefix: repoPrefix,
-		Repo:       repo,
+		Command:        "prune",
+		RepoIdentifier: repoIdentifier,
 	}
 }
 
-func ForgetCommand(repoPrefix, repo, snapshotID string) *Command {
+func ForgetCommand(repoIdentifier, snapshotID string) *Command {
 	return &Command{
-		Command:    "forget",
-		RepoPrefix: repoPrefix,
-		Repo:       repo,
-		Args:       []string{snapshotID},
+		Command:        "forget",
+		RepoIdentifier: repoIdentifier,
+		Args:           []string{snapshotID},
 	}
 }

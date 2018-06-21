@@ -25,10 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/boolptr"
 )
 
@@ -39,18 +41,26 @@ type Backupper interface {
 }
 
 type backupper struct {
-	repoManager *repositoryManager
 	ctx         context.Context
+	repoManager *repositoryManager
+	repoLister  arkv1listers.ResticRepositoryLister
 
 	results     map[string]chan *arkv1api.PodVolumeBackup
 	resultsLock sync.Mutex
 }
 
-func newBackupper(ctx context.Context, repoManager *repositoryManager, podVolumeBackupInformer cache.SharedIndexInformer) *backupper {
+func newBackupper(
+	ctx context.Context,
+	repoManager *repositoryManager,
+	podVolumeBackupInformer cache.SharedIndexInformer,
+	repoLister arkv1listers.ResticRepositoryLister,
+) *backupper {
 	b := &backupper{
-		repoManager: repoManager,
 		ctx:         ctx,
-		results:     make(map[string]chan *arkv1api.PodVolumeBackup),
+		repoManager: repoManager,
+		repoLister:  repoLister,
+
+		results: make(map[string]chan *arkv1api.PodVolumeBackup),
 	}
 
 	podVolumeBackupInformer.AddEventHandler(
@@ -74,6 +84,31 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
+func getRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
+	repo, err := repoLister.ResticRepositories(ns).Get(name)
+	if apierrors.IsNotFound(err) {
+		return nil, errors.Wrapf(err, "restic repository not found")
+	}
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting restic repository")
+	}
+
+	return repo, nil
+}
+
+func getReadyRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
+	repo, err := getRepo(repoLister, ns, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if repo.Status.Phase != arkv1api.ResticRepositoryPhaseReady {
+		return nil, errors.New("restic repository not ready")
+	}
+
+	return repo, nil
+}
+
 func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
 	// get volumes to backup from pod's annotations
 	volumesToBackup := GetVolumesToBackup(pod)
@@ -81,8 +116,8 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 		return nil, nil
 	}
 
-	// ensure a repo exists for the pod's namespace
-	if err := b.repoManager.ensureRepo(pod.Namespace); err != nil {
+	repo, err := getReadyRepo(b.repoLister, backup.Namespace, pod.Namespace)
+	if err != nil {
 		return nil, []error{err}
 	}
 
@@ -101,7 +136,7 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 		b.repoManager.repoLocker.Lock(pod.Namespace)
 		defer b.repoManager.repoLocker.Unlock(pod.Namespace)
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, b.repoManager.config.repoPrefix)
+		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(b.repoManager.arkClient.ArkV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
 			errs = append(errs, err)
@@ -135,7 +170,7 @@ ForEachVolume:
 	return volumeSnapshots, errs
 }
 
-func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoPrefix string) *arkv1api.PodVolumeBackup {
+func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *arkv1api.PodVolumeBackup {
 	return &arkv1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
@@ -171,7 +206,11 @@ func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName,
 				"ns":         pod.Namespace,
 				"volume":     volumeName,
 			},
-			RepoPrefix: repoPrefix,
+			RepoIdentifier: repoIdentifier,
 		},
 	}
+}
+
+func errorOnly(_ interface{}, err error) error {
+	return err
 }

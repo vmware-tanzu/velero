@@ -14,31 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restic
+package repo
 
 import (
 	"crypto/rand"
+	"time"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kclientset "k8s.io/client-go/kubernetes"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cmd"
+	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	"github.com/heptio/ark/pkg/restic"
+	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
-func NewInitRepositoryCommand(f client.Factory) *cobra.Command {
+func NewInitCommand(f client.Factory) *cobra.Command {
 	o := NewInitRepositoryOptions()
 
 	c := &cobra.Command{
-		Use:   "init-repository",
-		Short: "create an encryption key for a restic repository",
-		Long:  "create an encryption key for a restic repository",
+		Use:   "init NAMESPACE",
+		Short: "initialize a restic repository for a specified namespace",
+		Long:  "initialize a restic repository for a specified namespace",
+		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Complete(f))
+			cmd.CheckError(o.Complete(f, args))
 			cmd.CheckError(o.Validate(f))
 			cmd.CheckError(o.Run(f))
 		},
@@ -50,20 +56,23 @@ func NewInitRepositoryCommand(f client.Factory) *cobra.Command {
 }
 
 type InitRepositoryOptions struct {
-	Namespace string
-	KeyFile   string
-	KeyData   string
-	KeySize   int
+	Namespace            string
+	KeyFile              string
+	KeyData              string
+	KeySize              int
+	MaintenanceFrequency time.Duration
 
 	fileSystem filesystem.Interface
 	kubeClient kclientset.Interface
+	arkClient  clientset.Interface
 	keyBytes   []byte
 }
 
 func NewInitRepositoryOptions() *InitRepositoryOptions {
 	return &InitRepositoryOptions{
-		KeySize:    1024,
-		fileSystem: filesystem.NewFileSystem(),
+		KeySize:              1024,
+		MaintenanceFrequency: restic.DefaultMaintenanceFrequency,
+		fileSystem:           filesystem.NewFileSystem(),
 	}
 }
 
@@ -76,9 +85,10 @@ func (o *InitRepositoryOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.KeyFile, "key-file", o.KeyFile, "Path to file containing the encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
 	flags.StringVar(&o.KeyData, "key-data", o.KeyData, "Encryption key for the restic repository. Optional; if unset, Ark will generate a random key for you.")
 	flags.IntVar(&o.KeySize, "key-size", o.KeySize, "Size of the generated key for the restic repository")
+	flags.DurationVar(&o.MaintenanceFrequency, "maintenance-frequency", o.MaintenanceFrequency, "How often maintenance (i.e. restic prune & check) is run on the repository")
 }
 
-func (o *InitRepositoryOptions) Complete(f client.Factory) error {
+func (o *InitRepositoryOptions) Complete(f client.Factory, args []string) error {
 	if o.KeyFile != "" && o.KeyData != "" {
 		return errKeyFileAndKeyDataProvided
 	}
@@ -87,7 +97,7 @@ func (o *InitRepositoryOptions) Complete(f client.Factory) error {
 		return errKeySizeTooSmall
 	}
 
-	o.Namespace = f.Namespace()
+	o.Namespace = args[0]
 
 	switch {
 	case o.KeyFile != "":
@@ -112,6 +122,10 @@ func (o *InitRepositoryOptions) Validate(f client.Factory) error {
 		return errors.Errorf("keyBytes is required")
 	}
 
+	if o.MaintenanceFrequency <= 0 {
+		return errors.Errorf("--maintenance-frequency must be greater than zero")
+	}
+
 	kubeClient, err := f.KubeClient()
 	if err != nil {
 		return err
@@ -122,9 +136,30 @@ func (o *InitRepositoryOptions) Validate(f client.Factory) error {
 		return err
 	}
 
+	arkClient, err := f.Client()
+	if err != nil {
+		return err
+	}
+	o.arkClient = arkClient
+
 	return nil
 }
 
 func (o *InitRepositoryOptions) Run(f client.Factory) error {
-	return restic.NewRepositoryKey(o.kubeClient.CoreV1(), o.Namespace, o.keyBytes)
+	if err := restic.NewRepositoryKey(o.kubeClient.CoreV1(), o.Namespace, o.keyBytes); err != nil {
+		return err
+	}
+
+	repo := &v1.ResticRepository{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: f.Namespace(),
+			Name:      o.Namespace,
+		},
+		Spec: v1.ResticRepositorySpec{
+			MaintenanceFrequency: metav1.Duration{Duration: o.MaintenanceFrequency},
+		},
+	}
+
+	_, err := o.arkClient.ArkV1().ResticRepositories(f.Namespace()).Create(repo)
+	return errors.Wrap(err, "error creating ResticRepository")
 }
