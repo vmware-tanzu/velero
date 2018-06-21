@@ -46,6 +46,7 @@ spec:
           volumeMounts:
             - name: host-pods
               mountPath: /host_pods
+              mountPropagation: HostToContainer
             - name: scratch
               mountPath: /scratch
           envFrom:
