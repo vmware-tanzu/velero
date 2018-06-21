@@ -31,7 +31,7 @@ import (
 
 const (
 	CredentialsSecretName = "ark-restic-credentials"
-	CurrentCredentialsKey = "ark-restic-credentials"
+	CurrentCredentialsKey = "current-key"
 	NewCredentialsKey     = "new-key"
 	OldCredentialsKey     = "old-key"
 )

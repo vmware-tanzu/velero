@@ -464,10 +464,9 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
 	}
 
-	// TODO do we want to use a kube informer factory?
 	secretsInformer := corev1informers.NewFilteredSecretInformer(
 		s.kubeClient,
-		"",
+		metav1.NamespaceAll,
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {

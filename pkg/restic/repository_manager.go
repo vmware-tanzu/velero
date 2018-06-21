@@ -238,37 +238,9 @@ func (rm *repositoryManager) ChangeKey(name string) error {
 	if newKey, ok := secret.Data[NewCredentialsKey]; ok {
 		log.Debugf("Found key in secret at %s", NewCredentialsKey)
 
-		if string(newKey) == string(secret.Data[CurrentCredentialsKey]) {
-			log.Debugf("New key is the same as current key")
-
-			return patchSecret(secret, func(s *corev1api.Secret) {
-				delete(s.Data, NewCredentialsKey)
-			}, rm.secretsClient)
-		}
-
-		newKeyFile, err := writeTempFile("", "", newKey)
-		if err != nil {
+		if err := rm.processNewKey(newKey, secret, repo.Spec.ResticIdentifier, log); err != nil {
 			return err
 		}
-		defer os.Remove(newKeyFile)
-
-		// if it's not valid, we need to run the restic cmd to change repo keys
-		if !isKeyValid(repo.Spec.ResticIdentifier, newKeyFile) {
-			log.Debugf("Key in %s is not valid", NewCredentialsKey)
-			if err := rm.exec(ChangeKeyCommand(repo.Spec.ResticIdentifier, newKeyFile)); err != nil {
-				return err
-			}
-			log.Debugf("Ran restic key passwd command successfully")
-		}
-
-		// the new key is now valid, so patch the secret to move keys around appropriately
-		if err := patchSecret(secret, func(s *corev1api.Secret) {
-			s.Data[OldCredentialsKey], s.Data[CurrentCredentialsKey] = s.Data[CurrentCredentialsKey], s.Data[NewCredentialsKey]
-			delete(s.Data, NewCredentialsKey)
-		}, rm.secretsClient); err != nil {
-			return err
-		}
-		log.Debugf("Patched secret to move %s into %s and %s into %s", NewCredentialsKey, CurrentCredentialsKey, CurrentCredentialsKey, OldCredentialsKey)
 	}
 
 	// if there's data at the OldCredentialsKey within the secret, it could mean any of the following:
@@ -278,33 +250,80 @@ func (rm *repositoryManager) ChangeKey(name string) error {
 	//	- we successfully changed the repo key, but failed to remove the old key from the secret
 	if oldKey, ok := secret.Data[OldCredentialsKey]; ok {
 		log.Debugf("Found key in secret at %s", OldCredentialsKey)
-		oldKeyFile, err := writeTempFile("", "", oldKey)
+
+		if err := rm.processOldKey(oldKey, secret, repo.Spec.ResticIdentifier, log); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// processNewKey processes data in the ark-restic-credentials secret, at the "new-key" key. It changes the restic repo's
+// key if newKey is not already a working key for the repo, and updates the ark-restic-credentials secret to move newKey
+// into the "current-key" key.
+func (rm *repositoryManager) processNewKey(newKey []byte, secret *corev1api.Secret, repoIdentifier string, log logrus.FieldLogger) error {
+	if string(newKey) == string(secret.Data[CurrentCredentialsKey]) {
+		log.Debugf("New key is the same as current key")
+
+		return patchSecret(secret, func(s *corev1api.Secret) {
+			delete(s.Data, NewCredentialsKey)
+		}, rm.secretsClient)
+	}
+
+	newKeyFile, err := writeTempFile("", "", newKey)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(newKeyFile)
+
+	// if it's not valid, we need to run the restic cmd to change repo keys
+	if !isKeyWorking(repoIdentifier, newKeyFile) {
+		log.Debugf("Key in %s does not already work for restic repo, replacing the current key with it", NewCredentialsKey)
+		if err := rm.exec(ChangeKeyCommand(repoIdentifier, newKeyFile)); err != nil {
+			return err
+		}
+		log.Debugf("Ran restic key passwd command successfully")
+	}
+
+	// the new key is now valid, so patch the secret to move keys around appropriately
+	if err := patchSecret(secret, func(s *corev1api.Secret) {
+		s.Data[OldCredentialsKey], s.Data[CurrentCredentialsKey] = s.Data[CurrentCredentialsKey], s.Data[NewCredentialsKey]
+		delete(s.Data, NewCredentialsKey)
+	}, rm.secretsClient); err != nil {
+		return err
+	}
+	log.Debugf("Patched secret to move %s into %s and %s into %s", NewCredentialsKey, CurrentCredentialsKey, CurrentCredentialsKey, OldCredentialsKey)
+
+	return nil
+}
+
+func (rm *repositoryManager) processOldKey(oldKey []byte, secret *corev1api.Secret, repoIdentifier string, log logrus.FieldLogger) error {
+	oldKeyFile, err := writeTempFile("", "", oldKey)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(oldKeyFile)
+
+	if isKeyWorking(repoIdentifier, oldKeyFile) {
+		log.Debugf("Key in %s still works for restic repo, removing it", OldCredentialsKey)
+		id, err := getKeyID(repoIdentifier, oldKeyFile)
 		if err != nil {
 			return err
 		}
-		defer os.Remove(oldKeyFile)
-
-		if isKeyValid(repo.Spec.ResticIdentifier, oldKeyFile) {
-			log.Debugf("Key in %s is valid", OldCredentialsKey)
-			id, err := getKeyID(repo.Spec.ResticIdentifier, oldKeyFile)
-			if err != nil {
-				return err
-			}
-			log.Debugf("Key in %s has restic id %s", OldCredentialsKey, id)
-			if err := rm.exec(RemoveKeyCommand(repo.Spec.ResticIdentifier, id)); err != nil {
-				return err
-			}
-			log.Debugf("Ran restic key remove command successfully")
-		}
-
-		if err := patchSecret(secret, func(s *corev1api.Secret) {
-			delete(s.Data, OldCredentialsKey)
-		}, rm.secretsClient); err != nil {
+		log.Debugf("Key in %s has restic id %s", OldCredentialsKey, id)
+		if err := rm.exec(RemoveKeyCommand(repoIdentifier, id)); err != nil {
 			return err
 		}
-		log.Debugf("Patched secret to remove %s", OldCredentialsKey)
+		log.Debugf("Ran restic key remove command successfully")
 	}
 
+	if err := patchSecret(secret, func(s *corev1api.Secret) {
+		delete(s.Data, OldCredentialsKey)
+	}, rm.secretsClient); err != nil {
+		return err
+	}
+	log.Debugf("Patched secret to remove %s", OldCredentialsKey)
 	return nil
 }
 
@@ -341,12 +360,12 @@ func getKeyID(resticIdentifer string, keyFile string) (string, error) {
 	return "", errors.New("unable to find current key")
 }
 
-func isKeyValid(resticIdentifier string, keyFile string) bool {
+func isKeyWorking(resticIdentifier string, keyFile string) bool {
 	// use `restic key list` as a test cmd to see if we can connect or not
 	cmd := ListKeysCommand(resticIdentifier)
 	cmd.PasswordFile = keyFile
 
-	// no error means key is valid
+	// no error means key works
 	return cmd.Cmd().Run() == nil
 }
 

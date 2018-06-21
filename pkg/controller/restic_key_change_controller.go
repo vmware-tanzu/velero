@@ -126,6 +126,12 @@ func (c *resticKeyChangeController) processQueueItem(key string) error {
 		return errors.Wrapf(err, "error getting secret")
 	}
 
+	// check again if we should process because secret may have changed
+	// since it was added to the queue
+	if !shouldProcess(secret) {
+		return nil
+	}
+
 	// Don't mutate the shared cache
 	secretCopy := secret.DeepCopy()
 
@@ -133,12 +139,6 @@ func (c *resticKeyChangeController) processQueueItem(key string) error {
 }
 
 func (c *resticKeyChangeController) processKeyChange(secret *corev1.Secret, log logrus.FieldLogger) error {
-	// check again if we should process because secret may have changed
-	// since it was added to the queue
-	if !shouldProcess(secret) {
-		return nil
-	}
-
 	log.Info("Processing repository key change")
 
 	if err := c.repositoryManager.ChangeKey(secret.Namespace); err != nil {
