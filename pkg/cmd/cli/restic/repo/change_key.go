@@ -17,6 +17,7 @@ limitations under the License.
 package repo
 
 import (
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -76,6 +77,10 @@ func (o *ChangeKeyOptions) Complete(f client.Factory, args []string) error {
 func (o *ChangeKeyOptions) Validate(f client.Factory) error {
 	if err := o.RepositoryKeyOptions.Validate(f); err != nil {
 		return err
+	}
+
+	if o.Repository == "" {
+		return errors.Errorf("repository name must be non-empty")
 	}
 
 	kubeClient, err := f.KubeClient()

@@ -90,6 +90,10 @@ func (o *InitRepositoryOptions) Validate(f client.Factory) error {
 		return err
 	}
 
+	if o.Namespace == "" {
+		return errors.Errorf("namespace name must be non-empty")
+	}
+
 	kubeClient, err := f.KubeClient()
 	if err != nil {
 		return err

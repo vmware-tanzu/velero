@@ -71,7 +71,7 @@ func (o *RepositoryKeyOptions) Complete(f client.Factory, args []string) error {
 		o.keyBytes = data
 	case o.KeyData != "":
 		o.keyBytes = []byte(o.KeyData)
-	case o.KeySize > 0:
+	default:
 		o.keyBytes = make([]byte, o.KeySize)
 		// rand.Reader always returns a nil error
 		rand.Read(o.keyBytes)
