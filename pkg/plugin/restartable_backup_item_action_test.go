@@ -97,88 +97,50 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	assert.Equal(t, expected, a)
 }
 
-func TestRestartableBackupItemActionAppliesTo(t *testing.T) {
-	p := new(mockRestartableProcess)
-	defer p.AssertExpectations(t)
-
-	// getDelegate error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
-	name := "pod"
-	r := newRestartableBackupItemAction(name, p)
-	a, err := r.AppliesTo()
-	assert.Equal(t, backup.ResourceSelector{}, a)
-	assert.EqualError(t, err, "reset error")
-
-	// Delegate returns error
-	p.On("resetIfNeeded").Return(nil)
-	delegate := new(mocks.ItemAction)
-	key := kindAndName{kind: PluginKindBackupItemAction, name: name}
-	p.On("getByKindAndName", key).Return(delegate, nil)
-	delegate.On("AppliesTo").Return(backup.ResourceSelector{}, errors.Errorf("applies to error")).Once()
-
-	a, err = r.AppliesTo()
-	assert.EqualError(t, err, "applies to error")
-	assert.Equal(t, backup.ResourceSelector{}, a)
-
-	// Happy path
-	resourceSelector := backup.ResourceSelector{
-		IncludedNamespaces: []string{"ns1"},
-	}
-	delegate.On("AppliesTo").Return(resourceSelector, nil)
-
-	a, err = r.AppliesTo()
-	assert.NoError(t, err)
-	assert.Equal(t, resourceSelector, a)
-}
-
-func TestRestartableBackupItemActionExecute(t *testing.T) {
-	p := new(mockRestartableProcess)
-	defer p.AssertExpectations(t)
-
-	item := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"foo": "bar",
-		},
-	}
+func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 	b := new(v1.Backup)
-	updatedItem := &unstructured.Unstructured{
+
+	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"color": "blue",
 		},
 	}
 
-	// getDelegate error
-	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
-	name := "pod"
-	r := newRestartableBackupItemAction(name, p)
+	pvToReturn := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"color": "green",
+		},
+	}
 
-	actualUpdatedItem, actualAdditionalItems, err := r.Execute(item, b)
-	assert.Nil(t, actualUpdatedItem)
-	assert.Nil(t, actualAdditionalItems)
-	assert.EqualError(t, err, "reset error")
-
-	// Delegate returns error
-	p.On("resetIfNeeded").Return(nil)
-	delegate := new(mocks.ItemAction)
-	key := kindAndName{kind: PluginKindBackupItemAction, name: name}
-	p.On("getByKindAndName", key).Return(delegate, nil)
-	delegate.On("Execute", item, b).Return(nil, nil, errors.Errorf("execute error")).Once()
-
-	actualUpdatedItem, actualAdditionalItems, err = r.Execute(item, b)
-	assert.Nil(t, actualUpdatedItem)
-	assert.Nil(t, actualAdditionalItems)
-	assert.EqualError(t, err, "execute error")
-
-	// Happy path
 	additionalItems := []backup.ResourceIdentifier{
 		{
 			GroupResource: schema.GroupResource{Group: "ark.heptio.com", Resource: "backups"},
 		},
 	}
-	delegate.On("Execute", item, b).Return(updatedItem, additionalItems, nil)
 
-	actualUpdatedItem, actualAdditionalItems, err = r.Execute(item, b)
-	assert.Equal(t, updatedItem, actualUpdatedItem)
-	assert.Equal(t, additionalItems, actualAdditionalItems)
-	assert.NoError(t, err)
+	runRestartableDelegateTests(
+		t,
+		PluginKindBackupItemAction,
+		func(key kindAndName, p RestartableProcess) interface{} {
+			return &restartableBackupItemAction{
+				key:                 key,
+				sharedPluginProcess: p,
+			}
+		},
+		func() mockable {
+			return new(mocks.ItemAction)
+		},
+		restartableDelegateTest{
+			function:                "AppliesTo",
+			inputs:                  []interface{}{},
+			expectedErrorOutputs:    []interface{}{backup.ResourceSelector{}, errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{backup.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+		},
+		restartableDelegateTest{
+			function:                "Execute",
+			inputs:                  []interface{}{pv, b},
+			expectedErrorOutputs:    []interface{}{nil, ([]backup.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
+		},
+	)
 }

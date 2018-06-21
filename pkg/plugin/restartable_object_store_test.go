@@ -18,7 +18,6 @@ package plugin
 
 import (
 	"io/ioutil"
-	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -183,119 +182,53 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 }
 
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
-	tests := []struct {
-		function                string
-		inputs                  []interface{}
-		expectedErrorOutputs    []interface{}
-		expectedDelegateOutputs []interface{}
-	}{
-		{
+	runRestartableDelegateTests(
+		t,
+		PluginKindObjectStore,
+		func(key kindAndName, p RestartableProcess) interface{} {
+			return &restartableObjectStore{
+				key:                 key,
+				sharedPluginProcess: p,
+			}
+		},
+		func() mockable {
+			return new(test.ObjectStore)
+		},
+		restartableDelegateTest{
 			function:                "PutObject",
 			inputs:                  []interface{}{"bucket", "key", strings.NewReader("body")},
 			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		{
+		restartableDelegateTest{
 			function:                "GetObject",
 			inputs:                  []interface{}{"bucket", "key"},
 			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{ioutil.NopCloser(strings.NewReader("object")), errors.Errorf("delegate error")},
 		},
-		{
+		restartableDelegateTest{
 			function:                "ListCommonPrefixes",
 			inputs:                  []interface{}{"bucket", "delimeter"},
 			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		{
+		restartableDelegateTest{
 			function:                "ListObjects",
 			inputs:                  []interface{}{"bucket", "prefix"},
 			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},
-		{
+		restartableDelegateTest{
 			function:                "DeleteObject",
 			inputs:                  []interface{}{"bucket", "key"},
 			expectedErrorOutputs:    []interface{}{errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{errors.Errorf("delegate error")},
 		},
-		{
+		restartableDelegateTest{
 			function:                "CreateSignedURL",
 			inputs:                  []interface{}{"bucket", "key", 30 * time.Minute},
 			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{"signedURL", errors.Errorf("delegate error")},
 		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.function, func(t *testing.T) {
-			p := new(mockRestartableProcess)
-			p.Test(t)
-			defer p.AssertExpectations(t)
-
-			// getDelegate error
-			p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
-			name := "aws"
-			key := kindAndName{kind: PluginKindObjectStore, name: name}
-			r := &restartableObjectStore{
-				key:                 key,
-				sharedPluginProcess: p,
-			}
-
-			// Get the method we're going to call using reflection
-			method := reflect.ValueOf(r).MethodByName(tc.function)
-			require.NotEmpty(t, method)
-
-			// Convert the test case inputs ([]interface{}) to []reflect.Value
-			var inputValues []reflect.Value
-			for i := range tc.inputs {
-				inputValues = append(inputValues, reflect.ValueOf(tc.inputs[i]))
-			}
-
-			// Invoke the method being tested
-			actual := method.Call(inputValues)
-
-			// This function asserts that the actual outputs match the expected outputs
-			checkOutputs := func(expected []interface{}, actual []reflect.Value) {
-				for i := range actual {
-					// Get the underlying value from the reflect.Value
-					a := actual[i].Interface()
-
-					// Check if it's an error
-					actualErr, actualErrOk := a.(error)
-					// Check if the expected output element is an error
-					expectedErr, expectedErrOk := expected[i].(error)
-					// If both are errors, use EqualError
-					if actualErrOk && expectedErrOk {
-						assert.EqualError(t, actualErr, expectedErr.Error())
-						continue
-					}
-
-					// Otherwise, use plain Equal
-					assert.Equal(t, expected[i], a)
-				}
-			}
-
-			// Make sure we get what we expected when getDelegate returned an error
-			checkOutputs(tc.expectedErrorOutputs, actual)
-
-			// Invoke delegate, make sure all returned values are passed through
-			p.On("resetIfNeeded").Return(nil)
-
-			objectStore := new(test.ObjectStore)
-			objectStore.Test(t)
-			defer objectStore.AssertExpectations(t)
-
-			p.On("getByKindAndName", key).Return(objectStore, nil)
-
-			// Set up the mocked method in the delegate
-			objectStore.On(tc.function, tc.inputs...).Return(tc.expectedDelegateOutputs...)
-
-			// Invoke the method being tested
-			actual = method.Call(inputValues)
-
-			// Make sure we get what we expected when invoking the delegate
-			checkOutputs(tc.expectedDelegateOutputs, actual)
-		})
-	}
+	)
 }
