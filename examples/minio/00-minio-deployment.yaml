@@ -31,6 +31,8 @@ spec:
       volumes:
       - name: storage
         emptyDir: {}
+      - name: config
+        emptyDir: {}
       containers:
       - name: minio
         image: minio/minio:latest
@@ -38,6 +40,7 @@ spec:
         args:
         - server
         - /storage
+        - --config-dir=/config
         env:
         - name: MINIO_ACCESS_KEY
           value: "minio"
@@ -48,6 +51,8 @@ spec:
         volumeMounts:
         - name: storage
           mountPath: "/storage"
+        - name: config
+          mountPath: "/config"
 
 ---
 apiVersion: v1
@@ -94,6 +99,9 @@ spec:
       name: minio-setup
     spec:
       restartPolicy: OnFailure
+      volumes:
+      - name: config
+        emptyDir: {}
       containers:
       - name: mc
         image: minio/mc:latest
@@ -101,4 +109,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "mc config host add ark http://minio:9000 minio minio123 && mc mb -p ark/ark"
+        - "mc --config-folder=/config config host add ark http://minio:9000 minio minio123 && mc --config-folder=/config mb -p ark/ark"
+        volumeMounts:
+        - name: config
+          mountPath: "/config"
