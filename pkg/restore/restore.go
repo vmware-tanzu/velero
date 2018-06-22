@@ -77,6 +77,7 @@ type kubernetesRestorer struct {
 	snapshotService       cloudprovider.SnapshotService
 	backupClient          arkv1client.BackupsGetter
 	namespaceClient       corev1.NamespaceInterface
+	pvClient              corev1.PersistentVolumeInterface
 	resticRestorerFactory restic.RestorerFactory
 	resticTimeout         time.Duration
 	resourcePriorities    []string
@@ -151,6 +152,7 @@ func NewKubernetesRestorer(
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
+	pvClient corev1.PersistentVolumeInterface,
 	resticRestorerFactory restic.RestorerFactory,
 	resticTimeout time.Duration,
 	logger logrus.FieldLogger,
@@ -162,6 +164,7 @@ func NewKubernetesRestorer(
 		snapshotService:       snapshotService,
 		backupClient:          backupClient,
 		namespaceClient:       namespaceClient,
+		pvClient:              pvClient,
 		resticRestorerFactory: resticRestorerFactory,
 		resticTimeout:         resticTimeout,
 		resourcePriorities:    resourcePriorities,
@@ -239,6 +242,7 @@ func (kr *kubernetesRestorer) Restore(restore *api.Restore, backup *api.Backup, 
 		dynamicFactory:       kr.dynamicFactory,
 		fileSystem:           kr.fileSystem,
 		namespaceClient:      kr.namespaceClient,
+		pvClient:             kr.pvClient,
 		actions:              resolvedActions,
 		snapshotService:      kr.snapshotService,
 		resticRestorer:       resticRestorer,
@@ -318,6 +322,7 @@ type context struct {
 	dynamicFactory       client.DynamicFactory
 	fileSystem           FileSystem
 	namespaceClient      corev1.NamespaceInterface
+	pvClient             corev1.PersistentVolumeInterface
 	actions              []resolvedAction
 	snapshotService      cloudprovider.SnapshotService
 	resticRestorer       restic.Restorer
@@ -657,6 +662,11 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if groupResource == kuberesource.PersistentVolumes {
+			// TODO if (a) there's no snapshot for this PV, and (b) the underlying
+			// cloud volume doesn't exist, should we error (which is what happens
+			// now), or should we skip trying to restore the PV and allow a new one
+			// to be dynamically provisioned, if applicable?
+
 			// restore the PV from snapshot (if applicable)
 			updatedObj, err := ctx.executePVAction(obj)
 			if err != nil {
@@ -712,6 +722,36 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 
 			obj = unstructuredObj
+		}
+
+		if groupResource == kuberesource.PersistentVolumeClaims {
+			pvName, err := collections.GetString(obj.UnstructuredContent(), "spec.volumeName")
+			if err != nil {
+				addToResult(&errs, namespace, errors.WithStack(err))
+				continue
+			}
+
+			// Does this PVC's claimed PV exist? If not, clear out the necessary
+			// fields to allow a new, empty PV to be dynamically-provisioned.
+			_, err = ctx.pvClient.Get(pvName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+				if err != nil {
+					addToResult(&errs, namespace, errors.WithStack(err))
+					continue
+				}
+				delete(spec, "volumeName")
+
+				annotations, err := collections.GetMap(obj.UnstructuredContent(), "metadata.annotations")
+				if err != nil {
+					addToResult(&errs, namespace, errors.WithStack(err))
+					continue
+				}
+				delete(annotations, "pv.kubernetes.io/bind-completed")
+			} else if err != nil {
+				addToResult(&errs, namespace, errors.WithStack(err))
+				continue
+			}
 		}
 
 		// clear out non-core metadata fields & status
