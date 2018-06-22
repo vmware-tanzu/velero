@@ -17,14 +17,12 @@ limitations under the License.
 package aws
 
 import (
-	"context"
 	"io"
 	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
@@ -47,30 +45,6 @@ type objectStore struct {
 
 func NewObjectStore() cloudprovider.ObjectStore {
 	return &objectStore{}
-}
-
-func getBucketRegion(bucket string) (string, error) {
-	var region string
-
-	session, err := session.NewSession()
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	for _, partition := range endpoints.DefaultPartitions() {
-		for regionHint := range partition.Regions() {
-			region, _ = s3manager.GetBucketRegion(context.Background(), session, bucket, regionHint)
-
-			// we only need to try a single region hint per partition, so break after the first
-			break
-		}
-
-		if region != "" {
-			return region, nil
-		}
-	}
-
-	return "", errors.New("unable to determine bucket's region")
 }
 
 func (o *objectStore) Init(config map[string]string) error {
@@ -100,7 +74,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	if s3URL == "" && region == "" {
 		var err error
 
-		region, err = getBucketRegion(bucket)
+		region, err = GetBucketRegion(bucket)
 		if err != nil {
 			return err
 		}

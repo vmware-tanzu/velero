@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider/aws"
 )
 
 type BackendType string
@@ -34,22 +35,9 @@ const (
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
 func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
-	if BackendType(config.Name) == AWSBackend {
-		var url string
-		switch {
-		// non-AWS, S3-compatible object store
-		case config.Config["s3Url"] != "":
-			url = config.Config["s3Url"]
-		default:
-			url = "s3.amazonaws.com"
-		}
-
-		return fmt.Sprintf("s3:%s/%s", url, config.ResticLocation)
-	}
-
 	var (
-		parts        = strings.SplitN(config.ResticLocation, "/", 2)
-		bucket, path string
+		parts                = strings.SplitN(config.ResticLocation, "/", 2)
+		bucket, path, prefix string
 	)
 
 	if len(parts) >= 1 {
@@ -59,8 +47,24 @@ func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
 		path = parts[1]
 	}
 
-	var prefix string
 	switch BackendType(config.Name) {
+	case AWSBackend:
+		var url string
+		switch {
+		// non-AWS, S3-compatible object store
+		case config.Config["s3Url"] != "":
+			url = config.Config["s3Url"]
+		default:
+			region, err := aws.GetBucketRegion(bucket)
+			if err != nil {
+				url = "s3.amazonaws.com"
+				break
+			}
+
+			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
+		}
+
+		return fmt.Sprintf("s3:%s/%s", url, config.ResticLocation)
 	case AzureBackend:
 		prefix = "azure"
 	case GCPBackend:
