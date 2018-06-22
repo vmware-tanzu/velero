@@ -31,5 +31,4 @@ Work with restic repositories
 ### SEE ALSO
 * [ark restic](ark_restic.md)	 - Work with restic
 * [ark restic repo get](ark_restic_repo_get.md)	 - Get restic repositories
-* [ark restic repo init](ark_restic_repo_init.md)	 - initialize a restic repository for a specified namespace
 

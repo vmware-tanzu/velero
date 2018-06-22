@@ -60,7 +60,7 @@ func NewPodVolumeBackupController(
 	podVolumeBackupInformer informers.PodVolumeBackupInformer,
 	podVolumeBackupClient arkv1client.PodVolumeBackupsGetter,
 	podInformer cache.SharedIndexInformer,
-	secretInformer corev1informers.SecretInformer,
+	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	nodeName string,
 ) Interface {
@@ -69,7 +69,7 @@ func NewPodVolumeBackupController(
 		podVolumeBackupClient: podVolumeBackupClient,
 		podVolumeBackupLister: podVolumeBackupInformer.Lister(),
 		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
-		secretLister:          secretInformer.Lister(),
+		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:             pvcInformer.Lister(),
 		nodeName:              nodeName,
 	}
@@ -78,8 +78,8 @@ func NewPodVolumeBackupController(
 	c.cacheSyncWaiters = append(
 		c.cacheSyncWaiters,
 		podVolumeBackupInformer.Informer().HasSynced,
-		secretInformer.Informer().HasSynced,
 		podInformer.HasSynced,
+		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
 	)
 	c.processBackupFunc = c.processBackup
@@ -194,7 +194,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
-	file, err := restic.TempCredentialsFile(c.secretLister, req.Spec.Pod.Namespace)
+	file, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

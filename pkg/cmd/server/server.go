@@ -235,14 +235,6 @@ func (s *server) run() error {
 		if err := s.initRestic(config.BackupStorageProvider); err != nil {
 			return err
 		}
-
-		// warn if restic daemonset does not exist
-		_, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get("restic", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			s.logger.Warn("Ark restic DaemonSet not found; restic backups will fail until it's created")
-		} else if err != nil {
-			return errors.WithStack(err)
-		}
 	}
 
 	if err := s.runControllers(config); err != nil {
@@ -457,15 +449,33 @@ func durationMin(a, b time.Duration) time.Duration {
 }
 
 func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
+	// warn if restic daemonset does not exist
+	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
+	} else if err != nil {
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of ark restic daemonset")
+	}
+
+	// ensure the repo key secret is set up
+	if err := restic.EnsureCommonRepositoryKey(s.kubeClient.CoreV1(), s.namespace); err != nil {
+		return err
+	}
+
 	// set the env vars that restic uses for creds purposes
 	if config.Name == string(restic.AzureBackend) {
 		os.Setenv("AZURE_ACCOUNT_NAME", os.Getenv("AZURE_STORAGE_ACCOUNT_ID"))
 		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
 	}
 
+	// use a stand-alone secrets informer so we can filter to only the restic credentials
+	// secret(s) within the heptio-ark namespace
+	//
+	// note: using an informer to access the single secret for all ark-managed
+	// restic repositories is overkill for now, but will be useful when we move
+	// to fully-encrypted backups and have unique keys per repository.
 	secretsInformer := corev1informers.NewFilteredSecretInformer(
 		s.kubeClient,
-		"",
+		s.namespace,
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
@@ -479,8 +489,8 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 		s.namespace,
 		s.arkClient,
 		secretsInformer,
-		s.kubeClient.CoreV1(),
 		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
+		s.arkClient.ArkV1(),
 		s.logger,
 	)
 	if err != nil {

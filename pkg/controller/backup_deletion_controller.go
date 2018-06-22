@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -38,6 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 )
+
+const resticTimeout = time.Minute
 
 type backupDeletionController struct {
 	*genericController
@@ -239,13 +242,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// Try to delete restic snapshots
 	log.Info("Removing restic snapshots")
-	if snapshots, err := restic.GetSnapshotsInBackup(backup, c.podvolumeBackupLister); err != nil {
-		errs = append(errs, err.Error())
-	} else {
-		for _, snapshot := range snapshots {
-			if err := c.resticMgr.Forget(snapshot); err != nil {
-				errs = append(errs, err.Error())
-			}
+	if deleteErrs := c.deleteResticSnapshots(backup); len(deleteErrs) > 0 {
+		for _, err := range deleteErrs {
+			errs = append(errs, err.Error())
 		}
 	}
 
@@ -302,6 +301,29 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	return nil
+}
+
+func (c *backupDeletionController) deleteResticSnapshots(backup *v1.Backup) []error {
+	if c.resticMgr == nil {
+		return nil
+	}
+
+	snapshots, err := restic.GetSnapshotsInBackup(backup, c.podvolumeBackupLister)
+	if err != nil {
+		return []error{err}
+	}
+
+	ctx, cancelFunc := context.WithTimeout(context.Background(), resticTimeout)
+	defer cancelFunc()
+
+	var errs []error
+	for _, snapshot := range snapshots {
+		if err := c.resticMgr.Forget(ctx, snapshot); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
 }
 
 const deleteBackupRequestMaxAge = 24 * time.Hour

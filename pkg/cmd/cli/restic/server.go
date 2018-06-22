@@ -24,6 +24,7 @@ import (
 	"github.com/heptio/ark/pkg/controller"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/logging"
 )
 
@@ -59,6 +60,7 @@ type resticServer struct {
 	arkInformerFactory  informers.SharedInformerFactory
 	kubeInformerFactory kubeinformers.SharedInformerFactory
 	podInformer         cache.SharedIndexInformer
+	secretInformer      cache.SharedIndexInformer
 	logger              logrus.FieldLogger
 	ctx                 context.Context
 	cancelFunc          context.CancelFunc
@@ -84,11 +86,27 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	// filter to only pods scheduled on this node.
 	podInformer := corev1informers.NewFilteredPodInformer(
 		kubeClient,
-		"",
+		metav1.NamespaceAll,
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
 			opts.FieldSelector = fmt.Sprintf("spec.nodeName=%s", os.Getenv("NODE_NAME"))
+		},
+	)
+
+	// use a stand-alone secrets informer so we can filter to only the restic credentials
+	// secret(s) within the heptio-ark namespace
+	//
+	// note: using an informer to access the single secret for all ark-managed
+	// restic repositories is overkill for now, but will be useful when we move
+	// to fully-encrypted backups and have unique keys per repository.
+	secretInformer := corev1informers.NewFilteredSecretInformer(
+		kubeClient,
+		os.Getenv("HEPTIO_ARK_NAMESPACE"),
+		0,
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		func(opts *metav1.ListOptions) {
+			opts.FieldSelector = fmt.Sprintf("metadata.name=%s", restic.CredentialsSecretName)
 		},
 	)
 
@@ -100,6 +118,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 		arkInformerFactory:  informers.NewFilteredSharedInformerFactory(arkClient, 0, os.Getenv("HEPTIO_ARK_NAMESPACE"), nil),
 		kubeInformerFactory: kubeinformers.NewSharedInformerFactory(kubeClient, 0),
 		podInformer:         podInformer,
+		secretInformer:      secretInformer,
 		logger:              logger,
 		ctx:                 ctx,
 		cancelFunc:          cancelFunc,
@@ -118,7 +137,7 @@ func (s *resticServer) run() {
 		s.arkInformerFactory.Ark().V1().PodVolumeBackups(),
 		s.arkClient.ArkV1(),
 		s.podInformer,
-		s.kubeInformerFactory.Core().V1().Secrets(),
+		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		os.Getenv("NODE_NAME"),
 	)
@@ -133,7 +152,7 @@ func (s *resticServer) run() {
 		s.arkInformerFactory.Ark().V1().PodVolumeRestores(),
 		s.arkClient.ArkV1(),
 		s.podInformer,
-		s.kubeInformerFactory.Core().V1().Secrets(),
+		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		os.Getenv("NODE_NAME"),
 	)
@@ -146,6 +165,7 @@ func (s *resticServer) run() {
 	go s.arkInformerFactory.Start(s.ctx.Done())
 	go s.kubeInformerFactory.Start(s.ctx.Done())
 	go s.podInformer.Run(s.ctx.Done())
+	go s.secretInformer.Run(s.ctx.Done())
 
 	s.logger.Info("Controllers started successfully")
 
