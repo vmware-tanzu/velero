@@ -634,6 +634,7 @@ func (s *server) runControllers(config *api.Config) error {
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
+		s.kubeClient.CoreV1().PersistentVolumes(),
 		s.resticManager,
 		config.PodVolumeOperationTimeout.Duration,
 		s.logger,
