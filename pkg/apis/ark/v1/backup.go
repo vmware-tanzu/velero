@@ -44,7 +44,7 @@ type BackupSpec struct {
 	// SnapshotVolumes specifies whether to take cloud snapshots
 	// of any PV's referenced in the set of objects included
 	// in the Backup.
-	SnapshotVolumes *bool `json:"snapshotVolumes"`
+	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
@@ -80,7 +80,7 @@ type BackupResourceHookSpec struct {
 	// ExcludedResources specifies the resources to which this hook spec does not apply.
 	ExcludedResources []string `json:"excludedResources"`
 	// LabelSelector, if specified, filters the resources to which this hook spec applies.
-	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 	// Hooks is a list of BackupResourceHooks to execute. DEPRECATED. Replaced by PreHooks.
 	Hooks []BackupResourceHook `json:"hooks"`
 	// PreHooks is a list of BackupResourceHooks to execute prior to storing the item in the backup.
