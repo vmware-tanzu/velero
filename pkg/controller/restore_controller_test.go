@@ -37,6 +37,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -95,6 +96,7 @@ func TestFetchBackup(t *testing.T) {
 				false,
 				logger,
 				pluginManager,
+				metrics.NewServerMetrics(),
 			).(*restoreController)
 
 			for _, itm := range test.informerBackups {
@@ -326,6 +328,7 @@ func TestProcessRestore(t *testing.T) {
 				test.allowRestoreSnapshots,
 				logger,
 				pluginManager,
+				metrics.NewServerMetrics(),
 			).(*restoreController)
 
 			if test.restore != nil {
@@ -410,7 +413,6 @@ func TestProcessRestore(t *testing.T) {
 			restorer.AssertExpectations(t)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
-
 			actions := client.Actions()
 
 			if test.expectedPhase == "" {

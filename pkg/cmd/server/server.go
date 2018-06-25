@@ -725,6 +725,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.snapshotService != nil,
 		s.logger,
 		s.pluginManager,
+		s.metrics,
 	)
 	wg.Add(1)
 	go func() {

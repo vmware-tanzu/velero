@@ -45,6 +45,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/boolptr"
@@ -84,6 +85,7 @@ type restoreController struct {
 	queue               workqueue.RateLimitingInterface
 	logger              logrus.FieldLogger
 	pluginManager       plugin.Manager
+	metrics             *metrics.ServerMetrics
 }
 
 func NewRestoreController(
@@ -98,6 +100,7 @@ func NewRestoreController(
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	pluginManager plugin.Manager,
+	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &restoreController{
 		namespace:           namespace,
@@ -114,6 +117,7 @@ func NewRestoreController(
 		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 		logger:              logger,
 		pluginManager:       pluginManager,
+		metrics:             metrics,
 	}
 
 	c.syncHandler = c.processRestore
@@ -255,8 +259,23 @@ func (c *restoreController) processRestore(key string) error {
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
-	// complete & validate restore
-	if restore.Status.ValidationErrors = c.completeAndValidate(restore); len(restore.Status.ValidationErrors) > 0 {
+	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
+	for _, nonrestorable := range nonRestorableResources {
+		if !excludedResources.Has(nonrestorable) {
+			restore.Spec.ExcludedResources = append(restore.Spec.ExcludedResources, nonrestorable)
+		}
+	}
+
+	backup, fetchErr := c.fetchBackup(c.bucket, restore.Spec.BackupName)
+	backupScheduleName := ""
+	if backup != nil {
+		backupScheduleName = backup.GetLabels()["ark-schedule"]
+	}
+	// Register attempts before we do validation so we can get better tracking
+	c.metrics.RegisterRestoreAttempt(backupScheduleName)
+
+	// validation
+	if restore.Status.ValidationErrors = c.completeAndValidate(restore, fetchErr); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
@@ -272,12 +291,12 @@ func (c *restoreController) processRestore(key string) error {
 	restore = updatedRestore.DeepCopy()
 
 	if restore.Status.Phase == api.RestorePhaseFailedValidation {
+		c.metrics.RegisterRestoreValidationFailed(backupScheduleName)
 		return nil
 	}
-
 	logContext.Debug("Running restore")
 	// execution & upload of restore
-	restoreWarnings, restoreErrors := c.runRestore(restore, c.bucket)
+	restoreWarnings, restoreErrors := c.runRestore(restore, c.bucket, backup)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
@@ -287,6 +306,11 @@ func (c *restoreController) processRestore(key string) error {
 	restore.Status.Errors = len(restoreErrors.Ark) + len(restoreErrors.Cluster)
 	for _, e := range restoreErrors.Namespaces {
 		restore.Status.Errors += len(e)
+	}
+	if restore.Status.Errors > 0 {
+		c.metrics.RegisterRestoreIncomplete(backupScheduleName)
+	} else {
+		c.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
 
 	logContext.Debug("restore completed")
@@ -300,7 +324,7 @@ func (c *restoreController) processRestore(key string) error {
 	return nil
 }
 
-func (c *restoreController) completeAndValidate(restore *api.Restore) []string {
+func (c *restoreController) completeAndValidate(restore *api.Restore, fetchErr error) []string {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -308,8 +332,13 @@ func (c *restoreController) completeAndValidate(restore *api.Restore) []string {
 			restore.Spec.ExcludedResources = append(restore.Spec.ExcludedResources, nonrestorable)
 		}
 	}
-
 	var validationErrors []string
+
+	if restore.Spec.BackupName == "" {
+		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
+	} else if fetchErr != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", fetchErr))
+	}
 
 	// validate that included resources don't contain any non-restorable resources
 	includedResources := sets.NewString(restore.Spec.IncludedResources...)
@@ -433,7 +462,7 @@ func (c *restoreController) fetchBackup(bucket, name string) (*api.Backup, error
 	return backup, nil
 }
 
-func (c *restoreController) runRestore(restore *api.Restore, bucket string) (restoreWarnings, restoreErrors api.RestoreResult) {
+func (c *restoreController) runRestore(restore *api.Restore, bucket string, backup *api.Backup) (restoreWarnings, restoreErrors api.RestoreResult) {
 	logContext := c.logger.WithFields(
 		logrus.Fields{
 			"restore": kubeutil.NamespaceAndName(restore),
