@@ -272,6 +272,7 @@ func TestBackupResource(t *testing.T) {
 				resourceHooks,
 				nil, // snapshot service
 				nil, // restic backupper
+				newPVCSnapshotTracker(),
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -293,6 +294,7 @@ func TestBackupResource(t *testing.T) {
 					resourceHooks,
 					dynamicFactory,
 					discoveryHelper,
+					mock.Anything,
 					mock.Anything,
 					mock.Anything,
 				).Return(itemBackupper)
@@ -438,6 +440,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				resourceHooks,
 				nil, // snapshot service
 				nil, // restic backupper
+				newPVCSnapshotTracker(),
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -460,6 +463,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				discoveryHelper,
 				mock.Anything, // snapshot service
 				mock.Anything, // restic backupper
+				mock.Anything, // pvc snapshot tracker
 			).Return(itemBackupper)
 
 			client := &arktest.FakeDynamicClient{}
@@ -519,6 +523,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		resourceHooks,
 		nil, // snapshot service
 		nil, // restic backupper
+		newPVCSnapshotTracker(),
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -553,6 +558,7 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Return(itemBackupper)
@@ -622,6 +628,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		resourceHooks,
 		nil, // snapshot service
 		nil, // restic backupper
+		newPVCSnapshotTracker(),
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -645,6 +652,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 	).Return(itemBackupper)
@@ -684,6 +692,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
@@ -698,6 +707,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		discoveryHelper,
 		snapshotService,
 		resticBackupper,
+		resticSnapshotTracker,
 	)
 	return args.Get(0).(ItemBackupper)
 }

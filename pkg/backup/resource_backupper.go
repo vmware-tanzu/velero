@@ -53,6 +53,7 @@ type resourceBackupperFactory interface {
 		resourceHooks []resourceHook,
 		snapshotService cloudprovider.SnapshotService,
 		resticBackupper restic.Backupper,
+		resticSnapshotTracker *pvcSnapshotTracker,
 	) resourceBackupper
 }
 
@@ -73,6 +74,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) resourceBackupper {
 	return &defaultResourceBackupper{
 		log:                   log,
@@ -89,6 +91,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 		resourceHooks:         resourceHooks,
 		snapshotService:       snapshotService,
 		resticBackupper:       resticBackupper,
+		resticSnapshotTracker: resticSnapshotTracker,
 		itemBackupperFactory:  &defaultItemBackupperFactory{},
 	}
 }
@@ -112,6 +115,7 @@ type defaultResourceBackupper struct {
 	resourceHooks         []resourceHook
 	snapshotService       cloudprovider.SnapshotService
 	resticBackupper       restic.Backupper
+	resticSnapshotTracker *pvcSnapshotTracker
 	itemBackupperFactory  itemBackupperFactory
 }
 
@@ -187,6 +191,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.discoveryHelper,
 		rb.snapshotService,
 		rb.resticBackupper,
+		rb.resticSnapshotTracker,
 	)
 
 	namespacesToList := getNamespacesToList(rb.namespaces)

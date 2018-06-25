@@ -286,6 +286,7 @@ func (kb *kubernetesBackupper) Backup(backup *api.Backup, backupFile, logFile io
 		resourceHooks,
 		kb.snapshotService,
 		resticBackupper,
+		newPVCSnapshotTracker(),
 	)
 
 	for _, group := range kb.discoveryHelper.Resources() {

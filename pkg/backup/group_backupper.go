@@ -51,6 +51,7 @@ type groupBackupperFactory interface {
 		resourceHooks []resourceHook,
 		snapshotService cloudprovider.SnapshotService,
 		resticBackupper restic.Backupper,
+		resticSnapshotTracker *pvcSnapshotTracker,
 	) groupBackupper
 }
 
@@ -70,6 +71,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) groupBackupper {
 	return &defaultGroupBackupper{
 		log:                      log,
@@ -86,6 +88,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 		resourceHooks:            resourceHooks,
 		snapshotService:          snapshotService,
 		resticBackupper:          resticBackupper,
+		resticSnapshotTracker:    resticSnapshotTracker,
 		resourceBackupperFactory: &defaultResourceBackupperFactory{},
 	}
 }
@@ -108,6 +111,7 @@ type defaultGroupBackupper struct {
 	resourceHooks            []resourceHook
 	snapshotService          cloudprovider.SnapshotService
 	resticBackupper          restic.Backupper
+	resticSnapshotTracker    *pvcSnapshotTracker
 	resourceBackupperFactory resourceBackupperFactory
 }
 
@@ -131,6 +135,7 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 			gb.resourceHooks,
 			gb.snapshotService,
 			gb.resticBackupper,
+			gb.resticSnapshotTracker,
 		)
 	)
 

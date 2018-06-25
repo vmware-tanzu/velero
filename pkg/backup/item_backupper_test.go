@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestBackupItemSkips(t *testing.T) {
@@ -163,6 +164,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 		snapshottableVolumes                  map[string]api.VolumeBackupInfo
 		snapshotError                         error
 		additionalItemError                   error
+		trackedPVCs                           sets.String
+		expectedTrackedPVCs                   sets.String
 	}{
 		{
 			name: "explicit namespace include",
@@ -294,6 +297,32 @@ func TestBackupItemNoSkips(t *testing.T) {
 			},
 		},
 		{
+			name: "takePVSnapshot is not invoked for PVs when their claim is tracked in the restic PVC tracker",
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			item:                  `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
+			expectError:           false,
+			expectExcluded:        false,
+			expectedTarHeaderName: "resources/persistentvolumes/cluster/mypv.json",
+			groupResource:         "persistentvolumes",
+			// empty snapshottableVolumes causes a snapshotService to be created, but no
+			// snapshots are expected to be taken.
+			snapshottableVolumes: map[string]api.VolumeBackupInfo{},
+			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
+		},
+		{
+			name: "takePVSnapshot is invoked for PVs when their claim is not tracked in the restic PVC tracker",
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			item:                  `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
+			expectError:           false,
+			expectExcluded:        false,
+			expectedTarHeaderName: "resources/persistentvolumes/cluster/mypv.json",
+			groupResource:         "persistentvolumes",
+			snapshottableVolumes: map[string]api.VolumeBackupInfo{
+				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
+			},
+			trackedPVCs: sets.NewString(key("another-pvc-ns", "another-pvc")),
+		},
+		{
 			name: "backup fails when takePVSnapshot fails",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:          `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
@@ -303,6 +332,16 @@ func TestBackupItemNoSkips(t *testing.T) {
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 			snapshotError: fmt.Errorf("failure"),
+		},
+		{
+			name: "pod's restic PVC volume backups (only) are tracked",
+			item: `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.ark.heptio.com/backup-volumes": "volume-1,volume-2"}}}`,
+			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+			groupResource:             "pods",
+			expectError:               false,
+			expectExcluded:            false,
+			expectedTarHeaderName:     "resources/pods/namespaces/foo/bar.json",
+			expectedTrackedPVCs:       sets.NewString(key("foo", "bar"), key("foo", "baz")),
 		},
 	}
 
@@ -376,6 +415,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				discoveryHelper,
 				nil, // snapshot service
 				nil, // restic backupper
+				newPVCSnapshotTracker(),
 			).(*defaultItemBackupper)
 
 			var snapshotService *arktest.FakeSnapshotService
@@ -386,6 +426,10 @@ func TestBackupItemNoSkips(t *testing.T) {
 					Error:                test.snapshotError,
 				}
 				b.snapshotService = snapshotService
+			}
+
+			if test.trackedPVCs != nil {
+				b.resticSnapshotTracker.pvcs = test.trackedPVCs
 			}
 
 			// make sure the podCommandExecutor was set correctly in the real hook handler
@@ -469,7 +513,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 
 			if test.snapshottableVolumes != nil {
-				require.Equal(t, 1, len(snapshotService.SnapshotsTaken))
+				require.Equal(t, len(test.snapshottableVolumes), len(snapshotService.SnapshotsTaken))
 
 				var expectedBackups []api.VolumeBackupInfo
 				for _, vbi := range test.snapshottableVolumes {
@@ -482,6 +526,14 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 
 				assert.Equal(t, expectedBackups, actualBackups)
+			}
+
+			if test.expectedTrackedPVCs != nil {
+				require.Equal(t, len(test.expectedTrackedPVCs), len(b.resticSnapshotTracker.pvcs))
+
+				for key := range test.expectedTrackedPVCs {
+					assert.True(t, b.resticSnapshotTracker.pvcs.Has(key))
+				}
 			}
 		})
 	}
