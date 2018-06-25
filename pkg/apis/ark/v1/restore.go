@@ -49,16 +49,16 @@ type RestoreSpec struct {
 	// LabelSelector is a metav1.LabelSelector to filter with
 	// when restoring individual objects from the backup. If empty
 	// or nil, all objects are included. Optional.
-	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// RestorePVs specifies whether to restore all included
 	// PVs from snapshot (via the cloudprovider).
-	RestorePVs *bool `json:"restorePVs"`
+	RestorePVs *bool `json:"restorePVs,omitempty"`
 
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the restore. If null, defaults
 	// to true.
-	IncludeClusterResources *bool `json:"includeClusterResources"`
+	IncludeClusterResources *bool `json:"includeClusterResources,omitempty"`
 }
 
 // RestorePhase is a string representation of the lifecycle phase
