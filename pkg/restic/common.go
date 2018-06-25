@@ -150,18 +150,21 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, repoName strin
 		return "", err
 	}
 
-	file, err := ioutil.TempFile("", fmt.Sprintf("%s-%s", CredentialsSecretName, repoName))
+	return writeTempFile("", fmt.Sprintf("%s-%s", CredentialsSecretName, repoName), repoKey)
+}
+
+func writeTempFile(dir, prefix string, contents []byte) (string, error) {
+	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	if _, err := file.Write(repoKey); err != nil {
+	if _, err := file.Write(contents); err != nil {
 		// nothing we can do about an error closing the file here, and we're
 		// already returning an error about the write failing.
 		file.Close()
 		return "", errors.WithStack(err)
 	}
-
 	name := file.Name()
 
 	if err := file.Close(); err != nil {

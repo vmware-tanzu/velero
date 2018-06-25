@@ -18,13 +18,18 @@ package restic
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -46,6 +51,9 @@ type RepositoryManager interface {
 
 	// PruneRepo deletes unused data from a repo.
 	PruneRepo(name string) error
+
+	// ChangeKey changes the encryption key for a repo.
+	ChangeKey(name string) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
@@ -205,6 +213,162 @@ func (rm *repositoryManager) Forget(snapshot SnapshotIdentifier) error {
 	return rm.exec(cmd)
 }
 
+func (rm *repositoryManager) ChangeKey(name string) error {
+	log := rm.log.WithField("repo", name)
+	log.Debug("Changing key")
+
+	repo, err := getReadyRepo(rm.repoLister, rm.namespace, name)
+	if err != nil {
+		return err
+	}
+
+	rm.repoLocker.LockExclusive(name)
+	defer rm.repoLocker.UnlockExclusive(name)
+
+	secret, err := rm.secretsLister.Secrets(name).Get(CredentialsSecretName)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// if there's data at the NewCredentialsKey within the secret, it could mean any of the following:
+	//	- this is our first time processing this key-change request
+	//	- we attempted to change the repo key already but got an error
+	//  - we successfully changed the repo key, but failed to update the secret to
+	//	  reflect the change
+	if newKey, ok := secret.Data[NewCredentialsKey]; ok {
+		log.Debugf("Found key in secret at %s", NewCredentialsKey)
+
+		if err := rm.processNewKey(newKey, secret, repo.Spec.ResticIdentifier, log); err != nil {
+			return err
+		}
+	}
+
+	// if there's data at the OldCredentialsKey within the secret, it could mean any of the following:
+	//	- this is our first time processing this key-change request
+	//  - a prior key-change request partially succeeded, meaning the new key was added to the repo
+	//    but the old key was not removed
+	//	- we successfully changed the repo key, but failed to remove the old key from the secret
+	if oldKey, ok := secret.Data[OldCredentialsKey]; ok {
+		log.Debugf("Found key in secret at %s", OldCredentialsKey)
+
+		if err := rm.processOldKey(oldKey, secret, repo.Spec.ResticIdentifier, log); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// processNewKey processes data in the ark-restic-credentials secret, at the "new-key" key. It changes the restic repo's
+// key if newKey is not already a working key for the repo, and updates the ark-restic-credentials secret to move newKey
+// into the "current-key" key.
+func (rm *repositoryManager) processNewKey(newKey []byte, secret *corev1api.Secret, repoIdentifier string, log logrus.FieldLogger) error {
+	if string(newKey) == string(secret.Data[CurrentCredentialsKey]) {
+		log.Debugf("New key is the same as current key")
+
+		return patchSecret(secret, func(s *corev1api.Secret) {
+			delete(s.Data, NewCredentialsKey)
+		}, rm.secretsClient)
+	}
+
+	newKeyFile, err := writeTempFile("", "", newKey)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(newKeyFile)
+
+	// if it's not valid, we need to run the restic cmd to change repo keys
+	if !isKeyWorking(repoIdentifier, newKeyFile) {
+		log.Debugf("Key in %s does not already work for restic repo, replacing the current key with it", NewCredentialsKey)
+		if err := rm.exec(ChangeKeyCommand(repoIdentifier, newKeyFile)); err != nil {
+			return err
+		}
+		log.Debugf("Ran restic key passwd command successfully")
+	}
+
+	// the new key is now valid, so patch the secret to move keys around appropriately
+	if err := patchSecret(secret, func(s *corev1api.Secret) {
+		s.Data[OldCredentialsKey], s.Data[CurrentCredentialsKey] = s.Data[CurrentCredentialsKey], s.Data[NewCredentialsKey]
+		delete(s.Data, NewCredentialsKey)
+	}, rm.secretsClient); err != nil {
+		return err
+	}
+	log.Debugf("Patched secret to move %s into %s and %s into %s", NewCredentialsKey, CurrentCredentialsKey, CurrentCredentialsKey, OldCredentialsKey)
+
+	return nil
+}
+
+func (rm *repositoryManager) processOldKey(oldKey []byte, secret *corev1api.Secret, repoIdentifier string, log logrus.FieldLogger) error {
+	oldKeyFile, err := writeTempFile("", "", oldKey)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(oldKeyFile)
+
+	if isKeyWorking(repoIdentifier, oldKeyFile) {
+		log.Debugf("Key in %s still works for restic repo, removing it", OldCredentialsKey)
+		id, err := getKeyID(repoIdentifier, oldKeyFile)
+		if err != nil {
+			return err
+		}
+		log.Debugf("Key in %s has restic id %s", OldCredentialsKey, id)
+		if err := rm.exec(RemoveKeyCommand(repoIdentifier, id)); err != nil {
+			return err
+		}
+		log.Debugf("Ran restic key remove command successfully")
+	}
+
+	if err := patchSecret(secret, func(s *corev1api.Secret) {
+		delete(s.Data, OldCredentialsKey)
+	}, rm.secretsClient); err != nil {
+		return err
+	}
+	log.Debugf("Patched secret to remove %s", OldCredentialsKey)
+	return nil
+}
+
+func getKeyID(resticIdentifer string, keyFile string) (string, error) {
+	cmd := ListKeysCommand(resticIdentifer)
+	cmd.PasswordFile = keyFile
+
+	stdout, _, err := arkexec.RunCommand(cmd.Cmd())
+	if err != nil {
+		return "", err
+	}
+
+	// TODO(1.0) once https://github.com/restic/restic/pull/1853 makes it into a restic
+	// release, we can replace this table-parsing with reading JSON.
+	for _, line := range strings.Split(stdout, "\n") {
+		// the current key is prefixed with a '*'
+		if !strings.HasPrefix(line, "*") {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) <= 0 {
+			return "", errors.New("unable to get current key's ID")
+		}
+
+		id := strings.TrimPrefix(fields[0], "*")
+		if len(id) <= 0 {
+			return "", errors.New("unable to get current key's ID")
+		}
+
+		return id, nil
+	}
+
+	return "", errors.New("unable to find current key")
+}
+
+func isKeyWorking(resticIdentifier string, keyFile string) bool {
+	// use `restic key list` as a test cmd to see if we can connect or not
+	cmd := ListKeysCommand(resticIdentifier)
+	cmd.PasswordFile = keyFile
+
+	// no error means key works
+	return cmd.Cmd().Run() == nil
+}
+
 func (rm *repositoryManager) exec(cmd *Command) error {
 	file, err := TempCredentialsFile(rm.secretsLister, cmd.RepoName())
 	if err != nil {
@@ -224,6 +388,31 @@ func (rm *repositoryManager) exec(cmd *Command) error {
 	}).Debugf("Ran restic command")
 	if err != nil {
 		return errors.Wrapf(err, "error running command=%s, stdout=%s, stderr=%s", cmd.String(), stdout, stderr)
+	}
+
+	return nil
+}
+
+func patchSecret(secret *corev1api.Secret, mutate func(s *corev1api.Secret), secretClient corev1client.SecretsGetter) error {
+	original, err := json.Marshal(secret)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling secret to JSON")
+	}
+
+	mutate(secret)
+
+	updated, err := json.Marshal(secret)
+	if err != nil {
+		return errors.Wrapf(err, "error marshalling updated secret to JSON")
+	}
+
+	patch, err := jsonpatch.CreateMergePatch(original, updated)
+	if err != nil {
+		return errors.Wrapf(err, "error creating merge patch")
+	}
+
+	if secret, err = secretClient.Secrets(secret.Namespace).Patch(secret.Name, types.MergePatchType, patch); err != nil {
+		return errors.Wrap(err, "error patching secret")
 	}
 
 	return nil

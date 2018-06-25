@@ -925,6 +925,7 @@ func (in *ResticRepositorySpec) DeepCopy() *ResticRepositorySpec {
 func (in *ResticRepositoryStatus) DeepCopyInto(out *ResticRepositoryStatus) {
 	*out = *in
 	in.LastMaintenanceTime.DeepCopyInto(&out.LastMaintenanceTime)
+	in.LastKeyChangeTime.DeepCopyInto(&out.LastKeyChangeTime)
 	return
 }
 

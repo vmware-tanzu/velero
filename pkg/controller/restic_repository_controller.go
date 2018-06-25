@@ -148,24 +148,27 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 		return err
 	}
 
-	if err := ensureRepo(req.Name, c.repositoryManager); err != nil {
+	created, err := ensureRepo(req.Name, c.repositoryManager)
+	if err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
-	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
-		req.Status.Phase = v1.ResticRepositoryPhaseReady
-		req.Status.LastMaintenanceTime = metav1.Time{Time: time.Now()}
-	})
+	return c.patchResticRepository(req, repoReady(created))
 }
 
-// ensureRepo first checks the repo, and returns if check passes. If it fails,
-// attempts to init the repo, and returns the result.
-func ensureRepo(name string, repoManager restic.RepositoryManager) error {
+// ensureRepo checks a repo, and if that fails, tries to init the repo. It returns
+// true if it created a new repo and false otherwise, and an error if the init repo
+// call fails.
+func ensureRepo(name string, repoManager restic.RepositoryManager) (bool, error) {
 	if repoManager.CheckRepo(name) == nil {
-		return nil
+		return false, nil
 	}
 
-	return repoManager.InitRepo(name)
+	if err := repoManager.InitRepo(name); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }
 
 func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepository, log logrus.FieldLogger) error {
@@ -216,11 +219,12 @@ func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository,
 
 	// we need to ensure it (first check, if check fails, attempt to init)
 	// because we don't know if it's been successfully initialized yet.
-	if err := ensureRepo(req.Name, c.repositoryManager); err != nil {
+	created, err := ensureRepo(req.Name, c.repositoryManager)
+	if err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
-	return c.patchResticRepository(req, repoReady())
+	return c.patchResticRepository(req, repoReady(created))
 }
 
 func repoNotReady(msg string) func(*v1.ResticRepository) {
@@ -230,10 +234,19 @@ func repoNotReady(msg string) func(*v1.ResticRepository) {
 	}
 }
 
-func repoReady() func(*v1.ResticRepository) {
+func repoReady(created bool) func(*v1.ResticRepository) {
 	return func(r *v1.ResticRepository) {
 		r.Status.Phase = v1.ResticRepositoryPhaseReady
 		r.Status.Message = ""
+
+		// if the repo already existed, don't record this as a key-change
+		// or maintenance event.
+		if created {
+			now := time.Now()
+
+			r.Status.LastMaintenanceTime = metav1.Time{Time: now}
+			r.Status.LastKeyChangeTime = metav1.Time{Time: now}
+		}
 	}
 }
 

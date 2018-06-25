@@ -49,6 +49,9 @@ type ResticRepositoryStatus struct {
 
 	// LastMaintenanceTime is the last time maintenance was run.
 	LastMaintenanceTime metav1.Time `json:"lastMaintenanceTime"`
+
+	// LastKeyChangeTime is the last time the encryption key was changed.
+	LastKeyChangeTime metav1.Time `json:"lastKeyChangeTime"`
 }
 
 // +genclient

@@ -56,6 +56,7 @@ func getSnapshotTagFlag(tags map[string]string) string {
 	return fmt.Sprintf("--tag=%s", strings.Join(tagFilters, ","))
 }
 
+// InitCommand returns a Command for running a restic init.
 func InitCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "init",
@@ -63,6 +64,7 @@ func InitCommand(repoIdentifier string) *Command {
 	}
 }
 
+// CheckCommand returns a Command for running a restic check.
 func CheckCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "check",
@@ -70,6 +72,7 @@ func CheckCommand(repoIdentifier string) *Command {
 	}
 }
 
+// PruneCommand returns a Command for running a restic prune.
 func PruneCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "prune",
@@ -77,6 +80,34 @@ func PruneCommand(repoIdentifier string) *Command {
 	}
 }
 
+// ListKeysCommand returns a Command for running a restic key list.
+func ListKeysCommand(repoIdentifier string) *Command {
+	return &Command{
+		Command:        "key list",
+		RepoIdentifier: repoIdentifier,
+		ExtraFlags:     []string{"--quiet"},
+	}
+}
+
+// ChangeKeyCommand returns a Command for running a restic key passwd.
+func ChangeKeyCommand(repoIdentifier string, newKeyFile string) *Command {
+	return &Command{
+		Command:        "key passwd",
+		RepoIdentifier: repoIdentifier,
+		ExtraFlags:     []string{"--new-password-file=" + newKeyFile},
+	}
+}
+
+// RemoveKeyCommand returns a Command for running a restic key remove.
+func RemoveKeyCommand(repoIdentifier string, keyID string) *Command {
+	return &Command{
+		Command:        "key remove",
+		RepoIdentifier: repoIdentifier,
+		Args:           []string{keyID},
+	}
+}
+
+// ForgetCommand returns a Command for running a restic forget.
 func ForgetCommand(repoIdentifier, snapshotID string) *Command {
 	return &Command{
 		Command:        "forget",
