@@ -21,8 +21,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/client-go/kubernetes/scheme"
+
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/api/core/v1"
@@ -32,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
@@ -576,8 +580,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 						IncludeClusterResources: test.includeClusterResources,
 					},
 				},
-				backup: &api.Backup{},
-				logger: arktest.NewLogger(),
+				backup:     &api.Backup{},
+				logger:     arktest.NewLogger(),
+				pvRestorer: &pvRestorer{},
 			}
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
@@ -672,6 +677,287 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 			assert.Equal(t, api.RestoreResult{}, errors)
 		})
 	}
+}
+
+func TestRestoringPVsWithoutSnapshots(t *testing.T) {
+	pv := `apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    EXPORT_block: "\nEXPORT\n{\n\tExport_Id = 1;\n\tPath = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tPseudo
+      = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tAccess_Type = RW;\n\tSquash
+      = no_root_squash;\n\tSecType = sys;\n\tFilesystem_id = 1.1;\n\tFSAL {\n\t\tName
+      = VFS;\n\t}\n}\n"
+    Export_Id: "1"
+    Project_Id: "0"
+    Project_block: ""
+    Provisioner_Id: 5fdf4025-78a5-11e8-9ece-0242ac110004
+    kubernetes.io/createdby: nfs-dynamic-provisioner
+    pv.kubernetes.io/provisioned-by: example.com/nfs
+    volume.beta.kubernetes.io/mount-options: vers=4.1
+  creationTimestamp: 2018-06-25T18:27:35Z
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  resourceVersion: "2576"
+  selfLink: /api/v1/persistentvolumes/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  uid: 6ecd24e4-78a5-11e8-a0d8-e2ad1e9734ce
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Mi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: nfs
+    namespace: default
+    resourceVersion: "2565"
+    uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  nfs:
+    path: /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+    server: 10.103.235.254
+  storageClassName: example-nfs
+status:
+  phase: Bound`
+
+	pvc := `apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    control-plane.alpha.kubernetes.io/leader: '{"holderIdentity":"5fdf5572-78a5-11e8-9ece-0242ac110004","leaseDurationSeconds":15,"acquireTime":"2018-06-25T18:27:35Z","renewTime":"2018-06-25T18:27:37Z","leaderTransitions":0}'
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"annotations":{},"name":"nfs","namespace":"default"},"spec":{"accessModes":["ReadWriteMany"],"resources":{"requests":{"storage":"1Mi"}},"storageClassName":"example-nfs"}}
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: example.com/nfs
+  creationTimestamp: 2018-06-25T18:27:28Z
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: nfs
+  namespace: default
+  resourceVersion: "2578"
+  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/nfs
+  uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+  storageClassName: example-nfs
+  volumeName: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+status:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Mi
+  phase: Bound`
+
+	tests := []struct {
+		name                          string
+		haveSnapshot                  bool
+		reclaimPolicy                 string
+		expectPVCVolumeName           bool
+		expectedPVCAnnotationsMissing sets.String
+		expectPVCreation              bool
+	}{
+		{
+			name:                "have snapshot, reclaim policy delete",
+			haveSnapshot:        true,
+			reclaimPolicy:       "Delete",
+			expectPVCVolumeName: true,
+			expectPVCreation:    true,
+		},
+		{
+			name:                "have snapshot, reclaim policy retain",
+			haveSnapshot:        true,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    true,
+		},
+		{
+			name:                          "no snapshot, reclaim policy delete",
+			haveSnapshot:                  false,
+			reclaimPolicy:                 "Delete",
+			expectPVCVolumeName:           false,
+			expectedPVCAnnotationsMissing: sets.NewString("pv.kubernetes.io/bind-completed", "pv.kubernetes.io/bound-by-controller"),
+		},
+		{
+			name:                "no snapshot, reclaim policy retain",
+			haveSnapshot:        false,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dynamicFactory := &arktest.FakeDynamicFactory{}
+			gv := schema.GroupVersion{Group: "", Version: "v1"}
+
+			pvClient := &arktest.FakeDynamicClient{}
+			defer pvClient.AssertExpectations(t)
+
+			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, "").Return(pvClient, nil)
+
+			pvcClient := &arktest.FakeDynamicClient{}
+			defer pvcClient.AssertExpectations(t)
+
+			pvcResource := metav1.APIResource{Name: "persistentvolumeclaims", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, pvcResource, "default").Return(pvcClient, nil)
+
+			obj, _, err := scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pv), nil, nil)
+			require.NoError(t, err)
+			pvObj, ok := obj.(*v1.PersistentVolume)
+			require.True(t, ok)
+			pvObj.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimPolicy(test.reclaimPolicy)
+			pvBytes, err := json.Marshal(pvObj)
+			require.NoError(t, err)
+
+			obj, _, err = scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pvc), nil, nil)
+			require.NoError(t, err)
+			pvcObj, ok := obj.(*v1.PersistentVolumeClaim)
+			require.True(t, ok)
+			pvcBytes, err := json.Marshal(pvcObj)
+			require.NoError(t, err)
+
+			backup := &api.Backup{}
+			if test.haveSnapshot {
+				backup.Status.VolumeBackups = map[string]*api.VolumeBackupInfo{
+					"pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce": {
+						SnapshotID: "snap",
+					},
+				}
+			}
+
+			pvRestorer := new(mockPVRestorer)
+			defer pvRestorer.AssertExpectations(t)
+
+			ctx := &context{
+				dynamicFactory: dynamicFactory,
+				actions:        []resolvedAction{},
+				fileSystem: arktest.NewFakeFileSystem().
+					WithFile("foo/resources/persistentvolumes/cluster/pv.json", pvBytes).
+					WithFile("foo/resources/persistentvolumeclaims/default/pvc.json", pvcBytes),
+				selector: labels.NewSelector(),
+				prioritizedResources: []schema.GroupResource{
+					kuberesource.PersistentVolumes,
+					kuberesource.PersistentVolumeClaims,
+				},
+				restore: &api.Restore{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "my-restore",
+					},
+				},
+				backup:         backup,
+				logger:         arktest.NewLogger(),
+				pvsToProvision: sets.NewString(),
+				pvRestorer:     pvRestorer,
+			}
+
+			pvWatch := new(mockWatch)
+			defer pvWatch.AssertExpectations(t)
+
+			unstructuredPVMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvObj)
+			require.NoError(t, err)
+			unstructuredPV := &unstructured.Unstructured{Object: unstructuredPVMap}
+
+			pvToRestore := unstructuredPV.DeepCopy()
+			restoredPV := unstructuredPV.DeepCopy()
+
+			if test.expectPVCreation {
+				// just to ensure we have the data flowing correctly
+				restoredPV.Object["foo"] = "bar"
+				pvRestorer.On("executePVAction", pvToRestore).Return(restoredPV, nil)
+			}
+
+			resetMetadataAndStatus(unstructuredPV)
+			addLabel(unstructuredPV, api.RestoreLabelKey, ctx.restore.Name)
+			unstructuredPV.Object["foo"] = "bar"
+
+			if test.expectPVCreation {
+				createdPV := unstructuredPV.DeepCopy()
+				pvClient.On("Create", unstructuredPV).Return(createdPV, nil)
+
+				pvClient.On("Watch", metav1.ListOptions{}).Return(pvWatch, nil)
+				pvWatchChan := make(chan watch.Event, 1)
+				readyPV := restoredPV.DeepCopy()
+				readyStatus, err := collections.GetMap(readyPV.Object, "status")
+				require.NoError(t, err)
+				readyStatus["phase"] = string(v1.VolumeAvailable)
+				pvWatchChan <- watch.Event{
+					Type:   watch.Modified,
+					Object: readyPV,
+				}
+				pvWatch.On("ResultChan").Return(pvWatchChan)
+			}
+
+			// Restore PV
+			warnings, errors := ctx.restoreResource("persistentvolumes", "", "foo/resources/persistentvolumes/cluster/")
+
+			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Cluster)
+			assert.Empty(t, warnings.Namespaces)
+			assert.Equal(t, api.RestoreResult{}, errors)
+
+			// Prep PVC restore
+			// Handle expectations
+			if !test.expectPVCVolumeName {
+				pvcObj.Spec.VolumeName = ""
+			}
+			for _, key := range test.expectedPVCAnnotationsMissing.List() {
+				delete(pvcObj.Annotations, key)
+			}
+
+			unstructuredPVCMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
+			require.NoError(t, err)
+			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
+
+			resetMetadataAndStatus(unstructuredPVC)
+			addLabel(unstructuredPVC, api.RestoreLabelKey, ctx.restore.Name)
+
+			createdPVC := unstructuredPVC.DeepCopy()
+			// just to ensure we have the data flowing correctly
+			createdPVC.Object["foo"] = "bar"
+
+			pvcClient.On("Create", unstructuredPVC).Return(createdPVC, nil)
+
+			// Restore PVC
+			warnings, errors = ctx.restoreResource("persistentvolumeclaims", "default", "foo/resources/persistentvolumeclaims/default/")
+
+			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Cluster)
+			assert.Empty(t, warnings.Namespaces)
+			assert.Equal(t, api.RestoreResult{}, errors)
+
+			ctx.resourceWaitGroup.Wait()
+		})
+	}
+}
+
+type mockPVRestorer struct {
+	mock.Mock
+}
+
+func (r *mockPVRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+	args := r.Called(obj)
+	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
+}
+
+type mockWatch struct {
+	mock.Mock
+}
+
+func (w *mockWatch) Stop() {
+	w.Called()
+}
+
+func (w *mockWatch) ResultChan() <-chan watch.Event {
+	args := w.Called()
+	return args.Get(0).(chan watch.Event)
 }
 
 type fakeWatch struct{}
@@ -954,14 +1240,17 @@ func TestExecutePVAction(t *testing.T) {
 				snapshotService = fakeSnapshotService
 			}
 
-			ctx := &context{
-				restore:         test.restore,
-				backup:          test.backup,
-				snapshotService: snapshotService,
+			r := &pvRestorer{
 				logger:          arktest.NewLogger(),
+				restorePVs:      test.restore.Spec.RestorePVs,
+				snapshotService: snapshotService,
+			}
+			if test.backup != nil {
+				r.snapshotVolumes = test.backup.Spec.SnapshotVolumes
+				r.volumeBackups = test.backup.Status.VolumeBackups
 			}
 
-			res, err := ctx.executePVAction(test.obj)
+			res, err := r.executePVAction(test.obj)
 
 			if test.expectedErr {
 				require.Error(t, err)
