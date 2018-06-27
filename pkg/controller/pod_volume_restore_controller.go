@@ -50,8 +50,8 @@ type podVolumeRestoreController struct {
 
 	podVolumeRestoreClient arkv1client.PodVolumeRestoresGetter
 	podVolumeRestoreLister listers.PodVolumeRestoreLister
-	secretLister           corev1listers.SecretLister
 	podLister              corev1listers.PodLister
+	secretLister           corev1listers.SecretLister
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	nodeName               string
 
@@ -64,7 +64,7 @@ func NewPodVolumeRestoreController(
 	podVolumeRestoreInformer informers.PodVolumeRestoreInformer,
 	podVolumeRestoreClient arkv1client.PodVolumeRestoresGetter,
 	podInformer cache.SharedIndexInformer,
-	secretInformer corev1informers.SecretInformer,
+	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	nodeName string,
 ) Interface {
@@ -73,7 +73,7 @@ func NewPodVolumeRestoreController(
 		podVolumeRestoreClient: podVolumeRestoreClient,
 		podVolumeRestoreLister: podVolumeRestoreInformer.Lister(),
 		podLister:              corev1listers.NewPodLister(podInformer.GetIndexer()),
-		secretLister:           secretInformer.Lister(),
+		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		nodeName:               nodeName,
 	}
@@ -82,8 +82,8 @@ func NewPodVolumeRestoreController(
 	c.cacheSyncWaiters = append(
 		c.cacheSyncWaiters,
 		podVolumeRestoreInformer.Informer().HasSynced,
-		secretInformer.Informer().HasSynced,
 		podInformer.HasSynced,
+		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
 	)
 	c.processRestoreFunc = c.processRestore
@@ -270,7 +270,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Spec.Pod.Namespace)
+	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

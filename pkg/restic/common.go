@@ -33,6 +33,7 @@ import (
 )
 
 const (
+	DaemonSet                   = "restic"
 	InitContainer               = "restic-wait"
 	DefaultMaintenanceFrequency = 24 * time.Hour
 
@@ -143,9 +144,14 @@ func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1li
 // encryption key for the given repo and returns its path. The
 // caller should generally call os.Remove() to remove the file
 // when done with it.
-func TempCredentialsFile(secretLister corev1listers.SecretLister, repoName string) (string, error) {
+func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, repoName string) (string, error) {
 	secretGetter := NewListerSecretGetter(secretLister)
-	repoKey, err := GetRepositoryKey(secretGetter, repoName)
+
+	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
+	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
+	// (all within the Ark server's namespace) so GetRepositoryKey will need to take the repo
+	// name as an argument as well.
+	repoKey, err := GetRepositoryKey(secretGetter, arkNamespace)
 	if err != nil {
 		return "", err
 	}

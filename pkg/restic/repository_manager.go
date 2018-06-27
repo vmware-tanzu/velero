@@ -25,12 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	arkv1informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	arkexec "github.com/heptio/ark/pkg/util/exec"
@@ -38,18 +38,18 @@ import (
 
 // RepositoryManager executes commands against restic repositories.
 type RepositoryManager interface {
-	// InitRepo initializes a repo with the specified name.
-	InitRepo(name string) error
+	// InitRepo initializes a repo with the specified name and identifier.
+	InitRepo(name, identifier string) error
 
 	// CheckRepo checks the specified repo for errors.
-	CheckRepo(name string) error
+	CheckRepo(name, identifier string) error
 
 	// PruneRepo deletes unused data from a repo.
-	PruneRepo(name string) error
+	PruneRepo(name, identifier string) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
-	Forget(snapshot SnapshotIdentifier) error
+	Forget(context.Context, SnapshotIdentifier) error
 
 	BackupperFactory
 
@@ -74,11 +74,11 @@ type repositoryManager struct {
 	namespace          string
 	arkClient          clientset.Interface
 	secretsLister      corev1listers.SecretLister
-	secretsClient      corev1client.SecretsGetter
 	repoLister         arkv1listers.ResticRepositoryLister
 	repoInformerSynced cache.InformerSynced
 	log                logrus.FieldLogger
 	repoLocker         *repoLocker
+	repoEnsurer        *repositoryEnsurer
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -87,19 +87,20 @@ func NewRepositoryManager(
 	namespace string,
 	arkClient clientset.Interface,
 	secretsInformer cache.SharedIndexInformer,
-	secretsClient corev1client.SecretsGetter,
 	repoInformer arkv1informers.ResticRepositoryInformer,
+	repoClient arkv1client.ResticRepositoriesGetter,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
 		namespace:          namespace,
 		arkClient:          arkClient,
 		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
-		secretsClient:      secretsClient,
 		repoLister:         repoInformer.Lister(),
 		repoInformerSynced: repoInformer.Informer().HasSynced,
 		log:                log,
-		repoLocker:         newRepoLocker(),
+
+		repoLocker:  newRepoLocker(),
+		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
 	}
 
 	if !cache.WaitForCacheSync(ctx.Done(), secretsInformer.HasSynced) {
@@ -120,7 +121,7 @@ func (rm *repositoryManager) NewBackupper(ctx context.Context, backup *arkv1api.
 		},
 	)
 
-	b := newBackupper(ctx, rm, informer, rm.repoLister)
+	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {
@@ -141,72 +142,63 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *arkv1api.
 		},
 	)
 
-	r := newRestorer(ctx, rm, informer, rm.repoLister)
+	r := newRestorer(ctx, rm, rm.repoEnsurer, informer, rm.log)
 
 	go informer.Run(ctx.Done())
-	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {
 		return nil, errors.New("timed out waiting for cache to sync")
 	}
 
 	return r, nil
 }
 
-func (rm *repositoryManager) InitRepo(name string) error {
-	repo, err := getRepo(rm.repoLister, rm.namespace, name)
-	if err != nil {
-		return err
-	}
-
+func (rm *repositoryManager) InitRepo(name, identifier string) error {
+	// restic init requires an exclusive lock
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	return rm.exec(InitCommand(repo.Spec.ResticIdentifier))
+	return rm.exec(InitCommand(identifier))
 }
 
-func (rm *repositoryManager) CheckRepo(name string) error {
-	repo, err := getRepo(rm.repoLister, rm.namespace, name)
-	if err != nil {
-		return err
-	}
-
+func (rm *repositoryManager) CheckRepo(name, identifier string) error {
+	// restic check requires an exclusive lock
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	cmd := CheckCommand(repo.Spec.ResticIdentifier)
-
-	return rm.exec(cmd)
+	return rm.exec(CheckCommand(identifier))
 }
 
-func (rm *repositoryManager) PruneRepo(name string) error {
-	repo, err := getReadyRepo(rm.repoLister, rm.namespace, name)
-	if err != nil {
-		return err
-	}
-
+func (rm *repositoryManager) PruneRepo(name, identifier string) error {
+	// restic prune requires an exclusive lock
 	rm.repoLocker.LockExclusive(name)
 	defer rm.repoLocker.UnlockExclusive(name)
 
-	cmd := PruneCommand(repo.Spec.ResticIdentifier)
-
-	return rm.exec(cmd)
+	return rm.exec(PruneCommand(identifier))
 }
 
-func (rm *repositoryManager) Forget(snapshot SnapshotIdentifier) error {
-	repo, err := getReadyRepo(rm.repoLister, rm.namespace, snapshot.Repo)
+func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {
+	// We can't wait for this in the constructor, because this informer is coming
+	// from the shared informer factory, which isn't started until *after* the repo
+	// manager is instantiated & passed to the controller constructors. We'd get a
+	// deadlock if we tried to wait for this in the constructor.
+	if !cache.WaitForCacheSync(ctx.Done(), rm.repoInformerSynced) {
+		return errors.New("timed out waiting for cache to sync")
+	}
+
+	repo, err := rm.repoEnsurer.EnsureRepo(ctx, rm.namespace, snapshot.Repo)
 	if err != nil {
 		return err
 	}
 
-	rm.repoLocker.LockExclusive(snapshot.Repo)
-	defer rm.repoLocker.UnlockExclusive(snapshot.Repo)
+	// restic forget requires an exclusive lock
+	rm.repoLocker.LockExclusive(repo.Name)
+	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
-	cmd := ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID)
-
-	return rm.exec(cmd)
+	return rm.exec(ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID))
 }
 
 func (rm *repositoryManager) exec(cmd *Command) error {
-	file, err := TempCredentialsFile(rm.secretsLister, cmd.RepoName())
+	file, err := TempCredentialsFile(rm.secretsLister, rm.namespace, cmd.RepoName())
 	if err != nil {
 		return err
 	}

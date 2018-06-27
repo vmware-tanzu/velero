@@ -25,12 +25,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	corev1api "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/boolptr"
 )
 
@@ -43,7 +41,7 @@ type Backupper interface {
 type backupper struct {
 	ctx         context.Context
 	repoManager *repositoryManager
-	repoLister  arkv1listers.ResticRepositoryLister
+	repoEnsurer *repositoryEnsurer
 
 	results     map[string]chan *arkv1api.PodVolumeBackup
 	resultsLock sync.Mutex
@@ -52,13 +50,14 @@ type backupper struct {
 func newBackupper(
 	ctx context.Context,
 	repoManager *repositoryManager,
+	repoEnsurer *repositoryEnsurer,
 	podVolumeBackupInformer cache.SharedIndexInformer,
-	repoLister arkv1listers.ResticRepositoryLister,
+	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
 		ctx:         ctx,
 		repoManager: repoManager,
-		repoLister:  repoLister,
+		repoEnsurer: repoEnsurer,
 
 		results: make(map[string]chan *arkv1api.PodVolumeBackup),
 	}
@@ -70,8 +69,14 @@ func newBackupper(
 
 				if pvb.Status.Phase == arkv1api.PodVolumeBackupPhaseCompleted || pvb.Status.Phase == arkv1api.PodVolumeBackupPhaseFailed {
 					b.resultsLock.Lock()
-					b.results[resultsKey(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name)] <- pvb
-					b.resultsLock.Unlock()
+					defer b.resultsLock.Unlock()
+
+					resChan, ok := b.results[resultsKey(pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name)]
+					if !ok {
+						log.Errorf("No results channel found for pod %s/%s to send pod volume backup %s/%s on", pvb.Spec.Pod.Namespace, pvb.Spec.Pod.Name, pvb.Namespace, pvb.Name)
+						return
+					}
+					resChan <- pvb
 				}
 			},
 		},
@@ -84,31 +89,6 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func getRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
-	repo, err := repoLister.ResticRepositories(ns).Get(name)
-	if apierrors.IsNotFound(err) {
-		return nil, errors.Wrapf(err, "restic repository not found")
-	}
-	if err != nil {
-		return nil, errors.Wrapf(err, "error getting restic repository")
-	}
-
-	return repo, nil
-}
-
-func getReadyRepo(repoLister arkv1listers.ResticRepositoryLister, ns, name string) (*arkv1api.ResticRepository, error) {
-	repo, err := getRepo(repoLister, ns, name)
-	if err != nil {
-		return nil, err
-	}
-
-	if repo.Status.Phase != arkv1api.ResticRepositoryPhaseReady {
-		return nil, errors.New("restic repository not ready")
-	}
-
-	return repo, nil
-}
-
 func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
 	// get volumes to backup from pod's annotations
 	volumesToBackup := GetVolumesToBackup(pod)
@@ -116,10 +96,15 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 		return nil, nil
 	}
 
-	repo, err := getReadyRepo(b.repoLister, backup.Namespace, pod.Namespace)
+	repo, err := b.repoEnsurer.EnsureRepo(b.ctx, backup.Namespace, pod.Namespace)
 	if err != nil {
 		return nil, []error{err}
 	}
+
+	// get a single non-exclusive lock since we'll wait for all individual
+	// backups to be complete before releasing it.
+	b.repoManager.repoLocker.Lock(pod.Namespace)
+	defer b.repoManager.repoLocker.Unlock(pod.Namespace)
 
 	resultsChan := make(chan *arkv1api.PodVolumeBackup)
 
@@ -133,9 +118,6 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 	)
 
 	for _, volumeName := range volumesToBackup {
-		b.repoManager.repoLocker.Lock(pod.Namespace)
-		defer b.repoManager.repoLocker.Unlock(pod.Namespace)
-
 		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(b.repoManager.arkClient.ArkV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {

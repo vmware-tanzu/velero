@@ -30,7 +30,6 @@ func NewRepositoryCommand(f client.Factory) *cobra.Command {
 	}
 
 	c.AddCommand(
-		NewInitCommand(f),
 		NewGetCommand(f, "get"),
 	)
 
