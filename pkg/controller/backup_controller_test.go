@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
@@ -175,12 +176,14 @@ func TestProcessBackup(t *testing.T) {
 
 			c.clock = clock.NewFakeClock(clockTime)
 
-			var expiration time.Time
+			var expiration, startTime time.Time
 
 			if test.backup != nil {
 				// add directly to the informer's store so the lister can function and so we don't have to
 				// start the shared informers.
 				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup.Backup)
+
+				startTime = c.clock.Now()
 
 				if test.backup.Spec.TTL.Duration > 0 {
 					expiration = c.clock.Now().Add(test.backup.Spec.TTL.Duration)
@@ -194,6 +197,7 @@ func TestProcessBackup(t *testing.T) {
 				backup.Spec.SnapshotVolumes = test.backup.Spec.SnapshotVolumes
 				backup.Status.Phase = v1.BackupPhaseInProgress
 				backup.Status.Expiration.Time = expiration
+				backup.Status.StartTimestamp.Time = startTime
 				backup.Status.Version = 1
 				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
@@ -231,6 +235,21 @@ func TestProcessBackup(t *testing.T) {
 				res.Status.Expiration.Time = expiration
 				res.Status.Phase = v1.BackupPhase(phase)
 
+				// If there's an error, it's mostly likely that the key wasn't found
+				// which is fine since not all patches will have them.
+				completionString, err := collections.GetString(patchMap, "status.completionTimestamp")
+				if err == nil {
+					completionTime, err := time.Parse(time.RFC3339Nano, completionString)
+					require.NoError(t, err, "unexpected completionTimestamp parsing error %v", err)
+					res.Status.CompletionTimestamp.Time = completionTime
+				}
+				startString, err := collections.GetString(patchMap, "status.startTimestamp")
+				if err == nil {
+					startTime, err := time.Parse(time.RFC3339Nano, startString)
+					require.NoError(t, err, "unexpected startTimestamp parsing error %v", err)
+					res.Status.StartTimestamp.Time = startTime
+				}
+
 				return true, res, nil
 			})
 
@@ -254,9 +273,11 @@ func TestProcessBackup(t *testing.T) {
 
 			// structs and func for decoding patch content
 			type StatusPatch struct {
-				Expiration time.Time      `json:"expiration"`
-				Version    int            `json:"version"`
-				Phase      v1.BackupPhase `json:"phase"`
+				Expiration          time.Time      `json:"expiration"`
+				Version             int            `json:"version"`
+				Phase               v1.BackupPhase `json:"phase"`
+				StartTimestamp      metav1.Time    `json:"startTimestamp"`
+				CompletionTimestamp metav1.Time    `json:"completionTimestamp"`
 			}
 
 			type Patch struct {
@@ -281,13 +302,14 @@ func TestProcessBackup(t *testing.T) {
 
 			arktest.ValidatePatch(t, actions[0], expected, decode)
 
-			// validate Patch call 2 (setting phase)
+			// validate Patch call 2 (setting phase, startTimestamp, completionTimestamp)
 			expected = Patch{
 				Status: StatusPatch{
-					Phase: v1.BackupPhaseCompleted,
+					Phase:               v1.BackupPhaseCompleted,
+					StartTimestamp:      metav1.Time{Time: c.clock.Now()},
+					CompletionTimestamp: metav1.Time{Time: c.clock.Now()},
 				},
 			}
-
 			arktest.ValidatePatch(t, actions[1], expected, decode)
 		})
 	}

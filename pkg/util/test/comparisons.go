@@ -19,8 +19,12 @@ package test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
+	"time"
+
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -77,5 +81,30 @@ func ValidatePatch(t *testing.T, action core.Action, expected interface{}, decod
 	actual, err := decodeFunc(decoder)
 	require.NoError(t, err)
 
-	assert.Equal(t, expected, actual)
+	AssertDeepEqual(t, expected, actual)
+}
+
+// TimesAreEqual compares two times for equality.
+// This function is used by equality.Semantic.DeepEqual to compare two time objects
+// without having to call a method.
+func TimesAreEqual(t1, t2 time.Time) bool {
+	return t1.Equal(t2)
+}
+
+// AssertDeepEqual asserts the semantic equality of objects.
+// This function exists in order to make sure time.Time and metav1.Time objects
+// can be compared correctly. See https://github.com/stretchr/testify/issues/502.
+func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
+	// By default, the equality.Semantic object doesn't have a function for comparing time.Times
+	err := equality.Semantic.AddFunc(TimesAreEqual)
+	if err != nil {
+		// Programmer error, the test should die.
+		t.Fatalf("Could not register equality function: %s", err)
+	}
+
+	if !equality.Semantic.DeepEqual(expected, actual) {
+		return assert.Fail(t, fmt.Sprintf("Objects not equal"))
+	}
+
+	return true
 }

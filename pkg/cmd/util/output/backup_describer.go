@@ -162,9 +162,22 @@ func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
 
 	d.Println()
-	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
+	// "<n/a>" output should only be applicable for backups that failed validation
+	if status.StartTimestamp.Time.IsZero() {
+		d.Printf("Started:\t%s\n", "<n/a>")
+	} else {
+		d.Printf("Started:\t%s\n", status.StartTimestamp.Time)
+	}
+	if status.CompletionTimestamp.Time.IsZero() {
+		d.Printf("Completed:\t%s\n", "<n/a>")
+	} else {
+		d.Printf("Completed:\t%s\n", status.CompletionTimestamp.Time)
+	}
 
 	d.Println()
+	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
+	d.Println()
+
 	d.Printf("Validation errors:")
 	if len(status.ValidationErrors) == 0 {
 		d.Printf("\t<none>\n")
