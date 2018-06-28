@@ -32,3 +32,7 @@ debug
 .container-*
 .vimrc
 .go
+.DS_Store
+.push-*
+.vscode
+*.diff
