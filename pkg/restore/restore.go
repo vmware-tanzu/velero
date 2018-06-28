@@ -670,6 +670,12 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 		name := obj.GetName()
 
+		// TODO: move to restore item action if/when we add a ShouldRestore() method to the interface
+		if groupResource == kuberesource.Pods && obj.GetAnnotations()[v1.MirrorPodAnnotationKey] != "" {
+			ctx.infof("Not restoring pod because it's a mirror pod")
+			continue
+		}
+
 		if groupResource == kuberesource.PersistentVolumes {
 			_, found := ctx.backup.Status.VolumeBackups[name]
 			reclaimPolicy, err := collections.GetString(obj.Object, "spec.persistentVolumeReclaimPolicy")

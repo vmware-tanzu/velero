@@ -544,6 +544,50 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
 			expectedObjs:            toUnstructured(newTestServiceAccount().WithArkLabel("my-restore").ServiceAccount),
 		},
+		{
+			name:                    "non-mirror pods are restored",
+			namespace:               "ns-1",
+			resourcePath:            "pods",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: nil,
+			fileSystem: arktest.NewFakeFileSystem().
+				WithFile(
+					"pods/pod.json",
+					NewTestUnstructured().
+						WithAPIVersion("v1").
+						WithKind("Pod").
+						WithNamespace("ns-1").
+						WithName("pod1").
+						ToJSON(),
+				),
+			expectedObjs: []unstructured.Unstructured{
+				*(NewTestUnstructured().
+					WithAPIVersion("v1").
+					WithKind("Pod").
+					WithNamespace("ns-1").
+					WithName("pod1").
+					WithArkLabel("my-restore").
+					Unstructured),
+			},
+		},
+		{
+			name:                    "mirror pods are not restored",
+			namespace:               "ns-1",
+			resourcePath:            "pods",
+			labelSelector:           labels.NewSelector(),
+			includeClusterResources: nil,
+			fileSystem: arktest.NewFakeFileSystem().
+				WithFile(
+					"pods/pod.json",
+					NewTestUnstructured().
+						WithAPIVersion("v1").
+						WithKind("Pod").
+						WithNamespace("ns-1").
+						WithName("pod1").
+						WithAnnotations(v1.MirrorPodAnnotationKey).
+						ToJSON(),
+				),
+		},
 	}
 
 	for _, test := range tests {
@@ -556,8 +600,8 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			dynamicFactory := &arktest.FakeDynamicFactory{}
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
 
-			resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, test.namespace).Return(resourceClient, nil)
+			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, configMapResource, test.namespace).Return(resourceClient, nil)
 
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
@@ -565,6 +609,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 
 			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
+
+			podResource := metav1.APIResource{Name: "pods", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, podResource, test.namespace).Return(resourceClient, nil)
 
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
@@ -1322,6 +1369,16 @@ func NewTestUnstructured() *testUnstructured {
 	return obj
 }
 
+func (obj *testUnstructured) WithAPIVersion(v string) *testUnstructured {
+	obj.Object["apiVersion"] = v
+	return obj
+}
+
+func (obj *testUnstructured) WithKind(k string) *testUnstructured {
+	obj.Object["kind"] = k
+	return obj
+}
+
 func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
 	return obj.withMap("metadata", fields...)
 }
@@ -1357,6 +1414,10 @@ func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured
 	return obj
 }
 
+func (obj *testUnstructured) WithNamespace(ns string) *testUnstructured {
+	return obj.WithMetadataField("namespace", ns)
+}
+
 func (obj *testUnstructured) WithName(name string) *testUnstructured {
 	return obj.WithMetadataField("name", name)
 }
@@ -1370,6 +1431,14 @@ func (obj *testUnstructured) WithArkLabel(restoreName string) *testUnstructured 
 	obj.SetLabels(ls)
 
 	return obj
+}
+
+func (obj *testUnstructured) ToJSON() []byte {
+	bytes, err := json.Marshal(obj.Object)
+	if err != nil {
+		panic(err)
+	}
+	return bytes
 }
 
 func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
