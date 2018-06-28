@@ -115,9 +115,27 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 	var (
 		errs            []error
 		volumeSnapshots = make(map[string]string)
+		podVolumes      = make(map[string]corev1api.Volume)
 	)
 
+	// put the pod's volumes in a map for efficient lookup below
+	for _, podVolume := range pod.Spec.Volumes {
+		podVolumes[podVolume.Name] = podVolume
+	}
+
 	for _, volumeName := range volumesToBackup {
+		if !volumeExists(podVolumes, volumeName) {
+			log.Warnf("No volume named %s found in pod %s/%s, skipping", volumeName, pod.Namespace, pod.Name)
+			continue
+		}
+
+		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
+		// daemonset pod has no way to access their data.
+		if isHostPathVolume(podVolumes, volumeName) {
+			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for restic backup, skipping", volumeName, pod.Namespace, pod.Name)
+			continue
+		}
+
 		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(b.repoManager.arkClient.ArkV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
@@ -150,6 +168,20 @@ ForEachVolume:
 	b.resultsLock.Unlock()
 
 	return volumeSnapshots, errs
+}
+
+func volumeExists(podVolumes map[string]corev1api.Volume, volumeName string) bool {
+	_, found := podVolumes[volumeName]
+	return found
+}
+
+func isHostPathVolume(podVolumes map[string]corev1api.Volume, volumeName string) bool {
+	volume, found := podVolumes[volumeName]
+	if !found {
+		return false
+	}
+
+	return volume.HostPath != nil
 }
 
 func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *arkv1api.PodVolumeBackup {
