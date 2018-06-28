@@ -21,7 +21,7 @@ contact:
   google: https://groups.google.com/forum/#!forum/heptio-ark
   github: https://github.com/heptio/ark
   twitter: https://twitter.com/heptioark
-  slack: https://kubernetes.slack.com/messages/ark
+  slack: https://kubernetes.slack.com/messages/ark-dr
 defaults:
 - scope:
     path: master
