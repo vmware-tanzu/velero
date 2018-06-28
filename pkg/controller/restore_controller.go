@@ -51,7 +51,19 @@ import (
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
 // included here are explicitly excluded from the restoration process.
-var nonRestorableResources = []string{"nodes", "events", "events.events.k8s.io"}
+var nonRestorableResources = []string{
+	"nodes",
+	"events",
+	"events.events.k8s.io",
+
+	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
+	// https://github.com/heptio/ark/issues/622
+	"backups.ark.heptio.com",
+
+	// Restores are cluster-specific, and don't have value moving across clusters.
+	// https://github.com/heptio/ark/issues/622
+	"restores.ark.heptio.com",
+}
 
 type restoreController struct {
 	namespace           string

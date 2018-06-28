@@ -255,6 +255,28 @@ func TestProcessRestore(t *testing.T) {
 				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: events.events.k8s.io",
 			},
 		},
+		{
+			name:          "restoration of backups.ark.heptio.com is not supported",
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "backups.ark.heptio.com", api.RestorePhaseNew).Restore,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:   false,
+			expectedPhase: string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{
+				"backups.ark.heptio.com are non-restorable resources",
+				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: backups.ark.heptio.com",
+			},
+		},
+		{
+			name:          "restoration of restores.ark.heptio.com is not supported",
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "restores.ark.heptio.com", api.RestorePhaseNew).Restore,
+			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			expectedErr:   false,
+			expectedPhase: string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{
+				"restores.ark.heptio.com are non-restorable resources",
+				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: restores.ark.heptio.com",
+			},
+		},
 	}
 
 	for _, test := range tests {
