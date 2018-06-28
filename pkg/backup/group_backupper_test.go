@@ -89,6 +89,7 @@ func TestBackupGroup(t *testing.T) {
 		resourceHooks,
 		nil, // snapshot service
 		nil, // restic backupper
+		newPVCSnapshotTracker(),
 	).(*defaultGroupBackupper)
 
 	resourceBackupperFactory := &mockResourceBackupperFactory{}
@@ -113,6 +114,7 @@ func TestBackupGroup(t *testing.T) {
 		resourceHooks,
 		nil,
 		mock.Anything, // restic backupper
+		mock.Anything, // pvc snapshot tracker
 	).Return(resourceBackupper)
 
 	group := &metav1.APIResourceList{
@@ -161,6 +163,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
@@ -176,6 +179,8 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 		tarWriter,
 		resourceHooks,
 		snapshotService,
+		resticBackupper,
+		resticSnapshotTracker,
 	)
 	return args.Get(0).(resourceBackupper)
 }

@@ -28,7 +28,6 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -58,6 +57,7 @@ type itemBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		snapshotService cloudprovider.SnapshotService,
 		resticBackupper restic.Backupper,
+		resticSnapshotTracker *pvcSnapshotTracker,
 	) ItemBackupper
 }
 
@@ -75,6 +75,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
 		backup:          backup,
@@ -90,7 +91,8 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 		itemHookHandler: &defaultItemHookHandler{
 			podCommandExecutor: podCommandExecutor,
 		},
-		resticBackupper: resticBackupper,
+		resticBackupper:       resticBackupper,
+		resticSnapshotTracker: resticSnapshotTracker,
 	}
 
 	// this is for testing purposes
@@ -104,17 +106,18 @@ type ItemBackupper interface {
 }
 
 type defaultItemBackupper struct {
-	backup          *api.Backup
-	namespaces      *collections.IncludesExcludes
-	resources       *collections.IncludesExcludes
-	backedUpItems   map[itemKey]struct{}
-	actions         []resolvedAction
-	tarWriter       tarWriter
-	resourceHooks   []resourceHook
-	dynamicFactory  client.DynamicFactory
-	discoveryHelper discovery.Helper
-	snapshotService cloudprovider.SnapshotService
-	resticBackupper restic.Backupper
+	backup                *api.Backup
+	namespaces            *collections.IncludesExcludes
+	resources             *collections.IncludesExcludes
+	backedUpItems         map[itemKey]struct{}
+	actions               []resolvedAction
+	tarWriter             tarWriter
+	resourceHooks         []resourceHook
+	dynamicFactory        client.DynamicFactory
+	discoveryHelper       discovery.Helper
+	snapshotService       cloudprovider.SnapshotService
+	resticBackupper       restic.Backupper
+	resticSnapshotTracker *pvcSnapshotTracker
 
 	itemHookHandler         itemHookHandler
 	additionalItemBackupper ItemBackupper
@@ -178,9 +181,30 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return err
 	}
 
-	backupErrs := make([]error, 0)
-	err = ib.executeActions(log, obj, groupResource, name, namespace, metadata)
-	if err != nil {
+	var (
+		backupErrs            []error
+		pod                   *corev1api.Pod
+		resticVolumesToBackup []string
+	)
+
+	if groupResource == kuberesource.Pods {
+		// pod needs to be initialized for the unstructured converter
+		pod = new(corev1api.Pod)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+			backupErrs = append(backupErrs, errors.WithStack(err))
+			// nil it on error since it's not valid
+			pod = nil
+		} else {
+			// get the volumes to backup using restic, and add any of them that are PVCs to the pvc snapshot
+			// tracker, so that when we backup PVCs/PVs via an item action in the next step, we don't snapshot
+			// PVs that will have their data backed up with restic.
+			resticVolumesToBackup = restic.GetVolumesToBackup(pod)
+
+			ib.resticSnapshotTracker.Track(pod, resticVolumesToBackup)
+		}
+	}
+
+	if err := ib.executeActions(log, obj, groupResource, name, namespace, metadata); err != nil {
 		log.WithError(err).Error("Error executing item actions")
 		backupErrs = append(backupErrs, err)
 	}
@@ -188,24 +212,22 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	if groupResource == kuberesource.PersistentVolumes {
 		if ib.snapshotService == nil {
 			log.Debug("Skipping Persistent Volume snapshot because they're not enabled.")
-		} else {
-			if err := ib.takePVSnapshot(obj, ib.backup, log); err != nil {
-				backupErrs = append(backupErrs, err)
-			}
+		} else if err := ib.takePVSnapshot(obj, ib.backup, log); err != nil {
+			backupErrs = append(backupErrs, err)
 		}
 	}
 
-	if groupResource == kuberesource.Pods && len(restic.GetVolumesToBackup(metadata)) > 0 {
-		var (
-			updatedObj runtime.Unstructured
-			errs       []error
-		)
+	if groupResource == kuberesource.Pods && pod != nil {
+		// this function will return partial results, so process volumeSnapshots
+		// even if there are errors.
+		volumeSnapshots, errs := ib.backupPodVolumes(log, pod, resticVolumesToBackup)
 
-		if updatedObj, errs = backupPodVolumes(log, ib.backup, obj, ib.resticBackupper); len(errs) > 0 {
-			backupErrs = append(backupErrs, errs...)
-		} else {
-			obj = updatedObj
+		// annotate the pod with the successful volume snapshots
+		for volume, snapshot := range volumeSnapshots {
+			restic.SetPodSnapshotAnnotation(metadata, volume, snapshot)
 		}
+
+		backupErrs = append(backupErrs, errs...)
 	}
 
 	log.Debug("Executing post hooks")
@@ -248,37 +270,19 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	return nil
 }
 
-func backupPodVolumes(log logrus.FieldLogger, backup *api.Backup, obj runtime.Unstructured, backupper restic.Backupper) (runtime.Unstructured, []error) {
-	if backupper == nil {
+// backupPodVolumes triggers restic backups of the specified pod volumes, and returns a map of volume name -> snapshot ID
+// for volumes that were successfully backed up, and a slice of any errors that were encountered.
+func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) (map[string]string, []error) {
+	if len(volumes) == 0 {
+		return nil, nil
+	}
+
+	if ib.resticBackupper == nil {
 		log.Warn("No restic backupper, not backing up pod's volumes")
-		return obj, nil
+		return nil, nil
 	}
 
-	pod := new(corev1api.Pod)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
-		return nil, []error{errors.WithStack(err)}
-	}
-
-	volumeSnapshots, errs := backupper.BackupPodVolumes(backup, pod, log)
-	if len(errs) > 0 {
-		return nil, errs
-	}
-	if len(volumeSnapshots) == 0 {
-		return obj, nil
-	}
-
-	// annotate the pod with the successful volume snapshots
-	for volume, snapshot := range volumeSnapshots {
-		restic.SetPodSnapshotAnnotation(pod, volume, snapshot)
-	}
-
-	// convert annotated pod back to unstructured to return
-	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
-	if err != nil {
-		return nil, []error{errors.WithStack(err)}
-	}
-
-	return &unstructured.Unstructured{Object: unstructuredObj}, nil
+	return ib.resticBackupper.BackupPodVolumes(ib.backup, pod, log)
 }
 
 func (ib *defaultItemBackupper) executeActions(log logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, name, namespace string, metadata metav1.Object) error {
@@ -347,7 +351,7 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *api.Backup, log logrus.FieldLogger) error {
+func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, backup *api.Backup, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
@@ -355,7 +359,21 @@ func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *
 		return nil
 	}
 
-	metadata, err := meta.Accessor(pv)
+	pv := new(corev1api.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv); err != nil {
+		return errors.WithStack(err)
+	}
+
+	// If this PV is claimed, see if we've already taken a (restic) snapshot of the contents
+	// of this PV. If so, don't take a snapshot.
+	if pv.Spec.ClaimRef != nil {
+		if ib.resticSnapshotTracker.Has(pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name) {
+			log.Info("Skipping Persistent Volume snapshot because volume has already been backed up.")
+			return nil
+		}
+	}
+
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -370,7 +388,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(pv runtime.Unstructured, backup *
 		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
 	}
 
-	volumeID, err := ib.snapshotService.GetVolumeID(pv)
+	volumeID, err := ib.snapshotService.GetVolumeID(obj)
 	if err != nil {
 		return errors.Wrapf(err, "error getting volume ID for PersistentVolume")
 	}

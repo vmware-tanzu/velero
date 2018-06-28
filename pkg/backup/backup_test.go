@@ -542,6 +542,7 @@ func TestBackup(t *testing.T) {
 				test.expectedHooks,
 				mock.Anything,
 				mock.Anything, // restic backupper
+				mock.Anything, // pvc snapshot tracker
 			).Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
@@ -606,6 +607,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
+		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
 	assert.NoError(t, b.Backup(&v1.Backup{}, &bytes.Buffer{}, &bytes.Buffer{}, nil))
@@ -631,6 +633,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		discoveryHelper,
 		mock.Anything,
 		secondCohabitatingResources,
+		mock.Anything,
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
@@ -665,6 +668,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 	resourceHooks []resourceHook,
 	snapshotService cloudprovider.SnapshotService,
 	resticBackupper restic.Backupper,
+	resticSnapshotTracker *pvcSnapshotTracker,
 ) groupBackupper {
 	args := f.Called(
 		log,
@@ -681,6 +685,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 		resourceHooks,
 		snapshotService,
 		resticBackupper,
+		resticSnapshotTracker,
 	)
 	return args.Get(0).(groupBackupper)
 }
