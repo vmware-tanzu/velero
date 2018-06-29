@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.8.3](https://github.com/heptio/ark/releases/tag/v0.8.3) - 2018-06-29
+
+##### Bug Fixes:
+  * Don't restore backup and restore resources to avoid possible data corruption (#622, @ncdc)
+
 #### [v0.8.2](https://github.com/heptio/ark/releases/tag/v0.8.2) - 2018-06-01
 
 ##### Bug Fixes:
