@@ -69,7 +69,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 				switch name {
 				case "aws":
-					objectStore, blockStore = aws.NewObjectStore(), aws.NewBlockStore()
+					objectStore, blockStore = aws.NewObjectStore(logger), aws.NewBlockStore()
 				case "azure":
 					objectStore, blockStore = azure.NewObjectStore(), azure.NewBlockStore()
 				case "gcp":

@@ -29,6 +29,8 @@ It has these top-level messages:
 	SetVolumeIDRequest
 	SetVolumeIDResponse
 	PutObjectRequest
+	ObjectExistsRequest
+	ObjectExistsResponse
 	GetObjectRequest
 	Bytes
 	ListCommonPrefixesRequest

@@ -22,10 +22,13 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 )
@@ -37,14 +40,23 @@ const (
 	bucketKey           = "bucket"
 )
 
+type s3Interface interface {
+	HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error)
+	GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error)
+	ListObjectsV2Pages(input *s3.ListObjectsV2Input, fn func(*s3.ListObjectsV2Output, bool) bool) error
+	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	GetObjectRequest(input *s3.GetObjectInput) (req *request.Request, output *s3.GetObjectOutput)
+}
+
 type objectStore struct {
-	s3         *s3.S3
+	logger     logrus.FieldLogger
+	s3         s3Interface
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
 }
 
-func NewObjectStore() cloudprovider.ObjectStore {
-	return &objectStore{}
+func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
+	return &objectStore{logger: logger}
 }
 
 func (o *objectStore) Init(config map[string]string) error {
@@ -126,6 +138,50 @@ func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error
 	_, err := o.s3Uploader.Upload(req)
 
 	return errors.Wrapf(err, "error putting object %s", key)
+}
+
+const notFoundCode = "NotFound"
+
+func (o *objectStore) ObjectExists(bucket, key string) (bool, error) {
+	log := o.logger.WithFields(
+		logrus.Fields{
+			"bucket": bucket,
+			"key":    key,
+		},
+	)
+
+	req := &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	}
+
+	log.Debug("Checking if object exists")
+	_, err := o.s3.HeadObject(req)
+
+	if err == nil {
+		log.Debug("Object exists")
+		return true, nil
+	}
+
+	log.Debug("Checking for AWS specific error information")
+	if aerr, ok := err.(awserr.Error); ok {
+		log.WithFields(
+			logrus.Fields{
+				"code":    aerr.Code(),
+				"message": aerr.Message(),
+			},
+		).Debugf("awserr.Error contents (origErr=%v)", aerr.OrigErr())
+
+		// The code will be NotFound if the key doesn't exist.
+		// See https://github.com/aws/aws-sdk-go/issues/1208 and https://github.com/aws/aws-sdk-go/pull/1213.
+		log.Debugf("Checking for code=%s", notFoundCode)
+		if aerr.Code() == notFoundCode {
+			log.Debug("Object doesn't exist - got not found")
+			return false, nil
+		}
+	}
+
+	return false, errors.WithStack(err)
 }
 
 func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {

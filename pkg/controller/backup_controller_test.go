@@ -22,6 +22,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -51,101 +54,242 @@ func (b *fakeBackupper) Backup(backup *v1.Backup, data, log io.Writer, actions [
 	return args.Error(0)
 }
 
+func TestProcessBackupSkips(t *testing.T) {
+	tests := []struct {
+		name                     string
+		key                      string
+		backup                   *arktest.TestBackup
+		expectExistenceCheck     bool
+		exists                   bool
+		existenceCheckError      error
+		expectPatch              bool
+		expectedValidationErrors []string
+	}{
+		{
+			name: "bad key",
+			key:  "bad/key/here",
+		},
+		{
+			name: "backup not found",
+			key:  "heptio-ark/backup2",
+		},
+		{
+			name:   "do not process phase FailedValidation",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailedValidation),
+		},
+		{
+			name:   "do not process phase InProgress",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseInProgress),
+		},
+		{
+			name:   "do not process phase Completed",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseCompleted),
+		},
+		{
+			name:   "do not process phase Failed",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailed),
+		},
+		{
+			name:   "do not process phase other",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase("arg"),
+		},
+		{
+			name:                     "invalid included/excluded resources fails validation",
+			key:                      "heptio-ark/backup1",
+			backup:                   arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("foo").WithExcludedResources("foo"),
+			expectExistenceCheck:     true,
+			exists:                   false,
+			expectPatch:              true,
+			expectedValidationErrors: []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: foo"},
+		},
+		{
+			name:                     "invalid included/excluded namespaces fails validation",
+			key:                      "heptio-ark/backup1",
+			backup:                   arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("foo").WithExcludedNamespaces("foo"),
+			expectExistenceCheck:     true,
+			exists:                   false,
+			expectPatch:              true,
+			expectedValidationErrors: []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: foo"},
+		},
+		{
+			name:                     "backup with SnapshotVolumes when allowSnapshots=false fails validation",
+			key:                      "heptio-ark/backup1",
+			backup:                   arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
+			expectExistenceCheck:     true,
+			exists:                   false,
+			expectPatch:              true,
+			expectedValidationErrors: []string{"Server is not configured for PV snapshots"},
+		},
+		{
+			name:                     "error checking for backup existence fails validation",
+			key:                      "heptio-ark/backup1",
+			backup:                   arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			expectExistenceCheck:     true,
+			exists:                   false,
+			existenceCheckError:      errors.New("existence check"),
+			expectPatch:              true,
+			expectedValidationErrors: []string{"Error checking if backup already exists in object storage: existence check"},
+		},
+		{
+			name:                     "backup exists in object storage",
+			key:                      "heptio-ark/backup1",
+			backup:                   arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			expectExistenceCheck:     true,
+			exists:                   true,
+			expectPatch:              true,
+			expectedValidationErrors: []string{"Backup already exists in object storage"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				client          = fake.NewSimpleClientset()
+				backupper       = &fakeBackupper{}
+				cloudBackups    = &arktest.BackupService{}
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger          = arktest.NewLogger()
+				pluginManager   = &MockManager{}
+				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
+			)
+			defer backupper.AssertExpectations(t)
+			defer cloudBackups.AssertExpectations(t)
+
+			c := NewBackupController(
+				sharedInformers.Ark().V1().Backups(),
+				client.ArkV1(),
+				backupper,
+				cloudBackups,
+				"bucket",
+				false,
+				logger,
+				pluginManager,
+				NewBackupTracker(),
+				metrics.NewServerMetrics(),
+			).(*backupController)
+
+			c.clock = clock.NewFakeClock(clockTime)
+
+			if tc.backup == nil {
+				err := c.processBackup(tc.key)
+				assert.NoError(t, err)
+				return
+			}
+
+			// add directly to the informer's store so the lister can function and so we don't have to
+			// start the shared informers.
+			sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(tc.backup.Backup)
+
+			if tc.expectExistenceCheck {
+				cloudBackups.On("BackupExists", "bucket", tc.backup.Name).Return(tc.exists, tc.existenceCheckError)
+			}
+
+			// this is necessary so the Patch() call returns the appropriate object
+			client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+				if tc.backup == nil {
+					return true, nil, nil
+				}
+
+				patch := action.(core.PatchAction).GetPatch()
+
+				// copy the backup and convert to json
+				backup := tc.backup.DeepCopy()
+				backupJSON, err := json.Marshal(backup)
+				require.NoError(t, err)
+
+				// patch it
+				patched, err := jsonpatch.MergePatch(backupJSON, patch)
+				require.NoError(t, err)
+
+				// convert patched json back to a backup
+				res := &v1.Backup{}
+				err = json.Unmarshal(patched, res)
+				require.NoError(t, err)
+
+				return true, res, nil
+			})
+
+			// method under test
+			err := c.processBackup(tc.key)
+			assert.NoError(t, err)
+
+			if !tc.expectPatch {
+				return
+			}
+
+			// structs and func for decoding patch content
+			type StatusPatch struct {
+				Version          int            `json:"version,omitempty"`
+				Expiration       metav1.Time    `json:"expiration,omitempty"`
+				Phase            v1.BackupPhase `json:"phase,omitempty"`
+				ValidationErrors []string       `json:"validationErrors,omitempty"`
+			}
+
+			type Patch struct {
+				Status StatusPatch `json:"status"`
+			}
+
+			decode := func(decoder *json.Decoder) (interface{}, error) {
+				actual := new(Patch)
+				err := decoder.Decode(actual)
+
+				return *actual, err
+			}
+
+			actions := client.Actions()
+			// validate Patch call 1 (setting phase, validation errs)
+			require.True(t, len(actions) > 0, "len(actions) is too small")
+
+			expected := Patch{
+				Status: StatusPatch{
+					Version:          backupVersion,
+					Phase:            v1.BackupPhaseFailedValidation,
+					ValidationErrors: tc.expectedValidationErrors,
+				},
+			}
+
+			arktest.ValidatePatch(t, actions[0], expected, decode)
+		})
+	}
+}
+
 func TestProcessBackup(t *testing.T) {
 	tests := []struct {
 		name             string
 		key              string
-		expectError      bool
 		expectedIncludes []string
 		expectedExcludes []string
 		backup           *arktest.TestBackup
-		expectBackup     bool
 		allowSnapshots   bool
 	}{
-		{
-			name:        "bad key",
-			key:         "bad/key/here",
-			expectError: true,
-		},
-		{
-			name:        "lister failed",
-			key:         "heptio-ark/backup1",
-			expectError: true,
-		},
-		{
-			name:         "do not process phase FailedValidation",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailedValidation),
-			expectBackup: false,
-		},
-		{
-			name:         "do not process phase InProgress",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseInProgress),
-			expectBackup: false,
-		},
-		{
-			name:         "do not process phase Completed",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseCompleted),
-			expectBackup: false,
-		},
-		{
-			name:         "do not process phase Failed",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseFailed),
-			expectBackup: false,
-		},
-		{
-			name:         "do not process phase other",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase("arg"),
-			expectBackup: false,
-		},
-		{
-			name:         "invalid included/excluded resources fails validation",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("foo").WithExcludedResources("foo"),
-			expectBackup: false,
-		},
-		{
-			name:         "invalid included/excluded namespaces fails validation",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("foo").WithExcludedNamespaces("foo"),
-			expectBackup: false,
-		},
+
 		{
 			name:             "make sure specified included and excluded resources are honored",
 			key:              "heptio-ark/backup1",
 			backup:           arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedResources("i", "j").WithExcludedResources("k", "l"),
 			expectedIncludes: []string{"i", "j"},
 			expectedExcludes: []string{"k", "l"},
-			expectBackup:     true,
 		},
 		{
-			name:         "if includednamespaces are specified, don't default to *",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
-			expectBackup: true,
+			name:   "if includednamespaces are specified, don't default to *",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithIncludedNamespaces("ns-1"),
 		},
 		{
-			name:         "ttl",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
-			expectBackup: true,
+			name:   "ttl",
+			key:    "heptio-ark/backup1",
+			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithTTL(10 * time.Minute),
 		},
-		{
-			name:         "backup with SnapshotVolumes when allowSnapshots=false fails validation",
-			key:          "heptio-ark/backup1",
-			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
-			expectBackup: false,
-		},
+
 		{
 			name:           "backup with SnapshotVolumes when allowSnapshots=true gets executed",
 			key:            "heptio-ark/backup1",
 			backup:         arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithSnapshotVolumes(true),
 			allowSnapshots: true,
-			expectBackup:   true,
 		},
 	}
 
@@ -160,6 +304,8 @@ func TestProcessBackup(t *testing.T) {
 				pluginManager   = &MockManager{}
 				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
 			)
+			defer backupper.AssertExpectations(t)
+			defer cloudBackups.AssertExpectations(t)
 
 			c := NewBackupController(
 				sharedInformers.Ark().V1().Backups(),
@@ -178,34 +324,34 @@ func TestProcessBackup(t *testing.T) {
 
 			var expiration, startTime time.Time
 
-			if test.backup != nil {
-				// add directly to the informer's store so the lister can function and so we don't have to
-				// start the shared informers.
-				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup.Backup)
+			// add directly to the informer's store so the lister can function and so we don't have to
+			// start the shared informers.
+			sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup.Backup)
 
-				startTime = c.clock.Now()
+			startTime = c.clock.Now()
 
-				if test.backup.Spec.TTL.Duration > 0 {
-					expiration = c.clock.Now().Add(test.backup.Spec.TTL.Duration)
-				}
-
-				// set up a Backup object to represent what we expect to be passed to backupper.Backup()
-				backup := test.backup.DeepCopy()
-				backup.Spec.IncludedResources = test.expectedIncludes
-				backup.Spec.ExcludedResources = test.expectedExcludes
-				backup.Spec.IncludedNamespaces = test.backup.Spec.IncludedNamespaces
-				backup.Spec.SnapshotVolumes = test.backup.Spec.SnapshotVolumes
-				backup.Status.Phase = v1.BackupPhaseInProgress
-				backup.Status.Expiration.Time = expiration
-				backup.Status.StartTimestamp.Time = startTime
-				backup.Status.Version = 1
-				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-				pluginManager.On("GetBackupItemActions", backup.Name).Return(nil, nil)
-				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
+			if test.backup.Spec.TTL.Duration > 0 {
+				expiration = c.clock.Now().Add(test.backup.Spec.TTL.Duration)
 			}
+
+			cloudBackups.On("BackupExists", "bucket", test.backup.Name).Return(false, nil)
+
+			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
+			backup := test.backup.DeepCopy()
+			backup.Spec.IncludedResources = test.expectedIncludes
+			backup.Spec.ExcludedResources = test.expectedExcludes
+			backup.Spec.IncludedNamespaces = test.backup.Spec.IncludedNamespaces
+			backup.Spec.SnapshotVolumes = test.backup.Spec.SnapshotVolumes
+			backup.Status.Phase = v1.BackupPhaseInProgress
+			backup.Status.Expiration.Time = expiration
+			backup.Status.StartTimestamp.Time = startTime
+			backup.Status.Version = 1
+			backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			pluginManager.On("GetBackupItemActions", backup.Name).Return(nil, nil)
+			pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
 
 			// this is necessary so the Patch() call returns the appropriate object
 			client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
@@ -256,17 +402,7 @@ func TestProcessBackup(t *testing.T) {
 			// method under test
 			err := c.processBackup(test.key)
 
-			if test.expectError {
-				require.Error(t, err, "processBackup should error")
-				return
-			}
 			require.NoError(t, err, "processBackup unexpected error: %v", err)
-
-			if !test.expectBackup {
-				assert.Empty(t, backupper.Calls)
-				assert.Empty(t, cloudBackups.Calls)
-				return
-			}
 
 			actions := client.Actions()
 			require.Equal(t, 2, len(actions))

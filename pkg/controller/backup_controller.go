@@ -31,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -210,11 +211,16 @@ func (controller *backupController) processBackup(key string) error {
 	logContext.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		logContext.WithError(err).Errorf("error splitting key")
+		return nil
 	}
 
 	logContext.Debug("Getting backup")
 	backup, err := controller.lister.Backups(ns).Get(name)
+	if apierrors.IsNotFound(err) {
+		logContext.Debug("backup not found")
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "error getting backup")
 	}
@@ -329,6 +335,14 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 
 	if !controller.pvProviderExists && itm.Spec.SnapshotVolumes != nil && *itm.Spec.SnapshotVolumes {
 		validationErrors = append(validationErrors, "Server is not configured for PV snapshots")
+	}
+
+	exists, err := controller.backupService.BackupExists(controller.bucket, itm.Name)
+	if err != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Error checking if backup already exists in object storage: %v", err))
+	}
+	if exists {
+		validationErrors = append(validationErrors, "Backup already exists in object storage")
 	}
 
 	return validationErrors

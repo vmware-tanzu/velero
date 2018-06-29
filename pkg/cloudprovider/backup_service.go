@@ -49,6 +49,9 @@ type BackupService interface {
 	// DeleteBackupDir deletes all files in object storage for the given backup.
 	DeleteBackupDir(bucket, backupName string) error
 
+	// BackupExists checks if the backup metadata file exists in object storage.
+	BackupExists(bucket, backupName string) (bool, error)
+
 	// GetBackup gets the specified api.Backup from the given bucket in object storage.
 	GetBackup(bucket, name string) (*api.Backup, error)
 
@@ -201,6 +204,10 @@ func (br *backupService) GetAllBackups(bucket string) ([]*api.Backup, error) {
 	}
 
 	return output, nil
+}
+
+func (br *backupService) BackupExists(bucket, backupName string) (bool, error) {
+	return br.objectStore.ObjectExists(bucket, getMetadataKey(backupName))
 }
 
 func (br *backupService) GetBackup(bucket, backupName string) (*api.Backup, error) {
