@@ -120,6 +120,15 @@ func (r *restartableObjectStore) PutObject(bucket string, key string, body io.Re
 	return delegate.PutObject(bucket, key, body)
 }
 
+// ObjectExists restarts the plugin's process if needed, then delegates the call.
+func (r *restartableObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	delegate, err := r.getDelegate()
+	if err != nil {
+		return false, err
+	}
+	return delegate.ObjectExists(bucket, key)
+}
+
 // GetObject restarts the plugin's process if needed, then delegates the call.
 func (r *restartableObjectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
 	delegate, err := r.getDelegate()

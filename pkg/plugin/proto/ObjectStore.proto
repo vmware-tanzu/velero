@@ -10,6 +10,16 @@ message PutObjectRequest {
     bytes body = 4;
 }
 
+message ObjectExistsRequest {
+    string plugin = 1;
+    string bucket = 2;
+    string key = 3;
+}
+
+message ObjectExistsResponse {
+    bool exists = 1;
+}
+
 message GetObjectRequest {
     string plugin = 1;
     string bucket = 2;
@@ -67,6 +77,7 @@ message ObjectStoreInitRequest {
 service ObjectStore {
     rpc Init(ObjectStoreInitRequest) returns (Empty);
     rpc PutObject(stream PutObjectRequest) returns (Empty);
+    rpc ObjectExists(ObjectExistsRequest) returns (ObjectExistsResponse);
     rpc GetObject(GetObjectRequest) returns (stream Bytes);
     rpc ListCommonPrefixes(ListCommonPrefixesRequest) returns (ListCommonPrefixesResponse);
     rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);

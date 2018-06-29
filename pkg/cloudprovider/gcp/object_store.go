@@ -39,6 +39,7 @@ const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
 type bucketWriter interface {
 	// getWriteCloser returns an io.WriteCloser that can be used to upload data to the specified bucket for the specified key.
 	getWriteCloser(bucket, key string) io.WriteCloser
+	getAttrs(bucket, key string) (*storage.ObjectAttrs, error)
 }
 
 type writer struct {
@@ -47,6 +48,10 @@ type writer struct {
 
 func (w *writer) getWriteCloser(bucket, key string) io.WriteCloser {
 	return w.client.Bucket(bucket).Object(key).NewWriter(context.Background())
+}
+
+func (w *writer) getAttrs(bucket, key string) (*storage.ObjectAttrs, error) {
+	return w.client.Bucket(bucket).Object(key).Attrs(context.Background())
 }
 
 type ObjectStore struct {
@@ -115,6 +120,19 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	}
 
 	return closeErr
+}
+
+func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	_, err := o.bucketWriter.getAttrs(bucket, key)
+
+	switch err {
+	case nil:
+		return true, nil
+	case storage.ErrObjectNotExist:
+		return false, nil
+	}
+
+	return false, errors.WithStack(err)
 }
 
 func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {

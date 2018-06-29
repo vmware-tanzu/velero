@@ -33,6 +33,9 @@ type ObjectStore interface {
 	// object storage bucket with the given key.
 	PutObject(bucket, key string, body io.Reader) error
 
+	// ObjectExists checks if there is an object with the given key in the object storage bucket.
+	ObjectExists(bucket, key string) (bool, error)
+
 	// GetObject retrieves the object with the given key from the specified
 	// bucket in object storage.
 	GetObject(bucket, key string) (io.ReadCloser, error)

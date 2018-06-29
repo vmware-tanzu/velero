@@ -141,6 +141,25 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
+func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	container, err := getContainerReference(o.blobClient, bucket)
+	if err != nil {
+		return false, err
+	}
+
+	blob, err := getBlobReference(container, key)
+	if err != nil {
+		return false, err
+	}
+
+	exists, err := blob.Exists()
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	return exists, nil
+}
+
 func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {

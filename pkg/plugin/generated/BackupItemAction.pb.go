@@ -18,6 +18,8 @@ It has these top-level messages:
 	BackupItemActionAppliesToRequest
 	BackupItemActionAppliesToResponse
 	PutObjectRequest
+	ObjectExistsRequest
+	ObjectExistsResponse
 	GetObjectRequest
 	Bytes
 	ListCommonPrefixesRequest
