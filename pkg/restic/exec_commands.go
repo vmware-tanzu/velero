@@ -18,21 +18,19 @@ package restic
 
 import (
 	"encoding/json"
-	"os/exec"
 
 	"github.com/pkg/errors"
+
+	"github.com/heptio/ark/pkg/util/exec"
 )
 
 // GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
 // in the specified repo matching the set of provided tags, or an error if a
 // unique snapshot cannot be identified.
 func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string) (string, error) {
-	output, err := GetSnapshotCommand(repoIdentifier, passwordFile, tags).Cmd().Output()
+	stdout, stderr, err := exec.RunCommand(GetSnapshotCommand(repoIdentifier, passwordFile, tags).Cmd())
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", errors.Wrapf(err, "error running command, stderr=%s", exitErr.Stderr)
-		}
-		return "", errors.Wrap(err, "error running command")
+		return "", errors.Wrapf(err, "error running command, stderr=%s", stderr)
 	}
 
 	type snapshotID struct {
@@ -40,7 +38,7 @@ func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string) 
 	}
 
 	var snapshots []snapshotID
-	if err := json.Unmarshal(output, &snapshots); err != nil {
+	if err := json.Unmarshal([]byte(stdout), &snapshots); err != nil {
 		return "", errors.Wrap(err, "error unmarshalling restic snapshots result")
 	}
 
