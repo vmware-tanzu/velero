@@ -69,11 +69,6 @@
   version = "~10.2.1-beta"
 
 [[constraint]]
-  name = "github.com/Azure/go-autorest"
-  version = "~8.1.x"
-
-
-[[constraint]]
   name = "cloud.google.com/go"
   version = "0.11.0"
 

@@ -151,7 +151,7 @@ type server struct {
 	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	discoveryClient       discovery.DiscoveryInterface
-	clientPool            dynamic.ClientPool
+	dynamicClient         dynamic.Interface
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
@@ -182,6 +182,11 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		return nil, err
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, err
+	}
+
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	s := &server{
@@ -191,7 +196,7 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		kubeClient:            kubeClient,
 		arkClient:             arkClient,
 		discoveryClient:       arkClient.Discovery(),
-		clientPool:            dynamic.NewDynamicClientPool(clientConfig),
+		dynamicClient:         dynamicClient,
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
 		ctx:           ctx,
 		cancelFunc:    cancelFunc,
@@ -562,7 +567,7 @@ func (s *server) runControllers(config *api.Config) error {
 
 		backupper, err := backup.NewKubernetesBackupper(
 			discoveryHelper,
-			client.NewDynamicFactory(s.clientPool),
+			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.snapshotService,
 			s.resticManager,
@@ -638,7 +643,7 @@ func (s *server) runControllers(config *api.Config) error {
 
 	restorer, err := restore.NewKubernetesRestorer(
 		discoveryHelper,
-		client.NewDynamicFactory(s.clientPool),
+		client.NewDynamicFactory(s.dynamicClient),
 		s.backupService,
 		s.snapshotService,
 		config.ResourcePriorities,

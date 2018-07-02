@@ -32,7 +32,9 @@ import (
 func TestGetVolumeID(t *testing.T) {
 	b := &blockStore{}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.gcePersistentDisk -> no error
 	volumeID, err := b.GetVolumeID(pv)
@@ -58,7 +60,9 @@ func TestGetVolumeID(t *testing.T) {
 func TestSetVolumeID(t *testing.T) {
 	b := &blockStore{}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.gcePersistentDisk -> error
 	updatedPV, err := b.SetVolumeID(pv, "abc123")

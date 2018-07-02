@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/restmapper"
 )
 
 // Helper exposes functions for interacting with the Kubernetes discovery
@@ -91,11 +91,11 @@ func (h *helper) Refresh() error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 
-	groupResources, err := discovery.GetAPIGroupResources(h.discoveryClient)
+	groupResources, err := restmapper.GetAPIGroupResources(h.discoveryClient)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	mapper := discovery.NewRESTMapper(groupResources, dynamic.VersionInterfaces)
+	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 	shortcutExpander, err := kcmdutil.NewShortcutExpander(mapper, h.discoveryClient, h.logger)
 	if err != nil {
 		return errors.WithStack(err)
