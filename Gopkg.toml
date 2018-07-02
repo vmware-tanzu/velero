@@ -28,21 +28,34 @@
 #
 # Kubernetes packages
 #
+
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "~1.10"
+  version = "~1.11"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "~7.0"
+  version = "~8.0"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.10.0"
+  version = "kubernetes-1.11.0"
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.10.0"
+  version = "kubernetes-1.11.0"
+
+# vendor/k8s.io/apimachinery/pkg/runtime/serializer/json/json.go:104:16:
+# unknown field 'CaseSensitive' in struct literal of type jsoniter.Config
+[[override]]
+  name = "github.com/json-iterator/go"
+  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
+
+# vendor/k8s.io/client-go/plugin/pkg/client/auth/azure/azure.go:300:25:
+# cannot call non-function spt.Token (type adal.Token)
+[[override]]
+  name = "github.com/Azure/go-autorest"
+  revision = "1ff28809256a84bb6966640ff3d0371af82ccba4"
 
 #
 # Cloud provider packages
@@ -85,9 +98,9 @@
 
 # TODO(1.0) this repo is a redirect to github.com/satori/go.uuid. Our
 # current version of azure-sdk-for-go references this redirect, so
-# use it so we don't get a duplicate copy of this dependency. 
+# use it so we don't get a duplicate copy of this dependency.
 # Once our azure-sdk-for-go is updated to a newer version (where
-# their dependency has changed to .../go.uuid), switch this to 
+# their dependency has changed to .../go.uuid), switch this to
 # github.com/satori/go.uuid
 [[constraint]]
   name = "github.com/satori/uuid"
@@ -96,11 +109,11 @@
 [[constraint]]
   name = "github.com/spf13/afero"
   branch = "master"
-  
+
 [[constraint]]
   name = "github.com/spf13/cobra"
   branch = "master"
-  
+
 [[constraint]]
   name = "github.com/spf13/pflag"
   version = "1.0.0"
