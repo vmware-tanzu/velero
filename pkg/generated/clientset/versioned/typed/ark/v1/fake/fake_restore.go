@@ -62,7 +62,7 @@ func (c *FakeRestores) List(opts v1.ListOptions) (result *ark_v1.RestoreList, er
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.RestoreList{}
+	list := &ark_v1.RestoreList{ListMeta: obj.(*ark_v1.RestoreList).ListMeta}
 	for _, item := range obj.(*ark_v1.RestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

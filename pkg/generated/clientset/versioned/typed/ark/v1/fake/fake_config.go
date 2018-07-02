@@ -62,7 +62,7 @@ func (c *FakeConfigs) List(opts v1.ListOptions) (result *ark_v1.ConfigList, err 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.ConfigList{}
+	list := &ark_v1.ConfigList{ListMeta: obj.(*ark_v1.ConfigList).ListMeta}
 	for _, item := range obj.(*ark_v1.ConfigList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
