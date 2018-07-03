@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -93,8 +94,17 @@ func (c *backupSyncController) run() {
 
 		cloudBackup.Namespace = c.namespace
 		cloudBackup.ResourceVersion = ""
-		if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !kuberrs.IsAlreadyExists(err) {
-			logContext.WithError(errors.WithStack(err)).Error("Error syncing backup from object storage")
+
+		// Backup only if backup does not exist in Kubernetes or if we are not able to get the backup for any reason.
+		_, err := c.client.Backups(cloudBackup.Namespace).Get(cloudBackup.Name, metav1.GetOptions{})
+		if err != nil {
+			if !kuberrs.IsNotFound(err) {
+				logContext.WithError(errors.WithStack(err)).Error("Error getting backup from client, proceeding with backup sync")
+			}
+
+			if _, err := c.client.Backups(cloudBackup.Namespace).Create(cloudBackup); err != nil && !kuberrs.IsAlreadyExists(err) {
+				logContext.WithError(errors.WithStack(err)).Error("Error syncing backup from object storage")
+			}
 		}
 	}
 }
