@@ -1,41 +1,43 @@
 # Restic Integration
 
-As of v0.9.0, Ark has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called 
+As of version 0.9.0, Ark has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called 
 [restic][1].
 
-Ark has always allowed you to take snapshots of persistent volumes as part of your backups, provided you’re using one of 
+Ark has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of 
 the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks). 
-And, since v0.6.0, we’ve had a plugin model which enables anyone to easily implement additional object and block storage 
-backends, outside of the main Ark repository.
+Starting with version 0.6.0, we provide a plugin model that enables anyone to implement additional object and block storage 
+backends, outside the main Ark repository.
 
 We integrated restic with Ark so that users have an out-of-the-box solution for backing up and restoring almost any type of Kubernetes
-volume*. We view this as a new capability for Ark, rather than a replacement for existing functionality. If you're running on AWS, and
-taking EBS snapshots as part of your regular Ark backups, great! There's no need to switch to using restic. However, if you've
-been waiting for a snapshot plugin to be implemented for your storage platform, or you're using EFS, AzureFile, NFS, emptyDir, 
-local, or any other volume type that doesn't have a native snapshot concept, restic may be for you.
+volume*. This is a new capability for Ark, not a replacement for existing functionality. If you're running on AWS, and
+taking EBS snapshots as part of your regular Ark backups, there's no need to switch to using restic. However, if you've
+been waiting for a snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir, 
+local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
-Additionally, since restic is not tied to a specific storage platform, this integration paves the way for future work to enable
+Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
 cross-volume-type data migrations. Stay tuned as this evolves!
 
-\* hostPath volumes are not supported, but the [new local volume type][4] is!
+\* hostPath volumes are not supported, but the [new local volume type][4] is supported.
 
 ## Setup
 
-This setup guide assumes you already have a working Ark v0.8.1+ installation. If not, go [here][2] for instructions. It
-also assumes you have the [latest release tag][3] of the Ark repo cloned locally.
+### Prerequisites
 
-### Pre-Install Steps - Upgrading from a Previous v0.9 Alpha
+- A working install of Ark version 0.8.1 or later. See [Set up Ark][2]
+- A local clone of [the latest release tag of the Ark repository][3]
 
-If you're upgrading from a previous pre-release version of Ark with restic, before you proceed you'll need to:
-- manually delete all of the repositories/data from your existing restic bucket
-- delete all Ark backups from your cluster using `ark backup delete`
-- delete all secrets named `ark-restic-credentials` across all namespaces in your cluster
+#### Additional steps if upgrading from version 0.9 alpha
+
+- Manually delete all of the repositories/data from your existing restic bucket
+- Delete all Ark backups from your cluster using `ark backup delete`
+- Delete all secrets named `ark-restic-credentials` across all namespaces in your cluster
 
 ### Instructions
 
-1. Download an updated Ark client from the [latest release][3], and move it to a location within your PATH.
+1. Download an updated Ark client from the [latest release][3], and move it to a location in your PATH.
 
 1. From the Ark root directory, run the following to create new custom resource definitions:
+
     ```bash
     kubectl apply -f examples/common/00-prereqs.yaml
     ```
@@ -47,15 +49,16 @@ If you're upgrading from a previous pre-release version of Ark with restic, befo
     - GCP: `kubectl apply -f examples/gcp/20-restic-daemonset.yaml`
     - Minio: `kubectl apply -f examples/minio/30-restic-daemonset.yaml`
 
-1. Update the image tag on the Ark daemonset and deployment to match the release version you used in Step 1 (e.g. `v0.9.0-alpha.3`):
+1. Update the image tag on the Ark daemonset and deployment to match the release version you're working with -- for example, `v0.9.0`:
+
     ```bash
     kubectl -n heptio-ark set image deployment/ark ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
     kubectl -n heptio-ark set image daemonset/restic ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
     ```
 
 1. Create a new bucket for restic to store its data in, and give the `heptio-ark` IAM user access to it, similarly to
-the main Ark bucket you've already set up. Note that for now, this must be a different bucket than the main Ark bucket,
-but we plan to remove this limitation in a future release.
+the main Ark bucket you've already set up. Note that this must be a different bucket than the main Ark bucket.
+We plan to remove this limitation in a future release.
 
 1. Uncomment `resticLocation` in your Ark config and set the value appropriately, then apply:
     
@@ -69,14 +72,15 @@ but we plan to remove this limitation in a future release.
 
 You're now ready to use Ark with restic.
 
-## Backing Up
+## Back up
 
-1. Run the following for each pod containing a volume that you'd like to back up using restic:
+1. Run the following for each pod that contains a volume to back up:
+
     ```bash
     kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.ark.heptio.com/backup-volumes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
 
-    The volume names specified in the annotation should be the names of the volumes within the pod spec. 
+    where the volume names are the names of the volumes in the pod spec. 
     
     For example, for the following pod:
 
@@ -108,21 +112,21 @@ You're now ready to use Ark with restic.
     kubectl -n foo annotate pod/sample backup.ark.heptio.com/backup-volumes=pvc-volume,emptydir-volume
     ```
 
+    This annotation can also be provided in a pod template spec if you use a controller to manage your pods.
 
-    This annotation can also be provided in the pod template spec if using a deployment, daemonset, etc.
-    to manage your pods.
+1. Take an Ark backup:
 
-1. Take an Ark backup as usual:
     ```bash
     ark backup create NAME OPTIONS...
     ```
 
-1. When the backup has completed, view information about your pod volume backups:
+1. When the backup completes, view information about the backups:
+
     ```bash
     kubectl -n heptio-ark get podvolumebackups -l ark.heptio.com/backup-name=YOUR_BACKUP_NAME -o yaml
     ```
 
-## Restoring
+## Restore
 
 Restore from your Ark backup as usual:
 
@@ -132,28 +136,27 @@ ark restore create --from-backup BACKUP_NAME OPTIONS...
 
 ## Limitations
 
-There are several limitations that users should be aware of:
-
-- As mentioned previously, you cannot use the main Ark bucket for storing restic backups. We plan to address this
+- You cannot use the main Ark bucket for storing restic backups. We plan to address this issue
 in a future release.
-- `hostPath` volumes are not supported. [Local persistent volumes][4] are, though!
+- `hostPath` volumes are not supported. [Local persistent volumes][4] are supported.
 - Those of you familiar with [restic][1] may know that it encrypts all of its data. We've decided to use a static, 
 common encryption key for all restic repositories created by Ark. **This means that anyone who has access to your
-bucket can decrypt your restic backup data**. You should ensure that you are limiting access to the restic bucket
+bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
 appropriately. We plan to implement full Ark backup encryption, including securing the restic encryption keys, in 
 a future release.   
 
 ## Troubleshooting
 
-If something's not working as expected, there are several places you can go to for more information on what might
-be happening.
+Run the following checks:
 
 Are your Ark server and daemonset pods running?
+
 ```bash
 kubectl get pods -n heptio-ark
 ```
 
 Does your restic repository exist, and is it ready?
+
 ```bash
 ark restic repo get
 
@@ -161,6 +164,7 @@ ark restic repo get REPO_NAME -o yaml
 ```
 
 Are there any errors in your Ark backup/restore?
+
 ```bash
 ark backup describe BACKUP_NAME
 ark backup logs BACKUP_NAME
@@ -170,6 +174,7 @@ ark restore logs RESTORE_NAME
 ```
 
 What is the status of your pod volume backups/restores?
+
 ```bash
 kubectl -n heptio-ark get podvolumebackups -l ark.heptio.com/backup-name=BACKUP_NAME -o yaml
 
@@ -177,25 +182,25 @@ kubectl -n heptio-ark get podvolumerestores -l ark.heptio.com/restore-name=RESTO
 ```
 
 Is there any useful information in the Ark server or daemon pod logs?
+
 ```bash
 kubectl -n heptio-ark logs deploy/ark
 kubectl -n heptio-ark logs DAEMON_POD_NAME
 ```
+
 **NOTE**: You can increase the verbosity of the pod logs by adding `--log-level=debug` as an argument
 to the container command in the deployment/daemonset pod template spec.
 
-## Details of Backup & Restore Process with Restic
+## How backup and restore work with restic
 
-This section describes in detail how backups/restores with Ark and restic work.
-
-As background, we've introduced three new custom resource definitions and associated controllers:
+We introduced three custom resource definitions and associated controllers:
 
 - `ResticRepository` - represents/manages the lifecycle of Ark's [restic repositories][5]. Ark creates
-a restic repository per namespace, when the first restic backup for a namespace is requested. The controller
+a restic repository per namespace when the first restic backup for a namespace is requested. The controller
 for this custom resource executes restic repository lifecycle commands -- `restic init`, `restic check`,
 and `restic prune`.
 
-    You can see information about your Ark restic repos with `ark restic repo get`.
+    You can see information about your Ark restic repositories by running `ark restic repo get`.
 
 - `PodVolumeBackup` - represents a restic backup of a volume in a pod. The main Ark backup process creates
 one or more of these when it finds an annotated pod. Each node in the cluster runs a controller for this
@@ -207,7 +212,7 @@ or more of these when it encounters a pod that has associated restic backups. Ea
 controller for this resource (in the same daemonset as above) that handles the `PodVolumeRestores` for pods 
 on that node. The controller executes `restic restore` commands to restore pod volume data.
 
-### Backups
+### Backup
 
 1. The main Ark backup process checks each pod that it's backing up for the annotation specifying a restic backup
 should be taken (`backup.ark.heptio.com/backup-volumes`)
@@ -224,8 +229,7 @@ should be taken (`backup.ark.heptio.com/backup-volumes`)
 1. As each `PodVolumeBackup` finishes, the main Ark process captures its restic snapshot ID and adds it as an annotation
 to the copy of the pod JSON that's stored in the Ark backup. This will be used for restores, as seen in the next section.
 
-
-### Restores
+### Restore
 
 1. The main Ark restore process checks each pod that it's restoring for annotations specifying a restic backup
 exists for a volume in the pod (`snapshot.ark.heptio.com/<volume-name>`)
@@ -254,7 +258,7 @@ on to running other init containers/the main containers.
 
 
 [1]: https://github.com/restic/restic
-[2]: https://heptio.github.io/ark/v0.8.1/cloud-common
+[2]: cloud-common.md
 [3]: https://github.com/heptio/ark/releases/
 [4]: https://kubernetes.io/docs/concepts/storage/volumes/#local
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
