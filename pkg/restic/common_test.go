@@ -319,11 +319,14 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			// sort to ensure good compare of slices
 			less := func(snapshots []SnapshotIdentifier) func(i, j int) bool {
 				return func(i, j int) bool {
-					return snapshots[i].Repo < snapshots[j].Repo &&
-						snapshots[i].SnapshotID < snapshots[j].SnapshotID
+					if snapshots[i].Repo == snapshots[j].Repo {
+						return snapshots[i].SnapshotID < snapshots[j].SnapshotID
+					}
+					return snapshots[i].Repo < snapshots[j].Repo
 				}
 
 			}
+
 			sort.Slice(test.expected, less(test.expected))
 			sort.Slice(res, less(res))
 
