@@ -17,6 +17,7 @@ package restic
 
 import (
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,16 +50,43 @@ func TestRestoreCommand(t *testing.T) {
 }
 
 func TestGetSnapshotCommand(t *testing.T) {
-	c := GetSnapshotCommand("repo-id", "password-file", map[string]string{"foo": "bar", "c": "d"})
+	expectedTags := map[string]string{"foo": "bar", "c": "d"}
+	c := GetSnapshotCommand("repo-id", "password-file", expectedTags)
 
 	assert.Equal(t, "snapshots", c.Command)
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 	assert.Equal(t, "password-file", c.PasswordFile)
 
-	expected := []string{"--json", "--last", "--tag=foo=bar,c=d"}
-	sort.Strings(expected)
-	sort.Strings(c.ExtraFlags)
-	assert.Equal(t, expected, c.ExtraFlags)
+	// set up expected flag names
+	expectedFlags := []string{"--json", "--last", "--tag"}
+	// for tracking actual flag names
+	actualFlags := []string{}
+	// for tracking actual --tag values as a map
+	actualTags := make(map[string]string)
+
+	// loop through actual flags
+	for _, flag := range c.ExtraFlags {
+		// split into 2 parts from the first = sign (if any)
+		parts := strings.SplitN(flag, "=", 2)
+		// parts[0] is the flag name
+		actualFlags = append(actualFlags, parts[0])
+		// convert --tag data to a map
+		if parts[0] == "--tag" {
+			// split based on ,
+			tags := strings.Split(parts[1], ",")
+			// loop through each key-value tag pair
+			for _, tag := range tags {
+				// split the pair on =
+				kvs := strings.Split(tag, "=")
+				// record actual key & value
+				actualTags[kvs[0]] = kvs[1]
+			}
+		}
+	}
+
+	assert.Equal(t, expectedFlags, actualFlags)
+	assert.Equal(t, expectedTags, actualTags)
+
 }
 
 func TestInitCommand(t *testing.T) {
