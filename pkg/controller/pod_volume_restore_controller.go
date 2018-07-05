@@ -42,6 +42,7 @@ import (
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	arkexec "github.com/heptio/ark/pkg/util/exec"
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -56,6 +57,7 @@ type podVolumeRestoreController struct {
 	nodeName               string
 
 	processRestoreFunc func(*arkv1api.PodVolumeRestore) error
+	fileSystem         filesystem.Interface
 }
 
 // NewPodVolumeRestoreController creates a new pod volume restore controller.
@@ -76,6 +78,8 @@ func NewPodVolumeRestoreController(
 		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		nodeName:               nodeName,
+
+		fileSystem: filesystem.NewFileSystem(),
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -270,7 +274,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 		return c.failRestore(req, errors.Wrap(err, "error getting volume directory name").Error(), log)
 	}
 
-	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace)
+	credsFile, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.failRestore(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/spf13/afero"
+
+	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
 type FakeFileSystem struct {
@@ -67,4 +69,8 @@ func (fs *FakeFileSystem) WithDirectories(path ...string) *FakeFileSystem {
 	}
 
 	return fs
+}
+
+func (fs *FakeFileSystem) TempFile(dir, prefix string) (filesystem.NameWriteCloser, error) {
+	return afero.TempFile(fs.fs, dir, prefix)
 }

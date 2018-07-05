@@ -32,6 +32,10 @@ const (
 	GCPBackend   BackendType = "gcp"
 )
 
+// this func is assigned to a package-level variable so it can be
+// replaced when unit-testing
+var getAWSBucketRegion = aws.GetBucketRegion
+
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
 func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
@@ -55,7 +59,7 @@ func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
 		case config.Config["s3Url"] != "":
 			url = config.Config["s3Url"]
 		default:
-			region, err := aws.GetBucketRegion(bucket)
+			region, err := getAWSBucketRegion(bucket)
 			if err != nil {
 				url = "s3.amazonaws.com"
 				break

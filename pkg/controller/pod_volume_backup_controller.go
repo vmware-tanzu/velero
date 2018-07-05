@@ -38,6 +38,7 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restic"
 	arkexec "github.com/heptio/ark/pkg/util/exec"
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -52,6 +53,7 @@ type podVolumeBackupController struct {
 	nodeName              string
 
 	processBackupFunc func(*arkv1api.PodVolumeBackup) error
+	fileSystem        filesystem.Interface
 }
 
 // NewPodVolumeBackupController creates a new pod volume backup controller.
@@ -72,6 +74,8 @@ func NewPodVolumeBackupController(
 		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:             pvcInformer.Lister(),
 		nodeName:              nodeName,
+
+		fileSystem: filesystem.NewFileSystem(),
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -194,7 +198,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
-	file, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace)
+	file, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)

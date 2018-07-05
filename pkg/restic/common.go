@@ -18,7 +18,6 @@ package restic
 
 import (
 	"fmt"
-	"io/ioutil"
 	"strings"
 	"time"
 
@@ -30,6 +29,7 @@ import (
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
 const (
@@ -144,7 +144,7 @@ func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1li
 // encryption key for the given repo and returns its path. The
 // caller should generally call os.Remove() to remove the file
 // when done with it.
-func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, repoName string) (string, error) {
+func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, repoName string, fs filesystem.Interface) (string, error) {
 	secretGetter := NewListerSecretGetter(secretLister)
 
 	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
@@ -156,7 +156,7 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, 
 		return "", err
 	}
 
-	file, err := ioutil.TempFile("", fmt.Sprintf("%s-%s", CredentialsSecretName, repoName))
+	file, err := fs.TempFile("", fmt.Sprintf("%s-%s", CredentialsSecretName, repoName))
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
