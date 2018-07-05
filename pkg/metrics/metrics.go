@@ -38,7 +38,7 @@ const (
 	restoreAttemptTotal          = "restore_attempt_total"
 	restoreValidationFailedTotal = "restore_validation_failed_total"
 	restoreSuccessTotal          = "restore_success_total"
-	restoreIncompleteTotal       = "restore_incomplete_total"
+	restoreFailedTotal           = "restore_failed_total"
 
 	scheduleLabel   = "schedule"
 	backupNameLabel = "backupName"
@@ -117,11 +117,11 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
-			restoreIncompleteTotal: prometheus.NewCounterVec(
+			restoreFailedTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
-					Name:      restoreIncompleteTotal,
-					Help:      "Total number of incomplete restores",
+					Name:      restoreFailedTotal,
+					Help:      "Total number of failed restores",
 				},
 				[]string{scheduleLabel},
 			),
@@ -129,7 +129,7 @@ func NewServerMetrics() *ServerMetrics {
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
 					Name:      restoreValidationFailedTotal,
-					Help:      "Total number of failed restore validations",
+					Help:      "Total number of failed restores failing validations",
 				},
 				[]string{scheduleLabel},
 			),
@@ -152,6 +152,18 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 	if c, ok := m.metrics[backupFailureCount].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 }
@@ -204,21 +216,21 @@ func (m *ServerMetrics) RegisterRestoreAttempt(backupSchedule string) {
 	}
 }
 
-// RegisterRestoreSuccess records a successful completion of a restore.
+// RegisterRestoreSuccess records a successful (maybe partial) completion of a restore.
 func (m *ServerMetrics) RegisterRestoreSuccess(backupSchedule string) {
 	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
 }
 
-// RegisterRestoreIncomplete records a restore that finished with errors.
-func (m *ServerMetrics) RegisterRestoreIncomplete(backupSchedule string) {
-	if c, ok := m.metrics[restoreIncompleteTotal].(*prometheus.CounterVec); ok {
+// RegisterRestoreFailed records a restore that failed.
+func (m *ServerMetrics) RegisterRestoreFailed(backupSchedule string) {
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
 }
 
-// RegisterRestoreValidationFailed records a failed restore.
+// RegisterRestoreValidationFailed records a restore that failed validation.
 func (m *ServerMetrics) RegisterRestoreValidationFailed(backupSchedule string) {
 	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()

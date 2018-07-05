@@ -259,27 +259,16 @@ func (c *restoreController) processRestore(key string) error {
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
-	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
-	for _, nonrestorable := range nonRestorableResources {
-		if !excludedResources.Has(nonrestorable) {
-			restore.Spec.ExcludedResources = append(restore.Spec.ExcludedResources, nonrestorable)
-		}
-	}
-
-	backup, fetchErr := c.fetchBackup(c.bucket, restore.Spec.BackupName)
-	backupScheduleName := ""
-	if backup != nil {
-		backupScheduleName = backup.GetLabels()["ark-schedule"]
-	}
-	// Register attempts before we do validation so we can get better tracking
-	c.metrics.RegisterRestoreAttempt(backupScheduleName)
-
 	// validation
-	if restore.Status.ValidationErrors = c.completeAndValidate(restore, fetchErr); len(restore.Status.ValidationErrors) > 0 {
+	if restore.Status.ValidationErrors = c.completeAndValidate(restore); len(restore.Status.ValidationErrors) > 0 {
 		restore.Status.Phase = api.RestorePhaseFailedValidation
 	} else {
 		restore.Status.Phase = api.RestorePhaseInProgress
 	}
+
+	backupScheduleName := restore.Spec.ScheduleName
+	// Register attempts after validation so we don't have to fetch the backup multiple times
+	c.metrics.RegisterRestoreAttempt(backupScheduleName)
 
 	// update status
 	updatedRestore, err := patchRestore(original, restore, c.restoreClient)
@@ -296,7 +285,7 @@ func (c *restoreController) processRestore(key string) error {
 	}
 	logContext.Debug("Running restore")
 	// execution & upload of restore
-	restoreWarnings, restoreErrors := c.runRestore(restore, c.bucket, backup)
+	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(restore, c.bucket)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
@@ -307,14 +296,18 @@ func (c *restoreController) processRestore(key string) error {
 	for _, e := range restoreErrors.Namespaces {
 		restore.Status.Errors += len(e)
 	}
-	if restore.Status.Errors > 0 {
-		c.metrics.RegisterRestoreIncomplete(backupScheduleName)
+
+	if restoreFailure != nil {
+		logContext.Debug("restore failed")
+		restore.Status.Phase = api.RestorePhaseFailed
+		restore.Status.FailureReason = restoreFailure.Error()
+		c.metrics.RegisterRestoreFailed(backupScheduleName)
 	} else {
+		logContext.Debug("restore completed")
+		// We got through the restore process without failing validation or restore execution
+		restore.Status.Phase = api.RestorePhaseCompleted
 		c.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
-
-	logContext.Debug("restore completed")
-	restore.Status.Phase = api.RestorePhaseCompleted
 
 	logContext.Debug("Updating Restore final status")
 	if _, err = patchRestore(original, restore, c.restoreClient); err != nil {
@@ -324,7 +317,7 @@ func (c *restoreController) processRestore(key string) error {
 	return nil
 }
 
-func (c *restoreController) completeAndValidate(restore *api.Restore, fetchErr error) []string {
+func (c *restoreController) completeAndValidate(restore *api.Restore) []string {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -333,12 +326,6 @@ func (c *restoreController) completeAndValidate(restore *api.Restore, fetchErr e
 		}
 	}
 	var validationErrors []string
-
-	if restore.Spec.BackupName == "" {
-		validationErrors = append(validationErrors, "BackupName must be non-empty and correspond to the name of a backup in object storage.")
-	} else if fetchErr != nil {
-		validationErrors = append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", fetchErr))
-	}
 
 	// validate that included resources don't contain any non-restorable resources
 	includedResources := sets.NewString(restore.Spec.IncludedResources...)
@@ -390,9 +377,17 @@ func (c *restoreController) completeAndValidate(restore *api.Restore, fetchErr e
 		}
 	}
 
-	// validate that we can fetch the source backup
-	if _, err := c.fetchBackup(c.bucket, restore.Spec.BackupName); err != nil {
+	var (
+		backup *api.Backup
+		err    error
+	)
+	if backup, err = c.fetchBackup(c.bucket, restore.Spec.BackupName); err != nil {
 		return append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
+	}
+
+	// Fill in the ScheduleName so it's easier to consume for metrics.
+	if restore.Spec.ScheduleName == "" {
+		restore.Spec.ScheduleName = backup.GetLabels()["ark-schedule"]
 	}
 
 	return validationErrors
@@ -462,7 +457,7 @@ func (c *restoreController) fetchBackup(bucket, name string) (*api.Backup, error
 	return backup, nil
 }
 
-func (c *restoreController) runRestore(restore *api.Restore, bucket string, backup *api.Backup) (restoreWarnings, restoreErrors api.RestoreResult) {
+func (c *restoreController) runRestore(restore *api.Restore, bucket string) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
 	logContext := c.logger.WithFields(
 		logrus.Fields{
 			"restore": kubeutil.NamespaceAndName(restore),
@@ -482,6 +477,7 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string, back
 	if err != nil {
 		logContext.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreFailure = err
 		return
 	}
 	tempFiles = append(tempFiles, backupFile)
@@ -490,6 +486,7 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string, back
 	if err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error creating log temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreFailure = err
 		return
 	}
 	tempFiles = append(tempFiles, logFile)
@@ -498,6 +495,7 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string, back
 	if err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error creating results temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreFailure = err
 		return
 	}
 	tempFiles = append(tempFiles, resultsFile)
@@ -506,10 +504,12 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string, back
 		for _, file := range tempFiles {
 			if err := file.Close(); err != nil {
 				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error closing file")
+				restoreFailure = err
 			}
 
 			if err := os.Remove(file.Name()); err != nil {
 				logContext.WithError(errors.WithStack(err)).WithField("file", file.Name()).Error("Error removing file")
+				restoreFailure = err
 			}
 		}
 	}()
@@ -521,6 +521,8 @@ func (c *restoreController) runRestore(restore *api.Restore, bucket string, back
 	}
 	defer c.pluginManager.CloseRestoreItemActions(restore.Name)
 
+	// Any return statement above this line means a total restore failure
+	// Some failures after this line *may* be a total restore failure
 	logContext.Info("starting restore")
 	restoreWarnings, restoreErrors = c.restorer.Restore(restore, backup, backupFile, logFile, actions)
 	logContext.Info("restore completed")

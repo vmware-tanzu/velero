@@ -103,6 +103,8 @@ func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
 	}
 
 	if !equality.Semantic.DeepEqual(expected, actual) {
+		fmt.Printf("expected = %+v\n", expected)
+		fmt.Printf("actual = %+v\n", actual)
 		return assert.Fail(t, fmt.Sprintf("Objects not equal"))
 	}
 

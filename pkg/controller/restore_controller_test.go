@@ -120,19 +120,21 @@ func TestFetchBackup(t *testing.T) {
 
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
-		name                        string
-		restoreKey                  string
-		restore                     *api.Restore
-		backup                      *api.Backup
-		restorerError               error
-		allowRestoreSnapshots       bool
-		expectedErr                 bool
-		expectedPhase               string
-		expectedValidationErrors    []string
-		expectedRestoreErrors       int
-		expectedRestorerCall        *api.Restore
-		backupServiceGetBackupError error
-		uploadLogError              error
+		name                             string
+		restoreKey                       string
+		restore                          *api.Restore
+		backup                           *api.Backup
+		restorerError                    error
+		allowRestoreSnapshots            bool
+		expectedErr                      bool
+		expectedPhase                    string
+		expectedValidationErrors         []string
+		expectedRestoreErrors            int
+		expectedRestorerCall             *api.Restore
+		backupServiceGetBackupError      error
+		uploadLogError                   error
+		backupServiceDownloadBackupError error
+		expectedFinalPhase               string
 	}{
 		{
 			name:        "invalid key returns error",
@@ -300,6 +302,14 @@ func TestProcessRestore(t *testing.T) {
 				"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: restores.ark.heptio.com",
 			},
 		},
+		{
+			name:                             "backup download error results in failed restore",
+			restore:                          NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
+			expectedPhase:                    string(api.RestorePhaseInProgress),
+			expectedFinalPhase:               string(api.RestorePhaseFailed),
+			backupServiceDownloadBackupError: errors.New("Couldn't download backup"),
+			backup: arktest.NewTestBackup().WithName("backup-1").Backup,
+		},
 	}
 
 	for _, test := range tests {
@@ -403,6 +413,10 @@ func TestProcessRestore(t *testing.T) {
 				backupSvc.On("GetBackup", "bucket", mock.Anything).Return(nil, test.backupServiceGetBackupError)
 			}
 
+			if test.backupServiceDownloadBackupError != nil {
+				backupSvc.On("DownloadBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceDownloadBackupError)
+			}
+
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActions", test.restore.Name).Return(nil, nil)
 				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return(nil)
@@ -477,6 +491,15 @@ func TestProcessRestore(t *testing.T) {
 					Errors: test.expectedRestoreErrors,
 				},
 			}
+			// Override our default expectations if the case requires it
+			if test.expectedFinalPhase != "" {
+				expected = Patch{
+					Status: StatusPatch{
+						Phase:  api.RestorePhaseCompleted,
+						Errors: test.expectedRestoreErrors,
+					},
+				}
+			}
 
 			arktest.ValidatePatch(t, actions[1], expected, decode)
 
@@ -506,6 +529,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		sharedInformers.Ark().V1().Backups(),
 		false,
 		logger,
+		nil,
 		nil,
 	).(*restoreController)
 
