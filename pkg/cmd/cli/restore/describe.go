@@ -18,6 +18,7 @@ package restore
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,10 +27,14 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/output"
+	"github.com/heptio/ark/pkg/restic"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
-	var listOptions metav1.ListOptions
+	var (
+		listOptions   metav1.ListOptions
+		volumeDetails bool
+	)
 
 	c := &cobra.Command{
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
@@ -53,7 +58,13 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 			first := true
 			for _, restore := range restores.Items {
-				s := output.DescribeRestore(&restore, arkClient)
+				opts := restic.NewPodVolumeRestoreListOptions(restore.Name, string(restore.UID))
+				podvolumeRestoreList, err := arkClient.ArkV1().PodVolumeRestores(f.Namespace()).List(opts)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
+				}
+
+				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, volumeDetails, arkClient)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -66,6 +77,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	}
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
+	c.Flags().BoolVar(&volumeDetails, "volume-details", volumeDetails, "display details of restic volume restores")
 
 	return c
 }

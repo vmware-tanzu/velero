@@ -16,6 +16,7 @@ ark describe backups [NAME1] [NAME2] [NAME...] [flags]
 ```
   -h, --help              help for backups
   -l, --selector string   only show items matching this label selector
+      --volume-details    display details of restic volume backups
 ```
 
 ### Options inherited from parent commands

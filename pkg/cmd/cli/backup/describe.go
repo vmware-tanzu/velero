@@ -20,18 +20,22 @@ import (
 	"fmt"
 	"os"
 
-	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/output"
+	"github.com/heptio/ark/pkg/restic"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
-	var listOptions metav1.ListOptions
+	var (
+		listOptions   metav1.ListOptions
+		volumeDetails bool
+	)
 
 	c := &cobra.Command{
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
@@ -61,7 +65,13 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequestList.Items)
+				opts := restic.NewPodVolumeBackupListOptions(backup.Name, string(backup.UID))
+				podVolumeBackupList, err := arkClient.ArkV1().PodVolumeBackups(f.Namespace()).List(opts)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
+				}
+
+				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, volumeDetails)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -74,6 +84,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	}
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
+	c.Flags().BoolVar(&volumeDetails, "volume-details", volumeDetails, "display details of restic volume backups")
 
 	return c
 }

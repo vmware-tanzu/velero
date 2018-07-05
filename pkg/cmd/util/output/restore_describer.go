@@ -19,6 +19,7 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 
@@ -28,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func DescribeRestore(restore *v1.Restore, arkClient clientset.Interface) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, volumeDetails bool, arkClient clientset.Interface) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -96,6 +97,11 @@ func DescribeRestore(restore *v1.Restore, arkClient clientset.Interface) string 
 
 		d.Println()
 		describeRestoreResults(d, restore, arkClient)
+
+		if len(podVolumeRestores) > 0 {
+			d.Println()
+			describePodVolumeRestores(d, podVolumeRestores, volumeDetails)
+		}
 	})
 }
 
@@ -135,4 +141,68 @@ func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
 			d.DescribeSlice(2, ns, warnings)
 		}
 	}
+}
+
+// describePodVolumeRestores describes pod volume restores in human-readable format.
+func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, details bool) {
+	if details {
+		d.Printf("Restic Restores:\n")
+	} else {
+		d.Printf("Restic Restores (specify --volume-details for more information):\n")
+	}
+
+	// separate restores by phase (combining <none> and New into a single group)
+	restoresByPhase := groupRestoresByPhase(restores)
+
+	// go through phases in a specific order
+	for _, phase := range []string{
+		string(v1.PodVolumeRestorePhaseCompleted),
+		string(v1.PodVolumeRestorePhaseFailed),
+		"In Progress",
+		string(v1.PodVolumeRestorePhaseNew),
+	} {
+		if len(restoresByPhase[phase]) == 0 {
+			continue
+		}
+
+		// if we're not printing details, just report the phase and count
+		if !details {
+			d.Printf("\t%s:\t%d\n", phase, len(restoresByPhase[phase]))
+			continue
+		}
+
+		// group the restores in the current phase by pod (i.e. "ns/name")
+		restoresByPod := new(volumesByPod)
+
+		for _, restore := range restoresByPhase[phase] {
+			restoresByPod.Add(restore.Spec.Pod.Namespace, restore.Spec.Pod.Name, restore.Spec.Volume)
+		}
+
+		d.Printf("\t%s:\n", phase)
+		for _, restoreGroup := range restoresByPod.Sorted() {
+			sort.Strings(restoreGroup.volumes)
+
+			// print volumes restored up for this pod
+			d.Printf("\t\t%s: %s\n", restoreGroup.label, strings.Join(restoreGroup.volumes, ", "))
+		}
+	}
+}
+
+func groupRestoresByPhase(restores []v1.PodVolumeRestore) map[string][]v1.PodVolumeRestore {
+	restoresByPhase := make(map[string][]v1.PodVolumeRestore)
+
+	phaseToGroup := map[v1.PodVolumeRestorePhase]string{
+		v1.PodVolumeRestorePhaseCompleted:  string(v1.PodVolumeRestorePhaseCompleted),
+		v1.PodVolumeRestorePhaseFailed:     string(v1.PodVolumeRestorePhaseFailed),
+		v1.PodVolumeRestorePhaseInProgress: "In Progress",
+		v1.PodVolumeRestorePhaseNew:        string(v1.PodVolumeRestorePhaseNew),
+		"": string(v1.PodVolumeRestorePhaseNew),
+	}
+
+	for _, restore := range restores {
+		group := phaseToGroup[restore.Status.Phase]
+		restoresByPhase[group] = append(restoresByPhase[group], restore)
+	}
+
+	return restoresByPhase
 }

@@ -176,3 +176,19 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, 
 
 	return name, nil
 }
+
+// NewPodVolumeBackupListOptions creates a ListOptions with a label selector configured to
+// find PodVolumeBackups for the backup identified by name and uid.
+func NewPodVolumeBackupListOptions(name, uid string) metav1.ListOptions {
+	return metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", arkv1api.BackupNameLabel, name, arkv1api.BackupUIDLabel, uid),
+	}
+}
+
+// NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
+// find PodVolumeRestores for the restore identified by name and uid.
+func NewPodVolumeRestoreListOptions(name, uid string) metav1.ListOptions {
+	return metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", arkv1api.RestoreNameLabel, name, arkv1api.RestoreUIDLabel, uid),
+	}
+}
