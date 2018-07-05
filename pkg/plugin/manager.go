@@ -184,16 +184,16 @@ func (m *manager) registerPlugins() error {
 
 	// first, register internal plugins
 	for _, provider := range []string{"aws", "gcp", "azure"} {
-		m.pluginRegistry.register(provider, arkCommand, []string{"run-plugin", "cloudprovider", provider}, PluginKindObjectStore, PluginKindBlockStore)
+		m.pluginRegistry.register(provider, arkCommand, []string{"run-plugin", "cloudprovider", provider, "--log-level", m.logLevel.String()}, PluginKindObjectStore, PluginKindBlockStore)
 	}
-	m.pluginRegistry.register("pv", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pv"}, PluginKindBackupItemAction)
-	m.pluginRegistry.register("backup-pod", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pod"}, PluginKindBackupItemAction)
-	m.pluginRegistry.register("serviceaccount", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "serviceaccount"}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("pv", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pv", "--log-level", m.logLevel.String()}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("backup-pod", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "pod", "--log-level", m.logLevel.String()}, PluginKindBackupItemAction)
+	m.pluginRegistry.register("serviceaccount", arkCommand, []string{"run-plugin", string(PluginKindBackupItemAction), "serviceaccount", "--log-level", m.logLevel.String()}, PluginKindBackupItemAction)
 
-	m.pluginRegistry.register("job", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "job"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("restore-pod", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "pod"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("svc", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "svc"}, PluginKindRestoreItemAction)
-	m.pluginRegistry.register("restic", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "restic"}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("job", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "job", "--log-level", m.logLevel.String()}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("restore-pod", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "pod", "--log-level", m.logLevel.String()}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("svc", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "svc", "--log-level", m.logLevel.String()}, PluginKindRestoreItemAction)
+	m.pluginRegistry.register("restic", arkCommand, []string{"run-plugin", string(PluginKindRestoreItemAction), "restic", "--log-level", m.logLevel.String()}, PluginKindRestoreItemAction)
 
 	// second, register external plugins (these will override internal plugins, if applicable)
 	if _, err := os.Stat(m.pluginDir); err != nil {
