@@ -23,7 +23,7 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 ### Prerequisites
 
-- A working install of Ark version 0.8.1 or later. See [Set up Ark][2]
+- A working install of Ark version 0.9.0 or later. See [Set up Ark][2]
 - A local clone of [the latest release tag of the Ark repository][3]
 
 #### Additional steps if upgrading from version 0.9 alpha
@@ -48,13 +48,6 @@ cross-volume-type data migrations. Stay tuned as this evolves!
     - Azure: `kubectl apply -f examples/azure/20-restic-daemonset.yaml`
     - GCP: `kubectl apply -f examples/gcp/20-restic-daemonset.yaml`
     - Minio: `kubectl apply -f examples/minio/30-restic-daemonset.yaml`
-
-1. Update the image tag on the Ark daemonset and deployment to match the release version you're working with -- for example, `v0.9.0`:
-
-    ```bash
-    kubectl -n heptio-ark set image deployment/ark ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
-    kubectl -n heptio-ark set image daemonset/restic ark=gcr.io/heptio-images/ark:<RELEASE_VERSION>
-    ```
 
 1. Create a new bucket for restic to store its data in, and give the `heptio-ark` IAM user access to it, similarly to
 the main Ark bucket you've already set up. Note that this must be a different bucket than the main Ark bucket.
@@ -123,16 +116,26 @@ You're now ready to use Ark with restic.
 1. When the backup completes, view information about the backups:
 
     ```bash
+    ark backup describe YOUR_BACKUP_NAME
+
     kubectl -n heptio-ark get podvolumebackups -l ark.heptio.com/backup-name=YOUR_BACKUP_NAME -o yaml
     ```
 
 ## Restore
 
-Restore from your Ark backup as usual:
+1. Restore from your Ark backup:
 
-```bash
-ark restore create --from-backup BACKUP_NAME OPTIONS...
-```
+    ```bash
+    ark restore create --from-backup BACKUP_NAME OPTIONS...
+    ```
+
+1. When the restore completes, view information about your pod volume restores:
+    
+    ```bash
+    ark restore describe YOUR_RESTORE_NAME
+
+    kubectl -n heptio-ark get podvolumerestores -l ark.heptio.com/restore-name=YOUR_RESTORE_NAME -o yaml
+    ```
 
 ## Limitations
 
