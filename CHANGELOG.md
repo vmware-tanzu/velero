@@ -1,5 +1,64 @@
 # Changelog
 
+#### [v0.9.0](https://github.com/heptio/ark/releases/tag/v0.9.0) - 2018-07-06
+
+##### Highlights:
+  * Ark now has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic](https://github.com/restic/restic).
+    This provides users an out-of-the-box solution for backing up and restoring almost any type of Kubernetes volume, whether or not it has snapshot support
+    integrated with Ark. For more information, see the [documentation](https://github.com/heptio/ark/blob/master/docs/restic.md).
+  * Support for Prometheus metrics has been added! View total number of backup attempts (including success or failure), total backup size in bytes, and backup
+    durations. More metrics coming in future releases!
+
+##### All New Features:
+  * Add restic support (#508 #532 #533 #534 #535 #537 #540 #541 #545 #546 #547 #548 #555 #557 #561 #563 #569 #570 #571 #606 #608 #610 #621 #631 #636, @skriss)
+  * Add prometheus metrics (#531 #551 #564, @ashish-amarnath @nrb)
+  * When backing up a service account, include cluster roles/cluster role bindings that reference it (#470, @skriss)
+  * When restoring service accounts, copy secrets/image pull secrets into the target cluster even if the service account already exists (#403, @nrb)
+
+##### Bug Fixes / Other Changes:
+  * Upgrade to Kubernetes 1.10 dependencies (#417, @skriss)
+  * Upgrade to go 1.10 and alpine 3.7 (#456, @skriss)
+  * Display no excluded resources/namespaces as `<none>` rather than `*` (#453, @nrb)
+  * Skip completed jobs and pods when restoring (#463, @nrb)
+  * Set namespace correctly when syncing backups from object storage (#472, @skriss)
+  * When building on macOS, bind-mount volumes with delegated config (#478, @skriss)
+  * Add replica sets and daemonsets to cohabitating resources so they're not backed up twice (#482 #485, @skriss)
+  * Shut down the Ark server gracefully on SIGINT/SIGTERM (#483, @skriss)
+  * Only back up resources that support GET and DELETE in addition to LIST and CREATE (#486, @nrb)
+  * Show a better error message when trying to get an incomplete restore's logs (#496, @nrb)
+  * Stop processing when setting a backup deletion request's phase to `Deleting` fails (#500, @nrb)
+  * Add library code to install Ark's server components (#437 #506, @marpaia)
+  * Properly handle errors when backing up additional items (#512, @carlpett)
+  * Run post hooks even if backup actions fail (#514, @carlpett)
+  * GCP: fail backup if upload to object storage fails (#510, @nrb)
+  * AWS: don't require `region` as part of backup storage provider config (#455, @skriss)
+  * Ignore terminating resources while doing a backup (#526, @yastij)
+  * Log to stdout instead of stderr (#553, @ncdc)
+  * Move sample minio deployment's config to an emptyDir (#566, @runyontr)
+  * Add `omitempty` tag to optional API fields (@580, @nikhita)
+  * Don't restore PVs with a reclaim policy of `Delete` and no snapshot (#613, @ncdc)
+  * Don't restore mirror pods (#619, @ncdc)
+
+##### Docs Contributors:
+  * @gianrubio
+  * @castrojo
+  * @dhananjaysathe
+  * @c-knowles
+  * @mattkelly
+  * @ae-v
+  * @hamidzr
+
+
+#### [v0.8.3](https://github.com/heptio/ark/releases/tag/v0.8.3) - 2018-06-29
+
+##### Bug Fixes:
+  * Don't restore backup and restore resources to avoid possible data corruption (#622, @ncdc)
+
+#### [v0.8.2](https://github.com/heptio/ark/releases/tag/v0.8.2) - 2018-06-01
+
+##### Bug Fixes:
+  * Don't crash when a persistent volume claim is missing spec.volumeName (#520, @ncdc)
+
 #### [v0.8.1](https://github.com/heptio/ark/releases/tag/v0.8.1) - 2018-04-23
 
 ##### Bug Fixes:
