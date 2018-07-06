@@ -9,6 +9,8 @@ The Ark repository includes a set of example YAML files that specify the setting
 * [Run Ark on Azure][2]
 * [Use IBM Cloud Object Store as Ark's storage destination][4]
 
+In version 0.9.0 and later, you can use Ark's integration with restic, which requires additional setup. See [Restic instructions][20].
+
 ## Examples
 
 After you set up the Ark server, try these examples:
@@ -77,3 +79,4 @@ After you set up the Ark server, try these examples:
 [3]: namespace.md
 [4]: ibm-config.md
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
+[20]: https://github.com/heptio/ark/blob/master/docs/restic.md
