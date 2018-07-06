@@ -107,6 +107,14 @@ Make sure that you install somewhere in your `$PATH`.
     
     NOTE: You might need to wait for a few minutes for the namespace to be fully cleaned up.
 
+### Schedule
+
+1. Run :
+
+    ```
+    ark schedule create nginx-backup --schedule="@every 1h"
+    ```
+
 ### Restore
 
 1. Run:
