@@ -144,6 +144,6 @@ kubectl delete -f examples/minio/
 kubectl delete -f examples/nginx-app/base.yaml
 ```
 
-[3]: /docs/cloud-common.md
-[18]: /docs/debugging-restores.md
+[3]: cloud-common.md
+[18]: debugging-restores.md
 [26]: https://github.com/heptio/ark/releases
