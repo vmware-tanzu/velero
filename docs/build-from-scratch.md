@@ -71,6 +71,23 @@ Ark's `Makefile` has a convenience target, `all-build`, that builds the followin
 * darwin-amd64
 * windows-amd64
 
+#### Running the Ark server locally
+
+Running the Ark server locally really speeds up the iterative development of server because the newer image does not have to be built into a container and then re-deployed on the cluster.
+
+To run the server locally, first create your AWS Credentials file. In case of Minio, the file will look something like -
+```console
+$ cat minio-creds
+[default]
+aws_access_key_id = minio
+aws_secret_access_key = minio123
+```
+
+Next up, start the server:
+```
+AWS_SHARED_CREDENTIALS_FILE=minio-creds ark server -n heptio-ark
+```
+
 ## 3. Test
 
 To run unit tests, use `make test`. You can also run `make verify` to ensure that all generated
