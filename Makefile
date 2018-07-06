@@ -138,7 +138,7 @@ all-push:
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
 	@docker push $(IMAGE):$(VERSION)
-	@if [[ "$(TAG_LATEST)" == "true" ]]; then \
+	@if [ "$(TAG_LATEST)" == "true" ]; then \
 		docker tag $(IMAGE):$(VERSION) $(IMAGE):latest; \
 		docker push $(IMAGE):latest; \
 	fi
