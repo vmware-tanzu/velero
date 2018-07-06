@@ -27,8 +27,6 @@ toc:
         url: /troubleshooting
       - page: Troubleshoot an install or setup
         url: /debugging-install
-      - page: Troubleshoot a backup delete
-        url: /debugging-deletes
       - page: Troubleshoot a restore
         url: /debugging-restores
   - title: Customize Ark
