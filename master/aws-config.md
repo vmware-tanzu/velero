@@ -139,7 +139,7 @@ Specify the following values in the example files:
 
 * In `examples/aws/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>`. See the [Config definition][6] for details.
+  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3, region is optional and will be queried from the AWS S3 API if not provided). See the [Config definition][6] for details.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
@@ -245,7 +245,7 @@ It can be set up for Ark by creating a role that will have required permissions,
       --policy-name heptio-ark-policy \
       --policy-document file://./heptio-ark-policy.json
     ```
-4. Update AWS_ACCOUNT_ID & HEPTIO_ARK_ROLE_NAME in the file `examples/common/10-deployment-kube2iam.yaml`:
+4. Update AWS_ACCOUNT_ID & HEPTIO_ARK_ROLE_NAME in the file `examples/aws/10-deployment-kube2iam.yaml`:
 
     ```
     ---
