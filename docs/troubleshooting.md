@@ -4,11 +4,8 @@ These tips can help you troubleshoot known issues. If they don't help, you can [
 
 * [Debug installation/setup issues][2]
 
-* [Delete namespaces and backups][0]
-
 * [Debug restores][1]
 
-[0]: debugging-deletes.md
 [1]: debugging-restores.md
 [2]: debugging-install.md
 [4]: https://github.com/heptio/ark/issues
