@@ -78,6 +78,8 @@ files (clientset, listers, shared informers, docs) are up to date.
 
 ## 4. Run
 
+### Prerequisites 
+
 When running Heptio Ark, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
 
 * Appropriate RBAC permissions in the cluster
@@ -90,12 +92,47 @@ When running Heptio Ark, you will need to account for the following (all of whic
 
 See [Cloud Provider Specifics][9] for more details.
 
-### Specifying your image
+### Option 1: Run your Ark server locally
 
-When your Ark deployment is up and running, you must replace the Heptio-provided Ark image with the image that you built. Run:
+Running the Ark server locally can speed up iterative development. This eliminates the need to rebuild the Ark server
+image and redeploy it to the cluster with each change.
+
+1. Set the appropriate environment variable for your cloud provider:
+    1. AWS: AWS_SHARED_CREDENTIALS_FILE
+    2. GCP: GOOGLE_APPLICATION_CREDENTIALS
+    3. Azure:
+        1. AZURE_CLIENT_ID
+        2. AZURE_CLIENT_SECRET
+        3. AZURE_SUBSCRIPTION_ID
+        4. AZURE_TENANT_ID
+        5. AZURE_STORAGE_ACCOUNT_ID
+        6. AZURE_STORAGE_KEY
+        7. AZURE_RESOURCE_GROUP
+
+2. Start the server:
 
 ```
-kubectl set image deployment/ark ark=$REGISTRY/ark:$VERSION
+ark server
+```
+
+Make sure `ark` is in your `PATH` or specify the full path.
+
+You may also specify these additional options, as needed:
+
+- `--kubeconfig`: set the path to the kubeconfig file the Ark server uses to talk to the Kubernetes apiserver
+- `--namespace`: the set namespace where the Ark server should look for backups, schedules, restores
+- `--log-level`: set the Ark server's log level
+- `--plugin-dir`: set the directory where the Ark server looks for plugins
+- `--metrics-address`: set the bind address and port where Prometheus metrics are exposed
+
+### Option 2: Run your Ark server in a deployment
+
+1. Install Ark using a deployment (TODO: link).
+
+2. Replace the deployment's default Ark image with the image that you built. Run:
+
+```
+kubectl --namespace=heptio-ark set image deployment/ark ark=$REGISTRY/ark:$VERSION
 ```
 where `$REGISTRY` and `$VERSION` are the values that you built with.
 
