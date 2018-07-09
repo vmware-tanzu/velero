@@ -14,13 +14,18 @@
 * `kubectl` installed
 * [Go][5] installed (minimum version 1.8)
 
-## Download
+## Getting the source
 
-Install with go:
-```
+```bash
+mkdir $HOME/go
+export GOPATH=$HOME/go
 go get github.com/heptio/ark
 ```
-The files are installed in `$GOPATH/src/github.com/heptio/ark`.
+
+Where `go` is your [import path][4] for Go.
+
+For Go development, it is recommended to add the Go import path (`$HOME/go` in this example) to your path.
+
 
 ## Build
 
@@ -46,14 +51,13 @@ The following files are automatically generated from the source code:
 * Documentation
 * Protobuf/gRPC types
 
-If you make any of the following changes, you must run `make update` to regenerate
-the files:
+Run `make update` to regenerate files if you make the following changes:
 
 * Add/edit/remove command line flags and/or their help text
 * Add/edit/remove commands or subcommands
 * Add new API types
 
-If you make the following change, you must run [generate-proto.sh][13] to regenerate files:
+Run [generate-proto.sh][13] to regenerate files if you make the following changes:
 
 * Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14]. 
 
@@ -65,6 +69,7 @@ For example, to build for the Mac, run `make build-darwin-amd64`.
 All binaries are placed in `_output/bin/<GOOS>/<GOARCH>`-- for example, `_output/bin/darwin/amd64/ark`.
 
 Ark's `Makefile` has a convenience target, `all-build`, that builds the following platforms:
+
 * linux-amd64
 * linux-arm
 * linux-arm64
@@ -90,51 +95,94 @@ When running Heptio Ark, you will need to account for the following (all of whic
   * Read/write access to object storage for backup data
 * A [Config object][8] definition for the Ark server
 
-See [Cloud Provider Specifics][9] for more details.
+### Create a cluster
+
+To provision a cluster on `aws` using Amazon’s official CloudFormation templates, here are two options:
+
+* EC2 [Quick Start for Kubernetes][17]
+
+* eksctl - [a CLI for Amazon EKS][18]
+
+To provision production grade clusters, see [Cloud Provider Specifics][9] instructions.
 
 ### Option 1: Run your Ark server locally
 
 Running the Ark server locally can speed up iterative development. This eliminates the need to rebuild the Ark server
 image and redeploy it to the cluster with each change.
 
-1. Set the appropriate environment variable for your cloud provider:
-    1. AWS: AWS_SHARED_CREDENTIALS_FILE
-    2. GCP: GOOGLE_APPLICATION_CREDENTIALS
-    3. Azure:
-        1. AZURE_CLIENT_ID
-        2. AZURE_CLIENT_SECRET
-        3. AZURE_SUBSCRIPTION_ID
-        4. AZURE_TENANT_ID
-        5. AZURE_STORAGE_ACCOUNT_ID
-        6. AZURE_STORAGE_KEY
-        7. AZURE_RESOURCE_GROUP
+#### 1. Set enviroment variables
 
-2. Start the server:
+Set the appropriate environment variable for your cloud provider:
 
+AWS: [AWS_SHARED_CREDENTIALS_FILE][15]
+
+GCP: [GOOGLE_APPLICATION_CREDENTIALS][16]
+
+Azure:
+
+  1. AZURE_CLIENT_ID
+
+  2. AZURE_CLIENT_SECRET
+
+  3. AZURE_SUBSCRIPTION_ID
+
+  4. AZURE_TENANT_ID
+
+  5. AZURE_STORAGE_ACCOUNT_ID
+
+  6. AZURE_STORAGE_KEY
+
+  7. AZURE_RESOURCE_GROUP
+
+#### 2. Create resources in a cluster
+
+You may create resources on a cluster using our [example configurations][19].
+
+##### Example
+
+Here is how to setup using an existing cluster in AWS: At the root of the Ark repo, edit `examples/aws/00-ark-config.yaml` to point to your AWS S3 bucket and region. Note: you can run `aws s3api list-buckets` to get the name of all your buckets.
+
+Then run the commands below.
+
+`00-prereqs.yaml` contains all our CustomResourceDefinitions (CRDs) that allow us to perform CRUD operations on backups, restores, schedules, etc. it also contains the `heptio-ark` namespace, the `ark` ServiceAccount, and a cluster role binding to grant the `ark` ServiceAccount the cluster-admin role:
+
+```bash
+kubectl apply -f examples/common/00-prereqs.yaml
 ```
-ark server
+
+`00-ark-config.yaml` is a sample Ark config resource for AWS:
+
+```bash
+kubectl apply -f examples/aws/00-ark-config.yaml
 ```
 
-Make sure `ark` is in your `PATH` or specify the full path.
 
-You may also specify these additional options, as needed:
+### 3. Start the Ark server
 
-- `--kubeconfig`: set the path to the kubeconfig file the Ark server uses to talk to the Kubernetes apiserver
-- `--namespace`: the set namespace where the Ark server should look for backups, schedules, restores
-- `--log-level`: set the Ark server's log level
-- `--plugin-dir`: set the directory where the Ark server looks for plugins
-- `--metrics-address`: set the bind address and port where Prometheus metrics are exposed
+* Make sure `ark` is in your `PATH` or specify the full path.
+
+* Set variable for Ark as needed. The variables below can be exported as environment variables or passed as CLI cmd flags:
+  * `--kubeconfig`: set the path to the kubeconfig file the Ark server uses to talk to the Kubernetes apiserver
+  * `--namespace`: the set namespace where the Ark server should look for backups, schedules, restores
+  * `--log-level`: set the Ark server's log level
+  * `--plugin-dir`: set the directory where the Ark server looks for plugins
+  * `--metrics-address`: set the bind address and port where Prometheus metrics are exposed
+
+* Start the server: `ark server`
 
 ### Option 2: Run your Ark server in a deployment
 
-1. Install Ark using a deployment (TODO: link).
+1. Install Ark using a deployment:
+
+We have examples of deployments for different cloud providers in `examples/<cloud-provider>/10-deployment.yaml`.
 
 2. Replace the deployment's default Ark image with the image that you built. Run:
 
 ```
 kubectl --namespace=heptio-ark set image deployment/ark ark=$REGISTRY/ark:$VERSION
 ```
-where `$REGISTRY` and `$VERSION` are the values that you built with.
+
+where `$REGISTRY` and `$VERSION` are the values that you built Ark with.
 
 ## 5. Vendoring dependencies
 
@@ -144,7 +192,7 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [1]: #prerequisites
 [2]: #download
 [3]: #build
-[4]: ../README.md#quickstart
+[4]: https://blog.golang.org/organizing-go-code
 [5]: https://golang.org/doc/install
 [6]: https://github.com/heptio/ark/tree/master/examples
 [7]: #run
@@ -155,3 +203,8 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [12]: #test
 [13]: https://github.com/heptio/ark/blob/master/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
+[15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
+[16]: https://cloud.google.com/docs/authentication/getting-started#setting_the_environment_variable
+[17]: https://aws.amazon.com/quickstart/architecture/heptio-kubernetes/
+[18]: https://eksctl.io/
+[19]: ../examples/README.md
