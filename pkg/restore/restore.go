@@ -55,6 +55,7 @@ import (
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 	arksync "github.com/heptio/ark/pkg/util/sync"
@@ -80,7 +81,7 @@ type kubernetesRestorer struct {
 	resticRestorerFactory restic.RestorerFactory
 	resticTimeout         time.Duration
 	resourcePriorities    []string
-	fileSystem            FileSystem
+	fileSystem            filesystem.Interface
 	logger                logrus.FieldLogger
 }
 
@@ -165,8 +166,9 @@ func NewKubernetesRestorer(
 		resticRestorerFactory: resticRestorerFactory,
 		resticTimeout:         resticTimeout,
 		resourcePriorities:    resourcePriorities,
-		fileSystem:            &osFileSystem{},
 		logger:                logger,
+
+		fileSystem: filesystem.NewFileSystem(),
 	}, nil
 }
 
@@ -326,7 +328,7 @@ type context struct {
 	selector             labels.Selector
 	logger               logrus.FieldLogger
 	dynamicFactory       client.DynamicFactory
-	fileSystem           FileSystem
+	fileSystem           filesystem.Interface
 	namespaceClient      corev1.NamespaceInterface
 	actions              []resolvedAction
 	snapshotService      cloudprovider.SnapshotService
