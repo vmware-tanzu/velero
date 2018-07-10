@@ -17,18 +17,20 @@ limitations under the License.
 package controller
 
 import (
-	"errors"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/ark/pkg/util/stringslice"
 	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBackupSyncControllerRun(t *testing.T) {
@@ -37,6 +39,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		getAllBackupsError error
 		cloudBackups       []*v1.Backup
 		namespace          string
+		existingBackups    sets.String
 	}{
 		{
 			name: "no cloud backups",
@@ -76,6 +79,16 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			},
 			namespace: "heptio-ark",
 		},
+		{
+			name: "normal case with backups that already exist in Kubernetes",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			existingBackups: sets.NewString("backup-2", "backup-3"),
+			namespace:       "ns-1",
+		},
 	}
 
 	for _, test := range tests {
@@ -97,22 +110,43 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			bs.On("GetAllBackups", "bucket").Return(test.cloudBackups, test.getAllBackupsError)
 
-			c.run()
-
 			expectedActions := make([]core.Action, 0)
+
+			client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
+				getAction := action.(core.GetAction)
+				if test.existingBackups.Has(getAction.GetName()) {
+					return true, nil, nil
+				}
+				// We return nil in place of the found backup object because
+				// we exclusively check for the error and don't use the object
+				// returned by the Get / Backups call.
+				return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("backups").GroupResource(), getAction.GetName())
+			})
+
+			c.run()
 
 			// we only expect creates for items within the target bucket
 			for _, cloudBackup := range test.cloudBackups {
 				// Verify that the run function stripped the GC finalizer
 				assert.False(t, stringslice.Has(cloudBackup.Finalizers, gcFinalizer))
 				assert.Equal(t, test.namespace, cloudBackup.Namespace)
-				action := core.NewCreateAction(
+
+				actionGet := core.NewGetAction(
+					v1.SchemeGroupVersion.WithResource("backups"),
+					test.namespace,
+					cloudBackup.Name,
+				)
+				expectedActions = append(expectedActions, actionGet)
+
+				if test.existingBackups.Has(cloudBackup.Name) {
+					continue
+				}
+				actionCreate := core.NewCreateAction(
 					v1.SchemeGroupVersion.WithResource("backups"),
 					test.namespace,
 					cloudBackup,
 				)
-
-				expectedActions = append(expectedActions, action)
+				expectedActions = append(expectedActions, actionCreate)
 			}
 
 			assert.Equal(t, expectedActions, client.Actions())
