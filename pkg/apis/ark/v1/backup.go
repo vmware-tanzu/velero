@@ -179,6 +179,7 @@ type BackupStatus struct {
 
 	// CompletionTimestamp records the time a backup was completed.
 	// Completion time is recorded even on failed backups.
+	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
 	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
 }
