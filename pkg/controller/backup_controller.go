@@ -370,6 +370,10 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		backup.Status.Phase = api.BackupPhaseCompleted
 	}
 
+	// Mark completion timestamp before serializing and uploading.
+	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
+	backup.Status.CompletionTimestamp.Time = controller.clock.Now()
+
 	backupJSON := new(bytes.Buffer)
 	if err := encode.EncodeTo(backup, "json", backupJSON); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding backup"))
@@ -393,7 +397,6 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	backupScheduleName := backup.GetLabels()["ark-schedule"]
 	controller.metrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
 
-	backup.Status.CompletionTimestamp.Time = controller.clock.Now()
 	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
 	backupDurationSeconds := float64(backupDuration / time.Second)
 	controller.metrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)

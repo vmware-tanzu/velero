@@ -17,8 +17,10 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -201,7 +203,15 @@ func TestProcessBackup(t *testing.T) {
 				backup.Status.Version = 1
 				backupper.On("Backup", backup, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
-				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+				// Ensure we have a CompletionTimestamp when uploading.
+				// Failures will display the bytes in buf.
+				completionTimestampIsPresent := func(buf *bytes.Buffer) bool {
+					json := buf.String()
+					timeString := `"completionTimestamp": "2006-01-02T15:04:05Z"`
+
+					return strings.Contains(json, timeString)
+				}
+				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything).Return(nil)
 
 				pluginManager.On("GetBackupItemActions", backup.Name).Return(nil, nil)
 				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
