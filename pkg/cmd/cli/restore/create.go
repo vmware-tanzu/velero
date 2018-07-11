@@ -38,13 +38,17 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
 
 	c := &cobra.Command{
-		Use:   use + " [RESTORE_NAME] --from-backup BACKUP_NAME",
+		Use:   use + " [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule SCHEDULE_NAME]",
 		Short: "Create a restore",
 		Example: `  # create a restore named "restore-1" from backup "backup-1"
   ark restore create restore-1 --from-backup backup-1
 
   # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
-  ark restore create --from-backup backup-1`,
+  ark restore create --from-backup backup-1
+ 
+  # create a restore from the latest successful backup triggered by schedule "schedule-1"
+  ark restore create --from-schedule schedule-1
+  `,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
@@ -62,6 +66,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
 type CreateOptions struct {
 	BackupName              string
+	ScheduleName            string
 	RestoreName             string
 	RestoreVolumes          flag.OptionalBool
 	Labels                  flag.Map
@@ -88,6 +93,7 @@ func NewCreateOptions() *CreateOptions {
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.BackupName, "from-backup", "", "backup to restore from")
+	flags.StringVar(&o.ScheduleName, "from-schedule", "", "schedule to restore from")
 	flags.Var(&o.IncludeNamespaces, "include-namespaces", "namespaces to include in the restore (use '*' for all namespaces)")
 	flags.Var(&o.ExcludeNamespaces, "exclude-namespaces", "namespaces to exclude from the restore")
 	flags.Var(&o.NamespaceMappings, "namespace-mappings", "namespace mappings from name in the backup to desired restored name in the form src1:dst1,src2:dst2,...")
@@ -104,9 +110,34 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = "true"
 }
 
+func (o *CreateOptions) Complete(args []string, f client.Factory) error {
+	if len(args) == 1 {
+		o.RestoreName = args[0]
+	} else {
+		sourceName := o.BackupName
+		if o.ScheduleName != "" {
+			sourceName = o.ScheduleName
+		}
+
+		o.RestoreName = fmt.Sprintf("%s-%s", sourceName, time.Now().Format("20060102150405"))
+	}
+
+	client, err := f.Client()
+	if err != nil {
+		return err
+	}
+	o.client = client
+
+	return nil
+}
+
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if len(o.BackupName) == 0 {
-		return errors.New("--from-backup is required")
+	if o.BackupName != "" && o.ScheduleName != "" {
+		return errors.New("either a backup or schedule must be specified, but not both")
+	}
+
+	if o.BackupName == "" && o.ScheduleName == "" {
+		return errors.New("either a backup or schedule must be specified, but not both")
 	}
 
 	if err := output.ValidateFlags(c); err != nil {
@@ -118,25 +149,16 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("Ark client is not set; unable to proceed")
 	}
 
-	if _, err := o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
-		return err
+	switch {
+	case o.BackupName != "":
+		if _, err := o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
+			return err
+		}
+	case o.ScheduleName != "":
+		if _, err := o.client.ArkV1().Schedules(f.Namespace()).Get(o.ScheduleName, metav1.GetOptions{}); err != nil {
+			return err
+		}
 	}
-
-	return nil
-}
-
-func (o *CreateOptions) Complete(args []string, f client.Factory) error {
-	if len(args) == 1 {
-		o.RestoreName = args[0]
-	} else {
-		o.RestoreName = fmt.Sprintf("%s-%s", o.BackupName, time.Now().Format("20060102150405"))
-	}
-
-	client, err := f.Client()
-	if err != nil {
-		return err
-	}
-	o.client = client
 
 	return nil
 }
@@ -155,6 +177,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		},
 		Spec: api.RestoreSpec{
 			BackupName:              o.BackupName,
+			ScheduleName:            o.ScheduleName,
 			IncludedNamespaces:      o.IncludeNamespaces,
 			ExcludedNamespaces:      o.ExcludeNamespaces,
 			IncludedResources:       o.IncludeResources,

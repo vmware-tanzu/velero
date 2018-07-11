@@ -23,11 +23,13 @@ import (
 	"io"
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -172,13 +174,32 @@ func TestProcessRestore(t *testing.T) {
 			expectedValidationErrors: []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: a-resource"},
 		},
 		{
-			name:                     "new restore with empty backup name fails validation",
+			name:                     "new restore with empty backup and schedule names fails validation",
 			restore:                  NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Restore,
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
-			expectedValidationErrors: []string{"BackupName must be non-empty and correspond to the name of a backup in object storage."},
+			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
 		},
-
+		{
+			name:                     "new restore with backup and schedule names provided fails validation",
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
+			expectedErr:              false,
+			expectedPhase:            string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
+		},
+		{
+			name:    "valid restore with schedule name gets executed",
+			restore: NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
+			backup: arktest.
+				NewTestBackup().
+				WithName("backup-1").
+				WithLabel("ark-schedule", "sched-1").
+				WithPhase(api.BackupPhaseCompleted).
+				Backup,
+			expectedErr:          false,
+			expectedPhase:        string(api.RestorePhaseInProgress),
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithSchedule("sched-1").Restore,
+		},
 		{
 			name:                        "restore with non-existent backup name fails",
 			restore:                     NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
@@ -337,6 +358,10 @@ func TestProcessRestore(t *testing.T) {
 
 					res.Status.Phase = api.RestorePhase(phase)
 
+					if backupName, err := collections.GetString(patchMap, "spec.backupName"); err == nil {
+						res.Spec.BackupName = backupName
+					}
+
 					return true, res, nil
 				})
 			}
@@ -356,8 +381,8 @@ func TestProcessRestore(t *testing.T) {
 				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
 				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
 				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
-				backupSvc.On("UploadRestoreLog", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(test.uploadLogError)
-				backupSvc.On("UploadRestoreResults", "bucket", test.restore.Spec.BackupName, test.restore.Name, mock.Anything).Return(nil)
+				backupSvc.On("UploadRestoreLog", "bucket", test.backup.Name, test.restore.Name, mock.Anything).Return(test.uploadLogError)
+				backupSvc.On("UploadRestoreResults", "bucket", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 			}
 
 			var (
@@ -372,7 +397,7 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			if test.backupServiceGetBackupError != nil {
-				backupSvc.On("GetBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceGetBackupError)
+				backupSvc.On("GetBackup", "bucket", mock.Anything).Return(nil, test.backupServiceGetBackupError)
 			}
 
 			if test.restore != nil {
@@ -394,6 +419,10 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			// structs and func for decoding patch content
+			type SpecPatch struct {
+				BackupName string `json:"backupName"`
+			}
+
 			type StatusPatch struct {
 				Phase            api.RestorePhase `json:"phase"`
 				ValidationErrors []string         `json:"validationErrors"`
@@ -401,6 +430,7 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			type Patch struct {
+				Spec   SpecPatch   `json:"spec,omitempty"`
 				Status StatusPatch `json:"status"`
 			}
 
@@ -419,6 +449,12 @@ func TestProcessRestore(t *testing.T) {
 					Phase:            api.RestorePhase(test.expectedPhase),
 					ValidationErrors: test.expectedValidationErrors,
 				},
+			}
+
+			if test.restore.Spec.ScheduleName != "" && test.backup != nil {
+				expected.Spec = SpecPatch{
+					BackupName: test.backup.Name,
+				}
 			}
 
 			arktest.ValidatePatch(t, actions[0], expected, decode)
@@ -448,6 +484,178 @@ func TestProcessRestore(t *testing.T) {
 			assert.Equal(t, *test.expectedRestorerCall, restorer.calledWithArg)
 		})
 	}
+}
+
+func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
+	var (
+		client          = fake.NewSimpleClientset()
+		sharedInformers = informers.NewSharedInformerFactory(client, 0)
+		logger          = arktest.NewLogger()
+	)
+
+	c := NewRestoreController(
+		api.DefaultNamespace,
+		sharedInformers.Ark().V1().Restores(),
+		client.ArkV1(),
+		client.ArkV1(),
+		nil,
+		nil,
+		"bucket",
+		sharedInformers.Ark().V1().Backups(),
+		false,
+		logger,
+		nil,
+	).(*restoreController)
+
+	restore := &api.Restore{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: api.DefaultNamespace,
+			Name:      "restore-1",
+		},
+		Spec: api.RestoreSpec{
+			ScheduleName: "schedule-1",
+		},
+	}
+
+	// no backups created from the schedule: fail validation
+	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
+		NewTestBackup().
+		WithName("backup-1").
+		WithLabel("ark-schedule", "non-matching-schedule").
+		WithPhase(api.BackupPhaseCompleted).
+		Backup,
+	))
+
+	errs := c.completeAndValidate(restore)
+	assert.Equal(t, []string{"No backups found for schedule"}, errs)
+	assert.Empty(t, restore.Spec.BackupName)
+
+	// no completed backups created from the schedule: fail validation
+	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
+		NewTestBackup().
+		WithName("backup-2").
+		WithLabel("ark-schedule", "schedule-1").
+		WithPhase(api.BackupPhaseInProgress).
+		Backup,
+	))
+
+	errs = c.completeAndValidate(restore)
+	assert.Equal(t, []string{"No completed backups found for schedule"}, errs)
+	assert.Empty(t, restore.Spec.BackupName)
+
+	// multiple completed backups created from the schedule: use most recent
+	now := time.Now()
+
+	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
+		NewTestBackup().
+		WithName("foo").
+		WithLabel("ark-schedule", "schedule-1").
+		WithPhase(api.BackupPhaseCompleted).
+		WithStartTimestamp(now).
+		Backup,
+	))
+	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
+		NewTestBackup().
+		WithName("bar").
+		WithLabel("ark-schedule", "schedule-1").
+		WithPhase(api.BackupPhaseCompleted).
+		WithStartTimestamp(now.Add(time.Second)).
+		Backup,
+	))
+
+	errs = c.completeAndValidate(restore)
+	assert.Nil(t, errs)
+	assert.Equal(t, "bar", restore.Spec.BackupName)
+}
+
+func TestBackupXorScheduleProvided(t *testing.T) {
+	r := &api.Restore{}
+	assert.False(t, backupXorScheduleProvided(r))
+
+	r.Spec.BackupName = "backup-1"
+	r.Spec.ScheduleName = "schedule-1"
+	assert.False(t, backupXorScheduleProvided(r))
+
+	r.Spec.BackupName = "backup-1"
+	r.Spec.ScheduleName = ""
+	assert.True(t, backupXorScheduleProvided(r))
+
+	r.Spec.BackupName = ""
+	r.Spec.ScheduleName = "schedule-1"
+	assert.True(t, backupXorScheduleProvided(r))
+
+}
+
+func TestMostRecentCompletedBackup(t *testing.T) {
+	backups := []*api.Backup{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "a",
+			},
+			Status: api.BackupStatus{
+				Phase: "",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "b",
+			},
+			Status: api.BackupStatus{
+				Phase: api.BackupPhaseNew,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "c",
+			},
+			Status: api.BackupStatus{
+				Phase: api.BackupPhaseInProgress,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "d",
+			},
+			Status: api.BackupStatus{
+				Phase: api.BackupPhaseFailedValidation,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "e",
+			},
+			Status: api.BackupStatus{
+				Phase: api.BackupPhaseFailed,
+			},
+		},
+	}
+
+	assert.Nil(t, mostRecentCompletedBackup(backups))
+
+	now := time.Now()
+
+	backups = append(backups, &api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+		Status: api.BackupStatus{
+			Phase:          api.BackupPhaseCompleted,
+			StartTimestamp: metav1.Time{Time: now},
+		},
+	})
+
+	expected := &api.Backup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "bar",
+		},
+		Status: api.BackupStatus{
+			Phase:          api.BackupPhaseCompleted,
+			StartTimestamp: metav1.Time{Time: now.Add(time.Second)},
+		},
+	}
+	backups = append(backups, expected)
+
+	assert.Equal(t, expected, mostRecentCompletedBackup(backups))
 }
 
 func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.RestorePhase) *arktest.TestRestore {
