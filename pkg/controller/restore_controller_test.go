@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -543,25 +544,28 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 	assert.Empty(t, restore.Spec.BackupName)
 
 	// multiple completed backups created from the schedule: use most recent
-	// (defined as last in alphabetical order)
+	now := time.Now()
+
 	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
 		NewTestBackup().
-		WithName("a").
+		WithName("foo").
 		WithLabel("ark-schedule", "schedule-1").
 		WithPhase(api.BackupPhaseCompleted).
+		WithStartTimestamp(now).
 		Backup,
 	))
 	require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(arktest.
 		NewTestBackup().
-		WithName("b").
+		WithName("bar").
 		WithLabel("ark-schedule", "schedule-1").
 		WithPhase(api.BackupPhaseCompleted).
+		WithStartTimestamp(now.Add(time.Second)).
 		Backup,
 	))
 
 	errs = c.completeAndValidate(restore)
 	assert.Nil(t, errs)
-	assert.Equal(t, "b", restore.Spec.BackupName)
+	assert.Equal(t, "bar", restore.Spec.BackupName)
 }
 
 func TestBackupXorScheduleProvided(t *testing.T) {
@@ -628,21 +632,25 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 
 	assert.Nil(t, mostRecentCompletedBackup(backups))
 
+	now := time.Now()
+
 	backups = append(backups, &api.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "a1",
+			Name: "foo",
 		},
 		Status: api.BackupStatus{
-			Phase: api.BackupPhaseCompleted,
+			Phase:          api.BackupPhaseCompleted,
+			StartTimestamp: metav1.Time{Time: now},
 		},
 	})
 
 	expected := &api.Backup{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "b1",
+			Name: "bar",
 		},
 		Status: api.BackupStatus{
-			Phase: api.BackupPhaseCompleted,
+			Phase:          api.BackupPhaseCompleted,
+			StartTimestamp: metav1.Time{Time: now.Add(time.Second)},
 		},
 	}
 	backups = append(backups, expected)

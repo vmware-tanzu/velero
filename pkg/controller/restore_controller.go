@@ -384,19 +384,11 @@ func backupXorScheduleProvided(restore *api.Restore) bool {
 }
 
 // mostRecentCompletedBackup returns the most recent backup that's
-// completed from a list of backups. Since the backups are expected
-// to be from a single schedule, "most recent" is defined as first
-// when sorted in reverse alphabetical order by name.
+// completed from a list of backups.
 func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	sort.Slice(backups, func(i, j int) bool {
-		// Use '>' because we want descending sort.
-		// Using Name rather than CreationTimestamp because in the case of
-		// backups synced into a new cluster, the CreationTimestamp value is
-		// time of creation in the new cluster rather than time of backup.
-		// TODO would be useful to have a new API field in backup.status
-		// that captures the time of backup as a time value (particularly
-		// for non-scheduled backups).
-		return backups[i].Name > backups[j].Name
+		// Use .After() because we want descending sort.
+		return backups[i].Status.StartTimestamp.After(backups[j].Status.StartTimestamp.Time)
 	})
 
 	for _, backup := range backups {
