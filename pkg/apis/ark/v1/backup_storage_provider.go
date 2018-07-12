@@ -20,22 +20,22 @@ type BackupStorageProvider struct {
 }
 
 type BackupStorageProviderSpec struct {
-	// Targets is a list of the backup storage targets
+	// Locations is a list of the backup storage locations
 	// for this provider
-	Targets []BackupStorageTarget `json:"targets"`
+	Locations []BackupStorageLocation `json:"locations"`
 
-	// DefaultTargetName is the name of the default backup
-	// storage target for this provider
-	DefaultTargetName string `json:"defaultTargetName"`
+	// DefaultLocationName is the name of the default backup
+	// storage location for this provider
+	DefaultLocationName string `json:"defaultLocationName"`
 }
 
-type BackupStorageTarget struct {
+type BackupStorageLocation struct {
 	Name string `json:"name"`
 
-	ObjectStorage *ObjectStorageTarget `json:"objectStorage"`
+	ObjectStorage *ObjectStorageLocation `json:"objectStorage"`
 }
 
-type ObjectStorageTarget struct {
+type ObjectStorageLocation struct {
 	Bucket string            `json:"bucket"`
 	Prefix string            `json:"prefix,omitempty"`
 	Config map[string]string `json:"config,omitempty"`
@@ -53,10 +53,10 @@ func NewBackupStorageProvider() *BackupStorageProvider {
 			Name:      "aws",
 		},
 		Spec: BackupStorageProviderSpec{
-			Targets: []BackupStorageTarget{
+			Locations: []BackupStorageLocation{
 				{
 					Name: "us-east-1",
-					ObjectStorage: &ObjectStorageTarget{
+					ObjectStorage: &ObjectStorageLocation{
 						Bucket: "ark-us-east-1",
 						Config: map[string]string{
 							"region": "us-east-1",
@@ -65,7 +65,7 @@ func NewBackupStorageProvider() *BackupStorageProvider {
 				},
 				{
 					Name: "us-west-1",
-					ObjectStorage: &ObjectStorageTarget{
+					ObjectStorage: &ObjectStorageLocation{
 						Bucket: "ark-us-west-1",
 						Config: map[string]string{
 							"region": "us-west-1",
@@ -73,7 +73,7 @@ func NewBackupStorageProvider() *BackupStorageProvider {
 					},
 				},
 			},
-			DefaultTargetName: "us-east-1",
+			DefaultLocationName: "us-east-1",
 		},
 	}
 }
