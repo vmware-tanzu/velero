@@ -34,7 +34,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -207,7 +206,10 @@ func (s *server) run() error {
 
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
-	if err := s.ensureArkNamespace(); err != nil {
+	// Since s.namespace, which specifies where backups/restores/schedules/etc. should live,
+	// *could* be different from the namespace where the Ark server pod runs, check to make
+	// sure it exists, and fail fast if it doesn't.
+	if err := s.namespaceExists(s.namespace); err != nil {
 		return err
 	}
 
@@ -244,22 +246,16 @@ func (s *server) run() error {
 	return nil
 }
 
-func (s *server) ensureArkNamespace() error {
-	logContext := s.logger.WithField("namespace", s.namespace)
+// namespaceExists returns nil if namespace can be successfully
+// gotten from the kubernetes API, or an error otherwise.
+func (s *server) namespaceExists(namespace string) error {
+	s.logger.WithField("namespace", namespace).Info("Checking existence of namespace")
 
-	logContext.Info("Ensuring namespace exists for backups")
-	defaultNamespace := v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: s.namespace,
-		},
+	if _, err := s.kubeClient.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		return errors.WithStack(err)
 	}
 
-	if created, err := kube.EnsureNamespaceExists(&defaultNamespace, s.kubeClient.CoreV1().Namespaces()); created {
-		logContext.Info("Namespace created")
-	} else if err != nil {
-		return err
-	}
-	logContext.Info("Namespace already exists")
+	s.logger.WithField("namespace", namespace).Info("Namespace exists")
 	return nil
 }
 
