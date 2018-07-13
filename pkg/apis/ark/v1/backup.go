@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // BackupSpec defines the specification for an Ark backup.
 type BackupSpec struct {
@@ -53,6 +56,19 @@ type BackupSpec struct {
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
 	IncludeClusterResources *bool `json:"includeClusterResources"`
+
+	// BackupStorageProviderRef is a reference to the storage provider that should
+	// be used to store the backup.
+	BackupStorageProviderRef corev1.LocalObjectReference `json:"backupStorageProviderRef"`
+
+	// BackupStorageLocation is the name of the location where the backup
+	// should be stored.
+	BackupStorageLocation string `json:"backupStorageLocation"`
+
+	// VolumeSnapshotLocations is a map of volume snapshot provider ref to
+	// location name specifying where volume snapshots of each type should be
+	// stored.
+	VolumeSnapshotLocations map[corev1.LocalObjectReference]string `json:"volumeSnapshotLocations"`
 
 	// Hooks represent custom behaviors that should be executed at different phases of the backup.
 	Hooks BackupHooks `json:"hooks"`

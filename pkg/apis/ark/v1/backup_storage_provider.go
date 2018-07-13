@@ -4,10 +4,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 /*
 
-- A BackupStorageProvider is one per provider for storing backups (tarball + metadata).
-  This could be, e.g., "AWS-S3", "GCS", "GitHub", etc. Initially, we'll only allow a
-  single provider to be configured for an Ark instance. Over time, we may need to enable
-  the concept of a "default" provider. Within each provider, there's a default *target*.
+A BackupStorageProvider is one per provider for storing backups (tarball + metadata).
+This could be, e.g., "AWS-S3", "GCS", "GitHub", etc. Within each provider, there's a
+default Location. Initially, we'll only allow a single provider to be configured for
+an Ark instance. Over time, we may need to enable the concept of a "default" provider.
 
 */
 
@@ -30,14 +30,44 @@ type BackupStorageProviderSpec struct {
 }
 
 type BackupStorageLocation struct {
+	// Name is a unique name for the location within the provider.
 	Name string `json:"name"`
 
+	// AccessMode is whether the storage location is read-write,
+	// read-only, etc.
+	AccessMode LocationAccessMode `json:"accessMode"`
+
+	// ObjectStorage is the details of the storage location if
+	// it's a location within an object store.
 	ObjectStorage *ObjectStorageLocation `json:"objectStorage"`
 }
 
+// LocationAccessMode is a string representation of whether the location
+// is read-write, read-only, etc.
+type LocationAccessMode string
+
+const (
+	// LocationAccessModeReadWrite means the location can be read from and
+	// written to, i.e. restored from and backed up to.
+	LocationAccessModeReadWrite LocationAccessMode = "rw"
+
+	// LocationAccessModeReadOnly means the location can only be read from,
+	// i.e. restored from.
+	LocationAccessModeReadOnly LocationAccessMode = "r"
+)
+
+// ObjectStorageLocation contains details of a backup storage location that
+// is within object storage.
 type ObjectStorageLocation struct {
-	Bucket string            `json:"bucket"`
-	Prefix string            `json:"prefix,omitempty"`
+	// Bucket is the name of the object storage bucket.
+	Bucket string `json:"bucket"`
+
+	// Prefix is the prefix that should be prepended to
+	// all objects saved in this location. Optional.
+	Prefix string `json:"prefix,omitempty"`
+
+	// Config is a map of provider/location-specific
+	// configuration information.
 	Config map[string]string `json:"config,omitempty"`
 }
 
@@ -67,10 +97,21 @@ func NewBackupStorageProvider() *BackupStorageProvider {
 					Name: "us-west-1",
 					ObjectStorage: &ObjectStorageLocation{
 						Bucket: "ark-us-west-1",
+						Prefix: "ark-backups",
 						Config: map[string]string{
 							"region": "us-west-1",
 						},
 					},
+				},
+				{
+					Name: "cluster-a-us-east-1",
+					ObjectStorage: &ObjectStorageLocation{
+						Bucket: "ark-cluster-a-us-east-1",
+						Config: map[string]string{
+							"region": "us-east-1",
+						},
+					},
+					AccessMode: LocationAccessModeReadOnly,
 				},
 			},
 			DefaultLocationName: "us-east-1",

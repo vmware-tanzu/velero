@@ -4,9 +4,9 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 /*
 
-- A VolumeSnapshotProvider is one per block storage provider. Since each PV type
-  will map to at most one VolumeSnapshotProvider, there's no concept of a "default"
-  VolumeSnapshotProvider. There is, however, a default *target* within each provider.
+A VolumeSnapshotProvider is one per block storage provider. Since each PV type
+will map to at most one VolumeSnapshotProvider, there's no concept of a "default"
+VolumeSnapshotProvider. There is, however, a default *target* within each provider.
 
 */
 
@@ -28,13 +28,22 @@ type VolumeSnapshotProviderSpec struct {
 	DefaultLocationName string `json:"defaultLocationName"`
 }
 
+// VolumeSnapshotLocation captures details about a location where
+// volume snapshots can be stored.
 type VolumeSnapshotLocation struct {
-	Name   string            `json:"name"`
-	Config map[string]string `json:"config"`
+	// Name is a unique name for the location within the provider.
+	Name string `json:"name"`
+
+	// AccessMode is whether the storage location is read-write,
+	// read-only, etc.
+	AccessMode LocationAccessMode `json:"accessMode"`
+
+	// Config is a map of provider/location-specific
+	// configuration information.
+	Config map[string]string `json:"config,omitempty"`
 }
 
-type VolumeSnapshotProviderStatus struct {
-}
+type VolumeSnapshotProviderStatus struct{}
 
 // NewVolumeSnapshotProvider is an example of what constructing a
 // VolumeSnapshotProvider looks like. To be removed.
