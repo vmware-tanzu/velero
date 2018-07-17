@@ -62,7 +62,7 @@ func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *ark_v1.Del
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.DeleteBackupRequestList{}
+	list := &ark_v1.DeleteBackupRequestList{ListMeta: obj.(*ark_v1.DeleteBackupRequestList).ListMeta}
 	for _, item := range obj.(*ark_v1.DeleteBackupRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

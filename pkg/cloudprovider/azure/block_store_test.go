@@ -29,7 +29,9 @@ import (
 func TestGetVolumeID(t *testing.T) {
 	b := &blockStore{}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.azureDisk -> no error
 	volumeID, err := b.GetVolumeID(pv)
@@ -58,7 +60,9 @@ func TestSetVolumeID(t *testing.T) {
 		subscription:  "sub",
 	}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.azureDisk -> error
 	updatedPV, err := b.SetVolumeID(pv, "updated")

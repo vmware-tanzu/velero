@@ -62,7 +62,7 @@ func (c *FakeResticRepositories) List(opts v1.ListOptions) (result *ark_v1.Resti
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.ResticRepositoryList{}
+	list := &ark_v1.ResticRepositoryList{ListMeta: obj.(*ark_v1.ResticRepositoryList).ListMeta}
 	for _, item := range obj.(*ark_v1.ResticRepositoryList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

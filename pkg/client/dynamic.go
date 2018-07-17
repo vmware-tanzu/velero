@@ -17,8 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"github.com/pkg/errors"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,24 +36,17 @@ type DynamicFactory interface {
 
 // dynamicFactory implements DynamicFactory.
 type dynamicFactory struct {
-	clientPool dynamic.ClientPool
+	dynamicClient dynamic.Interface
 }
 
 // NewDynamicFactory returns a new ClientPool-based dynamic factory.
-func NewDynamicFactory(clientPool dynamic.ClientPool) DynamicFactory {
-	return &dynamicFactory{clientPool: clientPool}
+func NewDynamicFactory(dynamicClient dynamic.Interface) DynamicFactory {
+	return &dynamicFactory{dynamicClient: dynamicClient}
 }
 
 func (f *dynamicFactory) ClientForGroupVersionResource(gv schema.GroupVersion, resource metav1.APIResource, namespace string) (Dynamic, error) {
-	// client-go doesn't actually use the kind when getting the dynamic client from the client pool;
-	// it only needs the group and version.
-	dynamicClient, err := f.clientPool.ClientForGroupVersionKind(gv.WithKind(""))
-	if err != nil {
-		return nil, errors.Wrapf(err, "error getting client for GroupVersion %s, Resource %s", gv.String, resource.String())
-	}
-
 	return &dynamicResourceClient{
-		resourceClient: dynamicClient.Resource(&resource, namespace),
+		resourceClient: f.dynamicClient.Resource(gv.WithResource(resource.Name)).Namespace(namespace),
 	}, nil
 }
 

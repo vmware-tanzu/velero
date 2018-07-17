@@ -162,7 +162,6 @@ func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
 	}
 
 	printer := printers.NewHumanReadablePrinter(
-		nil, // encoder, only needed if we want/need to convert unstructured/unknown to typed objects
 		nil, // decoder, only needed if we want/need to convert unstructured/unknown to typed objects
 		options,
 	)

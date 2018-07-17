@@ -17,6 +17,6 @@ FROM golang:1.10-alpine3.7
 RUN apk add --update --no-cache git bash && \
     mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
-    git clone -b kubernetes-1.10.0 https://github.com/kubernetes/code-generator && \
-    git clone -b kubernetes-1.10.0 https://github.com/kubernetes/apimachinery && \
+    git clone -b kubernetes-1.11.0 https://github.com/kubernetes/code-generator && \
+    git clone -b kubernetes-1.11.0 https://github.com/kubernetes/apimachinery && \
     echo chmod -R a+w /go

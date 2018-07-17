@@ -62,7 +62,7 @@ func (c *FakePodVolumeRestores) List(opts v1.ListOptions) (result *ark_v1.PodVol
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.PodVolumeRestoreList{}
+	list := &ark_v1.PodVolumeRestoreList{ListMeta: obj.(*ark_v1.PodVolumeRestoreList).ListMeta}
 	for _, item := range obj.(*ark_v1.PodVolumeRestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)

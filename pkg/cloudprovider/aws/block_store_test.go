@@ -31,7 +31,9 @@ import (
 func TestGetVolumeID(t *testing.T) {
 	b := &blockStore{}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.awsElasticBlockStore -> no error
 	volumeID, err := b.GetVolumeID(pv)
@@ -69,7 +71,9 @@ func TestGetVolumeID(t *testing.T) {
 func TestSetVolumeID(t *testing.T) {
 	b := &blockStore{}
 
-	pv := &unstructured.Unstructured{}
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
 
 	// missing spec.awsElasticBlockStore -> error
 	updatedPV, err := b.SetVolumeID(pv, "vol-updated")

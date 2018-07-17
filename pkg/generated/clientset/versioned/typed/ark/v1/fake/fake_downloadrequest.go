@@ -62,7 +62,7 @@ func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *ark_v1.Downloa
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.DownloadRequestList{}
+	list := &ark_v1.DownloadRequestList{ListMeta: obj.(*ark_v1.DownloadRequestList).ListMeta}
 	for _, item := range obj.(*ark_v1.DownloadRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
