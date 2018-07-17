@@ -25,21 +25,28 @@ import (
 
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
+	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
 type backupSyncController struct {
-	client        arkv1client.BackupsGetter
-	backupService cloudprovider.BackupService
-	bucket        string
-	syncPeriod    time.Duration
-	namespace     string
-	logger        logrus.FieldLogger
+	client               arkv1client.BackupsGetter
+	backupService        cloudprovider.BackupService
+	bucket               string
+	syncPeriod           time.Duration
+	namespace            string
+	backupLister         listers.BackupLister
+	backupInformerSynced cache.InformerSynced
+	logger               logrus.FieldLogger
 }
 
 func NewBackupSyncController(
@@ -48,6 +55,7 @@ func NewBackupSyncController(
 	bucket string,
 	syncPeriod time.Duration,
 	namespace string,
+	backupInformer informers.BackupInformer,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {
@@ -55,12 +63,14 @@ func NewBackupSyncController(
 		syncPeriod = time.Minute
 	}
 	return &backupSyncController{
-		client:        client,
-		backupService: backupService,
-		bucket:        bucket,
-		syncPeriod:    syncPeriod,
-		namespace:     namespace,
-		logger:        logger,
+		client:               client,
+		backupService:        backupService,
+		bucket:               bucket,
+		syncPeriod:           syncPeriod,
+		namespace:            namespace,
+		backupLister:         backupInformer.Lister(),
+		backupInformerSynced: backupInformer.Informer().HasSynced,
+		logger:               logger,
 	}
 }
 
@@ -69,6 +79,11 @@ func NewBackupSyncController(
 // receives on the ctx.Done() channel.
 func (c *backupSyncController) Run(ctx context.Context, workers int) error {
 	c.logger.Info("Running backup sync controller")
+	c.logger.Info("Waiting for caches to sync")
+	if !cache.WaitForCacheSync(ctx.Done(), c.backupInformerSynced) {
+		return errors.New("timed out waiting for caches to sync")
+	}
+	c.logger.Info("Caches are synced")
 	wait.Until(c.run, c.syncPeriod, ctx.Done())
 	return nil
 }
@@ -84,9 +99,12 @@ func (c *backupSyncController) run() {
 	}
 	c.logger.WithField("backupCount", len(backups)).Info("Got backups from object storage")
 
+	cloudBackupNames := sets.NewString()
 	for _, cloudBackup := range backups {
 		logContext := c.logger.WithField("backup", kube.NamespaceAndName(cloudBackup))
 		logContext.Info("Syncing backup")
+
+		cloudBackupNames.Insert(cloudBackup.Name)
 
 		// If we're syncing backups made by pre-0.8.0 versions, the server removes all finalizers
 		// faster than the sync finishes. Just process them as we find them.
@@ -107,4 +125,32 @@ func (c *backupSyncController) run() {
 			}
 		}
 	}
+
+	c.deleteUnused(cloudBackupNames)
+	return
+}
+
+// deleteUnused deletes backup objects from Kubernetes if there is no corresponding backup in the object storage.
+func (c *backupSyncController) deleteUnused(cloudBackupNames sets.String) {
+	// Backups objects in Kubernetes
+	backups, err := c.backupLister.Backups(c.namespace).List(labels.Everything())
+	if err != nil {
+		c.logger.WithError(errors.WithStack(err)).Error("Error listing backup from Kubernetes")
+	}
+	if len(backups) == 0 {
+		return
+	}
+
+	// For each backup object in Kubernetes, verify if has a corresponding backup in the object storage. If not, delete it.
+	for _, backup := range backups {
+		if !cloudBackupNames.Has(backup.Name) {
+			if err := c.client.Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
+				c.logger.WithError(errors.WithStack(err)).Error("Error deleting unused backup from Kubernetes")
+			} else {
+				c.logger.Debugf("Deleted backup: %s", backup.Name)
+			}
+		}
+	}
+
+	return
 }

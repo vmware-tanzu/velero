@@ -534,6 +534,7 @@ func (s *server) runControllers(config *api.Config) error {
 		config.BackupStorageProvider.Bucket,
 		config.BackupSyncPeriod.Duration,
 		s.namespace,
+		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.logger,
 	)
 	wg.Add(1)

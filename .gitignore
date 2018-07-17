@@ -38,3 +38,5 @@ debug
 *.diff
 
 _site/
+
+.vs
