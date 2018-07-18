@@ -27,17 +27,13 @@ import (
 
 // CRDs returns a list of the CRD types for all of the required Ark CRDs
 func CRDs() []*apiextv1beta1.CustomResourceDefinition {
-	return []*apiextv1beta1.CustomResourceDefinition{
-		crd("Backup", "backups"),
-		crd("Schedule", "schedules"),
-		crd("Restore", "restores"),
-		crd("Config", "configs"),
-		crd("DownloadRequest", "downloadrequests"),
-		crd("DeleteBackupRequest", "deletebackuprequests"),
-		crd("PodVolumeBackup", "podvolumebackups"),
-		crd("PodVolumeRestore", "podvolumerestores"),
-		crd("ResticRepository", "resticrepositories"),
+	var crds []*apiextv1beta1.CustomResourceDefinition
+
+	for kind, typeInfo := range arkv1.CustomResources() {
+		crds = append(crds, crd(kind, typeInfo.PluralName))
 	}
+
+	return crds
 }
 
 func crd(kind, plural string) *apiextv1beta1.CustomResourceDefinition {
