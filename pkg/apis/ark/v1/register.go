@@ -41,27 +41,41 @@ func Resource(resource string) schema.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
+type typeInfo struct {
+	PluralName   string
+	ItemType     runtime.Object
+	ItemListType runtime.Object
+}
+
+func newTypeInfo(pluralName string, itemType, itemListType runtime.Object) typeInfo {
+	return typeInfo{
+		PluralName:   pluralName,
+		ItemType:     itemType,
+		ItemListType: itemListType,
+	}
+}
+
+// CustomResources returns a map of all custom resources within the Ark
+// API group, keyed on Kind.
+func CustomResources() map[string]typeInfo {
+	return map[string]typeInfo{
+		"Backup":              newTypeInfo("backups", &Backup{}, &BackupList{}),
+		"Restore":             newTypeInfo("restores", &Restore{}, &RestoreList{}),
+		"Schedule":            newTypeInfo("schedules", &Schedule{}, &ScheduleList{}),
+		"Config":              newTypeInfo("configs", &Config{}, &ConfigList{}),
+		"DownloadRequest":     newTypeInfo("downloadrequests", &DownloadRequest{}, &DownloadRequestList{}),
+		"DeleteBackupRequest": newTypeInfo("deletebackuprequests", &DeleteBackupRequest{}, &DeleteBackupRequestList{}),
+		"PodVolumeBackup":     newTypeInfo("podvolumebackups", &PodVolumeBackup{}, &PodVolumeBackupList{}),
+		"PodVolumeRestore":    newTypeInfo("podvolumerestores", &PodVolumeRestore{}, &PodVolumeRestoreList{}),
+		"ResticRepository":    newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
+	}
+}
+
 func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Backup{},
-		&BackupList{},
-		&Schedule{},
-		&ScheduleList{},
-		&Restore{},
-		&RestoreList{},
-		&Config{},
-		&ConfigList{},
-		&DownloadRequest{},
-		&DownloadRequestList{},
-		&DeleteBackupRequest{},
-		&DeleteBackupRequestList{},
-		&PodVolumeBackup{},
-		&PodVolumeBackupList{},
-		&PodVolumeRestore{},
-		&PodVolumeRestoreList{},
-		&ResticRepository{},
-		&ResticRepositoryList{},
-	)
+	for _, typeInfo := range CustomResources() {
+		scheme.AddKnownTypes(SchemeGroupVersion, typeInfo.ItemType, typeInfo.ItemListType)
+	}
+
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
