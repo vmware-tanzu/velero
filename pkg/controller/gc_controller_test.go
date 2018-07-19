@@ -25,7 +25,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/watch"
@@ -46,6 +48,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 		controller = NewGCController(
 			arktest.NewLogger(),
 			sharedInformers.Ark().V1().Backups(),
+			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(),
 			1*time.Millisecond,
 		).(*gcController)
@@ -109,6 +112,7 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 	controller := NewGCController(
 		arktest.NewLogger(),
 		sharedInformers.Ark().V1().Backups(),
+		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(),
 		1*time.Millisecond,
 	).(*gcController)
@@ -152,6 +156,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 	tests := []struct {
 		name                           string
 		backup                         *api.Backup
+		deleteBackupRequests           []*api.DeleteBackupRequest
 		expectDeletion                 bool
 		createDeleteBackupRequestError bool
 		expectError                    bool
@@ -160,18 +165,62 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			name: "can't find backup - no error",
 		},
 		{
-			name: "expired backup is deleted",
+			name: "unexpired backup is not deleted",
+			backup: arktest.NewTestBackup().WithName("backup-1").
+				WithExpiration(fakeClock.Now().Add(1 * time.Minute)).
+				Backup,
+			expectDeletion: false,
+		},
+		{
+			name: "expired backup with no pending deletion requests is deleted",
 			backup: arktest.NewTestBackup().WithName("backup-1").
 				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
 				Backup,
 			expectDeletion: true,
 		},
 		{
-			name: "unexpired backup is not deleted",
+			name: "expired backup with a pending deletion request is not deleted",
 			backup: arktest.NewTestBackup().WithName("backup-1").
-				WithExpiration(fakeClock.Now().Add(1 * time.Minute)).
+				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
 				Backup,
+			deleteBackupRequests: []*api.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "foo",
+						Labels: map[string]string{
+							api.BackupNameLabel: "backup-1",
+							api.BackupUIDLabel:  "",
+						},
+					},
+					Status: api.DeleteBackupRequestStatus{
+						Phase: api.DeleteBackupRequestPhaseInProgress,
+					},
+				},
+			},
 			expectDeletion: false,
+		},
+		{
+			name: "expired backup with only processed deletion requests is deleted",
+			backup: arktest.NewTestBackup().WithName("backup-1").
+				WithExpiration(fakeClock.Now().Add(-1 * time.Second)).
+				Backup,
+			deleteBackupRequests: []*api.DeleteBackupRequest{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "foo",
+						Labels: map[string]string{
+							api.BackupNameLabel: "backup-1",
+							api.BackupUIDLabel:  "",
+						},
+					},
+					Status: api.DeleteBackupRequestStatus{
+						Phase: api.DeleteBackupRequestPhaseProcessed,
+					},
+				},
+			},
+			expectDeletion: true,
 		},
 		{
 			name: "create DeleteBackupRequest error returns an error",
@@ -194,6 +243,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			controller := NewGCController(
 				arktest.NewLogger(),
 				sharedInformers.Ark().V1().Backups(),
+				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(),
 				1*time.Millisecond,
 			).(*gcController)
@@ -203,6 +253,10 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			if test.backup != nil {
 				key = kube.NamespaceAndName(test.backup)
 				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup)
+			}
+
+			for _, dbr := range test.deleteBackupRequests {
+				sharedInformers.Ark().V1().DeleteBackupRequests().Informer().GetStore().Add(dbr)
 			}
 
 			if test.createDeleteBackupRequestError {
@@ -216,7 +270,12 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			assert.Equal(t, test.expectError, gotErr)
 
 			if test.expectDeletion {
-				assert.Len(t, client.Actions(), 1)
+				require.Len(t, client.Actions(), 1)
+
+				createAction, ok := client.Actions()[0].(core.CreateAction)
+				require.True(t, ok)
+
+				assert.Equal(t, "deletebackuprequests", createAction.GetResource().Resource)
 			} else {
 				assert.Len(t, client.Actions(), 0)
 			}

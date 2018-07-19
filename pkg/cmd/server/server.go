@@ -661,6 +661,7 @@ func (s *server) runControllers(config *api.Config) error {
 		gcController := controller.NewGCController(
 			s.logger,
 			s.sharedInformerFactory.Ark().V1().Backups(),
+			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(),
 			config.GCSyncPeriod.Duration,
 		)
