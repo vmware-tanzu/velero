@@ -38,6 +38,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -150,6 +152,7 @@ type server struct {
 	backupService         cloudprovider.BackupService
 	snapshotService       cloudprovider.SnapshotService
 	discoveryClient       discovery.DiscoveryInterface
+	discoveryHelper       arkdiscovery.Helper
 	dynamicClient         dynamic.Interface
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
@@ -218,6 +221,15 @@ func (s *server) run() error {
 		return err
 	}
 
+	if err := s.initDiscoveryHelper(); err != nil {
+		return err
+	}
+
+	// check to ensure all Ark CRDs exist
+	if err := s.arkResourcesExist(); err != nil {
+		return err
+	}
+
 	originalConfig, err := s.loadConfig()
 	if err != nil {
 		return err
@@ -261,6 +273,68 @@ func (s *server) namespaceExists(namespace string) error {
 	}
 
 	s.logger.WithField("namespace", namespace).Info("Namespace exists")
+	return nil
+}
+
+// initDiscoveryHelper instantiates the server's discovery helper and spawns a
+// goroutine to call Refresh() every 5 minutes.
+func (s *server) initDiscoveryHelper() error {
+	discoveryHelper, err := arkdiscovery.NewHelper(s.discoveryClient, s.logger)
+	if err != nil {
+		return err
+	}
+	s.discoveryHelper = discoveryHelper
+
+	go wait.Until(
+		func() {
+			if err := discoveryHelper.Refresh(); err != nil {
+				s.logger.WithError(err).Error("Error refreshing discovery")
+			}
+		},
+		5*time.Minute,
+		s.ctx.Done(),
+	)
+
+	return nil
+}
+
+// arkResourcesExist checks for the existence of each Ark CRD via discovery
+// and returns an error if any of them don't exist.
+func (s *server) arkResourcesExist() error {
+	s.logger.Info("Checking existence of Ark custom resource definitions")
+
+	var arkGroupVersion *metav1.APIResourceList
+	for _, gv := range s.discoveryHelper.Resources() {
+		if gv.GroupVersion == api.SchemeGroupVersion.String() {
+			arkGroupVersion = gv
+			break
+		}
+	}
+
+	if arkGroupVersion == nil {
+		return errors.Errorf("Ark API group %s not found", api.SchemeGroupVersion)
+	}
+
+	foundResources := sets.NewString()
+	for _, resource := range arkGroupVersion.APIResources {
+		foundResources.Insert(resource.Kind)
+	}
+
+	var errs []error
+	for kind := range api.CustomResources() {
+		if foundResources.Has(kind) {
+			s.logger.WithField("kind", kind).Debug("Found custom resource")
+			continue
+		}
+
+		errs = append(errs, errors.Errorf("custom resource %s not found in Ark API group %s", kind, api.SchemeGroupVersion))
+	}
+
+	if len(errs) > 0 {
+		return kubeerrs.NewAggregate(errs)
+	}
+
+	s.logger.Info("All Ark custom resource definitions exist")
 	return nil
 }
 
@@ -542,27 +616,13 @@ func (s *server) runControllers(config *api.Config) error {
 		wg.Done()
 	}()
 
-	discoveryHelper, err := arkdiscovery.NewHelper(s.discoveryClient, s.logger)
-	if err != nil {
-		return err
-	}
-	go wait.Until(
-		func() {
-			if err := discoveryHelper.Refresh(); err != nil {
-				s.logger.WithError(err).Error("Error refreshing discovery")
-			}
-		},
-		5*time.Minute,
-		ctx.Done(),
-	)
-
 	if config.RestoreOnlyMode {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 	} else {
 		backupTracker := controller.NewBackupTracker()
 
 		backupper, err := backup.NewKubernetesBackupper(
-			discoveryHelper,
+			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.snapshotService,
@@ -638,7 +698,7 @@ func (s *server) runControllers(config *api.Config) error {
 	}
 
 	restorer, err := restore.NewKubernetesRestorer(
-		discoveryHelper,
+		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
 		s.backupService,
 		s.snapshotService,
