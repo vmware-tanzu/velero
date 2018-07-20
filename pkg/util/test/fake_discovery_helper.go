@@ -29,6 +29,7 @@ type FakeDiscoveryHelper struct {
 	ResourceList       []*metav1.APIResourceList
 	Mapper             meta.RESTMapper
 	AutoReturnResource bool
+	APIGroupsList      []metav1.APIGroup
 }
 
 func NewFakeDiscoveryHelper(autoReturnResource bool, resources map[schema.GroupVersionResource]schema.GroupVersionResource) *FakeDiscoveryHelper {
@@ -54,6 +55,14 @@ func NewFakeDiscoveryHelper(autoReturnResource bool, resources map[schema.GroupV
 		}
 
 		apiResourceMap[gvString] = append(apiResourceMap[gvString], metav1.APIResource{Name: gvr.Resource})
+		helper.APIGroupsList = append(helper.APIGroupsList,
+			metav1.APIGroup{
+				Name: gvr.Group,
+				PreferredVersion: metav1.GroupVersionForDiscovery{
+					GroupVersion: gvString,
+					Version:      gvr.Version,
+				},
+			})
 	}
 
 	for group, resources := range apiResourceMap {
@@ -109,4 +118,8 @@ func (dh *FakeDiscoveryHelper) ResourceFor(input schema.GroupVersionResource) (s
 	}
 
 	return schema.GroupVersionResource{}, metav1.APIResource{}, errors.New("APIResource not found")
+}
+
+func (dh *FakeDiscoveryHelper) APIGroups() []metav1.APIGroup {
+	return dh.APIGroupsList
 }
