@@ -49,9 +49,12 @@ az storage account create \
     --https-only true \
     --kind BlobStorage \
     --access-tier Hot
+```
 
-# Create the blob container named "ark". Feel free to use a different name; you'll need to
-# adjust the `bucket` field under `backupStorageProvider` in the Ark Config accordingly if you do.
+Create the blob container named `ark`. Feel free to use a different name, preferrably unique to a single Kubernetes cluster. See the [FAQ][20] for more details. You'll need to
+adjust the `bucket` field under `backupStorageProvider` in the Ark Config accordingly if you do.
+
+```bash
 az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 
 # Obtain the storage access key for the storage account just created
@@ -91,6 +94,8 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
     Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
 
 1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
+
+    > If you'll be using Ark to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `heptio-ark`.
 
     ```bash
     # Create service principal and specify your own password
@@ -166,3 +171,4 @@ In the root of your Ark directory, run:
   [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
   [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
   [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
+  [20]: faq.md

@@ -9,7 +9,7 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 
 ## Create GCS bucket
 
-Heptio Ark requires an object storage bucket in which to store backups. Create a GCS bucket, replacing placeholder appropriately:
+Heptio Ark requires an object storage bucket in which to store backups, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing placeholder appropriately:
 
 ```bash
 gsutil mb gs://<YOUR_BUCKET>/
@@ -33,6 +33,8 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
     gcloud iam service-accounts create heptio-ark \
         --display-name "Heptio Ark service account"
     ```
+
+    > If you'll be using Ark to backup multiple clusters with multiple GCS buckets, it may be desirable to create a unique username per cluster rather than the default `heptio-ark`.
 
     Then list all accounts and find the `heptio-ark` account you just created:
     ```bash
@@ -118,5 +120,6 @@ In the root of your Ark directory, run:
   [7]: config-definition.md#gcp
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
+  [20]: faq.md
   [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control
 
