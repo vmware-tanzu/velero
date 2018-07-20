@@ -41,6 +41,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/metrics"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -55,6 +56,7 @@ type scheduleController struct {
 	syncPeriod            time.Duration
 	clock                 clock.Clock
 	logger                logrus.FieldLogger
+	metrics               *metrics.ServerMetrics
 }
 
 func NewScheduleController(
@@ -64,6 +66,7 @@ func NewScheduleController(
 	schedulesInformer informers.ScheduleInformer,
 	syncPeriod time.Duration,
 	logger logrus.FieldLogger,
+	metrics *metrics.ServerMetrics,
 ) *scheduleController {
 	if syncPeriod < time.Minute {
 		logger.WithField("syncPeriod", syncPeriod).Info("Provided schedule sync period is too short. Setting to 1 minute")
@@ -80,6 +83,7 @@ func NewScheduleController(
 		syncPeriod: syncPeriod,
 		clock:      clock.RealClock{},
 		logger:     logger,
+		metrics:    metrics,
 	}
 
 	c.syncHandler = c.processSchedule
@@ -106,6 +110,10 @@ func NewScheduleController(
 					return
 				}
 				c.queue.Add(key)
+				scheduleName := schedule.GetName()
+				c.logger.Info("Creating schedule ", scheduleName)
+				//Init Prometheus metrics to 0 to have them flowing up
+				metrics.InitSchedule(scheduleName)
 			},
 		},
 	)
