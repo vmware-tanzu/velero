@@ -11,7 +11,7 @@ If you do not have the `aws` CLI locally installed, follow the [user guide][5] t
 
 ## Create S3 bucket
 
-Heptio Ark requires an object storage bucket to store backups in. Create an S3 bucket, replacing placeholders appropriately:
+Heptio Ark requires an object storage bucket to store backups in, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
 
 ```bash
 aws s3api create-bucket \
@@ -36,6 +36,8 @@ For more information, see [the AWS documentation on IAM users][14].
     ```bash
     aws iam create-user --user-name heptio-ark
     ```
+    
+    > If you'll be using Ark to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `heptio-ark`.
 
 2. Attach policies to give `heptio-ark` the necessary permissions:
 
@@ -271,3 +273,4 @@ It can be set up for Ark by creating a role that will have required permissions,
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
 [6]: config-definition.md#aws
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+[20]: faq.md
