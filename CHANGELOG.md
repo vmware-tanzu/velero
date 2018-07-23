@@ -1,5 +1,14 @@
 # Changelog
 
+#### [v0.9.1](https://github.com/heptio/ark/releases/tag/v0.9.1) - 2018-07-23
+
+##### Bug Fixes:
+  * Require namespace for Ark's CRDs to already exist at server startup (#676, @skriss)
+  * Require all Ark CRDs to exist at server startup (#683, @skriss)
+  * Fix `latest` tagging in Makefile (#690, @skriss)
+  * Make Ark compatible with clusters that don't have the `rbac.authorization.k8s.io/v1` API group (#682, @nrb)
+  * Don't consider missing snapshots an error during backup deletion, limit backup deletion requests per backup to 1 (#687, @skriss)
+
 #### [v0.9.0](https://github.com/heptio/ark/releases/tag/v0.9.0) - 2018-07-06
 
 ##### Highlights:
