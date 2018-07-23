@@ -656,6 +656,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Schedules(),
 			config.ScheduleSyncPeriod.Duration,
 			s.logger,
+			s.metrics,
 		)
 		wg.Add(1)
 		go func() {

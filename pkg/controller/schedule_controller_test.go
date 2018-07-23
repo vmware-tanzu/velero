@@ -34,6 +34,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
@@ -129,6 +130,7 @@ func TestProcessSchedule(t *testing.T) {
 				sharedInformers.Ark().V1().Schedules(),
 				time.Duration(0),
 				logger,
+				metrics.NewServerMetrics(),
 			)
 
 			var (
