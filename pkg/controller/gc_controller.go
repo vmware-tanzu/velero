@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
+	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -39,6 +40,7 @@ type gcController struct {
 
 	logger                    logrus.FieldLogger
 	backupLister              listers.BackupLister
+	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
 	syncPeriod                time.Duration
 
@@ -49,6 +51,7 @@ type gcController struct {
 func NewGCController(
 	logger logrus.FieldLogger,
 	backupInformer informers.BackupInformer,
+	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	syncPeriod time.Duration,
 ) Interface {
@@ -62,12 +65,16 @@ func NewGCController(
 		syncPeriod:                syncPeriod,
 		clock:                     clock.RealClock{},
 		backupLister:              backupInformer.Lister(),
+		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		logger: logger,
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, backupInformer.Informer().HasSynced)
+	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
+		backupInformer.Informer().HasSynced,
+		deleteBackupRequestInformer.Informer().HasSynced,
+	)
 
 	c.resyncPeriod = syncPeriod
 	c.resyncFunc = c.enqueueAllBackups
@@ -130,12 +137,32 @@ func (c *gcController) processQueueItem(key string) error {
 		return nil
 	}
 
-	log.Info("Backup has expired. Creating a DeleteBackupRequest.")
+	log.Info("Backup has expired")
 
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		arkv1api.BackupNameLabel: backup.Name,
+		arkv1api.BackupUIDLabel:  string(backup.UID),
+	}))
+
+	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(ns).List(selector)
+	if err != nil {
+		return errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")
+	}
+
+	// if there's an existing unprocessed deletion request for this backup, don't create
+	// another one
+	for _, dbr := range dbrs {
+		switch dbr.Status.Phase {
+		case "", arkv1api.DeleteBackupRequestPhaseNew, arkv1api.DeleteBackupRequestPhaseInProgress:
+			log.Info("Backup already has a pending deletion request")
+			return nil
+		}
+	}
+
+	log.Info("Creating a new deletion request")
 	req := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 
-	_, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(req)
-	if err != nil {
+	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(req); err != nil {
 		return errors.Wrap(err, "error creating DeleteBackupRequest")
 	}
 

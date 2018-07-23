@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -103,8 +104,7 @@ func NewBackupDeletionController(
 
 	deleteBackupRequestInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    c.enqueue,
-			UpdateFunc: func(_, obj interface{}) { c.enqueue(obj) },
+			AddFunc: c.enqueue,
 		},
 	)
 
@@ -160,6 +160,12 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			r.Status.Errors = []string{"spec.backupName is required"}
 		})
 		return err
+	}
+
+	// Remove any existing deletion requests for this backup so we only have
+	// one at a time
+	if errs := c.deleteExistingDeletionRequests(req, log); errs != nil {
+		return kubeerrs.NewAggregate(errs)
 	}
 
 	// Don't allow deleting an in-progress backup
@@ -301,6 +307,30 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	return nil
+}
+
+func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
+	log.Info("Removing existing deletion requests for backup")
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{
+		v1.BackupNameLabel: req.Spec.BackupName,
+	}))
+	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(req.Namespace).List(selector)
+	if err != nil {
+		return []error{errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")}
+	}
+
+	var errs []error
+	for _, dbr := range dbrs {
+		if dbr.Name == req.Name {
+			continue
+		}
+
+		if err := c.deleteBackupRequestClient.DeleteBackupRequests(req.Namespace).Delete(dbr.Name, nil); err != nil {
+			errs = append(errs, errors.WithStack(err))
+		}
+	}
+
+	return errs
 }
 
 func (c *backupDeletionController) deleteResticSnapshots(backup *v1.Backup) []error {

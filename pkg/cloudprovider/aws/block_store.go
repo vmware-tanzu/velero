@@ -20,6 +20,7 @@ import (
 	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
@@ -219,7 +220,17 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 
 	_, err := b.ec2.DeleteSnapshot(req)
 
-	return errors.WithStack(err)
+	// if it's a NotFound error, we don't need to return an error
+	// since the snapshot is not there.
+	// see https://docs.aws.amazon.com/AWSEC2/latest/APIReference/errors-overview.html
+	if awsErr, ok := err.(awserr.Error); ok && awsErr.Code() == "InvalidSnapshot.NotFound" {
+		return nil
+	}
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
