@@ -93,7 +93,7 @@ func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Bac
 		for _, s := range crb.ServiceAccountSubjects(namespace) {
 			if s == name {
 				a.log.Infof("Adding clusterrole %s and clusterrolebinding %s to additionalItems since serviceaccount %s/%s is a subject",
-					crb.RoleRefName(), crb, namespace, name)
+					crb.RoleRefName(), crb.Name(), namespace, name)
 
 				bindings.Insert(crb.Name())
 				roles.Insert(crb.RoleRefName())
