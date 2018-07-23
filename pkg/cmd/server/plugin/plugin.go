@@ -28,6 +28,7 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cloudprovider/gcp"
 	"github.com/heptio/ark/pkg/cmd"
+	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	arkplugin "github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 )
@@ -87,7 +88,13 @@ func NewCommand(f client.Factory) *cobra.Command {
 					clientset, err := f.KubeClient()
 					cmd.CheckError(err)
 
-					action, err = backup.NewServiceAccountAction(logger, clientset.RbacV1().ClusterRoleBindings())
+					discoveryHelper, err := arkdiscovery.NewHelper(clientset.Discovery(), logger)
+					cmd.CheckError(err)
+
+					action, err = backup.NewServiceAccountAction(
+						logger,
+						backup.NewClusterRoleBindingListerMap(clientset),
+						discoveryHelper)
 					cmd.CheckError(err)
 				default:
 					logger.Fatal("Unrecognized plugin name")

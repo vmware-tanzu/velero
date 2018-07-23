@@ -19,6 +19,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -280,7 +281,16 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 
 	err = <-errChan
 
-	return errors.WithStack(err)
+	// if it's a 404 (not found) error, we don't need to return an error
+	// since the snapshot is not there.
+	if azureErr, ok := err.(autorest.DetailedError); ok && azureErr.StatusCode == http.StatusNotFound {
+		return nil
+	}
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 func getComputeResourceName(subscription, resourceGroup, resource, name string) string {

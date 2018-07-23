@@ -22,6 +22,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
@@ -50,4 +52,48 @@ func TestApplyConfigDefaults(t *testing.T) {
 	assert.Equal(t, 4*time.Minute, c.BackupSyncPeriod.Duration)
 	assert.Equal(t, 3*time.Minute, c.ScheduleSyncPeriod.Duration)
 	assert.Equal(t, []string{"a", "b"}, c.ResourcePriorities)
+}
+
+func TestArkResourcesExist(t *testing.T) {
+	var (
+		fakeDiscoveryHelper = &arktest.FakeDiscoveryHelper{}
+		server              = &server{
+			logger:          arktest.NewLogger(),
+			discoveryHelper: fakeDiscoveryHelper,
+		}
+	)
+
+	// Ark API group doesn't exist in discovery: should error
+	fakeDiscoveryHelper.ResourceList = []*metav1.APIResourceList{
+		{
+			GroupVersion: "foo/v1",
+			APIResources: []metav1.APIResource{
+				{
+					Name: "Backups",
+					Kind: "Backup",
+				},
+			},
+		},
+	}
+	assert.Error(t, server.arkResourcesExist())
+
+	// Ark API group doesn't contain any custom resources: should error
+	arkAPIResourceList := &metav1.APIResourceList{
+		GroupVersion: v1.SchemeGroupVersion.String(),
+	}
+
+	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, arkAPIResourceList)
+	assert.Error(t, server.arkResourcesExist())
+
+	// Ark API group contains all custom resources: should not error
+	for kind := range v1.CustomResources() {
+		arkAPIResourceList.APIResources = append(arkAPIResourceList.APIResources, metav1.APIResource{
+			Kind: kind,
+		})
+	}
+	assert.NoError(t, server.arkResourcesExist())
+
+	// Ark API group contains some but not all custom resources: should error
+	arkAPIResourceList.APIResources = arkAPIResourceList.APIResources[:3]
+	assert.Error(t, server.arkResourcesExist())
 }

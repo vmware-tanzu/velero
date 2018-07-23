@@ -45,6 +45,10 @@ type Helper interface {
 	// Refresh pulls an updated set of Ark-backuppable resources from the
 	// discovery API.
 	Refresh() error
+
+	// APIGroups gets the current set of supported APIGroups
+	// in the cluster.
+	APIGroups() []metav1.APIGroup
 }
 
 type helper struct {
@@ -56,6 +60,7 @@ type helper struct {
 	mapper       meta.RESTMapper
 	resources    []*metav1.APIResourceList
 	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
+	apiGroups    []metav1.APIGroup
 }
 
 var _ Helper = &helper{}
@@ -127,6 +132,12 @@ func (h *helper) Refresh() error {
 		}
 	}
 
+	apiGroupList, err := h.discoveryClient.ServerGroups()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	h.apiGroups = apiGroupList.Groups
+
 	return nil
 }
 
@@ -164,4 +175,10 @@ func (h *helper) Resources() []*metav1.APIResourceList {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	return h.resources
+}
+
+func (h *helper) APIGroups() []metav1.APIGroup {
+	h.lock.RLock()
+	defer h.lock.RUnlock()
+	return h.apiGroups
 }

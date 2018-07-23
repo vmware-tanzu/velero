@@ -25,28 +25,41 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/kuberesource"
 )
 
 // serviceAccountAction implements ItemAction.
 type serviceAccountAction struct {
 	log                 logrus.FieldLogger
-	clusterRoleBindings []rbac.ClusterRoleBinding
+	clusterRoleBindings []ClusterRoleBinding
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(log logrus.FieldLogger, client rbacclient.ClusterRoleBindingInterface) (ItemAction, error) {
-	clusterRoleBindings, err := client.List(metav1.ListOptions{})
+func NewServiceAccountAction(log logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper arkdiscovery.Helper) (ItemAction, error) {
+	// Look up the supported RBAC version
+	var supportedAPI metav1.GroupVersionForDiscovery
+	for _, ag := range discoveryHelper.APIGroups() {
+		if ag.Name == rbac.GroupName {
+			supportedAPI = ag.PreferredVersion
+			break
+		}
+	}
+
+	crbLister := clusterRoleBindingListers[supportedAPI.Version]
+
+	// This should be safe because the List call will return a 0-item slice
+	// if there's no matching API version.
+	crbs, err := crbLister.List()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	return &serviceAccountAction{
 		log:                 log,
-		clusterRoleBindings: clusterRoleBindings.Items,
+		clusterRoleBindings: crbs,
 	}, nil
 }
 
@@ -76,14 +89,14 @@ func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Bac
 		roles     = sets.NewString()
 	)
 
-	for _, clusterRoleBinding := range a.clusterRoleBindings {
-		for _, subj := range clusterRoleBinding.Subjects {
-			if subj.Kind == rbac.ServiceAccountKind && subj.Namespace == namespace && subj.Name == name {
+	for _, crb := range a.clusterRoleBindings {
+		for _, s := range crb.ServiceAccountSubjects(namespace) {
+			if s == name {
 				a.log.Infof("Adding clusterrole %s and clusterrolebinding %s to additionalItems since serviceaccount %s/%s is a subject",
-					clusterRoleBinding.RoleRef.Name, clusterRoleBinding.Name, namespace, name)
+					crb.RoleRefName(), crb.Name(), namespace, name)
 
-				bindings.Insert(clusterRoleBinding.Name)
-				roles.Insert(clusterRoleBinding.RoleRef.Name)
+				bindings.Insert(crb.Name())
+				roles.Insert(crb.RoleRefName())
 				break
 			}
 		}

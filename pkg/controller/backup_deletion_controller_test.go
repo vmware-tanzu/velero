@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -26,7 +25,6 @@ import (
 	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -36,73 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
 )
-
-func TestBackupDeletionControllerControllerHasUpdateFunc(t *testing.T) {
-	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
-	req.Namespace = "heptio-ark"
-	expected := kube.NamespaceAndName(req)
-
-	client := fake.NewSimpleClientset(req)
-
-	fakeWatch := watch.NewFake()
-	defer fakeWatch.Stop()
-	client.PrependWatchReactor("deletebackuprequests", core.DefaultWatchReactor(fakeWatch, nil))
-
-	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-
-	controller := NewBackupDeletionController(
-		arktest.NewLogger(),
-		sharedInformers.Ark().V1().DeleteBackupRequests(),
-		client.ArkV1(), // deleteBackupRequestClient
-		client.ArkV1(), // backupClient
-		nil,            // snapshotService
-		nil,            // backupService
-		"bucket",
-		sharedInformers.Ark().V1().Restores(),
-		client.ArkV1(), // restoreClient
-		NewBackupTracker(),
-		nil, // restic repository manager
-		sharedInformers.Ark().V1().PodVolumeBackups(),
-	).(*backupDeletionController)
-
-	// disable resync handler since we don't want to test it here
-	controller.resyncFunc = nil
-
-	keys := make(chan string)
-
-	controller.syncHandler = func(key string) error {
-		keys <- key
-		return nil
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	go sharedInformers.Start(ctx.Done())
-	go controller.Run(ctx, 1)
-
-	// wait for the AddFunc
-	select {
-	case <-ctx.Done():
-		t.Fatal("test timed out waiting for AddFunc")
-	case key := <-keys:
-		assert.Equal(t, expected, key)
-	}
-
-	req.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
-	fakeWatch.Add(req)
-
-	// wait for the UpdateFunc
-	select {
-	case <-ctx.Done():
-		t.Fatal("test timed out waiting for UpdateFunc")
-	case key := <-keys:
-		assert.Equal(t, expected, key)
-	}
-}
 
 func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 	client := fake.NewSimpleClientset()
@@ -234,6 +167,62 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		}
 
 		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
+	t.Run("existing deletion requests for the backup are deleted", func(t *testing.T) {
+		td := setupBackupDeletionControllerTest()
+		defer td.backupService.AssertExpectations(t)
+
+		// add the backup to the tracker so the execution of processRequest doesn't progress
+		// past checking for an in-progress backup. this makes validation easier.
+		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName)
+
+		require.NoError(t, td.sharedInformers.Ark().V1().DeleteBackupRequests().Informer().GetStore().Add(td.req))
+
+		existing := &v1.DeleteBackupRequest{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: td.req.Namespace,
+				Name:      "bar",
+				Labels: map[string]string{
+					v1.BackupNameLabel: td.req.Spec.BackupName,
+				},
+			},
+			Spec: v1.DeleteBackupRequestSpec{
+				BackupName: td.req.Spec.BackupName,
+			},
+		}
+		require.NoError(t, td.sharedInformers.Ark().V1().DeleteBackupRequests().Informer().GetStore().Add(existing))
+		_, err := td.client.ArkV1().DeleteBackupRequests(td.req.Namespace).Create(existing)
+		require.NoError(t, err)
+
+		require.NoError(t, td.sharedInformers.Ark().V1().DeleteBackupRequests().Informer().GetStore().Add(
+			&v1.DeleteBackupRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: td.req.Namespace,
+					Name:      "bar-2",
+					Labels: map[string]string{
+						v1.BackupNameLabel: "some-other-backup",
+					},
+				},
+				Spec: v1.DeleteBackupRequestSpec{
+					BackupName: "some-other-backup",
+				},
+			},
+		))
+
+		assert.NoError(t, td.controller.processRequest(td.req))
+
+		expectedDeleteAction := core.NewDeleteAction(
+			v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+			td.req.Namespace,
+			"bar",
+		)
+
+		// first action is the Create of an existing DBR for the backup as part of test data setup
+		// second action is the Delete of the existing DBR, which we're validating
+		// third action is the Patch of the DBR to set it to processed with an error
+		require.Len(t, td.client.Actions(), 3)
+		assert.Equal(t, expectedDeleteAction, td.client.Actions()[1])
 	})
 
 	t.Run("deleting an in progress backup isn't allowed", func(t *testing.T) {

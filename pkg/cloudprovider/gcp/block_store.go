@@ -19,6 +19,7 @@ package gcp
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net/http"
 	"os"
 
 	"github.com/pkg/errors"
@@ -27,6 +28,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -212,7 +214,16 @@ func getSnapshotTags(arkTags map[string]string, diskDescription string, log logr
 func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	_, err := b.gce.Snapshots.Delete(b.project, snapshotID).Do()
 
-	return errors.WithStack(err)
+	// if it's a 404 (not found) error, we don't need to return an error
+	// since the snapshot is not there.
+	if gcpErr, ok := err.(*googleapi.Error); ok && gcpErr.Code == http.StatusNotFound {
+		return nil
+	}
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
