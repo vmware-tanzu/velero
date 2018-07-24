@@ -9,10 +9,12 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 
 ## Create GCS bucket
 
-Heptio Ark requires an object storage bucket in which to store backups, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing placeholder appropriately:
+Heptio Ark requires an object storage bucket in which to store backups, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing the <YOUR_BUCKET> placeholder with the name of your bucket:
 
 ```bash
-gsutil mb gs://<YOUR_BUCKET>/
+BUCKET=<YOUR_BUCKET>
+
+gsutil mb gs://$BUCKET/
 ```
 
 ## Create service account
@@ -26,6 +28,10 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
     ```
 
     Store the `project` value from the results in the environment variable `$PROJECT_ID`.
+    
+    ```bash
+    PROJECT_ID=$(gcloud config get-value project)
+    ```
 
 2. Create a service account:
 
@@ -42,11 +48,16 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
     ```
 
     Set the `$SERVICE_ACCOUNT_EMAIL` variable to match its `email` value.
+    
+    ```bash
+    SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
+      --filter="displayName:Heptio Ark service account" \
+      --format 'value(email)')
+    ```
 
 3. Attach policies to give `heptio-ark` the necessary permissions to function:
 
     ```bash
-    BUCKET=<YOUR_BUCKET>
     
     ROLE_PERMISSIONS=(
         compute.disks.get
@@ -93,9 +104,11 @@ Create a Secret. In the directory of the credentials file you just created, run:
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_NAMESPACE> \
+    --namespace heptio-ark \
     --from-file cloud=credentials-ark
 ```
+
+_Note: If you use a custom namespace, replace `heptio-ark` with the name of the custom namespace_
 
 Specify the following values in the example files:
 
