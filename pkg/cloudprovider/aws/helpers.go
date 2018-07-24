@@ -18,6 +18,7 @@ package aws
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/pkg/errors"
 
@@ -50,4 +51,17 @@ func GetBucketRegion(bucket string) (string, error) {
 	}
 
 	return "", errors.New("unable to determine bucket's region")
+}
+
+// IsValidS3URLScheme returns true if the scheme is http:// or https://
+// and the url parses correctly, otherwise, return false
+func IsValidS3URLScheme(s3URL string) bool {
+	u, err := url.Parse(s3URL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	return true
 }

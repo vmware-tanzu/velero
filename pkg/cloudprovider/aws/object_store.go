@@ -85,6 +85,10 @@ func (o *objectStore) Init(config map[string]string) error {
 		WithS3ForcePathStyle(s3ForcePathStyle)
 
 	if s3URL != "" {
+		if !IsValidS3URLScheme(s3URL) {
+			return errors.Errorf("Invalid s3Url: %s", s3URL)
+		}
+
 		awsConfig = awsConfig.WithEndpointResolver(
 			endpoints.ResolverFunc(func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 				if service == endpoints.S3ServiceID {
