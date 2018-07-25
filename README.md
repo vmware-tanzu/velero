@@ -35,7 +35,7 @@ Feedback and discussion is available on [the mailing list][24].
 
 * Please familiarize yourself with the [Code of Conduct][8] before contributing.
 * See [CONTRIBUTING.md][5] for instructions on the developer certificate of origin that we require.
-* Read how [we're using ZenHub](26) for project and roadmap planning
+* Read how [we're using ZenHub][26] for project and roadmap planning
 
 ### Pull requests
 
