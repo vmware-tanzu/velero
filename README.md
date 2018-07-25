@@ -2,7 +2,7 @@
 
 **Maintainers:** [Heptio][0]
 
-[![Build Status][1]][2]
+[![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
 ## Overview
 
@@ -35,6 +35,7 @@ Feedback and discussion is available on [the mailing list][24].
 
 * Please familiarize yourself with the [Code of Conduct][8] before contributing.
 * See [CONTRIBUTING.md][5] for instructions on the developer certificate of origin that we require.
+* Read how [we're using ZenHub](26) for project and roadmap planning
 
 ### Pull requests
 
@@ -62,6 +63,7 @@ See [the list of releases][6] to find out about feature changes.
 
 [24]: http://j.hept.io/ark-list
 [25]: https://kubernetes.slack.com/messages/ark-dr
+[26]: https://github.com/heptio/ark/blob/master/docs/zenhub.md
 
 
 [29]: https://heptio.github.io/ark/
