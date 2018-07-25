@@ -21,12 +21,14 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/util/stringslice"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
@@ -94,9 +96,10 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bs     = &arktest.BackupService{}
-				client = fake.NewSimpleClientset()
-				logger = arktest.NewLogger()
+				bs              = &arktest.BackupService{}
+				client          = fake.NewSimpleClientset()
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger          = arktest.NewLogger()
 			)
 
 			c := NewBackupSyncController(
@@ -105,6 +108,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				"bucket",
 				time.Duration(0),
 				test.namespace,
+				sharedInformers.Ark().V1().Backups(),
 				logger,
 			).(*backupSyncController)
 
@@ -153,4 +157,139 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			bs.AssertExpectations(t)
 		})
 	}
+}
+
+func TestDeleteUnused(t *testing.T) {
+	tests := []struct {
+		name            string
+		cloudBackups    []*v1.Backup
+		k8sBackups      []*arktest.TestBackup
+		namespace       string
+		expectedDeletes sets.String
+	}{
+		{
+			name:      "no overlapping backups",
+			namespace: "ns-1",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			k8sBackups: []*arktest.TestBackup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupB").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupC").WithPhase(v1.BackupPhaseCompleted),
+			},
+			expectedDeletes: sets.NewString("backupA", "backupB", "backupC"),
+		},
+		{
+			name:      "some overlapping backups",
+			namespace: "ns-1",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			k8sBackups: []*arktest.TestBackup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupC").WithPhase(v1.BackupPhaseCompleted),
+			},
+			expectedDeletes: sets.NewString("backupC"),
+		},
+		{
+			name:      "all overlapping backups",
+			namespace: "ns-1",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			k8sBackups: []*arktest.TestBackup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithPhase(v1.BackupPhaseCompleted),
+			},
+			expectedDeletes: sets.NewString(),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				bs              = &arktest.BackupService{}
+				client          = fake.NewSimpleClientset()
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger          = arktest.NewLogger()
+			)
+
+			c := NewBackupSyncController(
+				client.ArkV1(),
+				bs,
+				"bucket",
+				time.Duration(0),
+				test.namespace,
+				sharedInformers.Ark().V1().Backups(),
+				logger,
+			).(*backupSyncController)
+
+			expectedDeleteActions := make([]core.Action, 0)
+
+			// setup: insert backups into Kubernetes
+			for _, backup := range test.k8sBackups {
+				if test.expectedDeletes.Has(backup.Name) {
+					actionDelete := core.NewDeleteAction(
+						v1.SchemeGroupVersion.WithResource("backups"),
+						test.namespace,
+						backup.Name,
+					)
+					expectedDeleteActions = append(expectedDeleteActions, actionDelete)
+				}
+
+				// add test backup to informer:
+				err := sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(backup.Backup)
+				assert.NoError(t, err, "Error adding backup to informer")
+
+				// add test backup to kubernetes:
+				_, err = client.Ark().Backups(test.namespace).Create(backup.Backup)
+				assert.NoError(t, err, "Error deleting from clientset")
+			}
+
+			// get names of client backups
+			testBackupNames := sets.NewString()
+			for _, cloudBackup := range test.cloudBackups {
+				testBackupNames.Insert(cloudBackup.Name)
+			}
+
+			c.deleteUnused(testBackupNames)
+
+			numBackups, err := numBackups(t, client, c.namespace)
+			assert.NoError(t, err)
+
+			expected := len(test.k8sBackups) - len(test.expectedDeletes)
+			assert.Equal(t, expected, numBackups)
+
+			arktest.CompareActions(t, expectedDeleteActions, getDeleteActions(client.Actions()))
+		})
+	}
+}
+
+func getDeleteActions(actions []core.Action) []core.Action {
+	var deleteActions []core.Action
+	for _, action := range actions {
+		if action.GetVerb() == "delete" {
+			deleteActions = append(deleteActions, action)
+		}
+	}
+	return deleteActions
+}
+
+func numBackups(t *testing.T, c *fake.Clientset, ns string) (int, error) {
+	t.Helper()
+	existingK8SBackups, err := c.ArkV1().Backups(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return 0, err
+	}
+
+	return len(existingK8SBackups.Items), nil
 }
