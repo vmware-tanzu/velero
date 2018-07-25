@@ -64,6 +64,20 @@ Make sure that you install somewhere in your PATH.
    ark backup create nginx-backup --selector 'backup notin (ignore)'
    ```
 
+1. (Optional) Create regularly scheduled backups based on a cron expression using the `app=nginx` label selector:
+
+    ```
+    ark schedule create nginx-daily --schedule="0 1 * * *" --selector app=nginx
+    ```
+
+    Alternatively, you can use some non-standard shorthand cron expressions:
+
+    ```
+    ark schedule create nginx-daily --schedule="@daily" --selector app=nginx
+    ```
+
+    See the [cron package's documentation][30] for more usage examples.
+
 1. Simulate a disaster:
 
     ```
@@ -147,3 +161,4 @@ kubectl delete -f examples/nginx-app/base.yaml
 [3]: cloud-common.md
 [18]: debugging-restores.md
 [26]: https://github.com/heptio/ark/releases
+[30]: https://godoc.org/github.com/robfig/cron
