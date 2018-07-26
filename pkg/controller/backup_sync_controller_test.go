@@ -212,6 +212,39 @@ func TestDeleteUnused(t *testing.T) {
 			},
 			expectedDeletes: sets.NewString(),
 		},
+		{
+			name:      "no overlapping backups but including backups that are not complete",
+			namespace: "ns-1",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			k8sBackups: []*arktest.TestBackup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithPhase(v1.BackupPhaseCompleted),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("Deleting").WithPhase(v1.BackupPhaseDeleting),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("Failed").WithPhase(v1.BackupPhaseFailed),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("FailedValidation").WithPhase(v1.BackupPhaseFailedValidation),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("InProgress").WithPhase(v1.BackupPhaseInProgress),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("New").WithPhase(v1.BackupPhaseNew),
+			},
+			expectedDeletes: sets.NewString("backupA"),
+		},
+		{
+			name:      "all overlapping backups and all backups that are not complete",
+			namespace: "ns-1",
+			cloudBackups: []*v1.Backup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+			},
+			k8sBackups: []*arktest.TestBackup{
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithPhase(v1.BackupPhaseFailed),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithPhase(v1.BackupPhaseFailedValidation),
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithPhase(v1.BackupPhaseInProgress),
+			},
+			expectedDeletes: sets.NewString(),
+		},
 	}
 
 	for _, test := range tests {
