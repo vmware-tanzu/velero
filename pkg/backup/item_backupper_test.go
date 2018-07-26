@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -537,6 +538,84 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 		})
 	}
+}
+
+type addAnnotationAction struct{}
+
+func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
+	// across a process boundary.
+	copy := item.(*unstructured.Unstructured).DeepCopy()
+
+	metadata, err := meta.Accessor(copy)
+	if err != nil {
+		return copy, nil, nil
+	}
+
+	annotations := metadata.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations["foo"] = "bar"
+	metadata.SetAnnotations(annotations)
+
+	return copy, nil, nil
+}
+
+func (a *addAnnotationAction) AppliesTo() (ResourceSelector, error) {
+	panic("not implemented")
+}
+
+func TestItemActionModificationsToItemPersist(t *testing.T) {
+	var (
+		w   = &fakeTarWriter{}
+		obj = &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"namespace": "myns",
+					"name":      "bar",
+				},
+			},
+		}
+		actions = []resolvedAction{
+			{
+				ItemAction:                &addAnnotationAction{},
+				namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+				resourceIncludesExcludes:  collections.NewIncludesExcludes(),
+				selector:                  labels.Everything(),
+			},
+		}
+		b = (&defaultItemBackupperFactory{}).newItemBackupper(
+			&v1.Backup{},
+			collections.NewIncludesExcludes(),
+			collections.NewIncludesExcludes(),
+			make(map[itemKey]struct{}),
+			actions,
+			nil,
+			w,
+			nil,
+			&arktest.FakeDynamicFactory{},
+			arktest.NewFakeDiscoveryHelper(true, nil),
+			nil,
+			nil,
+			newPVCSnapshotTracker(),
+		).(*defaultItemBackupper)
+	)
+
+	// our expected backed-up object is the passed-in object plus the annotation
+	// that the backup item action adds.
+	expected := obj.DeepCopy()
+	expected.SetAnnotations(map[string]string{"foo": "bar"})
+
+	// method under test
+	require.NoError(t, b.backupItem(arktest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
+
+	// get the actual backed-up item
+	require.Len(t, w.data, 1)
+	actual, err := arktest.GetAsMap(string(w.data[0]))
+	require.NoError(t, err)
+
+	assert.EqualValues(t, expected.Object, actual)
 }
 
 func TestTakePVSnapshot(t *testing.T) {
