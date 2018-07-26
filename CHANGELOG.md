@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.9.2](https://github.com/heptio/ark/releases/tag/v0.9.2) - 2018-07-26
+
+##### Bug Fixes:
+  * Fix issue where modifications made by backup item actions were not being saved to backup tarball (#704, @skriss)
+
 #### [v0.9.1](https://github.com/heptio/ark/releases/tag/v0.9.1) - 2018-07-23
 
 ##### Bug Fixes:
