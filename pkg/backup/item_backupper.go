@@ -204,10 +204,20 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
-	if err := ib.executeActions(log, obj, groupResource, name, namespace, metadata); err != nil {
+	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
+	if err != nil {
 		log.WithError(err).Error("Error executing item actions")
 		backupErrs = append(backupErrs, err)
+
+		// if there was an error running actions, execute post hooks and return
+		log.Debug("Executing post hooks")
+		if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.resourceHooks, hookPhasePost); err != nil {
+			backupErrs = append(backupErrs, err)
+		}
+
+		return kubeerrs.NewAggregate(backupErrs)
 	}
+	obj = updatedObj
 
 	if groupResource == kuberesource.PersistentVolumes {
 		if ib.snapshotService == nil {
@@ -285,7 +295,13 @@ func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *co
 	return ib.resticBackupper.BackupPodVolumes(ib.backup, pod, log)
 }
 
-func (ib *defaultItemBackupper) executeActions(log logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, name, namespace string, metadata metav1.Object) error {
+func (ib *defaultItemBackupper) executeActions(
+	log logrus.FieldLogger,
+	obj runtime.Unstructured,
+	groupResource schema.GroupResource,
+	name, namespace string,
+	metadata metav1.Object,
+) (runtime.Unstructured, error) {
 	for _, action := range ib.actions {
 		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 			log.Debug("Skipping action because it does not apply to this resource")
@@ -308,40 +324,40 @@ func (ib *defaultItemBackupper) executeActions(log logrus.FieldLogger, obj runti
 			logSetter.SetLog(log)
 		}
 
-		if updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backup); err == nil {
-			obj = updatedItem
-
-			for _, additionalItem := range additionalItemIdentifiers {
-				gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
-				if err != nil {
-					return err
-				}
-
-				client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
-				if err != nil {
-					return err
-				}
-
-				additionalItem, err := client.Get(additionalItem.Name, metav1.GetOptions{})
-				if err != nil {
-					return err
-				}
-
-				if err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
-					return err
-				}
-			}
-		} else {
+		updatedItem, additionalItemIdentifiers, err := action.Execute(obj, ib.backup)
+		if err != nil {
 			// We want this to show up in the log file at the place where the error occurs. When we return
 			// the error, it get aggregated with all the other ones at the end of the backup, making it
 			// harder to tell when it happened.
 			log.WithError(err).Error("error executing custom action")
 
-			return errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
+			return nil, errors.Wrapf(err, "error executing custom action (groupResource=%s, namespace=%s, name=%s)", groupResource.String(), namespace, name)
+		}
+		obj = updatedItem
+
+		for _, additionalItem := range additionalItemIdentifiers {
+			gvr, resource, err := ib.discoveryHelper.ResourceFor(additionalItem.GroupResource.WithVersion(""))
+			if err != nil {
+				return nil, err
+			}
+
+			client, err := ib.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), resource, additionalItem.Namespace)
+			if err != nil {
+				return nil, err
+			}
+
+			additionalItem, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+
+			if err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	return nil
+	return obj, nil
 }
 
 // zoneLabel is the label that stores availability-zone info
