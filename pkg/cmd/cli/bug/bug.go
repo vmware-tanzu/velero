@@ -1,0 +1,203 @@
+/*
+Copyright 2018 the Heptio Ark contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package bug
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"net/url"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
+	"text/template"
+	"time"
+
+	"github.com/heptio/ark/pkg/buildinfo"
+	"github.com/heptio/ark/pkg/cmd"
+	"github.com/spf13/cobra"
+)
+
+const (
+	// kubectlTimeout is how long we wait in seconds for `kubectl version`
+	// before killing the process
+	kubectlTimeout = 5 * time.Second
+	issueURL       = "https://github.com/heptio/ark/issues/new"
+	// IssueTemplate is used to generate .github/ISSUE_TEMPLATE/bug_report.md
+	// as well as the initial text that's place in a new Github issue as
+	// the result of running `ark bug`.
+	IssueTemplate = `---
+name: Bug report
+about: Tell us about a problem you are experiencing
+
+---
+
+**What steps did you take and what happened:**
+[A clear and concise description of what the bug is, and what commands you ran.)
+
+
+**What did you expect to happen:**
+
+
+**The output of the following commands will help us better understand what's going on**:
+(Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
+
+* ` + "`kubectl logs deployment/ark -n heptio-ark`" + `
+* ` + "`ark backup describe <backupname>` or `kubectl get backup/<backupname> -n heptio-ark -o yaml`" + `
+* ` + "`ark backup logs <backupname>`" + `
+* ` + "`ark restore describe <restorename>` or `kubectl get restore/<restorename> -n heptio-ark -o yaml`" + `
+* ` + "`ark restore logs <restorename>`" + `
+
+
+**Anything else you would like to add:**
+[Miscellaneous information that will assist in solving the issue.]
+
+
+**Environment:**
+
+- Ark version (use ` + "`ark version`" + `):{{.ArkVersion}} {{.GitCommit}} {{.GitTreeState}}
+- Kubernetes version (use ` + "`kubectl version`" + `): 
+{{- if .KubectlVersion}}
+` + "```" + `
+{{.KubectlVersion}}
+` + "```" + `
+{{end}}
+- Kubernetes installer & version:
+- Cloud provider or hardware configuration:
+- OS (e.g. from ` + "`/etc/os-release`" + `):
+{{if .RuntimeOS}}	- RuntimeOS: {{.RuntimeOS}}{{end -}}
+{{if .RuntimeArch}}	- RuntimeArch: {{.RuntimeArch}}{{end -}}
+`
+)
+
+func NewCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:   "bug",
+		Short: "Report an Ark bug",
+		Long:  "Open a browser window to report an Ark bug",
+		Run: func(c *cobra.Command, args []string) {
+			kubectlVersion, err := getKubectlVersion()
+			if err != nil {
+				// we don't want to prevent the user from submitting a bug
+				// if we can't get the kubectl version, so just display a warning
+				fmt.Fprintf(os.Stderr, "WARNING: can't get kubectl version: %v\n", err)
+			}
+			body, err := renderToString(newBugInfo(kubectlVersion))
+			cmd.CheckError(err)
+			cmd.CheckError(showIssueInBrowser(body))
+		},
+	}
+	return c
+}
+
+type ArkBugInfo struct {
+	ArkVersion     string
+	GitCommit      string
+	GitTreeState   string
+	RuntimeOS      string
+	RuntimeArch    string
+	KubectlVersion string
+}
+
+// cmdExistsOnPath checks to see if an executable is available on the current PATH
+func cmdExistsOnPath(name string) bool {
+	if _, err := exec.LookPath(name); err != nil {
+		return false
+	}
+	return true
+}
+
+// getKubectlVersion makes a best-effort to run `kubectl version`
+// and return it's output. This func will timeout and return an empty
+// string after kubectlTimeout if we're not connected to a cluster.
+func getKubectlVersion() (string, error) {
+	if !cmdExistsOnPath("kubectl") {
+		return "", errors.New("kubectl not found on PATH")
+	}
+
+	kubectlCmd := exec.Command("kubectl", "version")
+	var outbuf bytes.Buffer
+	kubectlCmd.Stdout = &outbuf
+	if err := kubectlCmd.Start(); err != nil {
+		return "", errors.New("can't start kubectl")
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		done <- kubectlCmd.Wait()
+	}()
+	select {
+	case <-time.After(kubectlTimeout):
+		// we don't care about the possible error returned from Kill() here,
+		// just return an empty string
+		kubectlCmd.Process.Kill()
+		return "", errors.New("timeout waiting for kubectl version")
+
+	case err := <-done:
+		if err != nil {
+			return "", errors.New("error waiting for kubectl process")
+		}
+	}
+	versionOut := outbuf.String()
+	kubectlVersion := strings.TrimSpace(string(versionOut))
+	return kubectlVersion, nil
+}
+
+func newBugInfo(kubectlVersion string) *ArkBugInfo {
+	return &ArkBugInfo{
+		ArkVersion:     buildinfo.Version,
+		GitCommit:      buildinfo.GitSHA,
+		GitTreeState:   buildinfo.GitTreeState,
+		RuntimeOS:      runtime.GOOS,
+		RuntimeArch:    runtime.GOARCH,
+		KubectlVersion: kubectlVersion}
+}
+
+// renderToString renders IssueTemplate to a string using the
+// supplied *ArkBugInfo
+func renderToString(bugInfo *ArkBugInfo) (string, error) {
+	outputTemplate, err := template.New("ghissue").Parse(IssueTemplate)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	err = outputTemplate.Execute(&buf, bugInfo)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// showIssueInBrowser opens a browser window to submit a Github issue using
+// a platform specific binary.
+func showIssueInBrowser(body string) error {
+	url := issueURL + "?body=" + url.QueryEscape(body)
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", url).Start()
+	case "linux":
+		if cmdExistsOnPath("xdg-open") {
+			return exec.Command("xdg-open", url).Start()
+		}
+		return fmt.Errorf("ark can't open a browser window using the command '%s'", "xdg-open")
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	default:
+		return fmt.Errorf("ark can't open a browser window on platform %s", runtime.GOOS)
+	}
+}

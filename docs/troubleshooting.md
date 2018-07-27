@@ -2,6 +2,8 @@
 
 These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
 
+In `ark` version >= `0.1.0`, you can use the `ark bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `ark` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
+
 Some general commands for troubleshooting that may be helpful:
 
 * `ark backup describe <backupName>` - describe the details of a backup
