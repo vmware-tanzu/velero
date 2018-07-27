@@ -17,15 +17,33 @@ limitations under the License.
 package restore
 
 import (
+	"encoding/json"
 	"testing"
 
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+func svcJSON(ports ...corev1api.ServicePort) string {
+	svc := corev1api.Service{
+		Spec: corev1api.ServiceSpec{
+			Ports: ports,
+		},
+	}
+
+	data, err := json.Marshal(svc)
+	if err != nil {
+		panic(err)
+	}
+
+	return string(data)
+}
+
 func TestServiceActionExecute(t *testing.T) {
+
 	tests := []struct {
 		name        string
 		obj         runtime.Unstructured
@@ -35,6 +53,11 @@ func TestServiceActionExecute(t *testing.T) {
 		{
 			name:        "no spec should error",
 			obj:         NewTestUnstructured().WithName("svc-1").Unstructured,
+			expectedErr: true,
+		},
+		{
+			name:        "no spec ports should error",
+			obj:         NewTestUnstructured().WithName("svc-1").WithSpec().Unstructured,
 			expectedErr: true,
 		},
 		{
@@ -61,6 +84,97 @@ func TestServiceActionExecute(t *testing.T) {
 				WithSpecField("ports", []interface{}{
 					map[string]interface{}{},
 					map[string]interface{}{"foo": "bar"},
+				}).Unstructured,
+		},
+		{
+			name: "unnamed nodePort should be deleted when missing in annotation",
+			obj: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{"nodePort": 8080},
+				}).Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{},
+				}).Unstructured,
+		},
+		{
+			name: "unnamed nodePort should be preserved when specified in annotation",
+			obj: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{
+						"nodePort": 8080,
+					},
+				}).Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{
+						"nodePort": 8080,
+					},
+				}).Unstructured,
+		},
+		{
+			name: "unnamed nodePort should be deleted when named nodePort specified in annotation",
+			obj: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{Name: "http", NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{
+						"nodePort": 8080,
+					},
+				}).Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{Name: "http", NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{},
+				}).Unstructured,
+		},
+		{
+			name: "named nodePort should be preserved when specified in annotation",
+			obj: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{Name: "http", NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{
+						"name":     "http",
+						"nodePort": 8080,
+					},
+					map[string]interface{}{
+						"name":     "admin",
+						"nodePort": 9090,
+					},
+				}).Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithAnnotationValues(map[string]string{
+					annotationLastAppliedConfig: svcJSON(corev1api.ServicePort{Name: "http", NodePort: 8080}),
+				}).
+				WithSpecField("ports", []interface{}{
+					map[string]interface{}{
+						"name":     "http",
+						"nodePort": 8080,
+					},
+					map[string]interface{}{
+						"name": "admin",
+					},
 				}).Unstructured,
 		},
 	}

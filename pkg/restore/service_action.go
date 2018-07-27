@@ -17,13 +17,20 @@ limitations under the License.
 package restore
 
 import (
+	"encoding/json"
+
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
 )
+
+const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
 
 type serviceAction struct {
 	log logrus.FieldLogger
@@ -52,6 +59,11 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		delete(spec, "clusterIP")
 	}
 
+	preservedPorts, err := getPreservedPorts(obj)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
 	if err != nil {
 		return nil, nil, err
@@ -59,8 +71,35 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 
 	for _, port := range ports {
 		p := port.(map[string]interface{})
+		var name string
+		if nameVal, ok := p["name"]; ok {
+			name = nameVal.(string)
+		}
+		if preservedPorts[name] {
+			continue
+		}
 		delete(p, "nodePort")
 	}
 
 	return obj, nil, nil
+}
+
+func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
+	preservedPorts := map[string]bool{}
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if lac, ok := metadata.GetAnnotations()[annotationLastAppliedConfig]; ok {
+		var svc corev1api.Service
+		if err := json.Unmarshal([]byte(lac), &svc); err != nil {
+			return nil, errors.WithStack(err)
+		}
+		for _, port := range svc.Spec.Ports {
+			if port.NodePort > 0 {
+				preservedPorts[port.Name] = true
+			}
+		}
+	}
+	return preservedPorts, nil
 }
