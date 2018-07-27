@@ -30,12 +30,18 @@ type ServerMetrics struct {
 const (
 	metricNamespace             = "ark"
 	backupTarballSizeBytesGauge = "backup_tarball_size_bytes"
-	backupAttemptCount          = "backup_attempt_total"
-	backupSuccessCount          = "backup_success_total"
-	backupFailureCount          = "backup_failure_total"
-	backupDurationSeconds       = "backup_duration_seconds"
+	// TODO: Rename the Count variables to match their strings
+	backupAttemptCount           = "backup_attempt_total"
+	backupSuccessCount           = "backup_success_total"
+	backupFailureCount           = "backup_failure_total"
+	backupDurationSeconds        = "backup_duration_seconds"
+	restoreAttemptTotal          = "restore_attempt_total"
+	restoreValidationFailedTotal = "restore_validation_failed_total"
+	restoreSuccessTotal          = "restore_success_total"
+	restoreFailedTotal           = "restore_failed_total"
 
-	scheduleLabel = "schedule"
+	scheduleLabel   = "schedule"
+	backupNameLabel = "backupName"
 
 	secondsInMinute = 60.0
 )
@@ -95,6 +101,38 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
+			restoreAttemptTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      restoreAttemptTotal,
+					Help:      "Total number of attempted restores",
+				},
+				[]string{scheduleLabel},
+			),
+			restoreSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      restoreSuccessTotal,
+					Help:      "Total number of successful restores",
+				},
+				[]string{scheduleLabel},
+			),
+			restoreFailedTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      restoreFailedTotal,
+					Help:      "Total number of failed restores",
+				},
+				[]string{scheduleLabel},
+			),
+			restoreValidationFailedTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      restoreValidationFailedTotal,
+					Help:      "Total number of failed restores failing validations",
+				},
+				[]string{scheduleLabel},
+			),
 		},
 	}
 }
@@ -114,6 +152,18 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 	if c, ok := m.metrics[backupFailureCount].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 }
@@ -157,4 +207,32 @@ func (m *ServerMetrics) RegisterBackupDuration(backupSchedule string, seconds fl
 // representing the number of seconds in that duration.
 func toSeconds(d time.Duration) float64 {
 	return float64(d / time.Second)
+}
+
+// RegisterRestoreAttempt records an attempt to restore a backup.
+func (m *ServerMetrics) RegisterRestoreAttempt(backupSchedule string) {
+	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterRestoreSuccess records a successful (maybe partial) completion of a restore.
+func (m *ServerMetrics) RegisterRestoreSuccess(backupSchedule string) {
+	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterRestoreFailed records a restore that failed.
+func (m *ServerMetrics) RegisterRestoreFailed(backupSchedule string) {
+	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterRestoreValidationFailed records a restore that failed validation.
+func (m *ServerMetrics) RegisterRestoreValidationFailed(backupSchedule string) {
+	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
 }

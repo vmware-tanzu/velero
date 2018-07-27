@@ -85,6 +85,10 @@ const (
 	// RestorePhaseCompleted means the restore has finished executing.
 	// Any relevant warnings or errors will be captured in the Status.
 	RestorePhaseCompleted RestorePhase = "Completed"
+
+	// RestorePhaseFailed means the restore was unable to execute.
+	// The failing error is recorded in status.FailureReason.
+	RestorePhaseFailed RestorePhase = "Failed"
 )
 
 // RestoreStatus captures the current status of an Ark restore
@@ -103,6 +107,9 @@ type RestoreStatus struct {
 	// Errors is a count of all error messages that were generated during
 	// execution of the restore. The actual errors are stored in object storage.
 	Errors int `json:"errors"`
+
+	// FailureReason is an error that caused the entire restore to fail.
+	FailureReason string `json:"failureReason"`
 }
 
 // RestoreResult is a collection of messages that were generated
