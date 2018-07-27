@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strings"
 	"text/template"
 
 	"github.com/heptio/ark/pkg/buildinfo"
@@ -60,6 +61,11 @@ const (
     - GitCommit: {{.GitCommit}}
     - GitTreeState: {{.GitTreeState}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
+
+` + "```" + `
+{{.KubectlVersion}}
+` + "```" + `
+
 - Kubernetes installer & version:
 - Cloud provider or hardware configuration:
 - OS (e.g. from ` + "`/etc/os-release`" + `): 
@@ -84,20 +90,29 @@ func NewCommand() *cobra.Command {
 }
 
 type arkBugInfo struct {
-	ArkVersion   string
-	GitCommit    string
-	GitTreeState string
-	RuntimeOS    string
-	RuntimeArch  string
+	ArkVersion     string
+	GitCommit      string
+	GitTreeState   string
+	RuntimeOS      string
+	RuntimeArch    string
+	KubectlVersion string
 }
 
 func newBugInfo() *arkBugInfo {
+	var kubectlVersion string
+	kubectlCmd := exec.Command("kubectl", "version")
+	versionOut, err := kubectlCmd.Output()
+	if err == nil {
+		kubectlVersion = strings.TrimSpace(string(versionOut))
+	}
+
 	bugInfo := arkBugInfo{
-		ArkVersion:   buildinfo.Version,
-		GitCommit:    buildinfo.GitSHA,
-		GitTreeState: buildinfo.GitTreeState,
-		RuntimeOS:    runtime.GOOS,
-		RuntimeArch:  runtime.GOARCH}
+		ArkVersion:     buildinfo.Version,
+		GitCommit:      buildinfo.GitSHA,
+		GitTreeState:   buildinfo.GitTreeState,
+		RuntimeOS:      runtime.GOOS,
+		RuntimeArch:    runtime.GOARCH,
+		KubectlVersion: kubectlVersion}
 	return &bugInfo
 }
 
