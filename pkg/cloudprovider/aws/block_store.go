@@ -141,15 +141,6 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return volumeType, iops, nil
 }
 
-func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	volumeInfo, err := b.describeVolume(volumeID)
-	if err != nil {
-		return false, err
-	}
-
-	return *volumeInfo.State == ec2.VolumeStateAvailable, nil
-}
-
 func (b *blockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},

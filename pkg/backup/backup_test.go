@@ -652,7 +652,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
 ) groupBackupper {
@@ -669,7 +669,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
-		snapshotService,
+		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
 	)

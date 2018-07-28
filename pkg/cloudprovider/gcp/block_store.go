@@ -137,16 +137,6 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return res.Type, nil, nil
 }
 
-func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
-	// TODO can we consider a disk ready while it's in the RESTORING state?
-	return disk.Status == "READY", nil
-}
-
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// snapshot names must adhere to RFC1035 and be 1-63 characters
 	// long

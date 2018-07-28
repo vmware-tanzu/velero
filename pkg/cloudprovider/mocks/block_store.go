@@ -146,27 +146,6 @@ func (_m *BlockStore) Init(config map[string]string) error {
 	return r0
 }
 
-// IsVolumeReady provides a mock function with given fields: volumeID, volumeAZ
-func (_m *BlockStore) IsVolumeReady(volumeID string, volumeAZ string) (bool, error) {
-	ret := _m.Called(volumeID, volumeAZ)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
-		r0 = rf(volumeID, volumeAZ)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(volumeID, volumeAZ)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // SetVolumeID provides a mock function with given fields: pv, volumeID
 func (_m *BlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	ret := _m.Called(pv, volumeID)

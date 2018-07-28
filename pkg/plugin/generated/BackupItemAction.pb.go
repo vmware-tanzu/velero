@@ -20,8 +20,6 @@ It has these top-level messages:
 	CreateVolumeResponse
 	GetVolumeInfoRequest
 	GetVolumeInfoResponse
-	IsVolumeReadyRequest
-	IsVolumeReadyResponse
 	CreateSnapshotRequest
 	CreateSnapshotResponse
 	DeleteSnapshotRequest

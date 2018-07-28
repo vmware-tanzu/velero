@@ -49,7 +49,7 @@ type backupDeletionController struct {
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	backupClient              arkv1client.BackupsGetter
-	snapshotService           cloudprovider.SnapshotService
+	blockStore                cloudprovider.BlockStore
 	objectStore               cloudprovider.ObjectStore
 	bucket                    string
 	restoreLister             listers.RestoreLister
@@ -69,7 +69,7 @@ func NewBackupDeletionController(
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	objectStore cloudprovider.ObjectStore,
 	bucket string,
 	restoreInformer informers.RestoreInformer,
@@ -83,7 +83,7 @@ func NewBackupDeletionController(
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
-		snapshotService:           snapshotService,
+		blockStore:                blockStore,
 		objectStore:               objectStore,
 		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
@@ -220,7 +220,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// If the backup includes snapshots but we don't currently have a PVProvider, we don't
 	// want to orphan the snapshots so skip deletion.
-	if c.snapshotService == nil && len(backup.Status.VolumeBackups) > 0 {
+	if c.blockStore == nil && len(backup.Status.VolumeBackups) > 0 {
 		req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = []string{"unable to delete backup because it includes PV snapshots and Ark is not configured with a PersistentVolumeProvider"}
@@ -244,7 +244,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	log.Info("Removing PV snapshots")
 	for _, volumeBackup := range backup.Status.VolumeBackups {
 		log.WithField("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
-		if err := c.snapshotService.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
+		if err := c.blockStore.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
 			errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", volumeBackup.SnapshotID).Error())
 		}
 	}

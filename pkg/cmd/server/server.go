@@ -149,7 +149,7 @@ type server struct {
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
 	objectStore           cloudprovider.ObjectStore
-	snapshotService       cloudprovider.SnapshotService
+	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
 	dynamicClient         dynamic.Interface
@@ -255,8 +255,15 @@ func (s *server) run() error {
 	}
 	s.objectStore = objectStore
 
-	if err := s.initSnapshotService(config); err != nil {
-		return err
+	if config.PersistentVolumeProvider == nil {
+		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
+	} else {
+		s.logger.Info("Configuring cloud provider for snapshot service")
+		blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
+		if err != nil {
+			return err
+		}
+		s.blockStore = blockStore
 	}
 
 	if config.BackupStorageProvider.ResticLocation != "" {
@@ -464,21 +471,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func (s *server) initSnapshotService(config *api.Config) error {
-	if config.PersistentVolumeProvider == nil {
-		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
-		return nil
-	}
-
-	s.logger.Info("Configuring cloud provider for snapshot service")
-	blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
-	if err != nil {
-		return err
-	}
-	s.snapshotService = cloudprovider.NewSnapshotService(blockStore)
-	return nil
-}
-
 func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
 	if cloudConfig.Name == "" {
 		return nil, errors.New("object storage provider name must not be empty")
@@ -620,7 +612,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.snapshotService,
+			s.blockStore,
 			s.resticManager,
 			config.PodVolumeOperationTimeout.Duration,
 		)
@@ -632,7 +624,7 @@ func (s *server) runControllers(config *api.Config) error {
 			backupper,
 			config.BackupStorageProvider.CloudProviderConfig,
 			config.BackupStorageProvider.Bucket,
-			s.snapshotService != nil,
+			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
 			s.pluginRegistry,
@@ -678,7 +670,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
-			s.snapshotService,
+			s.blockStore,
 			s.objectStore,
 			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
@@ -698,7 +690,7 @@ func (s *server) runControllers(config *api.Config) error {
 	restorer, err := restore.NewKubernetesRestorer(
 		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
-		s.snapshotService,
+		s.blockStore,
 		config.ResourcePriorities,
 		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
@@ -717,7 +709,7 @@ func (s *server) runControllers(config *api.Config) error {
 		config.BackupStorageProvider.CloudProviderConfig,
 		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
-		s.snapshotService != nil,
+		s.blockStore != nil,
 		s.logger,
 		s.logLevel,
 		s.pluginRegistry,

@@ -139,15 +139,6 @@ func (r *restartableBlockStore) GetVolumeInfo(volumeID string, volumeAZ string) 
 	return delegate.GetVolumeInfo(volumeID, volumeAZ)
 }
 
-// IsVolumeReady restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) IsVolumeReady(volumeID string, volumeAZ string) (ready bool, err error) {
-	delegate, err := r.getDelegate()
-	if err != nil {
-		return false, err
-	}
-	return delegate.IsVolumeReady(volumeID, volumeAZ)
-}
-
 // CreateSnapshot restarts the plugin's process if needed, then delegates the call.
 func (r *restartableBlockStore) CreateSnapshot(volumeID string, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
 	delegate, err := r.getDelegate()

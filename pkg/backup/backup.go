@@ -55,7 +55,7 @@ type kubernetesBackupper struct {
 	discoveryHelper        discovery.Helper
 	podCommandExecutor     podexec.PodCommandExecutor
 	groupBackupperFactory  groupBackupperFactory
-	snapshotService        cloudprovider.SnapshotService
+	blockStore             cloudprovider.BlockStore
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
 }
@@ -93,7 +93,7 @@ func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
 	podCommandExecutor podexec.PodCommandExecutor,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupperFactory restic.BackupperFactory,
 	resticTimeout time.Duration,
 ) (Backupper, error) {
@@ -102,7 +102,7 @@ func NewKubernetesBackupper(
 		dynamicFactory:         dynamicFactory,
 		podCommandExecutor:     podCommandExecutor,
 		groupBackupperFactory:  &defaultGroupBackupperFactory{},
-		snapshotService:        snapshotService,
+		blockStore:             blockStore,
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
 	}, nil
@@ -276,7 +276,7 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backup *api.Bac
 		kb.podCommandExecutor,
 		tw,
 		resourceHooks,
-		kb.snapshotService,
+		kb.blockStore,
 		resticBackupper,
 		newPVCSnapshotTracker(),
 	)

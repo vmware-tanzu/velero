@@ -73,7 +73,7 @@ type kindString string
 type kubernetesRestorer struct {
 	discoveryHelper       discovery.Helper
 	dynamicFactory        client.DynamicFactory
-	snapshotService       cloudprovider.SnapshotService
+	blockStore            cloudprovider.BlockStore
 	backupClient          arkv1client.BackupsGetter
 	namespaceClient       corev1.NamespaceInterface
 	resticRestorerFactory restic.RestorerFactory
@@ -145,7 +145,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resourcePriorities []string,
 	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
@@ -156,7 +156,7 @@ func NewKubernetesRestorer(
 	return &kubernetesRestorer{
 		discoveryHelper:       discoveryHelper,
 		dynamicFactory:        dynamicFactory,
-		snapshotService:       snapshotService,
+		blockStore:            blockStore,
 		backupClient:          backupClient,
 		namespaceClient:       namespaceClient,
 		resticRestorerFactory: resticRestorerFactory,
@@ -224,7 +224,7 @@ func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Resto
 		snapshotVolumes: backup.Spec.SnapshotVolumes,
 		restorePVs:      restore.Spec.RestorePVs,
 		volumeBackups:   backup.Status.VolumeBackups,
-		snapshotService: kr.snapshotService,
+		blockStore:      kr.blockStore,
 	}
 
 	restoreCtx := &context{
@@ -238,7 +238,7 @@ func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Resto
 		fileSystem:           kr.fileSystem,
 		namespaceClient:      kr.namespaceClient,
 		actions:              resolvedActions,
-		snapshotService:      kr.snapshotService,
+		blockStore:           kr.blockStore,
 		resticRestorer:       resticRestorer,
 		pvsToProvision:       sets.NewString(),
 		pvRestorer:           pvRestorer,
@@ -319,7 +319,7 @@ type context struct {
 	fileSystem           filesystem.Interface
 	namespaceClient      corev1.NamespaceInterface
 	actions              []resolvedAction
-	snapshotService      cloudprovider.SnapshotService
+	blockStore           cloudprovider.BlockStore
 	resticRestorer       restic.Restorer
 	globalWaitGroup      arksync.ErrorGroup
 	resourceWaitGroup    sync.WaitGroup
@@ -901,7 +901,7 @@ type pvRestorer struct {
 	snapshotVolumes *bool
 	restorePVs      *bool
 	volumeBackups   map[string]*api.VolumeBackupInfo
-	snapshotService cloudprovider.SnapshotService
+	blockStore      cloudprovider.BlockStore
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -937,7 +937,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	// Past this point, we expect to be doing a restore
 
-	if r.snapshotService == nil {
+	if r.blockStore == nil {
 		return nil, errors.New("you must configure a persistentVolumeProvider to restore PersistentVolumes from snapshots")
 	}
 
@@ -949,13 +949,13 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	)
 
 	log.Info("restoring persistent volume from snapshot")
-	volumeID, err := r.snapshotService.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
+	volumeID, err := r.blockStore.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
 	if err != nil {
 		return nil, err
 	}
 	log.Info("successfully restored persistent volume from snapshot")
 
-	updated1, err := r.snapshotService.SetVolumeID(obj, volumeID)
+	updated1, err := r.blockStore.SetVolumeID(obj, volumeID)
 	if err != nil {
 		return nil, err
 	}

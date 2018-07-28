@@ -117,16 +117,6 @@ func (c *BlockStoreGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string,
 	return res.VolumeType, iops, nil
 }
 
-// IsVolumeReady returns whether the specified volume is ready to be used.
-func (c *BlockStoreGRPCClient) IsVolumeReady(volumeID, volumeAZ string) (bool, error) {
-	res, err := c.grpcClient.IsVolumeReady(context.Background(), &proto.IsVolumeReadyRequest{Plugin: c.plugin, VolumeID: volumeID, VolumeAZ: volumeAZ})
-	if err != nil {
-		return false, err
-	}
-
-	return res.Ready, nil
-}
-
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
 func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
@@ -290,21 +280,6 @@ func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.Get
 	}
 
 	return res, nil
-}
-
-// IsVolumeReady returns whether the specified volume is ready to be used.
-func (s *BlockStoreGRPCServer) IsVolumeReady(ctx context.Context, req *proto.IsVolumeReadyRequest) (*proto.IsVolumeReadyResponse, error) {
-	impl, err := s.getImpl(req.Plugin)
-	if err != nil {
-		return nil, err
-	}
-
-	ready, err := impl.IsVolumeReady(req.VolumeID, req.VolumeAZ)
-	if err != nil {
-		return nil, err
-	}
-
-	return &proto.IsVolumeReadyResponse{Ready: ready}, nil
 }
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided

@@ -137,54 +137,6 @@ func (m *GetVolumeInfoResponse) GetIops() int64 {
 	return 0
 }
 
-type IsVolumeReadyRequest struct {
-	Plugin   string `protobuf:"bytes,1,opt,name=plugin" json:"plugin,omitempty"`
-	VolumeID string `protobuf:"bytes,2,opt,name=volumeID" json:"volumeID,omitempty"`
-	VolumeAZ string `protobuf:"bytes,3,opt,name=volumeAZ" json:"volumeAZ,omitempty"`
-}
-
-func (m *IsVolumeReadyRequest) Reset()                    { *m = IsVolumeReadyRequest{} }
-func (m *IsVolumeReadyRequest) String() string            { return proto.CompactTextString(m) }
-func (*IsVolumeReadyRequest) ProtoMessage()               {}
-func (*IsVolumeReadyRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
-
-func (m *IsVolumeReadyRequest) GetPlugin() string {
-	if m != nil {
-		return m.Plugin
-	}
-	return ""
-}
-
-func (m *IsVolumeReadyRequest) GetVolumeID() string {
-	if m != nil {
-		return m.VolumeID
-	}
-	return ""
-}
-
-func (m *IsVolumeReadyRequest) GetVolumeAZ() string {
-	if m != nil {
-		return m.VolumeAZ
-	}
-	return ""
-}
-
-type IsVolumeReadyResponse struct {
-	Ready bool `protobuf:"varint,1,opt,name=ready" json:"ready,omitempty"`
-}
-
-func (m *IsVolumeReadyResponse) Reset()                    { *m = IsVolumeReadyResponse{} }
-func (m *IsVolumeReadyResponse) String() string            { return proto.CompactTextString(m) }
-func (*IsVolumeReadyResponse) ProtoMessage()               {}
-func (*IsVolumeReadyResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
-
-func (m *IsVolumeReadyResponse) GetReady() bool {
-	if m != nil {
-		return m.Ready
-	}
-	return false
-}
-
 type CreateSnapshotRequest struct {
 	Plugin   string            `protobuf:"bytes,1,opt,name=plugin" json:"plugin,omitempty"`
 	VolumeID string            `protobuf:"bytes,2,opt,name=volumeID" json:"volumeID,omitempty"`
@@ -358,8 +310,6 @@ func init() {
 	proto.RegisterType((*CreateVolumeResponse)(nil), "generated.CreateVolumeResponse")
 	proto.RegisterType((*GetVolumeInfoRequest)(nil), "generated.GetVolumeInfoRequest")
 	proto.RegisterType((*GetVolumeInfoResponse)(nil), "generated.GetVolumeInfoResponse")
-	proto.RegisterType((*IsVolumeReadyRequest)(nil), "generated.IsVolumeReadyRequest")
-	proto.RegisterType((*IsVolumeReadyResponse)(nil), "generated.IsVolumeReadyResponse")
 	proto.RegisterType((*CreateSnapshotRequest)(nil), "generated.CreateSnapshotRequest")
 	proto.RegisterType((*CreateSnapshotResponse)(nil), "generated.CreateSnapshotResponse")
 	proto.RegisterType((*DeleteSnapshotRequest)(nil), "generated.DeleteSnapshotRequest")
@@ -383,7 +333,6 @@ type BlockStoreClient interface {
 	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*Empty, error)
 	CreateVolumeFromSnapshot(ctx context.Context, in *CreateVolumeRequest, opts ...grpc.CallOption) (*CreateVolumeResponse, error)
 	GetVolumeInfo(ctx context.Context, in *GetVolumeInfoRequest, opts ...grpc.CallOption) (*GetVolumeInfoResponse, error)
-	IsVolumeReady(ctx context.Context, in *IsVolumeReadyRequest, opts ...grpc.CallOption) (*IsVolumeReadyResponse, error)
 	CreateSnapshot(ctx context.Context, in *CreateSnapshotRequest, opts ...grpc.CallOption) (*CreateSnapshotResponse, error)
 	DeleteSnapshot(ctx context.Context, in *DeleteSnapshotRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetVolumeID(ctx context.Context, in *GetVolumeIDRequest, opts ...grpc.CallOption) (*GetVolumeIDResponse, error)
@@ -419,15 +368,6 @@ func (c *blockStoreClient) CreateVolumeFromSnapshot(ctx context.Context, in *Cre
 func (c *blockStoreClient) GetVolumeInfo(ctx context.Context, in *GetVolumeInfoRequest, opts ...grpc.CallOption) (*GetVolumeInfoResponse, error) {
 	out := new(GetVolumeInfoResponse)
 	err := grpc.Invoke(ctx, "/generated.BlockStore/GetVolumeInfo", in, out, c.cc, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *blockStoreClient) IsVolumeReady(ctx context.Context, in *IsVolumeReadyRequest, opts ...grpc.CallOption) (*IsVolumeReadyResponse, error) {
-	out := new(IsVolumeReadyResponse)
-	err := grpc.Invoke(ctx, "/generated.BlockStore/IsVolumeReady", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +416,6 @@ type BlockStoreServer interface {
 	Init(context.Context, *InitRequest) (*Empty, error)
 	CreateVolumeFromSnapshot(context.Context, *CreateVolumeRequest) (*CreateVolumeResponse, error)
 	GetVolumeInfo(context.Context, *GetVolumeInfoRequest) (*GetVolumeInfoResponse, error)
-	IsVolumeReady(context.Context, *IsVolumeReadyRequest) (*IsVolumeReadyResponse, error)
 	CreateSnapshot(context.Context, *CreateSnapshotRequest) (*CreateSnapshotResponse, error)
 	DeleteSnapshot(context.Context, *DeleteSnapshotRequest) (*Empty, error)
 	GetVolumeID(context.Context, *GetVolumeIDRequest) (*GetVolumeIDResponse, error)
@@ -537,24 +476,6 @@ func _BlockStore_GetVolumeInfo_Handler(srv interface{}, ctx context.Context, dec
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BlockStoreServer).GetVolumeInfo(ctx, req.(*GetVolumeInfoRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _BlockStore_IsVolumeReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IsVolumeReadyRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BlockStoreServer).IsVolumeReady(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/generated.BlockStore/IsVolumeReady",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BlockStoreServer).IsVolumeReady(ctx, req.(*IsVolumeReadyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -646,10 +567,6 @@ var _BlockStore_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetVolumeInfo",
 			Handler:    _BlockStore_GetVolumeInfo_Handler,
-		},
-		{
-			MethodName: "IsVolumeReady",
-			Handler:    _BlockStore_IsVolumeReady_Handler,
 		},
 		{
 			MethodName: "CreateSnapshot",

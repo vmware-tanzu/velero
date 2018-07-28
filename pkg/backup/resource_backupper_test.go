@@ -544,7 +544,6 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
 		itemHookHandler: itemHookHandler,
-		snapshotService: nil,
 	}
 
 	itemBackupperFactory.On("newItemBackupper",
@@ -690,7 +689,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
 ) ItemBackupper {
@@ -705,7 +704,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
-		snapshotService,
+		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
 	)
