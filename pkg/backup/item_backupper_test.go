@@ -277,7 +277,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			additionalItemError: errors.New("foo"),
 		},
 		{
-			name: "takePVSnapshot is not invoked for PVs when snapshotService == nil",
+			name: "takePVSnapshot is not invoked for PVs when blockStore == nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                  `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:           false,
@@ -286,7 +286,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			groupResource:         "persistentvolumes",
 		},
 		{
-			name: "takePVSnapshot is invoked for PVs when snapshotService != nil",
+			name: "takePVSnapshot is invoked for PVs when blockStore != nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                  `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:           false,
@@ -305,7 +305,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:        false,
 			expectedTarHeaderName: "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:         "persistentvolumes",
-			// empty snapshottableVolumes causes a snapshotService to be created, but no
+			// empty snapshottableVolumes causes a blockStore to be created, but no
 			// snapshots are expected to be taken.
 			snapshottableVolumes: map[string]api.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
@@ -419,14 +419,14 @@ func TestBackupItemNoSkips(t *testing.T) {
 				newPVCSnapshotTracker(),
 			).(*defaultItemBackupper)
 
-			var snapshotService *arktest.FakeSnapshotService
+			var blockStore *arktest.FakeBlockStore
 			if test.snapshottableVolumes != nil {
-				snapshotService = &arktest.FakeSnapshotService{
+				blockStore = &arktest.FakeBlockStore{
 					SnapshottableVolumes: test.snapshottableVolumes,
 					VolumeID:             "vol-abc123",
 					Error:                test.snapshotError,
 				}
-				b.snapshotService = snapshotService
+				b.blockStore = blockStore
 			}
 
 			if test.trackedPVCs != nil {
@@ -514,7 +514,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 
 			if test.snapshottableVolumes != nil {
-				require.Equal(t, len(test.snapshottableVolumes), len(snapshotService.SnapshotsTaken))
+				require.Equal(t, len(test.snapshottableVolumes), len(blockStore.SnapshotsTaken))
 
 				var expectedBackups []api.VolumeBackupInfo
 				for _, vbi := range test.snapshottableVolumes {
@@ -719,12 +719,12 @@ func TestTakePVSnapshot(t *testing.T) {
 				},
 			}
 
-			snapshotService := &arktest.FakeSnapshotService{
+			blockStore := &arktest.FakeBlockStore{
 				SnapshottableVolumes: test.volumeInfo,
 				VolumeID:             test.expectedVolumeID,
 			}
 
-			ib := &defaultItemBackupper{snapshotService: snapshotService}
+			ib := &defaultItemBackupper{blockStore: blockStore}
 
 			pv, err := arktest.GetAsMap(test.pv)
 			if err != nil {
@@ -754,12 +754,12 @@ func TestTakePVSnapshot(t *testing.T) {
 			}
 
 			// we should have one snapshot taken exactly
-			require.Equal(t, test.expectedSnapshotsTaken, snapshotService.SnapshotsTaken.Len())
+			require.Equal(t, test.expectedSnapshotsTaken, blockStore.SnapshotsTaken.Len())
 
 			if test.expectedSnapshotsTaken > 0 {
-				// the snapshotID should be the one in the entry in snapshotService.SnapshottableVolumes
+				// the snapshotID should be the one in the entry in blockStore.SnapshottableVolumes
 				// for the volume we ran the test for
-				snapshotID, _ := snapshotService.SnapshotsTaken.PopAny()
+				snapshotID, _ := blockStore.SnapshotsTaken.PopAny()
 
 				expectedVolumeBackups["mypv"] = &v1.VolumeBackupInfo{
 					SnapshotID:       snapshotID,

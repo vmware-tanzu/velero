@@ -183,19 +183,6 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return string(res.AccountType), nil, nil
 }
 
-func (b *blockStore) IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error) {
-	res, err := b.disks.Get(b.resourceGroup, volumeID)
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
-	if res.ProvisioningState == nil {
-		return false, errors.New("nil ProvisioningState returned from Get call")
-	}
-
-	return *res.ProvisioningState == "Succeeded", nil
-}
-
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
 	diskInfo, err := b.disks.Get(b.resourceGroup, volumeID)

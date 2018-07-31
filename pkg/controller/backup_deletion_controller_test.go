@@ -48,7 +48,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(), // deleteBackupRequestClient
 		client.ArkV1(), // backupClient
-		nil,            // snapshotService
+		nil,            // blockStore
 		nil,            // backupService
 		"bucket",
 		sharedInformers.Ark().V1().Restores(),
@@ -108,7 +108,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 type backupDeletionControllerTestData struct {
 	client          *fake.Clientset
 	sharedInformers informers.SharedInformerFactory
-	snapshotService *arktest.FakeSnapshotService
+	blockStore      *arktest.FakeBlockStore
 	controller      *backupDeletionController
 	req             *v1.DeleteBackupRequest
 }
@@ -116,19 +116,19 @@ type backupDeletionControllerTestData struct {
 func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
 	client := fake.NewSimpleClientset(objects...)
 	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	snapshotService := &arktest.FakeSnapshotService{SnapshotsTaken: sets.NewString()}
+	blockStore := &arktest.FakeBlockStore{SnapshotsTaken: sets.NewString()}
 	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 
 	data := &backupDeletionControllerTestData{
 		client:          client,
 		sharedInformers: sharedInformers,
-		snapshotService: snapshotService,
+		blockStore:      blockStore,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
-			snapshotService,
+			blockStore,
 			nil, // objectStore
 			"bucket",
 			sharedInformers.Ark().V1().Restores(),
@@ -305,9 +305,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		assert.Equal(t, expectedActions, td.client.Actions())
 	})
 
-	t.Run("no snapshot service, backup has snapshots", func(t *testing.T) {
+	t.Run("no block store, backup has snapshots", func(t *testing.T) {
 		td := setupBackupDeletionControllerTest()
-		td.controller.snapshotService = nil
+		td.controller.blockStore = nil
 
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			backup := arktest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap-1").Backup
@@ -364,7 +364,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, backup, nil
 		})
-		td.snapshotService.SnapshotsTaken.Insert("snap-1")
+		td.blockStore.SnapshotsTaken.Insert("snap-1")
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -438,7 +438,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		arktest.CompareActions(t, expectedActions, td.client.Actions())
 
 		// Make sure snapshot was deleted
-		assert.Equal(t, 0, td.snapshotService.SnapshotsTaken.Len())
+		assert.Equal(t, 0, td.blockStore.SnapshotsTaken.Len())
 	})
 }
 
@@ -560,7 +560,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(), // deleteBackupRequestClient
 				client.ArkV1(), // backupClient
-				nil,            // snapshotService
+				nil,            // blockStore
 				nil,            // backupService
 				"bucket",
 				sharedInformers.Ark().V1().Restores(),

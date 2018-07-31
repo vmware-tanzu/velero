@@ -80,9 +80,6 @@ type BlockStore interface {
 	// the specified block volume in the given availability zone.
 	GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error)
 
-	// IsVolumeReady returns whether the specified volume is ready to be used.
-	IsVolumeReady(volumeID, volumeAZ string) (ready bool, err error)
-
 	// CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 	// set of tags to the snapshot.
 	CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error)

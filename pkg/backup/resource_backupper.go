@@ -51,7 +51,7 @@ type resourceBackupperFactory interface {
 		podCommandExecutor podexec.PodCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
-		snapshotService cloudprovider.SnapshotService,
+		blockStore cloudprovider.BlockStore,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
 	) resourceBackupper
@@ -72,7 +72,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
 ) resourceBackupper {
@@ -89,7 +89,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 		podCommandExecutor:    podCommandExecutor,
 		tarWriter:             tarWriter,
 		resourceHooks:         resourceHooks,
-		snapshotService:       snapshotService,
+		blockStore:            blockStore,
 		resticBackupper:       resticBackupper,
 		resticSnapshotTracker: resticSnapshotTracker,
 		itemBackupperFactory:  &defaultItemBackupperFactory{},
@@ -113,7 +113,7 @@ type defaultResourceBackupper struct {
 	podCommandExecutor    podexec.PodCommandExecutor
 	tarWriter             tarWriter
 	resourceHooks         []resourceHook
-	snapshotService       cloudprovider.SnapshotService
+	blockStore            cloudprovider.BlockStore
 	resticBackupper       restic.Backupper
 	resticSnapshotTracker *pvcSnapshotTracker
 	itemBackupperFactory  itemBackupperFactory
@@ -189,7 +189,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.resourceHooks,
 		rb.dynamicFactory,
 		rb.discoveryHelper,
-		rb.snapshotService,
+		rb.blockStore,
 		rb.resticBackupper,
 		rb.resticSnapshotTracker,
 	)

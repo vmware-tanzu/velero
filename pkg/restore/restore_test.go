@@ -1193,7 +1193,7 @@ func TestExecutePVAction(t *testing.T) {
 		restore           *api.Restore
 		backup            *api.Backup
 		volumeMap         map[api.VolumeBackupInfo]string
-		noSnapshotService bool
+		noBlockStore      bool
 		expectedErr       bool
 		expectedRes       *unstructured.Unstructured
 		volumeID          string
@@ -1261,36 +1261,36 @@ func TestExecutePVAction(t *testing.T) {
 			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:              "restoring, snapshotService=nil, backup has at least 1 snapshot -> error",
-			obj:               NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
-			restore:           arktest.NewDefaultTestRestore().Restore,
-			backup:            &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-			volumeID:          "volume-1",
-			noSnapshotService: true,
-			expectedErr:       true,
-			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			name:         "restoring, blockStore=nil, backup has at least 1 snapshot -> error",
+			obj:          NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore:      arktest.NewDefaultTestRestore().Restore,
+			backup:       &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			volumeMap:    map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+			volumeID:     "volume-1",
+			noBlockStore: true,
+			expectedErr:  true,
+			expectedRes:  NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				snapshotService     cloudprovider.SnapshotService
-				fakeSnapshotService *arktest.FakeSnapshotService
+				blockStore     cloudprovider.BlockStore
+				fakeBlockStore *arktest.FakeBlockStore
 			)
-			if !test.noSnapshotService {
-				fakeSnapshotService = &arktest.FakeSnapshotService{
+			if !test.noBlockStore {
+				fakeBlockStore = &arktest.FakeBlockStore{
 					RestorableVolumes: test.volumeMap,
 					VolumeID:          test.volumeID,
 				}
-				snapshotService = fakeSnapshotService
+				blockStore = fakeBlockStore
 			}
 
 			r := &pvRestorer{
-				logger:          arktest.NewLogger(),
-				restorePVs:      test.restore.Spec.RestorePVs,
-				snapshotService: snapshotService,
+				logger:     arktest.NewLogger(),
+				restorePVs: test.restore.Spec.RestorePVs,
+				blockStore: blockStore,
 			}
 			if test.backup != nil {
 				r.snapshotVolumes = test.backup.Spec.SnapshotVolumes
@@ -1306,9 +1306,9 @@ func TestExecutePVAction(t *testing.T) {
 			require.NoError(t, err)
 
 			if test.expectSetVolumeID {
-				assert.Equal(t, test.volumeID, fakeSnapshotService.VolumeIDSet)
+				assert.Equal(t, test.volumeID, fakeBlockStore.VolumeIDSet)
 			} else {
-				assert.Equal(t, "", fakeSnapshotService.VolumeIDSet)
+				assert.Equal(t, "", fakeBlockStore.VolumeIDSet)
 			}
 			assert.Equal(t, test.expectedRes, res)
 		})

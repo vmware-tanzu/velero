@@ -49,7 +49,7 @@ type groupBackupperFactory interface {
 		podCommandExecutor podexec.PodCommandExecutor,
 		tarWriter tarWriter,
 		resourceHooks []resourceHook,
-		snapshotService cloudprovider.SnapshotService,
+		blockStore cloudprovider.BlockStore,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
 	) groupBackupper
@@ -69,7 +69,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
 ) groupBackupper {
@@ -86,7 +86,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 		podCommandExecutor:       podCommandExecutor,
 		tarWriter:                tarWriter,
 		resourceHooks:            resourceHooks,
-		snapshotService:          snapshotService,
+		blockStore:               blockStore,
 		resticBackupper:          resticBackupper,
 		resticSnapshotTracker:    resticSnapshotTracker,
 		resourceBackupperFactory: &defaultResourceBackupperFactory{},
@@ -109,7 +109,7 @@ type defaultGroupBackupper struct {
 	podCommandExecutor       podexec.PodCommandExecutor
 	tarWriter                tarWriter
 	resourceHooks            []resourceHook
-	snapshotService          cloudprovider.SnapshotService
+	blockStore               cloudprovider.BlockStore
 	resticBackupper          restic.Backupper
 	resticSnapshotTracker    *pvcSnapshotTracker
 	resourceBackupperFactory resourceBackupperFactory
@@ -133,7 +133,7 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 			gb.podCommandExecutor,
 			gb.tarWriter,
 			gb.resourceHooks,
-			gb.snapshotService,
+			gb.blockStore,
 			gb.resticBackupper,
 			gb.resticSnapshotTracker,
 		)

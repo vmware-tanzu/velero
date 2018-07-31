@@ -161,7 +161,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	resourceHooks []resourceHook,
-	snapshotService cloudprovider.SnapshotService,
+	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
 ) resourceBackupper {
@@ -178,7 +178,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 		podCommandExecutor,
 		tarWriter,
 		resourceHooks,
-		snapshotService,
+		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
 	)

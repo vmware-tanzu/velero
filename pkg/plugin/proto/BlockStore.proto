@@ -26,16 +26,6 @@ message GetVolumeInfoResponse {
     int64 iops = 2;
 }
 
-message IsVolumeReadyRequest {
-    string plugin = 1;
-    string volumeID = 2;
-    string volumeAZ = 3;
-}
-
-message IsVolumeReadyResponse {
-    bool ready = 1;
-}
-
 message CreateSnapshotRequest {
     string plugin = 1;
     string volumeID = 2;
@@ -75,7 +65,6 @@ service BlockStore {
     rpc Init(InitRequest) returns (Empty);
     rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
     rpc GetVolumeInfo(GetVolumeInfoRequest) returns (GetVolumeInfoResponse);
-    rpc IsVolumeReady(IsVolumeReadyRequest) returns (IsVolumeReadyResponse);
     rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);
     rpc DeleteSnapshot(DeleteSnapshotRequest) returns (Empty);
     rpc GetVolumeID(GetVolumeIDRequest) returns (GetVolumeIDResponse);

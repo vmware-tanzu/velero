@@ -25,7 +25,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
-type FakeSnapshotService struct {
+type FakeBlockStore struct {
 	// SnapshotID->VolumeID
 	SnapshotsTaken sets.String
 
@@ -41,26 +41,30 @@ type FakeSnapshotService struct {
 	Error error
 }
 
-func (s *FakeSnapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
-	if s.Error != nil {
-		return "", s.Error
+func (bs *FakeBlockStore) Init(config map[string]string) error {
+	return nil
+}
+
+func (bs *FakeBlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+	if bs.Error != nil {
+		return "", bs.Error
 	}
 
-	if _, exists := s.SnapshottableVolumes[volumeID]; !exists {
+	if _, exists := bs.SnapshottableVolumes[volumeID]; !exists {
 		return "", errors.New("snapshottable volume not found")
 	}
 
-	if s.SnapshotsTaken == nil {
-		s.SnapshotsTaken = sets.NewString()
+	if bs.SnapshotsTaken == nil {
+		bs.SnapshotsTaken = sets.NewString()
 	}
-	s.SnapshotsTaken.Insert(s.SnapshottableVolumes[volumeID].SnapshotID)
+	bs.SnapshotsTaken.Insert(bs.SnapshottableVolumes[volumeID].SnapshotID)
 
-	return s.SnapshottableVolumes[volumeID].SnapshotID, nil
+	return bs.SnapshottableVolumes[volumeID].SnapshotID, nil
 }
 
-func (s *FakeSnapshotService) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
-	if s.Error != nil {
-		return "", s.Error
+func (bs *FakeBlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+	if bs.Error != nil {
+		return "", bs.Error
 	}
 
 	key := api.VolumeBackupInfo{
@@ -70,44 +74,44 @@ func (s *FakeSnapshotService) CreateVolumeFromSnapshot(snapshotID, volumeType, v
 		AvailabilityZone: volumeAZ,
 	}
 
-	return s.RestorableVolumes[key], nil
+	return bs.RestorableVolumes[key], nil
 }
 
-func (s *FakeSnapshotService) DeleteSnapshot(snapshotID string) error {
-	if s.Error != nil {
-		return s.Error
+func (bs *FakeBlockStore) DeleteSnapshot(snapshotID string) error {
+	if bs.Error != nil {
+		return bs.Error
 	}
 
-	if !s.SnapshotsTaken.Has(snapshotID) {
+	if !bs.SnapshotsTaken.Has(snapshotID) {
 		return errors.New("snapshot not found")
 	}
 
-	s.SnapshotsTaken.Delete(snapshotID)
+	bs.SnapshotsTaken.Delete(snapshotID)
 
 	return nil
 }
 
-func (s *FakeSnapshotService) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	if s.Error != nil {
-		return "", nil, s.Error
+func (bs *FakeBlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	if bs.Error != nil {
+		return "", nil, bs.Error
 	}
 
-	if volumeInfo, exists := s.SnapshottableVolumes[volumeID]; !exists {
+	if volumeInfo, exists := bs.SnapshottableVolumes[volumeID]; !exists {
 		return "", nil, errors.New("VolumeID not found")
 	} else {
 		return volumeInfo.Type, volumeInfo.Iops, nil
 	}
 }
 
-func (s *FakeSnapshotService) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if s.Error != nil {
-		return "", s.Error
+func (bs *FakeBlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	if bs.Error != nil {
+		return "", bs.Error
 	}
 
-	return s.VolumeID, nil
+	return bs.VolumeID, nil
 }
 
-func (s *FakeSnapshotService) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	s.VolumeIDSet = volumeID
-	return pv, s.Error
+func (bs *FakeBlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	bs.VolumeIDSet = volumeID
+	return pv, bs.Error
 }

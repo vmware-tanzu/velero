@@ -230,12 +230,6 @@ func TestRestartableBlockStoreDelegatedFunctions(t *testing.T) {
 			expectedDelegateOutputs: []interface{}{"volumeType", to.Int64Ptr(10000), errors.Errorf("delegate error")},
 		},
 		restartableDelegateTest{
-			function:                "IsVolumeReady",
-			inputs:                  []interface{}{"volumeID", "volumeAZ"},
-			expectedErrorOutputs:    []interface{}{false, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{true, errors.Errorf("delegate error")},
-		},
-		restartableDelegateTest{
 			function:                "CreateSnapshot",
 			inputs:                  []interface{}{"volumeID", "volumeAZ", map[string]string{"a": "b"}},
 			expectedErrorOutputs:    []interface{}{"", errors.Errorf("reset error")},
