@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
@@ -130,7 +131,8 @@ func (c *backupSyncController) run() {
 	return
 }
 
-// deleteUnused deletes backup objects from Kubernetes if there is no corresponding backup in the object storage.
+// deleteUnused deletes backup objects from Kubernetes if they are complete
+// and there is no corresponding backup in the object storage.
 func (c *backupSyncController) deleteUnused(cloudBackupNames sets.String) {
 	// Backups objects in Kubernetes
 	backups, err := c.backupLister.Backups(c.namespace).List(labels.Everything())
@@ -141,9 +143,10 @@ func (c *backupSyncController) deleteUnused(cloudBackupNames sets.String) {
 		return
 	}
 
-	// For each backup object in Kubernetes, verify if has a corresponding backup in the object storage. If not, delete it.
+	// For each completed backup object in Kubernetes, delete it if it
+	// does not have a corresponding backup in object storage
 	for _, backup := range backups {
-		if !cloudBackupNames.Has(backup.Name) {
+		if backup.Status.Phase == api.BackupPhaseCompleted && !cloudBackupNames.Has(backup.Name) {
 			if err := c.client.Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
 				c.logger.WithError(errors.WithStack(err)).Error("Error deleting unused backup from Kubernetes")
 			} else {
