@@ -33,6 +33,7 @@ type Interface interface {
 	ReadFile(filename string) ([]byte, error)
 	DirExists(path string) (bool, error)
 	TempFile(dir, prefix string) (NameWriteCloser, error)
+	Stat(path string) (os.FileInfo, error)
 }
 
 type NameWriteCloser interface {
@@ -84,4 +85,8 @@ func (fs *osFileSystem) DirExists(path string) (bool, error) {
 
 func (fs *osFileSystem) TempFile(dir, prefix string) (NameWriteCloser, error) {
 	return ioutil.TempFile(dir, prefix)
+}
+
+func (fs *osFileSystem) Stat(path string) (os.FileInfo, error) {
+	return os.Stat(path)
 }

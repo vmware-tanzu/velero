@@ -38,7 +38,7 @@ type serviceAccountAction struct {
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(log logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper arkdiscovery.Helper) (ItemAction, error) {
+func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper arkdiscovery.Helper) (ItemAction, error) {
 	// Look up the supported RBAC version
 	var supportedAPI metav1.GroupVersionForDiscovery
 	for _, ag := range discoveryHelper.APIGroups() {
@@ -58,7 +58,7 @@ func NewServiceAccountAction(log logrus.FieldLogger, clusterRoleBindingListers m
 	}
 
 	return &serviceAccountAction{
-		log:                 log,
+		log:                 logger,
 		clusterRoleBindings: crbs,
 	}, nil
 }

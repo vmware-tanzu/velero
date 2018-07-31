@@ -28,15 +28,15 @@ import (
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
-// backupCacheBucket holds the backups and error from a GetAllBackups call.
+// backupCacheBucket holds the backups and error from a ListBackups call.
 type backupCacheBucket struct {
 	backups []*v1.Backup
 	error   error
 }
 
-// backupCache caches GetAllBackups calls, refreshing them periodically.
+// backupCache caches ListBackups calls, refreshing them periodically.
 type backupCache struct {
-	delegate BackupGetter
+	delegate BackupLister
 	lock     sync.RWMutex
 	// This doesn't really need to be a map right now, but if we ever move to supporting multiple
 	// buckets, this will be ready for it.
@@ -44,10 +44,10 @@ type backupCache struct {
 	logger  logrus.FieldLogger
 }
 
-var _ BackupGetter = &backupCache{}
+var _ BackupLister = &backupCache{}
 
 // NewBackupCache returns a new backup cache that refreshes from delegate every resyncPeriod.
-func NewBackupCache(ctx context.Context, delegate BackupGetter, resyncPeriod time.Duration, logger logrus.FieldLogger) BackupGetter {
+func NewBackupCache(ctx context.Context, delegate BackupLister, resyncPeriod time.Duration, logger logrus.FieldLogger) BackupLister {
 	c := &backupCache{
 		delegate: delegate,
 		buckets:  make(map[string]*backupCacheBucket),
@@ -70,11 +70,11 @@ func (c *backupCache) refresh() {
 
 	for bucketName, bucket := range c.buckets {
 		c.logger.WithField("bucket", bucketName).Debug("Refreshing bucket")
-		bucket.backups, bucket.error = c.delegate.GetAllBackups(bucketName)
+		bucket.backups, bucket.error = c.delegate.ListBackups(bucketName)
 	}
 }
 
-func (c *backupCache) GetAllBackups(bucketName string) ([]*v1.Backup, error) {
+func (c *backupCache) ListBackups(bucketName string) ([]*v1.Backup, error) {
 	c.lock.RLock()
 	bucket, found := c.buckets[bucketName]
 	c.lock.RUnlock()
@@ -88,7 +88,7 @@ func (c *backupCache) GetAllBackups(bucketName string) ([]*v1.Backup, error) {
 
 	logContext.Debug("Bucket is not in cache - doing a live lookup")
 
-	backups, err := c.delegate.GetAllBackups(bucketName)
+	backups, err := c.delegate.ListBackups(bucketName)
 	c.lock.Lock()
 	c.buckets[bucketName] = &backupCacheBucket{backups: backups, error: err}
 	c.lock.Unlock()

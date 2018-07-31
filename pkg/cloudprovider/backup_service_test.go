@@ -92,29 +92,27 @@ func TestUploadBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objStore   = &testutil.ObjectStore{}
-				bucket     = "test-bucket"
-				backupName = "test-backup"
-				logger     = arktest.NewLogger()
+				objectStore = &testutil.ObjectStore{}
+				bucket      = "test-bucket"
+				backupName  = "test-backup"
+				logger      = arktest.NewLogger()
 			)
-			defer objStore.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
 
 			if test.metadata != nil {
-				objStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
+				objectStore.On("PutObject", bucket, backupName+"/ark-backup.json", test.metadata).Return(test.metadataError)
 			}
 			if test.backup != nil && test.expectBackupUpload {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
+				objectStore.On("PutObject", bucket, backupName+"/"+backupName+".tar.gz", test.backup).Return(test.backupError)
 			}
 			if test.log != nil {
-				objStore.On("PutObject", bucket, backupName+"/"+backupName+"-logs.gz", test.log).Return(test.logError)
+				objectStore.On("PutObject", bucket, backupName+"/"+backupName+"-logs.gz", test.log).Return(test.logError)
 			}
 			if test.expectMetadataDelete {
-				objStore.On("DeleteObject", bucket, backupName+"/ark-backup.json").Return(nil)
+				objectStore.On("DeleteObject", bucket, backupName+"/ark-backup.json").Return(nil)
 			}
 
-			backupService := NewBackupService(objStore, logger)
-
-			err := backupService.UploadBackup(bucket, backupName, test.metadata, test.backup, test.log)
+			err := UploadBackup(logger, objectStore, bucket, backupName, test.metadata, test.backup, test.log)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -128,21 +126,19 @@ func TestUploadBackup(t *testing.T) {
 
 func TestDownloadBackup(t *testing.T) {
 	var (
-		o      = &testutil.ObjectStore{}
-		bucket = "b"
-		backup = "bak"
-		logger = arktest.NewLogger()
+		objectStore = &testutil.ObjectStore{}
+		bucket      = "b"
+		backup      = "bak"
 	)
-	o.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
+	objectStore.On("GetObject", bucket, backup+"/"+backup+".tar.gz").Return(ioutil.NopCloser(strings.NewReader("foo")), nil)
 
-	s := NewBackupService(o, logger)
-	rc, err := s.DownloadBackup(bucket, backup)
+	rc, err := DownloadBackup(objectStore, bucket, backup)
 	require.NoError(t, err)
 	require.NotNil(t, rc)
 	data, err := ioutil.ReadAll(rc)
 	require.NoError(t, err)
 	assert.Equal(t, "foo", string(data))
-	o.AssertExpectations(t)
+	objectStore.AssertExpectations(t)
 }
 
 func TestDeleteBackup(t *testing.T) {
@@ -165,26 +161,24 @@ func TestDeleteBackup(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bucket   = "bucket"
-				backup   = "bak"
-				objects  = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
-				objStore = &testutil.ObjectStore{}
-				logger   = arktest.NewLogger()
+				bucket      = "bucket"
+				backup      = "bak"
+				objects     = []string{"bak/ark-backup.json", "bak/bak.tar.gz", "bak/bak.log.gz"}
+				objectStore = &testutil.ObjectStore{}
+				logger      = arktest.NewLogger()
 			)
 
-			objStore.On("ListObjects", bucket, backup+"/").Return(objects, test.listObjectsError)
-			for i, o := range objects {
+			objectStore.On("ListObjects", bucket, backup+"/").Return(objects, test.listObjectsError)
+			for i, obj := range objects {
 				var err error
 				if i < len(test.deleteErrors) {
 					err = test.deleteErrors[i]
 				}
 
-				objStore.On("DeleteObject", bucket, o).Return(err)
+				objectStore.On("DeleteObject", bucket, obj).Return(err)
 			}
 
-			backupService := NewBackupService(objStore, logger)
-
-			err := backupService.DeleteBackupDir(bucket, backup)
+			err := DeleteBackupDir(logger, objectStore, bucket, backup)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -192,7 +186,7 @@ func TestDeleteBackup(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			objStore.AssertExpectations(t)
+			objectStore.AssertExpectations(t)
 		})
 	}
 }
@@ -239,18 +233,16 @@ func TestGetAllBackups(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				bucket   = "bucket"
-				objStore = &testutil.ObjectStore{}
-				logger   = arktest.NewLogger()
+				bucket      = "bucket"
+				objectStore = &testutil.ObjectStore{}
+				logger      = arktest.NewLogger()
 			)
 
-			objStore.On("ListCommonPrefixes", bucket, "/").Return([]string{"backup-1", "backup-2"}, nil)
-			objStore.On("GetObject", bucket, "backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
-			objStore.On("GetObject", bucket, "backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
+			objectStore.On("ListCommonPrefixes", bucket, "/").Return([]string{"backup-1", "backup-2"}, nil)
+			objectStore.On("GetObject", bucket, "backup-1/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-1/ark-backup.json"])), nil)
+			objectStore.On("GetObject", bucket, "backup-2/ark-backup.json").Return(ioutil.NopCloser(bytes.NewReader(test.storageData["backup-2/ark-backup.json"])), nil)
 
-			backupService := NewBackupService(objStore, logger)
-
-			res, err := backupService.GetAllBackups(bucket)
+			res, err := ListBackups(logger, objectStore, bucket)
 
 			if test.expectedErr != "" {
 				assert.EqualError(t, err, test.expectedErr)
@@ -260,7 +252,7 @@ func TestGetAllBackups(t *testing.T) {
 
 			assert.Equal(t, test.expectedRes, res)
 
-			objStore.AssertExpectations(t)
+			objectStore.AssertExpectations(t)
 		})
 	}
 }
@@ -327,20 +319,18 @@ func TestCreateSignedURL(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				objectStorage = &testutil.ObjectStore{}
-				logger        = arktest.NewLogger()
-				backupService = NewBackupService(objectStorage, logger)
+				objectStore = &testutil.ObjectStore{}
 			)
+			defer objectStore.AssertExpectations(t)
 
 			target := api.DownloadTarget{
 				Kind: test.targetKind,
 				Name: test.targetName,
 			}
-			objectStorage.On("CreateSignedURL", "bucket", test.expectedKey, time.Duration(0)).Return("url", nil)
-			url, err := backupService.CreateSignedURL(target, "bucket", test.directory, 0)
+			objectStore.On("CreateSignedURL", "bucket", test.expectedKey, time.Duration(0)).Return("url", nil)
+			url, err := CreateSignedURL(objectStore, target, "bucket", test.directory, 0)
 			require.NoError(t, err)
 			assert.Equal(t, "url", url)
-			objectStorage.AssertExpectations(t)
 		})
 	}
 }

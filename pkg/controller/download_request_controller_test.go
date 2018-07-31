@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -106,17 +107,15 @@ func TestProcessDownloadRequest(t *testing.T) {
 				sharedInformers          = informers.NewSharedInformerFactory(client, 0)
 				downloadRequestsInformer = sharedInformers.Ark().V1().DownloadRequests()
 				restoresInformer         = sharedInformers.Ark().V1().Restores()
-				backupService            = &arktest.BackupService{}
 				logger                   = arktest.NewLogger()
 				clockTime, _             = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
 			)
-			defer backupService.AssertExpectations(t)
 
 			c := NewDownloadRequestController(
 				client.ArkV1(),
 				downloadRequestsInformer,
 				restoresInformer,
-				backupService,
+				nil, // objectStore
 				"bucket",
 				logger,
 			).(*downloadRequestController)
@@ -126,7 +125,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			var downloadRequest *v1.DownloadRequest
 
 			if tc.expectedPhase == v1.DownloadRequestPhaseProcessed {
-				target := v1.DownloadTarget{
+				expectedTarget := v1.DownloadTarget{
 					Kind: tc.targetKind,
 					Name: tc.targetName,
 				}
@@ -137,7 +136,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 						Name:      "dr1",
 					},
 					Spec: v1.DownloadRequestSpec{
-						Target: target,
+						Target: expectedTarget,
 					},
 				}
 				downloadRequestsInformer.Informer().GetStore().Add(downloadRequest)
@@ -146,7 +145,13 @@ func TestProcessDownloadRequest(t *testing.T) {
 					restoresInformer.Informer().GetStore().Add(tc.restore)
 				}
 
-				backupService.On("CreateSignedURL", target, "bucket", tc.expectedDir, 10*time.Minute).Return("signedURL", nil)
+				c.createSignedURL = func(objectStore cloudprovider.ObjectStore, target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
+					require.Equal(t, expectedTarget, target)
+					require.Equal(t, "bucket", bucket)
+					require.Equal(t, tc.expectedDir, directory)
+					require.Equal(t, 10*time.Minute, ttl)
+					return "signedURL", nil
+				}
 			}
 
 			// method under test

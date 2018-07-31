@@ -18,6 +18,7 @@ package controller
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -50,53 +51,63 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	"github.com/heptio/ark/pkg/util/logging"
 )
 
 const backupVersion = 1
 
 type backupController struct {
-	backupper        backup.Backupper
-	backupService    cloudprovider.BackupService
-	bucket           string
-	pvProviderExists bool
-	lister           listers.BackupLister
-	listerSynced     cache.InformerSynced
-	client           arkv1client.BackupsGetter
-	syncHandler      func(backupName string) error
-	queue            workqueue.RateLimitingInterface
-	clock            clock.Clock
-	logger           logrus.FieldLogger
-	pluginManager    plugin.Manager
-	backupTracker    BackupTracker
-	metrics          *metrics.ServerMetrics
+	backupper         backup.Backupper
+	objectStoreConfig api.CloudProviderConfig
+	bucket            string
+	pvProviderExists  bool
+	lister            listers.BackupLister
+	listerSynced      cache.InformerSynced
+	client            arkv1client.BackupsGetter
+	syncHandler       func(backupName string) error
+	queue             workqueue.RateLimitingInterface
+	clock             clock.Clock
+	logger            logrus.FieldLogger
+	logLevel          logrus.Level
+	pluginRegistry    plugin.Registry
+	backupTracker     BackupTracker
+	metrics           *metrics.ServerMetrics
+
+	newPluginManager func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
 }
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
 	client arkv1client.BackupsGetter,
 	backupper backup.Backupper,
-	backupService cloudprovider.BackupService,
+	objectStoreConfig api.CloudProviderConfig,
 	bucket string,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
-	pluginManager plugin.Manager,
+	logLevel logrus.Level,
+	pluginRegistry plugin.Registry,
 	backupTracker BackupTracker,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupController{
-		backupper:        backupper,
-		backupService:    backupService,
-		bucket:           bucket,
-		pvProviderExists: pvProviderExists,
-		lister:           backupInformer.Lister(),
-		listerSynced:     backupInformer.Informer().HasSynced,
-		client:           client,
-		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
-		clock:            &clock.RealClock{},
-		logger:           logger,
-		pluginManager:    pluginManager,
-		backupTracker:    backupTracker,
-		metrics:          metrics,
+		backupper:         backupper,
+		objectStoreConfig: objectStoreConfig,
+		bucket:            bucket,
+		pvProviderExists:  pvProviderExists,
+		lister:            backupInformer.Lister(),
+		listerSynced:      backupInformer.Informer().HasSynced,
+		client:            client,
+		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
+		clock:             &clock.RealClock{},
+		logger:            logger,
+		logLevel:          logLevel,
+		pluginRegistry:    pluginRegistry,
+		backupTracker:     backupTracker,
+		metrics:           metrics,
+
+		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
 	}
 
 	c.syncHandler = c.processBackup
@@ -343,7 +354,22 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup log")
 	}
-	defer closeAndRemoveFile(logFile, log)
+	gzippedLogFile := gzip.NewWriter(logFile)
+	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
+	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
+	defer gzippedLogFile.Close()
+	defer closeAndRemoveFile(logFile, controller.logger)
+
+	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
+	// backup log failed for whatever reason.
+	logger := logging.DefaultLogger(controller.logLevel)
+	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
+	log = logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+
+	log.Info("Starting backup")
+
+	pluginManager := controller.newPluginManager(log, log.Level, controller.pluginRegistry)
+	defer pluginManager.CleanupClients()
 
 	backupFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -351,18 +377,22 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	}
 	defer closeAndRemoveFile(backupFile, log)
 
-	actions, err := controller.pluginManager.GetBackupItemActions(backup.Name)
+	actions, err := pluginManager.GetBackupItemActions()
 	if err != nil {
 		return err
 	}
-	defer controller.pluginManager.CloseBackupItemActions(backup.Name)
+
+	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	if err != nil {
+		return err
+	}
 
 	var errs []error
 
 	var backupJSONToUpload, backupFileToUpload io.Reader
 
 	// Do the actual backup
-	if err := controller.backupper.Backup(backup, backupFile, logFile, actions); err != nil {
+	if err := controller.backupper.Backup(log, backup, backupFile, actions); err != nil {
 		errs = append(errs, err)
 
 		backup.Status.Phase = api.BackupPhaseFailed
@@ -390,7 +420,11 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		backupSizeBytes = backupFileStat.Size()
 	}
 
-	if err := controller.backupService.UploadBackup(bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
+	if err := gzippedLogFile.Close(); err != nil {
+		controller.logger.WithError(err).Error("error closing gzippedLogFile")
+	}
+
+	if err := cloudprovider.UploadBackup(log, objectStore, bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -404,6 +438,24 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
+}
+
+// TODO(ncdc): move this to a better location that isn't backup specific
+func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
+	if cloudConfig.Name == "" {
+		return nil, errors.New("object storage provider name must not be empty")
+	}
+
+	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := objectStore.Init(cloudConfig.Config); err != nil {
+		return nil, err
+	}
+
+	return objectStore, nil
 }
 
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {

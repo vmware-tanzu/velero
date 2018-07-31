@@ -40,7 +40,7 @@ import (
 
 type backupSyncController struct {
 	client               arkv1client.BackupsGetter
-	backupService        cloudprovider.BackupService
+	cloudBackupLister    cloudprovider.BackupLister
 	bucket               string
 	syncPeriod           time.Duration
 	namespace            string
@@ -51,7 +51,7 @@ type backupSyncController struct {
 
 func NewBackupSyncController(
 	client arkv1client.BackupsGetter,
-	backupService cloudprovider.BackupService,
+	cloudBackupLister cloudprovider.BackupLister,
 	bucket string,
 	syncPeriod time.Duration,
 	namespace string,
@@ -64,7 +64,7 @@ func NewBackupSyncController(
 	}
 	return &backupSyncController{
 		client:               client,
-		backupService:        backupService,
+		cloudBackupLister:    cloudBackupLister,
 		bucket:               bucket,
 		syncPeriod:           syncPeriod,
 		namespace:            namespace,
@@ -92,7 +92,7 @@ const gcFinalizer = "gc.ark.heptio.com"
 
 func (c *backupSyncController) run() {
 	c.logger.Info("Syncing backups from object storage")
-	backups, err := c.backupService.GetAllBackups(c.bucket)
+	backups, err := c.cloudBackupLister.ListBackups(c.bucket)
 	if err != nil {
 		c.logger.WithError(err).Error("error listing backups")
 		return

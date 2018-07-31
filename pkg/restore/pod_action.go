@@ -32,9 +32,7 @@ type podAction struct {
 }
 
 func NewPodAction(logger logrus.FieldLogger) ItemAction {
-	return &podAction{
-		logger: logger,
-	}
+	return &podAction{logger: logger}
 }
 
 func (a *podAction) AppliesTo() (ResourceSelector, error) {

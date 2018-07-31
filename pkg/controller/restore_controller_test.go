@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,9 +36,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -79,9 +83,7 @@ func TestFetchBackup(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &arktest.BackupService{}
 				logger          = arktest.NewLogger()
-				pluginManager   = &MockManager{}
 			)
 
 			c := NewRestoreController(
@@ -90,12 +92,13 @@ func TestFetchBackup(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				backupSvc,
+				api.CloudProviderConfig{},
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				false,
 				logger,
-				pluginManager,
+				logrus.InfoLevel,
+				nil, //pluginRegistry
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 
@@ -104,20 +107,96 @@ func TestFetchBackup(t *testing.T) {
 			}
 
 			if test.backupServiceBackup != nil || test.backupServiceError != nil {
-				backupSvc.On("GetBackup", "bucket", test.backupName).Return(test.backupServiceBackup, test.backupServiceError)
+				c.getBackup = func(_ cloudprovider.ObjectStore, bucket, backup string) (*api.Backup, error) {
+					require.Equal(t, "bucket", bucket)
+					require.Equal(t, test.backupName, backup)
+					return test.backupServiceBackup, test.backupServiceError
+				}
 			}
 
-			backup, err := c.fetchBackup("bucket", test.backupName)
+			backup, err := c.fetchBackup(nil, test.backupName)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expectedRes, backup)
 			}
-
-			backupSvc.AssertExpectations(t)
 		})
 	}
 }
 
+func TestProcessRestoreSkips(t *testing.T) {
+	tests := []struct {
+		name        string
+		restoreKey  string
+		restore     *api.Restore
+		expectError bool
+	}{
+		{
+			name:       "invalid key returns error",
+			restoreKey: "invalid/key/value",
+		},
+		{
+			name:        "missing restore returns error",
+			restoreKey:  "foo/bar",
+			expectError: true,
+		},
+		{
+			name:       "restore with phase InProgress does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
+		},
+		{
+			name:       "restore with phase Completed does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
+		},
+		{
+			name:       "restore with phase FailedValidation does not get processed",
+			restoreKey: "foo/bar",
+			restore:    arktest.NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				client          = fake.NewSimpleClientset()
+				restorer        = &fakeRestorer{}
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+				logger          = arktest.NewLogger()
+				pluginManager   = &pluginmocks.Manager{}
+				objectStore     = &arktest.ObjectStore{}
+			)
+			defer restorer.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
+
+			c := NewRestoreController(
+				api.DefaultNamespace,
+				sharedInformers.Ark().V1().Restores(),
+				client.ArkV1(),
+				client.ArkV1(),
+				restorer,
+				api.CloudProviderConfig{Name: "myCloud"},
+				"bucket",
+				sharedInformers.Ark().V1().Backups(),
+				false, // pvProviderExists
+				logger,
+				logrus.InfoLevel,
+				nil, // pluginRegistry
+				metrics.NewServerMetrics(),
+			).(*restoreController)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
+
+			if test.restore != nil {
+				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
+			}
+
+			err := c.processRestore(test.restoreKey)
+			assert.Equal(t, test.expectError, err != nil)
+		})
+	}
+}
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
 		name                             string
@@ -136,31 +215,6 @@ func TestProcessRestore(t *testing.T) {
 		backupServiceDownloadBackupError error
 		expectedFinalPhase               string
 	}{
-		{
-			name:        "invalid key returns error",
-			restoreKey:  "invalid/key/value",
-			expectedErr: true,
-		},
-		{
-			name:        "missing restore returns error",
-			restoreKey:  "foo/bar",
-			expectedErr: true,
-		},
-		{
-			name:        "restore with phase InProgress does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseInProgress).Restore,
-			expectedErr: false,
-		},
-		{
-			name:        "restore with phase Completed does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseCompleted).Restore,
-			expectedErr: false,
-		},
-		{
-			name:        "restore with phase FailedValidation does not get processed",
-			restore:     arktest.NewTestRestore("foo", "bar", api.RestorePhaseFailedValidation).Restore,
-			expectedErr: false,
-		},
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
 			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
@@ -318,13 +372,12 @@ func TestProcessRestore(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				backupSvc       = &arktest.BackupService{}
 				logger          = arktest.NewLogger()
-				pluginManager   = &MockManager{}
+				pluginManager   = &pluginmocks.Manager{}
+				objectStore     = &arktest.ObjectStore{}
 			)
-
 			defer restorer.AssertExpectations(t)
-			defer backupSvc.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -332,16 +385,23 @@ func TestProcessRestore(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				backupSvc,
+				api.CloudProviderConfig{Name: "myCloud"},
 				"bucket",
 				sharedInformers.Ark().V1().Backups(),
 				test.allowRestoreSnapshots,
 				logger,
-				pluginManager,
+				logrus.InfoLevel,
+				nil, // pluginRegistry
 				metrics.NewServerMetrics(),
 			).(*restoreController)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
 
 			if test.restore != nil {
+				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
+				objectStore.On("Init", mock.Anything).Return(nil)
+
 				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
 
 				// this is necessary so the Patch() call returns the appropriate object
@@ -391,11 +451,24 @@ func TestProcessRestore(t *testing.T) {
 				errors.Ark = append(errors.Ark, "error uploading log file to object storage: "+test.uploadLogError.Error())
 			}
 			if test.expectedRestorerCall != nil {
-				downloadedBackup := ioutil.NopCloser(bytes.NewReader([]byte("hello world")))
-				backupSvc.On("DownloadBackup", mock.Anything, mock.Anything).Return(downloadedBackup, nil)
-				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
-				backupSvc.On("UploadRestoreLog", "bucket", test.backup.Name, test.restore.Name, mock.Anything).Return(test.uploadLogError)
-				backupSvc.On("UploadRestoreResults", "bucket", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
+				c.downloadBackup = func(objectStore cloudprovider.ObjectStore, bucket, backup string) (io.ReadCloser, error) {
+					require.Equal(t, test.backup.Name, backup)
+					return ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil
+				}
+
+				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
+
+				c.uploadRestoreLog = func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, log io.Reader) error {
+					require.Equal(t, test.backup.Name, backup)
+					require.Equal(t, test.restore.Name, restore)
+					return test.uploadLogError
+				}
+
+				c.uploadRestoreResults = func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, results io.Reader) error {
+					require.Equal(t, test.backup.Name, backup)
+					require.Equal(t, test.restore.Name, restore)
+					return nil
+				}
 			}
 
 			var (
@@ -410,21 +483,27 @@ func TestProcessRestore(t *testing.T) {
 			}
 
 			if test.backupServiceGetBackupError != nil {
-				backupSvc.On("GetBackup", "bucket", mock.Anything).Return(nil, test.backupServiceGetBackupError)
+				c.getBackup = func(_ cloudprovider.ObjectStore, bucket, backup string) (*api.Backup, error) {
+					require.Equal(t, "bucket", bucket)
+					require.Equal(t, test.restore.Spec.BackupName, backup)
+					return nil, test.backupServiceGetBackupError
+				}
 			}
 
 			if test.backupServiceDownloadBackupError != nil {
-				backupSvc.On("DownloadBackup", "bucket", test.restore.Spec.BackupName).Return(nil, test.backupServiceDownloadBackupError)
+				c.downloadBackup = func(_ cloudprovider.ObjectStore, bucket, backupName string) (io.ReadCloser, error) {
+					require.Equal(t, "bucket", bucket)
+					require.Equal(t, test.restore.Spec.BackupName, backupName)
+					return nil, test.backupServiceDownloadBackupError
+				}
 			}
 
 			if test.restore != nil {
-				pluginManager.On("GetRestoreItemActions", test.restore.Name).Return(nil, nil)
-				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return(nil)
+				pluginManager.On("GetRestoreItemActions").Return(nil, nil)
+				pluginManager.On("CleanupClients")
 			}
 
 			err = c.processRestore(key)
-			backupSvc.AssertExpectations(t)
-			restorer.AssertExpectations(t)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 			actions := client.Actions()
@@ -524,11 +603,12 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		client.ArkV1(),
 		client.ArkV1(),
 		nil,
-		nil,
+		api.CloudProviderConfig{Name: "myCloud"},
 		"bucket",
 		sharedInformers.Ark().V1().Backups(),
 		false,
 		logger,
+		logrus.DebugLevel,
 		nil,
 		nil,
 	).(*restoreController)
@@ -552,7 +632,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs := c.completeAndValidate(restore)
+	errs := c.completeAndValidate(nil, restore)
 	assert.Equal(t, []string{"No backups found for schedule"}, errs)
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -565,7 +645,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs = c.completeAndValidate(restore)
+	errs = c.completeAndValidate(nil, restore)
 	assert.Equal(t, []string{"No completed backups found for schedule"}, errs)
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -589,7 +669,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs = c.completeAndValidate(restore)
+	errs = c.completeAndValidate(nil, restore)
 	assert.Nil(t, errs)
 	assert.Equal(t, "bar", restore.Spec.BackupName)
 }
@@ -708,13 +788,13 @@ type fakeRestorer struct {
 }
 
 func (r *fakeRestorer) Restore(
+	log logrus.FieldLogger,
 	restore *api.Restore,
 	backup *api.Backup,
 	backupReader io.Reader,
-	logger io.Writer,
 	actions []restore.ItemAction,
 ) (api.RestoreResult, api.RestoreResult) {
-	res := r.Called(restore, backup, backupReader, logger)
+	res := r.Called(log, restore, backup, backupReader, actions)
 
 	r.calledWithArg = *restore
 
