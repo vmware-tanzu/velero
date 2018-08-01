@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
@@ -32,6 +33,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/output"
 	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -77,6 +79,7 @@ type CreateOptions struct {
 	NamespaceMappings       flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
+	Wait                    bool
 
 	client arkclient.Interface
 }
@@ -108,6 +111,8 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the restore")
 	f.NoOptDefVal = "true"
+
+	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
 }
 
 func (o *CreateOptions) Complete(args []string, f client.Factory) error {
@@ -193,12 +198,78 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
+	var restoreInformer cache.SharedIndexInformer
+	var updates chan *api.Restore
+	if o.Wait {
+		stop := make(chan struct{})
+		defer close(stop)
+
+		updates = make(chan *api.Restore)
+
+		restoreInformer = v1.NewRestoreInformer(o.client, f.Namespace(), 0, nil)
+
+		restoreInformer.AddEventHandler(
+			cache.FilteringResourceEventHandler{
+				FilterFunc: func(obj interface{}) bool {
+					restore, ok := obj.(*api.Restore)
+					if !ok {
+						return false
+					}
+					return restore.Name == o.RestoreName
+				},
+				Handler: cache.ResourceEventHandlerFuncs{
+					UpdateFunc: func(_, obj interface{}) {
+						restore, ok := obj.(*api.Restore)
+						if !ok {
+							return
+						}
+						updates <- restore
+					},
+					DeleteFunc: func(obj interface{}) {
+						restore, ok := obj.(*api.Restore)
+						if !ok {
+							return
+						}
+						updates <- restore
+					},
+				},
+			},
+		)
+		go restoreInformer.Run(stop)
+	}
+
 	restore, err := o.client.ArkV1().Restores(restore.Namespace).Create(restore)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Restore request %q submitted successfully.\n", restore.Name)
-	fmt.Printf("Run `ark restore describe %s` for more details.\n", restore.Name)
+	if o.Wait {
+		fmt.Println("Waiting for restore to complete. You may safely press ctrl-c to stop waiting - your restore will continue in the background.")
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Print(".")
+			case restore, ok := <-updates:
+				if !ok {
+					fmt.Println("\nError waiting: unable to watch restores.")
+					return nil
+				}
+
+				if restore.Status.Phase != api.RestorePhaseNew && restore.Status.Phase != api.RestorePhaseInProgress {
+					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `ark restore describe %s` and `ark restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
+					return nil
+				}
+			}
+		}
+	}
+
+	// Not waiting
+
+	fmt.Printf("Run `ark restore describe %s` or `ark restore logs %s` for more details.\n", restore.Name, restore.Name)
+
 	return nil
 }

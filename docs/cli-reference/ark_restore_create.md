@@ -43,6 +43,7 @@ ark restore create [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule S
       --restore-volumes optionalBool[=true]             whether to restore volumes from snapshots
   -l, --selector labelSelector                          only restore resources matching this label selector (default <none>)
       --show-labels                                     show labels in the last column
+  -w, --wait                                            wait for the operation to complete
 ```
 
 ### Options inherited from parent commands
