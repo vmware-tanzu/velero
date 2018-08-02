@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -43,7 +44,6 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -418,7 +418,7 @@ func TestProcessRestore(t *testing.T) {
 						return false, nil, err
 					}
 
-					phase, err := collections.GetString(patchMap, "status.phase")
+					phase, _, err := unstructured.NestedString(patchMap, "status", "phase")
 					if err != nil {
 						t.Logf("error getting status.phase: %s\n", err)
 						return false, nil, err
@@ -431,7 +431,7 @@ func TestProcessRestore(t *testing.T) {
 
 					res.Status.Phase = api.RestorePhase(phase)
 
-					if backupName, err := collections.GetString(patchMap, "spec.backupName"); err == nil {
+					if backupName, found, _ := unstructured.NestedString(patchMap, "spec", "backupName"); found {
 						res.Spec.BackupName = backupName
 					}
 

@@ -667,9 +667,9 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if groupResource == kuberesource.PersistentVolumes {
-			_, found := ctx.backup.Status.VolumeBackups[name]
-			reclaimPolicy, err := collections.GetString(obj.Object, "spec.persistentVolumeReclaimPolicy")
-			if err == nil && !found && reclaimPolicy == "Delete" {
+			_, snapshotFound := ctx.backup.Status.VolumeBackups[name]
+			reclaimPolicy, _, err := unstructured.NestedString(obj.Object, "spec", "persistentVolumeReclaimPolicy")
+			if err == nil && !snapshotFound && reclaimPolicy == "Delete" {
 				ctx.infof("Not restoring PV because it doesn't have a snapshot and its reclaim policy is Delete.")
 
 				ctx.pvsToProvision.Insert(name)
@@ -705,16 +705,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if groupResource == kuberesource.PersistentVolumeClaims {
-			spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-			if err != nil {
-				addToResult(&errs, namespace, err)
-				continue
-			}
-
-			if volumeName, exists := spec["volumeName"]; exists && ctx.pvsToProvision.Has(volumeName.(string)) {
+			if volumeName, exists, _ := unstructured.NestedString(obj.Object, "spec", "volumeName"); exists && ctx.pvsToProvision.Has(volumeName) {
 				ctx.infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, volumeName)
 
-				delete(spec, "volumeName")
+				unstructured.RemoveNestedField(obj.Object, "spec", "volumeName")
 
 				annotations := obj.GetAnnotations()
 				delete(annotations, "pv.kubernetes.io/bind-completed")
@@ -910,13 +904,8 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, err
-	}
-
-	delete(spec, "claimRef")
-	delete(spec, "storageClassName")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "claimRef")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "storageClassName")
 
 	if boolptr.IsSetToFalse(r.snapshotVolumes) {
 		// The backup had snapshots disabled, so we can return early
@@ -969,30 +958,30 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
-	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
-	if err != nil {
-		return false
-	}
+	phase, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 
 	return phase == string(v1.VolumeAvailable)
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	metadata, found, err := unstructured.NestedMap(obj.Object, "metadata")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
+	}
+	if !found {
+		return nil, errors.New("metadata not found")
 	}
 
 	for k := range metadata {
 		switch k {
 		case "name", "namespace", "labels", "annotations":
 		default:
-			delete(metadata, k)
+			unstructured.RemoveNestedField(obj.Object, "metadata", k)
 		}
 	}
 
 	// Never restore status
-	delete(obj.UnstructuredContent(), "status")
+	unstructured.RemoveNestedField(obj.Object, "status")
 
 	return obj, nil
 }

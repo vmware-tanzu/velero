@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -932,9 +933,7 @@ status:
 				pvClient.On("Watch", metav1.ListOptions{}).Return(pvWatch, nil)
 				pvWatchChan := make(chan watch.Event, 1)
 				readyPV := restoredPV.DeepCopy()
-				readyStatus, err := collections.GetMap(readyPV.Object, "status")
-				require.NoError(t, err)
-				readyStatus["phase"] = string(v1.VolumeAvailable)
+				require.NoError(t, unstructured.SetNestedField(readyPV.Object, string(v1.VolumeAvailable), "status", "phase"))
 				pvWatchChan <- watch.Event{
 					Type:   watch.Modified,
 					Object: readyPV,
@@ -1202,12 +1201,6 @@ func TestExecutePVAction(t *testing.T) {
 		{
 			name:        "no name should error",
 			obj:         NewTestUnstructured().WithMetadata().Unstructured,
-			restore:     arktest.NewDefaultTestRestore().Restore,
-			expectedErr: true,
-		},
-		{
-			name:        "no spec should error",
-			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().Restore,
 			expectedErr: true,
 		},
@@ -1678,16 +1671,17 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if _, found := metadata["labels"]; !found {
-		metadata["labels"] = make(map[string]interface{})
+	labels := metadata.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
 	}
-
-	metadata["labels"].(map[string]interface{})["fake-restorer"] = "foo"
+	labels["fake-restorer"] = "foo"
+	metadata.SetLabels(labels)
 
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {

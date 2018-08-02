@@ -19,12 +19,13 @@ package restore
 import (
 	"regexp"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type podAction struct {
@@ -46,69 +47,72 @@ var (
 )
 
 func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	a.logger.Debug("getting spec")
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "nodeName")
+
+	volumes, _, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "volumes")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
-	a.logger.Debug("deleting spec.NodeName")
-	delete(spec, "nodeName")
+	if len(volumes) > 0 {
+		var nonDefaultTokenVolumes []interface{}
+		for i, obj := range volumes {
+			volume, ok := obj.(map[string]interface{})
+			if !ok {
+				return nil, nil, errors.Errorf("expected .spec.volumes[%d] to be of type map[string]interface{}, was %T", i, obj)
+			}
 
-	newVolumes := make([]interface{}, 0)
-	a.logger.Debug("iterating over volumes")
-	err = collections.ForEach(spec, "volumes", func(volume map[string]interface{}) error {
-		name, err := collections.GetString(volume, "name")
-		if err != nil {
-			return err
-		}
-
-		a.logger.WithField("volumeName", name).Debug("Checking volume")
-		if !defaultTokenRegex.MatchString(name) {
-			a.logger.WithField("volumeName", name).Debug("Preserving volume")
-			newVolumes = append(newVolumes, volume)
-		} else {
-			a.logger.WithField("volumeName", name).Debug("Excluding volume")
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-
-	a.logger.Debug("Setting spec.volumes")
-	spec["volumes"] = newVolumes
-
-	a.logger.Debug("iterating over containers")
-	err = collections.ForEach(spec, "containers", func(container map[string]interface{}) error {
-		var newVolumeMounts []interface{}
-		err := collections.ForEach(container, "volumeMounts", func(volumeMount map[string]interface{}) error {
-			name, err := collections.GetString(volumeMount, "name")
+			name, _, err := unstructured.NestedString(volume, "name")
 			if err != nil {
-				return err
+				return nil, nil, errors.WithStack(err)
 			}
 
-			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
 			if !defaultTokenRegex.MatchString(name) {
-				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
-				newVolumeMounts = append(newVolumeMounts, volumeMount)
-			} else {
-				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
+				nonDefaultTokenVolumes = append(nonDefaultTokenVolumes, volume)
 			}
+		}
+		if err := unstructured.SetNestedSlice(obj.UnstructuredContent(), nonDefaultTokenVolumes, "spec", "volumes"); err != nil {
+			return nil, nil, errors.WithStack(err)
+		}
+	}
 
-			return nil
-		})
-		if err != nil {
-			return err
+	containers, _, err := unstructured.NestedSlice(obj.UnstructuredContent(), "spec", "containers")
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	for i, obj := range containers {
+		container, ok := obj.(map[string]interface{})
+		if !ok {
+			return nil, nil, errors.Errorf("expected .spec.containers[%d] to be of type map[string]interface{}, was %T", i, obj)
 		}
 
-		container["volumeMounts"] = newVolumeMounts
+		volumeMounts, _, err := unstructured.NestedSlice(container, "volumeMounts")
+		if err != nil {
+			return nil, nil, errors.WithStack(err)
+		}
 
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
+		var nonDefaultTokenVolumeMounts []interface{}
+		for j, obj := range volumeMounts {
+			volumeMount, ok := obj.(map[string]interface{})
+			if !ok {
+				return nil, nil, errors.Errorf("expected .spec.volumes[%d].volumeMounts[%d] to be of type map[string]interface{}, was %T", i, j, obj)
+			}
+
+			name, _, err := unstructured.NestedString(volumeMount, "name")
+			if err != nil {
+				return nil, nil, errors.WithStack(err)
+			}
+
+			if !defaultTokenRegex.MatchString(name) {
+				nonDefaultTokenVolumeMounts = append(nonDefaultTokenVolumeMounts, volumeMount)
+			}
+		}
+		container["volumeMounts"] = nonDefaultTokenVolumeMounts
+	}
+
+	if err := unstructured.SetNestedField(obj.UnstructuredContent(), containers, "spec", "containers"); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
 	return obj, nil, nil

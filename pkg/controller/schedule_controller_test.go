@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
@@ -35,7 +36,6 @@ import (
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -160,13 +160,11 @@ func TestProcessSchedule(t *testing.T) {
 					}
 
 					// these are the fields that may be updated by the controller
-					phase, err := collections.GetString(patchMap, "status.phase")
-					if err == nil {
+					if phase, found, _ := unstructured.NestedString(patchMap, "status", "phase"); found {
 						res.Status.Phase = api.SchedulePhase(phase)
 					}
 
-					lastBackupStr, err := collections.GetString(patchMap, "status.lastBackup")
-					if err == nil {
+					if lastBackupStr, found, _ := unstructured.NestedString(patchMap, "status", "lastBackup"); found {
 						parsed, err := time.Parse(time.RFC3339, lastBackupStr)
 						if err != nil {
 							t.Logf("error parsing status.lastBackup: %s\n", err)

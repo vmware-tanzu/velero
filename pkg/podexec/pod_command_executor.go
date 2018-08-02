@@ -25,12 +25,12 @@ import (
 	"github.com/sirupsen/logrus"
 
 	kapiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -170,49 +170,34 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	return err
 }
 
-func ensureContainerExists(pod map[string]interface{}, container string) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
+func ensureContainerExists(unstructuredPod map[string]interface{}, containerName string) error {
+	pod := new(kapiv1.Pod)
+
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPod, pod); err != nil {
+		return errors.WithStack(err)
 	}
-	for _, obj := range containers {
-		c, ok := obj.(map[string]interface{})
-		if !ok {
-			return errors.Errorf("unexpected type for container %T", obj)
-		}
-		name, ok := c["name"].(string)
-		if !ok {
-			return errors.Errorf("unexpected type for container name %T", c["name"])
-		}
-		if name == container {
+
+	for _, container := range pod.Spec.Containers {
+		if container.Name == containerName {
 			return nil
 		}
 	}
 
-	return errors.Errorf("no such container: %q", container)
+	return errors.Errorf("no such container: %q", containerName)
 }
 
-func setDefaultHookContainer(pod map[string]interface{}, hook *api.ExecHook) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
+func setDefaultHookContainer(unstructuredPod map[string]interface{}, hook *api.ExecHook) error {
+	pod := new(kapiv1.Pod)
+
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPod, pod); err != nil {
+		return errors.WithStack(err)
 	}
 
-	if len(containers) < 1 {
+	if len(pod.Spec.Containers) < 1 {
 		return errors.New("need at least 1 container")
 	}
 
-	container, ok := containers[0].(map[string]interface{})
-	if !ok {
-		return errors.Errorf("unexpected type for container %T", pod)
-	}
-
-	name, ok := container["name"].(string)
-	if !ok {
-		return errors.Errorf("unexpected type for container name %T", container["name"])
-	}
-	hook.Container = name
-
+	hook.Container = pod.Spec.Containers[0].Name
 	return nil
 }
 

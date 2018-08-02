@@ -24,10 +24,11 @@ import (
 
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -47,14 +48,9 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, nil, err
-	}
-
 	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
-	if val, _ := collections.GetString(spec, "clusterIP"); val != "None" {
-		delete(spec, "clusterIP")
+	if val, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "spec", "clusterIP"); val != "None" {
+		unstructured.RemoveNestedField(obj.UnstructuredContent(), "spec", "clusterIP")
 	}
 
 	preservedPorts, err := getPreservedPorts(obj)
@@ -62,9 +58,14 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		return nil, nil, err
 	}
 
-	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
+	portsObj, _, err := unstructured.NestedFieldNoCopy(obj.UnstructuredContent(), "spec", "ports")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
+	}
+
+	ports, ok := portsObj.([]interface{})
+	if !ok {
+		return nil, nil, errors.Errorf("expected .spec.ports to be of type []interface{}, was %T", portsObj)
 	}
 
 	for _, port := range ports {

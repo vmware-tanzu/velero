@@ -26,8 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // mergeServiceAccount takes a backed up serviceaccount and merges attributes into the current in-cluster service account.
@@ -58,9 +56,9 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 
 	desired.ImagePullSecrets = mergeLocalObjectReferenceSlices(desired.ImagePullSecrets, backupSA.ImagePullSecrets)
 
-	collections.MergeMaps(desired.Labels, backupSA.Labels)
+	mergeMaps(desired.Labels, backupSA.Labels)
 
-	collections.MergeMaps(desired.Annotations, backupSA.Annotations)
+	mergeMaps(desired.Annotations, backupSA.Annotations)
 
 	desiredUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desired)
 	if err != nil {
@@ -105,6 +103,17 @@ func mergeLocalObjectReferenceSlices(first, second []corev1api.LocalObjectRefere
 	}
 
 	return first
+}
+
+// mergeMaps takes two map[string]string and merges missing keys from the second into the first.
+// If a key already exists, its value is not overwritten.
+func mergeMaps(first, second map[string]string) {
+	for k, v := range second {
+		_, ok := first[k]
+		if !ok {
+			first[k] = v
+		}
+	}
 }
 
 // generatePatch will calculate a JSON merge patch for an object's desired state.

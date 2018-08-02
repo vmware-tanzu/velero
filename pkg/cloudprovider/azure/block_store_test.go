@@ -19,7 +19,6 @@ package azure
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,13 +37,13 @@ func TestGetVolumeID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
-	// missing spec.azureDisk.diskName -> error
+	// missing spec.azureDisk.diskName -> no error
 	azure := map[string]interface{}{}
 	pv.Object["spec"] = map[string]interface{}{
 		"azureDisk": azure,
 	}
 	volumeID, err = b.GetVolumeID(pv)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
 	// valid
@@ -75,10 +74,10 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
+	actual, _, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
 	require.NoError(t, err)
 	assert.Equal(t, "updated", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
+	actual, _, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
 	require.NoError(t, err)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", actual)
 
@@ -86,10 +85,10 @@ func TestSetVolumeID(t *testing.T) {
 	azure["diskURI"] = "/foo/bar/updated/blarg"
 	updatedPV, err = b.SetVolumeID(pv, "revised")
 	require.NoError(t, err)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
+	actual, _, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskName")
 	require.NoError(t, err)
 	assert.Equal(t, "revised", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
+	actual, _, err = unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "azureDisk", "diskURI")
 	require.NoError(t, err)
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", actual)
 }

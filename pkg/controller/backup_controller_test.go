@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
@@ -42,7 +43,6 @@ import (
 	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/logging"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
@@ -255,7 +255,7 @@ func TestProcessBackup(t *testing.T) {
 					return false, nil, err
 				}
 
-				phase, err := collections.GetString(patchMap, "status.phase")
+				phase, _, err := unstructured.NestedString(patchMap, "status", "phase")
 				if err != nil {
 					t.Logf("error getting status.phase: %s\n", err)
 					return false, nil, err
@@ -269,16 +269,15 @@ func TestProcessBackup(t *testing.T) {
 				res.Status.Expiration.Time = expiration
 				res.Status.Phase = v1.BackupPhase(phase)
 
-				// If there's an error, it's mostly likely that the key wasn't found
-				// which is fine since not all patches will have them.
-				completionString, err := collections.GetString(patchMap, "status.completionTimestamp")
-				if err == nil {
+				// Fine if the nested fields are not found since not all patches will have them.
+				completionString, found, _ := unstructured.NestedString(patchMap, "status", "completionTimestamp")
+				if found {
 					completionTime, err := time.Parse(time.RFC3339Nano, completionString)
 					require.NoError(t, err, "unexpected completionTimestamp parsing error %v", err)
 					res.Status.CompletionTimestamp.Time = completionTime
 				}
-				startString, err := collections.GetString(patchMap, "status.startTimestamp")
-				if err == nil {
+				startString, found, _ := unstructured.NestedString(patchMap, "status", "startTimestamp")
+				if found {
 					startTime, err := time.Parse(time.RFC3339Nano, startString)
 					require.NoError(t, err, "unexpected startTimestamp parsing error %v", err)
 					res.Status.StartTimestamp.Time = startTime

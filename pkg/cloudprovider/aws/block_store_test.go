@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/service/ec2"
-	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -40,13 +39,13 @@ func TestGetVolumeID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
-	// missing spec.awsElasticBlockStore.volumeID -> error
+	// missing spec.awsElasticBlockStore.volumeID -> no error
 	aws := map[string]interface{}{}
 	pv.Object["spec"] = map[string]interface{}{
 		"awsElasticBlockStore": aws,
 	}
 	volumeID, err = b.GetVolumeID(pv)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
 	// regex miss
@@ -86,7 +85,7 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
+	actual, _, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "awsElasticBlockStore", "volumeID")
 	require.NoError(t, err)
 	assert.Equal(t, "vol-updated", actual)
 }

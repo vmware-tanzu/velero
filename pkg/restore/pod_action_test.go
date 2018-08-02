@@ -33,11 +33,6 @@ func TestPodActionExecute(t *testing.T) {
 		expectedRes runtime.Unstructured
 	}{
 		{
-			name:        "no spec should error",
-			obj:         NewTestUnstructured().WithName("pod-1").Unstructured,
-			expectedErr: true,
-		},
-		{
 			name: "nodeName (only) should be deleted from spec",
 			obj: NewTestUnstructured().WithName("pod-1").WithSpec("nodeName", "foo").
 				WithSpecField("volumes", []interface{}{}).

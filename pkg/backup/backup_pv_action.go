@@ -17,13 +17,14 @@ limitations under the License.
 package backup
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
@@ -47,23 +48,25 @@ func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
 func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
 	a.log.Info("Executing backupPVAction")
 
-	var additionalItems []ResourceIdentifier
+	pvc := new(corev1api.PersistentVolumeClaim)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), pvc); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
 
-	pvc := item.UnstructuredContent()
-
-	volumeName, err := collections.GetString(pvc, "spec.volumeName")
 	// if there's no volume name, it's not an error, since it's possible
 	// for the PVC not be bound; don't return an additional PV item to
 	// back up.
-	if err != nil || volumeName == "" {
+	if pvc.Spec.VolumeName == "" {
 		a.log.Info("No spec.volumeName found for PersistentVolumeClaim")
-		return nil, nil, nil
+		return item, nil, nil
 	}
 
-	additionalItems = append(additionalItems, ResourceIdentifier{
-		GroupResource: kuberesource.PersistentVolumes,
-		Name:          volumeName,
-	})
+	additionalItems := []ResourceIdentifier{
+		{
+			GroupResource: kuberesource.PersistentVolumes,
+			Name:          pvc.Spec.VolumeName,
+		},
+	}
 
 	return item, additionalItems, nil
 }

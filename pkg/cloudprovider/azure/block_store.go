@@ -33,10 +33,11 @@ import (
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const (
@@ -343,27 +344,33 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 	return snapshotID, nil
 }
 
-func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
+func (b *blockStore) GetVolumeID(obj runtime.Unstructured) (string, error) {
+	pv := new(corev1api.PersistentVolume)
+
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.AzureDisk == nil {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.azureDisk.diskName")
-	if err != nil {
-		return "", err
-	}
-
-	return volumeID, nil
+	return pv.Spec.AzureDisk.DiskName, nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
-	if err != nil {
-		return nil, err
+	if obj, _, _ := unstructured.NestedFieldNoCopy(pv.UnstructuredContent(), "spec", "azureDisk"); obj == nil {
+		return nil, errors.New(".spec.azureDisk not found")
 	}
 
-	azure["diskName"] = volumeID
-	azure["diskURI"] = getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "azureDisk", "diskName"); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	diskURI := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), diskURI, "spec", "azureDisk", "diskURI"); err != nil {
+		return nil, errors.WithStack(err)
+	}
 
 	return pv, nil
 }

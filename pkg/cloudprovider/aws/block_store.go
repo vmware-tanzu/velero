@@ -26,11 +26,12 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 const regionKey = "region"
@@ -228,26 +229,28 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
 
-func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.awsElasticBlockStore") {
+func (b *blockStore) GetVolumeID(obj runtime.Unstructured) (string, error) {
+	pv := new(corev1api.PersistentVolume)
+
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pv); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.AWSElasticBlockStore == nil {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
-	if err != nil {
-		return "", err
-	}
-
-	return ebsVolumeIDRegex.FindString(volumeID), nil
+	return ebsVolumeIDRegex.FindString(pv.Spec.AWSElasticBlockStore.VolumeID), nil
 }
 
 func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	aws, err := collections.GetMap(pv.UnstructuredContent(), "spec.awsElasticBlockStore")
-	if err != nil {
-		return nil, err
+	if obj, _, _ := unstructured.NestedFieldNoCopy(pv.UnstructuredContent(), "spec", "awsElasticBlockStore"); obj == nil {
+		return nil, errors.New(".spec.awsElasticBlockStore not found")
 	}
 
-	aws["volumeID"] = volumeID
+	if err := unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID"); err != nil {
+		return nil, errors.WithStack(err)
+	}
 
 	return pv, nil
 }

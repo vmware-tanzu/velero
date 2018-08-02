@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 
 	"github.com/stretchr/testify/assert"
@@ -41,13 +40,13 @@ func TestGetVolumeID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
-	// missing spec.gcePersistentDisk.pdName -> error
+	// missing spec.gcePersistentDisk.pdName -> no error
 	gce := map[string]interface{}{}
 	pv.Object["spec"] = map[string]interface{}{
 		"gcePersistentDisk": gce,
 	}
 	volumeID, err = b.GetVolumeID(pv)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "", volumeID)
 
 	// valid
@@ -75,7 +74,7 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "123abc")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
+	actual, _, err := unstructured.NestedString(updatedPV.UnstructuredContent(), "spec", "gcePersistentDisk", "pdName")
 	require.NoError(t, err)
 	assert.Equal(t, "123abc", actual)
 }
