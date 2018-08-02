@@ -19,12 +19,14 @@ package restore
 import (
 	"regexp"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
 )
 
 type podAction struct {
@@ -46,70 +48,57 @@ var (
 )
 
 func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	a.logger.Debug("getting spec")
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, nil, err
+	pod := new(corev1api.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+		return obj, nil, errors.WithStack(err)
 	}
 
 	a.logger.Debug("deleting spec.NodeName")
-	delete(spec, "nodeName")
+	pod.Spec.NodeName = ""
 
-	newVolumes := make([]interface{}, 0)
 	a.logger.Debug("iterating over volumes")
-	err = collections.ForEach(spec, "volumes", func(volume map[string]interface{}) error {
-		name, err := collections.GetString(volume, "name")
-		if err != nil {
-			return err
+	var volumesExDefaultTokens []corev1api.Volume
+	for _, volume := range pod.Spec.Volumes {
+		log := a.logger.WithField("volumeName", volume.Name)
+		log.Debug("Checking volume")
+
+		if defaultTokenRegex.MatchString(volume.Name) {
+			log.Debug("Excluding volume")
+			continue
 		}
 
-		a.logger.WithField("volumeName", name).Debug("Checking volume")
-		if !defaultTokenRegex.MatchString(name) {
-			a.logger.WithField("volumeName", name).Debug("Preserving volume")
-			newVolumes = append(newVolumes, volume)
-		} else {
-			a.logger.WithField("volumeName", name).Debug("Excluding volume")
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
+		log.Debug("Preserving volume")
+		volumesExDefaultTokens = append(volumesExDefaultTokens, volume)
 	}
 
 	a.logger.Debug("Setting spec.volumes")
-	spec["volumes"] = newVolumes
+	pod.Spec.Volumes = volumesExDefaultTokens
 
 	a.logger.Debug("iterating over containers")
-	err = collections.ForEach(spec, "containers", func(container map[string]interface{}) error {
-		var newVolumeMounts []interface{}
-		err := collections.ForEach(container, "volumeMounts", func(volumeMount map[string]interface{}) error {
-			name, err := collections.GetString(volumeMount, "name")
-			if err != nil {
-				return err
+	for _, container := range pod.Spec.Containers {
+		log := a.logger.WithField("containerName", container.Name)
+		var volumeMountsExDefaultTokens []corev1api.VolumeMount
+
+		for _, mount := range container.VolumeMounts {
+			log = log.WithField("volumeMount", mount.Name)
+			log.Debug("Checking volumeMount")
+
+			if defaultTokenRegex.MatchString(mount.Name) {
+				log.Debug("Excluding volumeMount")
+				continue
 			}
 
-			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
-			if !defaultTokenRegex.MatchString(name) {
-				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
-				newVolumeMounts = append(newVolumeMounts, volumeMount)
-			} else {
-				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
-			}
-
-			return nil
-		})
-		if err != nil {
-			return err
+			log.Debug("Preserving volumeMount")
+			volumeMountsExDefaultTokens = append(volumeMountsExDefaultTokens, mount)
 		}
 
-		container["volumeMounts"] = newVolumeMounts
-
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
+		container.VolumeMounts = volumeMountsExDefaultTokens
 	}
 
-	return obj, nil, nil
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
+	if err != nil {
+		return obj, nil, err
+	}
+
+	return &unstructured.Unstructured{Object: res}, nil, nil
 }
