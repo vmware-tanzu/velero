@@ -328,7 +328,7 @@ func (s *server) arkResourcesExist() error {
 	}
 
 	if arkGroupVersion == nil {
-		return errors.Errorf("Ark API group %s not found", api.SchemeGroupVersion)
+		return errors.Errorf("Ark API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
 	}
 
 	foundResources := sets.NewString()
@@ -347,6 +347,7 @@ func (s *server) arkResourcesExist() error {
 	}
 
 	if len(errs) > 0 {
+		errs = append(errs, errors.New("Ark custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
 		return kubeerrs.NewAggregate(errs)
 	}
 
