@@ -64,6 +64,8 @@ Heptio Ark treats object storage as the source of truth. It continuously checks 
 
 This allows restore functionality to work in a cluster migration scenario, where the original backup objects do not exist in the new cluster.
 
+Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
+
 [19]: /img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
