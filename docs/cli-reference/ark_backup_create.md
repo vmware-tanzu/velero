@@ -27,6 +27,7 @@ ark backup create NAME [flags]
       --show-labels                                     show labels in the last column
       --snapshot-volumes optionalBool[=true]            take snapshots of PersistentVolumes as part of the backup
       --ttl duration                                    how long before the backup can be garbage collected (default 720h0m0s)
+  -w, --wait                                            wait for the operation to complete
 ```
 
 ### Options inherited from parent commands

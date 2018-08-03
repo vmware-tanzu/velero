@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
@@ -47,6 +49,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	}
 
 	o.BindFlags(c.Flags())
+	o.BindWait(c.Flags())
 	output.BindFlags(c.Flags())
 	output.ClearOutputFlagDefault(c)
 
@@ -64,6 +67,7 @@ type CreateOptions struct {
 	Labels                  flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
+	Wait                    bool
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -91,6 +95,12 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the backup")
 	f.NoOptDefVal = "true"
+}
+
+// BindWait binds the wait flag separately so it is not called by other create
+// commands that reuse CreateOptions's BindFlags method.
+func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
+	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
@@ -134,12 +144,78 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
+	var backupInformer cache.SharedIndexInformer
+	var updates chan *api.Backup
+	if o.Wait {
+		stop := make(chan struct{})
+		defer close(stop)
+
+		updates = make(chan *api.Backup)
+
+		backupInformer = v1.NewBackupInformer(arkClient, f.Namespace(), 0, nil)
+
+		backupInformer.AddEventHandler(
+			cache.FilteringResourceEventHandler{
+				FilterFunc: func(obj interface{}) bool {
+					backup, ok := obj.(*api.Backup)
+					if !ok {
+						return false
+					}
+					return backup.Name == o.Name
+				},
+				Handler: cache.ResourceEventHandlerFuncs{
+					UpdateFunc: func(_, obj interface{}) {
+						backup, ok := obj.(*api.Backup)
+						if !ok {
+							return
+						}
+						updates <- backup
+					},
+					DeleteFunc: func(obj interface{}) {
+						backup, ok := obj.(*api.Backup)
+						if !ok {
+							return
+						}
+						updates <- backup
+					},
+				},
+			},
+		)
+		go backupInformer.Run(stop)
+	}
+
 	_, err = arkClient.ArkV1().Backups(backup.Namespace).Create(backup)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Backup request %q submitted successfully.\n", backup.Name)
-	fmt.Printf("Run `ark backup describe %s` for more details.\n", backup.Name)
+	if o.Wait {
+		fmt.Println("Waiting for backup to complete. You may safely press ctrl-c to stop waiting - your backup will continue in the background.")
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				fmt.Print(".")
+			case backup, ok := <-updates:
+				if !ok {
+					fmt.Println("\nError waiting: unable to watch backups.")
+					return nil
+				}
+
+				if backup.Status.Phase != api.BackupPhaseNew && backup.Status.Phase != api.BackupPhaseInProgress {
+					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `ark backup describe %s` and `ark backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
+					return nil
+				}
+			}
+		}
+	}
+
+	// Not waiting
+
+	fmt.Printf("Run `ark backup describe %s` or `ark backup logs %s` for more details.\n", backup.Name, backup.Name)
+
 	return nil
 }
