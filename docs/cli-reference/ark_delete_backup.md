@@ -1,21 +1,43 @@
 ## ark delete backup
 
-Delete a backup
+Delete backups
 
 ### Synopsis
 
 
-Delete a backup
+Delete backups
 
 ```
-ark delete backup NAME [flags]
+ark delete backup [NAMES] [flags]
+```
+
+### Examples
+
+```
+  # delete a backup named "backup-1"
+  ark backup delete backup-1
+
+  # delete a backup named "backup-1" without prompting for confirmation
+  ark backup delete backup-1 --confirm
+
+  # delete backups named "backup-1" and "backup-2"
+  ark backup delete backup-1 backup-2
+
+  # delete all backups triggered by schedule "schedule-1"
+  ark backup delete --selector ark-schedule=schedule-1
+ 
+  # delete all backups
+  ark backup delete --all
+  
 ```
 
 ### Options
 
 ```
-      --confirm   Confirm deletion
-  -h, --help      help for backup
+      --all                      Delete all backups
+      --confirm                  Confirm deletion
+  -h, --help                     help for backup
+  -l, --selector labelSelector   Delete all backups matching this label selector (default <none>)
 ```
 
 ### Options inherited from parent commands

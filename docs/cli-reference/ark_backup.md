@@ -31,7 +31,7 @@ Work with backups
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark backup create](ark_backup_create.md)	 - Create a backup
-* [ark backup delete](ark_backup_delete.md)	 - Delete a backup
+* [ark backup delete](ark_backup_delete.md)	 - Delete backups
 * [ark backup describe](ark_backup_describe.md)	 - Describe backups
 * [ark backup download](ark_backup_download.md)	 - Download a backup
 * [ark backup get](ark_backup_get.md)	 - Get backups
