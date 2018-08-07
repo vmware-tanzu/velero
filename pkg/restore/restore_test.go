@@ -1404,9 +1404,18 @@ func (obj *testUnstructured) WithStatusField(field string, value interface{}) *t
 }
 
 func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured {
-	annotations := make(map[string]interface{})
+	vals := map[string]string{}
 	for _, field := range fields {
-		annotations[field] = "foo"
+		vals[field] = "foo"
+	}
+
+	return obj.WithAnnotationValues(vals)
+}
+
+func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
+	annotations := make(map[string]interface{})
+	for field, val := range fieldVals {
+		annotations[field] = val
 	}
 
 	obj = obj.WithMetadataField("annotations", annotations)
