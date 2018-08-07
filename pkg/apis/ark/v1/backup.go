@@ -16,7 +16,9 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // BackupSpec defines the specification for an Ark backup.
 type BackupSpec struct {
@@ -56,6 +58,9 @@ type BackupSpec struct {
 
 	// Hooks represent custom behaviors that should be executed at different phases of the backup.
 	Hooks BackupHooks `json:"hooks"`
+
+	// StorageLocation is a string containing the name of a BackupStorageLocation where the backup should be stored.
+	StorageLocation string `json:"storageLocation"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
