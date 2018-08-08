@@ -30,7 +30,7 @@ Delete ark resources
 
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark delete backup](ark_delete_backup.md)	 - Delete a backup
+* [ark delete backup](ark_delete_backup.md)	 - Delete backups
 * [ark delete restore](ark_delete_restore.md)	 - Delete a restore
 * [ark delete schedule](ark_delete_schedule.md)	 - Delete a schedule
 
