@@ -760,8 +760,9 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			obj.SetNamespace(namespace)
 		}
 
-		// add an ark-restore label to each resource for easy ID
-		addLabel(obj, api.RestoreLabelKey, ctx.restore.Name)
+		// label the resource with the restore's name for easy identification
+		// of all cluster resources created by this restore
+		addRestoreLabel(obj, ctx.restore.Name)
 
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, name)
 		createdObj, restoreErr := resourceClient.Create(obj)
@@ -782,8 +783,8 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 			// We know the cluster won't have the restore name label, so
 			// copy it over from the backup
-			restoreName := obj.GetLabels()[api.RestoreLabelKey]
-			addLabel(fromCluster, api.RestoreLabelKey, restoreName)
+			restoreName := obj.GetLabels()[api.RestoreNameLabel]
+			addRestoreLabel(fromCluster, restoreName)
 
 			if !equality.Semantic.DeepEqual(fromCluster, obj) {
 				switch groupResource {
@@ -997,15 +998,20 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 	return obj, nil
 }
 
-// addLabel applies the specified key/value to an object as a label.
-func addLabel(obj *unstructured.Unstructured, key string, val string) {
+// addRestoreLabel applies the specified key/value to an object as a label.
+func addRestoreLabel(obj metav1.Object, restoreName string) {
 	labels := obj.GetLabels()
 
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
-	labels[key] = val
+	labels[api.RestoreNameLabel] = restoreName
+
+	// TODO(1.0): remove the below line, and remove the `RestoreLabelKey`
+	// constant from the API pkg, since it's been replaced with the
+	// namespaced label above.
+	labels[api.RestoreLabelKey] = restoreName
 
 	obj.SetLabels(labels)
 }
