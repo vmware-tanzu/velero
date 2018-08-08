@@ -760,9 +760,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			obj.SetNamespace(namespace)
 		}
 
-		// label the resource with the restore's name for easy identification
-		// of all cluster resources created by this restore
-		addRestoreLabel(obj, ctx.restore.Name)
+		// label the resource with the restore's name and the restored backup's name
+		// for easy identification of all cluster resources created by this restore
+		// and which backup they came from
+		addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, name)
 		createdObj, restoreErr := resourceClient.Create(obj)
@@ -781,10 +782,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 				continue
 			}
 
-			// We know the cluster won't have the restore name label, so
-			// copy it over from the backup
-			restoreName := obj.GetLabels()[api.RestoreNameLabel]
-			addRestoreLabel(fromCluster, restoreName)
+			// We know the object from the cluster won't have the backup/restore name labels, so
+			// copy them from the object we attempted to restore.
+			labels := obj.GetLabels()
+			addRestoreLabels(fromCluster, labels[api.RestoreNameLabel], labels[api.BackupNameLabel])
 
 			if !equality.Semantic.DeepEqual(fromCluster, obj) {
 				switch groupResource {
@@ -998,14 +999,16 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 	return obj, nil
 }
 
-// addRestoreLabel applies the specified key/value to an object as a label.
-func addRestoreLabel(obj metav1.Object, restoreName string) {
+// addRestoreLabels labels the provided object with the restore name and
+// the restored backup's name.
+func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 	labels := obj.GetLabels()
 
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
+	labels[api.BackupNameLabel] = backupName
 	labels[api.RestoreNameLabel] = restoreName
 
 	// TODO(1.0): remove the below line, and remove the `RestoreLabelKey`

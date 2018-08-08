@@ -312,7 +312,7 @@ func TestNamespaceRemapping(t *testing.T) {
 
 	resourceClient := &arktest.FakeDynamicClient{}
 	for i := range expectedObjs {
-		addRestoreLabel(&expectedObjs[i], "")
+		addRestoreLabels(&expectedObjs[i], "", "")
 		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
 	}
 
@@ -594,7 +594,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resourceClient := &arktest.FakeDynamicClient{}
 			for i := range test.expectedObjs {
-				addRestoreLabel(&test.expectedObjs[i], "my-restore")
+				addRestoreLabels(&test.expectedObjs[i], "my-restore", "my-backup")
 				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
 			}
 
@@ -626,6 +626,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 					Spec: api.RestoreSpec{
 						IncludeClusterResources: test.includeClusterResources,
+						BackupName:              "my-backup",
 					},
 				},
 				backup:     &api.Backup{},
@@ -680,7 +681,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 				m[k] = v
 			}
 			fromBackupWithLabel := &unstructured.Unstructured{Object: m}
-			addRestoreLabel(fromBackupWithLabel, "my-restore")
+			addRestoreLabels(fromBackupWithLabel, "my-restore", "my-backup")
 			// resetMetadataAndStatus will strip the creationTimestamp before calling Create
 			fromBackupWithLabel.SetCreationTimestamp(metav1.Time{Time: time.Time{}})
 
@@ -711,6 +712,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 					},
 					Spec: api.RestoreSpec{
 						IncludeClusterResources: nil,
+						BackupName:              "my-backup",
 					},
 				},
 				backup: &api.Backup{},
@@ -922,7 +924,7 @@ status:
 			}
 
 			resetMetadataAndStatus(unstructuredPV)
-			addRestoreLabel(unstructuredPV, ctx.restore.Name)
+			addRestoreLabels(unstructuredPV, ctx.restore.Name, ctx.restore.Spec.BackupName)
 			unstructuredPV.Object["foo"] = "bar"
 
 			if test.expectPVCreation {
@@ -964,7 +966,7 @@ status:
 			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
 
 			resetMetadataAndStatus(unstructuredPVC)
-			addRestoreLabel(unstructuredPVC, ctx.restore.Name)
+			addRestoreLabels(unstructuredPVC, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 			createdPVC := unstructuredPVC.DeepCopy()
 			// just to ensure we have the data flowing correctly
