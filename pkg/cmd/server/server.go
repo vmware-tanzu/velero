@@ -77,9 +77,10 @@ const (
 
 func NewCommand() *cobra.Command {
 	var (
-		logLevelFlag   = logging.LogLevelFlag(logrus.InfoLevel)
-		pluginDir      = "/plugins"
-		metricsAddress = defaultMetricsAddress
+		logLevelFlag          = logging.LogLevelFlag(logrus.InfoLevel)
+		pluginDir             = "/plugins"
+		metricsAddress        = defaultMetricsAddress
+		defaultBackupLocation = "default"
 	)
 
 	var command = &cobra.Command{
@@ -114,7 +115,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, metricsAddress, logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, metricsAddress, defaultBackupLocation, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -124,6 +125,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&pluginDir, "plugin-dir", pluginDir, "directory containing Ark plugins")
 	command.Flags().StringVar(&metricsAddress, "metrics-address", metricsAddress, "the address to expose prometheus metrics")
+	command.Flags().StringVar(&defaultBackupLocation, "default-backup-storage-location", defaultBackupLocation, "name of the default backup storage location")
 
 	return command
 }
@@ -162,9 +164,10 @@ type server struct {
 	pluginManager         plugin.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
+	defaultBackupLocation string
 }
 
-func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName, pluginDir, metricsAddr, defaultBackupLocation string, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -205,12 +208,13 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
-		ctx:            ctx,
-		cancelFunc:     cancelFunc,
-		logger:         logger,
-		logLevel:       logger.Level,
-		pluginRegistry: pluginRegistry,
-		pluginManager:  pluginManager,
+		ctx:                   ctx,
+		cancelFunc:            cancelFunc,
+		logger:                logger,
+		logLevel:              logger.Level,
+		pluginRegistry:        pluginRegistry,
+		pluginManager:         pluginManager,
+		defaultBackupLocation: defaultBackupLocation,
 	}
 
 	return s, nil
