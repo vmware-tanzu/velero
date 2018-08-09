@@ -30,47 +30,60 @@ func TestGetRepoIdentifier(t *testing.T) {
 	getAWSBucketRegion = func(string) (string, error) {
 		return "", errors.New("no region found")
 	}
-	config := arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{Name: "aws"},
-		ResticLocation:      "bucket/prefix",
+
+	backupLocation := &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "aws",
+			Config:   map[string]string{ResticLocationConfigKey: "bucket/prefix"},
+		},
 	}
-	assert.Equal(t, "s3:s3.amazonaws.com/bucket/prefix/repo-1", GetRepoIdentifier(config, "repo-1"))
+	assert.Equal(t, "s3:s3.amazonaws.com/bucket/prefix/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
 	// stub implementation of getAWSBucketRegion
 	getAWSBucketRegion = func(string) (string, error) {
 		return "us-west-2", nil
 	}
 
-	config = arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{Name: "aws"},
-		ResticLocation:      "bucket",
-	}
-	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/repo-1", GetRepoIdentifier(config, "repo-1"))
-
-	config = arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{Name: "aws"},
-		ResticLocation:      "bucket/prefix",
-	}
-	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/prefix/repo-1", GetRepoIdentifier(config, "repo-1"))
-
-	config = arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{
-			Name:   "aws",
-			Config: map[string]string{"s3Url": "alternate-url"},
+	backupLocation = &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "aws",
+			Config:   map[string]string{ResticLocationConfigKey: "bucket"},
 		},
-		ResticLocation: "bucket/prefix",
 	}
-	assert.Equal(t, "s3:alternate-url/bucket/prefix/repo-1", GetRepoIdentifier(config, "repo-1"))
+	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	config = arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{Name: "azure"},
-		ResticLocation:      "bucket/prefix",
+	backupLocation = &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "aws",
+			Config:   map[string]string{ResticLocationConfigKey: "bucket/prefix"},
+		},
 	}
-	assert.Equal(t, "azure:bucket:/prefix/repo-1", GetRepoIdentifier(config, "repo-1"))
+	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/prefix/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	config = arkv1api.ObjectStorageProviderConfig{
-		CloudProviderConfig: arkv1api.CloudProviderConfig{Name: "gcp"},
-		ResticLocation:      "bucket-2/prefix-2",
+	backupLocation = &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "aws",
+			Config: map[string]string{
+				ResticLocationConfigKey: "bucket/prefix",
+				"s3Url":                 "alternate-url",
+			},
+		},
 	}
-	assert.Equal(t, "gs:bucket-2:/prefix-2/repo-2", GetRepoIdentifier(config, "repo-2"))
+	assert.Equal(t, "s3:alternate-url/bucket/prefix/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
+
+	backupLocation = &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "azure",
+			Config:   map[string]string{ResticLocationConfigKey: "bucket/prefix"},
+		},
+	}
+	assert.Equal(t, "azure:bucket:/prefix/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
+
+	backupLocation = &arkv1api.BackupStorageLocation{
+		Spec: arkv1api.BackupStorageLocationSpec{
+			Provider: "gcp",
+			Config:   map[string]string{ResticLocationConfigKey: "bucket-2/prefix-2"},
+		},
+	}
+	assert.Equal(t, "gs:bucket-2:/prefix-2/repo-2", GetRepoIdentifier(backupLocation, "repo-2"))
 }

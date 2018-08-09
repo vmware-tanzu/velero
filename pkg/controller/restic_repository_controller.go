@@ -44,7 +44,7 @@ type resticRepositoryController struct {
 
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter
 	resticRepositoryLister listers.ResticRepositoryLister
-	objectStorageConfig    arkv1api.ObjectStorageProviderConfig
+	storageLocation        *arkv1api.BackupStorageLocation
 	repositoryManager      restic.RepositoryManager
 
 	clock clock.Clock
@@ -55,14 +55,14 @@ func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer informers.ResticRepositoryInformer,
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter,
-	objectStorageConfig arkv1api.ObjectStorageProviderConfig,
+	storageLocation *arkv1api.BackupStorageLocation,
 	repositoryManager restic.RepositoryManager,
 ) Interface {
 	c := &resticRepositoryController{
 		genericController:      newGenericController("restic-repository", logger),
 		resticRepositoryClient: resticRepositoryClient,
 		resticRepositoryLister: resticRepositoryInformer.Lister(),
-		objectStorageConfig:    objectStorageConfig,
+		storageLocation:        storageLocation,
 		repositoryManager:      repositoryManager,
 		clock:                  &clock.RealClock{},
 	}
@@ -139,7 +139,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := c.patchResticRepository(req, func(r *v1.ResticRepository) {
-		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(c.objectStorageConfig, r.Name)
+		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(c.storageLocation, r.Name)
 
 		if r.Spec.MaintenanceFrequency.Duration <= 0 {
 			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}

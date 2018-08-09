@@ -36,6 +36,7 @@ const (
 	DaemonSet                   = "restic"
 	InitContainer               = "restic-wait"
 	DefaultMaintenanceFrequency = 24 * time.Hour
+	ResticLocationConfigKey     = "restic-location"
 
 	podAnnotationPrefix       = "snapshot.ark.heptio.com/"
 	volumesToBackupAnnotation = "backup.ark.heptio.com/backup-volumes"
