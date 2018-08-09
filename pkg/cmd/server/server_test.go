@@ -30,28 +30,28 @@ import (
 
 func TestApplyConfigDefaults(t *testing.T) {
 	var (
-		logger = arktest.NewLogger()
 		c      = &v1.Config{}
+		server = &server{
+			logger: arktest.NewLogger(),
+			config: serverConfig{},
+		}
 	)
 
 	// test defaulting
-	applyConfigDefaults(c, logger)
-	assert.Equal(t, defaultGCSyncPeriod, c.GCSyncPeriod.Duration)
-	assert.Equal(t, defaultBackupSyncPeriod, c.BackupSyncPeriod.Duration)
-	assert.Equal(t, defaultScheduleSyncPeriod, c.ScheduleSyncPeriod.Duration)
-	assert.Equal(t, defaultResourcePriorities, c.ResourcePriorities)
+	server.applyConfigDefaults(c)
+	assert.Equal(t, defaultBackupSyncPeriod, server.config.backupSyncPeriod)
+	assert.Equal(t, defaultPodVolumeOperationTimeout, server.config.podVolumeOperationTimeout)
+	assert.Equal(t, defaultRestorePriorities, server.config.restoreResourcePriorities)
 
-	// make sure defaulting doesn't overwrite real values
-	c.GCSyncPeriod.Duration = 5 * time.Minute
-	c.BackupSyncPeriod.Duration = 4 * time.Minute
-	c.ScheduleSyncPeriod.Duration = 3 * time.Minute
-	c.ResourcePriorities = []string{"a", "b"}
+	// // make sure defaulting doesn't overwrite real values
+	server.config.backupSyncPeriod = 4 * time.Minute
+	server.config.podVolumeOperationTimeout = 5 * time.Second
+	server.config.restoreResourcePriorities = []string{"a", "b"}
 
-	applyConfigDefaults(c, logger)
-	assert.Equal(t, 5*time.Minute, c.GCSyncPeriod.Duration)
-	assert.Equal(t, 4*time.Minute, c.BackupSyncPeriod.Duration)
-	assert.Equal(t, 3*time.Minute, c.ScheduleSyncPeriod.Duration)
-	assert.Equal(t, []string{"a", "b"}, c.ResourcePriorities)
+	server.applyConfigDefaults(c)
+	assert.Equal(t, 4*time.Minute, server.config.backupSyncPeriod)
+	assert.Equal(t, 5*time.Second, server.config.podVolumeOperationTimeout)
+	assert.Equal(t, []string{"a", "b"}, server.config.restoreResourcePriorities)
 }
 
 func TestArkResourcesExist(t *testing.T) {

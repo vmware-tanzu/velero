@@ -128,7 +128,6 @@ func TestProcessSchedule(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				sharedInformers.Ark().V1().Schedules(),
-				time.Duration(0),
 				logger,
 				metrics.NewServerMetrics(),
 			)

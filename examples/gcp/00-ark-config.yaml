@@ -29,7 +29,4 @@ backupStorageProvider:
   # This MUST be a different bucket than the main Ark bucket
   # specified just above.
   # resticLocation: <YOUR_RESTIC_LOCATION>
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
-restoreOnlyMode: false
+

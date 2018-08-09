@@ -20,8 +20,6 @@ import (
 	"time"
 
 	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type arkConfigOption func(*arkConfig)
@@ -97,18 +95,5 @@ func Config(
 			Bucket:         bucket,
 			ResticLocation: c.resticLocation,
 		},
-		BackupSyncPeriod: metav1.Duration{
-			Duration: c.backupSyncPeriod,
-		},
-		GCSyncPeriod: metav1.Duration{
-			Duration: c.gcSyncPeriod,
-		},
-		ScheduleSyncPeriod: metav1.Duration{
-			Duration: time.Minute,
-		},
-		PodVolumeOperationTimeout: metav1.Duration{
-			Duration: c.podVolumeOperationTimeout,
-		},
-		RestoreOnlyMode: c.restoreOnly,
 	}
 }

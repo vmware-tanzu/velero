@@ -45,31 +45,6 @@ type Config struct {
 	// Ark backups are stored in object storage. This may be a different cloud than
 	// where the cluster is running.
 	BackupStorageProvider ObjectStorageProviderConfig `json:"backupStorageProvider"`
-
-	// BackupSyncPeriod is how often the BackupSyncController runs to ensure all
-	// Ark backups in object storage exist as Backup API objects in the cluster.
-	BackupSyncPeriod metav1.Duration `json:"backupSyncPeriod"`
-
-	// GCSyncPeriod is how often the GCController runs to delete expired backup
-	// API objects and corresponding backup files in object storage.
-	GCSyncPeriod metav1.Duration `json:"gcSyncPeriod"`
-
-	// ScheduleSyncPeriod is how often the ScheduleController runs to check for
-	// new backups that should be triggered based on schedules.
-	ScheduleSyncPeriod metav1.Duration `json:"scheduleSyncPeriod"`
-
-	// PodVolumeOperationTimeout is how long backups/restores of pod volumes (i.e.
-	// using restic) should be allowed to run before timing out.
-	PodVolumeOperationTimeout metav1.Duration `json:"podVolumeOperationTimeout"`
-
-	// ResourcePriorities is an ordered slice of resources specifying the desired
-	// order of resource restores. Any resources not in the list will be restored
-	// alphabetically after the prioritized resources.
-	ResourcePriorities []string `json:"resourcePriorities"`
-
-	// RestoreOnlyMode is whether Ark should run in a mode where only restores
-	// are allowed; backups, schedules, and garbage-collection are all disabled.
-	RestoreOnlyMode bool `json:"restoreOnlyMode"`
 }
 
 // CloudProviderConfig is configuration information about how to connect

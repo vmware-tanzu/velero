@@ -33,7 +33,3 @@ backupStorageProvider:
   # resticLocation: <YOUR_RESTIC_LOCATION>
   config:
     region: <YOUR_REGION>
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
-restoreOnlyMode: false
