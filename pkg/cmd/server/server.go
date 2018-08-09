@@ -92,6 +92,7 @@ func NewCommand() *cobra.Command {
 			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities: defaultRestorePriorities,
 		}
+		defaultBackupLocation = "default"
 	)
 
 	var command = &cobra.Command{
@@ -126,7 +127,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, defaultBackupLocation, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -140,6 +141,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
+	command.Flags().StringVar(&defaultBackupLocation, "default-backup-storage-location", defaultBackupLocation, "name of the default backup storage location")
 
 	return command
 }
@@ -179,9 +181,10 @@ type server struct {
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
+	defaultBackupLocation string
 }
 
-func newServer(namespace, baseName string, config serverConfig, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName string, config serverConfig, defaultBackupLocation string, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -222,13 +225,14 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
-		ctx:            ctx,
-		cancelFunc:     cancelFunc,
-		logger:         logger,
-		logLevel:       logger.Level,
-		pluginRegistry: pluginRegistry,
-		pluginManager:  pluginManager,
-		config:         config,
+		ctx:                   ctx,
+		cancelFunc:            cancelFunc,
+		logger:                logger,
+		logLevel:              logger.Level,
+		pluginRegistry:        pluginRegistry,
+		pluginManager:         pluginManager,
+		config:                config,
+		defaultBackupLocation: defaultBackupLocation,
 	}
 
 	return s, nil
