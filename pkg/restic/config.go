@@ -38,9 +38,10 @@ var getAWSBucketRegion = aws.GetBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
-func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
+func getRepoPrefix(location *arkv1api.BackupStorageLocation) string {
 	var (
-		parts                = strings.SplitN(config.ResticLocation, "/", 2)
+		resticLocation       = location.Spec.Config[ResticLocationConfigKey]
+		parts                = strings.SplitN(resticLocation, "/", 2)
 		bucket, path, prefix string
 	)
 
@@ -51,13 +52,13 @@ func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
 		path = parts[1]
 	}
 
-	switch BackendType(config.Name) {
+	switch BackendType(location.Spec.Provider) {
 	case AWSBackend:
 		var url string
 		switch {
 		// non-AWS, S3-compatible object store
-		case config.Config["s3Url"] != "":
-			url = config.Config["s3Url"]
+		case location.Spec.Config["s3Url"] != "":
+			url = location.Spec.Config["s3Url"]
 		default:
 			region, err := getAWSBucketRegion(bucket)
 			if err != nil {
@@ -68,7 +69,7 @@ func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
 			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
-		return fmt.Sprintf("s3:%s/%s", url, config.ResticLocation)
+		return fmt.Sprintf("s3:%s/%s", url, resticLocation)
 	case AzureBackend:
 		prefix = "azure"
 	case GCPBackend:
@@ -80,8 +81,8 @@ func getRepoPrefix(config arkv1api.ObjectStorageProviderConfig) string {
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
 // restic commands for the given repository.
-func GetRepoIdentifier(config arkv1api.ObjectStorageProviderConfig, name string) string {
-	prefix := getRepoPrefix(config)
+func GetRepoIdentifier(location *arkv1api.BackupStorageLocation, name string) string {
+	prefix := getRepoPrefix(location)
 
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(prefix, "/"), name)
 }

@@ -271,6 +271,11 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
+	backupStorageLocation, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.defaultBackupLocation, metav1.GetOptions{})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
 	if err != nil {
 		return err
@@ -288,13 +293,13 @@ func (s *server) run() error {
 		s.blockStore = blockStore
 	}
 
-	if config.BackupStorageProvider.ResticLocation != "" {
-		if err := s.initRestic(config.BackupStorageProvider); err != nil {
+	if backupStorageLocation.Spec.Config[restic.ResticLocationConfigKey] != "" {
+		if err := s.initRestic(backupStorageLocation.Spec.Provider); err != nil {
 			return err
 		}
 	}
 
-	if err := s.runControllers(config); err != nil {
+	if err := s.runControllers(config, backupStorageLocation); err != nil {
 		return err
 	}
 
@@ -525,7 +530,7 @@ func durationMin(a, b time.Duration) time.Duration {
 	return b
 }
 
-func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
+func (s *server) initRestic(providerName string) error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
@@ -539,7 +544,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 	}
 
 	// set the env vars that restic uses for creds purposes
-	if config.Name == string(restic.AzureBackend) {
+	if providerName == string(restic.AzureBackend) {
 		os.Setenv("AZURE_ACCOUNT_NAME", os.Getenv("AZURE_STORAGE_ACCOUNT_ID"))
 		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
 	}
@@ -578,7 +583,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 	return nil
 }
 
-func (s *server) runControllers(config *api.Config) error {
+func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.BackupStorageLocation) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
@@ -755,7 +760,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.logger,
 			s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 			s.arkClient.ArkV1(),
-			config.BackupStorageProvider,
+			defaultBackupLocation,
 			s.resticManager,
 		)
 		wg.Add(1)
