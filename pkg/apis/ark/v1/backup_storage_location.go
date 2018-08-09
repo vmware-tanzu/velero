@@ -34,9 +34,9 @@ type BackupStorageLocation struct {
 
 // BackupStorageLocationList is a list of BackupStorageLocations.
 type BackupStorageLocationList struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Items             []BackupStorageLocation `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []BackupStorageLocation `json:"items"`
 }
 
 // StorageType represents the type of storage that a backup location uses.
