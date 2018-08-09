@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2018 the Heptio Ark contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,30 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package create
+package backuplocation
 
 import (
 	"github.com/spf13/cobra"
 
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/cli/backup"
-	"github.com/heptio/ark/pkg/cmd/cli/backuplocation"
-	"github.com/heptio/ark/pkg/cmd/cli/restore"
-	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
-		Use:   "create",
-		Short: "Create ark resources",
-		Long:  "Create ark resources",
+		Use:   "backup-location",
+		Short: "Work with backup storage locations",
+		Long:  "Work with backup storage locations",
 	}
 
 	c.AddCommand(
-		backup.NewCreateCommand(f, "backup"),
-		schedule.NewCreateCommand(f, "schedule"),
-		restore.NewCreateCommand(f, "restore"),
-		backuplocation.NewCreateCommand(f, "backup-location"),
+		NewCreateCommand(f, "create"),
+		NewGetCommand(f, "get"),
 	)
 
 	return c
