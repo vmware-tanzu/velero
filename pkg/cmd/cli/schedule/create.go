@@ -51,8 +51,8 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 		Example: `ark create schedule NAME --schedule="0 */6 * * *"`,
 		Args:    cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Complete(args))
-			cmd.CheckError(o.Validate(c, args))
+			cmd.CheckError(o.Complete(args, f))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -82,16 +82,16 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "a cron expression specifying a recurring schedule for this backup to run")
 }
 
-func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
+func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if len(o.Schedule) == 0 {
 		return errors.New("--schedule is required")
 	}
 
-	return o.BackupOptions.Validate(c, args)
+	return o.BackupOptions.Validate(c, args, f)
 }
 
-func (o *CreateOptions) Complete(args []string) error {
-	return o.BackupOptions.Complete(args)
+func (o *CreateOptions) Complete(args []string, f client.Factory) error {
+	return o.BackupOptions.Complete(args, f)
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
@@ -114,6 +114,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				LabelSelector:      o.BackupOptions.Selector.LabelSelector,
 				SnapshotVolumes:    o.BackupOptions.SnapshotVolumes.Value,
 				TTL:                metav1.Duration{Duration: o.BackupOptions.TTL},
+				StorageLocation:    o.BackupOptions.StorageLocation,
 			},
 			Schedule: o.Schedule,
 		},

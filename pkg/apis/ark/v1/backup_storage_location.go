@@ -18,6 +18,7 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BackupStorageLocation is a location where Ark stores backup objects.
@@ -33,9 +34,9 @@ type BackupStorageLocation struct {
 
 // BackupStorageLocationList is a list of BackupStorageLocations.
 type BackupStorageLocationList struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
-	Items             []BackupStorageLocation `json:"items"`
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+	Items           []BackupStorageLocation `json:"items"`
 }
 
 // StorageType represents the type of storage that a backup location uses.
