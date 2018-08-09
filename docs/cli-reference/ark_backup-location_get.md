@@ -1,16 +1,24 @@
-## ark create
+## ark backup-location get
 
-Create ark resources
+Get backup storage locations
 
 ### Synopsis
 
 
-Create ark resources
+Get backup storage locations
+
+```
+ark backup-location get [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for create
+  -h, --help                        help for get
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
+  -l, --selector string             only show items matching this label selector
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -29,9 +37,5 @@ Create ark resources
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark create backup](ark_create_backup.md)	 - Create a backup
-* [ark create backup-location](ark_create_backup-location.md)	 - Create a backup storage location
-* [ark create restore](ark_create_restore.md)	 - Create a restore
-* [ark create schedule](ark_create_schedule.md)	 - Create a schedule
+* [ark backup-location](ark_backup-location.md)	 - Work with backup storage locations
 
