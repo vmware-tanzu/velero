@@ -23,6 +23,7 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	"github.com/heptio/ark/pkg/cmd/cli/backuplocation"
 	"github.com/heptio/ark/pkg/cmd/cli/bug"
 	cliclient "github.com/heptio/ark/pkg/cmd/cli/client"
 	"github.com/heptio/ark/pkg/cmd/cli/completion"
@@ -71,6 +72,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		completion.NewCommand(),
 		restic.NewCommand(f),
 		bug.NewCommand(),
+		backuplocation.NewCommand(f),
 	)
 
 	// add the glog flags
