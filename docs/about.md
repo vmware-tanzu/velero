@@ -29,7 +29,7 @@ Scheduled backups are saved with the name `<SCHEDULE NAME>-<TIMESTAMP>`, where `
 
 The **restore** operation allows you to restore all of the objects and persistent volumes from a previously created backup. You can also restore only a filtered subset of objects and persistent volumes. Ark supports multiple namespace remapping--for example, in a single restore, objects in namespace "abc" can be recreated under namespace "def", and the objects in namespace "123" under "456".
 
-The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `ark-restore` and value `<RESTORE NAME>`.
+The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `ark.heptio.com/restore-name` and value `<RESTORE NAME>`.
 
 You can also run the Ark server in restore-only mode, which disables backup, schedule, and garbage collection functionality during disaster recovery.
 

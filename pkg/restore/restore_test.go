@@ -307,11 +307,12 @@ func TestNamespaceRemapping(t *testing.T) {
 					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
 					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
 		expectedNS   = "ns-2"
-		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("").ConfigMap)
+		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap)
 	)
 
 	resourceClient := &arktest.FakeDynamicClient{}
 	for i := range expectedObjs {
+		addRestoreLabels(&expectedObjs[i], "", "")
 		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
 	}
 
@@ -381,8 +382,8 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").WithArkLabel("my-restore").ConfigMap,
-				newNamedTestConfigMap("cm-2").WithArkLabel("my-restore").ConfigMap,
+				newNamedTestConfigMap("cm-1").ConfigMap,
+				newNamedTestConfigMap("cm-2").ConfigMap,
 			),
 		},
 		{
@@ -415,7 +416,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					"ns-1": {"error decoding \"configmaps/cm-1-invalid.json\": invalid character 'h' in literal true (expecting 'r')"},
 				},
 			},
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").WithArkLabel("my-restore").ConfigMap),
+			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
 		},
 		{
 			name:          "matching label selector correctly includes",
@@ -423,7 +424,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "bar"})),
 			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).WithArkLabel("my-restore").ConfigMap),
+			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ConfigMap),
 		},
 		{
 			name:          "non-matching label selector correctly excludes",
@@ -440,7 +441,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem: arktest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1.json", newTestConfigMap().WithControllerOwner().ToJSON()).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").WithArkLabel("my-restore").ConfigMap),
+			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
 		},
 		{
 			name:          "namespace is remapped",
@@ -448,7 +449,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
 			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").WithArkLabel("my-restore").ConfigMap),
+			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap),
 		},
 		{
 			name:          "custom restorer is correctly used",
@@ -464,7 +465,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					selector:                  labels.Everything(),
 				},
 			},
-			expectedObjs: toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).WithArkLabel("my-restore").ConfigMap),
+			expectedObjs: toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).ConfigMap),
 		},
 		{
 			name:          "custom restorer for different group/resource is not used",
@@ -480,7 +481,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					selector:                  labels.Everything(),
 				},
 			},
-			expectedObjs: toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+			expectedObjs: toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
 			name:                    "cluster-scoped resources are skipped when IncludeClusterResources=false",
@@ -497,7 +498,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: falsePtr,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
 			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=true",
@@ -506,7 +507,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
+			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
 		},
 		{
 			name:                    "namespaced resources are not skipped when IncludeClusterResources=true",
@@ -515,7 +516,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
 			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=nil",
@@ -524,7 +525,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().WithArkLabel("my-restore").PersistentVolume),
+			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
 		},
 		{
 			name:                    "namespaced resources are not skipped when IncludeClusterResources=nil",
@@ -533,7 +534,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().WithArkLabel("my-restore").ConfigMap),
+			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
 			name:                    "serviceaccounts are restored",
@@ -542,7 +543,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
 			fileSystem:              arktest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
-			expectedObjs:            toUnstructured(newTestServiceAccount().WithArkLabel("my-restore").ServiceAccount),
+			expectedObjs:            toUnstructured(newTestServiceAccount().ServiceAccount),
 		},
 		{
 			name:                    "non-mirror pods are restored",
@@ -566,7 +567,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					WithKind("Pod").
 					WithNamespace("ns-1").
 					WithName("pod1").
-					WithArkLabel("my-restore").
 					Unstructured),
 			},
 		},
@@ -594,6 +594,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			resourceClient := &arktest.FakeDynamicClient{}
 			for i := range test.expectedObjs {
+				addRestoreLabels(&test.expectedObjs[i], "my-restore", "my-backup")
 				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
 			}
 
@@ -625,6 +626,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 					Spec: api.RestoreSpec{
 						IncludeClusterResources: test.includeClusterResources,
+						BackupName:              "my-backup",
 					},
 				},
 				backup:     &api.Backup{},
@@ -679,8 +681,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 				m[k] = v
 			}
 			fromBackupWithLabel := &unstructured.Unstructured{Object: m}
-			l := map[string]string{api.RestoreLabelKey: "my-restore"}
-			fromBackupWithLabel.SetLabels(l)
+			addRestoreLabels(fromBackupWithLabel, "my-restore", "my-backup")
 			// resetMetadataAndStatus will strip the creationTimestamp before calling Create
 			fromBackupWithLabel.SetCreationTimestamp(metav1.Time{Time: time.Time{}})
 
@@ -711,6 +712,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 					},
 					Spec: api.RestoreSpec{
 						IncludeClusterResources: nil,
+						BackupName:              "my-backup",
 					},
 				},
 				backup: &api.Backup{},
@@ -922,7 +924,7 @@ status:
 			}
 
 			resetMetadataAndStatus(unstructuredPV)
-			addLabel(unstructuredPV, api.RestoreLabelKey, ctx.restore.Name)
+			addRestoreLabels(unstructuredPV, ctx.restore.Name, ctx.restore.Spec.BackupName)
 			unstructuredPV.Object["foo"] = "bar"
 
 			if test.expectPVCreation {
@@ -964,7 +966,7 @@ status:
 			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
 
 			resetMetadataAndStatus(unstructuredPVC)
-			addLabel(unstructuredPVC, api.RestoreLabelKey, ctx.restore.Name)
+			addRestoreLabels(unstructuredPVC, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 			createdPVC := unstructuredPVC.DeepCopy()
 			// just to ensure we have the data flowing correctly
@@ -1431,17 +1433,6 @@ func (obj *testUnstructured) WithName(name string) *testUnstructured {
 	return obj.WithMetadataField("name", name)
 }
 
-func (obj *testUnstructured) WithArkLabel(restoreName string) *testUnstructured {
-	ls := obj.GetLabels()
-	if ls == nil {
-		ls = make(map[string]string)
-	}
-	ls[api.RestoreLabelKey] = restoreName
-	obj.SetLabels(ls)
-
-	return obj
-}
-
 func (obj *testUnstructured) ToJSON() []byte {
 	bytes, err := json.Marshal(obj.Object)
 	if err != nil {
@@ -1523,14 +1514,6 @@ func newTestServiceAccount() *testServiceAccount {
 	}
 }
 
-func (sa *testServiceAccount) WithArkLabel(restoreName string) *testServiceAccount {
-	if sa.Labels == nil {
-		sa.Labels = make(map[string]string)
-	}
-	sa.Labels[api.RestoreLabelKey] = restoreName
-	return sa
-}
-
 func (sa *testServiceAccount) WithImagePullSecret(name string) *testServiceAccount {
 	secret := v1.LocalObjectReference{Name: name}
 	sa.ImagePullSecrets = append(sa.ImagePullSecrets, secret)
@@ -1565,14 +1548,6 @@ func newTestPV() *testPersistentVolume {
 			Status: v1.PersistentVolumeStatus{},
 		},
 	}
-}
-
-func (pv *testPersistentVolume) WithArkLabel(restoreName string) *testPersistentVolume {
-	if pv.Labels == nil {
-		pv.Labels = make(map[string]string)
-	}
-	pv.Labels[api.RestoreLabelKey] = restoreName
-	return pv
 }
 
 func (pv *testPersistentVolume) ToJSON() []byte {
@@ -1627,16 +1602,6 @@ func newNamedTestConfigMap(name string) *testConfigMap {
 			},
 		},
 	}
-}
-
-func (cm *testConfigMap) WithArkLabel(restoreName string) *testConfigMap {
-	if cm.Labels == nil {
-		cm.Labels = make(map[string]string)
-	}
-
-	cm.Labels[api.RestoreLabelKey] = restoreName
-
-	return cm
 }
 
 func (cm *testConfigMap) WithNamespace(name string) *testConfigMap {

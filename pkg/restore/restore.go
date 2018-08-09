@@ -760,8 +760,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			obj.SetNamespace(namespace)
 		}
 
-		// add an ark-restore label to each resource for easy ID
-		addLabel(obj, api.RestoreLabelKey, ctx.restore.Name)
+		// label the resource with the restore's name and the restored backup's name
+		// for easy identification of all cluster resources created by this restore
+		// and which backup they came from
+		addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
 		ctx.infof("Restoring %s: %v", obj.GroupVersionKind().Kind, name)
 		createdObj, restoreErr := resourceClient.Create(obj)
@@ -780,10 +782,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 				continue
 			}
 
-			// We know the cluster won't have the restore name label, so
-			// copy it over from the backup
-			restoreName := obj.GetLabels()[api.RestoreLabelKey]
-			addLabel(fromCluster, api.RestoreLabelKey, restoreName)
+			// We know the object from the cluster won't have the backup/restore name labels, so
+			// copy them from the object we attempted to restore.
+			labels := obj.GetLabels()
+			addRestoreLabels(fromCluster, labels[api.RestoreNameLabel], labels[api.BackupNameLabel])
 
 			if !equality.Semantic.DeepEqual(fromCluster, obj) {
 				switch groupResource {
@@ -997,15 +999,22 @@ func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstr
 	return obj, nil
 }
 
-// addLabel applies the specified key/value to an object as a label.
-func addLabel(obj *unstructured.Unstructured, key string, val string) {
+// addRestoreLabels labels the provided object with the restore name and
+// the restored backup's name.
+func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 	labels := obj.GetLabels()
 
 	if labels == nil {
 		labels = make(map[string]string)
 	}
 
-	labels[key] = val
+	labels[api.BackupNameLabel] = backupName
+	labels[api.RestoreNameLabel] = restoreName
+
+	// TODO(1.0): remove the below line, and remove the `RestoreLabelKey`
+	// constant from the API pkg, since it's been replaced with the
+	// namespaced label above.
+	labels[api.RestoreLabelKey] = restoreName
 
 	obj.SetLabels(labels)
 }
