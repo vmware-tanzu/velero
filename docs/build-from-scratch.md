@@ -63,8 +63,8 @@ Run [generate-proto.sh][13] to regenerate files if you make the following change
 
 ### Cross compiling
 
-By default, `make` builds an `ark` binary that runs on your host operating system and architecture. 
-To build for another platform, run `make build-<GOOS>-<GOARCH`.
+By default, `make build` builds an `ark` binary for `linux-amd64`.
+To build for another platform, run `make build-<GOOS>-<GOARCH>`.
 For example, to build for the Mac, run `make build-darwin-amd64`.
 All binaries are placed in `_output/bin/<GOOS>/<GOARCH>`-- for example, `_output/bin/darwin/amd64/ark`.
 
