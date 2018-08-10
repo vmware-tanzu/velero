@@ -106,6 +106,18 @@ func (m *ServerMetrics) RegisterAllMetrics() {
 	}
 }
 
+func (m *ServerMetrics) InitSchedule(scheduleName string) {
+	if c, ok := m.metrics[backupAttemptCount].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[backupSuccessCount].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[backupFailureCount].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+}
+
 // SetBackupTarballSizeBytesGauge records the size, in bytes, of a backup tarball.
 func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, size int64) {
 	if g, ok := m.metrics[backupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
