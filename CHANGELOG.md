@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.9.3](https://github.com/heptio/ark/releases/tag/v0.9.3) - 2018-08-10
+
+#### Bug Fixes
+  * Initalize Prometheus metrics when creating a new schedule (#689, @lemaral)
+
 #### [v0.9.2](https://github.com/heptio/ark/releases/tag/v0.9.2) - 2018-07-26
 
 ##### Bug Fixes:
