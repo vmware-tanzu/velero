@@ -1,16 +1,28 @@
-## ark create
+## ark backup-location create
 
-Create ark resources
+Create a backup storage location
 
 ### Synopsis
 
 
-Create ark resources
+Create a backup storage location
+
+```
+ark backup-location create NAME [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for create
+      --bucket string               name of the object storage bucket where backups should be stored
+      --config mapStringString      configuration key-value pairs
+  -h, --help                        help for create
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+      --labels mapStringString      labels to apply to the backup storage location
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
+      --prefix string               prefix under which all Ark data should be stored within the bucket. Optional.
+      --provider string             name of the backup storage provider (e.g. aws, azure, gcp)
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -29,9 +41,5 @@ Create ark resources
 ```
 
 ### SEE ALSO
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark create backup](ark_create_backup.md)	 - Create a backup
-* [ark create backup-location](ark_create_backup-location.md)	 - Create a backup storage location
-* [ark create restore](ark_create_restore.md)	 - Create a restore
-* [ark create schedule](ark_create_schedule.md)	 - Create a schedule
+* [ark backup-location](ark_backup-location.md)	 - Work with backup storage locations
 
