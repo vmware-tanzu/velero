@@ -19,17 +19,16 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
@@ -47,10 +46,11 @@ import (
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
-func TestFetchBackup(t *testing.T) {
+func TestFetchBackupInfo(t *testing.T) {
 	tests := []struct {
 		name                string
 		backupName          string
+		informerLocations   []*api.BackupStorageLocation
 		informerBackups     []*api.Backup
 		backupServiceBackup *api.Backup
 		backupServiceError  error
@@ -58,16 +58,19 @@ func TestFetchBackup(t *testing.T) {
 		expectedErr         bool
 	}{
 		{
-			name:            "lister has backup",
-			backupName:      "backup-1",
-			informerBackups: []*api.Backup{arktest.NewTestBackup().WithName("backup-1").Backup},
-			expectedRes:     arktest.NewTestBackup().WithName("backup-1").Backup,
+			name:              "lister has backup",
+			backupName:        "backup-1",
+			informerLocations: []*api.BackupStorageLocation{arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
+			informerBackups:   []*api.Backup{arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
+			expectedRes:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 		{
-			name:                "backupSvc has backup",
+			name:                "lister does not have a backup, but backupSvc does",
 			backupName:          "backup-1",
-			backupServiceBackup: arktest.NewTestBackup().WithName("backup-1").Backup,
-			expectedRes:         arktest.NewTestBackup().WithName("backup-1").Backup,
+			backupServiceBackup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			informerLocations:   []*api.BackupStorageLocation{arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
+			informerBackups:     []*api.Backup{arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
+			expectedRes:         arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 		{
 			name:               "no backup",
@@ -84,7 +87,12 @@ func TestFetchBackup(t *testing.T) {
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
+				pluginManager   = &pluginmocks.Manager{}
+				objectStore     = &arktest.ObjectStore{}
 			)
+
+			defer restorer.AssertExpectations(t)
+			defer objectStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -92,18 +100,30 @@ func TestFetchBackup(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				api.CloudProviderConfig{},
-				"bucket",
 				sharedInformers.Ark().V1().Backups(),
+				sharedInformers.Ark().V1().BackupStorageLocations(),
 				false,
 				logger,
 				logrus.InfoLevel,
 				nil, //pluginRegistry
+				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
+			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
 
-			for _, itm := range test.informerBackups {
-				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(itm)
+			if test.backupServiceError == nil {
+				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
+				objectStore.On("Init", mock.Anything).Return(nil)
+
+				for _, itm := range test.informerLocations {
+					sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(itm)
+				}
+
+				for _, itm := range test.informerBackups {
+					sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(itm)
+				}
 			}
 
 			if test.backupServiceBackup != nil || test.backupServiceError != nil {
@@ -114,10 +134,10 @@ func TestFetchBackup(t *testing.T) {
 				}
 			}
 
-			backup, err := c.fetchBackup(nil, test.backupName)
+			info, err := c.fetchBackupInfo(test.backupName, pluginManager)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, backup)
+				assert.Equal(t, test.expectedRes, info.backup)
 			}
 		})
 	}
@@ -175,13 +195,13 @@ func TestProcessRestoreSkips(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				api.CloudProviderConfig{Name: "myCloud"},
-				"bucket",
 				sharedInformers.Ark().V1().Backups(),
+				sharedInformers.Ark().V1().BackupStorageLocations(),
 				false, // pvProviderExists
 				logger,
 				logrus.InfoLevel,
 				nil, // pluginRegistry
+				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
@@ -197,10 +217,12 @@ func TestProcessRestoreSkips(t *testing.T) {
 		})
 	}
 }
+
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
 		name                             string
 		restoreKey                       string
+		location                         *api.BackupStorageLocation
 		restore                          *api.Restore
 		backup                           *api.Backup
 		restorerError                    error
@@ -217,16 +239,18 @@ func TestProcessRestore(t *testing.T) {
 	}{
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
+			location:                 arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
-			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: another-1"},
 		},
 		{
 			name:                     "restore with resource in both includedResources and excludedResources fails validation",
+			location:                 arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:                  NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).WithExcludedResource("a-resource").Restore,
-			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: a-resource"},
@@ -246,11 +270,13 @@ func TestProcessRestore(t *testing.T) {
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
 		},
 		{
-			name:    "valid restore with schedule name gets executed",
-			restore: NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
+			name:     "valid restore with schedule name gets executed",
+			location: arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
+			restore:  NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
 			backup: arktest.
 				NewTestBackup().
 				WithName("backup-1").
+				WithStorageLocation("default").
 				WithLabel("ark-schedule", "sched-1").
 				WithPhase(api.BackupPhaseCompleted).
 				Backup,
@@ -263,13 +289,14 @@ func TestProcessRestore(t *testing.T) {
 			restore:                     NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
 			expectedErr:                 false,
 			expectedPhase:               string(api.RestorePhaseFailedValidation),
-			expectedValidationErrors:    []string{"Error retrieving backup: no backup here"},
+			expectedValidationErrors:    []string{"Error retrieving backup: not able to fetch from backup storage"},
 			backupServiceGetBackupError: errors.New("no backup here"),
 		},
 		{
 			name:                  "restorer throwing an error causes the restore to fail",
+			location:              arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:                arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:                arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			restorerError:         errors.New("blarg"),
 			expectedErr:           false,
 			expectedPhase:         string(api.RestorePhaseInProgress),
@@ -278,16 +305,18 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:                 "valid restore gets executed",
+			location:             arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:              NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:               arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:               arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
 		{
 			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
+			location:              arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:                arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:                arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			allowRestoreSnapshots: true,
 			expectedErr:           false,
 			expectedPhase:         string(api.RestorePhaseInProgress),
@@ -295,16 +324,18 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:                     "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
+			location:                 arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:                   arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:                   arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Server is not configured for PV snapshot restores"},
 		},
 		{
 			name:          "restoration of nodes is not supported",
+			location:      arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -314,8 +345,9 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:          "restoration of events is not supported",
+			location:      arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -325,8 +357,9 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:          "restoration of events.events.k8s.io is not supported",
+			location:      arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events.events.k8s.io", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -336,8 +369,9 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:          "restoration of backups.ark.heptio.com is not supported",
+			location:      arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "backups.ark.heptio.com", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -347,8 +381,9 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:          "restoration of restores.ark.heptio.com is not supported",
+			location:      arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "restores.ark.heptio.com", api.RestorePhaseNew).Restore,
-			backup:        arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:        arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -358,11 +393,12 @@ func TestProcessRestore(t *testing.T) {
 		},
 		{
 			name:                             "backup download error results in failed restore",
-			restore:                          NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
+			location:                         arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
+			restore:                          NewRestore(api.DefaultNamespace, "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
 			expectedPhase:                    string(api.RestorePhaseInProgress),
 			expectedFinalPhase:               string(api.RestorePhaseFailed),
 			backupServiceDownloadBackupError: errors.New("Couldn't download backup"),
-			backup: arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 	}
 
@@ -377,6 +413,7 @@ func TestProcessRestore(t *testing.T) {
 				objectStore     = &arktest.ObjectStore{}
 			)
 			defer restorer.AssertExpectations(t)
+
 			defer objectStore.AssertExpectations(t)
 
 			c := NewRestoreController(
@@ -385,23 +422,29 @@ func TestProcessRestore(t *testing.T) {
 				client.ArkV1(),
 				client.ArkV1(),
 				restorer,
-				api.CloudProviderConfig{Name: "myCloud"},
-				"bucket",
 				sharedInformers.Ark().V1().Backups(),
+				sharedInformers.Ark().V1().BackupStorageLocations(),
 				test.allowRestoreSnapshots,
 				logger,
 				logrus.InfoLevel,
 				nil, // pluginRegistry
+				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
 				return pluginManager
 			}
 
-			if test.restore != nil {
+			if test.location != nil {
+				sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(test.location)
+			}
+			if test.backup != nil {
+				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup)
 				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
 				objectStore.On("Init", mock.Anything).Return(nil)
+			}
 
+			if test.restore != nil {
 				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
 
 				// this is necessary so the Patch() call returns the appropriate object
@@ -590,11 +633,12 @@ func TestProcessRestore(t *testing.T) {
 	}
 }
 
-func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
+func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	var (
 		client          = fake.NewSimpleClientset()
 		sharedInformers = informers.NewSharedInformerFactory(client, 0)
 		logger          = arktest.NewLogger()
+		pluginManager   = &pluginmocks.Manager{}
 	)
 
 	c := NewRestoreController(
@@ -603,13 +647,13 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		client.ArkV1(),
 		client.ArkV1(),
 		nil,
-		api.CloudProviderConfig{Name: "myCloud"},
-		"bucket",
 		sharedInformers.Ark().V1().Backups(),
+		sharedInformers.Ark().V1().BackupStorageLocations(),
 		false,
 		logger,
 		logrus.DebugLevel,
 		nil,
+		"default",
 		nil,
 	).(*restoreController)
 
@@ -632,7 +676,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs := c.completeAndValidate(nil, restore)
+	errs := c.validateAndComplete(restore, pluginManager)
 	assert.Equal(t, []string{"No backups found for schedule"}, errs)
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -645,7 +689,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs = c.completeAndValidate(nil, restore)
+	errs = c.validateAndComplete(restore, pluginManager)
 	assert.Equal(t, []string{"No completed backups found for schedule"}, errs)
 	assert.Empty(t, restore.Spec.BackupName)
 
@@ -669,7 +713,7 @@ func TestCompleteAndValidateWhenScheduleNameSpecified(t *testing.T) {
 		Backup,
 	))
 
-	errs = c.completeAndValidate(nil, restore)
+	errs = c.validateAndComplete(restore, pluginManager)
 	assert.Nil(t, errs)
 	assert.Equal(t, "bar", restore.Spec.BackupName)
 }

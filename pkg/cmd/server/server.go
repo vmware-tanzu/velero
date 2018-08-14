@@ -712,13 +712,13 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		restorer,
-		config.BackupStorageProvider.CloudProviderConfig,
-		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.blockStore != nil,
 		s.logger,
 		s.logLevel,
 		s.pluginRegistry,
+		s.defaultBackupLocation,
 		s.metrics,
 	)
 
