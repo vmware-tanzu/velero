@@ -71,23 +71,24 @@ var nonRestorableResources = []string{
 }
 
 type restoreController struct {
-	namespace           string
-	restoreClient       arkv1client.RestoresGetter
-	backupClient        arkv1client.BackupsGetter
-	restorer            restore.Restorer
-	objectStoreConfig   api.CloudProviderConfig
-	bucket              string
-	pvProviderExists    bool
-	backupLister        listers.BackupLister
-	backupListerSynced  cache.InformerSynced
-	restoreLister       listers.RestoreLister
-	restoreListerSynced cache.InformerSynced
-	syncHandler         func(restoreName string) error
-	queue               workqueue.RateLimitingInterface
-	logger              logrus.FieldLogger
-	logLevel            logrus.Level
-	pluginRegistry      plugin.Registry
-	metrics             *metrics.ServerMetrics
+	namespace                  string
+	restoreClient              arkv1client.RestoresGetter
+	backupClient               arkv1client.BackupsGetter
+	restorer                   restore.Restorer
+	pvProviderExists           bool
+	backupLister               listers.BackupLister
+	backupListerSynced         cache.InformerSynced
+	restoreLister              listers.RestoreLister
+	restoreListerSynced        cache.InformerSynced
+	backupLocationLister       listers.BackupStorageLocationLister
+	backupLocationListerSynced cache.InformerSynced
+	syncHandler                func(restoreName string) error
+	queue                      workqueue.RateLimitingInterface
+	logger                     logrus.FieldLogger
+	logLevel                   logrus.Level
+	pluginRegistry             plugin.Registry
+	defaultBackupLocation      string
+	metrics                    *metrics.ServerMetrics
 
 	getBackup            cloudprovider.GetBackupFunc
 	downloadBackup       cloudprovider.DownloadBackupFunc
@@ -102,33 +103,34 @@ func NewRestoreController(
 	restoreClient arkv1client.RestoresGetter,
 	backupClient arkv1client.BackupsGetter,
 	restorer restore.Restorer,
-	objectStoreConfig api.CloudProviderConfig,
-	bucket string,
 	backupInformer informers.BackupInformer,
+	backupLocationInformer informers.BackupStorageLocationInformer,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	logLevel logrus.Level,
 	pluginRegistry plugin.Registry,
+	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 
 ) Interface {
 	c := &restoreController{
-		namespace:           namespace,
-		restoreClient:       restoreClient,
-		backupClient:        backupClient,
-		restorer:            restorer,
-		objectStoreConfig:   objectStoreConfig,
-		bucket:              bucket,
-		pvProviderExists:    pvProviderExists,
-		backupLister:        backupInformer.Lister(),
-		backupListerSynced:  backupInformer.Informer().HasSynced,
-		restoreLister:       restoreInformer.Lister(),
-		restoreListerSynced: restoreInformer.Informer().HasSynced,
-		queue:               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
-		logger:              logger,
-		logLevel:            logLevel,
-		pluginRegistry:      pluginRegistry,
-		metrics:             metrics,
+		namespace:                  namespace,
+		restoreClient:              restoreClient,
+		backupClient:               backupClient,
+		restorer:                   restorer,
+		pvProviderExists:           pvProviderExists,
+		backupLister:               backupInformer.Lister(),
+		backupListerSynced:         backupInformer.Informer().HasSynced,
+		restoreLister:              restoreInformer.Lister(),
+		restoreListerSynced:        restoreInformer.Informer().HasSynced,
+		backupLocationLister:       backupLocationInformer.Lister(),
+		backupLocationListerSynced: backupLocationInformer.Informer().HasSynced,
+		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
+		logger:                logger,
+		logLevel:              logLevel,
+		pluginRegistry:        pluginRegistry,
+		defaultBackupLocation: defaultBackupLocation,
+		metrics:               metrics,
 
 		getBackup:            cloudprovider.GetBackup,
 		downloadBackup:       cloudprovider.DownloadBackup,
@@ -193,7 +195,7 @@ func (c *restoreController) Run(ctx context.Context, numWorkers int) error {
 	defer c.logger.Info("Shutting down RestoreController")
 
 	c.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.backupListerSynced, c.restoreListerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), c.backupListerSynced, c.restoreListerSynced, c.backupLocationListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
 	c.logger.Info("Caches are synced")
@@ -283,28 +285,25 @@ func (c *restoreController) processRestore(key string) error {
 	pluginManager := c.newPluginManager(logContext, logContext.Level, c.pluginRegistry)
 	defer pluginManager.CleanupClients()
 
-	objectStore, err := getObjectStore(c.objectStoreConfig, pluginManager)
-	if err != nil {
-		return errors.Wrap(err, "error initializing object store")
-	}
-
 	actions, err := pluginManager.GetRestoreItemActions()
 	if err != nil {
 		return errors.Wrap(err, "error initializing restore item actions")
 	}
 
-	// complete & validate restore
-	if restore.Status.ValidationErrors = c.completeAndValidate(objectStore, restore); len(restore.Status.ValidationErrors) > 0 {
-		restore.Status.Phase = api.RestorePhaseFailedValidation
-	} else {
-		restore.Status.Phase = api.RestorePhaseInProgress
-	}
-
+	// validate the restore and fetch the backup
+	info := c.validateAndComplete(restore, pluginManager)
 	backupScheduleName := restore.Spec.ScheduleName
 	// Register attempts after validation so we don't have to fetch the backup multiple times
 	c.metrics.RegisterRestoreAttempt(backupScheduleName)
 
-	// update status
+	if len(restore.Status.ValidationErrors) > 0 {
+		restore.Status.Phase = api.RestorePhaseFailedValidation
+		c.metrics.RegisterRestoreValidationFailed(backupScheduleName)
+	} else {
+		restore.Status.Phase = api.RestorePhaseInProgress
+	}
+
+	// patch to update status and persist to API
 	updatedRestore, err := patchRestore(original, restore, c.restoreClient)
 	if err != nil {
 		return errors.Wrapf(err, "error updating Restore phase to %s", restore.Status.Phase)
@@ -314,15 +313,16 @@ func (c *restoreController) processRestore(key string) error {
 	restore = updatedRestore.DeepCopy()
 
 	if restore.Status.Phase == api.RestorePhaseFailedValidation {
-		c.metrics.RegisterRestoreValidationFailed(backupScheduleName)
 		return nil
 	}
+
 	logContext.Debug("Running restore")
+
 	// execution & upload of restore
 	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(
 		restore,
 		actions,
-		objectStore,
+		info,
 	)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
@@ -355,7 +355,13 @@ func (c *restoreController) processRestore(key string) error {
 	return nil
 }
 
-func (c *restoreController) completeAndValidate(objectStore cloudprovider.ObjectStore, restore *api.Restore) []string {
+type backupInfo struct {
+	bucketName  string
+	backup      *api.Backup
+	objectStore cloudprovider.ObjectStore
+}
+
+func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager plugin.Manager) backupInfo {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -363,34 +369,34 @@ func (c *restoreController) completeAndValidate(objectStore cloudprovider.Object
 			restore.Spec.ExcludedResources = append(restore.Spec.ExcludedResources, nonrestorable)
 		}
 	}
-	var validationErrors []string
 
 	// validate that included resources don't contain any non-restorable resources
 	includedResources := sets.NewString(restore.Spec.IncludedResources...)
 	for _, nonRestorableResource := range nonRestorableResources {
 		if includedResources.Has(nonRestorableResource) {
-			validationErrors = append(validationErrors, fmt.Sprintf("%v are non-restorable resources", nonRestorableResource))
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("%v are non-restorable resources", nonRestorableResource))
 		}
 	}
 
 	// validate included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedResources, restore.Spec.ExcludedResources) {
-		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
 	// validate included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedNamespaces, restore.Spec.ExcludedNamespaces) {
-		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
 	// validate that PV provider exists if we're restoring PVs
 	if boolptr.IsSetToTrue(restore.Spec.RestorePVs) && !c.pvProviderExists {
-		validationErrors = append(validationErrors, "Server is not configured for PV snapshot restores")
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Server is not configured for PV snapshot restores")
 	}
 
 	// validate that exactly one of BackupName and ScheduleName have been specified
 	if !backupXorScheduleProvided(restore) {
-		return append(validationErrors, "Either a backup or schedule must be specified as a source for the restore, but not both")
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Either a backup or schedule must be specified as a source for the restore, but not both")
+		return backupInfo{}
 	}
 
 	// if ScheduleName is specified, fill in BackupName with the most recent successful backup from
@@ -402,33 +408,33 @@ func (c *restoreController) completeAndValidate(objectStore cloudprovider.Object
 
 		backups, err := c.backupLister.Backups(c.namespace).List(selector)
 		if err != nil {
-			return append(validationErrors, "Unable to list backups for schedule")
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Unable to list backups for schedule")
+			return backupInfo{}
 		}
 		if len(backups) == 0 {
-			return append(validationErrors, "No backups found for schedule")
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No backups found for schedule")
 		}
 
 		if backup := mostRecentCompletedBackup(backups); backup != nil {
 			restore.Spec.BackupName = backup.Name
 		} else {
-			return append(validationErrors, "No completed backups found for schedule")
+			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "No completed backups found for schedule")
+			return backupInfo{}
 		}
 	}
 
-	var (
-		backup *api.Backup
-		err    error
-	)
-	if backup, err = c.fetchBackup(objectStore, restore.Spec.BackupName); err != nil {
-		return append(validationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
+	info, err := c.fetchBackupInfo(restore.Spec.BackupName, pluginManager)
+	if err != nil {
+		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Error retrieving backup: %v", err))
+		return backupInfo{}
 	}
 
 	// Fill in the ScheduleName so it's easier to consume for metrics.
 	if restore.Spec.ScheduleName == "" {
-		restore.Spec.ScheduleName = backup.GetLabels()["ark-schedule"]
+		restore.Spec.ScheduleName = info.backup.GetLabels()["ark-schedule"]
 	}
 
-	return validationErrors
+	return info
 }
 
 // backupXorScheduleProvided returns true if exactly one of BackupName and
@@ -462,43 +468,110 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	return nil
 }
 
-func (c *restoreController) fetchBackup(objectStore cloudprovider.ObjectStore, name string) (*api.Backup, error) {
-	backup, err := c.backupLister.Backups(c.namespace).Get(name)
-	if err == nil {
-		return backup, nil
-	}
-
-	if !apierrors.IsNotFound(err) {
-		return nil, errors.WithStack(err)
-	}
-
-	logContext := c.logger.WithField("backupName", name)
-
-	logContext.Debug("Backup not found in backupLister, checking object storage directly")
-	backup, err = c.getBackup(objectStore, c.bucket, name)
+// fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
+// find it, it tries to retrieve it from one of the backup storage locations.
+func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+	var info backupInfo
+	var err error
+	info.backup, err = c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
-		return nil, err
+		if !apierrors.IsNotFound(err) {
+			return backupInfo{}, errors.WithStack(err)
+		}
+
+		logContext := c.logger.WithField("backupName", backupName)
+		logContext.Debug("Backup not found in backupLister, checking each backup location directly, starting with default...")
+		return c.fetchFromBackupStorage(backupName, pluginManager)
+	}
+
+	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(info.backup.Spec.StorageLocation)
+	if err != nil {
+		return backupInfo{}, errors.WithStack(err)
+	}
+
+	info.objectStore, err = getObjectStoreForLocation(location, pluginManager)
+	if err != nil {
+		return backupInfo{}, errors.Wrap(err, "error initializing object store")
+	}
+	info.bucketName = location.Spec.ObjectStorage.Bucket
+
+	return info, nil
+}
+
+// fetchFromBackupStorage checks each backup storage location, starting with the default,
+// looking for a backup that matches the given backup name.
+func (c *restoreController) fetchFromBackupStorage(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+	locations, err := c.backupLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
+	if err != nil {
+		return backupInfo{}, errors.WithStack(err)
+	}
+
+	orderedLocations := orderedBackupLocations(locations, c.defaultBackupLocation)
+
+	logContext := c.logger.WithField("backupName", backupName)
+	for _, location := range orderedLocations {
+		info, err := c.backupInfoForLocation(location, backupName, pluginManager)
+		if err != nil {
+			logContext.WithField("locationName", location.Name).WithError(err).Error("Unable to fetch backup from object storage location")
+			continue
+		}
+		return info, nil
+	}
+
+	return backupInfo{}, errors.New("not able to fetch from backup storage")
+}
+
+func orderedBackupLocations(locations []*api.BackupStorageLocation, defaultLocationName string) []*api.BackupStorageLocation {
+	var result []*api.BackupStorageLocation
+
+	for i := range locations {
+		if locations[i].Name == defaultLocationName {
+			// put the default location first
+			result = append(result, locations[i])
+			// append everything before the default
+			result = append(result, locations[:i]...)
+			// append everything after the default
+			result = append(result, locations[i+1:]...)
+
+			return result
+		}
+	}
+
+	return locations
+}
+
+func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLocation, backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+	objectStore, err := getObjectStoreForLocation(location, pluginManager)
+	if err != nil {
+		return backupInfo{}, err
+	}
+
+	backup, err := c.getBackup(objectStore, location.Spec.ObjectStorage.Bucket, backupName)
+	if err != nil {
+		return backupInfo{}, err
 	}
 
 	// ResourceVersion needs to be cleared in order to create the object in the API
 	backup.ResourceVersion = ""
-	// Clear out the namespace too, just in case
+	// Clear out the namespace, in case the backup was made in a different cluster, with a different namespace
 	backup.Namespace = ""
 
-	created, createErr := c.backupClient.Backups(c.namespace).Create(backup)
-	if createErr != nil {
-		logContext.WithError(errors.WithStack(createErr)).Error("Unable to create API object for Backup")
-	} else {
-		backup = created
+	backupCreated, err := c.backupClient.Backups(c.namespace).Create(backup)
+	if err != nil {
+		return backupInfo{}, errors.WithStack(err)
 	}
 
-	return backup, nil
+	return backupInfo{
+		bucketName:  location.Spec.ObjectStorage.Bucket,
+		backup:      backupCreated,
+		objectStore: objectStore,
+	}, nil
 }
 
 func (c *restoreController) runRestore(
 	restore *api.Restore,
 	actions []restore.ItemAction,
-	objectStore cloudprovider.ObjectStore,
+	info backupInfo,
 ) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -530,14 +603,7 @@ func (c *restoreController) runRestore(
 			"backup":  restore.Spec.BackupName,
 		})
 
-	backup, err := c.fetchBackup(objectStore, restore.Spec.BackupName)
-	if err != nil {
-		logContext.WithError(err).Error("Error getting backup")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		return
-	}
-
-	backupFile, err := downloadToTempFile(objectStore, c.bucket, restore.Spec.BackupName, c.downloadBackup, c.logger)
+	backupFile, err := downloadToTempFile(info.objectStore, info.bucketName, restore.Spec.BackupName, c.downloadBackup, c.logger)
 	if err != nil {
 		logContext.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
@@ -558,7 +624,7 @@ func (c *restoreController) runRestore(
 	// Any return statement above this line means a total restore failure
 	// Some failures after this line *may* be a total restore failure
 	logContext.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(logContext, restore, backup, backupFile, actions)
+	restoreWarnings, restoreErrors = c.restorer.Restore(logContext, restore, info.backup, backupFile, actions)
 	logContext.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
@@ -571,7 +637,7 @@ func (c *restoreController) runRestore(
 		return
 	}
 
-	if err := c.uploadRestoreLog(objectStore, c.bucket, restore.Spec.BackupName, restore.Name, logFile); err != nil {
+	if err := c.uploadRestoreLog(info.objectStore, info.bucketName, restore.Spec.BackupName, restore.Name, logFile); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
 	}
 
@@ -592,7 +658,7 @@ func (c *restoreController) runRestore(
 		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
 		return
 	}
-	if err := c.uploadRestoreResults(objectStore, c.bucket, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
+	if err := c.uploadRestoreResults(info.objectStore, info.bucketName, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
 	}
 
