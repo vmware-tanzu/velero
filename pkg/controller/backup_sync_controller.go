@@ -31,17 +31,17 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/storage"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/stringslice"
 )
 
 type backupSyncController struct {
 	client               arkv1client.BackupsGetter
-	cloudBackupLister    cloudprovider.BackupLister
+	cloudBackupLister    storage.BackupLister
 	bucket               string
 	syncPeriod           time.Duration
 	namespace            string
@@ -52,7 +52,7 @@ type backupSyncController struct {
 
 func NewBackupSyncController(
 	client arkv1client.BackupsGetter,
-	cloudBackupLister cloudprovider.BackupLister,
+	cloudBackupLister storage.BackupLister,
 	bucket string,
 	syncPeriod time.Duration,
 	namespace string,

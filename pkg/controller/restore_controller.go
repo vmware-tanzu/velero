@@ -48,6 +48,7 @@ import (
 	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/storage"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
@@ -89,10 +90,10 @@ type restoreController struct {
 	pluginRegistry      plugin.Registry
 	metrics             *metrics.ServerMetrics
 
-	getBackup            cloudprovider.GetBackupFunc
-	downloadBackup       cloudprovider.DownloadBackupFunc
-	uploadRestoreLog     cloudprovider.UploadRestoreLogFunc
-	uploadRestoreResults cloudprovider.UploadRestoreResultsFunc
+	getBackup            storage.GetBackupFunc
+	downloadBackup       storage.DownloadBackupFunc
+	uploadRestoreLog     storage.UploadRestoreLogFunc
+	uploadRestoreResults storage.UploadRestoreResultsFunc
 	newPluginManager     func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
 }
 
@@ -130,10 +131,10 @@ func NewRestoreController(
 		pluginRegistry:      pluginRegistry,
 		metrics:             metrics,
 
-		getBackup:            cloudprovider.GetBackup,
-		downloadBackup:       cloudprovider.DownloadBackup,
-		uploadRestoreLog:     cloudprovider.UploadRestoreLog,
-		uploadRestoreResults: cloudprovider.UploadRestoreResults,
+		getBackup:            storage.GetBackup,
+		downloadBackup:       storage.DownloadBackup,
+		uploadRestoreLog:     storage.UploadRestoreLog,
+		uploadRestoreResults: storage.UploadRestoreResults,
 		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
 			return plugin.NewManager(logger, logLevel, pluginRegistry)
 		},
@@ -602,7 +603,7 @@ func (c *restoreController) runRestore(
 func downloadToTempFile(
 	objectStore cloudprovider.ObjectStore,
 	bucket, backupName string,
-	downloadBackup cloudprovider.DownloadBackupFunc,
+	downloadBackup storage.DownloadBackupFunc,
 	logger logrus.FieldLogger,
 ) (*os.File, error) {
 	readCloser, err := downloadBackup(objectStore, bucket, backupName)
