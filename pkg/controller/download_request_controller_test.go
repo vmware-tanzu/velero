@@ -21,7 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +33,8 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -52,9 +56,8 @@ func TestProcessDownloadRequest(t *testing.T) {
 			key:  "",
 		},
 		{
-			name:          "bad key format",
-			key:           "a/b/c",
-			expectedError: `error splitting queue key: unexpected key format: "a/b/c"`,
+			name: "bad key format",
+			key:  "a/b/c",
 		},
 		{
 			name:          "backup log request with phase '' gets a url",
@@ -109,16 +112,28 @@ func TestProcessDownloadRequest(t *testing.T) {
 				restoresInformer         = sharedInformers.Ark().V1().Restores()
 				logger                   = arktest.NewLogger()
 				clockTime, _             = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
+				pluginManager            = &pluginmocks.Manager{}
+				objectStore              = &arktest.ObjectStore{}
 			)
 
 			c := NewDownloadRequestController(
 				client.ArkV1(),
 				downloadRequestsInformer,
 				restoresInformer,
-				nil, // objectStore
-				"bucket",
+				sharedInformers.Ark().V1().BackupStorageLocations(),
+				sharedInformers.Ark().V1().Backups(),
+				nil, // pluginRegistry
 				logger,
 			).(*downloadRequestController)
+
+			c.newPluginManager = func(_ logrus.FieldLogger, _ logrus.Level, _ plugin.Registry) plugin.Manager {
+				return pluginManager
+			}
+
+			pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
+			pluginManager.On("CleanupClients").Return(nil)
+
+			objectStore.On("Init", mock.Anything).Return(nil)
 
 			c.clock = clock.NewFakeClock(clockTime)
 
@@ -143,6 +158,32 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 				if tc.restore != nil {
 					restoresInformer.Informer().GetStore().Add(tc.restore)
+				}
+
+				if tc.expectedDir != "" {
+					backup := &v1.Backup{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      tc.expectedDir,
+							Namespace: v1.DefaultNamespace,
+						},
+					}
+					require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(backup))
+
+					location := &v1.BackupStorageLocation{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      backup.Spec.StorageLocation,
+							Namespace: backup.Namespace,
+						},
+						Spec: v1.BackupStorageLocationSpec{
+							Provider: "objStoreProvider",
+							StorageType: v1.StorageType{
+								ObjectStorage: &v1.ObjectStorageLocation{
+									Bucket: "bucket",
+								},
+							},
+						},
+					}
+					require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
 				}
 
 				c.createSignedURL = func(objectStore cloudprovider.ObjectStore, target v1.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {

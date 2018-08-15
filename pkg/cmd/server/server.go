@@ -737,8 +737,9 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.objectStore,
-		config.BackupStorageProvider.Bucket,
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.pluginRegistry,
 		s.logger,
 	)
 	wg.Add(1)
