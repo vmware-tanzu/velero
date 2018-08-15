@@ -383,11 +383,6 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return err
 	}
 
-	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
-	if err != nil {
-		return err
-	}
-
 	var errs []error
 
 	var backupJSONToUpload, backupFileToUpload io.Reader
@@ -425,7 +420,14 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		controller.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 
-	if err := storage.UploadBackup(log, objectStore, bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
+	// TODO get location with name = backup.StorageLocation from lister
+	var location *api.BackupStorageLocation
+	accessor, err := storage.BackupAccessor(backup.Name, location, pluginManager, controller.logger)
+	if err != nil {
+		return err
+	}
+
+	if err := accessor.SaveBackup(backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 
