@@ -682,13 +682,13 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
 			s.blockStore,
-			s.objectStore,
-			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
+			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.pluginRegistry,
 		)
 		wg.Add(1)
 		go func() {
