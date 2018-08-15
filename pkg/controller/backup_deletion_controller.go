@@ -29,6 +29,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/restic"
+	"github.com/heptio/ark/pkg/storage"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -58,7 +59,7 @@ type backupDeletionController struct {
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 
-	deleteBackupDir    cloudprovider.DeleteBackupDirFunc
+	deleteBackupDir    storage.DeleteBackupDirFunc
 	processRequestFunc func(*v1.DeleteBackupRequest) error
 	clock              clock.Clock
 }
@@ -92,7 +93,7 @@ func NewBackupDeletionController(
 		resticMgr:                 resticMgr,
 
 		podvolumeBackupLister: podvolumeBackupInformer.Lister(),
-		deleteBackupDir:       cloudprovider.DeleteBackupDir,
+		deleteBackupDir:       storage.DeleteBackupDir,
 		clock:                 &clock.RealClock{},
 	}
 

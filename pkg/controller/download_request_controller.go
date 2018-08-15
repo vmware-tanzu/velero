@@ -40,6 +40,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/storage"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
@@ -56,7 +57,7 @@ type downloadRequestController struct {
 	clock                       clock.Clock
 	logger                      logrus.FieldLogger
 
-	createSignedURL cloudprovider.CreateSignedURLFunc
+	createSignedURL storage.CreateSignedURLFunc
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -80,7 +81,7 @@ func NewDownloadRequestController(
 		clock:                       &clock.RealClock{},
 		logger:                      logger,
 
-		createSignedURL: cloudprovider.CreateSignedURL,
+		createSignedURL: storage.CreateSignedURL,
 	}
 
 	c.syncHandler = c.processDownloadRequest

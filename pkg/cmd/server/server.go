@@ -64,6 +64,7 @@ import (
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/storage"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 	"github.com/heptio/ark/pkg/util/stringslice"
@@ -579,8 +580,8 @@ func (s *server) runControllers(config *api.Config) error {
 	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
 	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
 
-	liveBackupLister := cloudprovider.NewLiveBackupLister(s.logger, s.objectStore)
-	cachedBackupLister := cloudprovider.NewBackupCache(ctx, liveBackupLister, cloudBackupCacheResyncPeriod, s.logger)
+	liveBackupLister := storage.NewLiveBackupLister(s.logger, s.objectStore)
+	cachedBackupLister := storage.NewBackupCache(ctx, liveBackupLister, cloudBackupCacheResyncPeriod, s.logger)
 
 	go func() {
 		metricsMux := http.NewServeMux()
