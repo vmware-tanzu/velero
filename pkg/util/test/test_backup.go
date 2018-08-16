@@ -135,3 +135,8 @@ func (b *TestBackup) WithStartTimestamp(startTime time.Time) *TestBackup {
 	b.Status.StartTimestamp = metav1.Time{Time: startTime}
 	return b
 }
+
+func (b *TestBackup) WithStorageLocation(location string) *TestBackup {
+	b.Spec.StorageLocation = location
+	return b
+}
