@@ -152,6 +152,24 @@ func TestProcessBackup(t *testing.T) {
 			allowSnapshots: true,
 			expectBackup:   true,
 		},
+		{
+			name:         "Backup without a location will have it set to the default",
+			key:          "heptio-ark/backup1",
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			expectBackup: true,
+		},
+		{
+			name:         "Backup with a location completes",
+			key:          "heptio-ark/backup1",
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithStorageLocation("loc1"),
+			expectBackup: true,
+		},
+		{
+			name:         "Backup with non-existent location will fail validation",
+			key:          "heptio-ark/backup1",
+			backup:       arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithStorageLocation("loc2"),
+			expectBackup: false,
+		},
 	}
 
 	for _, test := range tests {
@@ -174,13 +192,13 @@ func TestProcessBackup(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				client.ArkV1(),
 				backupper,
-				v1.CloudProviderConfig{Name: "myCloud"},
-				"bucket",
 				test.allowSnapshots,
 				logger,
 				logrus.InfoLevel,
 				pluginRegistry,
 				NewBackupTracker(),
+				sharedInformers.Ark().V1().BackupStorageLocations(),
+				"default",
 				metrics.NewServerMetrics(),
 			).(*backupController)
 
@@ -223,6 +241,37 @@ func TestProcessBackup(t *testing.T) {
 					mock.Anything, // backup file
 					mock.Anything, // actions
 				).Return(nil)
+
+				defaultLocation := &v1.BackupStorageLocation{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: backup.Namespace,
+						Name:      "default",
+					},
+					Spec: v1.BackupStorageLocationSpec{
+						Provider: "myCloud",
+						StorageType: v1.StorageType{
+							ObjectStorage: &v1.ObjectStorageLocation{
+								Bucket: "bucket",
+							},
+						},
+					},
+				}
+				loc1 := &v1.BackupStorageLocation{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: backup.Namespace,
+						Name:      "loc1",
+					},
+					Spec: v1.BackupStorageLocationSpec{
+						Provider: "myCloud",
+						StorageType: v1.StorageType{
+							ObjectStorage: &v1.ObjectStorageLocation{
+								Bucket: "bucket",
+							},
+						},
+					},
+				}
+				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(defaultLocation))
+				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(loc1))
 
 				pluginManager.On("GetBackupItemActions").Return(nil, nil)
 
@@ -312,9 +361,13 @@ func TestProcessBackup(t *testing.T) {
 				StartTimestamp      metav1.Time    `json:"startTimestamp"`
 				CompletionTimestamp metav1.Time    `json:"completionTimestamp"`
 			}
+			type SpecPatch struct {
+				StorageLocation string `json:"storageLocation"`
+			}
 
 			type Patch struct {
 				Status StatusPatch `json:"status"`
+				Spec   SpecPatch   `json:"spec,omitempty"`
 			}
 
 			decode := func(decoder *json.Decoder) (interface{}, error) {
@@ -324,13 +377,27 @@ func TestProcessBackup(t *testing.T) {
 				return *actual, err
 			}
 
-			// validate Patch call 1 (setting version, expiration, and phase)
-			expected := Patch{
-				Status: StatusPatch{
-					Version:    1,
-					Phase:      v1.BackupPhaseInProgress,
-					Expiration: expiration,
-				},
+			// validate Patch call 1 (setting version, expiration, phase, and storage location)
+			var expected Patch
+			if test.backup.Spec.StorageLocation == "" {
+				expected = Patch{
+					Status: StatusPatch{
+						Version:    1,
+						Phase:      v1.BackupPhaseInProgress,
+						Expiration: expiration,
+					},
+					Spec: SpecPatch{
+						StorageLocation: "default",
+					},
+				}
+			} else {
+				expected = Patch{
+					Status: StatusPatch{
+						Version:    1,
+						Phase:      v1.BackupPhaseInProgress,
+						Expiration: expiration,
+					},
+				}
 			}
 
 			arktest.ValidatePatch(t, actions[0], expected, decode)
