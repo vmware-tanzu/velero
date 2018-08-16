@@ -31,7 +31,4 @@ backupStorageProvider:
     region: <YOUR_REGION>
     s3ForcePathStyle: "true"
     s3Url:  <YOUR_URL_ACCESS_POINT>
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
 ---

@@ -50,7 +50,6 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 			sharedInformers.Ark().V1().Backups(),
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(),
-			1*time.Millisecond,
 		).(*gcController)
 	)
 
@@ -114,7 +113,6 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Ark().V1().Backups(),
 		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(),
-		1*time.Millisecond,
 	).(*gcController)
 
 	keys := make(chan string)
@@ -245,7 +243,6 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(),
-				1*time.Millisecond,
 			).(*gcController)
 			controller.clock = fakeClock
 

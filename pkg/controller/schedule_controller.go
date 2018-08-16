@@ -45,6 +45,10 @@ import (
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
 
+const (
+	scheduleSyncPeriod = time.Minute
+)
+
 type scheduleController struct {
 	namespace             string
 	schedulesClient       arkv1client.SchedulesGetter
@@ -53,7 +57,6 @@ type scheduleController struct {
 	schedulesListerSynced cache.InformerSynced
 	syncHandler           func(scheduleName string) error
 	queue                 workqueue.RateLimitingInterface
-	syncPeriod            time.Duration
 	clock                 clock.Clock
 	logger                logrus.FieldLogger
 	metrics               *metrics.ServerMetrics
@@ -64,26 +67,19 @@ func NewScheduleController(
 	schedulesClient arkv1client.SchedulesGetter,
 	backupsClient arkv1client.BackupsGetter,
 	schedulesInformer informers.ScheduleInformer,
-	syncPeriod time.Duration,
 	logger logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
 ) *scheduleController {
-	if syncPeriod < time.Minute {
-		logger.WithField("syncPeriod", syncPeriod).Info("Provided schedule sync period is too short. Setting to 1 minute")
-		syncPeriod = time.Minute
-	}
-
 	c := &scheduleController{
 		namespace:             namespace,
 		schedulesClient:       schedulesClient,
 		backupsClient:         backupsClient,
 		schedulesLister:       schedulesInformer.Lister(),
 		schedulesListerSynced: schedulesInformer.Informer().HasSynced,
-		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "schedule"),
-		syncPeriod: syncPeriod,
-		clock:      clock.RealClock{},
-		logger:     logger,
-		metrics:    metrics,
+		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "schedule"),
+		clock:   clock.RealClock{},
+		logger:  logger,
+		metrics: metrics,
 	}
 
 	c.syncHandler = c.processSchedule
@@ -157,7 +153,7 @@ func (controller *scheduleController) Run(ctx context.Context, numWorkers int) e
 		}()
 	}
 
-	go wait.Until(controller.enqueueAllEnabledSchedules, controller.syncPeriod, ctx.Done())
+	go wait.Until(controller.enqueueAllEnabledSchedules, scheduleSyncPeriod, ctx.Done())
 
 	<-ctx.Done()
 	return nil

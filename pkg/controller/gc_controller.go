@@ -34,6 +34,10 @@ import (
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 )
 
+const (
+	GCSyncPeriod = 60 * time.Minute
+)
+
 // gcController creates DeleteBackupRequests for expired backups.
 type gcController struct {
 	*genericController
@@ -42,7 +46,6 @@ type gcController struct {
 	backupLister              listers.BackupLister
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
-	syncPeriod                time.Duration
 
 	clock clock.Clock
 }
@@ -53,16 +56,9 @@ func NewGCController(
 	backupInformer informers.BackupInformer,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
-	syncPeriod time.Duration,
 ) Interface {
-	if syncPeriod < time.Minute {
-		logger.WithField("syncPeriod", syncPeriod).Info("Provided GC sync period is too short. Setting to 1 minute")
-		syncPeriod = time.Minute
-	}
-
 	c := &gcController{
 		genericController:         newGenericController("gc-controller", logger),
-		syncPeriod:                syncPeriod,
 		clock:                     clock.RealClock{},
 		backupLister:              backupInformer.Lister(),
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
@@ -76,7 +72,7 @@ func NewGCController(
 		deleteBackupRequestInformer.Informer().HasSynced,
 	)
 
-	c.resyncPeriod = syncPeriod
+	c.resyncPeriod = GCSyncPeriod
 	c.resyncFunc = c.enqueueAllBackups
 
 	backupInformer.Informer().AddEventHandler(

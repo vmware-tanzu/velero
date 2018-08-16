@@ -339,15 +339,6 @@ func (in *Config) DeepCopyInto(out *Config) {
 		}
 	}
 	in.BackupStorageProvider.DeepCopyInto(&out.BackupStorageProvider)
-	out.BackupSyncPeriod = in.BackupSyncPeriod
-	out.GCSyncPeriod = in.GCSyncPeriod
-	out.ScheduleSyncPeriod = in.ScheduleSyncPeriod
-	out.PodVolumeOperationTimeout = in.PodVolumeOperationTimeout
-	if in.ResourcePriorities != nil {
-		in, out := &in.ResourcePriorities, &out.ResourcePriorities
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

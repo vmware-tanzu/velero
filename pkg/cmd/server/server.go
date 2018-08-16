@@ -75,11 +75,23 @@ const (
 	defaultMetricsAddress = ":8085"
 )
 
+type serverConfig struct {
+	pluginDir, metricsAddress                   string
+	backupSyncPeriod, podVolumeOperationTimeout time.Duration
+	restoreResourcePriorities                   []string
+	restoreOnly                                 bool
+}
+
 func NewCommand() *cobra.Command {
 	var (
-		logLevelFlag   = logging.LogLevelFlag(logrus.InfoLevel)
-		pluginDir      = "/plugins"
-		metricsAddress = defaultMetricsAddress
+		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
+		config       = serverConfig{
+			pluginDir:                 "/plugins",
+			metricsAddress:            defaultMetricsAddress,
+			backupSyncPeriod:          defaultBackupSyncPeriod,
+			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
+			restoreResourcePriorities: defaultRestorePriorities,
+		}
 	)
 
 	var command = &cobra.Command{
@@ -114,7 +126,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), pluginDir, metricsAddress, logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -122,8 +134,12 @@ func NewCommand() *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
-	command.Flags().StringVar(&pluginDir, "plugin-dir", pluginDir, "directory containing Ark plugins")
-	command.Flags().StringVar(&metricsAddress, "metrics-address", metricsAddress, "the address to expose prometheus metrics")
+	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Ark plugins")
+	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "the address to expose prometheus metrics")
+	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Ark backups in object storage exist as Backup API objects in the cluster")
+	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
+	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
+	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 
 	return command
 }
@@ -162,9 +178,10 @@ type server struct {
 	pluginManager         plugin.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
+	config                serverConfig
 }
 
-func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName string, config serverConfig, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -180,7 +197,7 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		return nil, errors.WithStack(err)
 	}
 
-	pluginRegistry := plugin.NewRegistry(pluginDir, logger, logger.Level)
+	pluginRegistry := plugin.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
@@ -198,7 +215,7 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 
 	s := &server{
 		namespace:             namespace,
-		metricsAddress:        metricsAddr,
+		metricsAddress:        config.metricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
 		arkClient:             arkClient,
@@ -211,6 +228,7 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 		logLevel:       logger.Level,
 		pluginRegistry: pluginRegistry,
 		pluginManager:  pluginManager,
+		config:         config,
 	}
 
 	return s, nil
@@ -245,7 +263,7 @@ func (s *server) run() error {
 	// watchConfig needs to examine the unmodified original config, so we keep that around as a
 	// separate object, and instead apply defaults to a clone.
 	config := originalConfig.DeepCopy()
-	applyConfigDefaults(config, s.logger)
+	s.applyConfigDefaults(config)
 
 	s.watchConfig(originalConfig)
 
@@ -277,6 +295,32 @@ func (s *server) run() error {
 	}
 
 	return nil
+}
+
+func (s *server) applyConfigDefaults(c *api.Config) {
+	if s.config.backupSyncPeriod == 0 {
+		s.config.backupSyncPeriod = defaultBackupSyncPeriod
+	}
+
+	if s.config.podVolumeOperationTimeout == 0 {
+		s.config.podVolumeOperationTimeout = defaultPodVolumeOperationTimeout
+	}
+
+	if len(s.config.restoreResourcePriorities) == 0 {
+		s.config.restoreResourcePriorities = defaultRestorePriorities
+		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using default resource priorities")
+	} else {
+		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using given resource priorities")
+	}
+
+	if c.BackupStorageProvider.Config == nil {
+		c.BackupStorageProvider.Config = make(map[string]string)
+	}
+
+	// add the bucket name to the config map so that object stores can use
+	// it when initializing. The AWS object store uses this to determine the
+	// bucket's region when setting up its client.
+	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -379,9 +423,7 @@ func (s *server) loadConfig() (*api.Config, error) {
 }
 
 const (
-	defaultGCSyncPeriod              = 60 * time.Minute
 	defaultBackupSyncPeriod          = 60 * time.Minute
-	defaultScheduleSyncPeriod        = time.Minute
 	defaultPodVolumeOperationTimeout = 60 * time.Minute
 )
 
@@ -394,7 +436,7 @@ const (
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have restic restores run before controllers adopt the pods.
-var defaultResourcePriorities = []string{
+var defaultRestorePriorities = []string{
 	"namespaces",
 	"persistentvolumes",
 	"persistentvolumeclaims",
@@ -403,40 +445,6 @@ var defaultResourcePriorities = []string{
 	"serviceaccounts",
 	"limitranges",
 	"pods",
-}
-
-func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
-	if c.GCSyncPeriod.Duration == 0 {
-		c.GCSyncPeriod.Duration = defaultGCSyncPeriod
-	}
-
-	if c.BackupSyncPeriod.Duration == 0 {
-		c.BackupSyncPeriod.Duration = defaultBackupSyncPeriod
-	}
-
-	if c.ScheduleSyncPeriod.Duration == 0 {
-		c.ScheduleSyncPeriod.Duration = defaultScheduleSyncPeriod
-	}
-
-	if c.PodVolumeOperationTimeout.Duration == 0 {
-		c.PodVolumeOperationTimeout.Duration = defaultPodVolumeOperationTimeout
-	}
-
-	if len(c.ResourcePriorities) == 0 {
-		c.ResourcePriorities = defaultResourcePriorities
-		logger.WithField("priorities", c.ResourcePriorities).Info("Using default resource priorities")
-	} else {
-		logger.WithField("priorities", c.ResourcePriorities).Info("Using resource priorities from config")
-	}
-
-	if c.BackupStorageProvider.Config == nil {
-		c.BackupStorageProvider.Config = make(map[string]string)
-	}
-
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
-	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // watchConfig adds an update event handler to the Config shared informer, invoking s.cancelFunc
@@ -572,7 +580,7 @@ func (s *server) runControllers(config *api.Config) error {
 	ctx := s.ctx
 	var wg sync.WaitGroup
 
-	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
+	cloudBackupCacheResyncPeriod := durationMin(controller.GCSyncPeriod, s.config.backupSyncPeriod)
 	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
 
 	liveBackupLister := cloudprovider.NewLiveBackupLister(s.logger, s.objectStore)
@@ -593,7 +601,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		cachedBackupLister,
 		config.BackupStorageProvider.Bucket,
-		config.BackupSyncPeriod.Duration,
+		s.config.backupSyncPeriod,
 		s.namespace,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.logger,
@@ -604,7 +612,7 @@ func (s *server) runControllers(config *api.Config) error {
 		wg.Done()
 	}()
 
-	if config.RestoreOnlyMode {
+	if s.config.restoreOnly {
 		s.logger.Info("Restore only mode - not starting the backup, schedule, delete-backup, or GC controllers")
 	} else {
 		backupTracker := controller.NewBackupTracker()
@@ -615,7 +623,7 @@ func (s *server) runControllers(config *api.Config) error {
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.blockStore,
 			s.resticManager,
-			config.PodVolumeOperationTimeout.Duration,
+			s.config.podVolumeOperationTimeout,
 		)
 		cmd.CheckError(err)
 
@@ -643,7 +651,6 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(),
 			s.arkClient.ArkV1(),
 			s.sharedInformerFactory.Ark().V1().Schedules(),
-			config.ScheduleSyncPeriod.Duration,
 			s.logger,
 			s.metrics,
 		)
@@ -658,7 +665,6 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(),
-			config.GCSyncPeriod.Duration,
 		)
 		wg.Add(1)
 		go func() {
@@ -692,11 +698,11 @@ func (s *server) runControllers(config *api.Config) error {
 		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
 		s.blockStore,
-		config.ResourcePriorities,
+		s.config.restoreResourcePriorities,
 		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
 		s.resticManager,
-		config.PodVolumeOperationTimeout.Duration,
+		s.config.podVolumeOperationTimeout,
 		s.logger,
 	)
 	cmd.CheckError(err)
