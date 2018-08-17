@@ -2,7 +2,9 @@
 
 The following example sets up the Ark server and client, then backs up and restores a sample application.
 
-For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. See [Set up Ark with your cloud provider][3] for how to run on a cloud provider. 
+For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. Backups and restores for an on-premises cluster work the same way as the example.
+
+See [Set up Ark with your cloud provider][3] for how to run on a cloud provider. 
 
 ### Prerequisites
 
