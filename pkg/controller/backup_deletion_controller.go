@@ -57,16 +57,16 @@ type backupDeletionController struct {
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 	backupLocationLister      listers.BackupStorageLocationLister
-	pluginRegistry            plugin.Registry
 	deleteBackupDir           cloudprovider.DeleteBackupDirFunc
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
-	newPluginManager          func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
+	newPluginManager          func(logrus.FieldLogger) plugin.Manager
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
 func NewBackupDeletionController(
 	logger logrus.FieldLogger,
+	logLevel logrus.Level,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
@@ -91,12 +91,13 @@ func NewBackupDeletionController(
 		resticMgr:                 resticMgr,
 		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
 		backupLocationLister:      backupLocationInformer.Lister(),
-		pluginRegistry:            pluginRegistry,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		deleteBackupDir:  cloudprovider.DeleteBackupDir,
-		newPluginManager: plugin.NewManager,
+		deleteBackupDir: cloudprovider.DeleteBackupDir,
+		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
 
 		clock: &clock.RealClock{},
 	}
@@ -314,8 +315,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	return nil
 }
 
-func (c *backupDeletionController) deleteBackupFromStorage(backup *v1.Backup, log *logrus.Entry) error {
-	pluginManager := c.newPluginManager(log, log.Level, c.pluginRegistry)
+func (c *backupDeletionController) deleteBackupFromStorage(backup *v1.Backup, log logrus.FieldLogger) error {
+	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
