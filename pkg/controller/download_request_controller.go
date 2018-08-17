@@ -197,7 +197,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
 	logContext := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
 	logContext.Info("checking for expiration of DownloadRequest")
-	if downloadRequest.Status.Expiration.Time.Before(c.clock.Now()) {
+	if downloadRequest.Status.Expiration.Time.After(c.clock.Now()) {
 		logContext.Debug("DownloadRequest has not expired")
 		return nil
 	}
