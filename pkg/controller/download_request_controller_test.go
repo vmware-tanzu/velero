@@ -61,6 +61,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 			informerFactory.Ark().V1().Backups(),
 			nil,
 			arktest.NewLogger(),
+			logrus.InfoLevel,
 		).(*downloadRequestController)
 	)
 
@@ -69,9 +70,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 
 	controller.clock = clock.NewFakeClock(clockTime)
 
-	controller.newPluginManager = func(_ logrus.FieldLogger, _ logrus.Level, _ plugin.Registry) plugin.Manager {
-		return pluginManager
-	}
+	controller.newPluginManager = func(_ logrus.FieldLogger) plugin.Manager { return pluginManager }
 
 	pluginManager.On("CleanupClients").Return()
 	objectStore.On("Init", mock.Anything).Return(nil)
