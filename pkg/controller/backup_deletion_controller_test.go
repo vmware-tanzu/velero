@@ -48,6 +48,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 
 	controller := NewBackupDeletionController(
 		arktest.NewLogger(),
+		logrus.InfoLevel,
 		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(), // deleteBackupRequestClient
 		client.ArkV1(), // backupClient
@@ -134,6 +135,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		objectStore:     objectStore,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
+			logrus.InfoLevel,
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
@@ -150,9 +152,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		req: req,
 	}
 
-	data.controller.newPluginManager = func(_ logrus.FieldLogger, _ logrus.Level, _ plugin.Registry) plugin.Manager {
-		return pluginManager
-	}
+	data.controller.newPluginManager = func(_ logrus.FieldLogger) plugin.Manager { return pluginManager }
 
 	pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
 	pluginManager.On("CleanupClients").Return(nil)
@@ -594,6 +594,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 
 			controller := NewBackupDeletionController(
 				arktest.NewLogger(),
+				logrus.InfoLevel,
 				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(), // deleteBackupRequestClient
 				client.ArkV1(), // backupClient
