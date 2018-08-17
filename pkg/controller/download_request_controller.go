@@ -50,8 +50,7 @@ type downloadRequestController struct {
 	createSignedURL       cloudprovider.CreateSignedURLFunc
 	backupLocationLister  listers.BackupStorageLocationLister
 	backupLister          listers.BackupLister
-	pluginRegistry        plugin.Registry
-	newPluginManager      func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
+	newPluginManager      func(logrus.FieldLogger) plugin.Manager
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -63,6 +62,7 @@ func NewDownloadRequestController(
 	backupInformer informers.BackupInformer,
 	pluginRegistry plugin.Registry,
 	logger logrus.FieldLogger,
+	logLevel logrus.Level,
 ) Interface {
 	c := &downloadRequestController{
 		genericController:     newGenericController("downloadrequest", logger),
@@ -74,8 +74,10 @@ func NewDownloadRequestController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		createSignedURL:  cloudprovider.CreateSignedURL,
-		newPluginManager: plugin.NewManager,
+		createSignedURL: cloudprovider.CreateSignedURL,
+		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
 
 		clock: &clock.RealClock{},
 	}
@@ -143,7 +145,7 @@ const signedURLTTL = 10 * time.Minute
 
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
-func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest, log *logrus.Entry) error {
+func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest, log logrus.FieldLogger) error {
 	update := downloadRequest.DeepCopy()
 
 	var (
@@ -173,7 +175,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return errors.WithStack(err)
 	}
 
-	pluginManager := c.newPluginManager(log, log.Level, c.pluginRegistry)
+	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)

@@ -742,6 +742,7 @@ func (s *server) runControllers(config *api.Config) error {
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.pluginRegistry,
 		s.logger,
+		s.logLevel,
 	)
 	wg.Add(1)
 	go func() {
