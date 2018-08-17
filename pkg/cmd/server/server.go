@@ -672,6 +672,7 @@ func (s *server) runControllers(config *api.Config) error {
 
 		backupDeletionController := controller.NewBackupDeletionController(
 			s.logger,
+			s.logLevel,
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
