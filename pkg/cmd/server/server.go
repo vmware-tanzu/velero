@@ -627,13 +627,13 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			config.BackupStorageProvider.CloudProviderConfig,
-			config.BackupStorageProvider.Bucket,
 			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
 			s.pluginRegistry,
 			backupTracker,
+			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.defaultBackupLocation,
 			s.metrics,
 		)
 		wg.Add(1)
