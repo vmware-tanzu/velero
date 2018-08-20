@@ -47,6 +47,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/collections"
 	"github.com/heptio/ark/pkg/util/encode"
@@ -437,7 +438,7 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 		controller.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 
-	if err := cloudprovider.UploadBackup(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
+	if err := persistence.UploadBackup(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 

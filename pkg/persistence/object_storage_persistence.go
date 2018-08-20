@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cloudprovider
+package persistence
 
 import (
 	"fmt"
@@ -28,6 +28,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -75,7 +76,7 @@ func seekToBeginning(r io.Reader) error {
 	return err
 }
 
-func seekAndPutObject(objectStore ObjectStore, bucket, key string, file io.Reader) error {
+func seekAndPutObject(objectStore cloudprovider.ObjectStore, bucket, key string, file io.Reader) error {
 	if file == nil {
 		return nil
 	}
@@ -87,27 +88,27 @@ func seekAndPutObject(objectStore ObjectStore, bucket, key string, file io.Reade
 	return objectStore.PutObject(bucket, key, file)
 }
 
-func UploadBackupLog(objectStore ObjectStore, bucket, backupName string, log io.Reader) error {
+func UploadBackupLog(objectStore cloudprovider.ObjectStore, bucket, backupName string, log io.Reader) error {
 	logKey := getBackupLogKey(backupName, backupName)
 	return seekAndPutObject(objectStore, bucket, logKey, log)
 }
 
-func UploadBackupMetadata(objectStore ObjectStore, bucket, backupName string, metadata io.Reader) error {
+func UploadBackupMetadata(objectStore cloudprovider.ObjectStore, bucket, backupName string, metadata io.Reader) error {
 	metadataKey := getMetadataKey(backupName)
 	return seekAndPutObject(objectStore, bucket, metadataKey, metadata)
 }
 
-func DeleteBackupMetadata(objectStore ObjectStore, bucket, backupName string) error {
+func DeleteBackupMetadata(objectStore cloudprovider.ObjectStore, bucket, backupName string) error {
 	metadataKey := getMetadataKey(backupName)
 	return objectStore.DeleteObject(bucket, metadataKey)
 }
 
-func UploadBackupData(objectStore ObjectStore, bucket, backupName string, backup io.Reader) error {
+func UploadBackupData(objectStore cloudprovider.ObjectStore, bucket, backupName string, backup io.Reader) error {
 	backupKey := getBackupContentsKey(backupName, backupName)
 	return seekAndPutObject(objectStore, bucket, backupKey, backup)
 }
 
-func UploadBackup(logger logrus.FieldLogger, objectStore ObjectStore, bucket, backupName string, metadata, backup, log io.Reader) error {
+func UploadBackup(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string, metadata, backup, log io.Reader) error {
 	if err := UploadBackupLog(objectStore, bucket, backupName, log); err != nil {
 		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 		// backup's status.
@@ -138,16 +139,16 @@ func UploadBackup(logger logrus.FieldLogger, objectStore ObjectStore, bucket, ba
 }
 
 // DownloadBackupFunc is a function that can download backup metadata from a bucket in object storage.
-type DownloadBackupFunc func(objectStore ObjectStore, bucket, backupName string) (io.ReadCloser, error)
+type DownloadBackupFunc func(objectStore cloudprovider.ObjectStore, bucket, backupName string) (io.ReadCloser, error)
 
 // DownloadBackup downloads an Ark backup with the specified object key from object storage via the cloud API.
 // It returns the snapshot metadata and data (separately), or an error if a problem is encountered
 // downloading or reading the file from the cloud API.
-func DownloadBackup(objectStore ObjectStore, bucket, backupName string) (io.ReadCloser, error) {
+func DownloadBackup(objectStore cloudprovider.ObjectStore, bucket, backupName string) (io.ReadCloser, error) {
 	return objectStore.GetObject(bucket, getBackupContentsKey(backupName, backupName))
 }
 
-func ListBackups(logger logrus.FieldLogger, objectStore ObjectStore, bucket string) ([]*api.Backup, error) {
+func ListBackups(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket string) ([]*api.Backup, error) {
 	prefixes, err := objectStore.ListCommonPrefixes(bucket, "/")
 	if err != nil {
 		return nil, err
@@ -172,10 +173,10 @@ func ListBackups(logger logrus.FieldLogger, objectStore ObjectStore, bucket stri
 }
 
 //GetBackupFunc is a function that can retrieve backup metadata from an object store
-type GetBackupFunc func(objectStore ObjectStore, bucket, backupName string) (*api.Backup, error)
+type GetBackupFunc func(objectStore cloudprovider.ObjectStore, bucket, backupName string) (*api.Backup, error)
 
 // GetBackup gets the specified api.Backup from the given bucket in object storage.
-func GetBackup(objectStore ObjectStore, bucket, backupName string) (*api.Backup, error) {
+func GetBackup(objectStore cloudprovider.ObjectStore, bucket, backupName string) (*api.Backup, error) {
 	key := getMetadataKey(backupName)
 
 	res, err := objectStore.GetObject(bucket, key)
@@ -204,10 +205,10 @@ func GetBackup(objectStore ObjectStore, bucket, backupName string) (*api.Backup,
 }
 
 // DeleteBackupDirFunc is a function that can delete a backup directory from a bucket in object storage.
-type DeleteBackupDirFunc func(logger logrus.FieldLogger, objectStore ObjectStore, bucket, backupName string) error
+type DeleteBackupDirFunc func(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string) error
 
 // DeleteBackupDir deletes all files in object storage for the given backup.
-func DeleteBackupDir(logger logrus.FieldLogger, objectStore ObjectStore, bucket, backupName string) error {
+func DeleteBackupDir(logger logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string) error {
 	objects, err := objectStore.ListObjects(bucket, backupName+"/")
 	if err != nil {
 		return err
@@ -228,11 +229,11 @@ func DeleteBackupDir(logger logrus.FieldLogger, objectStore ObjectStore, bucket,
 }
 
 // CreateSignedURLFunc is a function that can create a signed URL for an object in object storage.
-type CreateSignedURLFunc func(objectStore ObjectStore, target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error)
+type CreateSignedURLFunc func(objectStore cloudprovider.ObjectStore, target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error)
 
 // CreateSignedURL creates a pre-signed URL that can be used to download a file from object
 // storage. The URL expires after ttl.
-func CreateSignedURL(objectStore ObjectStore, target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
+func CreateSignedURL(objectStore cloudprovider.ObjectStore, target api.DownloadTarget, bucket, directory string, ttl time.Duration) (string, error) {
 	switch target.Kind {
 	case api.DownloadTargetKindBackupContents:
 		return objectStore.CreateSignedURL(bucket, getBackupContentsKey(directory, target.Name), ttl)
@@ -248,19 +249,19 @@ func CreateSignedURL(objectStore ObjectStore, target api.DownloadTarget, bucket,
 }
 
 // UploadRestoreLogFunc is a function that can upload a restore log to a bucket in object storage.
-type UploadRestoreLogFunc func(objectStore ObjectStore, bucket, backup, restore string, log io.Reader) error
+type UploadRestoreLogFunc func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, log io.Reader) error
 
 // UploadRestoreLog uploads the restore's log file to object storage.
-func UploadRestoreLog(objectStore ObjectStore, bucket, backup, restore string, log io.Reader) error {
+func UploadRestoreLog(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, log io.Reader) error {
 	key := getRestoreLogKey(backup, restore)
 	return objectStore.PutObject(bucket, key, log)
 }
 
 // UploadRestoreResultsFunc is a function that can upload restore results to a bucket in object storage.
-type UploadRestoreResultsFunc func(objectStore ObjectStore, bucket, backup, restore string, results io.Reader) error
+type UploadRestoreResultsFunc func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, results io.Reader) error
 
 // UploadRestoreResults uploads the restore's results file to object storage.
-func UploadRestoreResults(objectStore ObjectStore, bucket, backup, restore string, results io.Reader) error {
+func UploadRestoreResults(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, results io.Reader) error {
 	key := getRestoreResultsKey(backup, restore)
 	return objectStore.PutObject(bucket, key, results)
 }

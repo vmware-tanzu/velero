@@ -28,6 +28,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -57,7 +58,7 @@ type backupDeletionController struct {
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 	backupLocationLister      listers.BackupStorageLocationLister
-	deleteBackupDir           cloudprovider.DeleteBackupDirFunc
+	deleteBackupDir           persistence.DeleteBackupDirFunc
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) plugin.Manager
@@ -94,7 +95,7 @@ func NewBackupDeletionController(
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
-		deleteBackupDir:  cloudprovider.DeleteBackupDir,
+		deleteBackupDir:  persistence.DeleteBackupDir,
 
 		clock: &clock.RealClock{},
 	}

@@ -33,6 +33,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/stringslice"
@@ -76,7 +77,7 @@ func NewBackupSyncController(
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
-		listCloudBackups: cloudprovider.ListBackups,
+		listCloudBackups: persistence.ListBackups,
 	}
 
 	c.resyncFunc = c.run

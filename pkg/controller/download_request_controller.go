@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/kube"
 )
@@ -47,7 +47,7 @@ type downloadRequestController struct {
 	downloadRequestLister listers.DownloadRequestLister
 	restoreLister         listers.RestoreLister
 	clock                 clock.Clock
-	createSignedURL       cloudprovider.CreateSignedURLFunc
+	createSignedURL       persistence.CreateSignedURLFunc
 	backupLocationLister  listers.BackupStorageLocationLister
 	backupLister          listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) plugin.Manager
@@ -73,7 +73,7 @@ func NewDownloadRequestController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		createSignedURL:  cloudprovider.CreateSignedURL,
+		createSignedURL:  persistence.CreateSignedURL,
 		newPluginManager: newPluginManager,
 
 		clock: &clock.RealClock{},

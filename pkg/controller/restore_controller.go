@@ -46,6 +46,7 @@ import (
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/boolptr"
@@ -89,10 +90,10 @@ type restoreController struct {
 	defaultBackupLocation      string
 	metrics                    *metrics.ServerMetrics
 
-	getBackup            cloudprovider.GetBackupFunc
-	downloadBackup       cloudprovider.DownloadBackupFunc
-	uploadRestoreLog     cloudprovider.UploadRestoreLogFunc
-	uploadRestoreResults cloudprovider.UploadRestoreResultsFunc
+	getBackup            persistence.GetBackupFunc
+	downloadBackup       persistence.DownloadBackupFunc
+	uploadRestoreLog     persistence.UploadRestoreLogFunc
+	uploadRestoreResults persistence.UploadRestoreResultsFunc
 	newPluginManager     func(logger logrus.FieldLogger) plugin.Manager
 }
 
@@ -132,10 +133,10 @@ func NewRestoreController(
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager:     newPluginManager,
-		getBackup:            cloudprovider.GetBackup,
-		downloadBackup:       cloudprovider.DownloadBackup,
-		uploadRestoreLog:     cloudprovider.UploadRestoreLog,
-		uploadRestoreResults: cloudprovider.UploadRestoreResults,
+		getBackup:            persistence.GetBackup,
+		downloadBackup:       persistence.DownloadBackup,
+		uploadRestoreLog:     persistence.UploadRestoreLog,
+		uploadRestoreResults: persistence.UploadRestoreResults,
 	}
 
 	c.syncHandler = c.processRestore
@@ -667,7 +668,7 @@ func (c *restoreController) runRestore(
 func downloadToTempFile(
 	objectStore cloudprovider.ObjectStore,
 	bucket, backupName string,
-	downloadBackup cloudprovider.DownloadBackupFunc,
+	downloadBackup persistence.DownloadBackupFunc,
 	logger logrus.FieldLogger,
 ) (*os.File, error) {
 	readCloser, err := downloadBackup(objectStore, bucket, backupName)
