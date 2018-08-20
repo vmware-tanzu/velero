@@ -42,7 +42,6 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -74,6 +73,7 @@ type backupController struct {
 	backupLocationListerSynced cache.InformerSynced
 	defaultBackupLocation      string
 	metrics                    *metrics.ServerMetrics
+	newBackupStore             func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupController(
@@ -105,6 +105,8 @@ func NewBackupController(
 		backupLocationListerSynced: backupLocationInformer.Informer().HasSynced,
 		defaultBackupLocation:      defaultBackupLocation,
 		metrics:                    metrics,
+
+		newBackupStore: persistence.NewObjectBackupStore,
 	}
 
 	c.syncHandler = c.processBackup
@@ -382,21 +384,21 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 
 	log.Info("Starting backup")
 
-	pluginManager := controller.newPluginManager(log)
-	defer pluginManager.CleanupClients()
-
 	backupFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return errors.Wrap(err, "error creating temp file for backup")
 	}
 	defer closeAndRemoveFile(backupFile, log)
 
+	pluginManager := controller.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
 	actions, err := pluginManager.GetBackupItemActions()
 	if err != nil {
 		return err
 	}
 
-	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
+	backupStore, err := controller.newBackupStore(backupLocation, pluginManager, log)
 	if err != nil {
 		return err
 	}
@@ -438,7 +440,7 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 		controller.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 
-	if err := persistence.UploadBackup(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
+	if err := backupStore.PutBackup(backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -452,34 +454,6 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
-}
-
-// TODO(ncdc): move this to a better location that isn't backup specific
-func getObjectStoreForLocation(location *api.BackupStorageLocation, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if location.Spec.Provider == "" {
-		return nil, errors.New("backup storage location provider name must not be empty")
-	}
-
-	objectStore, err := manager.GetObjectStore(location.Spec.Provider)
-	if err != nil {
-		return nil, err
-	}
-
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
-	if location.Spec.ObjectStorage != nil {
-		if location.Spec.Config == nil {
-			location.Spec.Config = make(map[string]string)
-		}
-		location.Spec.Config["bucket"] = location.Spec.ObjectStorage.Bucket
-	}
-
-	if err := objectStore.Init(location.Spec.Config); err != nil {
-		return nil, err
-	}
-
-	return objectStore, nil
 }
 
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {

@@ -208,7 +208,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 		},
 		restartableDelegateTest{
 			function:                "ListCommonPrefixes",
-			inputs:                  []interface{}{"bucket", "delimeter"},
+			inputs:                  []interface{}{"bucket", "prefix", "delimiter"},
 			expectedErrorOutputs:    []interface{}{([]string)(nil), errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{[]string{"a", "b"}, errors.Errorf("delegate error")},
 		},

@@ -21,7 +21,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -98,7 +97,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	w := o.bucketWriter.getWriteCloser(bucket, key)
 
 	// The writer returned by NewWriter is asynchronous, so errors aren't guaranteed
@@ -114,7 +113,7 @@ func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error
 	return closeErr
 }
 
-func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	r, err := o.client.Bucket(bucket).Object(key).NewReader(context.Background())
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -123,28 +122,30 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return r, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	q := &storage.Query{
+		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
 
-	var res []string
-
 	iter := o.client.Bucket(bucket).Objects(context.Background(), q)
 
+	var res []string
 	for {
 		obj, err := iter.Next()
-		if err == iterator.Done {
-			return res, nil
-		}
-		if err != nil {
+		if err != nil && err != iterator.Done {
 			return nil, errors.WithStack(err)
+		}
+		if err == iterator.Done {
+			break
 		}
 
 		if obj.Prefix != "" {
-			res = append(res, obj.Prefix[0:strings.LastIndex(obj.Prefix, delimiter)])
+			res = append(res, obj.Prefix)
 		}
 	}
+
+	return res, nil
 }
 
 func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
@@ -169,7 +170,7 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	}
 }
 
-func (o *objectStore) DeleteObject(bucket string, key string) error {
+func (o *objectStore) DeleteObject(bucket, key string) error {
 	return errors.Wrapf(o.client.Bucket(bucket).Object(key).Delete(context.Background()), "error deleting object %s", key)
 }
 

@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -90,11 +89,8 @@ type restoreController struct {
 	defaultBackupLocation      string
 	metrics                    *metrics.ServerMetrics
 
-	getBackup            persistence.GetBackupFunc
-	downloadBackup       persistence.DownloadBackupFunc
-	uploadRestoreLog     persistence.UploadRestoreLogFunc
-	uploadRestoreResults persistence.UploadRestoreResultsFunc
-	newPluginManager     func(logger logrus.FieldLogger) plugin.Manager
+	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
+	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewRestoreController(
@@ -132,11 +128,8 @@ func NewRestoreController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		newPluginManager:     newPluginManager,
-		getBackup:            persistence.GetBackup,
-		downloadBackup:       persistence.DownloadBackup,
-		uploadRestoreLog:     persistence.UploadRestoreLog,
-		uploadRestoreResults: persistence.UploadRestoreResults,
+		newPluginManager: newPluginManager,
+		newBackupStore:   persistence.NewObjectBackupStore,
 	}
 
 	c.syncHandler = c.processRestore
@@ -354,9 +347,8 @@ func (c *restoreController) processRestore(key string) error {
 }
 
 type backupInfo struct {
-	bucketName  string
 	backup      *api.Backup
-	objectStore cloudprovider.ObjectStore
+	backupStore persistence.BackupStore
 }
 
 func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager plugin.Manager) backupInfo {
@@ -469,9 +461,7 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it tries to retrieve it from one of the backup storage locations.
 func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
-	var info backupInfo
-	var err error
-	info.backup, err = c.backupLister.Backups(c.namespace).Get(backupName)
+	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return backupInfo{}, errors.WithStack(err)
@@ -482,18 +472,20 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 		return c.fetchFromBackupStorage(backupName, pluginManager)
 	}
 
-	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(info.backup.Spec.StorageLocation)
+	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(backup.Spec.StorageLocation)
 	if err != nil {
 		return backupInfo{}, errors.WithStack(err)
 	}
 
-	info.objectStore, err = getObjectStoreForLocation(location, pluginManager)
+	backupStore, err := c.newBackupStore(location, pluginManager, c.logger)
 	if err != nil {
-		return backupInfo{}, errors.Wrap(err, "error initializing object store")
+		return backupInfo{}, err
 	}
-	info.bucketName = location.Spec.ObjectStorage.Bucket
 
-	return info, nil
+	return backupInfo{
+		backup:      backup,
+		backupStore: backupStore,
+	}, nil
 }
 
 // fetchFromBackupStorage checks each backup storage location, starting with the default,
@@ -541,12 +533,12 @@ func orderedBackupLocations(locations []*api.BackupStorageLocation, defaultLocat
 }
 
 func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLocation, backupName string, pluginManager plugin.Manager) (backupInfo, error) {
-	objectStore, err := getObjectStoreForLocation(location, pluginManager)
+	backupStore, err := persistence.NewObjectBackupStore(location, pluginManager, c.logger)
 	if err != nil {
 		return backupInfo{}, err
 	}
 
-	backup, err := c.getBackup(objectStore, location.Spec.ObjectStorage.Bucket, backupName)
+	backup, err := backupStore.GetBackupMetadata(backupName)
 	if err != nil {
 		return backupInfo{}, err
 	}
@@ -562,9 +554,8 @@ func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLoc
 	}
 
 	return backupInfo{
-		bucketName:  location.Spec.ObjectStorage.Bucket,
 		backup:      backupCreated,
-		objectStore: objectStore,
+		backupStore: backupStore,
 	}, nil
 }
 
@@ -603,7 +594,7 @@ func (c *restoreController) runRestore(
 			"backup":  restore.Spec.BackupName,
 		})
 
-	backupFile, err := downloadToTempFile(info.objectStore, info.bucketName, restore.Spec.BackupName, c.downloadBackup, c.logger)
+	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
 	if err != nil {
 		logContext.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
@@ -637,8 +628,8 @@ func (c *restoreController) runRestore(
 		return
 	}
 
-	if err := c.uploadRestoreLog(info.objectStore, info.bucketName, restore.Spec.BackupName, restore.Name, logFile); err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to object storage: %v", err))
+	if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
+		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to backup storage: %v", err))
 	}
 
 	m := map[string]api.RestoreResult{
@@ -658,20 +649,19 @@ func (c *restoreController) runRestore(
 		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
 		return
 	}
-	if err := c.uploadRestoreResults(info.objectStore, info.bucketName, restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error uploading results files to object storage")
+	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
+		logContext.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
 	}
 
 	return
 }
 
 func downloadToTempFile(
-	objectStore cloudprovider.ObjectStore,
-	bucket, backupName string,
-	downloadBackup persistence.DownloadBackupFunc,
+	backupName string,
+	backupStore persistence.BackupStore,
 	logger logrus.FieldLogger,
 ) (*os.File, error) {
-	readCloser, err := downloadBackup(objectStore, bucket, backupName)
+	readCloser, err := backupStore.GetBackupContents(backupName)
 	if err != nil {
 		return nil, err
 	}

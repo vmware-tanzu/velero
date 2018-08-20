@@ -132,10 +132,17 @@ func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, er
 }
 
 // ListCommonPrefixes gets a list of all object key prefixes that come
-// before the provided delimiter (this is often used to simulate a directory
-// hierarchy in object storage).
-func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, delimiter string) ([]string, error) {
-	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), &proto.ListCommonPrefixesRequest{Plugin: c.plugin, Bucket: bucket, Delimiter: delimiter})
+// after the provided prefix and before the provided delimiter (this is
+// often used to simulate a directory hierarchy in object storage).
+func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+	req := &proto.ListCommonPrefixesRequest{
+		Plugin:    c.plugin,
+		Bucket:    bucket,
+		Prefix:    prefix,
+		Delimiter: delimiter,
+	}
+
+	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -294,16 +301,16 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 	}
 }
 
-// ListCommonPrefixes gets a list of all object key prefixes that come
-// before the provided delimiter (this is often used to simulate a directory
-// hierarchy in object storage).
+// ListCommonPrefixes gets a list of all object key prefixes that start with
+// the specified prefix and stop at the next instance of the provided delimiter
+// (this is often used to simulate a directory hierarchy in object storage).
 func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (*proto.ListCommonPrefixesResponse, error) {
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
 	}
 
-	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Delimiter)
+	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Prefix, req.Delimiter)
 	if err != nil {
 		return nil, err
 	}

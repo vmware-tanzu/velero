@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -48,7 +47,7 @@ type backupSyncController struct {
 	namespace                   string
 	defaultBackupLocation       string
 	newPluginManager            func(logrus.FieldLogger) plugin.Manager
-	listCloudBackups            func(logrus.FieldLogger, cloudprovider.ObjectStore, string) ([]*arkv1api.Backup, error)
+	newBackupStore              func(*arkv1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupSyncController(
@@ -77,7 +76,7 @@ func NewBackupSyncController(
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
-		listCloudBackups: persistence.ListBackups,
+		newBackupStore:   persistence.NewObjectBackupStore,
 	}
 
 	c.resyncFunc = c.run
@@ -109,19 +108,19 @@ func (c *backupSyncController) run() {
 		log := c.logger.WithField("backupLocation", location.Name)
 		log.Info("Syncing backups from backup location")
 
-		objectStore, err := getObjectStoreForLocation(location, pluginManager)
+		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
-			log.WithError(err).Error("Error getting object store for location")
+			log.WithError(err).Error("Error getting backup store for location")
 			continue
 		}
 
-		backupsInBackupStore, err := c.listCloudBackups(log, objectStore, location.Spec.ObjectStorage.Bucket)
+		backupsInBackupStore, err := backupStore.ListBackups()
 		if err != nil {
-			log.WithError(err).Error("Error listing backups in object store")
+			log.WithError(err).Error("Error listing backups in backup store")
 			continue
 		}
 
-		log.WithField("backupCount", len(backupsInBackupStore)).Info("Got backups from object store")
+		log.WithField("backupCount", len(backupsInBackupStore)).Info("Got backups from backup store")
 
 		cloudBackupNames := sets.NewString()
 		for _, cloudBackup := range backupsInBackupStore {
