@@ -27,14 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/printers"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
+	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
 var (
-	backupColumns = []string{"NAME", "STATUS", "CREATED", "EXPIRES", "SELECTOR"}
+	backupColumns = []string{"NAME", "STATUS", "CREATED", "EXPIRES", "STORAGE LOCATION", "SELECTOR"}
 )
 
-func printBackupList(list *v1.BackupList, w io.Writer, options printers.PrintOptions) error {
+func printBackupList(list *arkv1api.BackupList, w io.Writer, options printers.PrintOptions) error {
 	sortBackupsByPrefixAndTimestamp(list)
 
 	for i := range list.Items {
@@ -45,7 +45,7 @@ func printBackupList(list *v1.BackupList, w io.Writer, options printers.PrintOpt
 	return nil
 }
 
-func sortBackupsByPrefixAndTimestamp(list *v1.BackupList) {
+func sortBackupsByPrefixAndTimestamp(list *arkv1api.BackupList) {
 	// sort by default alphabetically, but if backups stem from a common schedule
 	// (detected by the presence of a 14-digit timestamp suffix), then within that
 	// group, sort by newest to oldest (i.e. prefix ASC, suffix DESC)
@@ -70,7 +70,7 @@ func sortBackupsByPrefixAndTimestamp(list *v1.BackupList) {
 	})
 }
 
-func printBackup(backup *v1.Backup, w io.Writer, options printers.PrintOptions) error {
+func printBackup(backup *arkv1api.Backup, w io.Writer, options printers.PrintOptions) error {
 	name := printers.FormatResourceName(options.Kind, backup.Name, options.WithKind)
 
 	if options.WithNamespace {
@@ -86,13 +86,15 @@ func printBackup(backup *v1.Backup, w io.Writer, options printers.PrintOptions) 
 
 	status := backup.Status.Phase
 	if status == "" {
-		status = v1.BackupPhaseNew
+		status = arkv1api.BackupPhaseNew
 	}
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero() {
 		status = "Deleting"
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", name, status, backup.CreationTimestamp.Time, humanReadableTimeFromNow(expiration), metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
+	location := backup.Spec.StorageLocation
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", name, status, backup.CreationTimestamp.Time, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
 		return err
 	}
 
