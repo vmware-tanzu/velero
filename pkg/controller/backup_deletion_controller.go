@@ -28,6 +28,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/pkg/errors"
@@ -50,33 +51,33 @@ type backupDeletionController struct {
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	backupClient              arkv1client.BackupsGetter
 	blockStore                cloudprovider.BlockStore
-	objectStore               cloudprovider.ObjectStore
-	bucket                    string
 	restoreLister             listers.RestoreLister
 	restoreClient             arkv1client.RestoresGetter
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
-
-	deleteBackupDir    cloudprovider.DeleteBackupDirFunc
-	processRequestFunc func(*v1.DeleteBackupRequest) error
-	clock              clock.Clock
+	backupLocationLister      listers.BackupStorageLocationLister
+	deleteBackupDir           cloudprovider.DeleteBackupDirFunc
+	processRequestFunc        func(*v1.DeleteBackupRequest) error
+	clock                     clock.Clock
+	newPluginManager          func(logrus.FieldLogger) plugin.Manager
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
 func NewBackupDeletionController(
 	logger logrus.FieldLogger,
+	logLevel logrus.Level,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
 	blockStore cloudprovider.BlockStore,
-	objectStore cloudprovider.ObjectStore,
-	bucket string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
+	backupLocationInformer informers.BackupStorageLocationInformer,
+	pluginRegistry plugin.Registry,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -84,16 +85,21 @@ func NewBackupDeletionController(
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
 		blockStore:                blockStore,
-		objectStore:               objectStore,
-		bucket:                    bucket,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
+		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
+		backupLocationLister:      backupLocationInformer.Lister(),
 
-		podvolumeBackupLister: podvolumeBackupInformer.Lister(),
-		deleteBackupDir:       cloudprovider.DeleteBackupDir,
-		clock:                 &clock.RealClock{},
+		// use variables to refer to these functions so they can be
+		// replaced with fakes for testing.
+		deleteBackupDir: cloudprovider.DeleteBackupDir,
+		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
+
+		clock: &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -102,6 +108,7 @@ func NewBackupDeletionController(
 		deleteBackupRequestInformer.Informer().HasSynced,
 		restoreInformer.Informer().HasSynced,
 		podvolumeBackupInformer.Informer().HasSynced,
+		backupLocationInformer.Informer().HasSynced,
 	)
 	c.processRequestFunc = c.processRequest
 
@@ -240,7 +247,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	var errs []string
 
-	// Try to delete snapshots
 	log.Info("Removing PV snapshots")
 	for _, volumeBackup := range backup.Status.VolumeBackups {
 		log.WithField("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
@@ -249,7 +255,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
-	// Try to delete restic snapshots
 	log.Info("Removing restic snapshots")
 	if deleteErrs := c.deleteResticSnapshots(backup); len(deleteErrs) > 0 {
 		for _, err := range deleteErrs {
@@ -257,13 +262,11 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
-	// Try to delete backup from backup storage
 	log.Info("Removing backup from backup storage")
-	if err := c.deleteBackupDir(log, c.objectStore, c.bucket, backup.Name); err != nil {
-		errs = append(errs, errors.Wrap(err, "error deleting backup from backup storage").Error())
+	if err := c.deleteBackupFromStorage(backup, log); err != nil {
+		errs = append(errs, err.Error())
 	}
 
-	// Try to delete restores
 	log.Info("Removing restores")
 	if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
@@ -307,6 +310,27 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			// If this errors, all we can do is log it.
 			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
 		}
+	}
+
+	return nil
+}
+
+func (c *backupDeletionController) deleteBackupFromStorage(backup *v1.Backup, log logrus.FieldLogger) error {
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
+	if err != nil {
+		return err
+	}
+
+	if err := c.deleteBackupDir(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name); err != nil {
+		return errors.Wrap(err, "error deleting backup from backup storage")
 	}
 
 	return nil

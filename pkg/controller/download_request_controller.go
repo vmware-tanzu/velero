@@ -17,9 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -31,32 +29,28 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type downloadRequestController struct {
-	downloadRequestClient       arkv1client.DownloadRequestsGetter
-	downloadRequestLister       listers.DownloadRequestLister
-	downloadRequestListerSynced cache.InformerSynced
-	restoreLister               listers.RestoreLister
-	restoreListerSynced         cache.InformerSynced
-	objectStore                 cloudprovider.ObjectStore
-	bucket                      string
-	syncHandler                 func(key string) error
-	queue                       workqueue.RateLimitingInterface
-	clock                       clock.Clock
-	logger                      logrus.FieldLogger
+	*genericController
 
-	createSignedURL cloudprovider.CreateSignedURLFunc
+	downloadRequestClient arkv1client.DownloadRequestsGetter
+	downloadRequestLister listers.DownloadRequestLister
+	restoreLister         listers.RestoreLister
+	clock                 clock.Clock
+	createSignedURL       cloudprovider.CreateSignedURLFunc
+	backupLocationLister  listers.BackupStorageLocationLister
+	backupLister          listers.BackupLister
+	newPluginManager      func(logrus.FieldLogger) plugin.Manager
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -64,26 +58,38 @@ func NewDownloadRequestController(
 	downloadRequestClient arkv1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
 	restoreInformer informers.RestoreInformer,
-	objectStore cloudprovider.ObjectStore,
-	bucket string,
+	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupInformer informers.BackupInformer,
+	pluginRegistry plugin.Registry,
 	logger logrus.FieldLogger,
+	logLevel logrus.Level,
 ) Interface {
 	c := &downloadRequestController{
-		downloadRequestClient:       downloadRequestClient,
-		downloadRequestLister:       downloadRequestInformer.Lister(),
-		downloadRequestListerSynced: downloadRequestInformer.Informer().HasSynced,
-		restoreLister:               restoreInformer.Lister(),
-		restoreListerSynced:         restoreInformer.Informer().HasSynced,
-		objectStore:                 objectStore,
-		bucket:                      bucket,
-		queue:                       workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "downloadrequest"),
-		clock:                       &clock.RealClock{},
-		logger:                      logger,
+		genericController:     newGenericController("downloadrequest", logger),
+		downloadRequestClient: downloadRequestClient,
+		downloadRequestLister: downloadRequestInformer.Lister(),
+		restoreLister:         restoreInformer.Lister(),
+		backupLocationLister:  backupLocationInformer.Lister(),
+		backupLister:          backupInformer.Lister(),
 
+		// use variables to refer to these functions so they can be
+		// replaced with fakes for testing.
 		createSignedURL: cloudprovider.CreateSignedURL,
+		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
+			return plugin.NewManager(logger, logLevel, pluginRegistry)
+		},
+
+		clock: &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processDownloadRequest
+	c.cacheSyncWaiters = append(
+		c.cacheSyncWaiters,
+		downloadRequestInformer.Informer().HasSynced,
+		restoreInformer.Informer().HasSynced,
+		backupLocationInformer.Informer().HasSynced,
+		backupInformer.Informer().HasSynced,
+	)
 
 	downloadRequestInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -104,102 +110,21 @@ func NewDownloadRequestController(
 	return c
 }
 
-// Run is a blocking function that runs the specified number of worker goroutines
-// to process items in the work queue. It will return when it receives on the
-// ctx.Done() channel.
-func (c *downloadRequestController) Run(ctx context.Context, numWorkers int) error {
-	var wg sync.WaitGroup
-
-	defer func() {
-		c.logger.Info("Waiting for workers to finish their work")
-
-		c.queue.ShutDown()
-
-		// We have to wait here in the deferred function instead of at the bottom of the function body
-		// because we have to shut down the queue in order for the workers to shut down gracefully, and
-		// we want to shut down the queue via defer and not at the end of the body.
-		wg.Wait()
-
-		c.logger.Info("All workers have finished")
-	}()
-
-	c.logger.Info("Starting DownloadRequestController")
-	defer c.logger.Info("Shutting down DownloadRequestController")
-
-	c.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.downloadRequestListerSynced, c.restoreListerSynced) {
-		return errors.New("timed out waiting for caches to sync")
-	}
-	c.logger.Info("Caches are synced")
-
-	wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			wait.Until(c.runWorker, time.Second, ctx.Done())
-			wg.Done()
-		}()
-	}
-
-	wg.Add(1)
-	go func() {
-		wait.Until(c.resync, time.Minute, ctx.Done())
-		wg.Done()
-	}()
-
-	<-ctx.Done()
-
-	return nil
-}
-
-// runWorker runs a worker until the controller's queue indicates it's time to shut down.
-func (c *downloadRequestController) runWorker() {
-	// continually take items off the queue (waits if it's
-	// empty) until we get a shutdown signal from the queue
-	for c.processNextWorkItem() {
-	}
-}
-
-// processNextWorkItem processes a single item from the queue.
-func (c *downloadRequestController) processNextWorkItem() bool {
-	key, quit := c.queue.Get()
-	if quit {
-		return false
-	}
-	// always call done on this item, since if it fails we'll add
-	// it back with rate-limiting below
-	defer c.queue.Done(key)
-
-	err := c.syncHandler(key.(string))
-	if err == nil {
-		// If you had no error, tell the queue to stop tracking history for your key. This will reset
-		// things like failure counts for per-item rate limiting.
-		c.queue.Forget(key)
-		return true
-	}
-
-	c.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
-
-	// we had an error processing the item so add it back
-	// into the queue for re-processing with rate-limiting
-	c.queue.AddRateLimited(key)
-
-	return true
-}
-
 // processDownloadRequest is the default per-item sync handler. It generates a pre-signed URL for
 // a new DownloadRequest or deletes the DownloadRequest if it has expired.
 func (c *downloadRequestController) processDownloadRequest(key string) error {
-	logContext := c.logger.WithField("key", key)
+	log := c.logger.WithField("key", key)
 
-	logContext.Debug("Running processDownloadRequest")
+	log.Debug("Running processDownloadRequest")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		log.WithError(err).Error("error splitting queue key")
+		return nil
 	}
 
 	downloadRequest, err := c.downloadRequestLister.DownloadRequests(ns).Get(name)
 	if apierrors.IsNotFound(err) {
-		logContext.Debug("Unable to find DownloadRequest")
+		log.Debug("Unable to find DownloadRequest")
 		return nil
 	}
 	if err != nil {
@@ -208,7 +133,7 @@ func (c *downloadRequestController) processDownloadRequest(key string) error {
 
 	switch downloadRequest.Status.Phase {
 	case "", v1.DownloadRequestPhaseNew:
-		return c.generatePreSignedURL(downloadRequest)
+		return c.generatePreSignedURL(downloadRequest, log)
 	case v1.DownloadRequestPhaseProcessed:
 		return c.deleteIfExpired(downloadRequest)
 	}
@@ -220,7 +145,7 @@ const signedURLTTL = 10 * time.Minute
 
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
-func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest) error {
+func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest, log logrus.FieldLogger) error {
 	update := downloadRequest.DeepCopy()
 
 	var (
@@ -240,7 +165,25 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		directory = downloadRequest.Spec.Target.Name
 	}
 
-	update.Status.DownloadURL, err = c.createSignedURL(c.objectStore, downloadRequest.Spec.Target, c.bucket, directory, signedURLTTL)
+	backup, err := c.backupLister.Backups(downloadRequest.Namespace).Get(directory)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	update.Status.DownloadURL, err = c.createSignedURL(objectStore, downloadRequest.Spec.Target, backupLocation.Spec.ObjectStorage.Bucket, directory, signedURLTTL)
 	if err != nil {
 		return err
 	}
@@ -256,7 +199,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
 	logContext := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
 	logContext.Info("checking for expiration of DownloadRequest")
-	if downloadRequest.Status.Expiration.Time.Before(c.clock.Now()) {
+	if downloadRequest.Status.Expiration.Time.After(c.clock.Now()) {
 		logContext.Debug("DownloadRequest has not expired")
 		return nil
 	}

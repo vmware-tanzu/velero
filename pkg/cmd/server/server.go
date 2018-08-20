@@ -672,17 +672,18 @@ func (s *server) runControllers(config *api.Config) error {
 
 		backupDeletionController := controller.NewBackupDeletionController(
 			s.logger,
+			s.logLevel,
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
 			s.blockStore,
-			s.objectStore,
-			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
+			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.pluginRegistry,
 		)
 		wg.Add(1)
 		go func() {
@@ -731,9 +732,11 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.objectStore,
-		config.BackupStorageProvider.Bucket,
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.pluginRegistry,
 		s.logger,
+		s.logLevel,
 	)
 	wg.Add(1)
 	go func() {
