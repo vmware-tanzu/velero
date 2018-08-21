@@ -25,13 +25,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -364,10 +363,14 @@ func TestProcessBackup(t *testing.T) {
 			type SpecPatch struct {
 				StorageLocation string `json:"storageLocation"`
 			}
+			type ObjectMetaPatch struct {
+				Labels map[string]string `json:"labels"`
+			}
 
 			type Patch struct {
-				Status StatusPatch `json:"status"`
-				Spec   SpecPatch   `json:"spec,omitempty"`
+				Status     StatusPatch     `json:"status"`
+				Spec       SpecPatch       `json:"spec,omitempty"`
+				ObjectMeta ObjectMetaPatch `json:"metadata,omitempty"`
 			}
 
 			decode := func(decoder *json.Decoder) (interface{}, error) {
@@ -389,6 +392,11 @@ func TestProcessBackup(t *testing.T) {
 					Spec: SpecPatch{
 						StorageLocation: "default",
 					},
+					ObjectMeta: ObjectMetaPatch{
+						Labels: map[string]string{
+							v1.StorageLocationLabel: "default",
+						},
+					},
 				}
 			} else {
 				expected = Patch{
@@ -396,6 +404,11 @@ func TestProcessBackup(t *testing.T) {
 						Version:    1,
 						Phase:      v1.BackupPhaseInProgress,
 						Expiration: expiration,
+					},
+					ObjectMeta: ObjectMetaPatch{
+						Labels: map[string]string{
+							v1.StorageLocationLabel: test.backup.Spec.StorageLocation,
+						},
 					},
 				}
 			}

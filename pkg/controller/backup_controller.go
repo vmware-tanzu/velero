@@ -349,6 +349,12 @@ func (controller *backupController) getLocationAndValidate(itm *api.Backup, defa
 		itm.Spec.StorageLocation = defaultBackupLocation
 	}
 
+	// add the storage location as a label for easy filtering later.
+	if itm.Labels == nil {
+		itm.Labels = make(map[string]string)
+	}
+	itm.Labels[api.StorageLocationLabel] = itm.Spec.StorageLocation
+
 	var backupLocation *api.BackupStorageLocation
 	backupLocation, err := controller.backupLocationLister.BackupStorageLocations(itm.Namespace).Get(itm.Spec.StorageLocation)
 	if err != nil {
