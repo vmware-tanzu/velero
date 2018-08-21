@@ -581,12 +581,6 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 	ctx := s.ctx
 	var wg sync.WaitGroup
 
-	cloudBackupCacheResyncPeriod := durationMin(config.GCSyncPeriod.Duration, config.BackupSyncPeriod.Duration)
-	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
-
-	liveBackupLister := cloudprovider.NewLiveBackupLister(s.logger, s.objectStore)
-	cachedBackupLister := cloudprovider.NewBackupCache(ctx, liveBackupLister, cloudBackupCacheResyncPeriod, s.logger)
-
 	go func() {
 		metricsMux := http.NewServeMux()
 		metricsMux.Handle("/metrics", promhttp.Handler())
@@ -600,12 +594,13 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
-		cachedBackupLister,
-		config.BackupStorageProvider.Bucket,
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		config.BackupSyncPeriod.Duration,
 		s.namespace,
-		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.pluginRegistry,
 		s.logger,
+		s.logLevel,
 	)
 	wg.Add(1)
 	go func() {
@@ -769,7 +764,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 
-	// Remove this sometime after v0.8.0
+	// TODO(1.0): remove
 	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Ark().V1().Backups().Informer().HasSynced)
 	s.removeDeprecatedGCFinalizer()
 
@@ -783,9 +778,10 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 	return nil
 }
 
-const gcFinalizer = "gc.ark.heptio.com"
-
+// TODO(1.0): remove
 func (s *server) removeDeprecatedGCFinalizer() {
+	const gcFinalizer = "gc.ark.heptio.com"
+
 	backups, err := s.sharedInformerFactory.Ark().V1().Backups().Lister().List(labels.Everything())
 	if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
