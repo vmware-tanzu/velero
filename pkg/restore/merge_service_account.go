@@ -58,9 +58,9 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 
 	desired.ImagePullSecrets = mergeLocalObjectReferenceSlices(desired.ImagePullSecrets, backupSA.ImagePullSecrets)
 
-	collections.MergeMaps(desired.Labels, backupSA.Labels)
+	desired.Labels = collections.MergeMaps(desired.Labels, backupSA.Labels)
 
-	collections.MergeMaps(desired.Annotations, backupSA.Annotations)
+	desired.Annotations = collections.MergeMaps(desired.Annotations, backupSA.Annotations)
 
 	desiredUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desired)
 	if err != nil {
