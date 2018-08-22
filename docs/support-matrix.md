@@ -19,6 +19,7 @@ _Note that these providers are not regularly tested by the Ark team._
  * [IBM Cloud][5]
  * [Minio][9]
  * Ceph RADOS v12.2.7
+ * [DigitalOcean][7]
 
 ## Volume Snapshot Providers
 | Provider                         | Owner           | Contact                         |
