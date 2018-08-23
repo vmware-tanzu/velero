@@ -1,5 +1,19 @@
 package storage
 
+// Copyright 2017 Microsoft Corporation
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 import (
 	"errors"
 	"fmt"
@@ -426,7 +440,7 @@ func (f *File) URL() string {
 	return f.fsc.client.getEndpoint(fileServiceName, f.buildPath(), nil)
 }
 
-// WriteRangeOptions includes opptions for a write file range operation
+// WriteRangeOptions includes options for a write file range operation
 type WriteRangeOptions struct {
 	Timeout    uint
 	ContentMD5 string
