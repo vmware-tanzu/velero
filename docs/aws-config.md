@@ -141,7 +141,11 @@ Specify the following values in the example files:
 
 * In `examples/aws/00-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3, region is optional and will be queried from the AWS S3 API if not provided). See the [Config definition][6] for details.
+  * Replace `<YOUR_REGION>`. See the [Config definition][6] for details.
+
+* In `examples/aws/05-ark-backupstoragelocation.yaml`:
+
+  * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3 backup storage, region is optional and will be queried from the AWS S3 API if not provided). See the [BackupStorageLocation definition][21] for details.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
@@ -274,3 +278,4 @@ It can be set up for Ark by creating a role that will have required permissions,
 [6]: config-definition.md#aws
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [20]: faq.md
+[21]: backupstoragelocation-definition.md#aws

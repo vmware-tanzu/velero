@@ -112,9 +112,9 @@ _Note: If you use a custom namespace, replace `heptio-ark` with the name of the 
 
 Specify the following values in the example files:
 
-* In file `examples/gcp/00-ark-config.yaml`:
+* In file `examples/gcp/05-ark-backupstoragelocation.yaml`:
 
-  * Replace `<YOUR_BUCKET>`. See the [Config definition][7] for details.
+  * Replace `<YOUR_BUCKET>`. See the [BackupStorageLocation definition][7] for details.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
@@ -130,7 +130,7 @@ In the root of your Ark directory, run:
   ```
 
   [0]: namespace.md
-  [7]: config-definition.md#gcp
+  [7]: backupstoragelocation-definition.md#gcp
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
   [20]: faq.md
