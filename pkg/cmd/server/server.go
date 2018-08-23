@@ -76,10 +76,10 @@ const (
 )
 
 type serverConfig struct {
-	pluginDir, metricsAddress                   string
-	backupSyncPeriod, podVolumeOperationTimeout time.Duration
-	restoreResourcePriorities                   []string
-	restoreOnly                                 bool
+	pluginDir, metricsAddress, defaultBackupLocation string
+	backupSyncPeriod, podVolumeOperationTimeout      time.Duration
+	restoreResourcePriorities                        []string
+	restoreOnly                                      bool
 }
 
 func NewCommand() *cobra.Command {
@@ -88,11 +88,11 @@ func NewCommand() *cobra.Command {
 		config       = serverConfig{
 			pluginDir:                 "/plugins",
 			metricsAddress:            defaultMetricsAddress,
+			defaultBackupLocation:     "default",
 			backupSyncPeriod:          defaultBackupSyncPeriod,
 			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities: defaultRestorePriorities,
 		}
-		defaultBackupLocation = "default"
 	)
 
 	var command = &cobra.Command{
@@ -127,7 +127,7 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, defaultBackupLocation, logger)
+			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -141,7 +141,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
-	command.Flags().StringVar(&defaultBackupLocation, "default-backup-storage-location", defaultBackupLocation, "name of the default backup storage location")
+	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
 
 	return command
 }
@@ -166,7 +166,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	objectStore           cloudprovider.ObjectStore
 	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
@@ -181,10 +180,9 @@ type server struct {
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
-	defaultBackupLocation string
 }
 
-func newServer(namespace, baseName string, config serverConfig, defaultBackupLocation string, logger *logrus.Logger) (*server, error) {
+func newServer(namespace, baseName string, config serverConfig, logger *logrus.Logger) (*server, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -225,14 +223,13 @@ func newServer(namespace, baseName string, config serverConfig, defaultBackupLoc
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
 		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
-		ctx:                   ctx,
-		cancelFunc:            cancelFunc,
-		logger:                logger,
-		logLevel:              logger.Level,
-		pluginRegistry:        pluginRegistry,
-		pluginManager:         pluginManager,
-		config:                config,
-		defaultBackupLocation: defaultBackupLocation,
+		ctx:            ctx,
+		cancelFunc:     cancelFunc,
+		logger:         logger,
+		logLevel:       logger.Level,
+		pluginRegistry: pluginRegistry,
+		pluginManager:  pluginManager,
+		config:         config,
 	}
 
 	return s, nil
@@ -271,16 +268,10 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
-	backupStorageLocation, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.defaultBackupLocation, metav1.GetOptions{})
+	backupStorageLocation, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
-	if err != nil {
-		return err
-	}
-	s.objectStore = objectStore
 
 	if config.PersistentVolumeProvider == nil {
 		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
@@ -321,15 +312,6 @@ func (s *server) applyConfigDefaults(c *api.Config) {
 	} else {
 		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using given resource priorities")
 	}
-
-	if c.BackupStorageProvider.Config == nil {
-		c.BackupStorageProvider.Config = make(map[string]string)
-	}
-
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
-	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -489,23 +471,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("object storage provider name must not be empty")
-	}
-
-	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := objectStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return objectStore, nil
-}
-
 func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
 	if cloudConfig.Name == "" {
 		return nil, errors.New("block storage provider name must not be empty")
@@ -641,7 +606,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 			s.pluginRegistry,
 			backupTracker,
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-			s.defaultBackupLocation,
+			s.config.defaultBackupLocation,
 			s.metrics,
 		)
 		wg.Add(1)
@@ -724,7 +689,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.logger,
 		s.logLevel,
 		s.pluginRegistry,
-		s.defaultBackupLocation,
+		s.config.defaultBackupLocation,
 		s.metrics,
 	)
 

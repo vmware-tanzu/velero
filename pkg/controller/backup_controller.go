@@ -460,24 +460,6 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 }
 
 // TODO(ncdc): move this to a better location that isn't backup specific
-func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("object storage provider name must not be empty")
-	}
-
-	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := objectStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return objectStore, nil
-}
-
-// TODO(nrb): Consolidate with other implementations
 func getObjectStoreForLocation(location *api.BackupStorageLocation, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
 	if location.Spec.Provider == "" {
 		return nil, errors.New("backup storage location provider name must not be empty")
@@ -486,6 +468,16 @@ func getObjectStoreForLocation(location *api.BackupStorageLocation, manager plug
 	objectStore, err := manager.GetObjectStore(location.Spec.Provider)
 	if err != nil {
 		return nil, err
+	}
+
+	// add the bucket name to the config map so that object stores can use
+	// it when initializing. The AWS object store uses this to determine the
+	// bucket's region when setting up its client.
+	if location.Spec.ObjectStorage != nil {
+		if location.Spec.Config == nil {
+			location.Spec.Config = make(map[string]string)
+		}
+		location.Spec.Config["bucket"] = location.Spec.ObjectStorage.Bucket
 	}
 
 	if err := objectStore.Init(location.Spec.Config); err != nil {
