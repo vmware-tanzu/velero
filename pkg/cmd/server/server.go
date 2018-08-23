@@ -166,7 +166,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	objectStore           cloudprovider.ObjectStore
 	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
@@ -274,12 +273,6 @@ func (s *server) run() error {
 		return errors.WithStack(err)
 	}
 
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
-	if err != nil {
-		return err
-	}
-	s.objectStore = objectStore
-
 	if config.PersistentVolumeProvider == nil {
 		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
 	} else {
@@ -319,15 +312,6 @@ func (s *server) applyConfigDefaults(c *api.Config) {
 	} else {
 		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using given resource priorities")
 	}
-
-	if c.BackupStorageProvider.Config == nil {
-		c.BackupStorageProvider.Config = make(map[string]string)
-	}
-
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
-	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -485,23 +469,6 @@ func (s *server) watchConfig(config *api.Config) {
 			}
 		},
 	})
-}
-
-func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("object storage provider name must not be empty")
-	}
-
-	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := objectStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return objectStore, nil
 }
 
 func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
