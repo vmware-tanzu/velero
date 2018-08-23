@@ -53,9 +53,9 @@ func newGenericController(name string, logger logrus.FieldLogger) *genericContro
 // to process items in the work queue. It will return when it receives on the
 // ctx.Done() channel.
 func (c *genericController) Run(ctx context.Context, numWorkers int) error {
-	if c.syncHandler == nil {
+	if c.syncHandler == nil && c.resyncFunc == nil {
 		// programmer error
-		panic("syncHandler is required")
+		panic("at least one of syncHandler or resyncFunc is required")
 	}
 
 	var wg sync.WaitGroup
@@ -83,12 +83,14 @@ func (c *genericController) Run(ctx context.Context, numWorkers int) error {
 	}
 	c.logger.Info("Caches are synced")
 
-	wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			wait.Until(c.runWorker, time.Second, ctx.Done())
-			wg.Done()
-		}()
+	if c.syncHandler != nil {
+		wg.Add(numWorkers)
+		for i := 0; i < numWorkers; i++ {
+			go func() {
+				wait.Until(c.runWorker, time.Second, ctx.Done())
+				wg.Done()
+			}()
+		}
 	}
 
 	if c.resyncFunc != nil {
