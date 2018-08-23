@@ -21,7 +21,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
@@ -37,10 +41,57 @@ func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
 	return &objectStore{log: logger}
 }
 
-func (o *objectStore) Init(config map[string]string) error {
-	cfg := getConfig()
+func getStorageAccountsClient(envVars map[string]string) (*storagemgmt.AccountsClient, error) {
+	spt, err := helpers.NewServicePrincipalTokenFromCredentials(envVars, azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating new service principal token")
+	}
 
-	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
+	accountsClient := storagemgmt.NewAccountsClient(envVars[azureSubscriptionIDKey])
+	accountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
+
+	return &accountsClient, nil
+}
+
+func getStorageAccountKey(client *storagemgmt.AccountsClient, resourceGroup, storageAccount string) (string, error) {
+	res, err := client.ListKeys(resourceGroup, storageAccount)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if res.Keys == nil || len(*res.Keys) == 0 {
+		return "", errors.New("No storage keys found")
+	}
+
+	var storageKey string
+
+	for _, key := range *res.Keys {
+		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
+		// the storagemgmt.Full constant in the SDK is defined as "Full".
+		if strings.ToUpper(string(key.Permissions)) == strings.ToUpper(string(storagemgmt.Full)) {
+			storageKey = *key.Value
+			break
+		}
+	}
+
+	if storageKey == "" {
+		return "", errors.New("No storage key with Full permissions found")
+	}
+
+	return storageKey, nil
+}
+
+func (o *objectStore) Init(config map[string]string) error {
+	storageAccountsClient, err := getStorageAccountsClient(getAzureEnvVars())
+	if err != nil {
+		return err
+	}
+
+	storageAccountKey, err := getStorageAccountKey(storageAccountsClient, config["resourceGroup"], config["storageAccount"])
+	if err != nil {
+		return err
+	}
+
+	storageClient, err := storage.NewBasicClient(config["storageAccount"], storageAccountKey)
 	if err != nil {
 		return errors.WithStack(err)
 	}

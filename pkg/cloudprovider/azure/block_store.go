@@ -40,16 +40,14 @@ import (
 )
 
 const (
-	azureClientIDKey         = "AZURE_CLIENT_ID"
-	azureClientSecretKey     = "AZURE_CLIENT_SECRET"
-	azureSubscriptionIDKey   = "AZURE_SUBSCRIPTION_ID"
-	azureTenantIDKey         = "AZURE_TENANT_ID"
-	azureStorageAccountIDKey = "AZURE_STORAGE_ACCOUNT_ID"
-	azureStorageKeyKey       = "AZURE_STORAGE_KEY"
-	azureResourceGroupKey    = "AZURE_RESOURCE_GROUP"
-	apiTimeoutKey            = "apiTimeout"
-	snapshotsResource        = "snapshots"
-	disksResource            = "disks"
+	azureTenantIDKey       = "AZURE_TENANT_ID"
+	azureSubscriptionIDKey = "AZURE_SUBSCRIPTION_ID"
+	azureClientIDKey       = "AZURE_CLIENT_ID"
+	azureClientSecretKey   = "AZURE_CLIENT_SECRET"
+	azureResourceGroupKey  = "AZURE_RESOURCE_GROUP"
+	apiTimeoutKey          = "apiTimeout"
+	snapshotsResource      = "snapshots"
+	disksResource          = "disks"
 )
 
 type blockStore struct {
@@ -71,15 +69,13 @@ func (si *snapshotIdentifier) String() string {
 	return getComputeResourceName(si.subscription, si.resourceGroup, snapshotsResource, si.name)
 }
 
-func getConfig() map[string]string {
+func getAzureEnvVars() map[string]string {
 	cfg := map[string]string{
-		azureClientIDKey:         "",
-		azureClientSecretKey:     "",
-		azureSubscriptionIDKey:   "",
-		azureTenantIDKey:         "",
-		azureStorageAccountIDKey: "",
-		azureStorageKeyKey:       "",
-		azureResourceGroupKey:    "",
+		azureTenantIDKey:       "",
+		azureSubscriptionIDKey: "",
+		azureClientIDKey:       "",
+		azureClientSecretKey:   "",
+		azureResourceGroupKey:  "",
 	}
 
 	for key := range cfg {
@@ -108,7 +104,7 @@ func (b *blockStore) Init(config map[string]string) error {
 		apiTimeout = 2 * time.Minute
 	}
 
-	cfg := getConfig()
+	cfg := getAzureEnvVars()
 
 	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
