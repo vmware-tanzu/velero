@@ -40,11 +40,6 @@ type Config struct {
 	// PersistentVolumeProvider is the configuration information for the cloud where
 	// the cluster is running and has PersistentVolumes to snapshot or restore. Optional.
 	PersistentVolumeProvider *CloudProviderConfig `json:"persistentVolumeProvider"`
-
-	// BackupStorageProvider is the configuration information for the cloud where
-	// Ark backups are stored in object storage. This may be a different cloud than
-	// where the cluster is running.
-	BackupStorageProvider ObjectStorageProviderConfig `json:"backupStorageProvider"`
 }
 
 // CloudProviderConfig is configuration information about how to connect
@@ -53,22 +48,4 @@ type CloudProviderConfig struct {
 	Name string `json:"name"`
 
 	Config map[string]string `json:"config"`
-}
-
-// ObjectStorageProviderConfig is configuration information for connecting to
-// a particular bucket in object storage to access Ark backups.
-type ObjectStorageProviderConfig struct {
-	// CloudProviderConfig is the configuration information for the cloud where
-	// Ark backups are stored in object storage.
-	CloudProviderConfig `json:",inline"`
-
-	// Bucket is the name of the bucket in object storage where Ark backups
-	// are stored.
-	Bucket string `json:"bucket"`
-
-	// ResticLocation is the bucket and optional prefix in object storage where
-	// Ark stores restic backups of pod volumes, specified either as "bucket" or
-	// "bucket/prefix". This bucket must be different than the `Bucket` field.
-	// Optional.
-	ResticLocation string `json:"resticLocation"`
 }
