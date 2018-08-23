@@ -135,9 +135,13 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
 * In file `examples/azure/10-ark-config.yaml`:
 
-  * Replace `<YOUR_BUCKET>` and `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
+  * Replace `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
 
-Here is an example of a completed file.
+* In file `examples/azure/05-ark-backupstoragelocation.yaml`:
+
+  * Replace `<YOUR_BUCKET>`. See the [BackupStorageLocation definition][21] for details.
+
+Here is an example of a completed config file.
 
 ```yaml
 apiVersion: ark.heptio.com/v1
@@ -149,9 +153,6 @@ persistentVolumeProvider:
   name: azure
   config:
     apiTimeout: 15m
-backupStorageProvider:
-  name: azure
-  bucket: ark
 backupSyncPeriod: 30m
 gcSyncPeriod: 30m
 scheduleSyncPeriod: 1m
@@ -166,9 +167,10 @@ In the root of your Ark directory, run:
   kubectl apply -f examples/azure/
   ```
 
-  [0]: namespace.md
-  [8]: config-definition.md#azure
-  [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
-  [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
-  [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
-  [20]: faq.md
+[0]: namespace.md
+[8]: config-definition.md#azure
+[17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
+[18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
+[19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
+[20]: faq.md
+[21]: backupstoragelocation-definition.md#azure

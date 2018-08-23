@@ -14,21 +14,19 @@
 
 ---
 apiVersion: ark.heptio.com/v1
-kind: Config
+kind: BackupStorageLocation
 metadata:
-  namespace: heptio-ark
   name: default
-backupStorageProvider:
-  name: aws
-  bucket: <YOUR_BUCKET>
-  # Uncomment the below line to enable restic integration.
-  # The format for resticLocation is <bucket>[/<prefix>],
-  # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
-  # This MUST be a different bucket than the main Ark bucket
-  # specified just above.
-  # resticLocation: <YOUR_RESTIC_LOCATION>
-  config:
-    region: <YOUR_REGION>
-    s3ForcePathStyle: "true"
-    s3Url:  <YOUR_URL_ACCESS_POINT>
----
+  namespace: heptio-ark
+spec:
+  provider: aws
+  objectStorage:
+    bucket: <YOUR_BUCKET> 
+    config:
+      region: <YOUR_REGION>
+      # Uncomment the below line to enable restic integration.
+      # The format for resticLocation is <bucket>[/<prefix>],
+      # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
+      # This MUST be a different bucket than the main Ark bucket
+      # specified just above.
+      # restic-location: <YOUR_RESTIC_LOCATION>

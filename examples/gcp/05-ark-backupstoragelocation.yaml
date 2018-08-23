@@ -1,4 +1,4 @@
-# Copyright 2017 the Heptio Ark contributors.
+# Copyright 2018 the Heptio Ark contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +14,17 @@
 
 ---
 apiVersion: ark.heptio.com/v1
-kind: Config
+kind: BackupStorageLocation
 metadata:
-  namespace: heptio-ark
   name: default
-persistentVolumeProvider:
-  name: aws
-  config:
-    region: <YOUR_REGION>
+  namespace: heptio-ark
+spec:
+  provider: gcp
+  objectStorage:
+    bucket: <YOUR_BUCKET> 
+    # Uncomment the below line to enable restic integration.
+    # The format for resticLocation is <bucket>[/<prefix>],
+    # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
+    # This MUST be a different bucket than the main Ark bucket
+    # specified just above.
+    # restic-location: <YOUR_RESTIC_LOCATION>
