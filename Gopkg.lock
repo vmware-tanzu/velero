@@ -372,8 +372,8 @@
 [[projects]]
   name = "github.com/spf13/pflag"
   packages = ["."]
-  revision = "e57e3eeb33f795204c1ca35f56c44f83227c6e66"
-  version = "v1.0.0"
+  revision = "9a97c102cda95a86cec2345a6f09f55a939babf5"
+  version = "v1.0.2"
 
 [[projects]]
   name = "github.com/stretchr/objx"
@@ -806,6 +806,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4706135745ec21274791f454998d264dd167c78b472674ba813dca08cc962d7d"
+  inputs-digest = "33c5dc3b6a01cf1997d7380e1966b01f249d90cb4f4c1023094fefe78ba0acfc"
   solver-name = "gps-cdcl"
   solver-version = 1
