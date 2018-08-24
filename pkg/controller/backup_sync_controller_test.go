@@ -176,6 +176,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				time.Duration(0),
 				test.namespace,
+				"",
 				nil, // pluginRegistry
 				arktest.NewLogger(),
 				logrus.DebugLevel,
@@ -341,6 +342,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				time.Duration(0),
 				test.namespace,
+				"",
 				nil, // pluginRegistry
 				arktest.NewLogger(),
 				logrus.InfoLevel,
