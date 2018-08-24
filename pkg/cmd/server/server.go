@@ -571,6 +571,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.config.backupSyncPeriod,
 		s.namespace,
+		s.config.defaultBackupLocation,
 		s.pluginRegistry,
 		s.logger,
 		s.logLevel,
