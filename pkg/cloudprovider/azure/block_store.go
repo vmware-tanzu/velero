@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/arm/disk"
-	"github.com/Azure/azure-sdk-for-go/arm/examples/helpers"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
@@ -40,14 +39,10 @@ import (
 )
 
 const (
-	azureTenantIDKey       = "AZURE_TENANT_ID"
-	azureSubscriptionIDKey = "AZURE_SUBSCRIPTION_ID"
-	azureClientIDKey       = "AZURE_CLIENT_ID"
-	azureClientSecretKey   = "AZURE_CLIENT_SECRET"
-	azureResourceGroupKey  = "AZURE_RESOURCE_GROUP"
-	apiTimeoutKey          = "apiTimeout"
-	snapshotsResource      = "snapshots"
-	disksResource          = "disks"
+	resourceGroupEnvVar = "AZURE_RESOURCE_GROUP"
+	apiTimeoutConfigKey = "apiTimeout"
+	snapshotsResource   = "snapshots"
+	disksResource       = "disks"
 )
 
 type blockStore struct {
@@ -69,50 +64,37 @@ func (si *snapshotIdentifier) String() string {
 	return getComputeResourceName(si.subscription, si.resourceGroup, snapshotsResource, si.name)
 }
 
-func getAzureEnvVars() map[string]string {
-	cfg := map[string]string{
-		azureTenantIDKey:       "",
-		azureSubscriptionIDKey: "",
-		azureClientIDKey:       "",
-		azureClientSecretKey:   "",
-		azureResourceGroupKey:  "",
-	}
-
-	for key := range cfg {
-		cfg[key] = os.Getenv(key)
-	}
-
-	return cfg
-}
-
 func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
 	return &blockStore{log: logger}
 }
 
 func (b *blockStore) Init(config map[string]string) error {
-	var (
-		apiTimeoutVal = config[apiTimeoutKey]
-		apiTimeout    time.Duration
-		err           error
-	)
-
-	if apiTimeout, err = time.ParseDuration(apiTimeoutVal); err != nil {
-		return errors.Wrapf(err, "could not parse %s (expected time.Duration)", apiTimeoutKey)
-	}
-
-	if apiTimeout == 0 {
-		apiTimeout = 2 * time.Minute
-	}
-
-	cfg := getAzureEnvVars()
-
-	spt, err := helpers.NewServicePrincipalTokenFromCredentials(cfg, azure.PublicCloud.ResourceManagerEndpoint)
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
-		return errors.Wrap(err, "error creating new service principal token")
+		return errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	disksClient := disk.NewDisksClient(cfg[azureSubscriptionIDKey])
-	snapsClient := disk.NewSnapshotsClient(cfg[azureSubscriptionIDKey])
+	// 2. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
+	var apiTimeout time.Duration
+	if val := config[apiTimeoutConfigKey]; val == "" {
+		apiTimeout = 2 * time.Minute
+	} else {
+		apiTimeout, err = time.ParseDuration(val)
+		if err != nil {
+			return errors.Wrapf(err, "unable to parse value %q for config key %q (expected a duration string)", val, apiTimeoutConfigKey)
+		}
+	}
+
+	// 3. get SPT
+	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return errors.Wrap(err, "error getting service principal token")
+	}
+
+	// 4. set up clients
+	disksClient := disk.NewDisksClient(envVars[subscriptionIDEnvVar])
+	snapsClient := disk.NewSnapshotsClient(envVars[subscriptionIDEnvVar])
 
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
@@ -123,8 +105,8 @@ func (b *blockStore) Init(config map[string]string) error {
 
 	b.disks = &disksClient
 	b.snaps = &snapsClient
-	b.subscription = cfg[azureSubscriptionIDKey]
-	b.resourceGroup = cfg[azureResourceGroupKey]
+	b.subscription = envVars[subscriptionIDEnvVar]
+	b.resourceGroup = envVars[resourceGroupEnvVar]
 	b.apiTimeout = apiTimeout
 
 	return nil
