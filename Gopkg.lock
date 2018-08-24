@@ -18,7 +18,6 @@
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "arm/disk",
-    "arm/examples/helpers",
     "services/storage/mgmt/2017-10-01/storage",
     "storage"
   ]
@@ -807,6 +806,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "84d160fa2e769b80040762566acadbe7c23ee774124dfdf7a498c0e65cd8011a"
+  inputs-digest = "4706135745ec21274791f454998d264dd167c78b472674ba813dca08cc962d7d"
   solver-name = "gps-cdcl"
   solver-version = 1
