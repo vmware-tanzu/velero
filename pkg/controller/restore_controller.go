@@ -521,6 +521,8 @@ func (c *restoreController) fetchFromBackupStorage(backupName string, pluginMana
 	return backupInfo{}, errors.New("not able to fetch from backup storage")
 }
 
+// orderedBackupLocations returns a new slice with the default backup location first (if it exists),
+// followed by the rest of the locations in no particular order.
 func orderedBackupLocations(locations []*api.BackupStorageLocation, defaultLocationName string) []*api.BackupStorageLocation {
 	var result []*api.BackupStorageLocation
 

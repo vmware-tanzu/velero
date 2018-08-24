@@ -45,6 +45,7 @@ type backupSyncController struct {
 	backupLister                listers.BackupLister
 	backupStorageLocationLister listers.BackupStorageLocationLister
 	namespace                   string
+	defaultBackupLocation       string
 	newPluginManager            func(logrus.FieldLogger) plugin.Manager
 	listCloudBackups            func(logrus.FieldLogger, cloudprovider.ObjectStore, string) ([]*arkv1api.Backup, error)
 }
@@ -55,6 +56,7 @@ func NewBackupSyncController(
 	backupStorageLocationInformer informers.BackupStorageLocationInformer,
 	syncPeriod time.Duration,
 	namespace string,
+	defaultBackupLocation string,
 	pluginRegistry plugin.Registry,
 	logger logrus.FieldLogger,
 	logLevel logrus.Level,
@@ -68,6 +70,7 @@ func NewBackupSyncController(
 		genericController:           newGenericController("backup-sync", logger),
 		client:                      client,
 		namespace:                   namespace,
+		defaultBackupLocation:       defaultBackupLocation,
 		backupLister:                backupInformer.Lister(),
 		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
 
@@ -97,6 +100,8 @@ func (c *backupSyncController) run() {
 		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
 		return
 	}
+	// sync the default location first, if it exists
+	locations = orderedBackupLocations(locations, c.defaultBackupLocation)
 
 	pluginManager := c.newPluginManager(c.logger)
 
