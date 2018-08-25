@@ -57,9 +57,8 @@ func NewBackupSyncController(
 	syncPeriod time.Duration,
 	namespace string,
 	defaultBackupLocation string,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	logger logrus.FieldLogger,
-	logLevel logrus.Level,
 ) Interface {
 	if syncPeriod < time.Minute {
 		logger.Infof("Provided backup sync period %v is too short. Setting to 1 minute", syncPeriod)
@@ -74,9 +73,9 @@ func NewBackupSyncController(
 		backupLister:                backupInformer.Lister(),
 		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
 
-		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
+		// use variables to refer to these functions so they can be
+		// replaced with fakes for testing.
+		newPluginManager: newPluginManager,
 		listCloudBackups: cloudprovider.ListBackups,
 	}
 

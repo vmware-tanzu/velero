@@ -66,7 +66,6 @@ type backupDeletionController struct {
 // NewBackupDeletionController creates a new backup deletion controller.
 func NewBackupDeletionController(
 	logger logrus.FieldLogger,
-	logLevel logrus.Level,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
@@ -77,7 +76,7 @@ func NewBackupDeletionController(
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -94,10 +93,8 @@ func NewBackupDeletionController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		deleteBackupDir: cloudprovider.DeleteBackupDir,
-		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
+		newPluginManager: newPluginManager,
+		deleteBackupDir:  cloudprovider.DeleteBackupDir,
 
 		clock: &clock.RealClock{},
 	}
