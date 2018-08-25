@@ -33,6 +33,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/util/encode"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
@@ -265,7 +266,7 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objectStore := new(arktest.ObjectStore)
+			objectStore := new(cloudprovidermocks.ObjectStore)
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",

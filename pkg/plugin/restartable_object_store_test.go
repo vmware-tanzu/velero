@@ -22,10 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 )
 
 func TestRestartableGetObjectStore(t *testing.T) {
@@ -47,7 +48,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 		},
 		{
 			name:   "happy path",
-			plugin: new(test.ObjectStore),
+			plugin: new(cloudprovidermocks.ObjectStore),
 		},
 	}
 
@@ -95,7 +96,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	err := r.reinitialize(3)
 	assert.EqualError(t, err, "int is not a cloudprovider.ObjectStore!")
 
-	objectStore := new(test.ObjectStore)
+	objectStore := new(cloudprovidermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 
@@ -127,7 +128,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
-	objectStore := new(test.ObjectStore)
+	objectStore := new(cloudprovidermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(objectStore, nil)
@@ -158,7 +159,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	assert.EqualError(t, err, "getByKindAndName error")
 
 	// Delegate returns error
-	objectStore := new(test.ObjectStore)
+	objectStore := new(cloudprovidermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(objectStore, nil)
@@ -192,7 +193,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 			}
 		},
 		func() mockable {
-			return new(test.ObjectStore)
+			return new(cloudprovidermocks.ObjectStore)
 		},
 		restartableDelegateTest{
 			function:                "PutObject",
