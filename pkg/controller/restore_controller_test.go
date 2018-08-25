@@ -105,13 +105,10 @@ func TestFetchBackupInfo(t *testing.T) {
 				false,
 				logger,
 				logrus.InfoLevel,
-				nil, //pluginRegistry
+				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
-			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-				return pluginManager
-			}
 
 			if test.backupServiceError == nil {
 				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
@@ -200,13 +197,10 @@ func TestProcessRestoreSkips(t *testing.T) {
 				false, // pvProviderExists
 				logger,
 				logrus.InfoLevel,
-				nil, // pluginRegistry
+				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
-			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-				return pluginManager
-			}
 
 			if test.restore != nil {
 				sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(test.restore)
@@ -427,13 +421,10 @@ func TestProcessRestore(t *testing.T) {
 				test.allowRestoreSnapshots,
 				logger,
 				logrus.InfoLevel,
-				nil, // pluginRegistry
+				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
-			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-				return pluginManager
-			}
 
 			if test.location != nil {
 				sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(test.location)

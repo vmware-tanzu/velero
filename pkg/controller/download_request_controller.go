@@ -60,9 +60,8 @@ func NewDownloadRequestController(
 	restoreInformer informers.RestoreInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	backupInformer informers.BackupInformer,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	logger logrus.FieldLogger,
-	logLevel logrus.Level,
 ) Interface {
 	c := &downloadRequestController{
 		genericController:     newGenericController("downloadrequest", logger),
@@ -74,10 +73,8 @@ func NewDownloadRequestController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		createSignedURL: cloudprovider.CreateSignedURL,
-		newPluginManager: func(logger logrus.FieldLogger) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
+		createSignedURL:  cloudprovider.CreateSignedURL,
+		newPluginManager: newPluginManager,
 
 		clock: &clock.RealClock{},
 	}

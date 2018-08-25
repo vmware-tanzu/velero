@@ -178,7 +178,6 @@ func TestProcessBackup(t *testing.T) {
 				backupper       = &fakeBackupper{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel)
-				pluginRegistry  = plugin.NewRegistry("/dir", logger, logrus.InfoLevel)
 				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
 				objectStore     = &arktest.ObjectStore{}
 				pluginManager   = &pluginmocks.Manager{}
@@ -194,7 +193,7 @@ func TestProcessBackup(t *testing.T) {
 				test.allowSnapshots,
 				logger,
 				logrus.InfoLevel,
-				pluginRegistry,
+				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 				NewBackupTracker(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				"default",
@@ -202,9 +201,6 @@ func TestProcessBackup(t *testing.T) {
 			).(*backupController)
 
 			c.clock = clock.NewFakeClock(clockTime)
-			c.newPluginManager = func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-				return pluginManager
-			}
 
 			var expiration, startTime time.Time
 

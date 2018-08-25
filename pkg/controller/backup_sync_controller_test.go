@@ -177,14 +177,13 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				time.Duration(0),
 				test.namespace,
 				"",
-				nil, // pluginRegistry
+				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 				arktest.NewLogger(),
-				logrus.DebugLevel,
 			).(*backupSyncController)
 
-			c.newPluginManager = func(_ logrus.FieldLogger) plugin.Manager { return pluginManager }
 			pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
 			pluginManager.On("CleanupClients").Return(nil)
+
 			objectStore.On("Init", mock.Anything).Return(nil)
 
 			for _, location := range test.locations {
@@ -343,9 +342,8 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				time.Duration(0),
 				test.namespace,
 				"",
-				nil, // pluginRegistry
+				nil, // new plugin manager func
 				arktest.NewLogger(),
-				logrus.InfoLevel,
 			).(*backupSyncController)
 
 			expectedDeleteActions := make([]core.Action, 0)

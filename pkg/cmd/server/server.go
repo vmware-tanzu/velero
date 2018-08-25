@@ -565,6 +565,10 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 	s.metrics = metrics.NewServerMetrics()
 	s.metrics.RegisterAllMetrics()
 
+	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
+		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+	}
+
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().Backups(),
@@ -572,9 +576,8 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.config.backupSyncPeriod,
 		s.namespace,
 		s.config.defaultBackupLocation,
-		s.pluginRegistry,
+		newPluginManager,
 		s.logger,
-		s.logLevel,
 	)
 	wg.Add(1)
 	go func() {
@@ -604,7 +607,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
-			s.pluginRegistry,
+			newPluginManager,
 			backupTracker,
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
@@ -644,7 +647,6 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 
 		backupDeletionController := controller.NewBackupDeletionController(
 			s.logger,
-			s.logLevel,
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
@@ -655,7 +657,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-			s.pluginRegistry,
+			newPluginManager,
 		)
 		wg.Add(1)
 		go func() {
@@ -689,7 +691,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.blockStore != nil,
 		s.logger,
 		s.logLevel,
-		s.pluginRegistry,
+		newPluginManager,
 		s.config.defaultBackupLocation,
 		s.metrics,
 	)
@@ -706,9 +708,8 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.sharedInformerFactory.Ark().V1().Restores(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.sharedInformerFactory.Ark().V1().Backups(),
-		s.pluginRegistry,
+		newPluginManager,
 		s.logger,
-		s.logLevel,
 	)
 	wg.Add(1)
 	go func() {

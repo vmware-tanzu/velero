@@ -86,7 +86,6 @@ type restoreController struct {
 	queue                      workqueue.RateLimitingInterface
 	logger                     logrus.FieldLogger
 	logLevel                   logrus.Level
-	pluginRegistry             plugin.Registry
 	defaultBackupLocation      string
 	metrics                    *metrics.ServerMetrics
 
@@ -94,7 +93,7 @@ type restoreController struct {
 	downloadBackup       cloudprovider.DownloadBackupFunc
 	uploadRestoreLog     cloudprovider.UploadRestoreLogFunc
 	uploadRestoreResults cloudprovider.UploadRestoreResultsFunc
-	newPluginManager     func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
+	newPluginManager     func(logger logrus.FieldLogger) plugin.Manager
 }
 
 func NewRestoreController(
@@ -108,10 +107,9 @@ func NewRestoreController(
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	logLevel logrus.Level,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
-
 ) Interface {
 	c := &restoreController{
 		namespace:                  namespace,
@@ -128,17 +126,16 @@ func NewRestoreController(
 		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
 		logger:                logger,
 		logLevel:              logLevel,
-		pluginRegistry:        pluginRegistry,
 		defaultBackupLocation: defaultBackupLocation,
 		metrics:               metrics,
 
+		// use variables to refer to these functions so they can be
+		// replaced with fakes for testing.
+		newPluginManager:     newPluginManager,
 		getBackup:            cloudprovider.GetBackup,
 		downloadBackup:       cloudprovider.DownloadBackup,
 		uploadRestoreLog:     cloudprovider.UploadRestoreLog,
 		uploadRestoreResults: cloudprovider.UploadRestoreResults,
-		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
 	}
 
 	c.syncHandler = c.processRestore
@@ -282,7 +279,7 @@ func (c *restoreController) processRestore(key string) error {
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
-	pluginManager := c.newPluginManager(logContext, logContext.Level, c.pluginRegistry)
+	pluginManager := c.newPluginManager(logContext)
 	defer pluginManager.CleanupClients()
 
 	actions, err := pluginManager.GetRestoreItemActions()

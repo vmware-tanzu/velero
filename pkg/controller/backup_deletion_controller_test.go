@@ -48,7 +48,6 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 
 	controller := NewBackupDeletionController(
 		arktest.NewLogger(),
-		logrus.InfoLevel,
 		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(), // deleteBackupRequestClient
 		client.ArkV1(), // backupClient
@@ -59,7 +58,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		nil, // restic repository manager
 		sharedInformers.Ark().V1().PodVolumeBackups(),
 		sharedInformers.Ark().V1().BackupStorageLocations(),
-		nil, // pluginRegistry
+		nil, // new plugin manager func
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -135,7 +134,6 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		objectStore:     objectStore,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
-			logrus.InfoLevel,
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
@@ -146,13 +144,11 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			nil, // restic repository manager
 			sharedInformers.Ark().V1().PodVolumeBackups(),
 			sharedInformers.Ark().V1().BackupStorageLocations(),
-			nil, // pluginRegistry
+			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 		).(*backupDeletionController),
 
 		req: req,
 	}
-
-	data.controller.newPluginManager = func(_ logrus.FieldLogger) plugin.Manager { return pluginManager }
 
 	pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
 	pluginManager.On("CleanupClients").Return(nil)
@@ -594,7 +590,6 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 
 			controller := NewBackupDeletionController(
 				arktest.NewLogger(),
-				logrus.InfoLevel,
 				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(), // deleteBackupRequestClient
 				client.ArkV1(), // backupClient
@@ -605,7 +600,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				nil,
 				sharedInformers.Ark().V1().PodVolumeBackups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
-				nil, // pluginRegistry
+				nil, // new plugin manager func
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}

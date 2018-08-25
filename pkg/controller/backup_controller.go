@@ -67,14 +67,12 @@ type backupController struct {
 	clock                      clock.Clock
 	logger                     logrus.FieldLogger
 	logLevel                   logrus.Level
-	pluginRegistry             plugin.Registry
+	newPluginManager           func(logrus.FieldLogger) plugin.Manager
 	backupTracker              BackupTracker
 	backupLocationLister       listers.BackupStorageLocationLister
 	backupLocationListerSynced cache.InformerSynced
 	defaultBackupLocation      string
 	metrics                    *metrics.ServerMetrics
-
-	newPluginManager func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
 }
 
 func NewBackupController(
@@ -84,7 +82,7 @@ func NewBackupController(
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	logLevel logrus.Level,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
@@ -100,16 +98,12 @@ func NewBackupController(
 		clock:                      &clock.RealClock{},
 		logger:                     logger,
 		logLevel:                   logLevel,
-		pluginRegistry:             pluginRegistry,
+		newPluginManager:           newPluginManager,
 		backupTracker:              backupTracker,
 		backupLocationLister:       backupLocationInformer.Lister(),
 		backupLocationListerSynced: backupLocationInformer.Informer().HasSynced,
 		defaultBackupLocation:      defaultBackupLocation,
 		metrics:                    metrics,
-
-		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
 	}
 
 	c.syncHandler = c.processBackup
@@ -387,7 +381,7 @@ func (controller *backupController) runBackup(backup *api.Backup, backupLocation
 
 	log.Info("Starting backup")
 
-	pluginManager := controller.newPluginManager(log, log.Level, controller.pluginRegistry)
+	pluginManager := controller.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	backupFile, err := ioutil.TempFile("", "")
