@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -67,7 +68,6 @@ import (
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 	"github.com/heptio/ark/pkg/util/stringslice"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -222,7 +222,7 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		arkClient:             arkClient,
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
+		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(arkClient, 0, informers.WithNamespace(namespace)),
 		ctx:            ctx,
 		cancelFunc:     cancelFunc,
 		logger:         logger,
@@ -486,13 +486,6 @@ func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) 
 	}
 
 	return blockStore, nil
-}
-
-func durationMin(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func (s *server) initRestic(providerName string) error {
