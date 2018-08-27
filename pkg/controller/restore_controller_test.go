@@ -377,7 +377,7 @@ func TestProcessRestore(t *testing.T) {
 
 			if test.restore != nil {
 				pluginManager.On("GetRestoreItemActions", test.restore.Name).Return(nil, nil)
-				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return(nil)
+				pluginManager.On("CloseRestoreItemActions", test.restore.Name).Return()
 			}
 
 			err = c.processRestore(key)

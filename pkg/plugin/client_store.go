@@ -71,6 +71,22 @@ func (s *clientStore) list(kind PluginKind, scope string) ([]*plugin.Client, err
 	return nil, errors.New("clients not found")
 }
 
+// listAll returns all plugin clients for all kinds/scopes, or a
+// zero-valued slice if there are none.
+func (s *clientStore) listAll() []*plugin.Client {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	var clients []*plugin.Client
+	for _, pluginsByName := range s.clients {
+		for name := range pluginsByName {
+			clients = append(clients, pluginsByName[name])
+		}
+	}
+
+	return clients
+}
+
 // add stores a plugin client for the given kind/name/scope.
 func (s *clientStore) add(client *plugin.Client, kind PluginKind, name, scope string) {
 	s.lock.Lock()
@@ -102,4 +118,12 @@ func (s *clientStore) deleteAll(kind PluginKind, scope string) {
 	defer s.lock.Unlock()
 
 	delete(s.clients, clientKey{kind, scope})
+}
+
+// clear removes all clients for all kinds/scopes from the store.
+func (s *clientStore) clear() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.clients = make(map[clientKey]map[string]*plugin.Client)
 }
