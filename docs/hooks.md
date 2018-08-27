@@ -14,11 +14,6 @@ As of version v0.7.0, Ark also supports "post" hooks - these execute after all c
 completed, as well as after all the additional items specified by custom actions have been backed
 up.
 
-An example of when you might use both pre and post hooks is freezing a file system. If you want to
-ensure that all pending disk I/O operations have completed prior to taking a snapshot, you could use
-a pre hook to run `fsfreeze --freeze`. Next, Ark would take a snapshot of the disk. Finally, you
-could use a post hook to run `fsfreeze --unfreeze`.
-
 There are two ways to specify hooks: annotations on the pod itself, and in the Backup spec.
 
 ### Specifying Hooks As Pod Annotations
@@ -51,4 +46,43 @@ Ark v0.7.0+ continues to support the original (deprecated) way to specify pre ho
 Please see the documentation on the [Backup API Type][1] for how to specify hooks in the Backup
 spec.
 
+## Hook Example with fsfreeze
+
+We are going to walk through using both pre and post hooks for freezing a file system. Freezing the
+file system is useful to ensure that all pending disk I/O operations have completed prior to taking a snapshot.
+
+We will be using [example/nginx-app/with-pv.yaml][2] for this example. Follow the [steps for your provider][3] to
+setup this example.
+
+### Annotations
+
+The Ark [example/nginx-app/with-pv.yaml][2] serves as an example of adding the pre and post hook annotations directly
+to your declarative deployment. Below is an example of what updating an object in place might look like.
+
+Place Ark in to restore only mode. By placing Ark in restore only mode you prevent Ark backups from running
+while you are adding the annotations and avoid the condition where the pre hook freezes the file system, but
+there is no post hook setup to unfreeze the file system.
+
+    kubectl patch -n heptio-ark config default --type merge -p '{"restoreOnlyMode": true}'
+
+Now you patch your deployment with the required annotations.
+
+    kubectl annotate pod -n nginx-example -l app=nginx pre.hook.backup.ark.heptio.com/command='["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]'
+    kubectl annotate pod -n nginx-example -l app=nginx pre.hook.backup.ark.heptio.com/containr=fsfreeze
+
+    kubectl annotate pod -n nginx-example -l app=nginx post.hook.backup.ark.heptio.com/command='["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]'
+    kubectl annotate pod -n nginx-example -l app=nginx post.hook.backup.ark.heptio.com/containr=fsfreeze
+
+Finally remove Ark from restore only mode and test the pre and post hooks by creating a backup. You can use the Ark logs to verify that the pre and post
+hooks are running and exiting without error.
+
+    kubectl patch -n heptio-ark config default --type merge -p '{"restoreOnlyMode": false}'
+    ark backup create nginx-hook-test
+
+    ark backup get nginx-hook-test
+    ark backup logs nginx-hook-test | grep hookCommand
+
+
 [1]: api-types/backup.md
+[2]: https://github.com/heptio/ark/blob/master/examples/nginx-app/with-pv.yaml
+[3]: cloud-common.md
