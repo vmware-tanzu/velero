@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
 
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -36,8 +37,9 @@ import (
 // Ark backup and restore data in/from a persistent backup store.
 type BackupStore interface {
 	IsValid() error
+	GetRevision() (string, error)
 
-	ListBackups() ([]*arkv1api.Backup, error)
+	ListBackups() ([]string, error)
 
 	PutBackup(name string, metadata, contents, log io.Reader) error
 	GetBackupMetadata(name string) (*arkv1api.Backup, error)
@@ -133,16 +135,16 @@ func (s *objectBackupStore) IsValid() error {
 	return nil
 }
 
-func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
+func (s *objectBackupStore) ListBackups() ([]string, error) {
 	prefixes, err := s.objectStore.ListCommonPrefixes(s.bucket, s.layout.subdirs["backups"], "/")
 	if err != nil {
 		return nil, err
 	}
 	if len(prefixes) == 0 {
-		return []*arkv1api.Backup{}, nil
+		return []string{}, nil
 	}
 
-	output := make([]*arkv1api.Backup, 0, len(prefixes))
+	output := make([]string, 0, len(prefixes))
 
 	for _, prefix := range prefixes {
 		// values returned from a call to cloudprovider.ObjectStore's
@@ -151,13 +153,7 @@ func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
 		// each of those off to get the backup name.
 		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.layout.subdirs["backups"]), "/")
 
-		backup, err := s.GetBackupMetadata(backupName)
-		if err != nil {
-			s.logger.WithError(err).WithField("dir", backupName).Error("Error reading backup directory")
-			continue
-		}
-
-		output = append(output, backup)
+		output = append(output, backupName)
 	}
 
 	return output, nil
@@ -185,6 +181,10 @@ func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents 
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(name), contents); err != nil {
 		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
 		return kerrors.NewAggregate([]error{err, deleteErr})
+	}
+
+	if err := s.putRevision(); err != nil {
+		s.logger.WithField("backup", name).WithError(err).Warn("Error updating backup store revision")
 	}
 
 	return nil
@@ -239,6 +239,10 @@ func (s *objectBackupStore) DeleteBackup(name string) error {
 		}
 	}
 
+	if err := s.putRevision(); err != nil {
+		s.logger.WithField("backup", name).WithError(err).Warn("Error updating backup store revision")
+	}
+
 	return errors.WithStack(kerrors.NewAggregate(errs))
 }
 
@@ -256,6 +260,10 @@ func (s *objectBackupStore) DeleteRestore(name string) error {
 		if err := s.objectStore.DeleteObject(s.bucket, key); err != nil {
 			errs = append(errs, err)
 		}
+	}
+
+	if err = s.putRevision(); err != nil {
+		errs = append(errs, err)
 	}
 
 	return errors.WithStack(kerrors.NewAggregate(errs))
@@ -282,6 +290,30 @@ func (s *objectBackupStore) GetDownloadURL(target arkv1api.DownloadTarget) (stri
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
+}
+
+func (s *objectBackupStore) GetRevision() (string, error) {
+	rdr, err := s.objectStore.GetObject(s.bucket, s.layout.getRevisionKey())
+	if err != nil {
+		return "", err
+	}
+
+	bytes, err := ioutil.ReadAll(rdr)
+	if err != nil {
+		return "", errors.Wrap(err, "error reading contents of revision file")
+	}
+
+	return string(bytes), nil
+}
+
+func (s *objectBackupStore) putRevision() error {
+	rdr := strings.NewReader(uuid.NewV4().String())
+
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getRevisionKey(), rdr); err != nil {
+		return errors.Wrap(err, "error updating revision file")
+	}
+
+	return nil
 }
 
 func seekToBeginning(r io.Reader) error {

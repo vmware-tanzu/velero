@@ -38,6 +38,7 @@ func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
 		"backups":  path.Join(prefix, "backups") + "/",
 		"restores": path.Join(prefix, "restores") + "/",
 		"restic":   path.Join(prefix, "restic") + "/",
+		"metadata": path.Join(prefix, "metadata") + "/",
 	}
 
 	return &ObjectStoreLayout{
@@ -56,6 +57,10 @@ func (l *ObjectStoreLayout) GetResticDir() string {
 func (l *ObjectStoreLayout) isValidSubdir(name string) bool {
 	_, ok := l.subdirs[name]
 	return ok
+}
+
+func (l *ObjectStoreLayout) getRevisionKey() string {
+	return path.Join(l.subdirs["metadata"], "revision")
 }
 
 func (l *ObjectStoreLayout) getBackupDir(backup string) string {

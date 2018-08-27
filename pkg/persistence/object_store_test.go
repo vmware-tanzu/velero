@@ -21,11 +21,13 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
+	"path"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -160,7 +162,7 @@ func TestListBackups(t *testing.T) {
 		name        string
 		prefix      string
 		storageData cloudprovider.BucketData
-		expectedRes []*api.Backup
+		expectedRes []string
 		expectedErr string
 	}{
 		{
@@ -169,16 +171,7 @@ func TestListBackups(t *testing.T) {
 				"backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
 				"backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
-			expectedRes: []*api.Backup{
-				{
-					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
-					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
-				},
-				{
-					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
-					ObjectMeta: metav1.ObjectMeta{Name: "backup-2"},
-				},
-			},
+			expectedRes: []string{"backup-1", "backup-2"},
 		},
 		{
 			name:   "normal case with backup store prefix",
@@ -187,29 +180,7 @@ func TestListBackups(t *testing.T) {
 				"ark-backups/backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
 				"ark-backups/backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
-			expectedRes: []*api.Backup{
-				{
-					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
-					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
-				},
-				{
-					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
-					ObjectMeta: metav1.ObjectMeta{Name: "backup-2"},
-				},
-			},
-		},
-		{
-			name: "backup that can't be decoded is ignored",
-			storageData: map[string][]byte{
-				"backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"backups/backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
-			},
-			expectedRes: []*api.Backup{
-				{
-					TypeMeta:   metav1.TypeMeta{Kind: "Backup", APIVersion: "ark.heptio.com/v1"},
-					ObjectMeta: metav1.ObjectMeta{Name: "backup-1"},
-				},
-			},
+			expectedRes: []string{"backup-1", "backup-2"},
 		},
 	}
 
@@ -225,22 +196,8 @@ func TestListBackups(t *testing.T) {
 
 			arktest.AssertErrorMatches(t, tc.expectedErr, err)
 
-			getComparer := func(obj []*api.Backup) func(i, j int) bool {
-				return func(i, j int) bool {
-					switch strings.Compare(obj[i].Namespace, obj[j].Namespace) {
-					case -1:
-						return true
-					case 1:
-						return false
-					default:
-						// namespaces are the same: compare by name
-						return obj[i].Name < obj[j].Name
-					}
-				}
-			}
-
-			sort.Slice(tc.expectedRes, getComparer(tc.expectedRes))
-			sort.Slice(res, getComparer(res))
+			sort.Strings(tc.expectedRes)
+			sort.Strings(res)
 
 			assert.Equal(t, tc.expectedRes, res)
 		})
@@ -263,7 +220,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-logs.gz", "metadata/revision"},
 		},
 		{
 			name:         "normal case with backup store prefix",
@@ -272,7 +229,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "",
-			expectedKeys: []string{"prefix-1/backups/backup-1/ark-backup.json", "prefix-1/backups/backup-1/backup-1.tar.gz", "prefix-1/backups/backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"prefix-1/backups/backup-1/ark-backup.json", "prefix-1/backups/backup-1/backup-1.tar.gz", "prefix-1/backups/backup-1/backup-1-logs.gz", "prefix-1/metadata/revision"},
 		},
 		{
 			name:         "error on metadata upload does not upload data",
@@ -296,7 +253,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("bar"),
 			log:          new(errorReader),
 			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz"},
+			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "metadata/revision"},
 		},
 		{
 			name:         "don't upload data when metadata is nil",
@@ -309,15 +266,17 @@ func TestPutBackup(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-		err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log)
+			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log)
 
-		arktest.AssertErrorMatches(t, tc.expectedErr, err)
-		assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
-		for _, key := range tc.expectedKeys {
-			assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
-		}
+			arktest.AssertErrorMatches(t, tc.expectedErr, err)
+			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
+			for _, key := range tc.expectedKeys {
+				assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
+			}
+		})
 	}
 }
 
@@ -378,6 +337,7 @@ func TestDeleteBackup(t *testing.T) {
 				}
 
 				objectStore.On("DeleteObject", backupStore.bucket, obj).Return(err)
+				objectStore.On("PutObject", "test-bucket", path.Join(test.prefix, "metadata", "revision"), mock.Anything).Return(nil)
 			}
 
 			err := backupStore.DeleteBackup("bak")

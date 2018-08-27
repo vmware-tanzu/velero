@@ -20,11 +20,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
@@ -170,6 +173,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
+				client.ArkV1(),
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				time.Duration(0),
@@ -195,7 +199,14 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				backupStore, ok := backupStores[location.Name]
 				require.True(t, ok, "no mock backup store for location %s", location.Name)
 
-				backupStore.On("ListBackups").Return(test.cloudBackups[location.Spec.ObjectStorage.Bucket], nil)
+				backupStore.On("GetRevision").Return("foo", nil)
+
+				var backupNames []string
+				for _, b := range test.cloudBackups[location.Spec.ObjectStorage.Bucket] {
+					backupNames = append(backupNames, b.Name)
+					backupStore.On("GetBackupMetadata", b.Name).Return(b, nil)
+				}
+				backupStore.On("ListBackups").Return(backupNames, nil)
 			}
 
 			for _, existingBackup := range test.existingBackups {
@@ -336,6 +347,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 
 			c := NewBackupSyncController(
 				client.ArkV1(),
+				client.ArkV1(),
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				time.Duration(0),
@@ -377,6 +389,95 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			arktest.CompareActions(t, expectedDeleteActions, getDeleteActions(client.Actions()))
 		})
 	}
+}
+
+func TestShouldSync(t *testing.T) {
+	c := clock.NewFakeClock(time.Now())
+
+	tests := []struct {
+		name                string
+		location            *arkv1api.BackupStorageLocation
+		backupStoreRevision string
+		now                 time.Time
+		expectSync          bool
+		expectedRevision    string
+	}{
+		{
+			name:                "BSL with no last-synced metadata should sync",
+			location:            &arkv1api.BackupStorageLocation{},
+			backupStoreRevision: "foo",
+			now:                 c.Now(),
+			expectSync:          true,
+			expectedRevision:    "foo",
+		},
+		{
+			name: "BSL with unchanged revision last synced more than an hour ago should sync",
+			location: &arkv1api.BackupStorageLocation{
+				Status: arkv1api.BackupStorageLocationStatus{
+					LastSyncedRevision: types.UID("foo"),
+					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-61 * time.Minute)},
+				},
+			},
+			backupStoreRevision: "foo",
+			now:                 c.Now(),
+			expectSync:          true,
+			expectedRevision:    "foo",
+		},
+		{
+			name: "BSL with unchanged revision last synced less than an hour ago should not sync",
+			location: &arkv1api.BackupStorageLocation{
+				Status: arkv1api.BackupStorageLocationStatus{
+					LastSyncedRevision: types.UID("foo"),
+					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-59 * time.Minute)},
+				},
+			},
+			backupStoreRevision: "foo",
+			now:                 c.Now(),
+			expectSync:          false,
+		},
+		{
+			name: "BSL with different revision than backup store last synced less than an hour ago should sync",
+			location: &arkv1api.BackupStorageLocation{
+				Status: arkv1api.BackupStorageLocationStatus{
+					LastSyncedRevision: types.UID("foo"),
+					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-time.Minute)},
+				},
+			},
+			backupStoreRevision: "bar",
+			now:                 c.Now(),
+			expectSync:          true,
+			expectedRevision:    "bar",
+		},
+		{
+			name: "BSL with different revision than backup store last synced more than an hour ago should sync",
+			location: &arkv1api.BackupStorageLocation{
+				Status: arkv1api.BackupStorageLocationStatus{
+					LastSyncedRevision: types.UID("foo"),
+					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-61 * time.Minute)},
+				},
+			},
+			backupStoreRevision: "bar",
+			now:                 c.Now(),
+			expectSync:          true,
+			expectedRevision:    "bar",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			backupStore := new(persistencemocks.BackupStore)
+			if test.backupStoreRevision != "" {
+				backupStore.On("GetRevision").Return(test.backupStoreRevision, nil)
+			} else {
+				backupStore.On("GetRevision").Return("", errors.New("object revision not found"))
+			}
+
+			shouldSync, rev := shouldSync(test.location, test.now, backupStore, arktest.NewLogger())
+			assert.Equal(t, test.expectSync, shouldSync)
+			assert.Equal(t, test.expectedRevision, rev)
+		})
+	}
+
 }
 
 func getDeleteActions(actions []core.Action) []core.Action {
