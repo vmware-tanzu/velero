@@ -4,7 +4,6 @@ Get and set client configuration file values
 
 ### Synopsis
 
-
 Get and set client configuration file values
 
 ### Options
@@ -29,6 +28,7 @@ Get and set client configuration file values
 ```
 
 ### SEE ALSO
+
 * [ark client](ark_client.md)	 - Ark client related commands
 * [ark client config get](ark_client_config_get.md)	 - Get client configuration file values
 * [ark client config set](ark_client_config_set.md)	 - Set client configuration file values

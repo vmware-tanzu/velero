@@ -4,7 +4,6 @@ Describe backups
 
 ### Synopsis
 
-
 Describe backups
 
 ```
@@ -35,5 +34,6 @@ ark backup describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

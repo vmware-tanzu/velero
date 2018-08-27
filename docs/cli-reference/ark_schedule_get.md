@@ -4,7 +4,6 @@ Get schedules
 
 ### Synopsis
 
-
 Get schedules
 
 ```
@@ -37,5 +36,6 @@ ark schedule get [flags]
 ```
 
 ### SEE ALSO
+
 * [ark schedule](ark_schedule.md)	 - Work with schedules
 

@@ -4,7 +4,6 @@ Get ark resources
 
 ### Synopsis
 
-
 Get ark resources
 
 ### Options
@@ -29,6 +28,7 @@ Get ark resources
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark get backup-locations](ark_get_backup-locations.md)	 - Get backup storage locations
 * [ark get backups](ark_get_backups.md)	 - Get backups

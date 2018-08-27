@@ -4,7 +4,6 @@ Run the ark server
 
 ### Synopsis
 
-
 Run the ark server
 
 ```
@@ -14,15 +13,15 @@ ark server [flags]
 ### Options
 
 ```
-      --backup-sync-period duration               how often to ensure all Ark backups in object storage exist as Backup API objects in the cluster (default 1h0m0s)
-      --default-backup-storage-location string    name of the default backup storage location (default "default")
-  -h, --help                                      help for server
-      --log-level                                 the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
-      --metrics-address string                    the address to expose prometheus metrics (default ":8085")
-      --plugin-dir string                         directory containing Ark plugins (default "/plugins")
-      --restic-timeout duration                   how long backups/restores of pod volumes should be allowed to run before timing out (default 1h0m0s)
-      --restore-only                              run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled
-      --restore-resource-priorities stringSlice   desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources (default [namespaces,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods])
+      --backup-sync-period duration              how often to ensure all Ark backups in object storage exist as Backup API objects in the cluster (default 1h0m0s)
+      --default-backup-storage-location string   name of the default backup storage location (default "default")
+  -h, --help                                     help for server
+      --log-level                                the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
+      --metrics-address string                   the address to expose prometheus metrics (default ":8085")
+      --plugin-dir string                        directory containing Ark plugins (default "/plugins")
+      --restic-timeout duration                  how long backups/restores of pod volumes should be allowed to run before timing out (default 1h0m0s)
+      --restore-only                             run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled
+      --restore-resource-priorities strings      desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources (default [namespaces,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods])
 ```
 
 ### Options inherited from parent commands
@@ -41,5 +40,6 @@ ark server [flags]
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 

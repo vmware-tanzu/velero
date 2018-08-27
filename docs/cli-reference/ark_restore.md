@@ -4,7 +4,6 @@ Work with restores
 
 ### Synopsis
 
-
 Work with restores
 
 ### Options
@@ -29,6 +28,7 @@ Work with restores
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark restore create](ark_restore_create.md)	 - Create a restore
 * [ark restore delete](ark_restore_delete.md)	 - Delete a restore

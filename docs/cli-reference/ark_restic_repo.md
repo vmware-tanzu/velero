@@ -4,7 +4,6 @@ Work with restic repositories
 
 ### Synopsis
 
-
 Work with restic repositories
 
 ### Options
@@ -29,6 +28,7 @@ Work with restic repositories
 ```
 
 ### SEE ALSO
+
 * [ark restic](ark_restic.md)	 - Work with restic
 * [ark restic repo get](ark_restic_repo_get.md)	 - Get restic repositories
 

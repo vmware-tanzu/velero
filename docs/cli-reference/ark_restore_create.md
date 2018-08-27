@@ -4,7 +4,6 @@ Create a restore
 
 ### Synopsis
 
-
 Create a restore
 
 ```
@@ -62,5 +61,6 @@ ark restore create [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule S
 ```
 
 ### SEE ALSO
+
 * [ark restore](ark_restore.md)	 - Work with restores
 

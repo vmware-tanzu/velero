@@ -4,7 +4,6 @@ Create a backup storage location
 
 ### Synopsis
 
-
 Create a backup storage location
 
 ```
@@ -41,5 +40,6 @@ ark backup-location create NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup-location](ark_backup-location.md)	 - Work with backup storage locations
 

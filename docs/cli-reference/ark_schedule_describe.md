@@ -4,7 +4,6 @@ Describe schedules
 
 ### Synopsis
 
-
 Describe schedules
 
 ```
@@ -34,5 +33,6 @@ ark schedule describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark schedule](ark_schedule.md)	 - Work with schedules
 

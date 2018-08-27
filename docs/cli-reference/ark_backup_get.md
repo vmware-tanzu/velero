@@ -4,7 +4,6 @@ Get backups
 
 ### Synopsis
 
-
 Get backups
 
 ```
@@ -37,5 +36,6 @@ ark backup get [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

@@ -4,7 +4,6 @@ Get restic repositories
 
 ### Synopsis
 
-
 Get restic repositories
 
 ```
@@ -37,5 +36,6 @@ ark restic repo get [flags]
 ```
 
 ### SEE ALSO
+
 * [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 

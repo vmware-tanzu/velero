@@ -4,7 +4,6 @@ Delete a schedule
 
 ### Synopsis
 
-
 Delete a schedule
 
 ```
@@ -33,5 +32,6 @@ ark delete schedule NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark delete](ark_delete.md)	 - Delete ark resources
 

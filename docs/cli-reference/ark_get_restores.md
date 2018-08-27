@@ -4,7 +4,6 @@ Get restores
 
 ### Synopsis
 
-
 Get restores
 
 ```
@@ -37,5 +36,6 @@ ark get restores [flags]
 ```
 
 ### SEE ALSO
+
 * [ark get](ark_get.md)	 - Get ark resources
 

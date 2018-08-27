@@ -4,7 +4,6 @@ Delete a restore
 
 ### Synopsis
 
-
 Delete a restore
 
 ```
@@ -33,5 +32,6 @@ ark restore delete NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark restore](ark_restore.md)	 - Work with restores
 

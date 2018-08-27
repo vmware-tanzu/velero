@@ -4,7 +4,6 @@ Work with schedules
 
 ### Synopsis
 
-
 Work with schedules
 
 ### Options
@@ -29,6 +28,7 @@ Work with schedules
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark schedule create](ark_schedule_create.md)	 - Create a schedule
 * [ark schedule delete](ark_schedule_delete.md)	 - Delete a schedule

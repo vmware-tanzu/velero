@@ -4,7 +4,6 @@ Get backup storage locations
 
 ### Synopsis
 
-
 Get backup storage locations
 
 ```
@@ -37,5 +36,6 @@ ark backup-location get [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup-location](ark_backup-location.md)	 - Work with backup storage locations
 

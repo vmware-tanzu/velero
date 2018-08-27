@@ -4,7 +4,6 @@ Get restore logs
 
 ### Synopsis
 
-
 Get restore logs
 
 ```
@@ -34,5 +33,6 @@ ark restore logs RESTORE [flags]
 ```
 
 ### SEE ALSO
+
 * [ark restore](ark_restore.md)	 - Work with restores
 

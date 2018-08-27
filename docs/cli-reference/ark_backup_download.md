@@ -4,7 +4,6 @@ Download a backup
 
 ### Synopsis
 
-
 Download a backup
 
 ```
@@ -36,5 +35,6 @@ ark backup download NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

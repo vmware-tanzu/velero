@@ -4,7 +4,6 @@ Describe ark resources
 
 ### Synopsis
 
-
 Describe ark resources
 
 ### Options
@@ -29,6 +28,7 @@ Describe ark resources
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark describe backups](ark_describe_backups.md)	 - Describe backups
 * [ark describe restores](ark_describe_restores.md)	 - Describe restores

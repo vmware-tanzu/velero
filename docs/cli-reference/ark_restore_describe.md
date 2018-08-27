@@ -4,7 +4,6 @@ Describe restores
 
 ### Synopsis
 
-
 Describe restores
 
 ```
@@ -35,5 +34,6 @@ ark restore describe [NAME1] [NAME2] [NAME...] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark restore](ark_restore.md)	 - Work with restores
 
