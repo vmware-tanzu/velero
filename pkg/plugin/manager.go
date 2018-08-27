@@ -164,7 +164,12 @@ func pluginForKind(kind PluginKind) plugin.Plugin {
 	}
 }
 
-func getPluginInstance(client *plugin.Client, kind PluginKind) (interface{}, error) {
+type pluginClient interface {
+	Client() (plugin.ClientProtocol, error)
+	Kill()
+}
+
+func getPluginInstance(client pluginClient, kind PluginKind) (interface{}, error) {
 	protocolClient, err := client.Client()
 	if err != nil {
 		return nil, errors.WithStack(err)

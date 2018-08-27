@@ -38,6 +38,6 @@ func (b *clientBuilder) withCommand(name string, args ...string) *clientBuilder 
 	return b
 }
 
-func (b *clientBuilder) client() *hcplugin.Client {
+func (b *clientBuilder) client() pluginClient {
 	return hcplugin.NewClient(b.config)
 }
