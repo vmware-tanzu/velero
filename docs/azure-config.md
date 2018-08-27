@@ -51,23 +51,15 @@ az storage account create \
     --access-tier Hot
 ```
 
-Create the blob container named `ark`. Feel free to use a different name, preferrably unique to a single Kubernetes cluster. See the [FAQ][20] for more details. You'll need to
-adjust the `bucket` field under `backupStorageProvider` in the Ark Config accordingly if you do.
+Create the blob container named `ark`. Feel free to use a different name, preferably unique to a single Kubernetes cluster. See the [FAQ][20] for more details.
 
 ```bash
 az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
-
-# Obtain the storage access key for the storage account just created
-AZURE_STORAGE_KEY=`az storage account keys list \
-    --account-name $AZURE_STORAGE_ACCOUNT_ID \
-    --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
-    --query '[0].value' \
-    -o tsv`
 ```
 
 ## Create service principal
 
-To integrate Ark with Azure, you must create an Ark-specific [service principal][17]. Note that seven environment variables must be set for Ark to work properly.
+To integrate Ark with Azure, you must create an Ark-specific [service principal][17].
 
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
@@ -79,11 +71,11 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
 1. Set the name of the Resource Group that contains your Kubernetes cluster.
 
     ```bash
-    # Make sure this is the name of the second resource group. See warning.
+    # Make sure this is the name of the auto-generated resource group. See warning.
     AZURE_RESOURCE_GROUP=<NAME_OF_RESOURCE_GROUP_2>
     ```
 
-    WARNING: `AZURE_RESOURCE_GROUP` must be set to the name of the second resource group that is created when you provision your cluster in Azure. Your cluster is provisioned in the resource group that you specified when you created the cluster. Your disks, however, are provisioned in the second resource group.
+    WARNING: `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created when you provision your cluster in Azure. Your cluster is provisioned in the resource group that you specified when you created the cluster. Your disks, however, are provisioned in the second resource group.
 
     If you are unsure of the Resource Group name, run the following command to get a list that you can select from. Then set the `AZURE_RESOURCE_GROUP` environment variable to the appropriate value.
 
@@ -117,18 +109,16 @@ In the Ark root directory, run the following to first set up namespaces, RBAC, a
 kubectl apply -f examples/common/00-prereqs.yaml
 ```
 
-Now you need to create a Secret that contains all the seven environment variables you just set. The command looks like the following:
+Now you need to create a Secret that contains all the environment variables you just set. The command looks like the following:
 
 ```bash
 kubectl create secret generic cloud-credentials \
     --namespace <ARK_NAMESPACE> \
     --from-literal AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID} \
     --from-literal AZURE_TENANT_ID=${AZURE_TENANT_ID} \
-    --from-literal AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP} \
     --from-literal AZURE_CLIENT_ID=${AZURE_CLIENT_ID} \
     --from-literal AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET} \
-    --from-literal AZURE_STORAGE_ACCOUNT_ID=${AZURE_STORAGE_ACCOUNT_ID} \
-    --from-literal AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
+    --from-literal AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
 ```
 
 Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
@@ -139,7 +129,7 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
 * In file `examples/azure/05-ark-backupstoragelocation.yaml`:
 
-  * Replace `<YOUR_BUCKET>`. See the [BackupStorageLocation definition][21] for details.
+  * Replace `<YOUR_BLOB_CONTAINER>`, `<YOUR_STORAGE_RESOURCE_GROUP>`, and `<YOUR_STORAGE_ACCOUNT>`. See the [BackupStorageLocation definition][21] for details.
 
 Here is an example of a completed config file.
 

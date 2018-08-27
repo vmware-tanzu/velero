@@ -41,7 +41,7 @@ into the Ark server pod. Ensure the following:
 This means that the secrets containing the Azure service principal credentials for Ark has not been created/mounted 
 properly into the Ark server pod. Ensure the following:
 * The `cloud-credentials` secret exists in the Ark server's namespace
-* The `cloud-credentials` secret has seven keys and each one has the correct value (see [setup instructions](0))
+* The `cloud-credentials` secret has all of the expected keys and each one has the correct value (see [setup instructions](0))
 * The `cloud-credentials` secret is defined as a volume for the Ark deployment
 * The `cloud-credentials` secret is being mounted into the Ark server pod at `/credentials`
 

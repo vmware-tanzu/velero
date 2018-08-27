@@ -53,12 +53,6 @@ The configurable parameters are as follows:
 | --- | --- | --- | --- |
 | `region` | string | Required Field | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list. |
 
-#### GCP
-
-##### persistentVolumeProvider/config
-
-No parameters required.
-
 #### Azure
 
 ##### persistentVolumeProvider/config
@@ -66,6 +60,13 @@ No parameters required.
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `apiTimeout` | metav1.Duration | 2m0s | How long to wait for an Azure API request to complete before timeout. |
+
+#### GCP
+
+##### persistentVolumeProvider/config
+
+No parameters required.
+
 
 ## Deployment
 

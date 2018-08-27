@@ -21,7 +21,10 @@ metadata:
 spec:
   provider: azure
   objectStorage:
-    bucket: <YOUR_BUCKET> 
+    bucket: <YOUR_BLOB_CONTAINER> 
+    config:
+      resourceGroup: <YOUR_STORAGE_RESOURCE_GROUP>
+      storageAccount: <YOUR_STORAGE_ACCOUNT>
     # Uncomment the below line to enable restic integration.
     # The format for resticLocation is <bucket>[/<prefix>],
     # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
