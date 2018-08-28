@@ -53,9 +53,9 @@ kubectl create secret generic cloud-credentials \
 
 Specify the following values in the example files:
 
-* In `examples/ibm/00-ark-config.yaml`:
+* In `examples/ibm/05-ark-backupstoragelocation.yaml`:
 
-  * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>` and `<YOUR_URL_ACCESS_POINT>`. See the [Config definition][6] for details.
+  * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>` and `<YOUR_URL_ACCESS_POINT>`. See the [BackupStorageLocation definition][6] for details.
 
 
 
@@ -78,5 +78,5 @@ In the root of your Ark directory, run:
   [3]: https://console.bluemix.net/docs/services/cloud-object-storage/iam/service-credentials.html#service-credentials
   [4]: https://www.ibm.com/support/knowledgecenter/SSBS6K_2.1.0/kc_welcome_containers.html
   [5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
-  [6]: config-definition.md#aws
+  [6]: backupstoragelocation-definition.md#aws
   [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html

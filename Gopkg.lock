@@ -18,11 +18,11 @@
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "arm/disk",
-    "arm/examples/helpers",
+    "services/storage/mgmt/2017-10-01/storage",
     "storage"
   ]
-  revision = "2d49bb8f2cee530cc16f1f1a9f0aae763dee257d"
-  version = "v10.2.1-beta"
+  revision = "2d1d76c9013c4feb6695a2346f0e66ea0ef77aa6"
+  version = "v11.3.0-beta"
 
 [[projects]]
   name = "github.com/Azure/go-autorest"
@@ -806,6 +806,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "70b3cfc235408d89934ada479417194e2a82df523f459f7d9d3264538805ea98"
+  inputs-digest = "4706135745ec21274791f454998d264dd167c78b472674ba813dca08cc962d7d"
   solver-name = "gps-cdcl"
   solver-version = 1

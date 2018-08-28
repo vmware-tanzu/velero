@@ -17,83 +17,19 @@ limitations under the License.
 package install
 
 import (
-	"time"
-
 	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
 )
-
-type arkConfigOption func(*arkConfig)
-
-type arkConfig struct {
-	backupSyncPeriod          time.Duration
-	gcSyncPeriod              time.Duration
-	podVolumeOperationTimeout time.Duration
-	restoreOnly               bool
-	resticLocation            string
-}
-
-func WithBackupSyncPeriod(t time.Duration) arkConfigOption {
-	return func(c *arkConfig) {
-		c.backupSyncPeriod = t
-	}
-}
-
-func WithGCSyncPeriod(t time.Duration) arkConfigOption {
-	return func(c *arkConfig) {
-		c.gcSyncPeriod = t
-	}
-}
-
-func WithPodVolumeOperationTimeout(t time.Duration) arkConfigOption {
-	return func(c *arkConfig) {
-		c.podVolumeOperationTimeout = t
-	}
-}
-
-func WithRestoreOnly() arkConfigOption {
-	return func(c *arkConfig) {
-		c.restoreOnly = true
-	}
-}
-
-func WithResticLocation(location string) arkConfigOption {
-	return func(c *arkConfig) {
-		c.resticLocation = location
-	}
-}
 
 func Config(
 	namespace string,
 	pvCloudProviderName string,
 	pvCloudProviderConfig map[string]string,
-	backupCloudProviderName string,
-	backupCloudProviderConfig map[string]string,
-	bucket string,
-	opts ...arkConfigOption,
 ) *arkv1.Config {
-	c := &arkConfig{
-		backupSyncPeriod:          30 * time.Minute,
-		gcSyncPeriod:              30 * time.Minute,
-		podVolumeOperationTimeout: 60 * time.Minute,
-	}
-
-	for _, opt := range opts {
-		opt(c)
-	}
-
 	return &arkv1.Config{
 		ObjectMeta: objectMeta(namespace, "default"),
 		PersistentVolumeProvider: &arkv1.CloudProviderConfig{
 			Name:   pvCloudProviderName,
 			Config: pvCloudProviderConfig,
-		},
-		BackupStorageProvider: arkv1.ObjectStorageProviderConfig{
-			CloudProviderConfig: arkv1.CloudProviderConfig{
-				Name:   backupCloudProviderName,
-				Config: backupCloudProviderConfig,
-			},
-			Bucket:         bucket,
-			ResticLocation: c.resticLocation,
 		},
 	}
 }

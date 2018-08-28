@@ -31,6 +31,7 @@ Create ark resources
 ### SEE ALSO
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark create backup](ark_create_backup.md)	 - Create a backup
+* [ark create backup-location](ark_create_backup-location.md)	 - Create a backup storage location
 * [ark create restore](ark_create_restore.md)	 - Create a restore
 * [ark create schedule](ark_create_schedule.md)	 - Create a schedule
 

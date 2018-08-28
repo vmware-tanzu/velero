@@ -21,19 +21,19 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
+	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DescribeBackup describes a backup in human-readable format.
-func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest, podVolumeBackups []v1.PodVolumeBackup, volumeDetails bool) string {
+func DescribeBackup(backup *arkv1api.Backup, deleteRequests []arkv1api.DeleteBackupRequest, podVolumeBackups []arkv1api.PodVolumeBackup, volumeDetails bool) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
 
 		d.Println()
 		phase := backup.Status.Phase
 		if phase == "" {
-			phase = v1.BackupPhaseNew
+			phase = arkv1api.BackupPhaseNew
 		}
 		d.Printf("Phase:\t%s\n", phase)
 
@@ -56,7 +56,7 @@ func DescribeBackup(backup *v1.Backup, deleteRequests []v1.DeleteBackupRequest, 
 }
 
 // DescribeBackupSpec describes a backup spec in human-readable format.
-func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
+func DescribeBackupSpec(d *Describer, spec arkv1api.BackupSpec) {
 	// TODO make a helper for this and use it in all the describers.
 	d.Printf("Namespaces:\n")
 	var s string
@@ -96,6 +96,9 @@ func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
 		s = metav1.FormatLabelSelector(spec.LabelSelector)
 	}
 	d.Printf("Label selector:\t%s\n", s)
+
+	d.Println()
+	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)
 
 	d.Println()
 	d.Printf("Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
@@ -164,7 +167,7 @@ func DescribeBackupSpec(d *Describer, spec v1.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
+func DescribeBackupStatus(d *Describer, status arkv1api.BackupStatus) {
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
 
 	d.Println()
@@ -213,7 +216,7 @@ func DescribeBackupStatus(d *Describer, status v1.BackupStatus) {
 }
 
 // DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
-func DescribeDeleteBackupRequests(d *Describer, requests []v1.DeleteBackupRequest) {
+func DescribeDeleteBackupRequests(d *Describer, requests []arkv1api.DeleteBackupRequest) {
 	d.Printf("Deletion Attempts")
 	if count := failedDeletionCount(requests); count > 0 {
 		d.Printf(" (%d failed)", count)
@@ -238,10 +241,10 @@ func DescribeDeleteBackupRequests(d *Describer, requests []v1.DeleteBackupReques
 	}
 }
 
-func failedDeletionCount(requests []v1.DeleteBackupRequest) int {
+func failedDeletionCount(requests []arkv1api.DeleteBackupRequest) int {
 	var count int
 	for _, req := range requests {
-		if req.Status.Phase == v1.DeleteBackupRequestPhaseProcessed && len(req.Status.Errors) > 0 {
+		if req.Status.Phase == arkv1api.DeleteBackupRequestPhaseProcessed && len(req.Status.Errors) > 0 {
 			count++
 		}
 	}
@@ -249,7 +252,7 @@ func failedDeletionCount(requests []v1.DeleteBackupRequest) int {
 }
 
 // DescribePodVolumeBackups describes pod volume backups in human-readable format.
-func DescribePodVolumeBackups(d *Describer, backups []v1.PodVolumeBackup, details bool) {
+func DescribePodVolumeBackups(d *Describer, backups []arkv1api.PodVolumeBackup, details bool) {
 	if details {
 		d.Printf("Restic Backups:\n")
 	} else {
@@ -261,10 +264,10 @@ func DescribePodVolumeBackups(d *Describer, backups []v1.PodVolumeBackup, detail
 
 	// go through phases in a specific order
 	for _, phase := range []string{
-		string(v1.PodVolumeBackupPhaseCompleted),
-		string(v1.PodVolumeBackupPhaseFailed),
+		string(arkv1api.PodVolumeBackupPhaseCompleted),
+		string(arkv1api.PodVolumeBackupPhaseFailed),
 		"In Progress",
-		string(v1.PodVolumeBackupPhaseNew),
+		string(arkv1api.PodVolumeBackupPhaseNew),
 	} {
 		if len(backupsByPhase[phase]) == 0 {
 			continue
@@ -293,15 +296,15 @@ func DescribePodVolumeBackups(d *Describer, backups []v1.PodVolumeBackup, detail
 	}
 }
 
-func groupByPhase(backups []v1.PodVolumeBackup) map[string][]v1.PodVolumeBackup {
-	backupsByPhase := make(map[string][]v1.PodVolumeBackup)
+func groupByPhase(backups []arkv1api.PodVolumeBackup) map[string][]arkv1api.PodVolumeBackup {
+	backupsByPhase := make(map[string][]arkv1api.PodVolumeBackup)
 
-	phaseToGroup := map[v1.PodVolumeBackupPhase]string{
-		v1.PodVolumeBackupPhaseCompleted:  string(v1.PodVolumeBackupPhaseCompleted),
-		v1.PodVolumeBackupPhaseFailed:     string(v1.PodVolumeBackupPhaseFailed),
-		v1.PodVolumeBackupPhaseInProgress: "In Progress",
-		v1.PodVolumeBackupPhaseNew:        string(v1.PodVolumeBackupPhaseNew),
-		"": string(v1.PodVolumeBackupPhaseNew),
+	phaseToGroup := map[arkv1api.PodVolumeBackupPhase]string{
+		arkv1api.PodVolumeBackupPhaseCompleted:  string(arkv1api.PodVolumeBackupPhaseCompleted),
+		arkv1api.PodVolumeBackupPhaseFailed:     string(arkv1api.PodVolumeBackupPhaseFailed),
+		arkv1api.PodVolumeBackupPhaseInProgress: "In Progress",
+		arkv1api.PodVolumeBackupPhaseNew:        string(arkv1api.PodVolumeBackupPhaseNew),
+		"": string(arkv1api.PodVolumeBackupPhaseNew),
 	}
 
 	for _, backup := range backups {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/cli/backup"
+	"github.com/heptio/ark/pkg/cmd/cli/backuplocation"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
 	"github.com/heptio/ark/pkg/cmd/cli/schedule"
 )
@@ -36,6 +37,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		backup.NewCreateCommand(f, "backup"),
 		schedule.NewCreateCommand(f, "schedule"),
 		restore.NewCreateCommand(f, "restore"),
+		backuplocation.NewCreateCommand(f, "backup-location"),
 	)
 
 	return c

@@ -143,6 +143,8 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 	printer.Handler(scheduleColumns, nil, printScheduleList)
 	printer.Handler(resticRepoColumns, nil, printResticRepo)
 	printer.Handler(resticRepoColumns, nil, printResticRepoList)
+	printer.Handler(backupStorageLocationColumns, nil, printBackupStorageLocation)
+	printer.Handler(backupStorageLocationColumns, nil, printBackupStorageLocationList)
 
 	err = printer.PrintObj(obj, os.Stdout)
 	if err != nil {

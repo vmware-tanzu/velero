@@ -26,10 +26,13 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,13 +52,13 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		client.ArkV1(), // deleteBackupRequestClient
 		client.ArkV1(), // backupClient
 		nil,            // blockStore
-		nil,            // backupService
-		"bucket",
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
 		NewBackupTracker(),
 		nil, // restic repository manager
 		sharedInformers.Ark().V1().PodVolumeBackups(),
+		sharedInformers.Ark().V1().BackupStorageLocations(),
+		nil, // new plugin manager func
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -109,37 +112,47 @@ type backupDeletionControllerTestData struct {
 	client          *fake.Clientset
 	sharedInformers informers.SharedInformerFactory
 	blockStore      *arktest.FakeBlockStore
+	objectStore     *arktest.ObjectStore
 	controller      *backupDeletionController
 	req             *v1.DeleteBackupRequest
 }
 
 func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
-	client := fake.NewSimpleClientset(objects...)
-	sharedInformers := informers.NewSharedInformerFactory(client, 0)
-	blockStore := &arktest.FakeBlockStore{SnapshotsTaken: sets.NewString()}
-	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
+	var (
+		client          = fake.NewSimpleClientset(objects...)
+		sharedInformers = informers.NewSharedInformerFactory(client, 0)
+		blockStore      = &arktest.FakeBlockStore{SnapshotsTaken: sets.NewString()}
+		pluginManager   = &pluginmocks.Manager{}
+		objectStore     = &arktest.ObjectStore{}
+		req             = pkgbackup.NewDeleteBackupRequest("foo", "uid")
+	)
 
 	data := &backupDeletionControllerTestData{
 		client:          client,
 		sharedInformers: sharedInformers,
 		blockStore:      blockStore,
+		objectStore:     objectStore,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
 			blockStore,
-			nil, // objectStore
-			"bucket",
 			sharedInformers.Ark().V1().Restores(),
 			client.ArkV1(), // restoreClient
 			NewBackupTracker(),
 			nil, // restic repository manager
 			sharedInformers.Ark().V1().PodVolumeBackups(),
+			sharedInformers.Ark().V1().BackupStorageLocations(),
+			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 		).(*backupDeletionController),
 
 		req: req,
 	}
+
+	pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
+	pluginManager.On("CleanupClients").Return(nil)
+
 	req.Namespace = "heptio-ark"
 	req.Name = "foo-abcde"
 
@@ -347,6 +360,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	t.Run("full delete, no errors", func(t *testing.T) {
 		backup := arktest.NewTestBackup().WithName("foo").WithSnapshot("pv-1", "snap-1").Backup
 		backup.UID = "uid"
+		backup.Spec.StorageLocation = "primary"
 
 		restore1 := arktest.NewTestRestore("heptio-ark", "restore-1", v1.RestorePhaseCompleted).WithBackup("foo").Restore
 		restore2 := arktest.NewTestRestore("heptio-ark", "restore-2", v1.RestorePhaseCompleted).WithBackup("foo").Restore
@@ -357,6 +371,24 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore1)
 		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore3)
+
+		location := &v1.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.StorageLocation,
+			},
+			Spec: v1.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: v1.StorageType{
+					ObjectStorage: &v1.ObjectStorageLocation{
+						Bucket: "bucket",
+					},
+				},
+			},
+		}
+		require.NoError(t, td.sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+
+		td.objectStore.On("Init", mock.Anything).Return(nil)
 
 		// Clear out req labels to make sure the controller adds them
 		td.req.Labels = make(map[string]string)
@@ -374,8 +406,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
-		td.controller.deleteBackupDir = func(_ logrus.FieldLogger, _ cloudprovider.ObjectStore, bucket, backupName string) error {
-			require.Equal(t, "bucket", bucket)
+		td.controller.deleteBackupDir = func(_ logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string) error {
+			require.NotNil(t, objectStore)
+			require.Equal(t, location.Spec.ObjectStorage.Bucket, bucket)
 			require.Equal(t, td.req.Spec.BackupName, backupName)
 			return nil
 		}
@@ -561,13 +594,13 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				client.ArkV1(), // deleteBackupRequestClient
 				client.ArkV1(), // backupClient
 				nil,            // blockStore
-				nil,            // backupService
-				"bucket",
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(), // restoreClient
 				NewBackupTracker(),
 				nil,
 				sharedInformers.Ark().V1().PodVolumeBackups(),
+				sharedInformers.Ark().V1().BackupStorageLocations(),
+				nil, // new plugin manager func
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}

@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -67,7 +68,6 @@ import (
 	"github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
 	"github.com/heptio/ark/pkg/util/stringslice"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -76,10 +76,10 @@ const (
 )
 
 type serverConfig struct {
-	pluginDir, metricsAddress                   string
-	backupSyncPeriod, podVolumeOperationTimeout time.Duration
-	restoreResourcePriorities                   []string
-	restoreOnly                                 bool
+	pluginDir, metricsAddress, defaultBackupLocation string
+	backupSyncPeriod, podVolumeOperationTimeout      time.Duration
+	restoreResourcePriorities                        []string
+	restoreOnly                                      bool
 }
 
 func NewCommand() *cobra.Command {
@@ -88,6 +88,7 @@ func NewCommand() *cobra.Command {
 		config       = serverConfig{
 			pluginDir:                 "/plugins",
 			metricsAddress:            defaultMetricsAddress,
+			defaultBackupLocation:     "default",
 			backupSyncPeriod:          defaultBackupSyncPeriod,
 			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities: defaultRestorePriorities,
@@ -140,6 +141,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
+	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
 
 	return command
 }
@@ -164,7 +166,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	objectStore           cloudprovider.ObjectStore
 	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
@@ -221,7 +222,7 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		arkClient:             arkClient,
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewFilteredSharedInformerFactory(arkClient, 0, namespace, nil),
+		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(arkClient, 0, informers.WithNamespace(namespace)),
 		ctx:            ctx,
 		cancelFunc:     cancelFunc,
 		logger:         logger,
@@ -267,11 +268,10 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
-	objectStore, err := getObjectStore(config.BackupStorageProvider.CloudProviderConfig, s.pluginManager)
+	backupStorageLocation, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return errors.WithStack(err)
 	}
-	s.objectStore = objectStore
 
 	if config.PersistentVolumeProvider == nil {
 		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
@@ -284,13 +284,13 @@ func (s *server) run() error {
 		s.blockStore = blockStore
 	}
 
-	if config.BackupStorageProvider.ResticLocation != "" {
-		if err := s.initRestic(config.BackupStorageProvider); err != nil {
+	if backupStorageLocation.Spec.Config[restic.ResticLocationConfigKey] != "" {
+		if err := s.initRestic(backupStorageLocation.Spec.Provider); err != nil {
 			return err
 		}
 	}
 
-	if err := s.runControllers(config); err != nil {
+	if err := s.runControllers(config, backupStorageLocation); err != nil {
 		return err
 	}
 
@@ -312,15 +312,6 @@ func (s *server) applyConfigDefaults(c *api.Config) {
 	} else {
 		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using given resource priorities")
 	}
-
-	if c.BackupStorageProvider.Config == nil {
-		c.BackupStorageProvider.Config = make(map[string]string)
-	}
-
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
-	c.BackupStorageProvider.Config["bucket"] = c.BackupStorageProvider.Bucket
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -480,23 +471,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("object storage provider name must not be empty")
-	}
-
-	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := objectStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return objectStore, nil
-}
-
 func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
 	if cloudConfig.Name == "" {
 		return nil, errors.New("block storage provider name must not be empty")
@@ -514,14 +488,7 @@ func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) 
 	return blockStore, nil
 }
 
-func durationMin(a, b time.Duration) time.Duration {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
+func (s *server) initRestic(providerName string) error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
@@ -535,7 +502,7 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 	}
 
 	// set the env vars that restic uses for creds purposes
-	if config.Name == string(restic.AzureBackend) {
+	if providerName == string(restic.AzureBackend) {
 		os.Setenv("AZURE_ACCOUNT_NAME", os.Getenv("AZURE_STORAGE_ACCOUNT_ID"))
 		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
 	}
@@ -574,17 +541,11 @@ func (s *server) initRestic(config api.ObjectStorageProviderConfig) error {
 	return nil
 }
 
-func (s *server) runControllers(config *api.Config) error {
+func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.BackupStorageLocation) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
 	var wg sync.WaitGroup
-
-	cloudBackupCacheResyncPeriod := durationMin(controller.GCSyncPeriod, s.config.backupSyncPeriod)
-	s.logger.Infof("Caching cloud backups every %s", cloudBackupCacheResyncPeriod)
-
-	liveBackupLister := cloudprovider.NewLiveBackupLister(s.logger, s.objectStore)
-	cachedBackupLister := cloudprovider.NewBackupCache(ctx, liveBackupLister, cloudBackupCacheResyncPeriod, s.logger)
 
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -597,13 +558,18 @@ func (s *server) runControllers(config *api.Config) error {
 	s.metrics = metrics.NewServerMetrics()
 	s.metrics.RegisterAllMetrics()
 
+	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
+		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+	}
+
 	backupSyncController := controller.NewBackupSyncController(
 		s.arkClient.ArkV1(),
-		cachedBackupLister,
-		config.BackupStorageProvider.Bucket,
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.config.backupSyncPeriod,
 		s.namespace,
-		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.config.defaultBackupLocation,
+		newPluginManager,
 		s.logger,
 	)
 	wg.Add(1)
@@ -631,13 +597,13 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			config.BackupStorageProvider.CloudProviderConfig,
-			config.BackupStorageProvider.Bucket,
 			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
-			s.pluginRegistry,
+			newPluginManager,
 			backupTracker,
+			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.config.defaultBackupLocation,
 			s.metrics,
 		)
 		wg.Add(1)
@@ -678,13 +644,13 @@ func (s *server) runControllers(config *api.Config) error {
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
 			s.blockStore,
-			s.objectStore,
-			config.BackupStorageProvider.Bucket,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
+			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			newPluginManager,
 		)
 		wg.Add(1)
 		go func() {
@@ -713,13 +679,13 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		restorer,
-		config.BackupStorageProvider.CloudProviderConfig,
-		config.BackupStorageProvider.Bucket,
 		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.blockStore != nil,
 		s.logger,
 		s.logLevel,
-		s.pluginRegistry,
+		newPluginManager,
+		s.config.defaultBackupLocation,
 		s.metrics,
 	)
 
@@ -733,8 +699,9 @@ func (s *server) runControllers(config *api.Config) error {
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
 		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.objectStore,
-		config.BackupStorageProvider.Bucket,
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Ark().V1().Backups(),
+		newPluginManager,
 		s.logger,
 	)
 	wg.Add(1)
@@ -748,7 +715,7 @@ func (s *server) runControllers(config *api.Config) error {
 			s.logger,
 			s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 			s.arkClient.ArkV1(),
-			config.BackupStorageProvider,
+			defaultBackupLocation,
 			s.resticManager,
 		)
 		wg.Add(1)
@@ -763,7 +730,7 @@ func (s *server) runControllers(config *api.Config) error {
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 
-	// Remove this sometime after v0.8.0
+	// TODO(1.0): remove
 	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Ark().V1().Backups().Informer().HasSynced)
 	s.removeDeprecatedGCFinalizer()
 
@@ -777,9 +744,10 @@ func (s *server) runControllers(config *api.Config) error {
 	return nil
 }
 
-const gcFinalizer = "gc.ark.heptio.com"
-
+// TODO(1.0): remove
 func (s *server) removeDeprecatedGCFinalizer() {
+	const gcFinalizer = "gc.ark.heptio.com"
+
 	backups, err := s.sharedInformerFactory.Ark().V1().Backups().Lister().List(labels.Everything())
 	if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")

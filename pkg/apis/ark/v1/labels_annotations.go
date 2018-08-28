@@ -36,4 +36,8 @@ const (
 	// a backup/restore-specific timeout value for pod volume operations (i.e.
 	// restic backups/restores).
 	PodVolumeOperationTimeoutAnnotation = "ark.heptio.com/pod-volume-timeout"
+
+	// StorageLocationLabel is the label key used to identify the storage
+	// location of a backup.
+	StorageLocationLabel = "ark.heptio.com/storage-location"
 )

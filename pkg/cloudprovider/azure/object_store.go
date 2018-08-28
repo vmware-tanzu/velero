@@ -18,14 +18,23 @@ package azure
 
 import (
 	"io"
+	"os"
 	"strings"
 	"time"
 
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
+	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/heptio/ark/pkg/cloudprovider"
+)
+
+const (
+	resourceGroupConfigKey  = "resourceGroup"
+	storageAccountConfigKey = "storageAccount"
 )
 
 type objectStore struct {
@@ -37,16 +46,74 @@ func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
 	return &objectStore{log: logger}
 }
 
-func (o *objectStore) Init(config map[string]string) error {
-	cfg := getConfig()
-
-	storageClient, err := storage.NewBasicClient(cfg[azureStorageAccountIDKey], cfg[azureStorageKeyKey])
+func getStorageAccountKey(client storagemgmt.AccountsClient, resourceGroup, storageAccount string) (string, error) {
+	res, err := client.ListKeys(resourceGroup, storageAccount)
 	if err != nil {
-		return errors.WithStack(err)
+		return "", errors.WithStack(err)
+	}
+	if res.Keys == nil || len(*res.Keys) == 0 {
+		return "", errors.New("No storage keys found")
+	}
+
+	var storageKey string
+
+	for _, key := range *res.Keys {
+		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
+		// the storagemgmt.Full constant in the SDK is defined as "Full".
+		if strings.ToUpper(string(key.Permissions)) == strings.ToUpper(string(storagemgmt.Full)) {
+			storageKey = *key.Value
+			break
+		}
+	}
+
+	if storageKey == "" {
+		return "", errors.New("No storage key with Full permissions found")
+	}
+
+	return storageKey, nil
+}
+
+func mapLookup(data map[string]string) func(string) string {
+	return func(key string) string {
+		return data[key]
+	}
+}
+
+func (o *objectStore) Init(config map[string]string) error {
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	if err != nil {
+		return errors.Wrap(err, "unable to get all required environment variables")
+	}
+
+	// 2. we need config["resourceGroup"], config["storageAccount"]
+	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return errors.Wrap(err, "unable to get all required config values")
+	}
+
+	// 3. get SPT
+	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return errors.Wrap(err, "error getting service principal token")
+	}
+
+	// 4. get storageAccountsClient
+	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
+	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
+
+	// 5. get storage key
+	storageAccountKey, err := getStorageAccountKey(storageAccountsClient, config[resourceGroupConfigKey], config[storageAccountConfigKey])
+	if err != nil {
+		return errors.Wrap(err, "error getting storage account key")
+	}
+
+	// 6. get storageClient and blobClient
+	storageClient, err := storage.NewBasicClient(config[storageAccountConfigKey], storageAccountKey)
+	if err != nil {
+		return errors.Wrap(err, "error getting storage client")
 	}
 
 	blobClient := storageClient.GetBlobService()
-
 	o.blobClient = &blobClient
 
 	return nil
@@ -147,8 +214,6 @@ func (o *objectStore) DeleteObject(bucket string, key string) error {
 	return errors.WithStack(blob.Delete(nil))
 }
 
-const sasURIReadPermission = "r"
-
 func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
@@ -160,7 +225,16 @@ func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (st
 		return "", err
 	}
 
-	return blob.GetSASURI(time.Now().Add(ttl), sasURIReadPermission)
+	opts := storage.BlobSASOptions{
+		SASOptions: storage.SASOptions{
+			Expiry: time.Now().Add(ttl),
+		},
+		BlobServiceSASPermissions: storage.BlobServiceSASPermissions{
+			Read: true,
+		},
+	}
+
+	return blob.GetSASURI(opts)
 }
 
 func getContainerReference(blobClient *storage.BlobStorageClient, bucket string) (*storage.Container, error) {

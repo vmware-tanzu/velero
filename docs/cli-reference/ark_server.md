@@ -15,6 +15,7 @@ ark server [flags]
 
 ```
       --backup-sync-period duration               how often to ensure all Ark backups in object storage exist as Backup API objects in the cluster (default 1h0m0s)
+      --default-backup-storage-location string    name of the default backup storage location (default "default")
   -h, --help                                      help for server
       --log-level                                 the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
       --metrics-address string                    the address to expose prometheus metrics (default ":8085")

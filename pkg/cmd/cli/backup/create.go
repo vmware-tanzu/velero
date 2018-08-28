@@ -32,6 +32,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/output"
+	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -42,8 +43,8 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 		Short: "Create a backup",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			cmd.CheckError(o.Complete(args))
-			cmd.CheckError(o.Validate(c, args))
+			cmd.CheckError(o.Complete(args, f))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -68,6 +69,9 @@ type CreateOptions struct {
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
+	StorageLocation         string
+
+	client arkclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -87,6 +91,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.IncludeResources, "include-resources", "resources to include in the backup, formatted as resource.group, such as storageclasses.storage.k8s.io (use '*' for all resources)")
 	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup")
+	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
@@ -103,24 +108,31 @@ func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
 }
 
-func (o *CreateOptions) Validate(c *cobra.Command, args []string) error {
+func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
 	}
 
+	if o.StorageLocation != "" {
+		if _, err := o.client.ArkV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (o *CreateOptions) Complete(args []string) error {
+func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 	o.Name = args[0]
+	client, err := f.Client()
+	if err != nil {
+		return err
+	}
+	o.client = client
 	return nil
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	arkClient, err := f.Client()
-	if err != nil {
-		return err
-	}
 
 	backup := &api.Backup{
 		ObjectMeta: metav1.ObjectMeta{
@@ -137,6 +149,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			SnapshotVolumes:    o.SnapshotVolumes.Value,
 			TTL:                metav1.Duration{Duration: o.TTL},
 			IncludeClusterResources: o.IncludeClusterResources.Value,
+			StorageLocation:         o.StorageLocation,
 		},
 	}
 
@@ -152,7 +165,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 		updates = make(chan *api.Backup)
 
-		backupInformer = v1.NewBackupInformer(arkClient, f.Namespace(), 0, nil)
+		backupInformer = v1.NewBackupInformer(o.client, f.Namespace(), 0, nil)
 
 		backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
@@ -184,7 +197,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err = arkClient.ArkV1().Backups(backup.Namespace).Create(backup)
+	_, err := o.client.ArkV1().Backups(backup.Namespace).Create(backup)
 	if err != nil {
 		return err
 	}

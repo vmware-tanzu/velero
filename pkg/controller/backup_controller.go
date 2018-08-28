@@ -57,57 +57,53 @@ import (
 const backupVersion = 1
 
 type backupController struct {
-	backupper         backup.Backupper
-	objectStoreConfig api.CloudProviderConfig
-	bucket            string
-	pvProviderExists  bool
-	lister            listers.BackupLister
-	listerSynced      cache.InformerSynced
-	client            arkv1client.BackupsGetter
-	syncHandler       func(backupName string) error
-	queue             workqueue.RateLimitingInterface
-	clock             clock.Clock
-	logger            logrus.FieldLogger
-	logLevel          logrus.Level
-	pluginRegistry    plugin.Registry
-	backupTracker     BackupTracker
-	metrics           *metrics.ServerMetrics
-
-	newPluginManager func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager
+	backupper                  backup.Backupper
+	pvProviderExists           bool
+	lister                     listers.BackupLister
+	listerSynced               cache.InformerSynced
+	client                     arkv1client.BackupsGetter
+	syncHandler                func(backupName string) error
+	queue                      workqueue.RateLimitingInterface
+	clock                      clock.Clock
+	logger                     logrus.FieldLogger
+	logLevel                   logrus.Level
+	newPluginManager           func(logrus.FieldLogger) plugin.Manager
+	backupTracker              BackupTracker
+	backupLocationLister       listers.BackupStorageLocationLister
+	backupLocationListerSynced cache.InformerSynced
+	defaultBackupLocation      string
+	metrics                    *metrics.ServerMetrics
 }
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
 	client arkv1client.BackupsGetter,
 	backupper backup.Backupper,
-	objectStoreConfig api.CloudProviderConfig,
-	bucket string,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	logLevel logrus.Level,
-	pluginRegistry plugin.Registry,
+	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	backupTracker BackupTracker,
+	backupLocationInformer informers.BackupStorageLocationInformer,
+	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupController{
-		backupper:         backupper,
-		objectStoreConfig: objectStoreConfig,
-		bucket:            bucket,
-		pvProviderExists:  pvProviderExists,
-		lister:            backupInformer.Lister(),
-		listerSynced:      backupInformer.Informer().HasSynced,
-		client:            client,
-		queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
-		clock:             &clock.RealClock{},
-		logger:            logger,
-		logLevel:          logLevel,
-		pluginRegistry:    pluginRegistry,
-		backupTracker:     backupTracker,
-		metrics:           metrics,
-
-		newPluginManager: func(logger logrus.FieldLogger, logLevel logrus.Level, pluginRegistry plugin.Registry) plugin.Manager {
-			return plugin.NewManager(logger, logLevel, pluginRegistry)
-		},
+		backupper:                  backupper,
+		pvProviderExists:           pvProviderExists,
+		lister:                     backupInformer.Lister(),
+		listerSynced:               backupInformer.Informer().HasSynced,
+		client:                     client,
+		queue:                      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "backup"),
+		clock:                      &clock.RealClock{},
+		logger:                     logger,
+		logLevel:                   logLevel,
+		newPluginManager:           newPluginManager,
+		backupTracker:              backupTracker,
+		backupLocationLister:       backupLocationInformer.Lister(),
+		backupLocationListerSynced: backupLocationInformer.Informer().HasSynced,
+		defaultBackupLocation:      defaultBackupLocation,
+		metrics:                    metrics,
 	}
 
 	c.syncHandler = c.processBackup
@@ -165,7 +161,7 @@ func (controller *backupController) Run(ctx context.Context, numWorkers int) err
 	defer controller.logger.Info("Shutting down BackupController")
 
 	controller.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), controller.listerSynced) {
+	if !cache.WaitForCacheSync(ctx.Done(), controller.listerSynced, controller.backupLocationListerSynced) {
 		return errors.New("timed out waiting for caches to sync")
 	}
 	controller.logger.Info("Caches are synced")
@@ -259,8 +255,9 @@ func (controller *backupController) processBackup(key string) error {
 		backup.Status.Expiration = metav1.NewTime(controller.clock.Now().Add(backup.Spec.TTL.Duration))
 	}
 
+	var backupLocation *api.BackupStorageLocation
 	// validation
-	if backup.Status.ValidationErrors = controller.getValidationErrors(backup); len(backup.Status.ValidationErrors) > 0 {
+	if backupLocation, backup.Status.ValidationErrors = controller.getLocationAndValidate(backup, controller.defaultBackupLocation); len(backup.Status.ValidationErrors) > 0 {
 		backup.Status.Phase = api.BackupPhaseFailedValidation
 	} else {
 		backup.Status.Phase = api.BackupPhaseInProgress
@@ -287,7 +284,7 @@ func (controller *backupController) processBackup(key string) error {
 	backupScheduleName := backup.GetLabels()["ark-schedule"]
 	controller.metrics.RegisterBackupAttempt(backupScheduleName)
 
-	if err := controller.runBackup(backup, controller.bucket); err != nil {
+	if err := controller.runBackup(backup, backupLocation); err != nil {
 		logContext.WithError(err).Error("backup failed")
 		backup.Status.Phase = api.BackupPhaseFailed
 		controller.metrics.RegisterBackupFailed(backupScheduleName)
@@ -327,7 +324,7 @@ func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter
 	return res, nil
 }
 
-func (controller *backupController) getValidationErrors(itm *api.Backup) []string {
+func (controller *backupController) getLocationAndValidate(itm *api.Backup, defaultBackupLocation string) (*api.BackupStorageLocation, []string) {
 	var validationErrors []string
 
 	for _, err := range collections.ValidateIncludesExcludes(itm.Spec.IncludedResources, itm.Spec.ExcludedResources) {
@@ -342,10 +339,26 @@ func (controller *backupController) getValidationErrors(itm *api.Backup) []strin
 		validationErrors = append(validationErrors, "Server is not configured for PV snapshots")
 	}
 
-	return validationErrors
+	if itm.Spec.StorageLocation == "" {
+		itm.Spec.StorageLocation = defaultBackupLocation
+	}
+
+	// add the storage location as a label for easy filtering later.
+	if itm.Labels == nil {
+		itm.Labels = make(map[string]string)
+	}
+	itm.Labels[api.StorageLocationLabel] = itm.Spec.StorageLocation
+
+	var backupLocation *api.BackupStorageLocation
+	backupLocation, err := controller.backupLocationLister.BackupStorageLocations(itm.Namespace).Get(itm.Spec.StorageLocation)
+	if err != nil {
+		validationErrors = append(validationErrors, fmt.Sprintf("Error getting backup storage location: %v", err))
+	}
+
+	return backupLocation, validationErrors
 }
 
-func (controller *backupController) runBackup(backup *api.Backup, bucket string) error {
+func (controller *backupController) runBackup(backup *api.Backup, backupLocation *api.BackupStorageLocation) error {
 	log := controller.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 	backup.Status.StartTimestamp.Time = controller.clock.Now()
@@ -368,7 +381,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 
 	log.Info("Starting backup")
 
-	pluginManager := controller.newPluginManager(log, log.Level, controller.pluginRegistry)
+	pluginManager := controller.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	backupFile, err := ioutil.TempFile("", "")
@@ -382,7 +395,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		return err
 	}
 
-	objectStore, err := getObjectStore(controller.objectStoreConfig, pluginManager)
+	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
 	if err != nil {
 		return err
 	}
@@ -424,7 +437,7 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 		controller.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 
-	if err := cloudprovider.UploadBackup(log, objectStore, bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
+	if err := cloudprovider.UploadBackup(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
 		errs = append(errs, err)
 	}
 
@@ -441,17 +454,27 @@ func (controller *backupController) runBackup(backup *api.Backup, bucket string)
 }
 
 // TODO(ncdc): move this to a better location that isn't backup specific
-func getObjectStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("object storage provider name must not be empty")
+func getObjectStoreForLocation(location *api.BackupStorageLocation, manager plugin.Manager) (cloudprovider.ObjectStore, error) {
+	if location.Spec.Provider == "" {
+		return nil, errors.New("backup storage location provider name must not be empty")
 	}
 
-	objectStore, err := manager.GetObjectStore(cloudConfig.Name)
+	objectStore, err := manager.GetObjectStore(location.Spec.Provider)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := objectStore.Init(cloudConfig.Config); err != nil {
+	// add the bucket name to the config map so that object stores can use
+	// it when initializing. The AWS object store uses this to determine the
+	// bucket's region when setting up its client.
+	if location.Spec.ObjectStorage != nil {
+		if location.Spec.Config == nil {
+			location.Spec.Config = make(map[string]string)
+		}
+		location.Spec.Config["bucket"] = location.Spec.ObjectStorage.Bucket
+	}
+
+	if err := objectStore.Init(location.Spec.Config); err != nil {
 		return nil, err
 	}
 
