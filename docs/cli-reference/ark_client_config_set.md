@@ -4,7 +4,6 @@ Set client configuration file values
 
 ### Synopsis
 
-
 Set client configuration file values
 
 ```
@@ -33,5 +32,6 @@ ark client config set KEY=VALUE [KEY=VALUE]... [flags]
 ```
 
 ### SEE ALSO
+
 * [ark client config](ark_client_config.md)	 - Get and set client configuration file values
 

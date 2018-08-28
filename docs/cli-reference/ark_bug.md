@@ -4,7 +4,6 @@ Report an Ark bug
 
 ### Synopsis
 
-
 Open a browser window to report an Ark bug
 
 ```
@@ -33,5 +32,6 @@ ark bug [flags]
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 

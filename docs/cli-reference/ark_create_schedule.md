@@ -4,7 +4,6 @@ Create a schedule
 
 ### Synopsis
 
-
 The --schedule flag is required, in cron notation:
 
 | Character Position | Character Period | Acceptable Values |
@@ -61,5 +60,6 @@ ark create schedule NAME --schedule="0 */6 * * *"
 ```
 
 ### SEE ALSO
+
 * [ark create](ark_create.md)	 - Create ark resources
 

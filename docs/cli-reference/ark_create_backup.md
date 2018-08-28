@@ -4,7 +4,6 @@ Create a backup
 
 ### Synopsis
 
-
 Create a backup
 
 ```
@@ -47,5 +46,6 @@ ark create backup NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark create](ark_create.md)	 - Create ark resources
 

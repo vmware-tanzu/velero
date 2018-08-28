@@ -4,7 +4,6 @@ Get backup logs
 
 ### Synopsis
 
-
 Get backup logs
 
 ```
@@ -34,5 +33,6 @@ ark backup logs BACKUP [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

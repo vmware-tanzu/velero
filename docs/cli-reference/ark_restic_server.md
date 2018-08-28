@@ -4,7 +4,6 @@ Run the ark restic server
 
 ### Synopsis
 
-
 Run the ark restic server
 
 ```
@@ -34,5 +33,6 @@ ark restic server [flags]
 ```
 
 ### SEE ALSO
+
 * [ark restic](ark_restic.md)	 - Work with restic
 

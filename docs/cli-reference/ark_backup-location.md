@@ -4,7 +4,6 @@ Work with backup storage locations
 
 ### Synopsis
 
-
 Work with backup storage locations
 
 ### Options
@@ -29,6 +28,7 @@ Work with backup storage locations
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark backup-location create](ark_backup-location_create.md)	 - Create a backup storage location
 * [ark backup-location get](ark_backup-location_get.md)	 - Get backup storage locations

@@ -107,11 +107,11 @@
 
 [[constraint]]
   name = "github.com/spf13/cobra"
-  branch = "master"
+  version = "0.0.3"
 
 [[constraint]]
   name = "github.com/spf13/pflag"
-  version = "1.0.0"
+  version = "1.0.2"
 
 [[constraint]]
   name = "github.com/stretchr/testify"

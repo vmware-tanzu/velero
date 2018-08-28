@@ -4,7 +4,6 @@ Print the ark version and associated image
 
 ### Synopsis
 
-
 Print the ark version and associated image
 
 ```
@@ -33,5 +32,6 @@ ark version [flags]
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 

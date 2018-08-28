@@ -4,7 +4,6 @@ Remove a plugin
 
 ### Synopsis
 
-
 Remove a plugin
 
 ```
@@ -33,5 +32,6 @@ ark plugin remove [NAME | IMAGE] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark plugin](ark_plugin.md)	 - Work with plugins
 

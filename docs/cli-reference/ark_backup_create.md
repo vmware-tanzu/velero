@@ -4,7 +4,6 @@ Create a backup
 
 ### Synopsis
 
-
 Create a backup
 
 ```
@@ -47,5 +46,6 @@ ark backup create NAME [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

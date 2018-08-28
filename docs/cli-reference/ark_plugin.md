@@ -4,7 +4,6 @@ Work with plugins
 
 ### Synopsis
 
-
 Work with plugins
 
 ### Options
@@ -29,6 +28,7 @@ Work with plugins
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark plugin add](ark_plugin_add.md)	 - Add a plugin
 * [ark plugin remove](ark_plugin_remove.md)	 - Remove a plugin

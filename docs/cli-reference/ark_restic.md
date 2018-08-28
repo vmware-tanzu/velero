@@ -4,7 +4,6 @@ Work with restic
 
 ### Synopsis
 
-
 Work with restic
 
 ### Options
@@ -29,6 +28,7 @@ Work with restic
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark restic repo](ark_restic_repo.md)	 - Work with restic repositories
 * [ark restic server](ark_restic_server.md)	 - Run the ark restic server

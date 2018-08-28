@@ -4,7 +4,6 @@ Add a plugin
 
 ### Synopsis
 
-
 Add a plugin
 
 ```
@@ -34,5 +33,6 @@ ark plugin add IMAGE [flags]
 ```
 
 ### SEE ALSO
+
 * [ark plugin](ark_plugin.md)	 - Work with plugins
 

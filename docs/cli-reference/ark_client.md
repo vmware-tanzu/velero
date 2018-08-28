@@ -4,7 +4,6 @@ Ark client related commands
 
 ### Synopsis
 
-
 Ark client related commands
 
 ### Options
@@ -29,6 +28,7 @@ Ark client related commands
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 * [ark client config](ark_client_config.md)	 - Get and set client configuration file values
 

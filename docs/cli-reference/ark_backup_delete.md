@@ -4,7 +4,6 @@ Delete backups
 
 ### Synopsis
 
-
 Delete backups
 
 ```
@@ -56,5 +55,6 @@ ark backup delete [NAMES] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 

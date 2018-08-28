@@ -4,7 +4,6 @@ Get client configuration file values
 
 ### Synopsis
 
-
 Get client configuration file values
 
 ```
@@ -33,5 +32,6 @@ ark client config get [KEY 1] [KEY 2] [...] [flags]
 ```
 
 ### SEE ALSO
+
 * [ark client config](ark_client_config.md)	 - Get and set client configuration file values
 

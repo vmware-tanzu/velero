@@ -4,7 +4,6 @@ Output shell completion code for the specified shell (bash or zsh)
 
 ### Synopsis
 
-
 Generate shell completion code.
 
 Auto completion supports both bash and zsh. Output is to STDOUT.
@@ -42,5 +41,6 @@ ark completion SHELL [flags]
 ```
 
 ### SEE ALSO
+
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
 

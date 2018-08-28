@@ -4,7 +4,6 @@ Back up and restore Kubernetes cluster resources.
 
 ### Synopsis
 
-
 Heptio Ark is a tool for managing disaster recovery, specifically for Kubernetes
 cluster resources. It provides a simple, configurable, and operationally robust
 way to back up your application state and associated data.
@@ -30,6 +29,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 ```
 
 ### SEE ALSO
+
 * [ark backup](ark_backup.md)	 - Work with backups
 * [ark backup-location](ark_backup-location.md)	 - Work with backup storage locations
 * [ark bug](ark_bug.md)	 - Report an Ark bug
