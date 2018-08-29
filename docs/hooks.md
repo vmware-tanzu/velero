@@ -79,5 +79,5 @@ ark backup logs nginx-hook-test | grep hookCommand
 
 
 [1]: api-types/backup.md
-[2]: https://github.com/heptio/ark/blob/master/examples/nginx-app/with-pv.yaml
+[2]: examples/nginx-app/with-pv.yaml
 [3]: cloud-common.md
