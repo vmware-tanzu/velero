@@ -18,15 +18,12 @@ package controller
 
 import (
 	"compress/gzip"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"sort"
-	"sync"
-	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -36,9 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
@@ -71,23 +66,19 @@ var nonRestorableResources = []string{
 }
 
 type restoreController struct {
-	namespace                  string
-	restoreClient              arkv1client.RestoresGetter
-	backupClient               arkv1client.BackupsGetter
-	restorer                   restore.Restorer
-	pvProviderExists           bool
-	backupLister               listers.BackupLister
-	backupListerSynced         cache.InformerSynced
-	restoreLister              listers.RestoreLister
-	restoreListerSynced        cache.InformerSynced
-	backupLocationLister       listers.BackupStorageLocationLister
-	backupLocationListerSynced cache.InformerSynced
-	syncHandler                func(restoreName string) error
-	queue                      workqueue.RateLimitingInterface
-	logger                     logrus.FieldLogger
-	logLevel                   logrus.Level
-	defaultBackupLocation      string
-	metrics                    *metrics.ServerMetrics
+	*genericController
+
+	namespace             string
+	restoreClient         arkv1client.RestoresGetter
+	backupClient          arkv1client.BackupsGetter
+	restorer              restore.Restorer
+	pvProviderExists      bool
+	backupLister          listers.BackupLister
+	restoreLister         listers.RestoreLister
+	backupLocationLister  listers.BackupStorageLocationLister
+	restoreLogLevel       logrus.Level
+	defaultBackupLocation string
+	metrics               *metrics.ServerMetrics
 
 	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -103,26 +94,22 @@ func NewRestoreController(
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
-	logLevel logrus.Level,
+	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &restoreController{
-		namespace:                  namespace,
-		restoreClient:              restoreClient,
-		backupClient:               backupClient,
-		restorer:                   restorer,
-		pvProviderExists:           pvProviderExists,
-		backupLister:               backupInformer.Lister(),
-		backupListerSynced:         backupInformer.Informer().HasSynced,
-		restoreLister:              restoreInformer.Lister(),
-		restoreListerSynced:        restoreInformer.Informer().HasSynced,
-		backupLocationLister:       backupLocationInformer.Lister(),
-		backupLocationListerSynced: backupLocationInformer.Informer().HasSynced,
-		queue:                 workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "restore"),
-		logger:                logger,
-		logLevel:              logLevel,
+		genericController:     newGenericController("restore", logger),
+		namespace:             namespace,
+		restoreClient:         restoreClient,
+		backupClient:          backupClient,
+		restorer:              restorer,
+		pvProviderExists:      pvProviderExists,
+		backupLister:          backupInformer.Lister(),
+		restoreLister:         restoreInformer.Lister(),
+		backupLocationLister:  backupLocationInformer.Lister(),
+		restoreLogLevel:       restoreLogLevel,
 		defaultBackupLocation: defaultBackupLocation,
 		metrics:               metrics,
 
@@ -133,6 +120,11 @@ func NewRestoreController(
 	}
 
 	c.syncHandler = c.processRestore
+	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
+		backupInformer.Informer().HasSynced,
+		restoreInformer.Informer().HasSynced,
+		backupLocationInformer.Informer().HasSynced,
+	)
 
 	restoreInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -163,91 +155,18 @@ func NewRestoreController(
 	return c
 }
 
-// Run is a blocking function that runs the specified number of worker goroutines
-// to process items in the work queue. It will return when it receives on the
-// ctx.Done() channel.
-func (c *restoreController) Run(ctx context.Context, numWorkers int) error {
-	var wg sync.WaitGroup
-
-	defer func() {
-		c.logger.Info("Waiting for workers to finish their work")
-
-		c.queue.ShutDown()
-
-		// We have to wait here in the deferred function instead of at the bottom of the function body
-		// because we have to shut down the queue in order for the workers to shut down gracefully, and
-		// we want to shut down the queue via defer and not at the end of the body.
-		wg.Wait()
-
-		c.logger.Info("All workers have finished")
-	}()
-
-	c.logger.Info("Starting RestoreController")
-	defer c.logger.Info("Shutting down RestoreController")
-
-	c.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.backupListerSynced, c.restoreListerSynced, c.backupLocationListerSynced) {
-		return errors.New("timed out waiting for caches to sync")
-	}
-	c.logger.Info("Caches are synced")
-
-	wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			wait.Until(c.runWorker, time.Second, ctx.Done())
-			wg.Done()
-		}()
-	}
-
-	<-ctx.Done()
-
-	return nil
-}
-
-func (c *restoreController) runWorker() {
-	// continually take items off the queue (waits if it's
-	// empty) until we get a shutdown signal from the queue
-	for c.processNextWorkItem() {
-	}
-}
-
-func (c *restoreController) processNextWorkItem() bool {
-	key, quit := c.queue.Get()
-	if quit {
-		return false
-	}
-	// always call done on this item, since if it fails we'll add
-	// it back with rate-limiting below
-	defer c.queue.Done(key)
-
-	err := c.syncHandler(key.(string))
-	if err == nil {
-		// If you had no error, tell the queue to stop tracking history for your key. This will reset
-		// things like failure counts for per-item rate limiting.
-		c.queue.Forget(key)
-		return true
-	}
-
-	c.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
-	// we had an error processing the item so add it back
-	// into the queue for re-processing with rate-limiting
-	c.queue.AddRateLimited(key)
-
-	return true
-}
-
 func (c *restoreController) processRestore(key string) error {
-	logContext := c.logger.WithField("key", key)
+	log := c.logger.WithField("key", key)
 
-	logContext.Debug("Running processRestore")
+	log.Debug("Running processRestore")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		logContext.WithError(err).Error("unable to process restore: error splitting queue key")
+		log.WithError(err).Error("unable to process restore: error splitting queue key")
 		// Return nil here so we don't try to process the key any more
 		return nil
 	}
 
-	logContext.Debug("Getting Restore")
+	log.Debug("Getting Restore")
 	restore, err := c.restoreLister.Restores(ns).Get(name)
 	if err != nil {
 		return errors.Wrap(err, "error getting Restore")
@@ -267,13 +186,13 @@ func (c *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	logContext.Debug("Cloning Restore")
+	log.Debug("Cloning Restore")
 	// store ref to original for creating patch
 	original := restore
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
-	pluginManager := c.newPluginManager(logContext)
+	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
 	actions, err := pluginManager.GetRestoreItemActions()
@@ -307,7 +226,7 @@ func (c *restoreController) processRestore(key string) error {
 		return nil
 	}
 
-	logContext.Debug("Running restore")
+	log.Debug("Running restore")
 
 	// execution & upload of restore
 	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(
@@ -327,20 +246,20 @@ func (c *restoreController) processRestore(key string) error {
 	}
 
 	if restoreFailure != nil {
-		logContext.Debug("restore failed")
+		log.Debug("restore failed")
 		restore.Status.Phase = api.RestorePhaseFailed
 		restore.Status.FailureReason = restoreFailure.Error()
 		c.metrics.RegisterRestoreFailed(backupScheduleName)
 	} else {
-		logContext.Debug("restore completed")
+		log.Debug("restore completed")
 		// We got through the restore process without failing validation or restore execution
 		restore.Status.Phase = api.RestorePhaseCompleted
 		c.metrics.RegisterRestoreSuccess(backupScheduleName)
 	}
 
-	logContext.Debug("Updating Restore final status")
+	log.Debug("Updating Restore final status")
 	if _, err = patchRestore(original, restore, c.restoreClient); err != nil {
-		logContext.WithError(errors.WithStack(err)).Info("Error updating Restore final status")
+		log.WithError(errors.WithStack(err)).Info("Error updating Restore final status")
 	}
 
 	return nil
@@ -467,8 +386,8 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 			return backupInfo{}, errors.WithStack(err)
 		}
 
-		logContext := c.logger.WithField("backupName", backupName)
-		logContext.Debug("Backup not found in backupLister, checking each backup location directly, starting with default...")
+		log := c.logger.WithField("backupName", backupName)
+		log.Debug("Backup not found in backupLister, checking each backup location directly, starting with default...")
 		return c.fetchFromBackupStorage(backupName, pluginManager)
 	}
 
@@ -498,11 +417,11 @@ func (c *restoreController) fetchFromBackupStorage(backupName string, pluginMana
 
 	orderedLocations := orderedBackupLocations(locations, c.defaultBackupLocation)
 
-	logContext := c.logger.WithField("backupName", backupName)
+	log := c.logger.WithField("backupName", backupName)
 	for _, location := range orderedLocations {
 		info, err := c.backupInfoForLocation(location, backupName, pluginManager)
 		if err != nil {
-			logContext.WithField("locationName", location.Name).WithError(err).Error("Unable to fetch backup from object storage location")
+			log.WithField("locationName", location.Name).WithError(err).Error("Unable to fetch backup from object storage location")
 			continue
 		}
 		return info, nil
@@ -586,9 +505,9 @@ func (c *restoreController) runRestore(
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.logLevel)
+	logger := logging.DefaultLogger(c.restoreLogLevel)
 	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
-	logContext := logger.WithFields(
+	log := logger.WithFields(
 		logrus.Fields{
 			"restore": kubeutil.NamespaceAndName(restore),
 			"backup":  restore.Spec.BackupName,
@@ -596,7 +515,7 @@ func (c *restoreController) runRestore(
 
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
 	if err != nil {
-		logContext.WithError(err).Error("Error downloading backup")
+		log.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
 		return
@@ -605,7 +524,7 @@ func (c *restoreController) runRestore(
 
 	resultsFile, err := ioutil.TempFile("", "")
 	if err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error creating results temp file")
+		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
 		return
@@ -614,9 +533,9 @@ func (c *restoreController) runRestore(
 
 	// Any return statement above this line means a total restore failure
 	// Some failures after this line *may* be a total restore failure
-	logContext.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(logContext, restore, info.backup, backupFile, actions)
-	logContext.Info("restore completed")
+	log.Info("starting restore")
+	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, backupFile, actions)
+	log.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
 	if err := gzippedLogFile.Close(); err != nil {
@@ -640,17 +559,17 @@ func (c *restoreController) runRestore(
 	gzippedResultsFile := gzip.NewWriter(resultsFile)
 
 	if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error encoding restore results")
+		log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
 		return
 	}
 	gzippedResultsFile.Close()
 
 	if _, err = resultsFile.Seek(0, 0); err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
+		log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
 		return
 	}
 	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
-		logContext.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
+		log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
 	}
 
 	return
@@ -677,9 +596,9 @@ func downloadToTempFile(
 		return nil, errors.Wrap(err, "error copying Backup to temp file")
 	}
 
-	logContext := logger.WithField("backup", backupName)
+	log := logger.WithField("backup", backupName)
 
-	logContext.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
 		"fileName": file.Name(),
 		"bytes":    n,
 	}).Debug("Copied Backup to file")

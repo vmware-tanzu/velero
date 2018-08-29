@@ -17,10 +17,8 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -33,9 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/util/workqueue"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
@@ -50,16 +46,14 @@ const (
 )
 
 type scheduleController struct {
-	namespace             string
-	schedulesClient       arkv1client.SchedulesGetter
-	backupsClient         arkv1client.BackupsGetter
-	schedulesLister       listers.ScheduleLister
-	schedulesListerSynced cache.InformerSynced
-	syncHandler           func(scheduleName string) error
-	queue                 workqueue.RateLimitingInterface
-	clock                 clock.Clock
-	logger                logrus.FieldLogger
-	metrics               *metrics.ServerMetrics
+	*genericController
+
+	namespace       string
+	schedulesClient arkv1client.SchedulesGetter
+	backupsClient   arkv1client.BackupsGetter
+	schedulesLister listers.ScheduleLister
+	clock           clock.Clock
+	metrics         *metrics.ServerMetrics
 }
 
 func NewScheduleController(
@@ -71,18 +65,19 @@ func NewScheduleController(
 	metrics *metrics.ServerMetrics,
 ) *scheduleController {
 	c := &scheduleController{
-		namespace:             namespace,
-		schedulesClient:       schedulesClient,
-		backupsClient:         backupsClient,
-		schedulesLister:       schedulesInformer.Lister(),
-		schedulesListerSynced: schedulesInformer.Informer().HasSynced,
-		queue:   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "schedule"),
-		clock:   clock.RealClock{},
-		logger:  logger,
-		metrics: metrics,
+		genericController: newGenericController("schedule", logger),
+		namespace:         namespace,
+		schedulesClient:   schedulesClient,
+		backupsClient:     backupsClient,
+		schedulesLister:   schedulesInformer.Lister(),
+		clock:             clock.RealClock{},
+		metrics:           metrics,
 	}
 
 	c.syncHandler = c.processSchedule
+	c.cacheSyncWaiters = append(c.cacheSyncWaiters, schedulesInformer.Informer().HasSynced)
+	c.resyncFunc = c.enqueueAllEnabledSchedules
+	c.resyncPeriod = scheduleSyncPeriod
 
 	schedulesInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -117,52 +112,10 @@ func NewScheduleController(
 	return c
 }
 
-// Run is a blocking function that runs the specified number of worker goroutines
-// to process items in the work queue. It will return when it receives on the
-// ctx.Done() channel.
-func (controller *scheduleController) Run(ctx context.Context, numWorkers int) error {
-	var wg sync.WaitGroup
-
-	defer func() {
-		controller.logger.Info("Waiting for workers to finish their work")
-
-		controller.queue.ShutDown()
-
-		// We have to wait here in the deferred function instead of at the bottom of the function body
-		// because we have to shut down the queue in order for the workers to shut down gracefully, and
-		// we want to shut down the queue via defer and not at the end of the body.
-		wg.Wait()
-
-		controller.logger.Info("All workers have finished")
-	}()
-
-	controller.logger.Info("Starting ScheduleController")
-	defer controller.logger.Info("Shutting down ScheduleController")
-
-	controller.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), controller.schedulesListerSynced) {
-		return errors.New("timed out waiting for caches to sync")
-	}
-	controller.logger.Info("Caches are synced")
-
-	wg.Add(numWorkers)
-	for i := 0; i < numWorkers; i++ {
-		go func() {
-			wait.Until(controller.runWorker, time.Second, ctx.Done())
-			wg.Done()
-		}()
-	}
-
-	go wait.Until(controller.enqueueAllEnabledSchedules, scheduleSyncPeriod, ctx.Done())
-
-	<-ctx.Done()
-	return nil
-}
-
-func (controller *scheduleController) enqueueAllEnabledSchedules() {
-	schedules, err := controller.schedulesLister.Schedules(controller.namespace).List(labels.NewSelector())
+func (c *scheduleController) enqueueAllEnabledSchedules() {
+	schedules, err := c.schedulesLister.Schedules(c.namespace).List(labels.NewSelector())
 	if err != nil {
-		controller.logger.WithError(errors.WithStack(err)).Error("Error listing Schedules")
+		c.logger.WithError(errors.WithStack(err)).Error("Error listing Schedules")
 		return
 	}
 
@@ -173,60 +126,28 @@ func (controller *scheduleController) enqueueAllEnabledSchedules() {
 
 		key, err := cache.MetaNamespaceKeyFunc(schedule)
 		if err != nil {
-			controller.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
+			c.logger.WithError(errors.WithStack(err)).WithField("schedule", schedule).Error("Error creating queue key, item not added to queue")
 			continue
 		}
-		controller.queue.Add(key)
+		c.queue.Add(key)
 	}
 }
 
-func (controller *scheduleController) runWorker() {
-	// continually take items off the queue (waits if it's
-	// empty) until we get a shutdown signal from the queue
-	for controller.processNextWorkItem() {
-	}
-}
+func (c *scheduleController) processSchedule(key string) error {
+	log := c.logger.WithField("key", key)
 
-func (controller *scheduleController) processNextWorkItem() bool {
-	key, quit := controller.queue.Get()
-	if quit {
-		return false
-	}
-	// always call done on this item, since if it fails we'll add
-	// it back with rate-limiting below
-	defer controller.queue.Done(key)
-
-	err := controller.syncHandler(key.(string))
-	if err == nil {
-		// If you had no error, tell the queue to stop tracking history for your key. This will reset
-		// things like failure counts for per-item rate limiting.
-		controller.queue.Forget(key)
-		return true
-	}
-
-	controller.logger.WithError(err).WithField("key", key).Error("Error in syncHandler, re-adding item to queue")
-	// we had an error processing the item so add it back
-	// into the queue for re-processing with rate-limiting
-	controller.queue.AddRateLimited(key)
-
-	return true
-}
-
-func (controller *scheduleController) processSchedule(key string) error {
-	logContext := controller.logger.WithField("key", key)
-
-	logContext.Debug("Running processSchedule")
+	log.Debug("Running processSchedule")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return errors.Wrap(err, "error splitting queue key")
 	}
 
-	logContext.Debug("Getting Schedule")
-	schedule, err := controller.schedulesLister.Schedules(ns).Get(name)
+	log.Debug("Getting Schedule")
+	schedule, err := c.schedulesLister.Schedules(ns).Get(name)
 	if err != nil {
 		// schedule no longer exists
 		if apierrors.IsNotFound(err) {
-			logContext.WithError(err).Debug("Schedule not found")
+			log.WithError(err).Debug("Schedule not found")
 			return nil
 		}
 		return errors.Wrap(err, "error getting Schedule")
@@ -239,7 +160,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 		return nil
 	}
 
-	logContext.Debug("Cloning schedule")
+	log.Debug("Cloning schedule")
 	// store ref to original for creating patch
 	original := schedule
 	// don't modify items in the cache
@@ -249,7 +170,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 	// so re-validate
 	currentPhase := schedule.Status.Phase
 
-	cronSchedule, errs := parseCronSchedule(schedule, controller.logger)
+	cronSchedule, errs := parseCronSchedule(schedule, c.logger)
 	if len(errs) > 0 {
 		schedule.Status.Phase = api.SchedulePhaseFailedValidation
 		schedule.Status.ValidationErrors = errs
@@ -259,7 +180,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 
 	// update status if it's changed
 	if currentPhase != schedule.Status.Phase {
-		updatedSchedule, err := patchSchedule(original, schedule, controller.schedulesClient)
+		updatedSchedule, err := patchSchedule(original, schedule, c.schedulesClient)
 		if err != nil {
 			return errors.Wrapf(err, "error updating Schedule phase to %s", schedule.Status.Phase)
 		}
@@ -271,7 +192,7 @@ func (controller *scheduleController) processSchedule(key string) error {
 	}
 
 	// check for the schedule being due to run, and submit a Backup if so
-	if err := controller.submitBackupIfDue(schedule, cronSchedule); err != nil {
+	if err := c.submitBackupIfDue(schedule, cronSchedule); err != nil {
 		return err
 	}
 
@@ -288,14 +209,14 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 		return nil, validationErrors
 	}
 
-	logContext := logger.WithField("schedule", kubeutil.NamespaceAndName(itm))
+	log := logger.WithField("schedule", kubeutil.NamespaceAndName(itm))
 
 	// adding a recover() around cron.Parse because it panics on empty string and is possible
 	// that it panics under other scenarios as well.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logContext.WithFields(logrus.Fields{
+				log.WithFields(logrus.Fields{
 					"schedule": itm.Spec.Schedule,
 					"recover":  r,
 				}).Debug("Panic parsing schedule")
@@ -304,7 +225,7 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 		}()
 
 		if res, err := cron.ParseStandard(itm.Spec.Schedule); err != nil {
-			logContext.WithError(errors.WithStack(err)).WithField("schedule", itm.Spec.Schedule).Debug("Error parsing schedule")
+			log.WithError(errors.WithStack(err)).WithField("schedule", itm.Spec.Schedule).Debug("Error parsing schedule")
 			validationErrors = append(validationErrors, fmt.Sprintf("invalid schedule: %v", err))
 		} else {
 			schedule = res
@@ -318,15 +239,15 @@ func parseCronSchedule(itm *api.Schedule, logger logrus.FieldLogger) (cron.Sched
 	return schedule, nil
 }
 
-func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule cron.Schedule) error {
+func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule cron.Schedule) error {
 	var (
-		now                = controller.clock.Now()
+		now                = c.clock.Now()
 		isDue, nextRunTime = getNextRunTime(item, cronSchedule, now)
-		logContext         = controller.logger.WithField("schedule", kubeutil.NamespaceAndName(item))
+		log                = c.logger.WithField("schedule", kubeutil.NamespaceAndName(item))
 	)
 
 	if !isDue {
-		logContext.WithField("nextRunTime", nextRunTime).Info("Schedule is not due, skipping")
+		log.WithField("nextRunTime", nextRunTime).Info("Schedule is not due, skipping")
 		return nil
 	}
 
@@ -336,9 +257,9 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 	// It might also make sense in the future to explicitly check for currently-running
 	// backups so that we don't overlap runs (for disk snapshots in particular, this can
 	// lead to performance issues).
-	logContext.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
+	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
 	backup := getBackup(item, now)
-	if _, err := controller.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
+	if _, err := c.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
 		return errors.Wrap(err, "error creating Backup")
 	}
 
@@ -347,7 +268,7 @@ func (controller *scheduleController) submitBackupIfDue(item *api.Schedule, cron
 
 	schedule.Status.LastBackup = metav1.NewTime(now)
 
-	if _, err := patchSchedule(original, schedule, controller.schedulesClient); err != nil {
+	if _, err := patchSchedule(original, schedule, c.schedulesClient); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)
 	}
 
