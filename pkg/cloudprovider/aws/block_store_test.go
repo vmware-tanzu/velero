@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"os"
 	"sort"
 	"testing"
 
@@ -85,6 +86,91 @@ func TestSetVolumeID(t *testing.T) {
 	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
 	require.NoError(t, err)
 	assert.Equal(t, "vol-updated", actual)
+}
+
+func TestGetTagsForCluster(t *testing.T) {
+	tests := []struct {
+		name         string
+		isNameSet    bool
+		snapshotTags []*ec2.Tag
+		expected     []*ec2.Tag
+	}{
+		{
+			name:         "degenerate case (no tags)",
+			isNameSet:    false,
+			snapshotTags: nil,
+			expected:     nil,
+		},
+		{
+			name:      "cluster tags exist and remain set",
+			isNameSet: false,
+			snapshotTags: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "old-cluster"),
+				ec2Tag("kubernetes.io/cluster/old-cluster", "owned"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+			expected: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "old-cluster"),
+				ec2Tag("kubernetes.io/cluster/old-cluster", "owned"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+		},
+		{
+			name:         "cluster tags only get applied",
+			isNameSet:    true,
+			snapshotTags: nil,
+			expected: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "current-cluster"),
+				ec2Tag("kubernetes.io/cluster/current-cluster", "owned"),
+			},
+		},
+		{
+			name:         "non-overlaping cluster and snapshot tags both get applied",
+			isNameSet:    true,
+			snapshotTags: []*ec2.Tag{ec2Tag("aws-key", "aws-val")},
+			expected: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "current-cluster"),
+				ec2Tag("kubernetes.io/cluster/current-cluster", "owned"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+		},
+		{name: "overlaping cluster tags, current cluster tags take precedence",
+			isNameSet: true,
+			snapshotTags: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "old-name"),
+				ec2Tag("kubernetes.io/cluster/old-name", "owned"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+			expected: []*ec2.Tag{
+				ec2Tag("KubernetesCluster", "current-cluster"),
+				ec2Tag("kubernetes.io/cluster/current-cluster", "owned"),
+				ec2Tag("aws-key", "aws-val"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.isNameSet {
+				os.Setenv("AWS_CLUSTER_NAME", "current-cluster")
+			}
+			res := getTagsForCluster(test.snapshotTags)
+
+			sort.Slice(res, func(i, j int) bool {
+				return *res[i].Key < *res[j].Key
+			})
+
+			sort.Slice(test.expected, func(i, j int) bool {
+				return *test.expected[i].Key < *test.expected[j].Key
+			})
+
+			assert.Equal(t, test.expected, res)
+
+			if test.isNameSet {
+				os.Unsetenv("AWS_CLUSTER_NAME")
+			}
+		})
+	}
 }
 
 func TestGetTags(t *testing.T) {
