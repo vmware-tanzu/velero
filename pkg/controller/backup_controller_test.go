@@ -204,7 +204,7 @@ func TestProcessBackup(t *testing.T) {
 				cloudBackups.On("UploadBackup", "bucket", backup.Name, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 				pluginManager.On("GetBackupItemActions", backup.Name).Return(nil, nil)
-				pluginManager.On("CloseBackupItemActions", backup.Name).Return(nil)
+				pluginManager.On("CloseBackupItemActions", backup.Name).Return()
 			}
 
 			// this is necessary so the Patch() call returns the appropriate object
@@ -321,17 +321,9 @@ type MockManager struct {
 }
 
 // CloseBackupItemActions provides a mock function with given fields: backupName
-func (_m *MockManager) CloseBackupItemActions(backupName string) error {
-	ret := _m.Called(backupName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(backupName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *MockManager) CloseBackupItemActions(backupName string) {
+	_ = _m.Called(backupName)
+	return
 }
 
 // GetBackupItemActions provides a mock function with given fields: backupName, logger, level
@@ -358,17 +350,9 @@ func (_m *MockManager) GetBackupItemActions(backupName string) ([]backup.ItemAct
 }
 
 // CloseRestoreItemActions provides a mock function with given fields: restoreName
-func (_m *MockManager) CloseRestoreItemActions(restoreName string) error {
-	ret := _m.Called(restoreName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string) error); ok {
-		r0 = rf(restoreName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *MockManager) CloseRestoreItemActions(restoreName string) {
+	_ = _m.Called(restoreName)
+	return
 }
 
 // GetRestoreItemActions provides a mock function with given fields: restoreName, logger, level
@@ -440,8 +424,8 @@ func (_m *MockManager) GetObjectStore(name string) (cloudprovider.ObjectStore, e
 	return r0, r1
 }
 
-// CleanupClients provides a mock function
-func (_m *MockManager) CleanupClients() {
+// CloseAllClients provides a mock function
+func (_m *MockManager) CloseAllClients() {
 	_ = _m.Called()
 	return
 }

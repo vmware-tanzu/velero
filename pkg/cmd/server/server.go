@@ -205,7 +205,7 @@ func newServer(namespace, baseName, pluginDir, metricsAddr string, logger *logru
 }
 
 func (s *server) run() error {
-	defer s.pluginManager.CleanupClients()
+	defer s.pluginManager.CloseAllClients()
 
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 

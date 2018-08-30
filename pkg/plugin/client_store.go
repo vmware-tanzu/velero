@@ -3,7 +3,6 @@ package plugin
 import (
 	"sync"
 
-	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 )
 
@@ -20,7 +19,7 @@ type clientKey struct {
 
 func newClientStore() *clientStore {
 	return &clientStore{
-		clients: make(map[clientKey]map[string]*plugin.Client),
+		clients: make(map[clientKey]map[string]pluginClient),
 		lock:    &sync.RWMutex{},
 	}
 }
@@ -33,13 +32,13 @@ type clientStore struct {
 	// kind and scope (e.g. all BackupItemActions for a given
 	// backup), and efficient lookup by kind+name+scope (e.g.
 	// the AWS ObjectStore.)
-	clients map[clientKey]map[string]*plugin.Client
+	clients map[clientKey]map[string]pluginClient
 	lock    *sync.RWMutex
 }
 
 // get returns a plugin client for the given kind/name/scope, or an error if none
 // is found.
-func (s *clientStore) get(kind PluginKind, name, scope string) (*plugin.Client, error) {
+func (s *clientStore) get(kind PluginKind, name, scope string) (pluginClient, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -54,12 +53,12 @@ func (s *clientStore) get(kind PluginKind, name, scope string) (*plugin.Client, 
 
 // list returns all plugin clients for the given kind/scope, or an
 // error if none are found.
-func (s *clientStore) list(kind PluginKind, scope string) ([]*plugin.Client, error) {
+func (s *clientStore) list(kind PluginKind, scope string) ([]pluginClient, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
 	if forScope, found := s.clients[clientKey{kind, scope}]; found {
-		var clients []*plugin.Client
+		var clients []pluginClient
 
 		for _, client := range forScope {
 			clients = append(clients, client)
@@ -71,15 +70,31 @@ func (s *clientStore) list(kind PluginKind, scope string) ([]*plugin.Client, err
 	return nil, errors.New("clients not found")
 }
 
+// listAll returns all plugin clients for all kinds/scopes, or a
+// zero-valued slice if there are none.
+func (s *clientStore) listAll() []pluginClient {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+
+	var clients []pluginClient
+	for _, pluginsByName := range s.clients {
+		for name := range pluginsByName {
+			clients = append(clients, pluginsByName[name])
+		}
+	}
+
+	return clients
+}
+
 // add stores a plugin client for the given kind/name/scope.
-func (s *clientStore) add(client *plugin.Client, kind PluginKind, name, scope string) {
+func (s *clientStore) add(client pluginClient, kind PluginKind, name, scope string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	key := clientKey{kind, scope}
 
 	if _, found := s.clients[key]; !found {
-		s.clients[key] = make(map[string]*plugin.Client)
+		s.clients[key] = make(map[string]pluginClient)
 	}
 
 	s.clients[key][name] = client
@@ -102,4 +117,12 @@ func (s *clientStore) deleteAll(kind PluginKind, scope string) {
 	defer s.lock.Unlock()
 
 	delete(s.clients, clientKey{kind, scope})
+}
+
+// clear removes all clients for all kinds/scopes from the store.
+func (s *clientStore) clear() {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.clients = make(map[clientKey]map[string]pluginClient)
 }

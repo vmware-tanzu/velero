@@ -44,7 +44,6 @@ func baseConfig() *plugin.ClientConfig {
 	return &plugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		Managed:          true,
 	}
 }
 
@@ -112,7 +111,7 @@ type Manager interface {
 
 	// CloseBackupItemActions terminates the plugin sub-processes that
 	// are hosting BackupItemAction plugins for the given backup name.
-	CloseBackupItemActions(backupName string) error
+	CloseBackupItemActions(backupName string)
 
 	// GetRestoreItemActions returns all restore.ItemAction plugins.
 	// These plugin instances should ONLY be used for a single restore
@@ -123,10 +122,10 @@ type Manager interface {
 
 	// CloseRestoreItemActions terminates the plugin sub-processes that
 	// are hosting RestoreItemAction plugins for the given restore name.
-	CloseRestoreItemActions(restoreName string) error
+	CloseRestoreItemActions(restoreName string)
 
-	// CleanupClients kills all plugin subprocesses.
-	CleanupClients()
+	// CloseAllClients terminates all plugin subprocesses.
+	CloseAllClients()
 }
 
 type manager struct {
@@ -165,7 +164,12 @@ func pluginForKind(kind PluginKind) plugin.Plugin {
 	}
 }
 
-func getPluginInstance(client *plugin.Client, kind PluginKind) (interface{}, error) {
+type pluginClient interface {
+	Client() (plugin.ClientProtocol, error)
+	Kill()
+}
+
+func getPluginInstance(client pluginClient, kind PluginKind) (interface{}, error) {
 	protocolClient, err := client.Client()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -349,8 +353,8 @@ func (m *manager) GetBackupItemActions(backupName string) ([]backup.ItemAction, 
 
 // CloseBackupItemActions terminates the plugin sub-processes that
 // are hosting BackupItemAction plugins for the given backup name.
-func (m *manager) CloseBackupItemActions(backupName string) error {
-	return closeAll(m.clientStore, PluginKindBackupItemAction, backupName)
+func (m *manager) CloseBackupItemActions(backupName string) {
+	closeAll(m.clientStore, PluginKindBackupItemAction, backupName)
 }
 
 func (m *manager) GetRestoreItemActions(restoreName string) ([]restore.ItemAction, error) {
@@ -398,14 +402,18 @@ func (m *manager) GetRestoreItemActions(restoreName string) ([]restore.ItemActio
 
 // CloseRestoreItemActions terminates the plugin sub-processes that
 // are hosting RestoreItemAction plugins for the given restore name.
-func (m *manager) CloseRestoreItemActions(restoreName string) error {
-	return closeAll(m.clientStore, PluginKindRestoreItemAction, restoreName)
+func (m *manager) CloseRestoreItemActions(restoreName string) {
+	closeAll(m.clientStore, PluginKindRestoreItemAction, restoreName)
 }
 
-func closeAll(store *clientStore, kind PluginKind, scope string) error {
+func closeAll(store *clientStore, kind PluginKind, scope string) {
 	clients, err := store.list(kind, scope)
 	if err != nil {
-		return err
+		// store.list(...) only returns an error if no clients are
+		// found for the specified kind and scope. We don't need
+		// to treat this as an error when trying to close all clients,
+		// because this means there are no clients to close.
+		return
 	}
 
 	for _, client := range clients {
@@ -413,10 +421,12 @@ func closeAll(store *clientStore, kind PluginKind, scope string) error {
 	}
 
 	store.deleteAll(kind, scope)
-
-	return nil
 }
 
-func (m *manager) CleanupClients() {
-	plugin.CleanupClients()
+func (m *manager) CloseAllClients() {
+	for _, client := range m.clientStore.listAll() {
+		client.Kill()
+	}
+
+	m.clientStore.clear()
 }
