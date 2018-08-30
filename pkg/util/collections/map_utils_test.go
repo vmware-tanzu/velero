@@ -18,6 +18,8 @@ package collections
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetString(t *testing.T) {
@@ -42,5 +44,59 @@ func TestGetString(t *testing.T) {
 		if res != tc.result {
 			t.Error("res")
 		}
+	}
+}
+
+func TestMergeMaps(t *testing.T) {
+	var testCases = []struct {
+		name        string
+		source      map[string]string
+		destination map[string]string
+		expected    map[string]string
+	}{
+		{
+			name:        "nil destination should result in source being copied",
+			destination: nil,
+			source: map[string]string{
+				"k1": "v1",
+			},
+			expected: map[string]string{
+				"k1": "v1",
+			},
+		},
+		{
+			name: "keys missing from destination should be copied from source",
+			destination: map[string]string{
+				"k2": "v2",
+			},
+			source: map[string]string{
+				"k1": "v1",
+			},
+			expected: map[string]string{
+				"k1": "v1",
+				"k2": "v2",
+			},
+		},
+		{
+			name: "matching key should not have value copied from source",
+			destination: map[string]string{
+				"k1": "v1",
+			},
+			source: map[string]string{
+				"k1": "v2",
+			},
+			expected: map[string]string{
+				"k1": "v1",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			result := MergeMaps(tc.destination, tc.source)
+
+			assert.Equal(t, tc.expected, result)
+		})
 	}
 }
