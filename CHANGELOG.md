@@ -1,5 +1,11 @@
 # Changelog
 
+#### [v0.9.4](https://github.com/heptio/ark/releases/tag/v0.9.4) - 2018-09-05
+
+#### Bug Fixes
+  * Terminate plugin clients to resolve memory leaks (#797, @skriss)
+  * Fix nil map errors when merging annotations (#812, @nrb)
+
 #### [v0.9.3](https://github.com/heptio/ark/releases/tag/v0.9.3) - 2018-08-10
 
 #### Bug Fixes
