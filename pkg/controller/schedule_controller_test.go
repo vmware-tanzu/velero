@@ -403,6 +403,9 @@ func TestGetBackup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
+					Labels: map[string]string{
+						"ark-schedule": "bar",
+					},
 				},
 				Spec: api.BackupSpec{},
 			},
@@ -423,6 +426,9 @@ func TestGetBackup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725141500",
+					Labels: map[string]string{
+						"ark-schedule": "bar",
+					},
 				},
 				Spec: api.BackupSpec{},
 			},
@@ -450,6 +456,9 @@ func TestGetBackup(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
+					Labels: map[string]string{
+						"ark-schedule": "bar",
+					},
 				},
 				Spec: api.BackupSpec{
 					IncludedNamespaces: []string{"ns-1", "ns-2"},
@@ -459,6 +468,35 @@ func TestGetBackup(t *testing.T) {
 					LabelSelector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
 					TTL:                metav1.Duration{Duration: time.Duration(300)},
 				},
+			},
+		},
+		{
+			name: "ensure schedule labels is copied",
+			schedule: &api.Schedule{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar",
+					Labels: map[string]string{
+						"foo": "bar",
+						"bar": "baz",
+					},
+				},
+				Spec: api.ScheduleSpec{
+					Template: api.BackupSpec{},
+				},
+			},
+			testClockTime: "2017-07-25 14:15:00",
+			expectedBackup: &api.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "foo",
+					Name:      "bar-20170725141500",
+					Labels: map[string]string{
+						"ark-schedule": "bar",
+						"bar":          "baz",
+						"foo":          "bar",
+					},
+				},
+				Spec: api.BackupSpec{},
 			},
 		},
 	}
@@ -472,6 +510,7 @@ func TestGetBackup(t *testing.T) {
 
 			assert.Equal(t, test.expectedBackup.Namespace, backup.Namespace)
 			assert.Equal(t, test.expectedBackup.Name, backup.Name)
+			assert.Equal(t, test.expectedBackup.Labels, backup.Labels)
 			assert.Equal(t, test.expectedBackup.Spec, backup.Spec)
 		})
 	}
