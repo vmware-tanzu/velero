@@ -48,6 +48,11 @@ spec:
     metadata:
       labels:
         app: nginx
+      annotations:
+        pre.hook.backup.ark.heptio.com/container: fsfreeze
+        pre.hook.backup.ark.heptio.com/command: '["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]'
+        post.hook.backup.ark.heptio.com/container: fsfreeze
+        post.hook.backup.ark.heptio.com/command: '["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]'
     spec:
       volumes:
         - name: nginx-logs
@@ -58,6 +63,14 @@ spec:
         name: nginx
         ports:
         - containerPort: 80
+        volumeMounts:
+          - mountPath: "/var/log/nginx"
+            name: nginx-logs
+            readOnly: false
+      - image: gcr.io/heptio-images/fsfreeze-pause:latest
+        name: fsfreeze
+        securityContext:
+          privileged: true
         volumeMounts:
           - mountPath: "/var/log/nginx"
             name: nginx-logs

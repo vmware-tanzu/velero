@@ -129,9 +129,22 @@ shell: build-dirs build-image
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
+build-fsfreeze:
+	@docker build -t $(REGISTRY)/fsfreeze-pause:$(VERSION) -f Dockerfile-fsfreeze-pause.alpine _output
+	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > $@
+
+push-fsfreeze:
+	@docker push $(REGISTRY)/fsfreeze-pause:$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(REGISTRY)/fsfreeze-pause:$(VERSION) $(IMAGE):latest
+	docker push $(REGISTRY)/fsfreeze-pause:latest
+endif
+	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > $@
+
 all-containers:
 	$(MAKE) container
 	$(MAKE) container BIN=ark-restic-restore-helper
+	$(MAKE) build-fsfreeze
 
 container: verify test .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
@@ -145,6 +158,7 @@ container-name:
 all-push:
 	$(MAKE) push
 	$(MAKE) push BIN=ark-restic-restore-helper
+	$(MAKE) push-fsfreeze
 
 
 push: .push-$(DOTFILE_IMAGE) push-name
