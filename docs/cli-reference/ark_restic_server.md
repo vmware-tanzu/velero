@@ -13,8 +13,9 @@ ark restic server [flags]
 ### Options
 
 ```
-  -h, --help        help for server
-      --log-level   the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
+      --default-backup-storage-location string   name of the default backup storage location (default "default")
+  -h, --help                                     help for server
+      --log-level                                the level at which to log. Valid values are debug, info, warning, error, fatal, panic. (default info)
 ```
 
 ### Options inherited from parent commands

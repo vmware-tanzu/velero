@@ -46,8 +46,30 @@ func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
 	return &objectStore{log: logger}
 }
 
-func getStorageAccountKey(client storagemgmt.AccountsClient, resourceGroup, storageAccount string) (string, error) {
-	res, err := client.ListKeys(resourceGroup, storageAccount)
+func getStorageAccountKey(config map[string]string) (string, error) {
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	if err != nil {
+		return "", errors.Wrap(err, "unable to get all required environment variables")
+	}
+
+	// 2. we need config["resourceGroup"], config["storageAccount"]
+	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return "", errors.Wrap(err, "unable to get all required config values")
+	}
+
+	// 3. get SPT
+	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return "", errors.Wrap(err, "error getting service principal token")
+	}
+
+	// 4. get storageAccountsClient
+	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
+	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
+
+	// 5. get storage key
+	res, err := storageAccountsClient.ListKeys(config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -56,7 +78,6 @@ func getStorageAccountKey(client storagemgmt.AccountsClient, resourceGroup, stor
 	}
 
 	var storageKey string
-
 	for _, key := range *res.Keys {
 		// uppercase both strings for comparison because the ListKeys call returns e.g. "FULL" but
 		// the storagemgmt.Full constant in the SDK is defined as "Full".
@@ -80,31 +101,9 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *objectStore) Init(config map[string]string) error {
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
-		return errors.Wrap(err, "unable to get all required environment variables")
-	}
-
-	// 2. we need config["resourceGroup"], config["storageAccount"]
-	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
-		return errors.Wrap(err, "unable to get all required config values")
-	}
-
-	// 3. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
-	if err != nil {
-		return errors.Wrap(err, "error getting service principal token")
-	}
-
-	// 4. get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
-	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
-
-	// 5. get storage key
-	storageAccountKey, err := getStorageAccountKey(storageAccountsClient, config[resourceGroupConfigKey], config[storageAccountConfigKey])
-	if err != nil {
-		return errors.Wrap(err, "error getting storage account key")
+		return err
 	}
 
 	// 6. get storageClient and blobClient

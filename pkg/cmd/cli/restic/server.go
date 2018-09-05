@@ -34,6 +34,7 @@ import (
 
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
@@ -44,7 +45,10 @@ import (
 )
 
 func NewServerCommand(f client.Factory) *cobra.Command {
-	var logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
+	var (
+		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
+		location     = "default"
+	)
 
 	var command = &cobra.Command{
 		Use:   "server",
@@ -57,7 +61,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logger := logging.DefaultLogger(logLevel)
 			logger.Infof("Starting Ark restic server %s", buildinfo.FormattedGitSHA())
 
-			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), location)
 			cmd.CheckError(err)
 
 			s.run()
@@ -65,6 +69,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
+	command.Flags().StringVar(&location, "default-backup-storage-location", location, "name of the default backup storage location")
 
 	return command
 }
@@ -81,7 +86,7 @@ type resticServer struct {
 	cancelFunc          context.CancelFunc
 }
 
-func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
+func newResticServer(logger logrus.FieldLogger, baseName, locationName string) (*resticServer, error) {
 	clientConfig, err := client.Config("", "", baseName)
 	if err != nil {
 		return nil, err
@@ -95,6 +100,17 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	arkClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
+	}
+
+	location, err := arkClient.ArkV1().BackupStorageLocations(os.Getenv("HEPTIO_ARK_NAMESPACE")).Get(locationName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if location.Spec.Provider == "azure" {
+		if err := azure.SetResticEnvVars(location.Spec.Config); err != nil {
+			return nil, err
+		}
 	}
 
 	// use a stand-alone pod informer because we want to use a field selector to

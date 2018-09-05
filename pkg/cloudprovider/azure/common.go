@@ -17,6 +17,7 @@ limitations under the License.
 package azure
 
 import (
+	"os"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -30,6 +31,21 @@ const (
 	clientIDEnvVar       = "AZURE_CLIENT_ID"
 	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
 )
+
+// SetResticEnvVars sets the environment variables that restic
+// relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
+// on info in the provided object storage location config map.
+func SetResticEnvVars(config map[string]string) error {
+	os.Setenv("AZURE_ACCOUNT_NAME", config[storageAccountConfigKey])
+
+	storageAccountKey, err := getStorageAccountKey(config)
+	if err != nil {
+		return err
+	}
+	os.Setenv("AZURE_ACCOUNT_KEY", storageAccountKey)
+
+	return nil
+}
 
 func newServicePrincipalToken(tenantID, clientID, clientSecret, scope string) (*adal.ServicePrincipalToken, error) {
 	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
