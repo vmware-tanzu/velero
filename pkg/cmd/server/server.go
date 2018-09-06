@@ -54,6 +54,7 @@ import (
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
@@ -285,7 +286,7 @@ func (s *server) run() error {
 	}
 
 	if backupStorageLocation.Spec.Config[restic.ResticLocationConfigKey] != "" {
-		if err := s.initRestic(backupStorageLocation.Spec.Provider); err != nil {
+		if err := s.initRestic(backupStorageLocation); err != nil {
 			return err
 		}
 	}
@@ -488,7 +489,7 @@ func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) 
 	return blockStore, nil
 }
 
-func (s *server) initRestic(providerName string) error {
+func (s *server) initRestic(location *api.BackupStorageLocation) error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
@@ -502,9 +503,10 @@ func (s *server) initRestic(providerName string) error {
 	}
 
 	// set the env vars that restic uses for creds purposes
-	if providerName == string(restic.AzureBackend) {
-		os.Setenv("AZURE_ACCOUNT_NAME", os.Getenv("AZURE_STORAGE_ACCOUNT_ID"))
-		os.Setenv("AZURE_ACCOUNT_KEY", os.Getenv("AZURE_STORAGE_KEY"))
+	if location.Spec.Provider == string(restic.AzureBackend) {
+		if err := azure.SetResticEnvVars(location.Spec.Config); err != nil {
+			return err
+		}
 	}
 
 	// use a stand-alone secrets informer so we can filter to only the restic credentials
