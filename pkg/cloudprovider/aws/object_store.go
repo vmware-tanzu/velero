@@ -116,7 +116,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -134,7 +134,7 @@ func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error
 	return errors.Wrapf(err, "error putting object %s", key)
 }
 
-func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -148,9 +148,10 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return res.Body, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
+		Prefix:    &prefix,
 		Delimiter: &delimiter,
 	}
 
@@ -161,7 +162,6 @@ func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]str
 		}
 		return !lastPage
 	})
-
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -190,7 +190,7 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (o *objectStore) DeleteObject(bucket string, key string) error {
+func (o *objectStore) DeleteObject(bucket, key string) error {
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,

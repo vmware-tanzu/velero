@@ -21,25 +21,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	pkgbackup "github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/plugin"
-	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	pkgbackup "github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/persistence"
+	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
+	"github.com/heptio/ark/pkg/plugin"
+	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
@@ -112,7 +114,7 @@ type backupDeletionControllerTestData struct {
 	client          *fake.Clientset
 	sharedInformers informers.SharedInformerFactory
 	blockStore      *arktest.FakeBlockStore
-	objectStore     *arktest.ObjectStore
+	backupStore     *persistencemocks.BackupStore
 	controller      *backupDeletionController
 	req             *v1.DeleteBackupRequest
 }
@@ -123,7 +125,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		sharedInformers = informers.NewSharedInformerFactory(client, 0)
 		blockStore      = &arktest.FakeBlockStore{SnapshotsTaken: sets.NewString()}
 		pluginManager   = &pluginmocks.Manager{}
-		objectStore     = &arktest.ObjectStore{}
+		backupStore     = &persistencemocks.BackupStore{}
 		req             = pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	)
 
@@ -131,7 +133,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		client:          client,
 		sharedInformers: sharedInformers,
 		blockStore:      blockStore,
-		objectStore:     objectStore,
+		backupStore:     backupStore,
 		controller: NewBackupDeletionController(
 			arktest.NewLogger(),
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
@@ -150,7 +152,10 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		req: req,
 	}
 
-	pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
+	data.controller.newBackupStore = func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+		return backupStore, nil
+	}
+
 	pluginManager.On("CleanupClients").Return(nil)
 
 	req.Namespace = "heptio-ark"
@@ -388,8 +393,6 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		}
 		require.NoError(t, td.sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
 
-		td.objectStore.On("Init", mock.Anything).Return(nil)
-
 		// Clear out req labels to make sure the controller adds them
 		td.req.Labels = make(map[string]string)
 
@@ -406,12 +409,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
-		td.controller.deleteBackupDir = func(_ logrus.FieldLogger, objectStore cloudprovider.ObjectStore, bucket, backupName string) error {
-			require.NotNil(t, objectStore)
-			require.Equal(t, location.Spec.ObjectStorage.Bucket, bucket)
-			require.Equal(t, td.req.Spec.BackupName, backupName)
-			return nil
-		}
+		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)

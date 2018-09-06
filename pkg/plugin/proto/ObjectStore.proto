@@ -24,6 +24,7 @@ message ListCommonPrefixesRequest {
     string plugin = 1;
     string bucket = 2;
     string delimiter = 3;
+    string prefix = 4;
 }
 
 message ListCommonPrefixesResponse {

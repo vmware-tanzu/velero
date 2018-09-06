@@ -127,12 +127,12 @@ func (r *restartableObjectStore) GetObject(bucket string, key string) (io.ReadCl
 }
 
 // ListCommonPrefixes restarts the plugin's process if needed, then delegates the call.
-func (r *restartableObjectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (r *restartableObjectStore) ListCommonPrefixes(bucket string, prefix string, delimiter string) ([]string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
 	}
-	return delegate.ListCommonPrefixes(bucket, delimiter)
+	return delegate.ListCommonPrefixes(bucket, prefix, delimiter)
 }
 
 // ListObjects restarts the plugin's process if needed, then delegates the call.

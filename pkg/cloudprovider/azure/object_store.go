@@ -119,7 +119,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error {
+func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return err
@@ -133,7 +133,7 @@ func (o *objectStore) PutObject(bucket string, key string, body io.Reader) error
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
-func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error) {
+func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -152,13 +152,14 @@ func (o *objectStore) GetObject(bucket string, key string) (io.ReadCloser, error
 	return res, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]string, error) {
+func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
 	}
 
 	params := storage.ListBlobsParameters{
+		Prefix:    prefix,
 		Delimiter: delimiter,
 	}
 
@@ -167,14 +168,7 @@ func (o *objectStore) ListCommonPrefixes(bucket string, delimiter string) ([]str
 		return nil, errors.WithStack(err)
 	}
 
-	// Azure returns prefixes inclusive of the last delimiter. We need to strip
-	// it.
-	ret := make([]string, 0, len(res.BlobPrefixes))
-	for _, prefix := range res.BlobPrefixes {
-		ret = append(ret, prefix[0:strings.LastIndex(prefix, delimiter)])
-	}
-
-	return ret, nil
+	return res.BlobPrefixes, nil
 }
 
 func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {

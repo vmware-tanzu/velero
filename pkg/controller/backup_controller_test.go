@@ -19,26 +19,27 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
 
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/persistence"
+	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/util/collections"
@@ -179,12 +180,12 @@ func TestProcessBackup(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel)
 				clockTime, _    = time.Parse("Mon Jan 2 15:04:05 2006", "Mon Jan 2 15:04:05 2006")
-				objectStore     = &arktest.ObjectStore{}
 				pluginManager   = &pluginmocks.Manager{}
+				backupStore     = &persistencemocks.BackupStore{}
 			)
 			defer backupper.AssertExpectations(t)
-			defer objectStore.AssertExpectations(t)
 			defer pluginManager.AssertExpectations(t)
+			defer backupStore.AssertExpectations(t)
 
 			c := NewBackupController(
 				sharedInformers.Ark().V1().Backups(),
@@ -202,6 +203,10 @@ func TestProcessBackup(t *testing.T) {
 
 			c.clock = clock.NewFakeClock(clockTime)
 
+			c.newBackupStore = func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+				return backupStore, nil
+			}
+
 			var expiration, startTime time.Time
 
 			if test.backup != nil {
@@ -217,9 +222,6 @@ func TestProcessBackup(t *testing.T) {
 			}
 
 			if test.expectBackup {
-				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
-				objectStore.On("Init", mock.Anything).Return(nil)
-
 				// set up a Backup object to represent what we expect to be passed to backupper.Backup()
 				backup := test.backup.DeepCopy()
 				backup.Spec.IncludedResources = test.expectedIncludes
@@ -278,11 +280,8 @@ func TestProcessBackup(t *testing.T) {
 
 					return strings.Contains(json, timeString)
 				}
-				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/%s-logs.gz", test.backup.Name, test.backup.Name), mock.Anything).Return(nil)
-				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/ark-backup.json", test.backup.Name), mock.MatchedBy(completionTimestampIsPresent)).Return(nil)
-				objectStore.On("PutObject", "bucket", fmt.Sprintf("%s/%s.tar.gz", test.backup.Name, test.backup.Name), mock.Anything).Return(nil)
-
-				pluginManager.On("CleanupClients")
+				backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything).Return(nil)
+				pluginManager.On("CleanupClients").Return()
 			}
 
 			// this is necessary so the Patch() call returns the appropriate object

@@ -20,25 +20,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/persistence"
+	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/util/stringslice"
 	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/stretchr/testify/assert"
 )
 
 func defaultLocationsList(namespace string) []*arkv1api.BackupStorageLocation {
@@ -167,7 +165,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				pluginManager   = &pluginmocks.Manager{}
-				objectStore     = &arktest.ObjectStore{}
+				backupStores    = make(map[string]*persistencemocks.BackupStore)
 			)
 
 			c := NewBackupSyncController(
@@ -181,22 +179,23 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				arktest.NewLogger(),
 			).(*backupSyncController)
 
-			pluginManager.On("GetObjectStore", "objStoreProvider").Return(objectStore, nil)
-			pluginManager.On("CleanupClients").Return(nil)
+			c.newBackupStore = func(loc *arkv1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+				// this gets populated just below, prior to exercising the method under test
+				return backupStores[loc.Name], nil
+			}
 
-			objectStore.On("Init", mock.Anything).Return(nil)
+			pluginManager.On("CleanupClients").Return(nil)
 
 			for _, location := range test.locations {
 				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+				backupStores[location.Name] = &persistencemocks.BackupStore{}
 			}
 
-			c.listCloudBackups = func(_ logrus.FieldLogger, _ cloudprovider.ObjectStore, bucket string) ([]*arkv1api.Backup, error) {
-				backups, ok := test.cloudBackups[bucket]
-				if !ok {
-					return nil, errors.New("bucket not found")
-				}
+			for _, location := range test.locations {
+				backupStore, ok := backupStores[location.Name]
+				require.True(t, ok, "no mock backup store for location %s", location.Name)
 
-				return backups, nil
+				backupStore.On("ListBackups").Return(test.cloudBackups[location.Spec.ObjectStorage.Bucket], nil)
 			}
 
 			for _, existingBackup := range test.existingBackups {

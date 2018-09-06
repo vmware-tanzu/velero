@@ -29,16 +29,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/persistence"
+	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	"github.com/heptio/ark/pkg/restore"
@@ -48,14 +50,14 @@ import (
 
 func TestFetchBackupInfo(t *testing.T) {
 	tests := []struct {
-		name                string
-		backupName          string
-		informerLocations   []*api.BackupStorageLocation
-		informerBackups     []*api.Backup
-		backupServiceBackup *api.Backup
-		backupServiceError  error
-		expectedRes         *api.Backup
-		expectedErr         bool
+		name              string
+		backupName        string
+		informerLocations []*api.BackupStorageLocation
+		informerBackups   []*api.Backup
+		backupStoreBackup *api.Backup
+		backupStoreError  error
+		expectedRes       *api.Backup
+		expectedErr       bool
 	}{
 		{
 			name:              "lister has backup",
@@ -65,18 +67,18 @@ func TestFetchBackupInfo(t *testing.T) {
 			expectedRes:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 		{
-			name:                "lister does not have a backup, but backupSvc does",
-			backupName:          "backup-1",
-			backupServiceBackup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
-			informerLocations:   []*api.BackupStorageLocation{arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
-			informerBackups:     []*api.Backup{arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
-			expectedRes:         arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			name:              "lister does not have a backup, but backupSvc does",
+			backupName:        "backup-1",
+			backupStoreBackup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			informerLocations: []*api.BackupStorageLocation{arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
+			informerBackups:   []*api.Backup{arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
+			expectedRes:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 		{
-			name:               "no backup",
-			backupName:         "backup-1",
-			backupServiceError: errors.New("no backup here"),
-			expectedErr:        true,
+			name:             "no backup",
+			backupName:       "backup-1",
+			backupStoreError: errors.New("no backup here"),
+			expectedErr:      true,
 		},
 	}
 
@@ -88,11 +90,11 @@ func TestFetchBackupInfo(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
 				pluginManager   = &pluginmocks.Manager{}
-				objectStore     = &arktest.ObjectStore{}
+				backupStore     = &persistencemocks.BackupStore{}
 			)
 
 			defer restorer.AssertExpectations(t)
-			defer objectStore.AssertExpectations(t)
+			defer backupStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -110,10 +112,11 @@ func TestFetchBackupInfo(t *testing.T) {
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 
-			if test.backupServiceError == nil {
-				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
-				objectStore.On("Init", mock.Anything).Return(nil)
+			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+				return backupStore, nil
+			}
 
+			if test.backupStoreError == nil {
 				for _, itm := range test.informerLocations {
 					sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(itm)
 				}
@@ -123,19 +126,23 @@ func TestFetchBackupInfo(t *testing.T) {
 				}
 			}
 
-			if test.backupServiceBackup != nil || test.backupServiceError != nil {
-				c.getBackup = func(_ cloudprovider.ObjectStore, bucket, backup string) (*api.Backup, error) {
-					require.Equal(t, "bucket", bucket)
-					require.Equal(t, test.backupName, backup)
-					return test.backupServiceBackup, test.backupServiceError
-				}
+			if test.backupStoreBackup != nil && test.backupStoreError != nil {
+				panic("developer error - only one of backupStoreBackup, backupStoreError can be non-nil")
+			}
+
+			if test.backupStoreError != nil {
+				// TODO why do I need .Maybe() here?
+				backupStore.On("GetBackupMetadata", test.backupName).Return(nil, test.backupStoreError).Maybe()
+			}
+			if test.backupStoreBackup != nil {
+				// TODO why do I need .Maybe() here?
+				backupStore.On("GetBackupMetadata", test.backupName).Return(test.backupStoreBackup, nil).Maybe()
 			}
 
 			info, err := c.fetchBackupInfo(test.backupName, pluginManager)
 
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, info.backup)
-			}
+			require.Equal(t, test.expectedErr, err != nil)
+			assert.Equal(t, test.expectedRes, info.backup)
 		})
 	}
 }
@@ -180,11 +187,7 @@ func TestProcessRestoreSkips(t *testing.T) {
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
-				pluginManager   = &pluginmocks.Manager{}
-				objectStore     = &arktest.ObjectStore{}
 			)
-			defer restorer.AssertExpectations(t)
-			defer objectStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -197,7 +200,7 @@ func TestProcessRestoreSkips(t *testing.T) {
 				false, // pvProviderExists
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				nil,
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
@@ -207,6 +210,7 @@ func TestProcessRestoreSkips(t *testing.T) {
 			}
 
 			err := c.processRestore(test.restoreKey)
+
 			assert.Equal(t, test.expectError, err != nil)
 		})
 	}
@@ -214,22 +218,22 @@ func TestProcessRestoreSkips(t *testing.T) {
 
 func TestProcessRestore(t *testing.T) {
 	tests := []struct {
-		name                             string
-		restoreKey                       string
-		location                         *api.BackupStorageLocation
-		restore                          *api.Restore
-		backup                           *api.Backup
-		restorerError                    error
-		allowRestoreSnapshots            bool
-		expectedErr                      bool
-		expectedPhase                    string
-		expectedValidationErrors         []string
-		expectedRestoreErrors            int
-		expectedRestorerCall             *api.Restore
-		backupServiceGetBackupError      error
-		uploadLogError                   error
-		backupServiceDownloadBackupError error
-		expectedFinalPhase               string
+		name                            string
+		restoreKey                      string
+		location                        *api.BackupStorageLocation
+		restore                         *api.Restore
+		backup                          *api.Backup
+		restorerError                   error
+		allowRestoreSnapshots           bool
+		expectedErr                     bool
+		expectedPhase                   string
+		expectedValidationErrors        []string
+		expectedRestoreErrors           int
+		expectedRestorerCall            *api.Restore
+		backupStoreGetBackupMetadataErr error
+		backupStoreGetBackupContentsErr error
+		putRestoreLogErr                error
+		expectedFinalPhase              string
 	}{
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
@@ -279,12 +283,12 @@ func TestProcessRestore(t *testing.T) {
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithSchedule("sched-1").Restore,
 		},
 		{
-			name:                        "restore with non-existent backup name fails",
-			restore:                     NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
-			expectedErr:                 false,
-			expectedPhase:               string(api.RestorePhaseFailedValidation),
-			expectedValidationErrors:    []string{"Error retrieving backup: not able to fetch from backup storage"},
-			backupServiceGetBackupError: errors.New("no backup here"),
+			name:                            "restore with non-existent backup name fails",
+			restore:                         NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
+			expectedErr:                     false,
+			expectedPhase:                   string(api.RestorePhaseFailedValidation),
+			expectedValidationErrors:        []string{"Error retrieving backup: not able to fetch from backup storage"},
+			backupStoreGetBackupMetadataErr: errors.New("no backup here"),
 		},
 		{
 			name:                  "restorer throwing an error causes the restore to fail",
@@ -386,12 +390,12 @@ func TestProcessRestore(t *testing.T) {
 			},
 		},
 		{
-			name:                             "backup download error results in failed restore",
-			location:                         arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
-			restore:                          NewRestore(api.DefaultNamespace, "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			expectedPhase:                    string(api.RestorePhaseInProgress),
-			expectedFinalPhase:               string(api.RestorePhaseFailed),
-			backupServiceDownloadBackupError: errors.New("Couldn't download backup"),
+			name:                            "backup download error results in failed restore",
+			location:                        arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
+			restore:                         NewRestore(api.DefaultNamespace, "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
+			expectedPhase:                   string(api.RestorePhaseInProgress),
+			expectedFinalPhase:              string(api.RestorePhaseFailed),
+			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
 			backup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 	}
@@ -404,11 +408,11 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = arktest.NewLogger()
 				pluginManager   = &pluginmocks.Manager{}
-				objectStore     = &arktest.ObjectStore{}
+				backupStore     = &persistencemocks.BackupStore{}
 			)
-			defer restorer.AssertExpectations(t)
 
-			defer objectStore.AssertExpectations(t)
+			defer restorer.AssertExpectations(t)
+			defer backupStore.AssertExpectations(t)
 
 			c := NewRestoreController(
 				api.DefaultNamespace,
@@ -426,13 +430,15 @@ func TestProcessRestore(t *testing.T) {
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 
+			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+				return backupStore, nil
+			}
+
 			if test.location != nil {
 				sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(test.location)
 			}
 			if test.backup != nil {
 				sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup)
-				pluginManager.On("GetObjectStore", "myCloud").Return(objectStore, nil)
-				objectStore.On("Init", mock.Anything).Return(nil)
 			}
 
 			if test.restore != nil {
@@ -481,28 +487,17 @@ func TestProcessRestore(t *testing.T) {
 			if test.restorerError != nil {
 				errors.Namespaces = map[string][]string{"ns-1": {test.restorerError.Error()}}
 			}
-			if test.uploadLogError != nil {
-				errors.Ark = append(errors.Ark, "error uploading log file to object storage: "+test.uploadLogError.Error())
+			if test.putRestoreLogErr != nil {
+				errors.Ark = append(errors.Ark, "error uploading log file to object storage: "+test.putRestoreLogErr.Error())
 			}
 			if test.expectedRestorerCall != nil {
-				c.downloadBackup = func(objectStore cloudprovider.ObjectStore, bucket, backup string) (io.ReadCloser, error) {
-					require.Equal(t, test.backup.Name, backup)
-					return ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil
-				}
+				backupStore.On("GetBackupContents", test.backup.Name).Return(ioutil.NopCloser(bytes.NewReader([]byte("hello world"))), nil)
 
 				restorer.On("Restore", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(warnings, errors)
 
-				c.uploadRestoreLog = func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, log io.Reader) error {
-					require.Equal(t, test.backup.Name, backup)
-					require.Equal(t, test.restore.Name, restore)
-					return test.uploadLogError
-				}
+				backupStore.On("PutRestoreLog", test.backup.Name, test.restore.Name, mock.Anything).Return(test.putRestoreLogErr)
 
-				c.uploadRestoreResults = func(objectStore cloudprovider.ObjectStore, bucket, backup, restore string, results io.Reader) error {
-					require.Equal(t, test.backup.Name, backup)
-					require.Equal(t, test.restore.Name, restore)
-					return nil
-				}
+				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 			}
 
 			var (
@@ -516,20 +511,14 @@ func TestProcessRestore(t *testing.T) {
 				}
 			}
 
-			if test.backupServiceGetBackupError != nil {
-				c.getBackup = func(_ cloudprovider.ObjectStore, bucket, backup string) (*api.Backup, error) {
-					require.Equal(t, "bucket", bucket)
-					require.Equal(t, test.restore.Spec.BackupName, backup)
-					return nil, test.backupServiceGetBackupError
-				}
+			if test.backupStoreGetBackupMetadataErr != nil {
+				// TODO why do I need .Maybe() here?
+				backupStore.On("GetBackupMetadata", test.restore.Spec.BackupName).Return(nil, test.backupStoreGetBackupMetadataErr).Maybe()
 			}
 
-			if test.backupServiceDownloadBackupError != nil {
-				c.downloadBackup = func(_ cloudprovider.ObjectStore, bucket, backupName string) (io.ReadCloser, error) {
-					require.Equal(t, "bucket", bucket)
-					require.Equal(t, test.restore.Spec.BackupName, backupName)
-					return nil, test.backupServiceDownloadBackupError
-				}
+			if test.backupStoreGetBackupContentsErr != nil {
+				// TODO why do I need .Maybe() here?
+				backupStore.On("GetBackupContents", test.restore.Spec.BackupName).Return(nil, test.backupStoreGetBackupContentsErr).Maybe()
 			}
 
 			if test.restore != nil {

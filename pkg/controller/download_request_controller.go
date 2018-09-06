@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/util/kube"
 )
@@ -47,10 +47,10 @@ type downloadRequestController struct {
 	downloadRequestLister listers.DownloadRequestLister
 	restoreLister         listers.RestoreLister
 	clock                 clock.Clock
-	createSignedURL       cloudprovider.CreateSignedURLFunc
 	backupLocationLister  listers.BackupStorageLocationLister
 	backupLister          listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) plugin.Manager
+	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -73,8 +73,8 @@ func NewDownloadRequestController(
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
-		createSignedURL:  cloudprovider.CreateSignedURL,
 		newPluginManager: newPluginManager,
+		newBackupStore:   persistence.NewObjectBackupStore,
 
 		clock: &clock.RealClock{},
 	}
@@ -146,8 +146,8 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	update := downloadRequest.DeepCopy()
 
 	var (
-		directory string
-		err       error
+		backupName string
+		err        error
 	)
 
 	switch downloadRequest.Spec.Target.Kind {
@@ -157,12 +157,12 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 			return errors.Wrap(err, "error getting Restore")
 		}
 
-		directory = restore.Spec.BackupName
+		backupName = restore.Spec.BackupName
 	default:
-		directory = downloadRequest.Spec.Target.Name
+		backupName = downloadRequest.Spec.Target.Name
 	}
 
-	backup, err := c.backupLister.Backups(downloadRequest.Namespace).Get(directory)
+	backup, err := c.backupLister.Backups(downloadRequest.Namespace).Get(backupName)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -175,18 +175,17 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
+	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	update.Status.DownloadURL, err = c.createSignedURL(objectStore, downloadRequest.Spec.Target, backupLocation.Spec.ObjectStorage.Bucket, directory, signedURLTTL)
-	if err != nil {
+	if update.Status.DownloadURL, err = backupStore.GetDownloadURL(backupName, downloadRequest.Spec.Target); err != nil {
 		return err
 	}
 
 	update.Status.Phase = v1.DownloadRequestPhaseProcessed
-	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(signedURLTTL))
+	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(persistence.DownloadURLTTL))
 
 	_, err = patchDownloadRequest(downloadRequest, update, c.downloadRequestClient)
 	return errors.WithStack(err)

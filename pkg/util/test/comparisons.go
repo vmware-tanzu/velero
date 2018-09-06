@@ -110,3 +110,13 @@ func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
 
 	return true
 }
+
+// AssertErrorMatches asserts that if expected is the empty string, actual
+// is nil, otherwise, that actual's error string matches expected.
+func AssertErrorMatches(t *testing.T, expected string, actual error) bool {
+	if expected != "" {
+		return assert.EqualError(t, actual, expected)
+	}
+
+	return assert.NoError(t, actual)
+}

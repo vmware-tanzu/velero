@@ -28,6 +28,7 @@ import (
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/kube"
@@ -57,10 +58,10 @@ type backupDeletionController struct {
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 	backupLocationLister      listers.BackupStorageLocationLister
-	deleteBackupDir           cloudprovider.DeleteBackupDirFunc
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) plugin.Manager
+	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -94,7 +95,7 @@ func NewBackupDeletionController(
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
-		deleteBackupDir:  cloudprovider.DeleteBackupDir,
+		newBackupStore:   persistence.NewObjectBackupStore,
 
 		clock: &clock.RealClock{},
 	}
@@ -321,12 +322,12 @@ func (c *backupDeletionController) deleteBackupFromStorage(backup *v1.Backup, lo
 		return errors.WithStack(err)
 	}
 
-	objectStore, err := getObjectStoreForLocation(backupLocation, pluginManager)
+	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
 	if err != nil {
 		return err
 	}
 
-	if err := c.deleteBackupDir(log, objectStore, backupLocation.Spec.ObjectStorage.Bucket, backup.Name); err != nil {
+	if err := backupStore.DeleteBackup(backup.Name); err != nil {
 		return errors.Wrap(err, "error deleting backup from backup storage")
 	}
 
