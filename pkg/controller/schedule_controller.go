@@ -370,13 +370,23 @@ func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: item.Namespace,
 			Name:      fmt.Sprintf("%s-%s", item.Name, timestamp.Format("20060102150405")),
-			Labels: map[string]string{
-				"ark-schedule": item.Name,
-			},
 		},
 	}
 
+	// add schedule labels and 'ark-schedule' label to the backup
+	addLabelsToBackup(item, backup)
+
 	return backup
+}
+
+func addLabelsToBackup(item *api.Schedule, backup *api.Backup) {
+	labels := item.Labels
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels["ark-schedule"] = item.Name
+
+	backup.Labels = labels
 }
 
 func patchSchedule(original, updated *api.Schedule, client arkv1client.SchedulesGetter) (*api.Schedule, error) {

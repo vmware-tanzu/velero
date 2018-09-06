@@ -104,6 +104,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
 			Name:      o.BackupOptions.Name,
+			Labels:    o.BackupOptions.Labels.Data(),
 		},
 		Spec: api.ScheduleSpec{
 			Template: api.BackupSpec{
