@@ -21,6 +21,8 @@ toc:
         url: /ibm-config
       - page: Configuration reference
         url: /config-definition
+      - page: Restic Setup
+        url: /restic#setup
   - title: Troubleshooting
     subfolderitems:
       - page: Troubleshooting
@@ -29,6 +31,8 @@ toc:
         url: /debugging-install
       - page: Troubleshoot a restore
         url: /debugging-restores
+      - page: Troubleshoot Restic
+        url: /restic#troubleshooting
   - title: Customize Ark
     subfolderitems:
       - page: Build from source
