@@ -33,11 +33,31 @@ kubectl edit deployment/ark -n heptio-ark
 ```
 
 
-* [Debug installation/setup issues][2]
+## [Debug installation/setup issues][2]
 
-* [Debug restores][1]
+## [Debug restores][1]
+
+## Miscellaneous issues
+
+### Ark reports `custom resource not found` errors when starting up.
+
+Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
+the `examples/common/00-prereqs.yaml` file to create these defintions, then restart Ark.
+
+### `ark backup logs` returns a `SignatureDoesNotMatch` error
+
+Downloading artifacts from object storage utilizes temporary, signed URLs. In the case of S3-compatible
+providers, such as Ceph, there may be differences between their implementation and the official S3
+API that cause errors.
+
+Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
+
+  * Make sure your S3-compatible layer is using [signature version 4][5] (such as Ceph RADOS v12.2.7)
+  * For Ceph, try using a native Ceph account for credentials instead of external providers such as OpenStack Keystone
+
 
 [1]: debugging-restores.md
 [2]: debugging-install.md
 [4]: https://github.com/heptio/ark/issues
+[5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
 [25]: https://kubernetes.slack.com/messages/ark-dr
