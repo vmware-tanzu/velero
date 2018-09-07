@@ -165,5 +165,5 @@ In the root of your Ark directory, run:
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
 [20]: faq.md
-[21]: backupstoragelocation-definition.md#azure
+[21]: api-types/backupstoragelocation.md#azure
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
