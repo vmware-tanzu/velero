@@ -74,8 +74,9 @@ const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
 
-	defaultBackupSyncPeriod          = time.Minute
-	defaultPodVolumeOperationTimeout = 60 * time.Minute
+	defaultBackupSyncPeriod           = time.Minute
+	defaultPodVolumeOperationTimeout  = 60 * time.Minute
+	defaultResourceTerminatingTimeout = 10 * time.Minute
 
 	// server's client default qps and burst
 	defaultClientQPS   float32 = 20.0
@@ -85,14 +86,14 @@ const (
 )
 
 type serverConfig struct {
-	pluginDir, metricsAddress, defaultBackupLocation string
-	backupSyncPeriod, podVolumeOperationTimeout      time.Duration
-	restoreResourcePriorities                        []string
-	defaultVolumeSnapshotLocations                   map[string]string
-	restoreOnly                                      bool
-	clientQPS                                        float32
-	clientBurst                                      int
-	profilerAddress                                  string
+	pluginDir, metricsAddress, defaultBackupLocation                        string
+	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
+	restoreResourcePriorities                                               []string
+	defaultVolumeSnapshotLocations                                          map[string]string
+	restoreOnly                                                             bool
+	clientQPS                                                               float32
+	clientBurst                                                             int
+	profilerAddress                                                         string
 }
 
 func NewCommand() *cobra.Command {
@@ -110,6 +111,7 @@ func NewCommand() *cobra.Command {
 			clientQPS:                      defaultClientQPS,
 			clientBurst:                    defaultClientBurst,
 			profilerAddress:                defaultProfilerAddress,
+			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
 		}
 	)
 
@@ -168,6 +170,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
+	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
 
 	return command
 }
@@ -615,7 +618,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupDeletionController.Run(ctx, 1)
 			wg.Done()
 		}()
-
 	}
 
 	restorer, err := restore.NewKubernetesRestorer(
@@ -625,6 +627,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.kubeClient.CoreV1().Namespaces(),
 		s.resticManager,
 		s.config.podVolumeOperationTimeout,
+		s.config.resourceTerminatingTimeout,
 		s.logger,
 	)
 	cmd.CheckError(err)
