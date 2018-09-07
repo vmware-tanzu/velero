@@ -42,7 +42,6 @@ const (
 type gcController struct {
 	*genericController
 
-	logger                    logrus.FieldLogger
 	backupLister              listers.BackupLister
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
@@ -63,7 +62,6 @@ func NewGCController(
 		backupLister:              backupInformer.Lister(),
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		deleteBackupRequestClient: deleteBackupRequestClient,
-		logger: logger,
 	}
 
 	c.syncHandler = c.processQueueItem
