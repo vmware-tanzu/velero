@@ -78,5 +78,5 @@ In the root of your Ark directory, run:
   [3]: https://console.bluemix.net/docs/services/cloud-object-storage/iam/service-credentials.html#service-credentials
   [4]: https://www.ibm.com/support/knowledgecenter/SSBS6K_2.1.0/kc_welcome_containers.html
   [5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
-  [6]: backupstoragelocation-definition.md#aws
+  [6]: api-types/backupstoragelocation.md#aws
   [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
