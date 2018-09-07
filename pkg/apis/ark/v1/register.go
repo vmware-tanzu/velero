@@ -59,16 +59,18 @@ func newTypeInfo(pluralName string, itemType, itemListType runtime.Object) typeI
 // API group, keyed on Kind.
 func CustomResources() map[string]typeInfo {
 	return map[string]typeInfo{
-		"Backup":                newTypeInfo("backups", &Backup{}, &BackupList{}),
-		"Restore":               newTypeInfo("restores", &Restore{}, &RestoreList{}),
-		"Schedule":              newTypeInfo("schedules", &Schedule{}, &ScheduleList{}),
-		"Config":                newTypeInfo("configs", &Config{}, &ConfigList{}),
-		"DownloadRequest":       newTypeInfo("downloadrequests", &DownloadRequest{}, &DownloadRequestList{}),
-		"DeleteBackupRequest":   newTypeInfo("deletebackuprequests", &DeleteBackupRequest{}, &DeleteBackupRequestList{}),
-		"PodVolumeBackup":       newTypeInfo("podvolumebackups", &PodVolumeBackup{}, &PodVolumeBackupList{}),
-		"PodVolumeRestore":      newTypeInfo("podvolumerestores", &PodVolumeRestore{}, &PodVolumeRestoreList{}),
-		"ResticRepository":      newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
-		"BackupStorageLocation": newTypeInfo("backupstoragelocations", &BackupStorageLocation{}, &BackupStorageLocationList{}),
+		"Backup":                 newTypeInfo("backups", &Backup{}, &BackupList{}),
+		"Restore":                newTypeInfo("restores", &Restore{}, &RestoreList{}),
+		"Schedule":               newTypeInfo("schedules", &Schedule{}, &ScheduleList{}),
+		"Config":                 newTypeInfo("configs", &Config{}, &ConfigList{}),
+		"DownloadRequest":        newTypeInfo("downloadrequests", &DownloadRequest{}, &DownloadRequestList{}),
+		"DeleteBackupRequest":    newTypeInfo("deletebackuprequests", &DeleteBackupRequest{}, &DeleteBackupRequestList{}),
+		"PodVolumeBackup":        newTypeInfo("podvolumebackups", &PodVolumeBackup{}, &PodVolumeBackupList{}),
+		"PodVolumeRestore":       newTypeInfo("podvolumerestores", &PodVolumeRestore{}, &PodVolumeRestoreList{}),
+		"ResticRepository":       newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
+		"BackupStorageLocation":  newTypeInfo("backupstoragelocations", &BackupStorageLocation{}, &BackupStorageLocationList{}),
+		"VolumeSnapshotLocation": newTypeInfo("volumesnapshotlocations", &VolumeSnapshotLocation{}, &VolumeSnapshotLocationList{}),
+		"VolumeSnapshot":         newTypeInfo("volumesnapshots", &VolumeSnapshot{}, &VolumeSnapshotList{}),
 	}
 }
 
