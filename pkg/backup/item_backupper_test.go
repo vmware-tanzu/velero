@@ -26,6 +26,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
@@ -609,6 +610,74 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 
 	// method under test
 	require.NoError(t, b.backupItem(arktest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
+
+	// get the actual backed-up item
+	require.Len(t, w.data, 1)
+	actual, err := arktest.GetAsMap(string(w.data[0]))
+	require.NoError(t, err)
+
+	assert.EqualValues(t, expected.Object, actual)
+}
+
+func TestResticAnnotationsPersist(t *testing.T) {
+	var (
+		w   = &fakeTarWriter{}
+		obj = &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"namespace": "myns",
+					"name":      "bar",
+					"annotations": map[string]interface{}{
+						"backup.ark.heptio.com/backup-volumes": "volume-1,volume-2",
+					},
+				},
+			},
+		}
+		actions = []resolvedAction{
+			{
+				ItemAction:                &addAnnotationAction{},
+				namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+				resourceIncludesExcludes:  collections.NewIncludesExcludes(),
+				selector:                  labels.Everything(),
+			},
+		}
+		resticBackupper = &resticmocks.Backupper{}
+		b               = (&defaultItemBackupperFactory{}).newItemBackupper(
+			&v1.Backup{},
+			collections.NewIncludesExcludes(),
+			collections.NewIncludesExcludes(),
+			make(map[itemKey]struct{}),
+			actions,
+			nil,
+			w,
+			nil,
+			&arktest.FakeDynamicFactory{},
+			arktest.NewFakeDiscoveryHelper(true, nil),
+			nil,
+			resticBackupper,
+			newPVCSnapshotTracker(),
+		).(*defaultItemBackupper)
+	)
+
+	resticBackupper.
+		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
+		Return(map[string]string{"volume-1": "snapshot-1", "volume-2": "snapshot-2"}, nil)
+
+	// our expected backed-up object is the passed-in object, plus the annotation
+	// that the backup item action adds, plus the annotations that the restic
+	// backupper adds
+	expected := obj.DeepCopy()
+	annotations := expected.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations["foo"] = "bar"
+	annotations["snapshot.ark.heptio.com/volume-1"] = "snapshot-1"
+	annotations["snapshot.ark.heptio.com/volume-2"] = "snapshot-2"
+	expected.SetAnnotations(annotations)
+
+	// method under test
+	require.NoError(t, b.backupItem(arktest.NewLogger(), obj, schema.ParseGroupResource("pods")))
 
 	// get the actual backed-up item
 	require.Len(t, w.data, 1)
