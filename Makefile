@@ -58,7 +58,7 @@ endif
 #		DOCKERFILE ?= Dockerfile.arm64 #aarch64/busybox
 #endif
 
-IMAGE := $(REGISTRY)/$(BIN)
+IMAGE = $(REGISTRY)/$(BIN)
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
@@ -129,17 +129,21 @@ shell: build-dirs build-image
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
+# Use a slightly customized build/push targets since we don't have a Go binary to build for the fsfreeze image
+build-fsfreeze: BIN = fsfreeze-pause
 build-fsfreeze:
-	@docker build -t $(REGISTRY)/fsfreeze-pause:$(VERSION) -f Dockerfile-fsfreeze-pause.alpine _output
-	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > $@
+	@cp $(DOCKERFILE)  _output/.dockerfile-$(BIN).alpine
+	@docker build -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
+	@docker images -q $(IMAGE):$(VERSION) > .container-$(DOTFILE_IMAGE)
 
+push-fsfreeze: BIN = fsfreeze-pause
 push-fsfreeze:
-	@docker push $(REGISTRY)/fsfreeze-pause:$(VERSION)
+	@docker push $(IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(REGISTRY)/fsfreeze-pause:$(VERSION) $(IMAGE):latest
-	docker push $(REGISTRY)/fsfreeze-pause:latest
+	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	docker push $(IMAGE):latest
 endif
-	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > $@
+	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
 
 all-containers:
 	$(MAKE) container
