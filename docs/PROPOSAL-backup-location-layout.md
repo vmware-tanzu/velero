@@ -99,6 +99,17 @@ Here's what it looks like:
       ...
 ```
 
+As of v0.11, each backup storage location will be owned by a single cluster, meaning only that cluster has full write access to it.
+The following access rules apply for each top-level directory:
+
+| Directory | Owning Cluster | All Other Clusters |
+| --------- | -------------- | ------------------ |
+| metadata/ | read-write     | read-only, **except** when assuming location ownership |
+| backups/  | read-write     | read-only          |
+| restores/ | read-write     | TBD (possibly read-write so restore logs/results can be written) |
+| restic/   | read-write     | read-only          |
+
+
 # Migrating to the New Layout
 
 There are two main approaches I see for migrating to the new layout:
