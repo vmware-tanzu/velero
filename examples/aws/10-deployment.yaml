@@ -50,6 +50,8 @@ spec:
               value: /credentials/cloud
             - name: ARK_SCRATCH_DIR
               value: /scratch
+            #- name: AWS_CLUSTER_NAME
+            #  value: <YOUR_CLUSTER_NAME>
       volumes:
         - name: cloud-credentials
           secret:

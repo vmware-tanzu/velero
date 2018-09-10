@@ -151,6 +151,31 @@ Specify the following values in the example files:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
 
+* (Optional) If you have multiple clusters and you want to support migration of resources between them, in file `examples/aws/10-deployment.yaml`:
+
+    * Uncomment the environment variable `AWS_CLUSTER_NAME` and replace `<YOUR_CLUSTER_NAME>` with the current cluster's name. When restoring backup, it will make Ark (and cluster it's running on) claim ownership of AWS volumes created from snapshots taken on different cluster.
+    The best way to get the current cluster's name is to either check it with used deployment tool or to read it directly from the EC2 instances tags. 
+    
+      The following listing shows how to get the cluster's nodes EC2 Tags. First, get the nodes external IDs (EC2 IDs):
+
+        ```bash
+        kubectl get nodes -o jsonpath='{.items[*].spec.externalID}'
+        ```
+    
+      Copy one of the returned IDs `<ID>` and use it with the `aws` CLI tool to search for one of the following:
+
+      * The `kubernetes.io/cluster/<AWS_CLUSTER_NAME>` tag of the value `owned`. The `<AWS_CLUSTER_NAME>` is then your cluster's name:
+
+          ```bash
+          aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=value,Values=owned"
+          ```
+    
+      * If the first output returns nothing, then check for the legacy Tag `KubernetesCluster` of the value `<AWS_CLUSTER_NAME>`:
+
+          ```bash
+          aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=key,Values=KubernetesCluster"
+        ```
+
 ## Start the server
 
 In the root of your Ark directory, run:
