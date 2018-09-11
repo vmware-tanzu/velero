@@ -631,15 +631,6 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			continue
 		}
 
-		if hasControllerOwner(obj.GetOwnerReferences()) {
-			// non-pods with controller owners shouldn't be restored; pods with controller
-			// owners should only be restored if they have restic snapshots to restore
-			if groupResource != kuberesource.Pods || !restic.PodHasSnapshotAnnotation(obj) {
-				ctx.infof("%s has a controller owner - skipping", kube.NamespaceAndName(obj))
-				continue
-			}
-		}
-
 		complete, err := isCompleted(obj, groupResource)
 		if err != nil {
 			addToResult(&errs, namespace, fmt.Errorf("error checking completion %q: %v", fullPath, err))

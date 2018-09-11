@@ -381,6 +381,7 @@ var defaultResourcePriorities = []string{
 	"serviceaccounts",
 	"limitranges",
 	"pods",
+	"replicaset",
 }
 
 func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
