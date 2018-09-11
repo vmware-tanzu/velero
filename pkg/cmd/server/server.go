@@ -472,6 +472,7 @@ var defaultRestorePriorities = []string{
 	"serviceaccounts",
 	"limitranges",
 	"pods",
+	"replicaset",
 }
 
 // watchConfig adds an update event handler to the Config shared informer, invoking s.cancelFunc
