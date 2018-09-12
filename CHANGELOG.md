@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.9.5](https://github.com/heptio/ark/releases/tag/v0.9.5) - 2018-09-17
+
+#### Bug Fixes
+  * Fix issue causing restic restores not to work (#834, @skriss)
+
 #### [v0.9.4](https://github.com/heptio/ark/releases/tag/v0.9.4) - 2018-09-05
 
 #### Bug Fixes
