@@ -217,6 +217,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return kubeerrs.NewAggregate(backupErrs)
 	}
 	obj = updatedObj
+	if metadata, err = meta.Accessor(obj); err != nil {
+		return errors.WithStack(err)
+	}
 
 	if groupResource == kuberesource.PersistentVolumes {
 		if ib.blockStore == nil {
