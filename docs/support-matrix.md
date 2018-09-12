@@ -28,7 +28,7 @@ _Note that these providers are not regularly tested by the Ark team._
 | [Azure Managed Disks][3]         | Ark Team        | [Slack][10], [GitHub Issue][11] |
 | [Google Compute Engine Disks][4] | Ark Team        | [Slack][10], [GitHub Issue][11] |
 | [Restic][1]                      | Ark Team        | [Slack][10], [GitHub Issue][11] |
-| [Portworx][6]                    | PortWorx        |                                 |
+| [Portworx][6]                    | Portworx        |                                 |
 | [DigitalOcean][7]                | StackPointCloud |                                 |
 
 ### Adding a new plugin
