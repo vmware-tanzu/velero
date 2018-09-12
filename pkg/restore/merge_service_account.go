@@ -47,8 +47,8 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 
 	for i := len(backupSA.Secrets) - 1; i >= 0; i-- {
 		secret := &backupSA.Secrets[i]
-		if strings.HasPrefix(secret.Name, "default-token-") {
-			// Copy all secrets *except* default-token
+		if strings.HasPrefix(secret.Name, backupSA.Name+"-token-") {
+			// Copy all secrets *except* -token-
 			backupSA.Secrets = append(backupSA.Secrets[:i], backupSA.Secrets[i+1:]...)
 			break
 		}
