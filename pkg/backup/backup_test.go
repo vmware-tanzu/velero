@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -68,12 +67,8 @@ func newFakeAction(resource string) *fakeAction {
 	return (&fakeAction{}).ForResource(resource)
 }
 
-func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
-	metadata, err := meta.Accessor(item)
-	if err != nil {
-		return item, a.additionalItems, err
-	}
-	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
+func (a *fakeAction) Execute(item kubeutil.UnstructuredObject, backup *v1.Backup) (kubeutil.UnstructuredObject, []ResourceIdentifier, error) {
+	a.ids = append(a.ids, kubeutil.NamespaceAndName(item))
 	a.backups = append(a.backups, *backup)
 
 	return item, a.additionalItems, nil

@@ -24,13 +24,13 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/backup/mocks"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/context"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -91,7 +91,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 		name                string
 		backup              []byte
 		item                []byte
-		implUpdatedItem     runtime.Unstructured
+		implUpdatedItem     kube.UnstructuredObject
 		implAdditionalItems []backup.ResourceIdentifier
 		implError           error
 		expectError         bool

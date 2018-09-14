@@ -20,12 +20,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // podAction implements ItemAction.
@@ -48,7 +46,7 @@ func (a *podAction) AppliesTo() (ResourceSelector, error) {
 // Execute scans the pod's spec.volumes for persistentVolumeClaim volumes and returns a
 // ResourceIdentifier list containing references to all of the persistentVolumeClaim volumes used by
 // the pod. This ensures that when a pod is backed up, all referenced PVCs are backed up too.
-func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *podAction) Execute(item kube.UnstructuredObject, backup *v1.Backup) (kube.UnstructuredObject, []ResourceIdentifier, error) {
 	a.log.Info("Executing podAction")
 	defer a.log.Info("Done executing podAction")
 
@@ -56,11 +54,6 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	if !collections.Exists(pod, "spec.volumes") {
 		a.log.Info("pod has no volumes")
 		return item, nil, nil
-	}
-
-	metadata, err := meta.Accessor(item)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to access pod metadata")
 	}
 
 	volumes, err := collections.GetSlice(pod, "spec.volumes")
@@ -91,7 +84,7 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 
 		additionalItems = append(additionalItems, ResourceIdentifier{
 			GroupResource: kuberesource.PersistentVolumeClaims,
-			Namespace:     metadata.GetNamespace(),
+			Namespace:     item.GetNamespace(),
 			Name:          claimName,
 		})
 	}

@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestPodActionAppliesTo(t *testing.T) {
@@ -41,7 +41,7 @@ func TestPodActionAppliesTo(t *testing.T) {
 func TestPodActionExecute(t *testing.T) {
 	tests := []struct {
 		name     string
-		pod      runtime.Unstructured
+		pod      kube.UnstructuredObject
 		expected []ResourceIdentifier
 	}{
 		{

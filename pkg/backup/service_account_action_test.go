@@ -27,9 +27,9 @@ import (
 	rbac "k8s.io/api/rbac/v1"
 	rbacbeta "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -200,7 +200,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 func TestServiceAccountActionExecute(t *testing.T) {
 	tests := []struct {
 		name                    string
-		serviceAccount          runtime.Unstructured
+		serviceAccount          kube.UnstructuredObject
 		crbs                    []rbac.ClusterRoleBinding
 		expectedAdditionalItems []ResourceIdentifier
 	}{
@@ -408,7 +408,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 	tests := []struct {
 		name                    string
-		serviceAccount          runtime.Unstructured
+		serviceAccount          kube.UnstructuredObject
 		crbs                    []rbacbeta.ClusterRoleBinding
 		expectedAdditionalItems []ResourceIdentifier
 	}{

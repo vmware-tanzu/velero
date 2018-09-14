@@ -21,17 +21,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestJobActionExecute(t *testing.T) {
 	tests := []struct {
 		name        string
-		obj         runtime.Unstructured
+		obj         kube.UnstructuredObject
 		expectedErr bool
-		expectedRes runtime.Unstructured
+		expectedRes kube.UnstructuredObject
 	}{
 		{
 			name: "missing spec.selector and/or spec.template should not error",

@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,6 +40,7 @@ import (
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type itemBackupperFactory interface {
@@ -101,7 +101,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 }
 
 type ItemBackupper interface {
-	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error
+	backupItem(logger logrus.FieldLogger, obj kube.UnstructuredObject, groupResource schema.GroupResource) error
 }
 
 type defaultItemBackupper struct {
@@ -124,14 +124,9 @@ type defaultItemBackupper struct {
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
-func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return err
-	}
-
-	namespace := metadata.GetNamespace()
-	name := metadata.GetName()
+func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj kube.UnstructuredObject, groupResource schema.GroupResource) error {
+	namespace := obj.GetNamespace()
+	name := obj.GetName()
 
 	log := logger.WithField("name", name)
 	if namespace != "" {
@@ -157,7 +152,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return nil
 	}
 
-	if metadata.GetDeletionTimestamp() != nil {
+	if obj.GetDeletionTimestamp() != nil {
 		log.Info("Skipping item because it's being deleted.")
 		return nil
 	}
@@ -203,7 +198,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
-	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace, metadata)
+	updatedObj, err := ib.executeActions(log, obj, groupResource, name, namespace)
 	if err != nil {
 		log.WithError(err).Error("Error executing item actions")
 		backupErrs = append(backupErrs, err)
@@ -217,9 +212,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return kubeerrs.NewAggregate(backupErrs)
 	}
 	obj = updatedObj
-	if metadata, err = meta.Accessor(obj); err != nil {
-		return errors.WithStack(err)
-	}
 
 	if groupResource == kuberesource.PersistentVolumes {
 		if ib.blockStore == nil {
@@ -236,7 +228,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 		// annotate the pod with the successful volume snapshots
 		for volume, snapshot := range volumeSnapshots {
-			restic.SetPodSnapshotAnnotation(metadata, volume, snapshot)
+			restic.SetPodSnapshotAnnotation(obj, volume, snapshot)
 		}
 
 		backupErrs = append(backupErrs, errs...)
@@ -299,11 +291,10 @@ func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *co
 
 func (ib *defaultItemBackupper) executeActions(
 	log logrus.FieldLogger,
-	obj runtime.Unstructured,
+	obj kube.UnstructuredObject,
 	groupResource schema.GroupResource,
 	name, namespace string,
-	metadata metav1.Object,
-) (runtime.Unstructured, error) {
+) (kube.UnstructuredObject, error) {
 	for _, action := range ib.actions {
 		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 			log.Debug("Skipping action because it does not apply to this resource")
@@ -315,7 +306,7 @@ func (ib *defaultItemBackupper) executeActions(
 			continue
 		}
 
-		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
+		if !action.selector.Matches(labels.Set(obj.GetLabels())) {
 			log.Debug("Skipping action because label selector does not match")
 			continue
 		}
@@ -365,7 +356,7 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, backup *api.Backup, log logrus.FieldLogger) error {
+func (ib *defaultItemBackupper) takePVSnapshot(obj kube.UnstructuredObject, backup *api.Backup, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
 	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
@@ -387,14 +378,9 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, backup 
 		}
 	}
 
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	name := metadata.GetName()
+	name := obj.GetName()
 	var pvFailureDomainZone string
-	labels := metadata.GetLabels()
+	labels := obj.GetLabels()
 
 	if labels[zoneLabel] != "" {
 		pvFailureDomainZone = labels[zoneLabel]
@@ -415,7 +401,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, backup 
 
 	tags := map[string]string{
 		"ark.heptio.com/backup": backup.Name,
-		"ark.heptio.com/pv":     metadata.GetName(),
+		"ark.heptio.com/pv":     obj.GetName(),
 	}
 
 	log.Info("Snapshotting PersistentVolume")

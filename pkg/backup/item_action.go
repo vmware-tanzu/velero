@@ -17,10 +17,10 @@ limitations under the License.
 package backup
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // ItemAction is an actor that performs an operation on an individual item being backed up.
@@ -34,7 +34,7 @@ type ItemAction interface {
 	// including mutating the item itself prior to backup. The item (unmodified or modified)
 	// should be returned, along with an optional slice of ResourceIdentifiers specifying
 	// additional related items that should be backed up.
-	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []ResourceIdentifier, error)
+	Execute(item kube.UnstructuredObject, backup *api.Backup) (kube.UnstructuredObject, []ResourceIdentifier, error)
 }
 
 // ResourceIdentifier describes a single item by its group, resource, namespace, and name.

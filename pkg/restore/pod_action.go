@@ -21,10 +21,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type podAction struct {
@@ -45,7 +44,7 @@ var (
 	defaultTokenRegex = regexp.MustCompile("default-token-.*")
 )
 
-func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *podAction) Execute(obj kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	a.logger.Debug("getting spec")
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {

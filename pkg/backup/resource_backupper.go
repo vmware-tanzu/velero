@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type resourceBackupperFactory interface {
@@ -264,24 +264,18 @@ func (rb *defaultResourceBackupper) backupResource(
 
 		log.WithField("namespace", namespace).Infof("Retrieved %d items", len(items))
 		for _, item := range items {
-			unstructured, ok := item.(runtime.Unstructured)
+			obj, ok := item.(kube.UnstructuredObject)
 			if !ok {
 				errs = append(errs, errors.Errorf("unexpected type %T", item))
 				continue
 			}
 
-			metadata, err := meta.Accessor(unstructured)
-			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "unable to get a metadata accessor"))
+			if gr == kuberesource.Namespaces && !rb.namespaces.ShouldInclude(obj.GetName()) {
+				log.WithField("name", obj.GetName()).Info("skipping namespace because it is excluded")
 				continue
 			}
 
-			if gr == kuberesource.Namespaces && !rb.namespaces.ShouldInclude(metadata.GetName()) {
-				log.WithField("name", metadata.GetName()).Info("skipping namespace because it is excluded")
-				continue
-			}
-
-			if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
+			if err := itemBackupper.backupItem(log, obj, gr); err != nil {
 				errs = append(errs, err)
 			}
 		}

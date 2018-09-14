@@ -44,6 +44,7 @@ import (
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
@@ -1642,7 +1643,7 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (r *fakeAction) Execute(obj kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
 	if err != nil {
 		return nil, nil, err

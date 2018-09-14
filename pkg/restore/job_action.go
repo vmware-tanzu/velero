@@ -19,10 +19,9 @@ package restore
 import (
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type jobAction struct {
@@ -39,7 +38,7 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *jobAction) Execute(obj kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	fieldDeletions := map[string]string{
 		"spec.selector.matchLabels":     "controller-uid",
 		"spec.template.metadata.labels": "controller-uid",

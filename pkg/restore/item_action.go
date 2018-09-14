@@ -17,9 +17,8 @@ limitations under the License.
 package restore
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
-
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // ItemAction is an actor that performs an operation on an individual item being restored.
@@ -34,7 +33,7 @@ type ItemAction interface {
 	// should be returned, along with a warning (which will be logged but will not prevent
 	// the item from being restored) or error (which will be logged and will prevent the item
 	// from being restored) if applicable.
-	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error)
+	Execute(obj kube.UnstructuredObject, restore *api.Restore) (res kube.UnstructuredObject, warning error, err error)
 }
 
 // ResourceSelector is a collection of included/excluded namespaces,

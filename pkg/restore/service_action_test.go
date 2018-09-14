@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func svcJSON(ports ...corev1api.ServicePort) string {
@@ -46,9 +46,9 @@ func TestServiceActionExecute(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		obj         runtime.Unstructured
+		obj         kube.UnstructuredObject
 		expectedErr bool
-		expectedRes runtime.Unstructured
+		expectedRes kube.UnstructuredObject
 	}{
 		{
 			name:        "no spec should error",

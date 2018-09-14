@@ -23,11 +23,10 @@ import (
 	"github.com/sirupsen/logrus"
 
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -46,7 +45,7 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *serviceAction) Execute(obj kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
 		return nil, nil, err
@@ -82,13 +81,10 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 	return obj, nil, nil
 }
 
-func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
+func getPreservedPorts(obj kube.UnstructuredObject) (map[string]bool, error) {
 	preservedPorts := map[string]bool{}
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if lac, ok := metadata.GetAnnotations()[annotationLastAppliedConfig]; ok {
+
+	if lac, ok := obj.GetAnnotations()[annotationLastAppliedConfig]; ok {
 		var svc corev1api.Service
 		if err := json.Unmarshal([]byte(lac), &svc); err != nil {
 			return nil, errors.WithStack(err)

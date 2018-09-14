@@ -16,10 +16,11 @@ limitations under the License.
 package plugin
 
 import (
+	"github.com/pkg/errors"
+
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/backup"
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with
@@ -76,7 +77,7 @@ func (r *restartableBackupItemAction) AppliesTo() (backup.ResourceSelector, erro
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []backup.ResourceIdentifier, error) {
+func (r *restartableBackupItemAction) Execute(item kube.UnstructuredObject, backup *api.Backup) (kube.UnstructuredObject, []backup.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err

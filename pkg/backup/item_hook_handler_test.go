@@ -23,6 +23,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -31,7 +32,6 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -39,7 +39,7 @@ type mockItemHookHandler struct {
 	mock.Mock
 }
 
-func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj runtime.Unstructured, resourceHooks []resourceHook, phase hookPhase) error {
+func (h *mockItemHookHandler) handleHooks(log logrus.FieldLogger, groupResource schema.GroupResource, obj kube.UnstructuredObject, resourceHooks []resourceHook, phase hookPhase) error {
 	args := h.Called(log, groupResource, obj, resourceHooks, phase)
 	return args.Error(0)
 }
@@ -48,7 +48,7 @@ func TestHandleHooksSkips(t *testing.T) {
 	tests := []struct {
 		name          string
 		groupResource string
-		item          runtime.Unstructured
+		item          kube.UnstructuredObject
 		hooks         []resourceHook
 	}{
 		{
@@ -133,7 +133,7 @@ func TestHandleHooks(t *testing.T) {
 		name                  string
 		phase                 hookPhase
 		groupResource         string
-		item                  runtime.Unstructured
+		item                  kube.UnstructuredObject
 		hooks                 []resourceHook
 		hookErrorsByContainer map[string]error
 		expectedError         error

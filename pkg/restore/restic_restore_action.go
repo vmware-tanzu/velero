@@ -60,13 +60,13 @@ func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *resticRestoreAction) Execute(obj kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	a.logger.Info("Executing resticRestoreAction")
 	defer a.logger.Info("Done executing resticRestoreAction")
 
 	var pod corev1.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pod); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
+		return nil, nil, errors.Wrap(err, "unable to convert pod from kube.UnstructuredObject")
 	}
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
@@ -119,7 +119,7 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
+		return nil, nil, errors.Wrap(err, "unable to convert pod to kube.UnstructuredObject")
 	}
 
 	return &unstructured.Unstructured{Object: res}, nil, nil

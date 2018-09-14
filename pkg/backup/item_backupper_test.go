@@ -28,6 +28,7 @@ import (
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -543,22 +543,17 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 type addAnnotationAction struct{}
 
-func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *addAnnotationAction) Execute(item kube.UnstructuredObject, backup *v1.Backup) (kube.UnstructuredObject, []ResourceIdentifier, error) {
 	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
 	// across a process boundary.
 	copy := item.(*unstructured.Unstructured).DeepCopy()
 
-	metadata, err := meta.Accessor(copy)
-	if err != nil {
-		return copy, nil, nil
-	}
-
-	annotations := metadata.GetAnnotations()
+	annotations := copy.GetAnnotations()
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
 	annotations["foo"] = "bar"
-	metadata.SetAnnotations(annotations)
+	copy.SetAnnotations(annotations)
 
 	return copy, nil, nil
 }
@@ -869,7 +864,7 @@ type mockItemBackupper struct {
 	mock.Mock
 }
 
-func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
+func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj kube.UnstructuredObject, groupResource schema.GroupResource) error {
 	args := ib.Called(logger, obj, groupResource)
 	return args.Error(0)
 }

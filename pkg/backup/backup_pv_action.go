@@ -19,11 +19,10 @@ package backup
 import (
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
@@ -44,7 +43,7 @@ func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
 
 // Execute finds the PersistentVolume bound by the provided
 // PersistentVolumeClaim, if any, and backs it up
-func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *backupPVAction) Execute(item kube.UnstructuredObject, backup *v1.Backup) (kube.UnstructuredObject, []ResourceIdentifier, error) {
 	a.log.Info("Executing backupPVAction")
 
 	var additionalItems []ResourceIdentifier

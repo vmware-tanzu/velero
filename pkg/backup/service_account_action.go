@@ -17,18 +17,16 @@ limitations under the License.
 package backup
 
 import (
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	rbac "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // serviceAccountAction implements ItemAction.
@@ -73,18 +71,13 @@ func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
 // Execute checks for any ClusterRoleBindings that have this service account as a subject, and
 // adds the ClusterRoleBinding and associated ClusterRole to the list of additional items to
 // be backed up.
-func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *serviceAccountAction) Execute(item kube.UnstructuredObject, backup *v1.Backup) (kube.UnstructuredObject, []ResourceIdentifier, error) {
 	a.log.Info("Running serviceAccountAction")
 	defer a.log.Info("Done running serviceAccountAction")
 
-	objectMeta, err := meta.Accessor(item)
-	if err != nil {
-		return nil, nil, errors.WithStack(err)
-	}
-
 	var (
-		namespace = objectMeta.GetNamespace()
-		name      = objectMeta.GetName()
+		namespace = item.GetNamespace()
+		name      = item.GetName()
 		bindings  = sets.NewString()
 		roles     = sets.NewString()
 	)

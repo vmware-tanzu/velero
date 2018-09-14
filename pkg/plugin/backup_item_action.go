@@ -25,12 +25,12 @@ import (
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkbackup "github.com/heptio/ark/pkg/backup"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // BackupItemActionPlugin is an implementation of go-plugin's Plugin
@@ -86,7 +86,7 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (arkbackup.ResourceSelector, er
 	}, nil
 }
 
-func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []arkbackup.ResourceIdentifier, error) {
+func (c *BackupItemActionGRPCClient) Execute(item kube.UnstructuredObject, backup *api.Backup) (kube.UnstructuredObject, []arkbackup.ResourceIdentifier, error) {
 	itemJSON, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
 		return nil, nil, err

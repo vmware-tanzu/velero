@@ -25,11 +25,11 @@ import (
 	"google.golang.org/grpc"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
 	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 // RestoreItemActionPlugin is an implementation of go-plugin's Plugin
@@ -85,7 +85,7 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, err
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (c *RestoreItemActionGRPCClient) Execute(item kube.UnstructuredObject, restore *api.Restore) (kube.UnstructuredObject, error, error) {
 	itemJSON, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
 		return nil, nil, err

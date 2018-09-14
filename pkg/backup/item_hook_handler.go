@@ -21,19 +21,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/kube"
 )
 
 type hookPhase string
@@ -52,7 +50,7 @@ type itemHookHandler interface {
 	handleHooks(
 		log logrus.FieldLogger,
 		groupResource schema.GroupResource,
-		obj runtime.Unstructured,
+		obj kube.UnstructuredObject,
 		resourceHooks []resourceHook,
 		phase hookPhase,
 	) error
@@ -66,7 +64,7 @@ type defaultItemHookHandler struct {
 func (h *defaultItemHookHandler) handleHooks(
 	log logrus.FieldLogger,
 	groupResource schema.GroupResource,
-	obj runtime.Unstructured,
+	obj kube.UnstructuredObject,
 	resourceHooks []resourceHook,
 	phase hookPhase,
 ) error {
@@ -75,19 +73,14 @@ func (h *defaultItemHookHandler) handleHooks(
 		return nil
 	}
 
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return errors.Wrap(err, "unable to get a metadata accessor")
-	}
-
-	namespace := metadata.GetNamespace()
-	name := metadata.GetName()
+	namespace := obj.GetNamespace()
+	name := obj.GetName()
 
 	// If the pod has the hook specified via annotations, that takes priority.
-	hookFromAnnotations := getPodExecHookFromAnnotations(metadata.GetAnnotations(), phase)
+	hookFromAnnotations := getPodExecHookFromAnnotations(obj.GetAnnotations(), phase)
 	if phase == hookPhasePre && hookFromAnnotations == nil {
 		// See if the pod has the legacy hook annotation keys (i.e. without a phase specified)
-		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "")
+		hookFromAnnotations = getPodExecHookFromAnnotations(obj.GetAnnotations(), "")
 	}
 	if hookFromAnnotations != nil {
 		hookLog := log.WithFields(
@@ -107,7 +100,7 @@ func (h *defaultItemHookHandler) handleHooks(
 		return nil
 	}
 
-	labels := labels.Set(metadata.GetLabels())
+	labels := labels.Set(obj.GetLabels())
 	// Otherwise, check for hooks defined in the backup spec.
 	for _, resourceHook := range resourceHooks {
 		if !resourceHook.applicableTo(groupResource, namespace, labels) {
