@@ -28,7 +28,7 @@ _Note that these providers are not regularly tested by the Ark team._
 | [Azure Managed Disks][3]         | Ark Team        | [Slack][10], [GitHub Issue][11] |
 | [Google Compute Engine Disks][4] | Ark Team        | [Slack][10], [GitHub Issue][11] |
 | [Restic][1]                      | Ark Team        | [Slack][10], [GitHub Issue][11] |
-| [Portworx][6]                    | Portworx        |                                 |
+| [Portworx][6]                    | Portworx        | [Slack][13], [GitHub Issue][14] |
 | [DigitalOcean][7]                | StackPointCloud |                                 |
 
 ### Adding a new plugin
@@ -49,3 +49,5 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [10]: https://kubernetes.slack.com/messages/ark-dr
 [11]: https://github.com/heptio/ark/issues
 [12]: https://github.com/aws/aws-sdk-go/aws
+[13]: https://portworx.slack.com/messages/px-k8s
+[14]: https://github.com/portworx/ark-plugin/issues
