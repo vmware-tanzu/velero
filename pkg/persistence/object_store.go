@@ -17,7 +17,6 @@ limitations under the License.
 package persistence
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -36,6 +35,8 @@ import (
 // BackupStore defines operations for creating, retrieving, and deleting
 // Ark backup and restore data in/from a persistent backup store.
 type BackupStore interface {
+	IsValid() error
+
 	ListBackups() ([]*arkv1api.Backup, error)
 
 	PutBackup(name string, metadata, contents, log io.Reader) error
@@ -45,53 +46,18 @@ type BackupStore interface {
 
 	PutRestoreLog(backup, restore string, log io.Reader) error
 	PutRestoreResults(backup, restore string, results io.Reader) error
+	DeleteRestore(name string) error
 
-	GetDownloadURL(backup string, target arkv1api.DownloadTarget) (string, error)
+	GetDownloadURL(target arkv1api.DownloadTarget) (string, error)
 }
 
-const (
-	// DownloadURLTTL is how long a download URL is valid for.
-	DownloadURLTTL = 10 * time.Minute
-
-	backupMetadataFileFormatString = "%s/ark-backup.json"
-	backupFileFormatString         = "%s/%s.tar.gz"
-	backupLogFileFormatString      = "%s/%s-logs.gz"
-	restoreLogFileFormatString     = "%s/restore-%s-logs.gz"
-	restoreResultsFileFormatString = "%s/restore-%s-results.gz"
-)
-
-func getPrefix(prefix string) string {
-	if prefix == "" || strings.HasSuffix(prefix, "/") {
-		return prefix
-	}
-
-	return prefix + "/"
-}
-
-func getBackupMetadataKey(prefix, backup string) string {
-	return prefix + fmt.Sprintf(backupMetadataFileFormatString, backup)
-}
-
-func getBackupContentsKey(prefix, backup string) string {
-	return prefix + fmt.Sprintf(backupFileFormatString, backup, backup)
-}
-
-func getBackupLogKey(prefix, backup string) string {
-	return prefix + fmt.Sprintf(backupLogFileFormatString, backup, backup)
-}
-
-func getRestoreLogKey(prefix, backup, restore string) string {
-	return prefix + fmt.Sprintf(restoreLogFileFormatString, backup, restore)
-}
-
-func getRestoreResultsKey(prefix, backup, restore string) string {
-	return prefix + fmt.Sprintf(restoreResultsFileFormatString, backup, restore)
-}
+// DownloadURLTTL is how long a download URL is valid for.
+const DownloadURLTTL = 10 * time.Minute
 
 type objectBackupStore struct {
 	objectStore cloudprovider.ObjectStore
 	bucket      string
-	prefix      string
+	layout      *objectStoreLayout
 	logger      logrus.FieldLogger
 }
 
@@ -129,23 +95,46 @@ func NewObjectBackupStore(location *arkv1api.BackupStorageLocation, objectStoreG
 		return nil, err
 	}
 
-	prefix := getPrefix(location.Spec.ObjectStorage.Prefix)
-
 	log := logger.WithFields(logrus.Fields(map[string]interface{}{
 		"bucket": location.Spec.ObjectStorage.Bucket,
-		"prefix": prefix,
+		"prefix": location.Spec.ObjectStorage.Prefix,
 	}))
 
 	return &objectBackupStore{
 		objectStore: objectStore,
 		bucket:      location.Spec.ObjectStorage.Bucket,
-		prefix:      prefix,
+		layout:      newObjectStoreLayout(location.Spec.ObjectStorage.Prefix),
 		logger:      log,
 	}, nil
 }
 
+func (s *objectBackupStore) IsValid() error {
+	dirs, err := s.objectStore.ListCommonPrefixes(s.bucket, s.layout.rootPrefix, "/")
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	var invalid []string
+	for _, dir := range dirs {
+		subdir := strings.TrimSuffix(strings.TrimPrefix(dir, s.layout.rootPrefix), "/")
+		if !validRootDirs.Has(subdir) {
+			invalid = append(invalid, subdir)
+		}
+	}
+
+	if len(invalid) > 0 {
+		// don't include more than 3 invalid dirs in the error message
+		if len(invalid) > 3 {
+			return errors.Errorf("Backup store contains %d invalid top-level directories: %v", len(invalid), append(invalid[:3], "..."))
+		}
+		return errors.Errorf("Backup store contains invalid top-level directories: %v", invalid)
+	}
+
+	return nil
+}
+
 func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
-	prefixes, err := s.objectStore.ListCommonPrefixes(s.bucket, s.prefix, "/")
+	prefixes, err := s.objectStore.ListCommonPrefixes(s.bucket, s.layout.backupsDir, "/")
 	if err != nil {
 		return nil, err
 	}
@@ -157,10 +146,10 @@ func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
 
 	for _, prefix := range prefixes {
 		// values returned from a call to cloudprovider.ObjectStore's
-		// ListcommonPrefixes method return the *full* prefix, inclusive
-		// of s.prefix, and include the delimiter ("/") as a suffix. Trim
+		// ListCommonPrefixes method return the *full* prefix, inclusive
+		// of s.backupsPrefix, and include the delimiter ("/") as a suffix. Trim
 		// each of those off to get the backup name.
-		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.prefix), "/")
+		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.layout.backupsDir), "/")
 
 		backup, err := s.GetBackupMetadata(backupName)
 		if err != nil {
@@ -175,7 +164,7 @@ func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
 }
 
 func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents io.Reader, log io.Reader) error {
-	if err := seekAndPutObject(s.objectStore, s.bucket, getBackupLogKey(s.prefix, name), log); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(name), log); err != nil {
 		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 		// backup's status.
 		s.logger.WithError(err).WithField("backup", name).Error("Error uploading log file")
@@ -188,13 +177,13 @@ func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents 
 		return nil
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, getBackupMetadataKey(s.prefix, name), metadata); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(name), metadata); err != nil {
 		// failure to upload metadata file is a hard-stop
 		return err
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, getBackupContentsKey(s.prefix, name), contents); err != nil {
-		deleteErr := s.objectStore.DeleteObject(s.bucket, getBackupMetadataKey(s.prefix, name))
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(name), contents); err != nil {
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
@@ -202,7 +191,7 @@ func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents 
 }
 
 func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, error) {
-	key := getBackupMetadataKey(s.prefix, name)
+	key := s.layout.getBackupMetadataKey(name)
 
 	res, err := s.objectStore.GetObject(s.bucket, key)
 	if err != nil {
@@ -231,11 +220,30 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, er
 }
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
-	return s.objectStore.GetObject(s.bucket, getBackupContentsKey(s.prefix, name))
+	return s.objectStore.GetObject(s.bucket, s.layout.getBackupContentsKey(name))
 }
 
 func (s *objectBackupStore) DeleteBackup(name string) error {
-	objects, err := s.objectStore.ListObjects(s.bucket, s.prefix+name+"/")
+	objects, err := s.objectStore.ListObjects(s.bucket, s.layout.getBackupDir(name))
+	if err != nil {
+		return err
+	}
+
+	var errs []error
+	for _, key := range objects {
+		s.logger.WithFields(logrus.Fields{
+			"key": key,
+		}).Debug("Trying to delete object")
+		if err := s.objectStore.DeleteObject(s.bucket, key); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errors.WithStack(kerrors.NewAggregate(errs))
+}
+
+func (s *objectBackupStore) DeleteRestore(name string) error {
+	objects, err := s.objectStore.ListObjects(s.bucket, s.layout.getRestoreDir(name))
 	if err != nil {
 		return err
 	}
@@ -254,23 +262,23 @@ func (s *objectBackupStore) DeleteBackup(name string) error {
 }
 
 func (s *objectBackupStore) PutRestoreLog(backup string, restore string, log io.Reader) error {
-	return s.objectStore.PutObject(s.bucket, getRestoreLogKey(s.prefix, backup, restore), log)
+	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreLogKey(restore), log)
 }
 
 func (s *objectBackupStore) PutRestoreResults(backup string, restore string, results io.Reader) error {
-	return s.objectStore.PutObject(s.bucket, getRestoreResultsKey(s.prefix, backup, restore), results)
+	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResultsKey(restore), results)
 }
 
-func (s *objectBackupStore) GetDownloadURL(backup string, target arkv1api.DownloadTarget) (string, error) {
+func (s *objectBackupStore) GetDownloadURL(target arkv1api.DownloadTarget) (string, error) {
 	switch target.Kind {
 	case arkv1api.DownloadTargetKindBackupContents:
-		return s.objectStore.CreateSignedURL(s.bucket, getBackupContentsKey(s.prefix, backup), DownloadURLTTL)
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupContentsKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindBackupLog:
-		return s.objectStore.CreateSignedURL(s.bucket, getBackupLogKey(s.prefix, backup), DownloadURLTTL)
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupLogKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindRestoreLog:
-		return s.objectStore.CreateSignedURL(s.bucket, getRestoreLogKey(s.prefix, backup, target.Name), DownloadURLTTL)
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreLogKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindRestoreResults:
-		return s.objectStore.CreateSignedURL(s.bucket, getRestoreResultsKey(s.prefix, backup, target.Name), DownloadURLTTL)
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreResultsKey(target.Name), DownloadURLTTL)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}

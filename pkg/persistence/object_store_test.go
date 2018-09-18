@@ -53,12 +53,105 @@ func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTe
 		objectBackupStore: &objectBackupStore{
 			objectStore: objectStore,
 			bucket:      bucket,
-			prefix:      prefix,
+			layout:      newObjectStoreLayout(prefix),
 			logger:      arktest.NewLogger(),
 		},
 		objectStore: objectStore,
 		bucket:      bucket,
 		prefix:      prefix,
+	}
+}
+
+func TestIsValid(t *testing.T) {
+	tests := []struct {
+		name        string
+		prefix      string
+		storageData cloudprovider.BucketData
+		expectErr   bool
+	}{
+		{
+			name:      "empty backup store with no prefix is valid",
+			expectErr: false,
+		},
+		{
+			name:      "empty backup store with a prefix is valid",
+			prefix:    "bar",
+			expectErr: false,
+		},
+		{
+			name: "backup store with no prefix and only unsupported directories is invalid",
+			storageData: map[string][]byte{
+				"backup-1/ark-backup.json": {},
+				"backup-2/ark-backup.json": {},
+			},
+			expectErr: true,
+		},
+		{
+			name:   "backup store with a prefix and only unsupported directories is invalid",
+			prefix: "backups",
+			storageData: map[string][]byte{
+				"backups/backup-1/ark-backup.json": {},
+				"backups/backup-2/ark-backup.json": {},
+			},
+			expectErr: true,
+		},
+		{
+			name: "backup store with no prefix and both supported and unsupported directories is invalid",
+			storageData: map[string][]byte{
+				"backups/backup-1/ark-backup.json": {},
+				"backups/backup-2/ark-backup.json": {},
+				"restores/restore-1/foo":           {},
+				"unsupported-dir/foo":              {},
+			},
+			expectErr: true,
+		},
+		{
+			name:   "backup store with a prefix and both supported and unsupported directories is invalid",
+			prefix: "cluster-1",
+			storageData: map[string][]byte{
+				"cluster-1/backups/backup-1/ark-backup.json": {},
+				"cluster-1/backups/backup-2/ark-backup.json": {},
+				"cluster-1/restores/restore-1/foo":           {},
+				"cluster-1/unsupported-dir/foo":              {},
+			},
+			expectErr: true,
+		},
+		{
+			name: "backup store with no prefix and only supported directories is valid",
+			storageData: map[string][]byte{
+				"backups/backup-1/ark-backup.json": {},
+				"backups/backup-2/ark-backup.json": {},
+				"restores/restore-1/foo":           {},
+			},
+			expectErr: false,
+		},
+		{
+			name:   "backup store with a prefix and only supported directories is valid",
+			prefix: "cluster-1",
+			storageData: map[string][]byte{
+				"cluster-1/backups/backup-1/ark-backup.json": {},
+				"cluster-1/backups/backup-2/ark-backup.json": {},
+				"cluster-1/restores/restore-1/foo":           {},
+			},
+			expectErr: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+
+			for key, obj := range tc.storageData {
+				require.NoError(t, harness.objectStore.PutObject(harness.bucket, key, bytes.NewReader(obj)))
+			}
+
+			err := harness.IsValid()
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
 	}
 }
 
@@ -73,8 +166,8 @@ func TestListBackups(t *testing.T) {
 		{
 			name: "normal case",
 			storageData: map[string][]byte{
-				"backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
+				"backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []*api.Backup{
 				{
@@ -91,8 +184,8 @@ func TestListBackups(t *testing.T) {
 			name:   "normal case with backup store prefix",
 			prefix: "ark-backups/",
 			storageData: map[string][]byte{
-				"ark-backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"ark-backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"ark-backups/backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
+				"ark-backups/backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []*api.Backup{
 				{
@@ -108,8 +201,8 @@ func TestListBackups(t *testing.T) {
 		{
 			name: "backup that can't be decoded is ignored",
 			storageData: map[string][]byte{
-				"backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
+				"backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
+				"backups/backup-2/ark-backup.json": []byte("this is not valid backup JSON"),
 			},
 			expectedRes: []*api.Backup{
 				{
@@ -170,7 +263,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "",
-			expectedKeys: []string{"backup-1/ark-backup.json", "backup-1/backup-1.tar.gz", "backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-logs.gz"},
 		},
 		{
 			name:         "normal case with backup store prefix",
@@ -179,7 +272,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "",
-			expectedKeys: []string{"prefix-1/backup-1/ark-backup.json", "prefix-1/backup-1/backup-1.tar.gz", "prefix-1/backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"prefix-1/backups/backup-1/ark-backup.json", "prefix-1/backups/backup-1/backup-1.tar.gz", "prefix-1/backups/backup-1/backup-1-logs.gz"},
 		},
 		{
 			name:         "error on metadata upload does not upload data",
@@ -187,7 +280,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "error readers return errors",
-			expectedKeys: []string{"backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
 			name:         "error on data upload deletes metadata",
@@ -195,7 +288,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     new(errorReader),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "error readers return errors",
-			expectedKeys: []string{"backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
 			name:         "error on log upload is ok",
@@ -203,7 +296,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("bar"),
 			log:          new(errorReader),
 			expectedErr:  "",
-			expectedKeys: []string{"backup-1/ark-backup.json", "backup-1/backup-1.tar.gz"},
+			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz"},
 		},
 		{
 			name:         "don't upload data when metadata is nil",
@@ -211,7 +304,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
 			expectedErr:  "",
-			expectedKeys: []string{"backup-1/backup-1-logs.gz"},
+			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 	}
 
@@ -231,7 +324,7 @@ func TestPutBackup(t *testing.T) {
 func TestGetBackupContents(t *testing.T) {
 	harness := newObjectBackupStoreTestHarness("test-bucket", "")
 
-	harness.objectStore.PutObject(harness.bucket, "test-backup/test-backup.tar.gz", newStringReadSeeker("foo"))
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup.tar.gz", newStringReadSeeker("foo"))
 
 	rc, err := harness.GetBackupContents("test-backup")
 	require.NoError(t, err)
@@ -270,14 +363,14 @@ func TestDeleteBackup(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				prefix:      test.prefix,
+				layout:      newObjectStoreLayout(test.prefix),
 				logger:      arktest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
 
-			objects := []string{test.prefix + "bak/ark-backup.json", test.prefix + "bak/bak.tar.gz", test.prefix + "bak/bak.log.gz"}
+			objects := []string{test.prefix + "backups/bak/ark-backup.json", test.prefix + "backups/bak/bak.tar.gz", test.prefix + "backups/bak/bak.log.gz"}
 
-			objectStore.On("ListObjects", backupStore.bucket, test.prefix+"bak/").Return(objects, test.listObjectsError)
+			objectStore.On("ListObjects", backupStore.bucket, test.prefix+"backups/bak/").Return(objects, test.listObjectsError)
 			for i, obj := range objects {
 				var err error
 				if i < len(test.deleteErrors) {
@@ -299,7 +392,6 @@ func TestGetDownloadURL(t *testing.T) {
 		name        string
 		targetKind  api.DownloadTargetKind
 		targetName  string
-		directory   string
 		prefix      string
 		expectedKey string
 	}{
@@ -307,58 +399,50 @@ func TestGetDownloadURL(t *testing.T) {
 			name:        "backup contents",
 			targetKind:  api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup",
-			directory:   "my-backup",
-			expectedKey: "my-backup/my-backup.tar.gz",
+			expectedKey: "backups/my-backup/my-backup.tar.gz",
 		},
 		{
 			name:        "backup log",
 			targetKind:  api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup",
-			directory:   "my-backup",
-			expectedKey: "my-backup/my-backup-logs.gz",
+			expectedKey: "backups/my-backup/my-backup-logs.gz",
 		},
 		{
 			name:        "scheduled backup contents",
 			targetKind:  api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup-20170913154901",
-			directory:   "my-backup-20170913154901",
-			expectedKey: "my-backup-20170913154901/my-backup-20170913154901.tar.gz",
+			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
 		},
 		{
 			name:        "scheduled backup log",
 			targetKind:  api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup-20170913154901",
-			directory:   "my-backup-20170913154901",
-			expectedKey: "my-backup-20170913154901/my-backup-20170913154901-logs.gz",
+			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 		},
 		{
 			name:        "backup contents with backup store prefix",
 			targetKind:  api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup",
-			directory:   "my-backup",
 			prefix:      "ark-backups/",
-			expectedKey: "ark-backups/my-backup/my-backup.tar.gz",
+			expectedKey: "ark-backups/backups/my-backup/my-backup.tar.gz",
 		},
 		{
 			name:        "restore log",
 			targetKind:  api.DownloadTargetKindRestoreLog,
 			targetName:  "b-20170913154901",
-			directory:   "b",
-			expectedKey: "b/restore-b-20170913154901-logs.gz",
+			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-logs.gz",
 		},
 		{
 			name:        "restore results",
 			targetKind:  api.DownloadTargetKindRestoreResults,
 			targetName:  "b-20170913154901",
-			directory:   "b",
-			expectedKey: "b/restore-b-20170913154901-results.gz",
+			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-results.gz",
 		},
 		{
 			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
 			targetKind:  api.DownloadTargetKindRestoreResults,
 			targetName:  "b-cool-20170913154901-20170913154902",
-			directory:   "b-cool-20170913154901",
-			expectedKey: "b-cool-20170913154901/restore-b-cool-20170913154901-20170913154902-results.gz",
+			expectedKey: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
 		},
 	}
 
@@ -368,7 +452,7 @@ func TestGetDownloadURL(t *testing.T) {
 
 			require.NoError(t, harness.objectStore.PutObject("test-bucket", test.expectedKey, newStringReadSeeker("foo")))
 
-			url, err := harness.GetDownloadURL(test.directory, api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
+			url, err := harness.GetDownloadURL(api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
 			require.NoError(t, err)
 			assert.Equal(t, "a-url", url)
 		})
