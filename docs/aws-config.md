@@ -278,4 +278,4 @@ It can be set up for Ark by creating a role that will have required permissions,
 [6]: config-definition.md#aws
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [20]: faq.md
-[21]: backupstoragelocation-definition.md#aws
+[21]: api-types/backupstoragelocation.md#aws

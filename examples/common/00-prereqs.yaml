@@ -163,6 +163,36 @@ spec:
     kind: BackupStorageLocation
 
 ---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: volumesnapshotlocations.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: volumesnapshotlocations
+    kind: VolumeSnapshotLocation
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: volumesnapshots.ark.heptio.com
+  labels:
+    component: ark
+spec:
+  group: ark.heptio.com
+  version: v1
+  scope: Namespaced
+  names:
+    plural: volumesnapshots
+    kind: VolumeSnapshot
+
+---
 apiVersion: v1
 kind: Namespace
 metadata:

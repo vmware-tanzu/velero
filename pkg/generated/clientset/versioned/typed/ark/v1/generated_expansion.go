@@ -37,3 +37,7 @@ type ResticRepositoryExpansion interface{}
 type RestoreExpansion interface{}
 
 type ScheduleExpansion interface{}
+
+type VolumeSnapshotExpansion interface{}
+
+type VolumeSnapshotLocationExpansion interface{}
