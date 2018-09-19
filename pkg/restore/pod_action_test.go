@@ -40,31 +40,36 @@ func TestPodActionExecute(t *testing.T) {
 		{
 			name: "nodeName (only) should be deleted from spec",
 			obj: NewTestUnstructured().WithName("pod-1").WithSpec("nodeName", "foo").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
 				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").WithSpec("foo").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
 				Unstructured,
 		},
 		{
-			name: "volumes matching default-token regex should be deleted",
+			name: "volumes matching prefix ServiceAccount-token- should be deleted",
 			obj: NewTestUnstructured().WithName("pod-1").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
-					map[string]interface{}{"name": "default-token-foo"},
+					map[string]interface{}{"name": "foo-token-foo"},
 				}).WithSpecField("containers", []interface{}{}).Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
 				}).WithSpecField("containers", []interface{}{}).Unstructured,
 		},
 		{
-			name: "container volumeMounts matching default-token regex should be deleted",
+			name: "container volumeMounts matching prefix ServiceAccount-token- should be deleted",
 			obj: NewTestUnstructured().WithName("svc-1").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{
 					map[string]interface{}{
@@ -73,7 +78,7 @@ func TestPodActionExecute(t *testing.T) {
 								"name": "foo",
 							},
 							map[string]interface{}{
-								"name": "default-token-foo",
+								"name": "foo-token-foo",
 							},
 						},
 					},
@@ -81,6 +86,7 @@ func TestPodActionExecute(t *testing.T) {
 				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{
 					map[string]interface{}{
