@@ -289,10 +289,8 @@ func (s *server) run() error {
 		s.blockStore = blockStore
 	}
 
-	if backupStorageLocation.Spec.Config[restic.ResticLocationConfigKey] != "" {
-		if err := s.initRestic(backupStorageLocation); err != nil {
-			return err
-		}
+	if err := s.initRestic(backupStorageLocation); err != nil {
+		return err
 	}
 
 	if err := s.runControllers(config, backupStorageLocation); err != nil {
@@ -749,22 +747,20 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		wg.Done()
 	}()
 
-	if s.resticManager != nil {
-		resticRepoController := controller.NewResticRepositoryController(
-			s.logger,
-			s.sharedInformerFactory.Ark().V1().ResticRepositories(),
-			s.arkClient.ArkV1(),
-			defaultBackupLocation,
-			s.resticManager,
-		)
-		wg.Add(1)
-		go func() {
-			// TODO only having a single worker may be an issue since maintenance
-			// can take a long time.
-			resticRepoController.Run(ctx, 1)
-			wg.Done()
-		}()
-	}
+	resticRepoController := controller.NewResticRepositoryController(
+		s.logger,
+		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
+		s.arkClient.ArkV1(),
+		defaultBackupLocation,
+		s.resticManager,
+	)
+	wg.Add(1)
+	go func() {
+		// TODO only having a single worker may be an issue since maintenance
+		// can take a long time.
+		resticRepoController.Run(ctx, 1)
+		wg.Done()
+	}()
 
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())

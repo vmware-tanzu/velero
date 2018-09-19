@@ -26,6 +26,25 @@ Prior to v0.10, Ark stored data in an object storage bucket using the following 
     ...
 ```
 
+Ark also stored restic data, if applicable, in a separate object storage bucket, structured as:
+
+```
+<your-ark-restic-bucket>/[<your-optional-prefix>/]
+    namespace-1/
+        data/
+        index/
+        keys/
+        snapshots/
+        config
+    namespace-2/
+        data/
+        index/
+        keys/
+        snapshots/
+        config
+    ...
+```
+
 As of v0.10, we've reorganized this layout to provide a cleaner and more extensible directory structure. The new layout looks like:
 
 ```
@@ -47,6 +66,20 @@ As of v0.10, we've reorganized this layout to provide a cleaner and more extensi
         restore-of-backup-2/
             restore-of-backup-2-logs.gz
             restore-of-backup-2-results.gz
+        ...
+    restic/
+        namespace-1/
+            data/
+            index/
+            keys/
+            snapshots/
+            config
+        namespace-2/
+            data/
+            index/
+            keys/
+            snapshots/
+            config
         ...
     ...
 ```
@@ -104,7 +137,22 @@ rclone copy ${RCLONE_REMOTE_NAME}:${ARK_TEMP_MIGRATION_BUCKET} ${RCLONE_REMOTE_N
 #    contains an exact copy of the temporary bucket's contents:
 rclone check ${RCLONE_REMOTE_NAME}:${ARK_BUCKET}/backups ${RCLONE_REMOTE_NAME}:${ARK_TEMP_MIGRATION_BUCKET}
 
-# 9. Once you've confirmed that Ark v0.10 works with your revised Ark
+# 9. OPTIONAL: If you have restic data to migrate:
+
+#    a. Copy the contents of your Ark restic location into your 
+#       Ark bucket, under the 'restic/' directory/prefix:
+     ARK_RESTIC_LOCATION=<your-ark-restic-bucket[/optional-prefix]>
+     rclone copy ${RCLONE_REMOTE_NAME}:${ARK_RESTIC_LOCATION} ${RCLONE_REMOTE_NAME}:${ARK_BUCKET}/restic
+
+#    b. Check that the 'restic/' directory in your Ark bucket now
+#       contains an exact copy of your restic location: 
+    rclone check ${RCLONE_REMOTE_NAME}:${ARK_BUCKET}/restic ${RCLONE_REMOTE_NAME}:${ARK_RESTIC_LOCATION}
+    
+#    c. Delete your ResticRepository custom resources to allow Ark
+#       to find them in the new location:
+    kubectl -n heptio-ark delete resticrepositories --all
+
+# 10. Once you've confirmed that Ark v0.10 works with your revised Ark
 #    bucket, you can delete the temporary migration bucket.
 ```
 

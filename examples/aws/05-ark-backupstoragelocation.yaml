@@ -24,9 +24,4 @@ spec:
     bucket: <YOUR_BUCKET> 
     config:
       region: <YOUR_REGION>
-      # Uncomment the below line to enable restic integration.
-      # The format for resticLocation is <bucket>[/<prefix>],
-      # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
-      # This MUST be a different bucket than the main Ark bucket
-      # specified just above.
-      # restic-location: <YOUR_RESTIC_LOCATION>
+

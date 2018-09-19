@@ -18,10 +18,12 @@ package restic
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider/aws"
+	"github.com/heptio/ark/pkg/persistence"
 )
 
 type BackendType string
@@ -39,18 +41,15 @@ var getAWSBucketRegion = aws.GetBucketRegion
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
 func getRepoPrefix(location *arkv1api.BackupStorageLocation) string {
-	var (
-		resticLocation       = location.Spec.Config[ResticLocationConfigKey]
-		parts                = strings.SplitN(resticLocation, "/", 2)
-		bucket, path, prefix string
-	)
+	var provider, bucket, prefix, bucketAndPrefix string
 
-	if len(parts) >= 1 {
-		bucket = parts[0]
+	if location.Spec.ObjectStorage != nil {
+		layout := persistence.NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix)
+
+		bucket = location.Spec.ObjectStorage.Bucket
+		prefix = layout.GetResticDir()
 	}
-	if len(parts) >= 2 {
-		path = parts[1]
-	}
+	bucketAndPrefix = path.Join(bucket, prefix)
 
 	switch BackendType(location.Spec.Provider) {
 	case AWSBackend:
@@ -69,14 +68,14 @@ func getRepoPrefix(location *arkv1api.BackupStorageLocation) string {
 			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
-		return fmt.Sprintf("s3:%s/%s", url, resticLocation)
+		return fmt.Sprintf("s3:%s/%s", url, bucketAndPrefix)
 	case AzureBackend:
-		prefix = "azure"
+		provider = "azure"
 	case GCPBackend:
-		prefix = "gs"
+		provider = "gs"
 	}
 
-	return fmt.Sprintf("%s:%s:/%s", prefix, bucket, path)
+	return fmt.Sprintf("%s:%s:/%s", provider, bucket, prefix)
 }
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
