@@ -1,15 +1,23 @@
-## ark get
+## ark get snapshot-locations
 
-Get ark resources
+Get snapshot locations
 
 ### Synopsis
 
-Get ark resources
+Get snapshot locations
+
+```
+ark get snapshot-locations [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for get
+  -h, --help                        help for snapshot-locations
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. (default "table")
+  -l, --selector string             only show items matching this label selector
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -29,10 +37,5 @@ Get ark resources
 
 ### SEE ALSO
 
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark get backup-locations](ark_get_backup-locations.md)	 - Get backup storage locations
-* [ark get backups](ark_get_backups.md)	 - Get backups
-* [ark get restores](ark_get_restores.md)	 - Get restores
-* [ark get schedules](ark_get_schedules.md)	 - Get schedules
-* [ark get snapshot-locations](ark_get_snapshot-locations.md)	 - Get snapshot locations
+* [ark get](ark_get.md)	 - Get ark resources
 

@@ -1,15 +1,15 @@
-## ark get
+## ark snapshot-location
 
-Get ark resources
+Work with snapshot locations
 
 ### Synopsis
 
-Get ark resources
+Work with snapshot locations
 
 ### Options
 
 ```
-  -h, --help   help for get
+  -h, --help   help for snapshot-location
 ```
 
 ### Options inherited from parent commands
@@ -30,9 +30,5 @@ Get ark resources
 ### SEE ALSO
 
 * [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark get backup-locations](ark_get_backup-locations.md)	 - Get backup storage locations
-* [ark get backups](ark_get_backups.md)	 - Get backups
-* [ark get restores](ark_get_restores.md)	 - Get restores
-* [ark get schedules](ark_get_schedules.md)	 - Get schedules
-* [ark get snapshot-locations](ark_get_snapshot-locations.md)	 - Get snapshot locations
+* [ark snapshot-location get](ark_snapshot-location_get.md)	 - Get snapshot locations
 

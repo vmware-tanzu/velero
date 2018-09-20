@@ -44,5 +44,6 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.
 * [ark restore](ark_restore.md)	 - Work with restores
 * [ark schedule](ark_schedule.md)	 - Work with schedules
 * [ark server](ark_server.md)	 - Run the ark server
+* [ark snapshot-location](ark_snapshot-location.md)	 - Work with snapshot locations
 * [ark version](ark_version.md)	 - Print the ark version and associated image
 
