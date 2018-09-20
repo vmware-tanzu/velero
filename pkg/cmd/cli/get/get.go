@@ -24,6 +24,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd/cli/backuplocation"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
 	"github.com/heptio/ark/pkg/cmd/cli/schedule"
+	"github.com/heptio/ark/pkg/cmd/cli/snapshotlocation"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -45,11 +46,15 @@ func NewCommand(f client.Factory) *cobra.Command {
 	backupLocationCommand := backuplocation.NewGetCommand(f, "backup-locations")
 	backupLocationCommand.Aliases = []string{"backup-location"}
 
+	snapshotLocationCommand := snapshotlocation.NewGetCommand(f, "snapshot-locations")
+	snapshotLocationCommand.Aliases = []string{"snapshot-location"}
+
 	c.AddCommand(
 		backupCommand,
 		scheduleCommand,
 		restoreCommand,
 		backupLocationCommand,
+		snapshotLocationCommand,
 	)
 
 	return c

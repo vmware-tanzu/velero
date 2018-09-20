@@ -35,6 +35,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd/cli/restic"
 	"github.com/heptio/ark/pkg/cmd/cli/restore"
 	"github.com/heptio/ark/pkg/cmd/cli/schedule"
+	"github.com/heptio/ark/pkg/cmd/cli/snapshotlocation"
 	"github.com/heptio/ark/pkg/cmd/server"
 	runplugin "github.com/heptio/ark/pkg/cmd/server/plugin"
 	"github.com/heptio/ark/pkg/cmd/version"
@@ -73,6 +74,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		restic.NewCommand(f),
 		bug.NewCommand(),
 		backuplocation.NewCommand(f),
+		snapshotlocation.NewCommand(f),
 	)
 
 	// add the glog flags
