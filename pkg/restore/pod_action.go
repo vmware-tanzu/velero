@@ -17,7 +17,7 @@ limitations under the License.
 package restore
 
 import (
-	"regexp"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -43,10 +43,6 @@ func (a *podAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-var (
-	defaultTokenRegex = regexp.MustCompile("default-token-.*")
-)
-
 func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
 	a.logger.Debug("getting spec")
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
@@ -57,6 +53,11 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 	a.logger.Debug("deleting spec.NodeName")
 	delete(spec, "nodeName")
 
+	serviceAccountName, err := collections.GetString(spec, "serviceAccountName")
+	if err != nil {
+		return nil, nil, err
+	}
+
 	newVolumes := make([]interface{}, 0)
 	a.logger.Debug("iterating over volumes")
 	err = collections.ForEach(spec, "volumes", func(volume map[string]interface{}) error {
@@ -66,11 +67,11 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		}
 
 		a.logger.WithField("volumeName", name).Debug("Checking volume")
-		if !defaultTokenRegex.MatchString(name) {
+		if strings.HasPrefix(name, serviceAccountName+"-token-") {
+			a.logger.WithField("volumeName", name).Debug("Excluding volume")
+		} else {
 			a.logger.WithField("volumeName", name).Debug("Preserving volume")
 			newVolumes = append(newVolumes, volume)
-		} else {
-			a.logger.WithField("volumeName", name).Debug("Excluding volume")
 		}
 
 		return nil
@@ -92,11 +93,11 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 			}
 
 			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
-			if !defaultTokenRegex.MatchString(name) {
+			if strings.HasPrefix(name, serviceAccountName+"-token-") {
+				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
+			} else {
 				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
 				newVolumeMounts = append(newVolumeMounts, volumeMount)
-			} else {
-				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
 			}
 
 			return nil
