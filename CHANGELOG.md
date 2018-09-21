@@ -1,5 +1,11 @@
 # Changelog
 
+#### [v0.9.6](https://github.com/heptio/ark/releases/tag/v0.9.6) - 2018-09-21
+
+#### Bug Fixes
+  * Discard service account tokens from non-default service accounts on restore (#843, @james-powis)
+  * Update Docker images to use `alpine:3.8` (#852, @nrb)
+
 #### [v0.9.5](https://github.com/heptio/ark/releases/tag/v0.9.5) - 2018-09-17
 
 #### Bug Fixes
