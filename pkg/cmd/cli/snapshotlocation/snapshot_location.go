@@ -30,6 +30,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	}
 
 	c.AddCommand(
+		NewCreateCommand(f, "create"),
 		NewGetCommand(f, "get"),
 	)
 
