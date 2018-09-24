@@ -1,15 +1,25 @@
-## ark snapshot-location
+## ark snapshot-location create
 
-Work with snapshot locations
+Create a volume snapshot location
 
 ### Synopsis
 
-Work with snapshot locations
+Create a volume snapshot location
+
+```
+ark snapshot-location create NAME [flags]
+```
 
 ### Options
 
 ```
-  -h, --help   help for snapshot-location
+      --config mapStringString      configuration key-value pairs
+  -h, --help                        help for create
+      --label-columns stringArray   a comma-separated list of labels to be displayed as columns
+      --labels mapStringString      labels to apply to the volume snapshot location
+  -o, --output string               Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.
+      --provider string             name of the volume snapshot provider (e.g. aws, azure, gcp)
+      --show-labels                 show labels in the last column
 ```
 
 ### Options inherited from parent commands
@@ -29,7 +39,5 @@ Work with snapshot locations
 
 ### SEE ALSO
 
-* [ark](ark.md)	 - Back up and restore Kubernetes cluster resources.
-* [ark snapshot-location create](ark_snapshot-location_create.md)	 - Create a volume snapshot location
-* [ark snapshot-location get](ark_snapshot-location_get.md)	 - Get snapshot locations
+* [ark snapshot-location](ark_snapshot-location.md)	 - Work with snapshot locations
 
