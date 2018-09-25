@@ -57,7 +57,7 @@ const DownloadURLTTL = 10 * time.Minute
 type objectBackupStore struct {
 	objectStore cloudprovider.ObjectStore
 	bucket      string
-	layout      *objectStoreLayout
+	layout      *ObjectStoreLayout
 	logger      logrus.FieldLogger
 }
 
@@ -103,7 +103,7 @@ func NewObjectBackupStore(location *arkv1api.BackupStorageLocation, objectStoreG
 	return &objectBackupStore{
 		objectStore: objectStore,
 		bucket:      location.Spec.ObjectStorage.Bucket,
-		layout:      newObjectStoreLayout(location.Spec.ObjectStorage.Prefix),
+		layout:      NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix),
 		logger:      log,
 	}, nil
 }
@@ -117,7 +117,7 @@ func (s *objectBackupStore) IsValid() error {
 	var invalid []string
 	for _, dir := range dirs {
 		subdir := strings.TrimSuffix(strings.TrimPrefix(dir, s.layout.rootPrefix), "/")
-		if !validRootDirs.Has(subdir) {
+		if !s.layout.isValidSubdir(subdir) {
 			invalid = append(invalid, subdir)
 		}
 	}
@@ -134,7 +134,7 @@ func (s *objectBackupStore) IsValid() error {
 }
 
 func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
-	prefixes, err := s.objectStore.ListCommonPrefixes(s.bucket, s.layout.backupsDir, "/")
+	prefixes, err := s.objectStore.ListCommonPrefixes(s.bucket, s.layout.subdirs["backups"], "/")
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
 		// ListCommonPrefixes method return the *full* prefix, inclusive
 		// of s.backupsPrefix, and include the delimiter ("/") as a suffix. Trim
 		// each of those off to get the backup name.
-		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.layout.backupsDir), "/")
+		backupName := strings.TrimSuffix(strings.TrimPrefix(prefix, s.layout.subdirs["backups"]), "/")
 
 		backup, err := s.GetBackupMetadata(backupName)
 		if err != nil {
