@@ -17,10 +17,7 @@ limitations under the License.
 package backup
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -34,6 +31,7 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
+	"github.com/heptio/ark/pkg/cmd/cli"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
@@ -117,31 +115,16 @@ func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		hasSelector = o.Selector.LabelSelector != nil
 	)
 
-	if !xor(hasNames, hasAll, hasSelector) {
+	if !cli.Xor(hasNames, hasAll, hasSelector) {
 		return errors.New("you must specify exactly one of: specific backup name(s), the --all flag, or the --selector flag")
 	}
 
 	return nil
 }
 
-// xor returns true if exactly one of the provided values is true,
-// or false otherwise.
-func xor(val bool, vals ...bool) bool {
-	res := val
-
-	for _, v := range vals {
-		if res && v {
-			return false
-		}
-		res = res || v
-	}
-
-	return res
-}
-
 // Run performs the delete backup operation.
 func (o *DeleteOptions) Run() error {
-	if !o.Confirm && !getConfirmation() {
+	if !o.Confirm && !cli.GetConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
 	}
@@ -196,29 +179,4 @@ func (o *DeleteOptions) Run() error {
 	}
 
 	return kubeerrs.NewAggregate(errs)
-}
-
-func getConfirmation() bool {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Printf("Are you sure you want to continue (Y/N)? ")
-
-		confirmation, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading user input: %v\n", err)
-			return false
-		}
-		confirmation = strings.TrimSpace(confirmation)
-		if len(confirmation) != 1 {
-			continue
-		}
-
-		switch strings.ToLower(confirmation) {
-		case "y":
-			return true
-		case "n":
-			return false
-		}
-	}
 }
