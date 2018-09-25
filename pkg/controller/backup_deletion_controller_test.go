@@ -410,6 +410,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		})
 
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
+		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
+		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)

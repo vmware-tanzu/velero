@@ -62,6 +62,7 @@ import (
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/metrics"
+	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
@@ -252,8 +253,11 @@ func (s *server) run() error {
 		return err
 	}
 
-	// check to ensure all Ark CRDs exist
 	if err := s.arkResourcesExist(); err != nil {
+		return err
+	}
+
+	if err := s.validateBackupStorageLocations(); err != nil {
 		return err
 	}
 
@@ -388,6 +392,39 @@ func (s *server) arkResourcesExist() error {
 	}
 
 	s.logger.Info("All Ark custom resource definitions exist")
+	return nil
+}
+
+// validateBackupStorageLocations checks to ensure all backup storage locations exist
+// and have a compatible layout, and returns an error if not.
+func (s *server) validateBackupStorageLocations() error {
+	s.logger.Info("Checking that all backup storage locations are valid")
+
+	locations, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	var invalid []string
+	for _, location := range locations.Items {
+		backupStore, err := persistence.NewObjectBackupStore(&location, s.pluginManager, s.logger)
+		if err != nil {
+			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
+			continue
+		}
+
+		if err := backupStore.IsValid(); err != nil {
+			invalid = append(invalid, errors.Wrapf(err,
+				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Ark, please refer to https://heptio.github.io/ark/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
+				location.Name,
+			).Error())
+		}
+	}
+
+	if len(invalid) > 0 {
+		return errors.Errorf("some backup storage locations are invalid: %s", strings.Join(invalid, "; "))
+	}
+
 	return nil
 }
 

@@ -25,6 +25,20 @@ func (_m *BackupStore) DeleteBackup(name string) error {
 	return r0
 }
 
+// DeleteRestore provides a mock function with given fields: name
+func (_m *BackupStore) DeleteRestore(name string) error {
+	ret := _m.Called(name)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // GetBackupContents provides a mock function with given fields: name
 func (_m *BackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
 	ret := _m.Called(name)
@@ -71,25 +85,39 @@ func (_m *BackupStore) GetBackupMetadata(name string) (*v1.Backup, error) {
 	return r0, r1
 }
 
-// GetDownloadURL provides a mock function with given fields: backup, target
-func (_m *BackupStore) GetDownloadURL(backup string, target v1.DownloadTarget) (string, error) {
-	ret := _m.Called(backup, target)
+// GetDownloadURL provides a mock function with given fields: target
+func (_m *BackupStore) GetDownloadURL(target v1.DownloadTarget) (string, error) {
+	ret := _m.Called(target)
 
 	var r0 string
-	if rf, ok := ret.Get(0).(func(string, v1.DownloadTarget) string); ok {
-		r0 = rf(backup, target)
+	if rf, ok := ret.Get(0).(func(v1.DownloadTarget) string); ok {
+		r0 = rf(target)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, v1.DownloadTarget) error); ok {
-		r1 = rf(backup, target)
+	if rf, ok := ret.Get(1).(func(v1.DownloadTarget) error); ok {
+		r1 = rf(target)
 	} else {
 		r1 = ret.Error(1)
 	}
 
 	return r0, r1
+}
+
+// IsValid provides a mock function with given fields:
+func (_m *BackupStore) IsValid() error {
+	ret := _m.Called()
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // ListBackups provides a mock function with given fields:

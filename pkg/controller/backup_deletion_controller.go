@@ -261,7 +261,15 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	log.Info("Removing backup from backup storage")
-	if err := c.deleteBackupFromStorage(backup, log); err != nil {
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
+	if backupStoreErr != nil {
+		errs = append(errs, backupStoreErr.Error())
+	}
+
+	if err := backupStore.DeleteBackup(backup.Name); err != nil {
 		errs = append(errs, err.Error())
 	}
 
@@ -275,6 +283,13 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			}
 
 			restoreLog := log.WithField("restore", kube.NamespaceAndName(restore))
+
+			restoreLog.Info("Deleting restore log/results from backup storage")
+			if err := backupStore.DeleteRestore(restore.Name); err != nil {
+				errs = append(errs, err.Error())
+				// if we couldn't delete the restore files, don't delete the API object
+				continue
+			}
 
 			restoreLog.Info("Deleting restore referencing backup")
 			if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
@@ -313,27 +328,19 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	return nil
 }
 
-func (c *backupDeletionController) deleteBackupFromStorage(backup *v1.Backup, log logrus.FieldLogger) error {
-	pluginManager := c.newPluginManager(log)
-	defer pluginManager.CleanupClients()
-
+func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
 	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if err := backupStore.DeleteBackup(backup.Name); err != nil {
-		return errors.Wrap(err, "error deleting backup from backup storage")
-	}
-
-	return nil
+	return backupStore, nil
 }
-
 func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{

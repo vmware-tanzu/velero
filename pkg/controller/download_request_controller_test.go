@@ -274,7 +274,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			}
 
 			if tc.expectGetsURL {
-				harness.backupStore.On("GetDownloadURL", tc.backup.Name, tc.downloadRequest.Spec.Target).Return("a-url", nil)
+				harness.backupStore.On("GetDownloadURL", tc.downloadRequest.Spec.Target).Return("a-url", nil)
 			}
 
 			// exercise method under test
