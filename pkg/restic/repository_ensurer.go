@@ -101,8 +101,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		return repos[0], nil
 	}
 
-	// if we're here, it means we didn't find a repo, meaning we need to create a new
-	// one and wait for it to be ready
+	// no repo found: create one and wait for it to be ready
 
 	repo := &arkv1api.ResticRepository{
 		ObjectMeta: metav1.ObjectMeta{

@@ -220,7 +220,8 @@ func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName,
 				"ns":         pod.Namespace,
 				"volume":     volumeName,
 			},
-			RepoIdentifier: repoIdentifier,
+			BackupStorageLocation: backup.Spec.StorageLocation,
+			RepoIdentifier:        repoIdentifier,
 		},
 	}
 }

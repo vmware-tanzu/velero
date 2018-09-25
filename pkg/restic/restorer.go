@@ -113,7 +113,7 @@ func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.P
 	)
 
 	for volume, snapshot := range volumesToRestore {
-		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, repo.Spec.ResticIdentifier)
+		volumeRestore := newPodVolumeRestore(restore, pod, volume, snapshot, backupLocation, repo.Spec.ResticIdentifier)
 
 		if err := errorOnly(r.repoManager.arkClient.ArkV1().PodVolumeRestores(volumeRestore.Namespace).Create(volumeRestore)); err != nil {
 			errs = append(errs, errors.WithStack(err))
@@ -142,7 +142,7 @@ ForEachVolume:
 	return errs
 }
 
-func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, snapshot, repoIdentifier string) *arkv1api.PodVolumeRestore {
+func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, snapshot, backupLocation, repoIdentifier string) *arkv1api.PodVolumeRestore {
 	return &arkv1api.PodVolumeRestore{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    restore.Namespace,
@@ -169,9 +169,10 @@ func newPodVolumeRestore(restore *arkv1api.Restore, pod *corev1api.Pod, volume, 
 				Name:      pod.Name,
 				UID:       pod.UID,
 			},
-			Volume:         volume,
-			SnapshotID:     snapshot,
-			RepoIdentifier: repoIdentifier,
+			Volume:                volume,
+			SnapshotID:            snapshot,
+			BackupStorageLocation: backupLocation,
+			RepoIdentifier:        repoIdentifier,
 		},
 	}
 }

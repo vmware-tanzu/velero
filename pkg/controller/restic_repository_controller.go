@@ -153,7 +153,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 		return err
 	}
 
-	if err := ensureRepo(req.Name, req.Spec.ResticIdentifier, c.repositoryManager); err != nil {
+	if err := ensureRepo(req, c.repositoryManager); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
@@ -165,12 +165,12 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 
 // ensureRepo first checks the repo, and returns if check passes. If it fails,
 // attempts to init the repo, and returns the result.
-func ensureRepo(name, identifier string, repoManager restic.RepositoryManager) error {
-	if repoManager.CheckRepo(name, identifier) == nil {
+func ensureRepo(repo *v1.ResticRepository, repoManager restic.RepositoryManager) error {
+	if repoManager.CheckRepo(repo) == nil {
 		return nil
 	}
 
-	return repoManager.InitRepo(name, identifier)
+	return repoManager.InitRepo(repo)
 }
 
 func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepository, log logrus.FieldLogger) error {
@@ -186,14 +186,14 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 	log.Info("Running maintenance on restic repository")
 
 	log.Debug("Checking repo before prune")
-	if err := c.repositoryManager.CheckRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.CheckRepo(req); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
 	// prune failures should be displayed in the `.status.message` field but
 	// should not cause the repo to move to `NotReady`.
 	log.Debug("Pruning repo")
-	if err := c.repositoryManager.PruneRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.PruneRepo(req); err != nil {
 		log.WithError(err).Warn("error pruning repository")
 		if patchErr := c.patchResticRepository(req, func(r *v1.ResticRepository) {
 			r.Status.Message = err.Error()
@@ -203,7 +203,7 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 	}
 
 	log.Debug("Checking repo after prune")
-	if err := c.repositoryManager.CheckRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.CheckRepo(req); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
@@ -221,7 +221,7 @@ func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository,
 
 	// we need to ensure it (first check, if check fails, attempt to init)
 	// because we don't know if it's been successfully initialized yet.
-	if err := ensureRepo(req.Name, req.Spec.ResticIdentifier, c.repositoryManager); err != nil {
+	if err := ensureRepo(req, c.repositoryManager); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 

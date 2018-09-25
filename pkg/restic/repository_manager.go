@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -40,13 +41,13 @@ import (
 // RepositoryManager executes commands against restic repositories.
 type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
-	InitRepo(name, identifier string) error
+	InitRepo(repo *arkv1api.ResticRepository) error
 
 	// CheckRepo checks the specified repo for errors.
-	CheckRepo(name, identifier string) error
+	CheckRepo(repo *arkv1api.ResticRepository) error
 
 	// PruneRepo deletes unused data from a repo.
-	PruneRepo(name, identifier string) error
+	PruneRepo(repo *arkv1api.ResticRepository) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
@@ -72,15 +73,18 @@ type RestorerFactory interface {
 }
 
 type repositoryManager struct {
-	namespace          string
-	arkClient          clientset.Interface
-	secretsLister      corev1listers.SecretLister
-	repoLister         arkv1listers.ResticRepositoryLister
-	repoInformerSynced cache.InformerSynced
-	log                logrus.FieldLogger
-	repoLocker         *repoLocker
-	repoEnsurer        *repositoryEnsurer
-	fileSystem         filesystem.Interface
+	namespace                    string
+	arkClient                    clientset.Interface
+	secretsLister                corev1listers.SecretLister
+	repoLister                   arkv1listers.ResticRepositoryLister
+	repoInformerSynced           cache.InformerSynced
+	backupLocationLister         arkv1listers.BackupStorageLocationLister
+	backupLocationInformerSynced cache.InformerSynced
+	log                          logrus.FieldLogger
+	repoLocker                   *repoLocker
+	repoEnsurer                  *repositoryEnsurer
+	fileSystem                   filesystem.Interface
+	ctx                          context.Context
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -91,15 +95,19 @@ func NewRepositoryManager(
 	secretsInformer cache.SharedIndexInformer,
 	repoInformer arkv1informers.ResticRepositoryInformer,
 	repoClient arkv1client.ResticRepositoriesGetter,
+	backupLocationInformer arkv1informers.BackupStorageLocationInformer,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
-		namespace:          namespace,
-		arkClient:          arkClient,
-		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
-		repoLister:         repoInformer.Lister(),
-		repoInformerSynced: repoInformer.Informer().HasSynced,
-		log:                log,
+		namespace:                    namespace,
+		arkClient:                    arkClient,
+		secretsLister:                corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
+		repoLister:                   repoInformer.Lister(),
+		repoInformerSynced:           repoInformer.Informer().HasSynced,
+		backupLocationLister:         backupLocationInformer.Lister(),
+		backupLocationInformerSynced: backupLocationInformer.Informer().HasSynced,
+		log: log,
+		ctx: ctx,
 
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),
@@ -155,28 +163,28 @@ func (rm *repositoryManager) NewRestorer(ctx context.Context, restore *arkv1api.
 	return r, nil
 }
 
-func (rm *repositoryManager) InitRepo(name, identifier string) error {
+func (rm *repositoryManager) InitRepo(repo *arkv1api.ResticRepository) error {
 	// restic init requires an exclusive lock
-	rm.repoLocker.LockExclusive(name)
-	defer rm.repoLocker.UnlockExclusive(name)
+	rm.repoLocker.LockExclusive(repo.Name)
+	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
-	return rm.exec(InitCommand(identifier))
+	return rm.exec(InitCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) CheckRepo(name, identifier string) error {
+func (rm *repositoryManager) CheckRepo(repo *arkv1api.ResticRepository) error {
 	// restic check requires an exclusive lock
-	rm.repoLocker.LockExclusive(name)
-	defer rm.repoLocker.UnlockExclusive(name)
+	rm.repoLocker.LockExclusive(repo.Name)
+	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
-	return rm.exec(CheckCommand(identifier))
+	return rm.exec(CheckCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) PruneRepo(name, identifier string) error {
+func (rm *repositoryManager) PruneRepo(repo *arkv1api.ResticRepository) error {
 	// restic prune requires an exclusive lock
-	rm.repoLocker.LockExclusive(name)
-	defer rm.repoLocker.UnlockExclusive(name)
+	rm.repoLocker.LockExclusive(repo.Name)
+	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
-	return rm.exec(PruneCommand(identifier))
+	return rm.exec(PruneCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {
@@ -197,10 +205,10 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 	rm.repoLocker.LockExclusive(repo.Name)
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
-	return rm.exec(ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID))
+	return rm.exec(ForgetCommand(repo.Spec.ResticIdentifier, snapshot.SnapshotID), repo.Spec.BackupStorageLocation)
 }
 
-func (rm *repositoryManager) exec(cmd *Command) error {
+func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	file, err := TempCredentialsFile(rm.secretsLister, rm.namespace, cmd.RepoName(), rm.fileSystem)
 	if err != nil {
 		return err
@@ -209,6 +217,18 @@ func (rm *repositoryManager) exec(cmd *Command) error {
 	defer os.Remove(file)
 
 	cmd.PasswordFile = file
+
+	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
+		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
+			return errors.New("timed out waiting for cache to sync")
+		}
+
+		env, err := AzureCmdEnv(rm.backupLocationLister, rm.namespace, backupLocation)
+		if err != nil {
+			return err
+		}
+		cmd.Env = env
+	}
 
 	stdout, stderr, err := arkexec.RunCommand(cmd.Cmd())
 	rm.log.WithFields(logrus.Fields{
