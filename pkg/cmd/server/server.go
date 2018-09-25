@@ -636,6 +636,8 @@ func (s *server) runControllers(config *api.Config) error {
 			backupTracker,
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
+			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+			nil,
 			s.metrics,
 		)
 		wg.Add(1)

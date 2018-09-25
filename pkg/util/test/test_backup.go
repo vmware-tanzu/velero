@@ -140,3 +140,8 @@ func (b *TestBackup) WithStorageLocation(location string) *TestBackup {
 	b.Spec.StorageLocation = location
 	return b
 }
+
+func (b *TestBackup) WithVolumeSnapshotLocations(locations []string) *TestBackup {
+	b.Spec.VolumeSnapshotLocations = locations
+	return b
+}
