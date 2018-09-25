@@ -188,7 +188,7 @@ func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdenti
 		return errors.New("timed out waiting for cache to sync")
 	}
 
-	repo, err := rm.repoEnsurer.EnsureRepo(ctx, rm.namespace, snapshot.Repo)
+	repo, err := rm.repoEnsurer.EnsureRepo(ctx, rm.namespace, snapshot.VolumeNamespace, snapshot.BackupStorageLocation)
 	if err != nil {
 		return err
 	}

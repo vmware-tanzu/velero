@@ -287,12 +287,12 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			},
 			expected: []SnapshotIdentifier{
 				{
-					Repo:       "ns-1",
-					SnapshotID: "snap-3",
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-3",
 				},
 				{
-					Repo:       "ns-1",
-					SnapshotID: "snap-4",
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-4",
 				},
 			},
 		},
@@ -319,10 +319,10 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			// sort to ensure good compare of slices
 			less := func(snapshots []SnapshotIdentifier) func(i, j int) bool {
 				return func(i, j int) bool {
-					if snapshots[i].Repo == snapshots[j].Repo {
+					if snapshots[i].VolumeNamespace == snapshots[j].VolumeNamespace {
 						return snapshots[i].SnapshotID < snapshots[j].SnapshotID
 					}
-					return snapshots[i].Repo < snapshots[j].Repo
+					return snapshots[i].VolumeNamespace < snapshots[j].VolumeNamespace
 				}
 
 			}

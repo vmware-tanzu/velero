@@ -105,11 +105,15 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 // SnapshotIdentifier uniquely identifies a restic snapshot
 // taken by Ark.
 type SnapshotIdentifier struct {
-	// Repo is the name of the restic repository where the
-	// snapshot is located
-	Repo string
+	// VolumeNamespace is the namespace of the pod/volume that
+	// the restic snapshot is for.
+	VolumeNamespace string
 
-	// SnapshotID is the short ID of the restic snapshot
+	// BackupStorageLocation is the backup's storage location
+	// name.
+	BackupStorageLocation string
+
+	// SnapshotID is the short ID of the restic snapshot.
 	SnapshotID string
 }
 
@@ -131,8 +135,9 @@ func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1li
 			continue
 		}
 		res = append(res, SnapshotIdentifier{
-			Repo:       item.Spec.Pod.Namespace,
-			SnapshotID: item.Status.SnapshotID,
+			VolumeNamespace:       item.Spec.Pod.Namespace,
+			BackupStorageLocation: backup.Spec.StorageLocation,
+			SnapshotID:            item.Status.SnapshotID,
 		})
 	}
 

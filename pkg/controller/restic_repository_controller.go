@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -44,7 +43,7 @@ type resticRepositoryController struct {
 
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter
 	resticRepositoryLister listers.ResticRepositoryLister
-	storageLocation        *arkv1api.BackupStorageLocation
+	backupLocationLister   listers.BackupStorageLocationLister
 	repositoryManager      restic.RepositoryManager
 
 	clock clock.Clock
@@ -55,20 +54,20 @@ func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer informers.ResticRepositoryInformer,
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter,
-	storageLocation *arkv1api.BackupStorageLocation,
+	backupLocationInformer informers.BackupStorageLocationInformer,
 	repositoryManager restic.RepositoryManager,
 ) Interface {
 	c := &resticRepositoryController{
 		genericController:      newGenericController("restic-repository", logger),
 		resticRepositoryClient: resticRepositoryClient,
 		resticRepositoryLister: resticRepositoryInformer.Lister(),
-		storageLocation:        storageLocation,
+		backupLocationLister:   backupLocationInformer.Lister(),
 		repositoryManager:      repositoryManager,
 		clock:                  &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, resticRepositoryInformer.Informer().HasSynced)
+	c.cacheSyncWaiters = append(c.cacheSyncWaiters, resticRepositoryInformer.Informer().HasSynced, backupLocationInformer.Informer().HasSynced)
 
 	resticRepositoryInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -137,9 +136,15 @@ func (c *resticRepositoryController) processQueueItem(key string) error {
 func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, log logrus.FieldLogger) error {
 	log.Info("Initializing restic repository")
 
+	// confirm the repo's BackupStorageLocation is valid
+	loc, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
+	if err != nil {
+		return c.patchResticRepository(req, repoNotReady(err.Error()))
+	}
+
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := c.patchResticRepository(req, func(r *v1.ResticRepository) {
-		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(c.storageLocation, r.Name)
+		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(loc, r.Spec.VolumeNamespace)
 
 		if r.Spec.MaintenanceFrequency.Duration <= 0 {
 			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}

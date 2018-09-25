@@ -828,7 +828,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 						return []error{err}
 					}
 
-					if errs := ctx.resticRestorer.RestorePodVolumes(ctx.restore, pod, originalNamespace, ctx.log); errs != nil {
+					if errs := ctx.resticRestorer.RestorePodVolumes(ctx.restore, pod, originalNamespace, ctx.backup.Spec.StorageLocation, ctx.log); errs != nil {
 						ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete restic restores of pod's volumes")
 						return errs
 					}

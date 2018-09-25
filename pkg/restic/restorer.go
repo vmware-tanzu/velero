@@ -34,7 +34,7 @@ import (
 // Restorer can execute restic restores of volumes in a pod.
 type Restorer interface {
 	// RestorePodVolumes restores all annotated volumes in a pod.
-	RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace string, log logrus.FieldLogger) []error
+	RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace, backupLocation string, log logrus.FieldLogger) []error
 }
 
 type restorer struct {
@@ -84,22 +84,22 @@ func newRestorer(
 	return r
 }
 
-func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace string, log logrus.FieldLogger) []error {
+func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace, backupLocation string, log logrus.FieldLogger) []error {
 	// get volumes to restore from pod's annotations
 	volumesToRestore := GetPodSnapshotAnnotations(pod)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}
 
-	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, restore.Namespace, sourceNamespace)
+	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, restore.Namespace, sourceNamespace, backupLocation)
 	if err != nil {
 		return []error{err}
 	}
 
 	// get a single non-exclusive lock since we'll wait for all individual
 	// restores to be complete before releasing it.
-	r.repoManager.repoLocker.Lock(pod.Namespace)
-	defer r.repoManager.repoLocker.Unlock(pod.Namespace)
+	r.repoManager.repoLocker.Lock(repo.Name)
+	defer r.repoManager.repoLocker.Unlock(repo.Name)
 
 	resultsChan := make(chan *arkv1api.PodVolumeRestore)
 

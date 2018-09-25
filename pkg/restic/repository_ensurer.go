@@ -18,13 +18,14 @@ package restic
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
@@ -59,7 +60,8 @@ func newRepositoryEnsurer(repoInformer arkv1informers.ResticRepositoryInformer, 
 					r.readyChansLock.Lock()
 					defer r.readyChansLock.Unlock()
 
-					readyChan, ok := r.readyChans[newObj.Name]
+					key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
+					readyChan, ok := r.readyChans[key]
 					if !ok {
 						log.Errorf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
 						return
@@ -75,30 +77,47 @@ func newRepositoryEnsurer(repoInformer arkv1informers.ResticRepositoryInformer, 
 	return r
 }
 
-func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, name string) (*arkv1api.ResticRepository, error) {
-	if repo, err := r.repoLister.ResticRepositories(namespace).Get(name); err != nil && !apierrors.IsNotFound(err) {
+func repoLabels(volumeNamespace, backupLocation string) labels.Set {
+	return map[string]string{
+		arkv1api.ResticVolumeNamespaceLabel: volumeNamespace,
+		arkv1api.StorageLocationLabel:       backupLocation,
+	}
+}
+
+func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*arkv1api.ResticRepository, error) {
+	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation))
+
+	repos, err := r.repoLister.ResticRepositories(namespace).List(selector)
+	if err != nil {
 		return nil, errors.WithStack(err)
-	} else if err == nil {
-		if repo.Status.Phase != arkv1api.ResticRepositoryPhaseReady {
+	}
+	if len(repos) > 1 {
+		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
+	}
+	if len(repos) == 1 {
+		if repos[0].Status.Phase != arkv1api.ResticRepositoryPhaseReady {
 			return nil, errors.New("restic repository is not ready")
 		}
-		return repo, nil
+		return repos[0], nil
 	}
 
-	// if we're here, it means we got an IsNotFound error, meaning we need to create a new
-	// repo and wait for it to be ready
+	// if we're here, it means we didn't find a repo, meaning we need to create a new
+	// one and wait for it to be ready
 
 	repo := &arkv1api.ResticRepository{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
+			Namespace:    namespace,
+			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
+			Labels:       repoLabels(volumeNamespace, backupLocation),
 		},
 		Spec: arkv1api.ResticRepositorySpec{
-			MaintenanceFrequency: metav1.Duration{Duration: DefaultMaintenanceFrequency},
+			VolumeNamespace:       volumeNamespace,
+			BackupStorageLocation: backupLocation,
+			MaintenanceFrequency:  metav1.Duration{Duration: DefaultMaintenanceFrequency},
 		},
 	}
 
-	readyChan := r.getReadyChan(name)
+	readyChan := r.getReadyChan(selector.String())
 	defer close(readyChan)
 
 	if _, err := r.repoClient.ResticRepositories(namespace).Create(repo); err != nil {

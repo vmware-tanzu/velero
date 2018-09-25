@@ -753,7 +753,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.logger,
 		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 		s.arkClient.ArkV1(),
-		defaultBackupLocation,
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.resticManager,
 	)
 	wg.Add(1)
