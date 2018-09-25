@@ -55,18 +55,20 @@ const backupVersion = 1
 type backupController struct {
 	*genericController
 
-	backupper             backup.Backupper
-	pvProviderExists      bool
-	lister                listers.BackupLister
-	client                arkv1client.BackupsGetter
-	clock                 clock.Clock
-	backupLogLevel        logrus.Level
-	newPluginManager      func(logrus.FieldLogger) plugin.Manager
-	backupTracker         BackupTracker
-	backupLocationLister  listers.BackupStorageLocationLister
-	defaultBackupLocation string
-	metrics               *metrics.ServerMetrics
-	newBackupStore        func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	backupper                backup.Backupper
+	pvProviderExists         bool
+	lister                   listers.BackupLister
+	client                   arkv1client.BackupsGetter
+	clock                    clock.Clock
+	backupLogLevel           logrus.Level
+	newPluginManager         func(logrus.FieldLogger) plugin.Manager
+	backupTracker            BackupTracker
+	backupLocationLister     listers.BackupStorageLocationLister
+	defaultBackupLocation    string
+	snapshotLocationLister   listers.VolumeSnapshotLocationLister
+	defaultSnapshotLocations map[string]string
+	metrics                  *metrics.ServerMetrics
+	newBackupStore           func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupController(
@@ -80,21 +82,25 @@ func NewBackupController(
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
+	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
+	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupController{
-		genericController:     newGenericController("backup", logger),
-		backupper:             backupper,
-		pvProviderExists:      pvProviderExists,
-		lister:                backupInformer.Lister(),
-		client:                client,
-		clock:                 &clock.RealClock{},
-		backupLogLevel:        backupLogLevel,
-		newPluginManager:      newPluginManager,
-		backupTracker:         backupTracker,
-		backupLocationLister:  backupLocationInformer.Lister(),
-		defaultBackupLocation: defaultBackupLocation,
-		metrics:               metrics,
+		genericController:        newGenericController("backup", logger),
+		backupper:                backupper,
+		pvProviderExists:         pvProviderExists,
+		lister:                   backupInformer.Lister(),
+		client:                   client,
+		clock:                    &clock.RealClock{},
+		backupLogLevel:           backupLogLevel,
+		newPluginManager:         newPluginManager,
+		backupTracker:            backupTracker,
+		backupLocationLister:     backupLocationInformer.Lister(),
+		defaultBackupLocation:    defaultBackupLocation,
+		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
+		defaultSnapshotLocations: defaultSnapshotLocations,
+		metrics:                  metrics,
 
 		newBackupStore: persistence.NewObjectBackupStore,
 	}
@@ -103,6 +109,7 @@ func NewBackupController(
 	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
 		backupInformer.Informer().HasSynced,
 		backupLocationInformer.Informer().HasSynced,
+		volumeSnapshotLocationInformer.Informer().HasSynced,
 	)
 
 	backupInformer.Informer().AddEventHandler(
@@ -178,9 +185,11 @@ func (c *backupController) processBackup(key string) error {
 		backup.Status.Expiration = metav1.NewTime(c.clock.Now().Add(backup.Spec.TTL.Duration))
 	}
 
-	var backupLocation *api.BackupStorageLocation
-	// validation
-	if backupLocation, backup.Status.ValidationErrors = c.getLocationAndValidate(backup, c.defaultBackupLocation); len(backup.Status.ValidationErrors) > 0 {
+	backupLocation, errs := c.getLocationAndValidate(backup, c.defaultBackupLocation)
+	errs = append(errs, c.defaultAndValidateSnapshotLocations(backup, c.defaultSnapshotLocations)...)
+	backup.Status.ValidationErrors = append(backup.Status.ValidationErrors, errs...)
+
+	if len(backup.Status.ValidationErrors) > 0 {
 		backup.Status.Phase = api.BackupPhaseFailedValidation
 	} else {
 		backup.Status.Phase = api.BackupPhaseInProgress
@@ -258,10 +267,6 @@ func (c *backupController) getLocationAndValidate(itm *api.Backup, defaultBackup
 		validationErrors = append(validationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
-	if !c.pvProviderExists && itm.Spec.SnapshotVolumes != nil && *itm.Spec.SnapshotVolumes {
-		validationErrors = append(validationErrors, "Server is not configured for PV snapshots")
-	}
-
 	if itm.Spec.StorageLocation == "" {
 		itm.Spec.StorageLocation = defaultBackupLocation
 	}
@@ -279,6 +284,53 @@ func (c *backupController) getLocationAndValidate(itm *api.Backup, defaultBackup
 	}
 
 	return backupLocation, validationErrors
+}
+
+// defaultAndValidateSnapshotLocations ensures:
+// - each location name in Spec VolumeSnapshotLocation exists as a location
+// - exactly 1 location per existing or default provider
+// - a given default provider's location name is added to the Spec VolumeSnapshotLocation if it does not exist as a VSL
+func (c *backupController) defaultAndValidateSnapshotLocations(itm *api.Backup, defaultLocations map[string]string) []string {
+	var errors []string
+	perProviderLocationName := make(map[string]string)
+	var finalLocationNameList []string
+	for _, locationName := range itm.Spec.VolumeSnapshotLocations {
+		// validate each locationName exists as a VolumeSnapshotLocation
+		location, err := c.snapshotLocationLister.VolumeSnapshotLocations(itm.Namespace).Get(locationName)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("error getting volume snapshot location named %s: %v", locationName, err))
+			continue
+		}
+
+		// ensure we end up with exactly 1 locationName *per provider*
+		providerLocationName := perProviderLocationName[location.Spec.Provider]
+		if providerLocationName != "" {
+			// if > 1 location name per provider as in ["aws-us-east-1" | "aws-us-west-1"] (same provider, multiple names)
+			if providerLocationName != locationName {
+				errors = append(errors, fmt.Sprintf("more than one VolumeSnapshotLocation name specified for provider %s: %s; unexpected name was %s", location.Spec.Provider, locationName, providerLocationName))
+				continue
+			}
+		} else {
+			// no dup exists: add locationName to the final list
+			finalLocationNameList = append(finalLocationNameList, locationName)
+			// keep track of all valid existing locations, per provider
+			perProviderLocationName[location.Spec.Provider] = locationName
+		}
+	}
+
+	if len(errors) > 0 {
+		return errors
+	}
+
+	for provider, defaultLocationName := range defaultLocations {
+		// if a location name for a given provider does not already exist, add the provider's default
+		if _, ok := perProviderLocationName[provider]; !ok {
+			finalLocationNameList = append(finalLocationNameList, defaultLocationName)
+		}
+	}
+	itm.Spec.VolumeSnapshotLocations = finalLocationNameList
+
+	return nil
 }
 
 func (c *backupController) runBackup(backup *api.Backup, backupLocation *api.BackupStorageLocation) error {

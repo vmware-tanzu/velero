@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -66,6 +67,7 @@ func TestProcessBackup(t *testing.T) {
 		backup           *arktest.TestBackup
 		expectBackup     bool
 		allowSnapshots   bool
+		defaultLocations map[string]string
 	}{
 		{
 			name:        "bad key",
@@ -198,6 +200,8 @@ func TestProcessBackup(t *testing.T) {
 				NewBackupTracker(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				"default",
+				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
+				test.defaultLocations,
 				metrics.NewServerMetrics(),
 			).(*backupController)
 
@@ -419,6 +423,124 @@ func TestProcessBackup(t *testing.T) {
 				},
 			}
 			arktest.ValidatePatch(t, actions[1], expected, decode)
+		})
+	}
+}
+
+func TestDefaultAndValidateSnapshotLocations(t *testing.T) {
+	defaultLocationsAWS := map[string]string{"aws": "aws-us-east-2"}
+	defaultLocationsFake := map[string]string{"fake-provider": "some-name"}
+
+	multipleLocationNames := []string{"aws-us-west-1", "aws-us-east-1"}
+
+	multipleLocation1 := arktest.LocationInfo{
+		Name:     multipleLocationNames[0],
+		Provider: "aws",
+		Config:   map[string]string{"region": "us-west-1"},
+	}
+	multipleLocation2 := arktest.LocationInfo{
+		Name:     multipleLocationNames[1],
+		Provider: "aws",
+		Config:   map[string]string{"region": "us-west-1"},
+	}
+
+	multipleLocationList := []arktest.LocationInfo{multipleLocation1, multipleLocation2}
+
+	dupLocationNames := []string{"aws-us-west-1", "aws-us-west-1"}
+	dupLocation1 := arktest.LocationInfo{
+		Name:     dupLocationNames[0],
+		Provider: "aws",
+		Config:   map[string]string{"region": "us-west-1"},
+	}
+	dupLocation2 := arktest.LocationInfo{
+		Name:     dupLocationNames[0],
+		Provider: "aws",
+		Config:   map[string]string{"region": "us-west-1"},
+	}
+	dupLocationList := []arktest.LocationInfo{dupLocation1, dupLocation2}
+
+	tests := []struct {
+		name                                string
+		backup                              *arktest.TestBackup
+		locations                           []*arktest.TestVolumeSnapshotLocation
+		defaultLocations                    map[string]string
+		expectedVolumeSnapshotLocationNames []string // adding these in the expected order will allow to test with better msgs in case of a test failure
+		expectedErrors                      string
+		expectedSuccess                     bool
+	}{
+		{
+			name:            "location name does not correspond to any existing location",
+			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations([]string{"random-name"}),
+			locations:       arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
+			expectedErrors:  "error getting volume snapshot location named random-name: volumesnapshotlocation.ark.heptio.com \"random-name\" not found",
+			expectedSuccess: false,
+		},
+		{
+			name:                                "duplicate locationName per provider: should filter out dups",
+			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames),
+			locations:                           arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
+			expectedVolumeSnapshotLocationNames: []string{dupLocationNames[0]},
+			expectedSuccess:                     true,
+		},
+		{
+			name:            "multiple location names per provider",
+			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(multipleLocationNames),
+			locations:       arktest.NewTestVolumeSnapshotLocation().WithName(multipleLocationNames[0]).WithProviderConfig(multipleLocationList),
+			expectedErrors:  "more than one VolumeSnapshotLocation name specified for provider aws: aws-us-east-1; unexpected name was aws-us-west-1",
+			expectedSuccess: false,
+		},
+		{
+			name:                                "no location name for the provider exists: the provider's default should be added",
+			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			defaultLocations:                    defaultLocationsAWS,
+			expectedVolumeSnapshotLocationNames: []string{defaultLocationsAWS["aws"]},
+			expectedSuccess:                     true,
+		},
+		{
+			name:            "no existing location name and no default location name given",
+			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			expectedSuccess: true,
+		},
+		{
+			name:                                "multiple location names for a provider, default location name for another provider",
+			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames),
+			locations:                           arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
+			defaultLocations:                    defaultLocationsFake,
+			expectedVolumeSnapshotLocationNames: []string{dupLocationNames[0], defaultLocationsFake["fake-provider"]},
+			expectedSuccess:                     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				client          = fake.NewSimpleClientset()
+				sharedInformers = informers.NewSharedInformerFactory(client, 0)
+			)
+
+			c := &backupController{
+				snapshotLocationLister: sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister(),
+			}
+
+			// set up a Backup object to represent what we expect to be passed to backupper.Backup()
+			backup := test.backup.DeepCopy()
+			backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
+			for _, location := range test.locations {
+				require.NoError(t, sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location.VolumeSnapshotLocation))
+			}
+
+			errs := c.defaultAndValidateSnapshotLocations(backup, test.defaultLocations)
+			if test.expectedSuccess {
+				for _, err := range errs {
+					require.NoError(t, errors.New(err), "defaultAndValidateSnapshotLocations unexpected error: %v", err)
+				}
+				require.Equal(t, test.expectedVolumeSnapshotLocationNames, backup.Spec.VolumeSnapshotLocations)
+			} else {
+				if len(errs) == 0 {
+					require.Error(t, nil, "defaultAndValidateSnapshotLocations expected error")
+				}
+				require.Contains(t, errs, test.expectedErrors)
+			}
 		})
 	}
 }
