@@ -57,29 +57,10 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		delete(spec, "clusterIP")
 	}
 
-	preservedPorts, err := getPreservedPorts(obj)
+	err = deleteNodePorts(obj, &spec)
 	if err != nil {
 		return nil, nil, err
 	}
-
-	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
-	serviceType, _ := collections.GetString(spec, "type")
-	if err != nil && serviceType != "ExternalName" {
-		return nil, nil, err
-	}
-
-	for _, port := range ports {
-		p := port.(map[string]interface{})
-		var name string
-		if nameVal, ok := p["name"]; ok {
-			name = nameVal.(string)
-		}
-		if preservedPorts[name] {
-			continue
-		}
-		delete(p, "nodePort")
-	}
-
 	return obj, nil, nil
 }
 
@@ -101,4 +82,30 @@ func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
 		}
 	}
 	return preservedPorts, nil
+}
+
+func deleteNodePorts(obj runtime.Unstructured, spec *map[string]interface{}) error {
+	preservedPorts, err := getPreservedPorts(obj)
+	if err != nil {
+		return err
+	}
+
+	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
+	serviceType, _ := collections.GetString(*spec, "type")
+	if err != nil && serviceType != "ExternalName" {
+		return err
+	}
+
+	for _, port := range ports {
+		p := port.(map[string]interface{})
+		var name string
+		if nameVal, ok := p["name"]; ok {
+			name = nameVal.(string)
+		}
+		if preservedPorts[name] {
+			continue
+		}
+		delete(p, "nodePort")
+	}
+	return nil
 }
