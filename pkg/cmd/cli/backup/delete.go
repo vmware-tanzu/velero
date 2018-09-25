@@ -21,7 +21,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,13 +31,11 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/cli"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 )
 
 // NewDeleteCommand creates a new command that deletes a backup.
 func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
-	o := &DeleteOptions{}
+	o := cli.NewDeleteOptions("backup")
 
 	c := &cobra.Command{
 		Use:   fmt.Sprintf("%s [NAMES]", use),
@@ -60,8 +57,8 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
   `,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
-			cmd.CheckError(o.Validate(c, args, f))
-			cmd.CheckError(o.Run())
+			cmd.CheckError(o.Validate(c, f, args))
+			cmd.CheckError(Run(o))
 		},
 	}
 
@@ -70,60 +67,8 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 	return c
 }
 
-// DeleteOptions contains parameters for deleting a backup.
-type DeleteOptions struct {
-	Names    []string
-	All      bool
-	Selector flag.LabelSelector
-	Confirm  bool
-
-	client    clientset.Interface
-	namespace string
-}
-
-// BindFlags binds options for this command to flags.
-func (o *DeleteOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.BoolVar(&o.Confirm, "confirm", o.Confirm, "Confirm deletion")
-	flags.BoolVar(&o.All, "all", o.All, "Delete all backups")
-	flags.VarP(&o.Selector, "selector", "l", "Delete all backups matching this label selector")
-}
-
-// Complete fills out the remainder of the parameters based on user input.
-func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
-	o.namespace = f.Namespace()
-
-	client, err := f.Client()
-	if err != nil {
-		return err
-	}
-	o.client = client
-
-	o.Names = args
-
-	return nil
-}
-
-// Validate ensures all of the parameters have been filled in correctly.
-func (o *DeleteOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-	if o.client == nil {
-		return errors.New("Ark client is not set; unable to proceed")
-	}
-
-	var (
-		hasNames    = len(o.Names) > 0
-		hasAll      = o.All
-		hasSelector = o.Selector.LabelSelector != nil
-	)
-
-	if !cli.Xor(hasNames, hasAll, hasSelector) {
-		return errors.New("you must specify exactly one of: specific backup name(s), the --all flag, or the --selector flag")
-	}
-
-	return nil
-}
-
 // Run performs the delete backup operation.
-func (o *DeleteOptions) Run() error {
+func Run(o *cli.DeleteOptions) error {
 	if !o.Confirm && !cli.GetConfirmation() {
 		// Don't do anything unless we get confirmation
 		return nil
@@ -138,7 +83,7 @@ func (o *DeleteOptions) Run() error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			backup, err := o.client.ArkV1().Backups(o.namespace).Get(name, metav1.GetOptions{})
+			backup, err := o.Client.ArkV1().Backups(o.Namespace).Get(name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -152,7 +97,7 @@ func (o *DeleteOptions) Run() error {
 			selector = o.Selector.String()
 		}
 
-		res, err := o.client.ArkV1().Backups(o.namespace).List(metav1.ListOptions{LabelSelector: selector})
+		res, err := o.Client.ArkV1().Backups(o.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -170,7 +115,7 @@ func (o *DeleteOptions) Run() error {
 	for _, b := range backups {
 		deleteRequest := backup.NewDeleteBackupRequest(b.Name, string(b.UID))
 
-		if _, err := o.client.ArkV1().DeleteBackupRequests(o.namespace).Create(deleteRequest); err != nil {
+		if _, err := o.Client.ArkV1().DeleteBackupRequests(o.Namespace).Create(deleteRequest); err != nil {
 			errs = append(errs, err)
 			continue
 		}
