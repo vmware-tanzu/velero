@@ -19,103 +19,43 @@ package backup
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestBackupGroup(t *testing.T) {
-	backup := &v1.Backup{}
+func TestBackupGroupBacksUpCorrectResourcesInCorrectOrder(t *testing.T) {
+	resourceBackupperFactory := new(mockResourceBackupperFactory)
+	resourceBackupper := new(mockResourceBackupper)
 
-	namespaces := collections.NewIncludesExcludes().Includes("a")
-	resources := collections.NewIncludesExcludes().Includes("b")
-
-	dynamicFactory := &arktest.FakeDynamicFactory{}
-	defer dynamicFactory.AssertExpectations(t)
-
-	discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
-
-	backedUpItems := map[itemKey]struct{}{
-		{resource: "a", namespace: "b", name: "c"}: {},
-	}
-
-	cohabitatingResources := map[string]*cohabitatingResource{
-		"a": {
-			resource:       "a",
-			groupResource1: schema.GroupResource{Group: "g1", Resource: "a"},
-			groupResource2: schema.GroupResource{Group: "g2", Resource: "a"},
-		},
-	}
-
-	actions := []resolvedAction{
-		{
-			ItemAction:               newFakeAction("pods"),
-			resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
-		},
-	}
-
-	podCommandExecutor := &arktest.MockPodCommandExecutor{}
-	defer podCommandExecutor.AssertExpectations(t)
-
-	tarWriter := &fakeTarWriter{}
-
-	resourceHooks := []resourceHook{
-		{name: "myhook"},
-	}
-
-	gb := (&defaultGroupBackupperFactory{}).newGroupBackupper(
-		arktest.NewLogger(),
-		backup,
-		namespaces,
-		resources,
-		dynamicFactory,
-		discoveryHelper,
-		backedUpItems,
-		cohabitatingResources,
-		actions,
-		podCommandExecutor,
-		tarWriter,
-		resourceHooks,
-		nil, // snapshot service
-		nil, // restic backupper
-		newPVCSnapshotTracker(),
-	).(*defaultGroupBackupper)
-
-	resourceBackupperFactory := &mockResourceBackupperFactory{}
 	defer resourceBackupperFactory.AssertExpectations(t)
-	gb.resourceBackupperFactory = resourceBackupperFactory
-
-	resourceBackupper := &mockResourceBackupper{}
 	defer resourceBackupper.AssertExpectations(t)
 
 	resourceBackupperFactory.On("newResourceBackupper",
 		mock.Anything,
-		backup,
-		namespaces,
-		resources,
-		dynamicFactory,
-		discoveryHelper,
-		backedUpItems,
-		cohabitatingResources,
-		actions,
-		podCommandExecutor,
-		tarWriter,
-		resourceHooks,
-		nil,
-		mock.Anything, // restic backupper
-		mock.Anything, // pvc snapshot tracker
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
+		mock.Anything,
 	).Return(resourceBackupper)
+
+	gb := &defaultGroupBackupper{
+		log: arktest.NewLogger(),
+		resourceBackupperFactory: resourceBackupperFactory,
+	}
 
 	group := &metav1.APIResourceList{
 		GroupVersion: "v1",
@@ -126,9 +66,7 @@ func TestBackupGroup(t *testing.T) {
 		},
 	}
 
-	expectedOrder := []string{"pods", "persistentvolumeclaims", "persistentvolumes"}
 	var actualOrder []string
-
 	runFunc := func(args mock.Arguments) {
 		actualOrder = append(actualOrder, args.Get(1).(metav1.APIResource).Name)
 	}
@@ -137,11 +75,10 @@ func TestBackupGroup(t *testing.T) {
 	resourceBackupper.On("backupResource", group, metav1.APIResource{Name: "persistentvolumeclaims"}).Return(nil).Run(runFunc)
 	resourceBackupper.On("backupResource", group, metav1.APIResource{Name: "persistentvolumes"}).Return(nil).Run(runFunc)
 
-	err := gb.backupGroup(group)
-	require.NoError(t, err)
+	require.NoError(t, gb.backupGroup(group))
 
 	// make sure PVs were last
-	assert.Equal(t, expectedOrder, actualOrder)
+	assert.Equal(t, []string{"pods", "persistentvolumeclaims", "persistentvolumes"}, actualOrder)
 }
 
 type mockResourceBackupperFactory struct {
@@ -150,37 +87,29 @@ type mockResourceBackupperFactory struct {
 
 func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	log logrus.FieldLogger,
-	backup *v1.Backup,
-	namespaces *collections.IncludesExcludes,
-	resources *collections.IncludesExcludes,
+	backup *Request,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions []resolvedAction,
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
-	resourceHooks []resourceHook,
-	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
+	blockStoreGetter BlockStoreGetter,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
 		backup,
-		namespaces,
-		resources,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
 		cohabitatingResources,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
-		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
+		blockStoreGetter,
 	)
 	return args.Get(0).(resourceBackupper)
 }

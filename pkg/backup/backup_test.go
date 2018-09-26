@@ -38,7 +38,6 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
@@ -372,17 +371,16 @@ func parseLabelSelectorOrDie(s string) labels.Selector {
 
 func TestBackup(t *testing.T) {
 	tests := []struct {
-		name                  string
-		backup                *v1.Backup
-		expectedNamespaces    *collections.IncludesExcludes
-		expectedResources     *collections.IncludesExcludes
-		expectedLabelSelector string
-		expectedHooks         []resourceHook
-		backupGroupErrors     map[*metav1.APIResourceList]error
-		expectedError         error
+		name               string
+		backup             *v1.Backup
+		expectedNamespaces *collections.IncludesExcludes
+		expectedResources  *collections.IncludesExcludes
+		expectedHooks      []resourceHook
+		backupGroupErrors  map[*metav1.APIResourceList]error
+		expectedError      error
 	}{
 		{
-			name: "happy path, no actions, no label selector, no hooks, no errors",
+			name: "happy path, no actions, no hooks, no errors",
 			backup: &v1.Backup{
 				Spec: v1.BackupSpec{
 					// cm - shortcut in legacy api group
@@ -396,25 +394,6 @@ func TestBackup(t *testing.T) {
 			expectedNamespaces: collections.NewIncludesExcludes().Includes("a", "b").Excludes("c", "d"),
 			expectedResources:  collections.NewIncludesExcludes().Includes("configmaps", "certificatesigningrequests.certificates.k8s.io", "roles.rbac.authorization.k8s.io"),
 			expectedHooks:      []resourceHook{},
-			backupGroupErrors: map[*metav1.APIResourceList]error{
-				v1Group:           nil,
-				certificatesGroup: nil,
-				rbacGroup:         nil,
-			},
-		},
-		{
-			name: "label selector",
-			backup: &v1.Backup{
-				Spec: v1.BackupSpec{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
-					},
-				},
-			},
-			expectedNamespaces:    collections.NewIncludesExcludes(),
-			expectedResources:     collections.NewIncludesExcludes(),
-			expectedHooks:         []resourceHook{},
-			expectedLabelSelector: "a=b",
 			backupGroupErrors: map[*metav1.APIResourceList]error{
 				v1Group:           nil,
 				certificatesGroup: nil,
@@ -488,6 +467,10 @@ func TestBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			req := &Request{
+				Backup: test.backup,
+			}
+
 			discoveryHelper := &arktest.FakeDiscoveryHelper{
 				Mapper: &arktest.FakeMapper{
 					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
@@ -503,77 +486,66 @@ func TestBackup(t *testing.T) {
 				},
 			}
 
-			dynamicFactory := &arktest.FakeDynamicFactory{}
+			dynamicFactory := new(arktest.FakeDynamicFactory)
 
 			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
-			b, err := NewKubernetesBackupper(
-				discoveryHelper,
-				dynamicFactory,
-				podCommandExecutor,
-				nil,
-				nil, // restic backupper factory
-				0,   // restic timeout
-			)
-			require.NoError(t, err)
-			kb := b.(*kubernetesBackupper)
-
 			groupBackupperFactory := &mockGroupBackupperFactory{}
 			defer groupBackupperFactory.AssertExpectations(t)
-			kb.groupBackupperFactory = groupBackupperFactory
 
 			groupBackupper := &mockGroupBackupper{}
 			defer groupBackupper.AssertExpectations(t)
 
 			groupBackupperFactory.On("newGroupBackupper",
 				mock.Anything, // log
-				test.backup,
-				test.expectedNamespaces,
-				test.expectedResources,
+				req,
 				dynamicFactory,
 				discoveryHelper,
 				map[itemKey]struct{}{}, // backedUpItems
 				cohabitatingResources(),
-				mock.Anything,
-				kb.podCommandExecutor,
+				podCommandExecutor,
 				mock.Anything, // tarWriter
-				test.expectedHooks,
-				mock.Anything,
 				mock.Anything, // restic backupper
 				mock.Anything, // pvc snapshot tracker
+				mock.Anything, // block store getter
 			).Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
 				groupBackupper.On("backupGroup", group).Return(err)
 			}
 
-			var backupFile bytes.Buffer
+			kb := &kubernetesBackupper{
+				discoveryHelper:       discoveryHelper,
+				dynamicFactory:        dynamicFactory,
+				podCommandExecutor:    podCommandExecutor,
+				groupBackupperFactory: groupBackupperFactory,
+			}
 
-			err = b.Backup(logging.DefaultLogger(logrus.DebugLevel), test.backup, &backupFile, nil)
+			err := kb.Backup(logging.DefaultLogger(logrus.DebugLevel), req, new(bytes.Buffer), nil, nil)
+
+			assert.Equal(t, test.expectedNamespaces, req.NamespaceIncludesExcludes)
+			assert.Equal(t, test.expectedResources, req.ResourceIncludesExcludes)
+			assert.Equal(t, test.expectedHooks, req.ResourceHooks)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
 				return
 			}
 			assert.NoError(t, err)
+
 		})
 	}
 }
 
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
-	discoveryHelper := &arktest.FakeDiscoveryHelper{
-		Mapper: &arktest.FakeMapper{
-			Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{},
-		},
+	groupBackupperFactory := &mockGroupBackupperFactory{}
+	kb := &kubernetesBackupper{
+		discoveryHelper:       new(arktest.FakeDiscoveryHelper),
+		groupBackupperFactory: groupBackupperFactory,
 	}
 
-	b, err := NewKubernetesBackupper(discoveryHelper, nil, nil, nil, nil, 0)
-	require.NoError(t, err)
-
-	kb := b.(*kubernetesBackupper)
-	groupBackupperFactory := &mockGroupBackupperFactory{}
-	kb.groupBackupperFactory = groupBackupperFactory
+	defer groupBackupperFactory.AssertExpectations(t)
 
 	// assert that newGroupBackupper() is called with the result of cohabitatingResources()
 	// passed as an argument.
@@ -582,9 +554,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		discoveryHelper,
+		kb.discoveryHelper,
 		mock.Anything,
 		firstCohabitatingResources,
 		mock.Anything,
@@ -592,12 +562,9 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, b.Backup(arktest.NewLogger(), &v1.Backup{}, &bytes.Buffer{}, nil))
-	groupBackupperFactory.AssertExpectations(t)
+	assert.NoError(t, kb.Backup(arktest.NewLogger(), &Request{Backup: &v1.Backup{}}, &bytes.Buffer{}, nil, nil))
 
 	// mutate the cohabitatingResources map that was used in the first backup to simulate
 	// the first backup process having done so.
@@ -614,9 +581,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
-		discoveryHelper,
+		kb.discoveryHelper,
 		mock.Anything,
 		secondCohabitatingResources,
 		mock.Anything,
@@ -624,16 +589,13 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 		mock.Anything,
 		mock.Anything,
-		mock.Anything,
-		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, b.Backup(arktest.NewLogger(), &v1.Backup{}, &bytes.Buffer{}, nil))
+	assert.NoError(t, kb.Backup(arktest.NewLogger(), &Request{Backup: new(v1.Backup)}, new(bytes.Buffer), nil, nil))
 	assert.NotEqual(t, firstCohabitatingResources, secondCohabitatingResources)
 	for _, resource := range secondCohabitatingResources {
 		assert.False(t, resource.seen)
 	}
-	groupBackupperFactory.AssertExpectations(t)
 }
 
 type mockGroupBackupperFactory struct {
@@ -642,36 +604,29 @@ type mockGroupBackupperFactory struct {
 
 func (f *mockGroupBackupperFactory) newGroupBackupper(
 	log logrus.FieldLogger,
-	backup *v1.Backup,
-	namespaces, resources *collections.IncludesExcludes,
+	backup *Request,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
 	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
-	actions []resolvedAction,
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
-	resourceHooks []resourceHook,
-	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
+	blockStoreGetter BlockStoreGetter,
 ) groupBackupper {
 	args := f.Called(
 		log,
 		backup,
-		namespaces,
-		resources,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
 		cohabitatingResources,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
-		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
+		blockStoreGetter,
 	)
 	return args.Get(0).(groupBackupper)
 }

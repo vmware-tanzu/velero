@@ -46,7 +46,7 @@ import (
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *api.Backup, backupFile io.Writer, actions []ItemAction) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -55,7 +55,6 @@ type kubernetesBackupper struct {
 	discoveryHelper        discovery.Helper
 	podCommandExecutor     podexec.PodCommandExecutor
 	groupBackupperFactory  groupBackupperFactory
-	blockStore             cloudprovider.BlockStore
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
 }
@@ -93,7 +92,6 @@ func NewKubernetesBackupper(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
 	podCommandExecutor podexec.PodCommandExecutor,
-	blockStore cloudprovider.BlockStore,
 	resticBackupperFactory restic.BackupperFactory,
 	resticTimeout time.Duration,
 ) (Backupper, error) {
@@ -102,7 +100,6 @@ func NewKubernetesBackupper(
 		dynamicFactory:         dynamicFactory,
 		podCommandExecutor:     podCommandExecutor,
 		groupBackupperFactory:  &defaultGroupBackupperFactory{},
-		blockStore:             blockStore,
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
 	}, nil
@@ -209,41 +206,43 @@ func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discov
 	return h, nil
 }
 
+type BlockStoreGetter interface {
+	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+}
+
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backup *api.Backup, backupFile io.Writer, actions []ItemAction) error {
+func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
 	tw := tar.NewWriter(gzippedData)
 	defer tw.Close()
 
-	log := logger.WithField("backup", kubeutil.NamespaceAndName(backup))
+	log := logger.WithField("backup", kubeutil.NamespaceAndName(backupRequest))
 	log.Info("Starting backup")
 
-	namespaceIncludesExcludes := getNamespaceIncludesExcludes(backup)
-	log.Infof("Including namespaces: %s", namespaceIncludesExcludes.IncludesString())
-	log.Infof("Excluding namespaces: %s", namespaceIncludesExcludes.ExcludesString())
+	backupRequest.NamespaceIncludesExcludes = getNamespaceIncludesExcludes(backupRequest.Backup)
+	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
+	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
 
-	resourceIncludesExcludes := getResourceIncludesExcludes(kb.discoveryHelper, backup.Spec.IncludedResources, backup.Spec.ExcludedResources)
-	log.Infof("Including resources: %s", resourceIncludesExcludes.IncludesString())
-	log.Infof("Excluding resources: %s", resourceIncludesExcludes.ExcludesString())
+	backupRequest.ResourceIncludesExcludes = getResourceIncludesExcludes(kb.discoveryHelper, backupRequest.Spec.IncludedResources, backupRequest.Spec.ExcludedResources)
+	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
+	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
 
-	resourceHooks, err := getResourceHooks(backup.Spec.Hooks.Resources, kb.discoveryHelper)
+	var err error
+	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
 	if err != nil {
 		return err
 	}
 
-	backedUpItems := make(map[itemKey]struct{})
-	var errs []error
-
-	resolvedActions, err := resolveActions(actions, kb.discoveryHelper)
+	backupRequest.ResolvedActions, err = resolveActions(actions, kb.discoveryHelper)
 	if err != nil {
 		return err
 	}
 
 	podVolumeTimeout := kb.resticTimeout
-	if val := backup.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+	if val := backupRequest.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
@@ -257,7 +256,7 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backup *api.Bac
 
 	var resticBackupper restic.Backupper
 	if kb.resticBackupperFactory != nil {
-		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backup)
+		resticBackupper, err = kb.resticBackupperFactory.NewBackupper(ctx, backupRequest.Backup)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -265,22 +264,19 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backup *api.Bac
 
 	gb := kb.groupBackupperFactory.newGroupBackupper(
 		log,
-		backup,
-		namespaceIncludesExcludes,
-		resourceIncludesExcludes,
+		backupRequest,
 		kb.dynamicFactory,
 		kb.discoveryHelper,
-		backedUpItems,
+		make(map[itemKey]struct{}),
 		cohabitatingResources(),
-		resolvedActions,
 		kb.podCommandExecutor,
 		tw,
-		resourceHooks,
-		kb.blockStore,
 		resticBackupper,
 		newPVCSnapshotTracker(),
+		blockStoreGetter,
 	)
 
+	var errs []error
 	for _, group := range kb.discoveryHelper.Resources() {
 		if err := gb.backupGroup(group); err != nil {
 			errs = append(errs, err)
