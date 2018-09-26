@@ -104,10 +104,6 @@ func (bs *FakeBlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int
 }
 
 func (bs *FakeBlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if bs.Error != nil {
-		return "", bs.Error
-	}
-
 	return bs.VolumeID, nil
 }
 

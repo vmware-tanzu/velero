@@ -53,7 +53,6 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
@@ -176,7 +175,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
 	dynamicClient         dynamic.Interface
@@ -289,17 +287,6 @@ func (s *server) run() error {
 	defaultVolumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
 	if err != nil {
 		return err
-	}
-
-	if config.PersistentVolumeProvider == nil {
-		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
-	} else {
-		s.logger.Info("Configuring cloud provider for snapshot service")
-		blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
-		if err != nil {
-			return err
-		}
-		s.blockStore = blockStore
 	}
 
 	if err := s.initRestic(); err != nil {
@@ -559,23 +546,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("block storage provider name must not be empty")
-	}
-
-	blockStore, err := manager.GetBlockStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := blockStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return blockStore, nil
-}
-
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
@@ -671,7 +641,6 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.blockStore,
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
 		)
@@ -681,7 +650,6 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
 			newPluginManager,
@@ -689,7 +657,7 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
 			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
-			s.config.defaultVolumeSnapshotLocations,
+			defaultVolumeSnapshotLocations,
 			s.metrics,
 		)
 		wg.Add(1)
@@ -729,7 +697,7 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
-			s.blockStore,
+			nil,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
@@ -749,7 +717,7 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 	restorer, err := restore.NewKubernetesRestorer(
 		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
-		s.blockStore,
+		nil,
 		s.config.restoreResourcePriorities,
 		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
@@ -767,7 +735,7 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 		restorer,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-		s.blockStore != nil,
+		false,
 		s.logger,
 		s.logLevel,
 		newPluginManager,

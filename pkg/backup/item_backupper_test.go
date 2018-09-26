@@ -26,6 +26,7 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
 	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
@@ -107,10 +108,13 @@ func TestBackupItemSkips(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.testName, func(t *testing.T) {
+			req := &Request{
+				NamespaceIncludesExcludes: test.namespaces,
+				ResourceIncludesExcludes:  test.resources,
+			}
 
 			ib := &defaultItemBackupper{
-				namespaces:    test.namespaces,
-				resources:     test.resources,
+				backupRequest: req,
 				backedUpItems: test.backedUpItems,
 			}
 
@@ -134,13 +138,15 @@ func TestBackupItemSkips(t *testing.T) {
 func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t *testing.T) {
 	f := false
 	ib := &defaultItemBackupper{
-		backup: &v1.Backup{
-			Spec: v1.BackupSpec{
-				IncludeClusterResources: &f,
+		backupRequest: &Request{
+			Backup: &v1.Backup{
+				Spec: v1.BackupSpec{
+					IncludeClusterResources: &f,
+				},
 			},
+			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
+			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
 		},
-		namespaces: collections.NewIncludesExcludes(),
-		resources:  collections.NewIncludesExcludes(),
 	}
 
 	u := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
@@ -350,14 +356,19 @@ func TestBackupItemNoSkips(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				actions       []resolvedAction
 				action        *fakeAction
-				backup        = &v1.Backup{}
+				backup        = new(Request)
 				groupResource = schema.ParseGroupResource("resource.group")
 				backedUpItems = make(map[itemKey]struct{})
-				resources     = collections.NewIncludesExcludes()
 				w             = &fakeTarWriter{}
 			)
+
+			backup.Backup = new(v1.Backup)
+			backup.NamespaceIncludesExcludes = collections.NewIncludesExcludes()
+			backup.ResourceIncludesExcludes = collections.NewIncludesExcludes()
+			backup.SnapshotLocations = []*v1.VolumeSnapshotLocation{
+				new(v1.VolumeSnapshotLocation),
+			}
 
 			if test.groupResource != "" {
 				groupResource = schema.ParseGroupResource(test.groupResource)
@@ -384,7 +395,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				action = &fakeAction{
 					additionalItems: test.customActionAdditionalItemIdentifiers,
 				}
-				actions = []resolvedAction{
+				backup.ResolvedActions = []resolvedAction{
 					{
 						ItemAction:                action,
 						namespaceIncludesExcludes: collections.NewIncludesExcludes(),
@@ -394,8 +405,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 			}
 
-			resourceHooks := []resourceHook{}
-
 			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
@@ -404,20 +413,18 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
 
+			blockStoreGetter := &blockStoreGetter{}
+
 			b := (&defaultItemBackupperFactory{}).newItemBackupper(
 				backup,
-				namespaces,
-				resources,
 				backedUpItems,
-				actions,
 				podCommandExecutor,
 				w,
-				resourceHooks,
 				dynamicFactory,
 				discoveryHelper,
-				nil, // snapshot service
 				nil, // restic backupper
 				newPVCSnapshotTracker(),
+				blockStoreGetter,
 			).(*defaultItemBackupper)
 
 			var blockStore *arktest.FakeBlockStore
@@ -427,7 +434,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 					VolumeID:             "vol-abc123",
 					Error:                test.snapshotError,
 				}
-				b.blockStore = blockStore
+
+				blockStoreGetter.blockStore = blockStore
 			}
 
 			if test.trackedPVCs != nil {
@@ -446,8 +454,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 			b.additionalItemBackupper = additionalItemBackupper
 
 			obj := &unstructured.Unstructured{Object: item}
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePre).Return(nil)
-			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, resourceHooks, hookPhasePost).Return(nil)
+			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePre).Return(nil)
+			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePost).Return(nil)
 
 			for i, item := range test.customActionAdditionalItemIdentifiers {
 				if test.additionalItemError != nil && i > 0 {
@@ -511,7 +519,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 
 				require.Equal(t, 1, len(action.backups), "unexpected custom action backups: %#v", action.backups)
-				assert.Equal(t, backup, &(action.backups[0]), "backup")
+				assert.Equal(t, backup.Backup, &(action.backups[0]), "backup")
 			}
 
 			if test.snapshottableVolumes != nil {
@@ -539,6 +547,17 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 		})
 	}
+}
+
+type blockStoreGetter struct {
+	blockStore cloudprovider.BlockStore
+}
+
+func (b *blockStoreGetter) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
+	if b.blockStore != nil {
+		return b.blockStore, nil
+	}
+	return nil, errors.New("plugin not found")
 }
 
 type addAnnotationAction struct{}
@@ -578,28 +597,29 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 				},
 			},
 		}
-		actions = []resolvedAction{
-			{
-				ItemAction:                &addAnnotationAction{},
-				namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-				resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-				selector:                  labels.Everything(),
+		req = &Request{
+			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
+			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
+			ResolvedActions: []resolvedAction{
+				{
+					ItemAction:                &addAnnotationAction{},
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
 			},
 		}
+
 		b = (&defaultItemBackupperFactory{}).newItemBackupper(
-			&v1.Backup{},
-			collections.NewIncludesExcludes(),
-			collections.NewIncludesExcludes(),
+			req,
 			make(map[itemKey]struct{}),
-			actions,
 			nil,
 			w,
-			nil,
 			&arktest.FakeDynamicFactory{},
 			arktest.NewFakeDiscoveryHelper(true, nil),
 			nil,
-			nil,
 			newPVCSnapshotTracker(),
+			nil,
 		).(*defaultItemBackupper)
 	)
 
@@ -633,29 +653,29 @@ func TestResticAnnotationsPersist(t *testing.T) {
 				},
 			},
 		}
-		actions = []resolvedAction{
-			{
-				ItemAction:                &addAnnotationAction{},
-				namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-				resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-				selector:                  labels.Everything(),
+		req = &Request{
+			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
+			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
+			ResolvedActions: []resolvedAction{
+				{
+					ItemAction:                &addAnnotationAction{},
+					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
+					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
+					selector:                  labels.Everything(),
+				},
 			},
 		}
 		resticBackupper = &resticmocks.Backupper{}
 		b               = (&defaultItemBackupperFactory{}).newItemBackupper(
-			&v1.Backup{},
-			collections.NewIncludesExcludes(),
-			collections.NewIncludesExcludes(),
+			req,
 			make(map[itemKey]struct{}),
-			actions,
 			nil,
 			w,
-			nil,
 			&arktest.FakeDynamicFactory{},
 			arktest.NewFakeDiscoveryHelper(true, nil),
-			nil,
 			resticBackupper,
 			newPVCSnapshotTracker(),
+			nil,
 		).(*defaultItemBackupper)
 	)
 
@@ -793,7 +813,13 @@ func TestTakePVSnapshot(t *testing.T) {
 				VolumeID:             test.expectedVolumeID,
 			}
 
-			ib := &defaultItemBackupper{blockStore: blockStore}
+			ib := &defaultItemBackupper{
+				backupRequest: &Request{
+					Backup:            backup,
+					SnapshotLocations: []*v1.VolumeSnapshotLocation{new(v1.VolumeSnapshotLocation)},
+				},
+				blockStoreGetter: &blockStoreGetter{blockStore: blockStore},
+			}
 
 			pv, err := arktest.GetAsMap(test.pv)
 			if err != nil {
@@ -801,7 +827,7 @@ func TestTakePVSnapshot(t *testing.T) {
 			}
 
 			// method under test
-			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, backup, arktest.NewLogger())
+			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, arktest.NewLogger())
 
 			gotErr := err != nil
 
