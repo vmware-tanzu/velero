@@ -1,6 +1,30 @@
-# Set up Ark with your cloud provider
+# Set up Ark on your platform
 
-To run Ark with your cloud provider, you specify provider-specific settings for the Ark server. In version 0.7.0 and later, you can run Ark in any namespace, which requires additional customization. See [Run in custom namespace][3].
+You can run Ark with a cloud provider or on-premises. For detailed information about the platforms that Ark supports, see [Compatible Storage Providers][99].
+
+In version 0.7.0 and later, you can run Ark in any namespace, which requires additional customization. See [Run in custom namespace][3].
+
+In version 0.9.0 and later, you can use Ark's integration with restic, which requires additional setup. See [restic instructions][20].
+
+## Set up Ark on-premises
+
+You can run Ark in an on-premises cluster in different ways depending on your requirements.
+
+### Highly-available Minio instance outside your cluster
+
+SOME EXPLANATION HERE
+
+### Rook plug-in
+
+SOME EXPLANATION HERE
+
+### restic
+
+OR TO QUOTE STEVE, YADDA YADDA YADDA
+
+(n.b. if we don't have much detail to add here, a bulleted list might be a better option than subheadings)
+
+## Cloud provider settings
 
 The Ark repository includes a set of example YAML files that specify the settings for each cloud provider. For provider-specific instructions, see:
 
@@ -8,8 +32,6 @@ The Ark repository includes a set of example YAML files that specify the setting
 * [Run Ark on GCP][1]
 * [Run Ark on Azure][2]
 * [Use IBM Cloud Object Store as Ark's storage destination][4]
-
-In version 0.9.0 and later, you can use Ark's integration with restic, which requires additional setup. See [Restic instructions][20].
 
 ## Examples
 
@@ -45,7 +67,7 @@ After you set up the Ark server, try these examples:
 
 ### Snapshot example (with PersistentVolumes)
 
-> NOTE: For Azure, your Kubernetes cluster needs to be version 1.7.2+ to support PV snapshotting of its managed disks.
+> NOTE: For Azure, you must run Kubernetes version 1.7.2 or later to support PV snapshotting of managed disks.
 
 1. Start the sample nginx app:
 
@@ -65,7 +87,7 @@ After you set up the Ark server, try these examples:
     kubectl delete namespaces nginx-example
     ```
 
-    Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Delete", these commands should trigger your cloud provider to delete the disk backing the PV. The deletion process is asynchronous so this may take some time. **Before continuing to the next step, check your cloud provider to confirm that the disk no longer exists.**
+    Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Delete", these commands should trigger your cloud provider to delete the disk that backs the PV. Deletion is asynchronous, so this may take some time. **Before continuing to the next step, check your cloud provider to confirm that the disk no longer exists.**
 
 1. Restore your lost resources:
 
@@ -79,4 +101,5 @@ After you set up the Ark server, try these examples:
 [3]: namespace.md
 [4]: ibm-config.md
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
-[20]: https://github.com/heptio/ark/blob/master/docs/restic.md
+[20]: restic.md
+[99]: support-matrix.md

@@ -9,13 +9,18 @@
 Ark gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Ark lets you:
 
 * Take backups of your cluster and restore in case of loss.
-* Copy cluster resources across cloud providers. NOTE: Cloud volume migrations are not yet supported.
+* Copy cluster resources to other clusters on the same platform.
+* Copy cluster resources to another platform.
 * Replicate your production environment for development and testing environments.
+
+**NOTE**: Cloud volume integrations are not yet supported.
 
 Ark consists of:
 
 * A server that runs on your cluster
 * A command-line client that runs locally
+
+You can run Ark in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
 
 ## More information
 
@@ -68,3 +73,5 @@ See [the list of releases][6] to find out about feature changes.
 
 [29]: https://heptio.github.io/ark/
 [30]: /docs/troubleshooting.md
+
+[99]: support-matrix.md
