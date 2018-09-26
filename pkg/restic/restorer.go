@@ -34,7 +34,7 @@ import (
 // Restorer can execute restic restores of volumes in a pod.
 type Restorer interface {
 	// RestorePodVolumes restores all annotated volumes in a pod.
-	RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, log logrus.FieldLogger) []error
+	RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace string, log logrus.FieldLogger) []error
 }
 
 type restorer struct {
@@ -84,14 +84,14 @@ func newRestorer(
 	return r
 }
 
-func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, log logrus.FieldLogger) []error {
+func (r *restorer) RestorePodVolumes(restore *arkv1api.Restore, pod *corev1api.Pod, sourceNamespace string, log logrus.FieldLogger) []error {
 	// get volumes to restore from pod's annotations
 	volumesToRestore := GetPodSnapshotAnnotations(pod)
 	if len(volumesToRestore) == 0 {
 		return nil
 	}
 
-	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, restore.Namespace, pod.Namespace)
+	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, restore.Namespace, sourceNamespace)
 	if err != nil {
 		return []error{err}
 	}

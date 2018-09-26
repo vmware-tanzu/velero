@@ -761,6 +761,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 		// necessary because we may have remapped the namespace
 		// if the namespace is blank, don't create the key
+		originalNamespace := obj.GetNamespace()
 		if namespace != "" {
 			obj.SetNamespace(namespace)
 		}
