@@ -103,8 +103,6 @@ To provision a cluster on `aws` using Amazon’s official CloudFormation templat
 
 * eksctl - [a CLI for Amazon EKS][18]
 
-To provision production grade clusters, see [Cloud Provider Specifics][9] instructions.
-
 ### Option 1: Run your Ark server locally
 
 Running the Ark server locally can speed up iterative development. This eliminates the need to rebuild the Ark server
@@ -197,7 +195,6 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [6]: https://github.com/heptio/ark/tree/master/examples
 [7]: #run
 [8]: config-definition.md
-[9]: cloud-common.md
 [10]: #vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #test
