@@ -2,7 +2,12 @@
 
 The following example sets up the Ark server and client, then backs up and restores a sample application.
 
-For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. See [Set up Ark with your cloud provider][3] for how to run on a cloud provider. 
+For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
+
+**NOTE** The example lets you explore basic Ark functionality. In the real world, however, you would back your cluster up to external storage.
+
+See [Set up Ark on your platform][3] for how to configure Ark for a production environment.
+
 
 ### Prerequisites
 
@@ -144,6 +149,6 @@ kubectl delete -f examples/minio/
 kubectl delete -f examples/nginx-app/base.yaml
 ```
 
-[3]: cloud-common.md
+[3]: install-overview.md
 [18]: debugging-restores.md
 [26]: https://github.com/heptio/ark/releases

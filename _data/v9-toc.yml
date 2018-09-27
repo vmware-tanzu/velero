@@ -7,10 +7,12 @@ toc:
         url: /quickstart
       - page: How Ark works
         url: /about
+      - page: Supported platforms
+        url: /support-matrix
   - title: Install
     subfolderitems:
-      - page: Set up with cloud provider
-        url: /cloud-common
+      - page: Set up Ark
+        url: /install-overview
       - page: Run on AWS
         url: /aws-config
       - page: Run on GCP
