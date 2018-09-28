@@ -22,6 +22,7 @@ _Note that these providers are not regularly tested by the Ark team._
  * [DigitalOcean][7]
 
 ## Volume Snapshot Providers
+
 | Provider                         | Owner           | Contact                         |
 |----------------------------------|-----------------|---------------------------------|
 | [AWS EBS][2]                     | Ark Team        | [Slack][10], [GitHub Issue][11] |
