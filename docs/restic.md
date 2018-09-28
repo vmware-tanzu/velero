@@ -23,14 +23,8 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 ### Prerequisites
 
-- A working install of Ark version 0.9.0 or later. See [Set up Ark][2]
+- A working install of Ark version 0.10.0 or later. See [Set up Ark][2]
 - A local clone of [the latest release tag of the Ark repository][3]
-
-#### Additional steps if upgrading from version 0.9 alpha
-
-- Manually delete all of the repositories/data from your existing restic bucket
-- Delete all Ark backups from your cluster using `ark backup delete`
-- Delete all secrets named `ark-restic-credentials` across all namespaces in your cluster
 
 ### Instructions
 
@@ -48,20 +42,6 @@ cross-volume-type data migrations. Stay tuned as this evolves!
     - Azure: `kubectl apply -f examples/azure/20-restic-daemonset.yaml`
     - GCP: `kubectl apply -f examples/gcp/20-restic-daemonset.yaml`
     - Minio: `kubectl apply -f examples/minio/30-restic-daemonset.yaml`
-
-1. Create a new bucket for restic to store its data in, and give the `heptio-ark` IAM user access to it, similarly to
-the main Ark bucket you've already set up. Note that this must be a different bucket than the main Ark bucket.
-We plan to remove this limitation in a future release.
-
-1. Uncomment `resticLocation` in your Ark config and set the value appropriately, then apply:
-    
-    - AWS: `kubectl apply -f examples/aws/00-ark-config.yaml`
-    - Azure: `kubectl apply -f examples/azure/10-ark-config.yaml`
-    - GCP: `kubectl apply -f examples/gcp/00-ark-config.yaml`
-    - Minio: `kubectl apply -f examples/minio/10-ark-config.yaml`
-
-    Note that `resticLocation` may either be just a bucket name, e.g. `my-restic-bucket`, or a bucket name plus a prefix under
-    which you'd like the restic data to be stored, e.g. `my-restic-bucket/ark-repos`.
 
 You're now ready to use Ark with restic.
 
@@ -139,8 +119,6 @@ You're now ready to use Ark with restic.
 
 ## Limitations
 
-- You cannot use the main Ark bucket for storing restic backups. We plan to address this issue
-in a future release.
 - `hostPath` volumes are not supported. [Local persistent volumes][4] are supported.
 - Those of you familiar with [restic][1] may know that it encrypts all of its data. We've decided to use a static, 
 common encryption key for all restic repositories created by Ark. **This means that anyone who has access to your

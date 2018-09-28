@@ -20,57 +20,68 @@ import (
 	"fmt"
 	"path"
 	"strings"
-
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-var validRootDirs = sets.NewString("backups", "restores")
-
-type objectStoreLayout struct {
-	rootPrefix  string
-	backupsDir  string
-	restoresDir string
+// ObjectStoreLayout defines how Ark's persisted files map to
+// keys in an object storage bucket.
+type ObjectStoreLayout struct {
+	rootPrefix string
+	subdirs    map[string]string
 }
 
-func newObjectStoreLayout(prefix string) *objectStoreLayout {
+func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix = prefix + "/"
 	}
 
-	backupsDir := path.Join(prefix, "backups") + "/"
-	restoresDir := path.Join(prefix, "restores") + "/"
+	subdirs := map[string]string{
+		"backups":  path.Join(prefix, "backups") + "/",
+		"restores": path.Join(prefix, "restores") + "/",
+		"restic":   path.Join(prefix, "restic") + "/",
+	}
 
-	return &objectStoreLayout{
-		rootPrefix:  prefix,
-		backupsDir:  backupsDir,
-		restoresDir: restoresDir,
+	return &ObjectStoreLayout{
+		rootPrefix: prefix,
+		subdirs:    subdirs,
 	}
 }
 
-func (l *objectStoreLayout) getBackupDir(backup string) string {
-	return path.Join(l.backupsDir, backup) + "/"
+// GetResticDir returns the full prefix representing the restic
+// directory within an object storage bucket containing a backup
+// store.
+func (l *ObjectStoreLayout) GetResticDir() string {
+	return l.subdirs["restic"]
 }
 
-func (l *objectStoreLayout) getRestoreDir(restore string) string {
-	return path.Join(l.restoresDir, restore) + "/"
+func (l *ObjectStoreLayout) isValidSubdir(name string) bool {
+	_, ok := l.subdirs[name]
+	return ok
 }
 
-func (l *objectStoreLayout) getBackupMetadataKey(backup string) string {
-	return path.Join(l.backupsDir, backup, "ark-backup.json")
+func (l *ObjectStoreLayout) getBackupDir(backup string) string {
+	return path.Join(l.subdirs["backups"], backup) + "/"
 }
 
-func (l *objectStoreLayout) getBackupContentsKey(backup string) string {
-	return path.Join(l.backupsDir, backup, fmt.Sprintf("%s.tar.gz", backup))
+func (l *ObjectStoreLayout) getRestoreDir(restore string) string {
+	return path.Join(l.subdirs["restores"], restore) + "/"
 }
 
-func (l *objectStoreLayout) getBackupLogKey(backup string) string {
-	return path.Join(l.backupsDir, backup, fmt.Sprintf("%s-logs.gz", backup))
+func (l *ObjectStoreLayout) getBackupMetadataKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, "ark-backup.json")
 }
 
-func (l *objectStoreLayout) getRestoreLogKey(restore string) string {
-	return path.Join(l.restoresDir, restore, fmt.Sprintf("restore-%s-logs.gz", restore))
+func (l *ObjectStoreLayout) getBackupContentsKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s.tar.gz", backup))
 }
 
-func (l *objectStoreLayout) getRestoreResultsKey(restore string) string {
-	return path.Join(l.restoresDir, restore, fmt.Sprintf("restore-%s-results.gz", restore))
+func (l *ObjectStoreLayout) getBackupLogKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-logs.gz", backup))
+}
+
+func (l *ObjectStoreLayout) getRestoreLogKey(restore string) string {
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-logs.gz", restore))
+}
+
+func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
+	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz", restore))
 }

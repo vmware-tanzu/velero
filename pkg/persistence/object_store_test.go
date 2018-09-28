@@ -53,7 +53,7 @@ func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTe
 		objectBackupStore: &objectBackupStore{
 			objectStore: objectStore,
 			bucket:      bucket,
-			layout:      newObjectStoreLayout(prefix),
+			layout:      NewObjectStoreLayout(prefix),
 			logger:      arktest.NewLogger(),
 		},
 		objectStore: objectStore,
@@ -363,7 +363,7 @@ func TestDeleteBackup(t *testing.T) {
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
-				layout:      newObjectStoreLayout(test.prefix),
+				layout:      NewObjectStoreLayout(test.prefix),
 				logger:      arktest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)

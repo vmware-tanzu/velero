@@ -161,11 +161,9 @@ func (c *podVolumeRestoreController) podHandler(obj interface{}) {
 		return
 	}
 
-	selector, err := labels.Parse(fmt.Sprintf("%s=%s", arkv1api.PodUIDLabel, pod.UID))
-	if err != nil {
-		log.WithError(err).Error("Unable to parse label selector %s", fmt.Sprintf("%s=%s", arkv1api.PodUIDLabel, pod.UID))
-		return
-	}
+	selector := labels.Set(map[string]string{
+		arkv1api.PodUIDLabel: string(pod.UID),
+	}).AsSelector()
 
 	pvrs, err := c.podVolumeRestoreLister.List(selector)
 	if err != nil {

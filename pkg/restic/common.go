@@ -36,7 +36,6 @@ const (
 	DaemonSet                   = "restic"
 	InitContainer               = "restic-wait"
 	DefaultMaintenanceFrequency = 24 * time.Hour
-	ResticLocationConfigKey     = "restic-location"
 
 	podAnnotationPrefix       = "snapshot.ark.heptio.com/"
 	volumesToBackupAnnotation = "backup.ark.heptio.com/backup-volumes"
@@ -117,10 +116,9 @@ type SnapshotIdentifier struct {
 // GetSnapshotsInBackup returns a list of all restic snapshot ids associated with
 // a given Ark backup.
 func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
-	selector, err := labels.Parse(fmt.Sprintf("%s=%s", arkv1api.BackupNameLabel, backup.Name))
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
+	selector := labels.Set(map[string]string{
+		arkv1api.BackupNameLabel: backup.Name,
+	}).AsSelector()
 
 	podVolumeBackups, err := podVolumeBackupLister.List(selector)
 	if err != nil {
