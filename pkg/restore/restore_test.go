@@ -189,7 +189,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 				restore:              test.restore,
 				namespaceClient:      &fakeNamespaceClient{},
 				fileSystem:           test.fileSystem,
-				logger:               log,
+				log:                  log,
 				prioritizedResources: test.prioritizedResources,
 			}
 
@@ -282,7 +282,7 @@ func TestRestorePriority(t *testing.T) {
 				namespaceClient:      &fakeNamespaceClient{},
 				fileSystem:           test.fileSystem,
 				prioritizedResources: test.prioritizedResources,
-				logger:               log,
+				log:                  log,
 			}
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
@@ -330,7 +330,7 @@ func TestNamespaceRemapping(t *testing.T) {
 		prioritizedResources: prioritizedResources,
 		restore:              restore,
 		backup:               &api.Backup{},
-		logger:               arktest.NewLogger(),
+		log:                  arktest.NewLogger(),
 	}
 
 	warnings, errors := ctx.restoreFromDir(baseDir)
@@ -618,7 +618,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 				},
 				backup:     &api.Backup{},
-				logger:     arktest.NewLogger(),
+				log:        arktest.NewLogger(),
 				pvRestorer: &pvRestorer{},
 			}
 
@@ -704,7 +704,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				logger: arktest.NewLogger(),
+				log:    arktest.NewLogger(),
 			}
 			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
 
@@ -890,7 +890,7 @@ status:
 					},
 				},
 				backup:         backup,
-				logger:         arktest.NewLogger(),
+				log:            arktest.NewLogger(),
 				pvsToProvision: sets.NewString(),
 				pvRestorer:     pvRestorer,
 			}
