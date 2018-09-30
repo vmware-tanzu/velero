@@ -57,8 +57,7 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		delete(spec, "clusterIP")
 	}
 
-	err = deleteNodePorts(obj, &spec)
-	if err != nil {
+	if err := deleteNodePorts(obj, &spec); err != nil {
 		return nil, nil, err
 	}
 	return obj, nil, nil
@@ -85,14 +84,17 @@ func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
 }
 
 func deleteNodePorts(obj runtime.Unstructured, spec *map[string]interface{}) error {
+	if serviceType, _ := collections.GetString(*spec, "type"); serviceType == "ExternalName" {
+		return nil
+	}
+
 	preservedPorts, err := getPreservedPorts(obj)
 	if err != nil {
 		return err
 	}
 
 	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
-	serviceType, _ := collections.GetString(*spec, "type")
-	if err != nil && serviceType != "ExternalName" {
+	if err != nil {
 		return err
 	}
 
