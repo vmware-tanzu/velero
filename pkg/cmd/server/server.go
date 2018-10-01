@@ -88,8 +88,9 @@ type serverConfig struct {
 
 func NewCommand() *cobra.Command {
 	var (
-		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
-		config       = serverConfig{
+		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
+		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
+		config                  = serverConfig{
 			pluginDir:                      "/plugins",
 			metricsAddress:                 defaultMetricsAddress,
 			defaultBackupLocation:          "default",
@@ -132,6 +133,10 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
+			if volumeSnapshotLocations.Data() != nil {
+				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
+			}
+
 			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
 			cmd.CheckError(err)
 
@@ -147,12 +152,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
-
-	volumeSnapshotLocations := flag.NewMap().WithKeyValueDelimiter(":")
-	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01, provider2:location-02, ...)")
-	if volumeSnapshotLocations.Data() != nil {
-		config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
-	}
+	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
 
 	return command
 }
@@ -287,7 +287,7 @@ func (s *server) run() error {
 		return errors.WithStack(err)
 	}
 
-	defaultVolumeSnapshotLocations, err := s.getDefaultVolumeSnapshotLocations()
+	defaultVolumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
 	if err != nil {
 		return err
 	}
@@ -314,24 +314,25 @@ func (s *server) run() error {
 	return nil
 }
 
-func (s *server) getDefaultVolumeSnapshotLocations() (map[string]*api.VolumeSnapshotLocation, error) {
+func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace string, defaultVolumeSnapshotLocations map[string]string) (map[string]*api.VolumeSnapshotLocation, error) {
 	providerDefaults := make(map[string]*api.VolumeSnapshotLocation)
-	if len(s.config.defaultVolumeSnapshotLocations) == 0 {
+	if len(defaultVolumeSnapshotLocations) == 0 {
 		return providerDefaults, nil
 	}
 
-	volumeSnapshotLocations, err := s.arkClient.ArkV1().VolumeSnapshotLocations(s.namespace).List(metav1.ListOptions{})
+	volumeSnapshotLocations, err := arkClient.ArkV1().VolumeSnapshotLocations(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return providerDefaults, errors.WithStack(err)
 	}
 
 	providerLocations := make(map[string][]*api.VolumeSnapshotLocation)
-	for _, vsl := range volumeSnapshotLocations.Items {
-		providerLocations[vsl.Spec.Provider] = append(providerLocations[vsl.Spec.Provider], &vsl)
+	for i, vsl := range volumeSnapshotLocations.Items {
+		locations := providerLocations[vsl.Spec.Provider]
+		providerLocations[vsl.Spec.Provider] = append(locations, &volumeSnapshotLocations.Items[i])
 	}
 
 	for provider, locations := range providerLocations {
-		defaultLocation, ok := s.config.defaultVolumeSnapshotLocations[provider]
+		defaultLocation, ok := defaultVolumeSnapshotLocations[provider]
 		if !ok {
 			return providerDefaults, errors.Errorf("missing provider %s. When using default volume snapshot locations, one must exist for every known provider.", provider)
 		}
