@@ -57,6 +57,25 @@ Create the blob container named `ark`. Feel free to use a different name, prefer
 az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 ```
 
+## Get resource group for persistent volume snapshots
+
+1. Set the name of the Resource Group that contains your Kubernetes cluster's virtual machines/disks.
+
+    > **WARNING**: If you're using [AKS][22], `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created 
+    when you provision your cluster in Azure, since this is the resource group that contains your cluster's virtual machines/disks.
+
+    ```bash
+    AZURE_RESOURCE_GROUP=<NAME_OF_RESOURCE_GROUP>
+    ```
+
+    If you are unsure of the Resource Group name, run the following command to get a list that you can select from. Then set the `AZURE_RESOURCE_GROUP` environment variable to the appropriate value.
+
+    ```bash
+    az group list --query '[].{ ResourceGroup: name, Location:location }'
+    ```
+
+    Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
+
 ## Create service principal
 
 To integrate Ark with Azure, you must create an Ark-specific [service principal][17].
@@ -67,23 +86,6 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
     AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
     AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
-
-1. Set the name of the Resource Group that contains your Kubernetes cluster.
-
-    ```bash
-    # Make sure this is the name of the auto-generated resource group. See warning.
-    AZURE_RESOURCE_GROUP=<NAME_OF_RESOURCE_GROUP_2>
-    ```
-
-    WARNING: `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created when you provision your cluster in Azure. Your cluster is provisioned in the resource group that you specified when you created the cluster. Your disks, however, are provisioned in the second resource group.
-
-    If you are unsure of the Resource Group name, run the following command to get a list that you can select from. Then set the `AZURE_RESOURCE_GROUP` environment variable to the appropriate value.
-
-    ```bash
-    az group list --query '[].{ ResourceGroup: name, Location:location }'
-    ```
-
-    Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
 
 1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
 
@@ -164,3 +166,4 @@ In the root of your Ark directory, run:
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
 [20]: faq.md
 [21]: backupstoragelocation-definition.md#azure
+[22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
