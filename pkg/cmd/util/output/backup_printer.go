@@ -94,7 +94,7 @@ func printBackup(backup *arkv1api.Backup, w io.Writer, options printers.PrintOpt
 
 	location := backup.Spec.StorageLocation
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", name, status, backup.CreationTimestamp.Time, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s", name, status, backup.Status.StartTimestamp.Time, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
 		return err
 	}
 
