@@ -4,7 +4,7 @@
 
 [![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
-## Overview
+## OVERVIEW
 
 Ark gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Ark lets you:
 
@@ -19,31 +19,31 @@ Ark consists of:
 
 You can run Ark in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
 
-## More information
+## MORE INFORMATION
 
 [The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Ark, and more.
 
-## Troubleshooting
+## TROUBLESHOOTING
 
 If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
 
-## Contributing
+## CONTRIBUTING
 
 Thanks for taking the time to join our community and start contributing!
 
 Feedback and discussion is available on [the mailing list][24].
 
-### Before you start
+### BEFORE YOU START
 
 * Please familiarize yourself with the [Code of Conduct][8] before contributing.
 * See [CONTRIBUTING.md][5] for instructions on the developer certificate of origin that we require.
 * Read how [we're using ZenHub][26] for project and roadmap planning
 
-### Pull requests
+### PULL REQUESTS
 
 * We welcome pull requests. Feel free to dig through the [issues][4] and jump in.
 
-## Changelog
+## CHANGELOG
 
 See [the list of releases][6] to find out about feature changes.
 
