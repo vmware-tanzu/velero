@@ -434,16 +434,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 		},
 		{
-			name:          "items with controller owner are skipped",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: arktest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newTestConfigMap().WithControllerOwner().ToJSON()).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
-		{
 			name:          "namespace is remapped",
 			namespace:     "ns-2",
 			resourcePath:  "configmaps",
