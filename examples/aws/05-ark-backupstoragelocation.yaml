@@ -22,6 +22,5 @@ spec:
   provider: aws
   objectStorage:
     bucket: <YOUR_BUCKET> 
-    config:
-      region: <YOUR_REGION>
-
+  config:
+    region: <YOUR_REGION>
