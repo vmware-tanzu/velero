@@ -450,7 +450,7 @@ func (s *server) loadConfig() (*api.Config, error) {
 }
 
 const (
-	defaultBackupSyncPeriod          = 60 * time.Minute
+	defaultBackupSyncPeriod          = time.Minute
 	defaultPodVolumeOperationTimeout = 60 * time.Minute
 )
 
@@ -601,6 +601,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 	}
 
 	backupSyncController := controller.NewBackupSyncController(
+		s.arkClient.ArkV1(),
 		s.arkClient.ArkV1(),
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),

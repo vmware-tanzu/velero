@@ -16,7 +16,10 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -89,6 +92,8 @@ const (
 
 // BackupStorageLocationStatus describes the current status of an Ark BackupStorageLocation.
 type BackupStorageLocationStatus struct {
-	Phase      BackupStorageLocationPhase      `json:"phase,omitempty"`
-	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
+	Phase              BackupStorageLocationPhase      `json:"phase,omitempty"`
+	AccessMode         BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
+	LastSyncedRevision types.UID                       `json:"lastSyncedRevision,omitempty"`
+	LastSyncedTime     metav1.Time                     `json:"lastSyncedTime,omitempty"`
 }

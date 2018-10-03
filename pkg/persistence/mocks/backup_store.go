@@ -120,16 +120,37 @@ func (_m *BackupStore) IsValid() error {
 	return r0
 }
 
-// ListBackups provides a mock function with given fields:
-func (_m *BackupStore) ListBackups() ([]*v1.Backup, error) {
+// GetRevision provides a mock function with given fields:
+func (_m *BackupStore) GetRevision() (string, error) {
 	ret := _m.Called()
 
-	var r0 []*v1.Backup
-	if rf, ok := ret.Get(0).(func() []*v1.Backup); ok {
+	var r0 string
+	if rf, ok := ret.Get(0).(func() string); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ListBackups provides a mock function with given fields:
+func (_m *BackupStore) ListBackups() ([]string, error) {
+	ret := _m.Called()
+
+	var r0 []string
+	if rf, ok := ret.Get(0).(func() []string); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*v1.Backup)
+			r0 = ret.Get(0).([]string)
 		}
 	}
 
