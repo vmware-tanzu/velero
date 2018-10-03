@@ -22,7 +22,7 @@ spec:
   provider: aws
   objectStorage:
     bucket: <YOUR_BUCKET> 
-    config:
-      s3ForcePathStyle: "true"
-      s3Url:  <YOUR_URL_ACCESS_POINT>
-      region: <YOUR_REGION>
+  config:
+    s3ForcePathStyle: "true"
+    s3Url:  <YOUR_URL_ACCESS_POINT>
+    region: <YOUR_REGION>

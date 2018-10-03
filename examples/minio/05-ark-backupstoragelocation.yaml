@@ -19,9 +19,12 @@ metadata:
   name: default
   namespace: heptio-ark
 spec:
-  provider: azure
+  provider: aws
   objectStorage:
-    bucket: <YOUR_BLOB_CONTAINER> 
+    bucket: ark
   config:
-    resourceGroup: <YOUR_STORAGE_RESOURCE_GROUP>
-    storageAccount: <YOUR_STORAGE_ACCOUNT>
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: http://minio.heptio-ark.svc:9000
+    
+

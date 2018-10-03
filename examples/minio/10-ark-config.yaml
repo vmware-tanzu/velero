@@ -18,17 +18,3 @@ kind: Config
 metadata:
   namespace: heptio-ark
   name: default
-backupStorageProvider:
-  name: aws
-  bucket: ark
-  # Uncomment the below line to enable restic integration.
-  # The format for resticLocation is <bucket>[/<prefix>],
-  # e.g. "my-restic-bucket" or "my-restic-bucket/repos".
-  # This MUST be a different bucket than the main Ark bucket
-  # specified just above.
-  # resticLocation: <YOUR_RESTIC_LOCATION>
-  config:
-    region: minio
-    s3ForcePathStyle: "true"
-    s3Url: http://minio.heptio-ark.svc:9000
-
