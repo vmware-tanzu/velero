@@ -56,7 +56,6 @@ import (
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
@@ -88,16 +87,14 @@ type serverConfig struct {
 
 func NewCommand() *cobra.Command {
 	var (
-		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
-		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
-		config                  = serverConfig{
-			pluginDir:                      "/plugins",
-			metricsAddress:                 defaultMetricsAddress,
-			defaultBackupLocation:          "default",
-			defaultVolumeSnapshotLocations: make(map[string]string),
-			backupSyncPeriod:               defaultBackupSyncPeriod,
-			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
-			restoreResourcePriorities:      defaultRestorePriorities,
+		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
+		config       = serverConfig{
+			pluginDir:                 "/plugins",
+			metricsAddress:            defaultMetricsAddress,
+			defaultBackupLocation:     "default",
+			backupSyncPeriod:          defaultBackupSyncPeriod,
+			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
+			restoreResourcePriorities: defaultRestorePriorities,
 		}
 	)
 
@@ -133,10 +130,6 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
-			if volumeSnapshotLocations.Data() != nil {
-				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
-			}
-
 			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
 			cmd.CheckError(err)
 
@@ -152,7 +145,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
-	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
+	command.Flags().StringToStringVar(&config.defaultVolumeSnapshotLocations, "default-volume-snapshot-locations", config.defaultVolumeSnapshotLocations, "list of unique volume providers and default volume snapshot location (provider1=location-01,provider2=location-02,...)")
 
 	return command
 }
