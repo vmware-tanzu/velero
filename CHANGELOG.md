@@ -3,6 +3,7 @@
 #### [v0.9.7](https://github.com/heptio/ark/releases/tag/v0.9.7) - 2018-10-04
 
 #### Bug Fixes
+  * Preserve explicitly-specified node ports during restore (#712, @timoreimann)
   * Enable restoring resources with ownerReference set (#837, @mwieczorek)
   * Fix error when restoring ExternalName services (#869, @shubheksha)
   * remove restore log helper for accurate line numbers (#891, @skriss)
