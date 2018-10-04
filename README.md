@@ -71,4 +71,4 @@ See [the list of releases][6] to find out about feature changes.
 [29]: https://heptio.github.io/ark/
 [30]: /docs/troubleshooting.md
 
-[99]: support-matrix.md
+[99]: /docs/support-matrix.md
