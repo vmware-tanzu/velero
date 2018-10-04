@@ -189,7 +189,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 				restore:              test.restore,
 				namespaceClient:      &fakeNamespaceClient{},
 				fileSystem:           test.fileSystem,
-				logger:               log,
+				log:                  log,
 				prioritizedResources: test.prioritizedResources,
 			}
 
@@ -282,7 +282,7 @@ func TestRestorePriority(t *testing.T) {
 				namespaceClient:      &fakeNamespaceClient{},
 				fileSystem:           test.fileSystem,
 				prioritizedResources: test.prioritizedResources,
-				logger:               log,
+				log:                  log,
 			}
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
@@ -330,7 +330,7 @@ func TestNamespaceRemapping(t *testing.T) {
 		prioritizedResources: prioritizedResources,
 		restore:              restore,
 		backup:               &api.Backup{},
-		logger:               arktest.NewLogger(),
+		log:                  arktest.NewLogger(),
 	}
 
 	warnings, errors := ctx.restoreFromDir(baseDir)
@@ -431,16 +431,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "not-bar"})),
 			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
-		},
-		{
-			name:          "items with controller owner are skipped",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: arktest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newTestConfigMap().WithControllerOwner().ToJSON()).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").WithArkLabel("my-restore").ConfigMap),
 		},
 		{
 			name:          "namespace is remapped",
@@ -628,7 +618,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 				},
 				backup:     &api.Backup{},
-				logger:     arktest.NewLogger(),
+				log:        arktest.NewLogger(),
 				pvRestorer: &pvRestorer{},
 			}
 
@@ -714,7 +704,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				logger: arktest.NewLogger(),
+				log:    arktest.NewLogger(),
 			}
 			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
 
@@ -900,7 +890,7 @@ status:
 					},
 				},
 				backup:         backup,
-				logger:         arktest.NewLogger(),
+				log:            arktest.NewLogger(),
 				pvsToProvision: sets.NewString(),
 				pvRestorer:     pvRestorer,
 			}

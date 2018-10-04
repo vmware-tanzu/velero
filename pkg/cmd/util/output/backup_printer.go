@@ -92,7 +92,7 @@ func printBackup(backup *v1.Backup, w io.Writer, options printers.PrintOptions) 
 		status = "Deleting"
 	}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", name, status, backup.CreationTimestamp.Time, humanReadableTimeFromNow(expiration), metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s", name, status, backup.Status.StartTimestamp.Time, humanReadableTimeFromNow(expiration), metav1.FormatLabelSelector(backup.Spec.LabelSelector)); err != nil {
 		return err
 	}
 
