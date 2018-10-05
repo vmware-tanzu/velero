@@ -112,5 +112,36 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		return nil, nil, err
 	}
 
+	a.logger.Debug("iterating over init containers")
+	err = collections.ForEach(spec, "initContainers", func(container map[string]interface{}) error {
+		var newVolumeMounts []interface{}
+		err := collections.ForEach(container, "volumeMounts", func(volumeMount map[string]interface{}) error {
+			name, err := collections.GetString(volumeMount, "name")
+			if err != nil {
+				return err
+			}
+
+			a.logger.WithField("volumeMount", name).Debug("Checking volumeMount")
+			if strings.HasPrefix(name, serviceAccountName+"-token-") {
+				a.logger.WithField("volumeMount", name).Debug("Excluding volumeMount")
+			} else {
+				a.logger.WithField("volumeMount", name).Debug("Preserving volumeMount")
+				newVolumeMounts = append(newVolumeMounts, volumeMount)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		container["volumeMounts"] = newVolumeMounts
+
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+
 	return obj, nil, nil
 }

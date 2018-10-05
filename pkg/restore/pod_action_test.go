@@ -43,18 +43,21 @@ func TestPodActionExecute(t *testing.T) {
 				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
 				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").WithSpec("foo").
 				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
 				Unstructured,
 		},
 		{
 			name: "volumes matching prefix ServiceAccount-token- should be deleted",
 			obj: NewTestUnstructured().WithName("pod-1").
 				WithSpec("serviceAccountName", "foo").
+				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
 					map[string]interface{}{"name": "foo-token-foo"},
@@ -62,6 +65,7 @@ func TestPodActionExecute(t *testing.T) {
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").
 				WithSpec("serviceAccountName", "foo").
+				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
 				}).WithSpecField("containers", []interface{}{}).Unstructured,
@@ -71,6 +75,7 @@ func TestPodActionExecute(t *testing.T) {
 			obj: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("containers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
@@ -88,7 +93,43 @@ func TestPodActionExecute(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
 				WithSpecField("volumes", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("containers", []interface{}{
+					map[string]interface{}{
+						"volumeMounts": []interface{}{
+							map[string]interface{}{
+								"name": "foo",
+							},
+						},
+					},
+				}).
+				Unstructured,
+		},
+		{
+			name: "initContainer volumeMounts matching prefix ServiceAccount-token- should be deleted",
+			obj: NewTestUnstructured().WithName("svc-1").
+				WithSpec("serviceAccountName", "foo").
+				WithSpecField("volumes", []interface{}{}).
+				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{
+					map[string]interface{}{
+						"volumeMounts": []interface{}{
+							map[string]interface{}{
+								"name": "foo",
+							},
+							map[string]interface{}{
+								"name": "foo-token-foo",
+							},
+						},
+					},
+				}).
+				Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("svc-1").
+				WithSpec("serviceAccountName", "foo").
+				WithSpecField("volumes", []interface{}{}).
+				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
 							map[string]interface{}{
