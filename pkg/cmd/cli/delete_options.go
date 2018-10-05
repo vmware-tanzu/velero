@@ -71,7 +71,7 @@ func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []stri
 		hasSelector = o.Selector.LabelSelector != nil
 	)
 	if !xor(hasNames, hasAll, hasSelector) {
-		return errors.New("you must specify exactly one of: specific restore name(s), the --all flag, or the --selector flag")
+		return errors.New("you must specify exactly one of: specific " + o.singularTypeName + " name(s), the --all flag, or the --selector flag")
 	}
 
 	return nil
