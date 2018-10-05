@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -50,6 +51,7 @@ type podVolumeBackupController struct {
 	secretLister          corev1listers.SecretLister
 	podLister             corev1listers.PodLister
 	pvcLister             corev1listers.PersistentVolumeClaimLister
+	backupLocationLister  listers.BackupStorageLocationLister
 	nodeName              string
 
 	processBackupFunc func(*arkv1api.PodVolumeBackup) error
@@ -64,6 +66,7 @@ func NewPodVolumeBackupController(
 	podInformer cache.SharedIndexInformer,
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
+	backupLocationInformer informers.BackupStorageLocationInformer,
 	nodeName string,
 ) Interface {
 	c := &podVolumeBackupController{
@@ -73,6 +76,7 @@ func NewPodVolumeBackupController(
 		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
 		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:             pvcInformer.Lister(),
+		backupLocationLister:  backupLocationInformer.Lister(),
 		nodeName:              nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -85,6 +89,7 @@ func NewPodVolumeBackupController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
+		backupLocationInformer.Informer().HasSynced,
 	)
 	c.processBackupFunc = c.processBackup
 
@@ -213,6 +218,15 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 		req.Spec.Tags,
 	)
 
+	// if this is azure, set resticCmd.Env appropriately
+	var env []string
+	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
+		if env, err = restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
+			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
+		}
+		resticCmd.Env = env
+	}
+
 	var stdout, stderr string
 
 	if stdout, stderr, err = arkexec.RunCommand(resticCmd.Cmd()); err != nil {
@@ -221,7 +235,7 @@ func (c *podVolumeBackupController) processBackup(req *arkv1api.PodVolumeBackup)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
-	snapshotID, err := restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags)
+	snapshotID, err := restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env)
 	if err != nil {
 		log.WithError(err).Error("Error getting SnapshotID")
 		return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)

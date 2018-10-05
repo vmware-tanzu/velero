@@ -40,4 +40,8 @@ const (
 	// StorageLocationLabel is the label key used to identify the storage
 	// location of a backup.
 	StorageLocationLabel = "ark.heptio.com/storage-location"
+
+	// ResticVolumeNamespaceLabel is the label key used to identify which
+	// namespace a restic repository stores pod volume backups for.
+	ResticVolumeNamespaceLabel = "ark.heptio.com/volume-namespace"
 )

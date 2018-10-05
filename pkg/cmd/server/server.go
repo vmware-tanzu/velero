@@ -54,7 +54,6 @@ import (
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/cloudprovider/azure"
 	"github.com/heptio/ark/pkg/cmd"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
@@ -538,13 +537,6 @@ func (s *server) initRestic(location *api.BackupStorageLocation) error {
 		return err
 	}
 
-	// set the env vars that restic uses for creds purposes
-	if location.Spec.Provider == string(restic.AzureBackend) {
-		if err := azure.SetResticEnvVars(location.Spec.Config); err != nil {
-			return err
-		}
-	}
-
 	// use a stand-alone secrets informer so we can filter to only the restic credentials
 	// secret(s) within the heptio-ark namespace
 	//
@@ -569,6 +561,7 @@ func (s *server) initRestic(location *api.BackupStorageLocation) error {
 		secretsInformer,
 		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 		s.arkClient.ArkV1(),
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.logger,
 	)
 	if err != nil {
@@ -753,7 +746,7 @@ func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.B
 		s.logger,
 		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
 		s.arkClient.ArkV1(),
-		defaultBackupLocation,
+		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.resticManager,
 	)
 	wg.Add(1)

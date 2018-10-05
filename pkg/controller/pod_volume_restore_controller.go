@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -54,6 +55,7 @@ type podVolumeRestoreController struct {
 	podLister              corev1listers.PodLister
 	secretLister           corev1listers.SecretLister
 	pvcLister              corev1listers.PersistentVolumeClaimLister
+	backupLocationLister   listers.BackupStorageLocationLister
 	nodeName               string
 
 	processRestoreFunc func(*arkv1api.PodVolumeRestore) error
@@ -68,6 +70,7 @@ func NewPodVolumeRestoreController(
 	podInformer cache.SharedIndexInformer,
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
+	backupLocationInformer informers.BackupStorageLocationInformer,
 	nodeName string,
 ) Interface {
 	c := &podVolumeRestoreController{
@@ -77,6 +80,7 @@ func NewPodVolumeRestoreController(
 		podLister:              corev1listers.NewPodLister(podInformer.GetIndexer()),
 		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
+		backupLocationLister:   backupLocationInformer.Lister(),
 		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -89,6 +93,7 @@ func NewPodVolumeRestoreController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
+		backupLocationInformer.Informer().HasSynced,
 	)
 	c.processRestoreFunc = c.processRestore
 
@@ -281,7 +286,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	defer os.Remove(credsFile)
 
 	// execute the restore process
-	if err := restorePodVolume(req, credsFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, credsFile, volumeDir, log); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -297,7 +302,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	return nil
 }
 
-func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -311,6 +316,15 @@ func restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir strin
 		req.Spec.SnapshotID,
 		volumePath,
 	)
+
+	// if this is azure, set resticCmd.Env appropriately
+	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
+		env, err := restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+		if err != nil {
+			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
+		}
+		resticCmd.Env = env
+	}
 
 	var stdout, stderr string
 

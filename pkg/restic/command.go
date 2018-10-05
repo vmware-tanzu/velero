@@ -32,6 +32,7 @@ type Command struct {
 	Dir            string
 	Args           []string
 	ExtraFlags     []string
+	Env            []string
 }
 
 func (c *Command) RepoName() string {
@@ -74,6 +75,10 @@ func (c *Command) Cmd() *exec.Cmd {
 	parts := c.StringSlice()
 	cmd := exec.Command(parts[0], parts[1:]...)
 	cmd.Dir = c.Dir
+
+	if len(c.Env) > 0 {
+		cmd.Env = c.Env
+	}
 
 	return cmd
 }

@@ -22,12 +22,20 @@ import (
 
 // ResticRepositorySpec is the specification for a ResticRepository.
 type ResticRepositorySpec struct {
-	// MaintenanceFrequency is how often maintenance should be run.
-	MaintenanceFrequency metav1.Duration `json:"maintenanceFrequency"`
+	// VolumeNamespace is the namespace this restic repository contains
+	// pod volume backups for.
+	VolumeNamespace string `json:"volumeNamespace"`
+
+	// BackupStorageLocation is the name of the BackupStorageLocation
+	// that should contain this repository.
+	BackupStorageLocation string `json:"backupStorageLocation"`
 
 	// ResticIdentifier is the full restic-compatible string for identifying
 	// this repository.
 	ResticIdentifier string `json:"resticIdentifier"`
+
+	// MaintenanceFrequency is how often maintenance should be run.
+	MaintenanceFrequency metav1.Duration `json:"maintenanceFrequency"`
 }
 
 // ResticRepositoryPhase represents the lifecycle phase of a ResticRepository.

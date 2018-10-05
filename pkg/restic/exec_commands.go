@@ -27,8 +27,13 @@ import (
 // GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
 // in the specified repo matching the set of provided tags, or an error if a
 // unique snapshot cannot be identified.
-func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string) (string, error) {
-	stdout, stderr, err := exec.RunCommand(GetSnapshotCommand(repoIdentifier, passwordFile, tags).Cmd())
+func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string, env []string) (string, error) {
+	cmd := GetSnapshotCommand(repoIdentifier, passwordFile, tags)
+	if len(env) > 0 {
+		cmd.Env = env
+	}
+
+	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
 	if err != nil {
 		return "", errors.Wrapf(err, "error running command, stderr=%s", stderr)
 	}

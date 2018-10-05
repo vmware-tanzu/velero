@@ -29,6 +29,10 @@ type PodVolumeRestoreSpec struct {
 	// Volume is the name of the volume within the Pod to be restored.
 	Volume string `json:"volume"`
 
+	// BackupStorageLocation is the name of the backup storage location
+	// where the restic repository is stored.
+	BackupStorageLocation string `json:"backupStorageLocation"`
+
 	// RepoIdentifier is the restic repository identifier.
 	RepoIdentifier string `json:"repoIdentifier"`
 

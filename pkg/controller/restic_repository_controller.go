@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
@@ -44,7 +43,7 @@ type resticRepositoryController struct {
 
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter
 	resticRepositoryLister listers.ResticRepositoryLister
-	storageLocation        *arkv1api.BackupStorageLocation
+	backupLocationLister   listers.BackupStorageLocationLister
 	repositoryManager      restic.RepositoryManager
 
 	clock clock.Clock
@@ -55,20 +54,20 @@ func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer informers.ResticRepositoryInformer,
 	resticRepositoryClient arkv1client.ResticRepositoriesGetter,
-	storageLocation *arkv1api.BackupStorageLocation,
+	backupLocationInformer informers.BackupStorageLocationInformer,
 	repositoryManager restic.RepositoryManager,
 ) Interface {
 	c := &resticRepositoryController{
 		genericController:      newGenericController("restic-repository", logger),
 		resticRepositoryClient: resticRepositoryClient,
 		resticRepositoryLister: resticRepositoryInformer.Lister(),
-		storageLocation:        storageLocation,
+		backupLocationLister:   backupLocationInformer.Lister(),
 		repositoryManager:      repositoryManager,
 		clock:                  &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, resticRepositoryInformer.Informer().HasSynced)
+	c.cacheSyncWaiters = append(c.cacheSyncWaiters, resticRepositoryInformer.Informer().HasSynced, backupLocationInformer.Informer().HasSynced)
 
 	resticRepositoryInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -137,9 +136,15 @@ func (c *resticRepositoryController) processQueueItem(key string) error {
 func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, log logrus.FieldLogger) error {
 	log.Info("Initializing restic repository")
 
+	// confirm the repo's BackupStorageLocation is valid
+	loc, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
+	if err != nil {
+		return c.patchResticRepository(req, repoNotReady(err.Error()))
+	}
+
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := c.patchResticRepository(req, func(r *v1.ResticRepository) {
-		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(c.storageLocation, r.Name)
+		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(loc, r.Spec.VolumeNamespace)
 
 		if r.Spec.MaintenanceFrequency.Duration <= 0 {
 			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}
@@ -148,7 +153,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 		return err
 	}
 
-	if err := ensureRepo(req.Name, req.Spec.ResticIdentifier, c.repositoryManager); err != nil {
+	if err := ensureRepo(req, c.repositoryManager); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
@@ -160,12 +165,12 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 
 // ensureRepo first checks the repo, and returns if check passes. If it fails,
 // attempts to init the repo, and returns the result.
-func ensureRepo(name, identifier string, repoManager restic.RepositoryManager) error {
-	if repoManager.CheckRepo(name, identifier) == nil {
+func ensureRepo(repo *v1.ResticRepository, repoManager restic.RepositoryManager) error {
+	if repoManager.CheckRepo(repo) == nil {
 		return nil
 	}
 
-	return repoManager.InitRepo(name, identifier)
+	return repoManager.InitRepo(repo)
 }
 
 func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepository, log logrus.FieldLogger) error {
@@ -181,14 +186,14 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 	log.Info("Running maintenance on restic repository")
 
 	log.Debug("Checking repo before prune")
-	if err := c.repositoryManager.CheckRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.CheckRepo(req); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
 	// prune failures should be displayed in the `.status.message` field but
 	// should not cause the repo to move to `NotReady`.
 	log.Debug("Pruning repo")
-	if err := c.repositoryManager.PruneRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.PruneRepo(req); err != nil {
 		log.WithError(err).Warn("error pruning repository")
 		if patchErr := c.patchResticRepository(req, func(r *v1.ResticRepository) {
 			r.Status.Message = err.Error()
@@ -198,7 +203,7 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 	}
 
 	log.Debug("Checking repo after prune")
-	if err := c.repositoryManager.CheckRepo(req.Name, req.Spec.ResticIdentifier); err != nil {
+	if err := c.repositoryManager.CheckRepo(req); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
@@ -216,7 +221,7 @@ func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository,
 
 	// we need to ensure it (first check, if check fails, attempt to init)
 	// because we don't know if it's been successfully initialized yet.
-	if err := ensureRepo(req.Name, req.Spec.ResticIdentifier, c.repositoryManager); err != nil {
+	if err := ensureRepo(req, c.repositoryManager); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
