@@ -21,7 +21,6 @@ import (
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/podexec"
@@ -220,10 +219,23 @@ func TestBackupResource(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		backup := &v1.Backup{
-			Spec: v1.BackupSpec{
-				IncludeClusterResources: test.includeClusterResources,
+		req := &Request{
+			Backup: &v1.Backup{
+				Spec: v1.BackupSpec{
+					IncludeClusterResources: test.includeClusterResources,
+				},
 			},
+			ResolvedActions: []resolvedAction{
+				{
+					ItemAction:               newFakeAction("pods"),
+					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
+				},
+			},
+			ResourceHooks: []resourceHook{
+				{name: "myhook"},
+			},
+			ResourceIncludesExcludes:  test.resources,
+			NamespaceIncludesExcludes: test.namespaces,
 		}
 
 		dynamicFactory := &arktest.FakeDynamicFactory{}
@@ -240,17 +252,6 @@ func TestBackupResource(t *testing.T) {
 			"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
 		}
 
-		actions := []resolvedAction{
-			{
-				ItemAction:               newFakeAction("pods"),
-				resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
-			},
-		}
-
-		resourceHooks := []resourceHook{
-			{name: "myhook"},
-		}
-
 		podCommandExecutor := &arktest.MockPodCommandExecutor{}
 		defer podCommandExecutor.AssertExpectations(t)
 
@@ -259,20 +260,16 @@ func TestBackupResource(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			rb := (&defaultResourceBackupperFactory{}).newResourceBackupper(
 				arktest.NewLogger(),
-				backup,
-				test.namespaces,
-				test.resources,
+				req,
 				dynamicFactory,
 				discoveryHelper,
 				backedUpItems,
 				cohabitatingResources,
-				actions,
 				podCommandExecutor,
 				tarWriter,
-				resourceHooks,
-				nil, // snapshot service
 				nil, // restic backupper
 				newPVCSnapshotTracker(),
+				nil,
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -284,14 +281,10 @@ func TestBackupResource(t *testing.T) {
 				defer itemBackupper.AssertExpectations(t)
 
 				itemBackupperFactory.On("newItemBackupper",
-					backup,
-					test.namespaces,
-					test.resources,
+					req,
 					backedUpItems,
-					actions,
 					podCommandExecutor,
 					tarWriter,
-					resourceHooks,
 					dynamicFactory,
 					discoveryHelper,
 					mock.Anything,
@@ -382,18 +375,28 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			backup := &v1.Backup{
-				Spec: v1.BackupSpec{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"foo": "bar",
+			req := &Request{
+				Backup: &v1.Backup{
+					Spec: v1.BackupSpec{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"foo": "bar",
+							},
 						},
 					},
 				},
+				NamespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
+				ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+				ResolvedActions: []resolvedAction{
+					{
+						ItemAction:               newFakeAction("pods"),
+						resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
+					},
+				},
+				ResourceHooks: []resourceHook{
+					{name: "myhook"},
+				},
 			}
-
-			namespaces := collections.NewIncludesExcludes().Includes("*")
-			resources := collections.NewIncludesExcludes().Includes("*")
 
 			dynamicFactory := &arktest.FakeDynamicFactory{}
 			defer dynamicFactory.AssertExpectations(t)
@@ -409,17 +412,6 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				"networkpolicies": newCohabitatingResource("networkpolicies", "extensions", "networking.k8s.io"),
 			}
 
-			actions := []resolvedAction{
-				{
-					ItemAction:               newFakeAction("pods"),
-					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
-				},
-			}
-
-			resourceHooks := []resourceHook{
-				{name: "myhook"},
-			}
-
 			podCommandExecutor := &arktest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
@@ -427,20 +419,16 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 			rb := (&defaultResourceBackupperFactory{}).newResourceBackupper(
 				arktest.NewLogger(),
-				backup,
-				namespaces,
-				resources,
+				req,
 				dynamicFactory,
 				discoveryHelper,
 				backedUpItems,
 				cohabitatingResources,
-				actions,
 				podCommandExecutor,
 				tarWriter,
-				resourceHooks,
-				nil, // snapshot service
 				nil, // restic backupper
 				newPVCSnapshotTracker(),
+				nil,
 			).(*defaultResourceBackupper)
 
 			itemBackupperFactory := &mockItemBackupperFactory{}
@@ -451,19 +439,15 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			defer itemBackupper.AssertExpectations(t)
 
 			itemBackupperFactory.On("newItemBackupper",
-				backup,
-				namespaces,
-				resources,
+				req,
 				backedUpItems,
-				actions,
 				podCommandExecutor,
 				tarWriter,
-				resourceHooks,
 				dynamicFactory,
 				discoveryHelper,
-				mock.Anything, // snapshot service
 				mock.Anything, // restic backupper
 				mock.Anything, // pvc snapshot tracker
+				nil,
 			).Return(itemBackupper)
 
 			client := &arktest.FakeDynamicClient{}
@@ -471,7 +455,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 			// STEP 1: make sure the initial backup goes through
 			dynamicFactory.On("ClientForGroupVersionResource", test.groupVersion1, test.apiResource, "").Return(client, nil)
-			client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(backup.Spec.LabelSelector)}).Return(&unstructured.UnstructuredList{}, nil)
+			client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(req.Backup.Spec.LabelSelector)}).Return(&unstructured.UnstructuredList{}, nil)
 
 			// STEP 2: do the backup
 			err := rb.backupResource(test.apiGroup1, test.apiResource)
@@ -485,10 +469,11 @@ func TestBackupResourceCohabitation(t *testing.T) {
 }
 
 func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
-	backup := &v1.Backup{}
-
-	namespaces := collections.NewIncludesExcludes().Includes("ns-1")
-	resources := collections.NewIncludesExcludes().Includes("*")
+	req := &Request{
+		Backup: &v1.Backup{},
+		NamespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("ns-1"),
+		ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
+	}
 
 	backedUpItems := map[itemKey]struct{}{}
 
@@ -499,10 +484,6 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 
 	cohabitatingResources := map[string]*cohabitatingResource{}
 
-	actions := []resolvedAction{}
-
-	resourceHooks := []resourceHook{}
-
 	podCommandExecutor := &arktest.MockPodCommandExecutor{}
 	defer podCommandExecutor.AssertExpectations(t)
 
@@ -510,20 +491,16 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 
 	rb := (&defaultResourceBackupperFactory{}).newResourceBackupper(
 		arktest.NewLogger(),
-		backup,
-		namespaces,
-		resources,
+		req,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
 		cohabitatingResources,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
-		nil, // snapshot service
 		nil, // restic backupper
 		newPVCSnapshotTracker(),
+		nil,
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -534,27 +511,19 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 	defer itemHookHandler.AssertExpectations(t)
 
 	itemBackupper := &defaultItemBackupper{
-		backup:          backup,
-		namespaces:      namespaces,
-		resources:       resources,
+		backupRequest:   req,
 		backedUpItems:   backedUpItems,
-		actions:         actions,
 		tarWriter:       tarWriter,
-		resourceHooks:   resourceHooks,
 		dynamicFactory:  dynamicFactory,
 		discoveryHelper: discoveryHelper,
 		itemHookHandler: itemHookHandler,
 	}
 
 	itemBackupperFactory.On("newItemBackupper",
-		backup,
-		namespaces,
-		resources,
+		req,
 		backedUpItems,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
 		mock.Anything,
@@ -570,8 +539,8 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 	ns1 := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Namespace","metadata":{"name":"ns-1"}}`)
 	client.On("Get", "ns-1", metav1.GetOptions{}).Return(ns1, nil)
 
-	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks, hookPhasePre).Return(nil)
-	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, resourceHooks, hookPhasePost).Return(nil)
+	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, req.ResourceHooks, hookPhasePre).Return(nil)
+	itemHookHandler.On("handleHooks", mock.Anything, schema.GroupResource{Group: "", Resource: "namespaces"}, ns1, req.ResourceHooks, hookPhasePost).Return(nil)
 
 	err := rb.backupResource(v1Group, namespacesResource)
 	require.NoError(t, err)
@@ -581,18 +550,19 @@ func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 }
 
 func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
-	backup := &v1.Backup{
-		Spec: v1.BackupSpec{
-			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"foo": "bar",
+	req := &Request{
+		Backup: &v1.Backup{
+			Spec: v1.BackupSpec{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"foo": "bar",
+					},
 				},
 			},
 		},
+		NamespaceIncludesExcludes: collections.NewIncludesExcludes().Excludes("ns-1"),
+		ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 	}
-
-	namespaces := collections.NewIncludesExcludes().Excludes("ns-1")
-	resources := collections.NewIncludesExcludes().Includes("*")
 
 	backedUpItems := map[itemKey]struct{}{}
 
@@ -603,10 +573,6 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 
 	cohabitatingResources := map[string]*cohabitatingResource{}
 
-	actions := []resolvedAction{}
-
-	resourceHooks := []resourceHook{}
-
 	podCommandExecutor := &arktest.MockPodCommandExecutor{}
 	defer podCommandExecutor.AssertExpectations(t)
 
@@ -614,20 +580,16 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 
 	rb := (&defaultResourceBackupperFactory{}).newResourceBackupper(
 		arktest.NewLogger(),
-		backup,
-		namespaces,
-		resources,
+		req,
 		dynamicFactory,
 		discoveryHelper,
 		backedUpItems,
 		cohabitatingResources,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
-		nil, // snapshot service
 		nil, // restic backupper
 		newPVCSnapshotTracker(),
+		nil,
 	).(*defaultResourceBackupper)
 
 	itemBackupperFactory := &mockItemBackupperFactory{}
@@ -641,14 +603,10 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 	defer itemBackupper.AssertExpectations(t)
 
 	itemBackupperFactory.On("newItemBackupper",
-		backup,
-		namespaces,
-		resources,
+		req,
 		backedUpItems,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
 		mock.Anything,
@@ -667,7 +625,7 @@ func TestBackupResourceListAllNamespacesExcludesCorrectly(t *testing.T) {
 	list := &unstructured.UnstructuredList{
 		Items: []unstructured.Unstructured{*ns1, *ns2},
 	}
-	client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(backup.Spec.LabelSelector)}).Return(list, nil)
+	client.On("List", metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(req.Backup.Spec.LabelSelector)}).Return(list, nil)
 
 	itemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), ns2, kuberesource.Namespaces).Return(nil)
 
@@ -680,33 +638,26 @@ type mockItemBackupperFactory struct {
 }
 
 func (ibf *mockItemBackupperFactory) newItemBackupper(
-	backup *v1.Backup,
-	namespaces, resources *collections.IncludesExcludes,
+	backup *Request,
 	backedUpItems map[itemKey]struct{},
-	actions []resolvedAction,
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
-	resourceHooks []resourceHook,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
-	blockStore cloudprovider.BlockStore,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
+	blockStoreGetter BlockStoreGetter,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
-		namespaces,
-		resources,
 		backedUpItems,
-		actions,
 		podCommandExecutor,
 		tarWriter,
-		resourceHooks,
 		dynamicFactory,
 		discoveryHelper,
-		blockStore,
 		resticBackupper,
 		resticSnapshotTracker,
+		blockStoreGetter,
 	)
 	return args.Get(0).(ItemBackupper)
 }
