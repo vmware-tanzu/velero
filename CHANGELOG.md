@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.9.8-beta.1](https://github.com/heptio/ark/releases/tag/v0.9.8-beta.1) - 2018-10-10
+
+#### Bug Fixes
+  * Discard service account token volume mounts from init containers on restore (#910, @james-powis)
+
 #### [v0.9.7](https://github.com/heptio/ark/releases/tag/v0.9.7) - 2018-10-04
 
 #### Bug Fixes
