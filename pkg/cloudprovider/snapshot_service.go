@@ -17,9 +17,6 @@ limitations under the License.
 package cloudprovider
 
 import (
-	"time"
-
-	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,11 +47,6 @@ type SnapshotService interface {
 	SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error)
 }
 
-const (
-	volumeCreateWaitTimeout  = 30 * time.Second
-	volumeCreatePollInterval = 1 * time.Second
-)
-
 type snapshotService struct {
 	blockStore BlockStore
 }
@@ -74,22 +66,7 @@ func (sr *snapshotService) CreateVolumeFromSnapshot(snapshotID string, volumeTyp
 		return "", err
 	}
 
-	// wait for volume to be ready (up to a maximum time limit)
-	ticker := time.NewTicker(volumeCreatePollInterval)
-	defer ticker.Stop()
-
-	timeout := time.NewTimer(volumeCreateWaitTimeout)
-
-	for {
-		select {
-		case <-timeout.C:
-			return "", errors.Errorf("timeout reached waiting for volume %v to be ready", volumeID)
-		case <-ticker.C:
-			if ready, err := sr.blockStore.IsVolumeReady(volumeID, volumeAZ); err == nil && ready {
-				return volumeID, nil
-			}
-		}
-	}
+	return volumeID, nil
 }
 
 func (sr *snapshotService) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
