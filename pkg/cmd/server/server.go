@@ -272,9 +272,9 @@ func (s *server) run() error {
 
 	s.watchConfig(originalConfig)
 
-	backupStorageLocation, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{})
-	if err != nil {
-		return errors.WithStack(err)
+	if _, err = s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
+		s.logger.WithError(errors.WithStack(err)).
+			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
 	}
 
 	if config.PersistentVolumeProvider == nil {
@@ -288,11 +288,11 @@ func (s *server) run() error {
 		s.blockStore = blockStore
 	}
 
-	if err := s.initRestic(backupStorageLocation); err != nil {
+	if err := s.initRestic(); err != nil {
 		return err
 	}
 
-	if err := s.runControllers(config, backupStorageLocation); err != nil {
+	if err := s.runControllers(config); err != nil {
 		return err
 	}
 
@@ -524,7 +524,7 @@ func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) 
 	return blockStore, nil
 }
 
-func (s *server) initRestic(location *api.BackupStorageLocation) error {
+func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
@@ -572,7 +572,7 @@ func (s *server) initRestic(location *api.BackupStorageLocation) error {
 	return nil
 }
 
-func (s *server) runControllers(config *api.Config, defaultBackupLocation *api.BackupStorageLocation) error {
+func (s *server) runControllers(config *api.Config) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
