@@ -67,7 +67,6 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
         compute.snapshots.create
         compute.snapshots.useReadOnly
         compute.snapshots.delete
-        compute.projects.get
     )
 
     gcloud iam roles create heptio_ark.server \
