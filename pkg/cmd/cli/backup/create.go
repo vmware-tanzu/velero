@@ -70,6 +70,7 @@ type CreateOptions struct {
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
 	StorageLocation         string
+	SnapshotLocations       []string
 
 	client arkclient.Interface
 }
@@ -92,6 +93,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.ExcludeResources, "exclude-resources", "resources to exclude from the backup, formatted as resource.group, such as storageclasses.storage.k8s.io")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup")
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
+	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "list of locations (at most one per provider) where volume snapshots should be stored")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
@@ -115,6 +117,12 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.StorageLocation != "" {
 		if _, err := o.client.ArkV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+			return err
+		}
+	}
+
+	for _, loc := range o.SnapshotLocations {
+		if _, err := o.client.ArkV1().VolumeSnapshotLocations(f.Namespace()).Get(loc, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -150,6 +158,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			TTL:                metav1.Duration{Duration: o.TTL},
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 			StorageLocation:         o.StorageLocation,
+			VolumeSnapshotLocations: o.SnapshotLocations,
 		},
 	}
 
