@@ -64,16 +64,6 @@ func (b *blockStore) Init(config map[string]string) error {
 		return errors.WithStack(err)
 	}
 
-	// validate connection
-	res, err := gce.Projects.Get(project).Do()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if res == nil {
-		return errors.Errorf("error getting project %q", project)
-	}
-
 	b.gce = gce
 	b.project = project
 
