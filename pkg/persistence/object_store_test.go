@@ -211,31 +211,47 @@ func TestPutBackup(t *testing.T) {
 		metadata     io.Reader
 		contents     io.Reader
 		log          io.Reader
+		snapshots    io.Reader
 		expectedErr  string
 		expectedKeys []string
 	}{
 		{
-			name:         "normal case",
-			metadata:     newStringReadSeeker("metadata"),
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-logs.gz", "metadata/revision"},
+			name:        "normal case",
+			metadata:    newStringReadSeeker("metadata"),
+			contents:    newStringReadSeeker("contents"),
+			log:         newStringReadSeeker("log"),
+			snapshots:   newStringReadSeeker("snapshots"),
+			expectedErr: "",
+			expectedKeys: []string{
+				"backups/backup-1/ark-backup.json",
+				"backups/backup-1/backup-1.tar.gz",
+				"backups/backup-1/backup-1-logs.gz",
+				"backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"metadata/revision",
+			},
 		},
 		{
-			name:         "normal case with backup store prefix",
-			prefix:       "prefix-1/",
-			metadata:     newStringReadSeeker("metadata"),
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			expectedErr:  "",
-			expectedKeys: []string{"prefix-1/backups/backup-1/ark-backup.json", "prefix-1/backups/backup-1/backup-1.tar.gz", "prefix-1/backups/backup-1/backup-1-logs.gz", "prefix-1/metadata/revision"},
+			name:        "normal case with backup store prefix",
+			prefix:      "prefix-1/",
+			metadata:    newStringReadSeeker("metadata"),
+			contents:    newStringReadSeeker("contents"),
+			log:         newStringReadSeeker("log"),
+			snapshots:   newStringReadSeeker("snapshots"),
+			expectedErr: "",
+			expectedKeys: []string{
+				"prefix-1/backups/backup-1/ark-backup.json",
+				"prefix-1/backups/backup-1/backup-1.tar.gz",
+				"prefix-1/backups/backup-1/backup-1-logs.gz",
+				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"prefix-1/metadata/revision",
+			},
 		},
 		{
 			name:         "error on metadata upload does not upload data",
 			metadata:     new(errorReader),
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "error readers return errors",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -244,22 +260,30 @@ func TestPutBackup(t *testing.T) {
 			metadata:     newStringReadSeeker("metadata"),
 			contents:     new(errorReader),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "error readers return errors",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
-			name:         "error on log upload is ok",
-			metadata:     newStringReadSeeker("foo"),
-			contents:     newStringReadSeeker("bar"),
-			log:          new(errorReader),
-			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "metadata/revision"},
+			name:        "error on log upload is ok",
+			metadata:    newStringReadSeeker("foo"),
+			contents:    newStringReadSeeker("bar"),
+			log:         new(errorReader),
+			snapshots:   newStringReadSeeker("snapshots"),
+			expectedErr: "",
+			expectedKeys: []string{
+				"backups/backup-1/ark-backup.json",
+				"backups/backup-1/backup-1.tar.gz",
+				"backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"metadata/revision",
+			},
 		},
 		{
 			name:         "don't upload data when metadata is nil",
 			metadata:     nil,
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -269,7 +293,7 @@ func TestPutBackup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log)
+			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log, tc.snapshots)
 
 			arktest.AssertErrorMatches(t, tc.expectedErr, err)
 			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))

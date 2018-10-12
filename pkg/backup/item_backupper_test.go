@@ -524,18 +524,16 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			if test.snapshottableVolumes != nil {
 				require.Equal(t, len(test.snapshottableVolumes), len(blockStore.SnapshotsTaken))
+			}
 
-				var expectedBackups []api.VolumeBackupInfo
-				for _, vbi := range test.snapshottableVolumes {
-					expectedBackups = append(expectedBackups, vbi)
-				}
+			if len(test.snapshottableVolumes) > 0 {
+				require.Len(t, backup.VolumeSnapshots, 1)
+				snapshot := backup.VolumeSnapshots[0]
 
-				var actualBackups []api.VolumeBackupInfo
-				for _, vbi := range backup.Status.VolumeBackups {
-					actualBackups = append(actualBackups, *vbi)
-				}
-
-				assert.Equal(t, expectedBackups, actualBackups)
+				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].SnapshotID, snapshot.Status.ProviderSnapshotID)
+				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].Type, snapshot.Spec.VolumeType)
+				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].Iops, snapshot.Spec.VolumeIOPS)
+				assert.Equal(t, test.snapshottableVolumes["vol-abc123"].AvailabilityZone, snapshot.Spec.VolumeAZ)
 			}
 
 			if test.expectedTrackedPVCs != nil {
@@ -718,7 +716,6 @@ func TestTakePVSnapshot(t *testing.T) {
 		expectError            bool
 		expectedVolumeID       string
 		expectedSnapshotsTaken int
-		existingVolumeBackups  map[string]*v1.VolumeBackupInfo
 		volumeInfo             map[string]v1.VolumeBackupInfo
 	}{
 		{
@@ -757,21 +754,6 @@ func TestTakePVSnapshot(t *testing.T) {
 			},
 		},
 		{
-			name:                   "preexisting volume backup info in backup status",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "pd-abc123",
-			ttl:                    5 * time.Minute,
-			existingVolumeBackups: map[string]*v1.VolumeBackupInfo{
-				"anotherpv": {SnapshotID: "anothersnap"},
-			},
-			volumeInfo: map[string]v1.VolumeBackupInfo{
-				"pd-abc123": {Type: "gp", SnapshotID: "snap-1"},
-			},
-		},
-		{
 			name:             "create snapshot error",
 			snapshotEnabled:  true,
 			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
@@ -802,9 +784,6 @@ func TestTakePVSnapshot(t *testing.T) {
 				Spec: v1.BackupSpec{
 					SnapshotVolumes: &test.snapshotEnabled,
 					TTL:             metav1.Duration{Duration: test.ttl},
-				},
-				Status: v1.BackupStatus{
-					VolumeBackups: test.existingVolumeBackups,
 				},
 			}
 
@@ -843,29 +822,18 @@ func TestTakePVSnapshot(t *testing.T) {
 				return
 			}
 
-			expectedVolumeBackups := test.existingVolumeBackups
-			if expectedVolumeBackups == nil {
-				expectedVolumeBackups = make(map[string]*v1.VolumeBackupInfo)
-			}
-
-			// we should have one snapshot taken exactly
+			// we should have exactly one snapshot taken
 			require.Equal(t, test.expectedSnapshotsTaken, blockStore.SnapshotsTaken.Len())
 
 			if test.expectedSnapshotsTaken > 0 {
-				// the snapshotID should be the one in the entry in blockStore.SnapshottableVolumes
-				// for the volume we ran the test for
+				require.Len(t, ib.backupRequest.VolumeSnapshots, 1)
+				snapshot := ib.backupRequest.VolumeSnapshots[0]
+
 				snapshotID, _ := blockStore.SnapshotsTaken.PopAny()
-
-				expectedVolumeBackups["mypv"] = &v1.VolumeBackupInfo{
-					SnapshotID:       snapshotID,
-					Type:             test.volumeInfo[test.expectedVolumeID].Type,
-					Iops:             test.volumeInfo[test.expectedVolumeID].Iops,
-					AvailabilityZone: test.volumeInfo[test.expectedVolumeID].AvailabilityZone,
-				}
-
-				if e, a := expectedVolumeBackups, backup.Status.VolumeBackups; !reflect.DeepEqual(e, a) {
-					t.Errorf("backup.status.VolumeBackups: expected %v, got %v", e, a)
-				}
+				assert.Equal(t, snapshotID, snapshot.Status.ProviderSnapshotID)
+				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Type, snapshot.Spec.VolumeType)
+				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Iops, snapshot.Spec.VolumeIOPS)
+				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].AvailabilityZone, snapshot.Spec.VolumeAZ)
 			}
 		})
 	}

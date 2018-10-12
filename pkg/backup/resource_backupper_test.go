@@ -448,6 +448,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				mock.Anything, // restic backupper
 				mock.Anything, // pvc snapshot tracker
 				nil,
+				mock.Anything,
 			).Return(itemBackupper)
 
 			client := &arktest.FakeDynamicClient{}
