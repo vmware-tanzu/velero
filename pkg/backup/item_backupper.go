@@ -40,6 +40,7 @@ import (
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/podexec"
 	"github.com/heptio/ark/pkg/restic"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 type itemBackupperFactory interface {
@@ -401,19 +402,14 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		return errors.WithStack(err)
 	}
 
-	name := metadata.GetName()
-	var pvFailureDomainZone string
-	labels := metadata.GetLabels()
-
-	if labels[zoneLabel] != "" {
-		pvFailureDomainZone = labels[zoneLabel]
-	} else {
+	pvFailureDomainZone := metadata.GetLabels()[zoneLabel]
+	if pvFailureDomainZone == "" {
 		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
 	}
 
 	var (
-		volumeID   string
-		blockStore cloudprovider.BlockStore
+		volumeID, location string
+		blockStore         cloudprovider.BlockStore
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {
@@ -439,6 +435,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 		log.Infof("Got volume ID for persistent volume")
 		blockStore = bs
+		location = snapshotLocation.Name
 		break
 	}
 
@@ -454,30 +451,45 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		"ark.heptio.com/pv":     metadata.GetName(),
 	}
 
-	log.Info("Snapshotting PersistentVolume")
-	snapshotID, err := blockStore.CreateSnapshot(volumeID, pvFailureDomainZone, tags)
-	if err != nil {
-		// log+error on purpose - log goes to the per-backup log file, error goes to the backup
-		log.WithError(err).Error("error creating snapshot")
-		return errors.WithMessage(err, "error creating snapshot")
-	}
-
+	log.Info("Getting volume information")
 	volumeType, iops, err := blockStore.GetVolumeInfo(volumeID, pvFailureDomainZone)
 	if err != nil {
 		log.WithError(err).Error("error getting volume info")
 		return errors.WithMessage(err, "error getting volume info")
 	}
 
-	if ib.backupRequest.Status.VolumeBackups == nil {
-		ib.backupRequest.Status.VolumeBackups = make(map[string]*api.VolumeBackupInfo)
-	}
+	log.Info("Snapshotting PersistentVolume")
+	snapshot := volumeSnapshot(ib.backupRequest.Backup, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
-	ib.backupRequest.Status.VolumeBackups[name] = &api.VolumeBackupInfo{
-		SnapshotID:       snapshotID,
-		Type:             volumeType,
-		Iops:             iops,
-		AvailabilityZone: pvFailureDomainZone,
+	var errs []error
+	snapshotID, err := blockStore.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
+	if err != nil {
+		log.WithError(err).Error("error creating snapshot")
+		errs = append(errs, errors.Wrap(err, "error taking snapshot of volume"))
+		snapshot.Status.Phase = volume.SnapshotPhaseFailed
+	} else {
+		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
+		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
+	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
 
-	return nil
+	// nil errors are automatically removed
+	return kubeerrs.NewAggregate(errs)
+}
+
+func volumeSnapshot(backup *api.Backup, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
+	return &volume.Snapshot{
+		Spec: volume.SnapshotSpec{
+			BackupName:       backup.Name,
+			BackupUID:        string(backup.UID),
+			Location:         location,
+			ProviderVolumeID: volumeID,
+			VolumeType:       volumeType,
+			VolumeAZ:         az,
+			VolumeIOPS:       iops,
+		},
+		Status: volume.SnapshotStatus{
+			Phase: volume.SnapshotPhaseNew,
+		},
+	}
 }
