@@ -24,13 +24,15 @@ import (
 	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestBackupPVAction(t *testing.T) {
 	pvc := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"spec": map[string]interface{}{},
+			"spec":   map[string]interface{}{},
+			"status": map[string]interface{}{},
 		},
 	}
 
@@ -51,11 +53,39 @@ func TestBackupPVAction(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, additional, 0)
 
-	// non-empty spec.volumeName should result in
-	// no error and an additional item for the PV
+	// non-empty spec.volumeName when status.phase is empty
+	// should result in no error and no additional items
 	pvc.Object["spec"].(map[string]interface{})["volumeName"] = "myVolume"
+	_, additional, err = a.Execute(pvc, backup)
+	require.NoError(t, err)
+	require.Len(t, additional, 0)
+
+	// non-empty spec.volumeName when status.phase is 'Pending'
+	// should result in no error and no additional items
+	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimPending
+	_, additional, err = a.Execute(pvc, backup)
+	require.NoError(t, err)
+	require.Len(t, additional, 0)
+
+	// non-empty spec.volumeName when status.phase is 'Lost'
+	// should result in no error and no additional items
+	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimLost
+	_, additional, err = a.Execute(pvc, backup)
+	require.NoError(t, err)
+	require.Len(t, additional, 0)
+
+	// non-empty spec.volumeName when status.phase is 'Bound'
+	// should result in no error and one additional item for the PV
+	pvc.Object["status"].(map[string]interface{})["phase"] = corev1api.ClaimBound
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Len(t, additional, 1)
 	assert.Equal(t, ResourceIdentifier{GroupResource: kuberesource.PersistentVolumes, Name: "myVolume"}, additional[0])
+
+	// empty spec.volumeName when status.phase is 'Bound' should
+	// result in no error and no additional items
+	pvc.Object["spec"].(map[string]interface{})["volumeName"] = ""
+	_, additional, err = a.Execute(pvc, backup)
+	assert.NoError(t, err)
+	assert.Len(t, additional, 0)
 }
