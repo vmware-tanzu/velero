@@ -6,4 +6,4 @@ Thanks for trying out Ark! We welcome all feedback, please consider joining our 
 
 # Updates
 
-For the latest updates about us, follow [**@heptio**](https://twitter.com/heptio) on Twitter or visit the [**heptio blog!**](https://blog.heptio.com/)
+For the latest updates about us, follow [**@heptioark**](https://twitter.com/heptioark) on Twitter or visit the [**heptio blog!**](https://blog.heptio.com/)
