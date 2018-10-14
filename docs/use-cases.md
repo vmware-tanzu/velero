@@ -19,7 +19,7 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 2. A disaster happens and you need to recreate your resources.
 
-3. Update the [Ark server deployment][3], adding the argument for the `server` command flag `restore-only` set to `true`. This prevents Backup objects from being created or deleted during your Restore process.
+3. Update the Ark server deployment, adding the argument for the `server` command flag `restore-only` set to `true`. This prevents Backup objects from being created or deleted during your Restore process.
 
 4. Create a restore with your most recent Ark Backup:
     ```
@@ -50,4 +50,3 @@ ark restore create --from-backup <BACKUP-NAME>
 
 [0]: #disaster-recovery
 [1]: #cluster-migration
-[3]: cli-reference/ark_server#options
