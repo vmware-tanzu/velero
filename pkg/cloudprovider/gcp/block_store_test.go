@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/heptio/ark/pkg/util/collections"
@@ -150,6 +151,62 @@ func TestGetSnapshotTags(t *testing.T) {
 			for k, v := range expectedMap {
 				assert.Equal(t, v, actualMap[k])
 			}
+		})
+	}
+}
+
+func TestRegionHelpers(t *testing.T) {
+	tests := []struct {
+		name                string
+		volumeAZ            string
+		expectedRegion      string
+		expectedIsMultiZone bool
+		expectedError       error
+	}{
+		{
+			name:                "valid multizone(2) tag",
+			volumeAZ:            "us-central1-a__us-central1-b",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: true,
+			expectedError:       nil,
+		},
+		{
+			name:                "valid multizone(4) tag",
+			volumeAZ:            "us-central1-a__us-central1-b__us-central1-f__us-central1-e",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: true,
+			expectedError:       nil,
+		},
+
+		{
+			name:                "valid single zone tag",
+			volumeAZ:            "us-central1-a",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: false,
+			expectedError:       nil,
+		},
+		{
+			name:                "invalid single zone tag",
+			volumeAZ:            "us^central1^a",
+			expectedRegion:      "",
+			expectedIsMultiZone: false,
+			expectedError:       fmt.Errorf("failed to parse region from zone: %q\n", "us^central1^a"),
+		},
+		{
+			name:                "invalid multizone tag",
+			volumeAZ:            "us^central1^a__us^central1^b",
+			expectedRegion:      "",
+			expectedIsMultiZone: true,
+			expectedError:       fmt.Errorf("failed to parse region from zone: %q\n", "us^central1^a__us^central1^b"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectedIsMultiZone, isMultiZone(test.volumeAZ))
+			region, err := parseRegion(test.volumeAZ)
+			assert.Equal(t, test.expectedError, err)
+			assert.Equal(t, test.expectedRegion, region)
 		})
 	}
 }
