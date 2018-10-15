@@ -33,7 +33,6 @@ import (
 )
 
 const (
-	resourceGroupConfigKey  = "resourceGroup"
 	storageAccountConfigKey = "storageAccount"
 )
 

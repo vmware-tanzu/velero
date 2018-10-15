@@ -56,8 +56,8 @@ func TestGetVolumeID(t *testing.T) {
 
 func TestSetVolumeID(t *testing.T) {
 	b := &blockStore{
-		resourceGroup: "rg",
-		subscription:  "sub",
+		disksResourceGroup: "rg",
+		subscription:       "sub",
 	}
 
 	pv := &unstructured.Unstructured{
@@ -99,8 +99,8 @@ func TestSetVolumeID(t *testing.T) {
 // format
 func TestParseSnapshotName(t *testing.T) {
 	b := &blockStore{
-		subscription:  "default-sub",
-		resourceGroup: "default-rg",
+		subscription:       "default-sub",
+		disksResourceGroup: "default-rg-legacy",
 	}
 
 	// invalid name
@@ -123,7 +123,7 @@ func TestParseSnapshotName(t *testing.T) {
 	snap, err = b.parseSnapshotName(fullName)
 	require.NoError(t, err)
 	assert.Equal(t, b.subscription, snap.subscription)
-	assert.Equal(t, b.resourceGroup, snap.resourceGroup)
+	assert.Equal(t, b.disksResourceGroup, snap.resourceGroup)
 	assert.Equal(t, fullName, snap.name)
 
 }

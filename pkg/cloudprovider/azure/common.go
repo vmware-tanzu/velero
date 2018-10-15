@@ -29,6 +29,8 @@ const (
 	subscriptionIDEnvVar = "AZURE_SUBSCRIPTION_ID"
 	clientIDEnvVar       = "AZURE_CLIENT_ID"
 	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
+
+	resourceGroupConfigKey = "resourceGroup"
 )
 
 // GetResticEnvVars gets the environment variables that restic
