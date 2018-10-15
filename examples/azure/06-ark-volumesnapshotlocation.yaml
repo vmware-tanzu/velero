@@ -21,4 +21,4 @@ metadata:
 spec:
   provider: azure
   config:
-    apiTimeout: 2m0s
+    apiTimeout: <YOUR_TIMEOUT>

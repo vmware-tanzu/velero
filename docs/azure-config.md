@@ -125,31 +125,14 @@ kubectl create secret generic cloud-credentials \
 
 Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
 
-* In file `examples/azure/10-ark-config.yaml`:
-
-  * Replace `<YOUR_TIMEOUT>`. See the [Config definition][8] for details.
-
 * In file `examples/azure/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BLOB_CONTAINER>`, `<YOUR_STORAGE_RESOURCE_GROUP>`, and `<YOUR_STORAGE_ACCOUNT>`. See the [BackupStorageLocation definition][21] for details.
 
-Here is an example of a completed config file.
+* In file `examples/azure/06-ark-volumesnapshotlocation.yaml`:
 
-```yaml
-apiVersion: ark.heptio.com/v1
-kind: Config
-metadata:
-  namespace: heptio-ark
-  name: default
-persistentVolumeProvider:
-  name: azure
-  config:
-    apiTimeout: 15m
-backupSyncPeriod: 30m
-gcSyncPeriod: 30m
-scheduleSyncPeriod: 1m
-restoreOnlyMode: false
-```
+  * Replace `<YOUR_TIMEOUT>`. See the [VolumeSnapshotLocation definition][8] for details.
+
 
 ## Start the server
 
@@ -160,7 +143,7 @@ In the root of your Ark directory, run:
   ```
 
 [0]: namespace.md
-[8]: config-definition.md#azure
+[8]: docs/api-types/volumesnapshotlocation.md#azure
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage

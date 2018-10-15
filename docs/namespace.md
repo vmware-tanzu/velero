@@ -7,7 +7,7 @@ you run Ark client commands.
 ## Edit the example files
 
 The Ark repository includes [a set of examples][0] that you can use to set up your Ark server. The
-examples place the server and backup/schedule/restore/config data in the `heptio-ark` namespace.
+examples place the server and backup/schedule/restore/etc. data in the `heptio-ark` namespace.
 
 To run the server in another namespace, you edit the relevant files, changing `heptio-ark` to
 your desired namespace.
@@ -18,9 +18,9 @@ files, changing `heptio-ark` to your desired namespace. You also need to create 
 
 For all cloud providers, edit `https://github.com/heptio/ark/blob/master/examples/common/00-prereqs.yaml`. This file defines:
 
-* CustomResourceDefinitions for the Ark objects (backups, schedules, restores, configs, downloadrequests)
+* CustomResourceDefinitions for the Ark objects (backups, schedules, restores, downloadrequests, etc.)
 * The namespace where the Ark server runs
-* The namespace where backups, schedules, restores, and the config are stored
+* The namespace where backups, schedules, restores, etc. are stored
 * The Ark service account
 * The RBAC rules to grant permissions to the Ark service account
 
@@ -29,16 +29,9 @@ For all cloud providers, edit `https://github.com/heptio/ark/blob/master/example
 
 For AWS, edit:
 
+* `https://github.com/heptio/ark/blob/master/examples/aws/05-ark-backupstoragelocation.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/aws/06-ark-volumesnapshotlocation.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/aws/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/aws/00-ark-config.yaml`
-
-
-### GCP
-
-For GCP, edit:
-
-* `https://github.com/heptio/ark/blob/master/examples/gcp/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/gcp/00-ark-config.yaml`
 
 
 ### Azure
@@ -46,14 +39,25 @@ For GCP, edit:
 For Azure, edit:
 
 * `https://github.com/heptio/ark/blob/master/examples/azure/00-ark-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/azure/10-ark-config.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/azure/05-ark-backupstoragelocation.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/azure/06-ark-volumesnapshotlocation.yaml`
+
+### GCP
+
+For GCP, edit:
+
+* `https://github.com/heptio/ark/blob/master/examples/gcp/05-ark-backupstoragelocation.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/gcp/06-ark-volumesnapshotlocation.yaml`
+* `https://github.com/heptio/ark/blob/master/examples/gcp/10-deployment.yaml`
+
 
 ### IBM
 
 For IBM, edit:
 
+* `https://github.com/heptio/ark/blob/master/examples/ibm/05-ark-backupstoragelocation.yaml`
 * `https://github.com/heptio/ark/blob/master/examples/ibm/10-deployment.yaml`
-* `https://github.com/heptio/ark/blob/master/examples/ibm/00-ark-config.yaml`
+
 
 ## Specify the namespace in client commands
 

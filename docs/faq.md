@@ -31,9 +31,7 @@ across multiple Ark instances can lead to numerous problems - failed backups, ov
 inadvertently deleted backups, etc., all of which can be avoided by using a separate bucket per Ark
 instance.
 
-Related to this, if you need to restore a backup from cluster A into cluster B, please use [restore-only][1]
-mode in cluster B's Ark instance while it's configured to use cluster A's bucket. This will ensure no 
+Related to this, if you need to restore a backup from cluster A into cluster B, please use restore-only
+mode in cluster B's Ark instance (via the `--restore-only` flag on the `ark server` command specified
+in your Ark deployment) while it's configured to use cluster A's bucket. This will ensure no 
 new backups are created, and no existing backups are deleted or overwritten.
-
-
-[1]: config-definition.md#main-config-parameters
