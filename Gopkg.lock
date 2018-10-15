@@ -372,6 +372,26 @@
   version = "v1.2.2"
 
 [[projects]]
+  name = "go.opencensus.io"
+  packages = [
+    ".",
+    "internal",
+    "internal/tagencoding",
+    "plugin/ochttp",
+    "plugin/ochttp/propagation/b3",
+    "stats",
+    "stats/internal",
+    "stats/view",
+    "tag",
+    "trace",
+    "trace/internal",
+    "trace/propagation",
+    "trace/tracestate"
+  ]
+  revision = "79993219becaa7e29e3b60cb67f5b8e82dee11d6"
+  version = "v0.17.0"
+
+[[projects]]
   branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
@@ -402,7 +422,7 @@
     "jws",
     "jwt"
   ]
-  revision = "9a379c6b3e95a790ffc43293c2a78dee0d7b6e20"
+  revision = "c57b0facaced709681d9f90397429b9430a74754"
 
 [[projects]]
   branch = "master"
@@ -454,9 +474,10 @@
     "iterator",
     "option",
     "storage/v1",
-    "transport/http"
+    "transport/http",
+    "transport/http/internal/propagation"
   ]
-  revision = "ed10e890a8366167a7ce33fac2b12447987bcb1c"
+  revision = "625cd1887957946515db468ce519bb71fa31fc7f"
 
 [[projects]]
   name = "google.golang.org/appengine"
