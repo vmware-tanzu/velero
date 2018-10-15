@@ -18,9 +18,11 @@ package gcp
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
@@ -102,6 +104,20 @@ func extractProjectFromCreds() (string, error) {
 	return creds.ProjectID, nil
 }
 
+func isMultiZone(volumeAZ string) bool {
+	return len(strings.Split(volumeAZ, "__")) > 1
+}
+
+func parseRegion(volumeAZ string) (string, error) {
+	zones := strings.Split(volumeAZ, "__")
+	zone := zones[0]
+	parts := strings.SplitAfterN(zone, "-", 3)
+	if len(parts) < 2 {
+		return "", fmt.Errorf("failed to parse region from zone: %q\n", volumeAZ)
+	}
+	return parts[0] + strings.TrimSuffix(parts[1], "-"), nil
+}
+
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	// get the snapshot so we can apply its tags to the volume
 	res, err := b.gce.Snapshots.Get(b.project, snapshotID).Do()
@@ -121,19 +137,44 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		Description:    res.Description,
 	}
 
-	if _, err = b.gce.Disks.Insert(b.project, volumeAZ, disk).Do(); err != nil {
-		return "", errors.WithStack(err)
+	if isMultiZone(volumeAZ) {
+		volumeRegion, err := parseRegion(volumeAZ)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		if _, err = b.gce.RegionDisks.Insert(b.project, volumeRegion, disk).Do(); err != nil {
+			return "", errors.WithStack(err)
+		}
+	} else {
+		if _, err = b.gce.Disks.Insert(b.project, volumeAZ, disk).Do(); err != nil {
+			return "", errors.WithStack(err)
+		}
 	}
 
 	return disk.Name, nil
 }
 
 func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
-	if err != nil {
-		return "", nil, errors.WithStack(err)
-	}
+	var (
+		res *compute.Disk
+		err error
+	)
 
+	if isMultiZone(volumeAZ) {
+		volumeRegion, err := parseRegion(volumeAZ)
+		if err != nil {
+			return "", nil, errors.WithStack(err)
+		}
+		res, err = b.gce.RegionDisks.Get(b.project, volumeRegion, volumeID).Do()
+		if err != nil {
+			return "", nil, errors.WithStack(err)
+		}
+	} else {
+		res, err = b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
+		if err != nil {
+			return "", nil, errors.WithStack(err)
+		}
+	}
 	return res.Type, nil, nil
 }
 
@@ -149,6 +190,18 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 		snapshotName = volumeID[0:63-len(suffix)] + suffix
 	}
 
+	if isMultiZone(volumeAZ) {
+		volumeRegion, err := parseRegion(volumeAZ)
+		if err != nil {
+			return "", errors.WithStack(err)
+		}
+		return b.createRegionSnapshot(snapshotName, volumeID, volumeRegion, tags)
+	} else {
+		return b.createSnapshot(snapshotName, volumeID, volumeAZ, tags)
+	}
+}
+
+func (b *blockStore) createSnapshot(snapshotName, volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -160,6 +213,25 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	}
 
 	_, err = b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	return gceSnap.Name, nil
+}
+
+func (b *blockStore) createRegionSnapshot(snapshotName, volumeID, volumeRegion string, tags map[string]string) (string, error) {
+	disk, err := b.gce.RegionDisks.Get(b.project, volumeRegion, volumeID).Do()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	gceSnap := compute.Snapshot{
+		Name:        snapshotName,
+		Description: getSnapshotTags(tags, disk.Description, b.log),
+	}
+
+	_, err = b.gce.RegionDisks.CreateSnapshot(b.project, volumeRegion, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
