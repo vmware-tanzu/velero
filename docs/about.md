@@ -45,7 +45,7 @@ When you run `ark backup create test-backup`:
 
 1. The `BackupController` makes a call to the object storage service -- for example, AWS S3 -- to upload the backup file.
 
-By default, `ark backup create` makes disk snapshots of any persistent volumes. You can adjust the snapshots by specifying additional flags. See [the CLI help][30] for more information. Snapshots can be disabled with the option `--snapshot-volumes=false`.
+By default, `ark backup create` makes disk snapshots of any persistent volumes. You can adjust the snapshots by specifying additional flags. Run `ark backup create --help` to see available flags. Snapshots can be disabled with the option `--snapshot-volumes=false`.
 
 ![19]
 
@@ -70,4 +70,4 @@ Likewise, if a backup object exists in Kubernetes but not in object storage, it 
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
-[30]: https://github.com/heptio/ark/blob/master/docs/cli-reference/ark_create_backup.md
+[10]: hooks.md

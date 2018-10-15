@@ -128,7 +128,7 @@ spec:
 
 ### Parameter Options
 
-The list of configurable options for the `ark server` deployment can be found on the [CLI reference][12] document.
+The list of configurable options for the `ark server` deployment can be found by running `ark server --help`.
 
 
 
@@ -142,6 +142,5 @@ The list of configurable options for the `ark server` deployment can be found on
 [9]: #example
 [10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
 [11]: #deployment
-[12]: cli-reference/ark_server.md
 [13]: #sample-deployment
 [14]: #parameter-options
