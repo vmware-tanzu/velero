@@ -29,7 +29,6 @@ type ArkV1Interface interface {
 	RESTClient() rest.Interface
 	BackupsGetter
 	BackupStorageLocationsGetter
-	ConfigsGetter
 	DeleteBackupRequestsGetter
 	DownloadRequestsGetter
 	PodVolumeBackupsGetter
@@ -51,10 +50,6 @@ func (c *ArkV1Client) Backups(namespace string) BackupInterface {
 
 func (c *ArkV1Client) BackupStorageLocations(namespace string) BackupStorageLocationInterface {
 	return newBackupStorageLocations(c, namespace)
-}
-
-func (c *ArkV1Client) Configs(namespace string) ConfigInterface {
-	return newConfigs(c, namespace)
 }
 
 func (c *ArkV1Client) DeleteBackupRequests(namespace string) DeleteBackupRequestInterface {

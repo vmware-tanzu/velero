@@ -28,8 +28,6 @@ type Interface interface {
 	Backups() BackupInformer
 	// BackupStorageLocations returns a BackupStorageLocationInformer.
 	BackupStorageLocations() BackupStorageLocationInformer
-	// Configs returns a ConfigInformer.
-	Configs() ConfigInformer
 	// DeleteBackupRequests returns a DeleteBackupRequestInformer.
 	DeleteBackupRequests() DeleteBackupRequestInformer
 	// DownloadRequests returns a DownloadRequestInformer.
@@ -67,11 +65,6 @@ func (v *version) Backups() BackupInformer {
 // BackupStorageLocations returns a BackupStorageLocationInformer.
 func (v *version) BackupStorageLocations() BackupStorageLocationInformer {
 	return &backupStorageLocationInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// Configs returns a ConfigInformer.
-func (v *version) Configs() ConfigInformer {
-	return &configInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // DeleteBackupRequests returns a DeleteBackupRequestInformer.

@@ -18,7 +18,6 @@ package server
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -28,32 +27,6 @@ import (
 	fakeclientset "github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	arktest "github.com/heptio/ark/pkg/util/test"
 )
-
-func TestApplyConfigDefaults(t *testing.T) {
-	var (
-		c      = &v1.Config{}
-		server = &server{
-			logger: arktest.NewLogger(),
-			config: serverConfig{},
-		}
-	)
-
-	// test defaulting
-	server.applyConfigDefaults(c)
-	assert.Equal(t, defaultBackupSyncPeriod, server.config.backupSyncPeriod)
-	assert.Equal(t, defaultPodVolumeOperationTimeout, server.config.podVolumeOperationTimeout)
-	assert.Equal(t, defaultRestorePriorities, server.config.restoreResourcePriorities)
-
-	// // make sure defaulting doesn't overwrite real values
-	server.config.backupSyncPeriod = 4 * time.Minute
-	server.config.podVolumeOperationTimeout = 5 * time.Second
-	server.config.restoreResourcePriorities = []string{"a", "b"}
-
-	server.applyConfigDefaults(c)
-	assert.Equal(t, 4*time.Minute, server.config.backupSyncPeriod)
-	assert.Equal(t, 5*time.Second, server.config.podVolumeOperationTimeout)
-	assert.Equal(t, []string{"a", "b"}, server.config.restoreResourcePriorities)
-}
 
 func TestArkResourcesExist(t *testing.T) {
 	var (
