@@ -40,18 +40,21 @@ import (
 
 const (
 	resourceGroupEnvVar = "AZURE_RESOURCE_GROUP"
+
 	apiTimeoutConfigKey = "apiTimeout"
-	snapshotsResource   = "snapshots"
-	disksResource       = "disks"
+
+	snapshotsResource = "snapshots"
+	disksResource     = "disks"
 )
 
 type blockStore struct {
-	log           logrus.FieldLogger
-	disks         *disk.DisksClient
-	snaps         *disk.SnapshotsClient
-	subscription  string
-	resourceGroup string
-	apiTimeout    time.Duration
+	log                logrus.FieldLogger
+	disks              *disk.DisksClient
+	snaps              *disk.SnapshotsClient
+	subscription       string
+	disksResourceGroup string
+	snapsResourceGroup string
+	apiTimeout         time.Duration
 }
 
 type snapshotIdentifier struct {
@@ -106,7 +109,16 @@ func (b *blockStore) Init(config map[string]string) error {
 	b.disks = &disksClient
 	b.snaps = &snapsClient
 	b.subscription = envVars[subscriptionIDEnvVar]
-	b.resourceGroup = envVars[resourceGroupEnvVar]
+	b.disksResourceGroup = envVars[resourceGroupEnvVar]
+	b.snapsResourceGroup = config[resourceGroupConfigKey]
+
+	// if no resource group was explicitly specified in 'config',
+	// use the value from the env var (i.e. the same one as where
+	// the cluster & disks are)
+	if b.snapsResourceGroup == "" {
+		b.snapsResourceGroup = envVars[resourceGroupEnvVar]
+	}
+
 	b.apiTimeout = apiTimeout
 
 	return nil
@@ -142,7 +154,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.disks.CreateOrUpdate(b.resourceGroup, *disk.Name, disk, ctx.Done())
+	_, errChan := b.disks.CreateOrUpdate(b.disksResourceGroup, *disk.Name, disk, ctx.Done())
 
 	err = <-errChan
 
@@ -153,7 +165,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 }
 
 func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := b.disks.Get(b.resourceGroup, volumeID)
+	res, err := b.disks.Get(b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
@@ -163,12 +175,12 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
-	diskInfo, err := b.disks.Get(b.resourceGroup, volumeID)
+	diskInfo, err := b.disks.Get(b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	fullDiskName := getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	fullDiskName := getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
 	suffix := "-" + uuid.NewV4().String()
@@ -194,14 +206,14 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.snaps.CreateOrUpdate(b.resourceGroup, *snap.Name, snap, ctx.Done())
+	_, errChan := b.snaps.CreateOrUpdate(b.snapsResourceGroup, *snap.Name, snap, ctx.Done())
 	err = <-errChan
 
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
-	return getComputeResourceName(b.subscription, b.resourceGroup, snapshotsResource, snapshotName), nil
+	return getComputeResourceName(b.subscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
 func getSnapshotTags(arkTags map[string]string, diskTags *map[string]*string) *map[string]*string {
@@ -279,8 +291,11 @@ func (b *blockStore) parseSnapshotName(name string) (*snapshotIdentifier, error)
 	// legacy format - name only (not fully-qualified)
 	case !strings.Contains(name, "/"):
 		return &snapshotIdentifier{
-			subscription:  b.subscription,
-			resourceGroup: b.resourceGroup,
+			subscription: b.subscription,
+			// use the disksResourceGroup here because Ark only
+			// supported storing snapshots in that resource group
+			// when the legacy snapshot format was used.
+			resourceGroup: b.disksResourceGroup,
 			name:          name,
 		}, nil
 	// current format - fully qualified
@@ -341,7 +356,7 @@ func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runt
 	}
 
 	azure["diskName"] = volumeID
-	azure["diskURI"] = getComputeResourceName(b.subscription, b.resourceGroup, disksResource, volumeID)
+	azure["diskURI"] = getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
 
 	return pv, nil
 }
