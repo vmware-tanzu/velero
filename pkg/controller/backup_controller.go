@@ -385,51 +385,74 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// Do the actual backup
 	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
 		errs = append(errs, err)
-
 		backup.Status.Phase = api.BackupPhaseFailed
 	} else {
 		backup.Status.Phase = api.BackupPhaseCompleted
-	}
-
-	// Mark completion timestamp before serializing and uploading.
-	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
-	backup.Status.CompletionTimestamp.Time = c.clock.Now()
-
-	var backupJSONToUpload, backupFileToUpload io.Reader
-	backupJSON := new(bytes.Buffer)
-	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding backup"))
-	} else {
-		// Only upload the json and backup tarball if encoding to json succeeded.
-		backupJSONToUpload = backupJSON
-		backupFileToUpload = backupFile
-	}
-
-	var backupSizeBytes int64
-	if backupFileStat, err := backupFile.Stat(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error getting file info"))
-	} else {
-		backupSizeBytes = backupFileStat.Size()
 	}
 
 	if err := gzippedLogFile.Close(); err != nil {
 		c.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 
-	if err := backupStore.PutBackup(backup.Name, backupJSONToUpload, backupFileToUpload, logFile); err != nil {
-		errs = append(errs, err)
-	}
+	// Mark completion timestamp before serializing and uploading.
+	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
+	backup.Status.CompletionTimestamp.Time = c.clock.Now()
 
-	backupScheduleName := backup.GetLabels()["ark-schedule"]
-	c.metrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
-
-	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
-	backupDurationSeconds := float64(backupDuration / time.Second)
-	c.metrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
+	errs = append(errs, persistBackup(backup, backupFile, logFile, backupStore, c.logger)...)
+	errs = append(errs, recordBackupMetrics(backup.Backup, backupFile, c.metrics))
 
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
+}
+
+func recordBackupMetrics(backup *api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {
+	backupScheduleName := backup.GetLabels()["ark-schedule"]
+
+	var backupSizeBytes int64
+	var err error
+	if backupFileStat, err := backupFile.Stat(); err != nil {
+		err = errors.Wrap(err, "error getting file info")
+	} else {
+		backupSizeBytes = backupFileStat.Size()
+	}
+	serverMetrics.SetBackupTarballSizeBytesGauge(backupScheduleName, backupSizeBytes)
+
+	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
+	backupDurationSeconds := float64(backupDuration / time.Second)
+	serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
+
+	return err
+}
+
+func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File, backupStore persistence.BackupStore, log logrus.FieldLogger) []error {
+	errs := []error{}
+	backupJSON := new(bytes.Buffer)
+
+	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding backup"))
+	}
+
+	volumeSnapshots := new(bytes.Buffer)
+	gzw := gzip.NewWriter(volumeSnapshots)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(backup.VolumeSnapshots); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding list of volume snapshots"))
+	}
+
+	if len(errs) > 0 {
+		// Don't upload the JSON files or backup tarball if encoding to json fails.
+		backupJSON = nil
+		backupContents = nil
+		volumeSnapshots = nil
+	}
+
+	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, volumeSnapshots); err != nil {
+		errs = append(errs, err)
+	}
+
+	return errs
 }
 
 func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {

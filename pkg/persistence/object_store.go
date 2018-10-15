@@ -17,6 +17,7 @@ limitations under the License.
 package persistence
 
 import (
+	"encoding/json"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -30,6 +31,7 @@ import (
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -39,8 +41,9 @@ type BackupStore interface {
 
 	ListBackups() ([]*arkv1api.Backup, error)
 
-	PutBackup(name string, metadata, contents, log io.Reader) error
+	PutBackup(name string, metadata, contents, log, volumeSnapshots io.Reader) error
 	GetBackupMetadata(name string) (*arkv1api.Backup, error)
+	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 	DeleteBackup(name string) error
 
@@ -163,7 +166,7 @@ func (s *objectBackupStore) ListBackups() ([]*arkv1api.Backup, error) {
 	return output, nil
 }
 
-func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents io.Reader, log io.Reader) error {
+func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volumeSnapshots io.Reader) error {
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(name), log); err != nil {
 		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 		// backup's status.
@@ -185,6 +188,18 @@ func (s *objectBackupStore) PutBackup(name string, metadata io.Reader, contents 
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(name), contents); err != nil {
 		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
 		return kerrors.NewAggregate([]error{err, deleteErr})
+	}
+
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(name), volumeSnapshots); err != nil {
+		errs := []error{err}
+
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(name))
+		errs = append(errs, deleteErr)
+
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
+		errs = append(errs, deleteErr)
+
+		return kerrors.NewAggregate(errs)
 	}
 
 	return nil
@@ -216,7 +231,23 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, er
 	}
 
 	return backupObj, nil
+}
 
+func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
+	key := s.layout.getBackupVolumeSnapshotsKey(name)
+
+	res, err := s.objectStore.GetObject(s.bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	var volumeSnapshots []*volume.Snapshot
+	if err := json.NewDecoder(res).Decode(&volumeSnapshots); err != nil {
+		return nil, errors.Wrap(err, "error decoding object data")
+	}
+
+	return volumeSnapshots, nil
 }
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {

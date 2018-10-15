@@ -3,6 +3,7 @@ package backup
 import (
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 // Request is a request for a backup, with all references to other objects
@@ -16,4 +17,6 @@ type Request struct {
 	ResourceIncludesExcludes  *collections.IncludesExcludes
 	ResourceHooks             []resourceHook
 	ResolvedActions           []resolvedAction
+
+	VolumeSnapshots []*volume.Snapshot
 }

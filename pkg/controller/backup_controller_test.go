@@ -320,7 +320,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			completionTimestampIsPresent := func(buf *bytes.Buffer) bool {
 				return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 			}
-			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything).Return(nil)
+			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)

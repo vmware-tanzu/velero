@@ -70,7 +70,6 @@ func CustomResources() map[string]typeInfo {
 		"ResticRepository":       newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
 		"BackupStorageLocation":  newTypeInfo("backupstoragelocations", &BackupStorageLocation{}, &BackupStorageLocationList{}),
 		"VolumeSnapshotLocation": newTypeInfo("volumesnapshotlocations", &VolumeSnapshotLocation{}, &VolumeSnapshotLocationList{}),
-		"VolumeSnapshot":         newTypeInfo("volumesnapshots", &VolumeSnapshot{}, &VolumeSnapshotList{}),
 	}
 }
 

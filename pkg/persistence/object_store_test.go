@@ -254,31 +254,45 @@ func TestPutBackup(t *testing.T) {
 		metadata     io.Reader
 		contents     io.Reader
 		log          io.Reader
+		snapshots    io.Reader
 		expectedErr  string
 		expectedKeys []string
 	}{
 		{
-			name:         "normal case",
-			metadata:     newStringReadSeeker("metadata"),
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-logs.gz"},
+			name:        "normal case",
+			metadata:    newStringReadSeeker("metadata"),
+			contents:    newStringReadSeeker("contents"),
+			log:         newStringReadSeeker("log"),
+			snapshots:   newStringReadSeeker("snapshots"),
+			expectedErr: "",
+			expectedKeys: []string{
+				"backups/backup-1/ark-backup.json",
+				"backups/backup-1/backup-1.tar.gz",
+				"backups/backup-1/backup-1-logs.gz",
+				"backups/backup-1/backup-1-volumesnapshots.json.gz",
+			},
 		},
 		{
-			name:         "normal case with backup store prefix",
-			prefix:       "prefix-1/",
-			metadata:     newStringReadSeeker("metadata"),
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			expectedErr:  "",
-			expectedKeys: []string{"prefix-1/backups/backup-1/ark-backup.json", "prefix-1/backups/backup-1/backup-1.tar.gz", "prefix-1/backups/backup-1/backup-1-logs.gz"},
+			name:        "normal case with backup store prefix",
+			prefix:      "prefix-1/",
+			metadata:    newStringReadSeeker("metadata"),
+			contents:    newStringReadSeeker("contents"),
+			log:         newStringReadSeeker("log"),
+			snapshots:   newStringReadSeeker("snapshots"),
+			expectedErr: "",
+			expectedKeys: []string{
+				"prefix-1/backups/backup-1/ark-backup.json",
+				"prefix-1/backups/backup-1/backup-1.tar.gz",
+				"prefix-1/backups/backup-1/backup-1-logs.gz",
+				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
+			},
 		},
 		{
 			name:         "error on metadata upload does not upload data",
 			metadata:     new(errorReader),
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "error readers return errors",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -287,6 +301,7 @@ func TestPutBackup(t *testing.T) {
 			metadata:     newStringReadSeeker("metadata"),
 			contents:     new(errorReader),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "error readers return errors",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -295,29 +310,33 @@ func TestPutBackup(t *testing.T) {
 			metadata:     newStringReadSeeker("foo"),
 			contents:     newStringReadSeeker("bar"),
 			log:          new(errorReader),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz"},
+			expectedKeys: []string{"backups/backup-1/ark-backup.json", "backups/backup-1/backup-1.tar.gz", "backups/backup-1/backup-1-volumesnapshots.json.gz"},
 		},
 		{
 			name:         "don't upload data when metadata is nil",
 			metadata:     nil,
 			contents:     newStringReadSeeker("contents"),
 			log:          newStringReadSeeker("log"),
+			snapshots:    newStringReadSeeker("snapshots"),
 			expectedErr:  "",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 	}
 
 	for _, tc := range tests {
-		harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-		err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log)
+			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log, tc.snapshots)
 
-		arktest.AssertErrorMatches(t, tc.expectedErr, err)
-		assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
-		for _, key := range tc.expectedKeys {
-			assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
-		}
+			arktest.AssertErrorMatches(t, tc.expectedErr, err)
+			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
+			for _, key := range tc.expectedKeys {
+				assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
+			}
+		})
 	}
 }
 
