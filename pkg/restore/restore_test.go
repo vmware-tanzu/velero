@@ -21,13 +21,20 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/client-go/kubernetes/scheme"
-
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/logging"
+	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/volume"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
 	"k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,14 +44,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/util/boolptr"
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestPrioritizeResources(t *testing.T) {
@@ -580,6 +581,12 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		},
 	}
 
+	var (
+		client                 = fake.NewSimpleClientset()
+		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
+		snapshotLocationLister = sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister()
+	)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resourceClient := &arktest.FakeDynamicClient{}
@@ -619,9 +626,16 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 						BackupName:              "my-backup",
 					},
 				},
-				backup:     &api.Backup{},
-				log:        arktest.NewLogger(),
-				pvRestorer: &pvRestorer{},
+				backup: &api.Backup{},
+				log:    arktest.NewLogger(),
+				pvRestorer: &pvRestorer{
+					logger: logging.DefaultLogger(logrus.DebugLevel),
+					blockStoreGetter: &fakeBlockStoreGetter{
+						volumeMap: map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+						volumeID:  "volume-1",
+					},
+					snapshotLocationLister: snapshotLocationLister,
+				},
 			}
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
@@ -1179,11 +1193,22 @@ func TestIsCompleted(t *testing.T) {
 func TestExecutePVAction(t *testing.T) {
 	iops := int64(1000)
 
+	locationsFake := map[string]*api.VolumeSnapshotLocation{
+		"default": arktest.NewTestVolumeSnapshotLocation().WithName("default-name").VolumeSnapshotLocation,
+	}
+
+	var locations []string
+	for key := range locationsFake {
+		locations = append(locations, key)
+	}
+
 	tests := []struct {
 		name              string
 		obj               *unstructured.Unstructured
 		restore           *api.Restore
-		backup            *api.Backup
+		backup            *arktest.TestBackup
+		volumeSnapshots   []*volume.Snapshot
+		locations         map[string]*api.VolumeSnapshotLocation
 		volumeMap         map[api.VolumeBackupInfo]string
 		noBlockStore      bool
 		expectedErr       bool
@@ -1207,21 +1232,28 @@ func TestExecutePVAction(t *testing.T) {
 			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      &api.Backup{},
+			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Spec: api.BackupSpec{SnapshotVolumes: boolptr.False()}},
+			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false),
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").Unstructured,
 		},
 		{
-			name:        "not restoring, return early",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
+			name:    "not restoring, return early",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
+					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
+				},
+			},
+			locations:   locationsFake,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
@@ -1229,23 +1261,38 @@ func TestExecutePVAction(t *testing.T) {
 			name:        "restoring, return without error if there is no PV->BackupInfo map",
 			obj:         NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{}},
+			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			locations:   locationsFake,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:        "restoring, return early if there is PV->BackupInfo map but no entry for this PV",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"another-pv": {}}}},
+			name:    "restoring, return early if there is PV->BackupInfo map but no entry for this PV",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "another-pv", VolumeType: "gp", VolumeIOPS: &iops},
+					Status: volume.SnapshotStatus{ProviderSnapshotID: "another-snap-1"},
+				},
+			},
+			locations:   locationsFake,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:              "volume type and IOPS are correctly passed to CreateVolume",
-			obj:               NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
-			restore:           arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:            &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1", Type: "gp", Iops: &iops}}}},
+			name:      "volume type and IOPS are correctly passed to CreateVolume",
+			obj:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			restore:   arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:    arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			locations: locationsFake,
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
+					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
+				},
+			},
 			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1", Type: "gp", Iops: &iops}: "volume-1"},
 			volumeID:          "volume-1",
 			expectedErr:       false,
@@ -1253,12 +1300,16 @@ func TestExecutePVAction(t *testing.T) {
 			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
 		},
 		{
-			name:         "restoring, blockStore=nil, backup has at least 1 snapshot -> error",
-			obj:          NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
-			restore:      arktest.NewDefaultTestRestore().Restore,
-			backup:       &api.Backup{Status: api.BackupStatus{VolumeBackups: map[string]*api.VolumeBackupInfo{"pv-1": {SnapshotID: "snap-1"}}}},
-			volumeMap:    map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-			volumeID:     "volume-1",
+			name:    "restoring, blockStore=nil, backup has at least 1 snapshot -> error",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			restore: arktest.NewDefaultTestRestore().Restore,
+			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
+					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
+				},
+			},
 			noBlockStore: true,
 			expectedErr:  true,
 			expectedRes:  NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
@@ -1268,25 +1319,42 @@ func TestExecutePVAction(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				blockStore     cloudprovider.BlockStore
-				fakeBlockStore *arktest.FakeBlockStore
+				blockStoreGetter     BlockStoreGetter
+				testBlockStoreGetter *fakeBlockStoreGetter
+
+				client                 = fake.NewSimpleClientset()
+				sharedInformers        = informers.NewSharedInformerFactory(client, 0)
+				snapshotLocationLister = sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister()
 			)
+
 			if !test.noBlockStore {
-				fakeBlockStore = &arktest.FakeBlockStore{
-					RestorableVolumes: test.volumeMap,
-					VolumeID:          test.volumeID,
+				testBlockStoreGetter = &fakeBlockStoreGetter{
+					volumeMap: test.volumeMap,
+					volumeID:  test.volumeID,
 				}
-				blockStore = fakeBlockStore
+				testBlockStoreGetter.GetBlockStore("default")
+				blockStoreGetter = testBlockStoreGetter
+				for _, location := range test.locations {
+					require.NoError(t, sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location))
+				}
+			} else {
+				assert.Equal(t, nil, blockStoreGetter)
 			}
 
 			r := &pvRestorer{
-				logger:     arktest.NewLogger(),
-				restorePVs: test.restore.Spec.RestorePVs,
-				blockStore: blockStore,
+				logger:                 logging.DefaultLogger(logrus.DebugLevel),
+				backupName:             "backup1",
+				backupNamespace:        api.DefaultNamespace,
+				restorePVs:             test.restore.Spec.RestorePVs,
+				snapshotLocationLister: snapshotLocationLister,
+				blockStoreGetter:       blockStoreGetter,
 			}
 			if test.backup != nil {
+				backup := test.backup.DeepCopy()
+				backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
+
 				r.snapshotVolumes = test.backup.Spec.SnapshotVolumes
-				r.volumeBackups = test.backup.Status.VolumeBackups
+				r.volumeSnapshots = test.volumeSnapshots
 			}
 
 			res, err := r.executePVAction(test.obj)
@@ -1298,9 +1366,9 @@ func TestExecutePVAction(t *testing.T) {
 			require.NoError(t, err)
 
 			if test.expectSetVolumeID {
-				assert.Equal(t, test.volumeID, fakeBlockStore.VolumeIDSet)
+				assert.Equal(t, test.volumeID, testBlockStoreGetter.fakeBlockStore.VolumeIDSet)
 			} else {
-				assert.Equal(t, "", fakeBlockStore.VolumeIDSet)
+				assert.Equal(t, "", testBlockStoreGetter.fakeBlockStore.VolumeIDSet)
 			}
 			assert.Equal(t, test.expectedRes, res)
 		})
@@ -1620,6 +1688,22 @@ func (cm *testConfigMap) ToJSON() []byte {
 
 type fakeAction struct {
 	resource string
+}
+
+type fakeBlockStoreGetter struct {
+	fakeBlockStore *arktest.FakeBlockStore
+	volumeMap      map[api.VolumeBackupInfo]string
+	volumeID       string
+}
+
+func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+	if r.fakeBlockStore == nil {
+		r.fakeBlockStore = &arktest.FakeBlockStore{
+			RestorableVolumes: r.volumeMap,
+			VolumeID:          r.volumeID,
+		}
+	}
+	return r.fakeBlockStore, nil
 }
 
 func newFakeAction(resource string) *fakeAction {

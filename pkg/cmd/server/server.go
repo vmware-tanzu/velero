@@ -728,9 +728,7 @@ func (s *server) runControllers(
 	restorer, err := restore.NewKubernetesRestorer(
 		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
-		nil,
 		s.config.restoreResourcePriorities,
-		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
 		s.resticManager,
 		s.config.podVolumeOperationTimeout,
@@ -746,6 +744,7 @@ func (s *server) runControllers(
 		restorer,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
 		false,
 		s.logger,
 		s.logLevel,

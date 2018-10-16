@@ -50,7 +50,7 @@ import (
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/discovery"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/kuberesource"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/boolptr"
@@ -58,12 +58,25 @@ import (
 	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/heptio/ark/pkg/util/kube"
 	arksync "github.com/heptio/ark/pkg/util/sync"
+	"github.com/heptio/ark/pkg/volume"
 )
+
+type BlockStoreGetter interface {
+	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+}
 
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(log logrus.FieldLogger, restore *api.Restore, backup *api.Backup, backupReader io.Reader, actions []ItemAction) (api.RestoreResult, api.RestoreResult)
+	Restore(log logrus.FieldLogger,
+		restore *api.Restore,
+		backup *api.Backup,
+		volumeSnapshots []*volume.Snapshot,
+		backupReader io.Reader,
+		actions []ItemAction,
+		snapshotLocationLister listers.VolumeSnapshotLocationLister,
+		blockStoreGetter BlockStoreGetter,
+	) (api.RestoreResult, api.RestoreResult)
 }
 
 type gvString string
@@ -73,8 +86,6 @@ type kindString string
 type kubernetesRestorer struct {
 	discoveryHelper       discovery.Helper
 	dynamicFactory        client.DynamicFactory
-	blockStore            cloudprovider.BlockStore
-	backupClient          arkv1client.BackupsGetter
 	namespaceClient       corev1.NamespaceInterface
 	resticRestorerFactory restic.RestorerFactory
 	resticTimeout         time.Duration
@@ -145,9 +156,7 @@ func prioritizeResources(helper discovery.Helper, priorities []string, includedR
 func NewKubernetesRestorer(
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
-	blockStore cloudprovider.BlockStore,
 	resourcePriorities []string,
-	backupClient arkv1client.BackupsGetter,
 	namespaceClient corev1.NamespaceInterface,
 	resticRestorerFactory restic.RestorerFactory,
 	resticTimeout time.Duration,
@@ -156,22 +165,29 @@ func NewKubernetesRestorer(
 	return &kubernetesRestorer{
 		discoveryHelper:       discoveryHelper,
 		dynamicFactory:        dynamicFactory,
-		blockStore:            blockStore,
-		backupClient:          backupClient,
 		namespaceClient:       namespaceClient,
 		resticRestorerFactory: resticRestorerFactory,
 		resticTimeout:         resticTimeout,
 		resourcePriorities:    resourcePriorities,
 		logger:                logger,
-
-		fileSystem: filesystem.NewFileSystem(),
+		fileSystem:            filesystem.NewFileSystem(),
 	}, nil
 }
 
 // Restore executes a restore into the target Kubernetes cluster according to the restore spec
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
-func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Restore, backup *api.Backup, backupReader io.Reader, actions []ItemAction) (api.RestoreResult, api.RestoreResult) {
+func (kr *kubernetesRestorer) Restore(
+	log logrus.FieldLogger,
+	restore *api.Restore,
+	backup *api.Backup,
+	volumeSnapshots []*volume.Snapshot,
+	backupReader io.Reader,
+	actions []ItemAction,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	blockStoreGetter BlockStoreGetter,
+) (api.RestoreResult, api.RestoreResult) {
+
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -220,11 +236,14 @@ func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Resto
 	}
 
 	pvRestorer := &pvRestorer{
-		logger:          log,
-		snapshotVolumes: backup.Spec.SnapshotVolumes,
-		restorePVs:      restore.Spec.RestorePVs,
-		volumeBackups:   backup.Status.VolumeBackups,
-		blockStore:      kr.blockStore,
+		logger:                 log,
+		backupName:             restore.Spec.BackupName,
+		backupNamespace:        backup.Namespace,
+		snapshotVolumes:        backup.Spec.SnapshotVolumes,
+		restorePVs:             restore.Spec.RestorePVs,
+		volumeSnapshots:        volumeSnapshots,
+		blockStoreGetter:       blockStoreGetter,
+		snapshotLocationLister: snapshotLocationLister,
 	}
 
 	restoreCtx := &context{
@@ -238,7 +257,7 @@ func (kr *kubernetesRestorer) Restore(log logrus.FieldLogger, restore *api.Resto
 		fileSystem:           kr.fileSystem,
 		namespaceClient:      kr.namespaceClient,
 		actions:              resolvedActions,
-		blockStore:           kr.blockStore,
+		blockStoreGetter:     blockStoreGetter,
 		resticRestorer:       resticRestorer,
 		pvsToProvision:       sets.NewString(),
 		pvRestorer:           pvRestorer,
@@ -319,7 +338,7 @@ type context struct {
 	fileSystem           filesystem.Interface
 	namespaceClient      corev1.NamespaceInterface
 	actions              []resolvedAction
-	blockStore           cloudprovider.BlockStore
+	blockStoreGetter     BlockStoreGetter
 	resticRestorer       restic.Restorer
 	globalWaitGroup      arksync.ErrorGroup
 	resourceWaitGroup    sync.WaitGroup
@@ -886,11 +905,14 @@ type PVRestorer interface {
 }
 
 type pvRestorer struct {
-	logger          logrus.FieldLogger
-	snapshotVolumes *bool
-	restorePVs      *bool
-	volumeBackups   map[string]*api.VolumeBackupInfo
-	blockStore      cloudprovider.BlockStore
+	logger                 logrus.FieldLogger
+	backupName             string
+	backupNamespace        string
+	snapshotVolumes        *bool
+	restorePVs             *bool
+	volumeSnapshots        []*volume.Snapshot
+	blockStoreGetter       BlockStoreGetter
+	snapshotLocationLister listers.VolumeSnapshotLocationLister
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -901,7 +923,7 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	delete(spec, "claimRef")
@@ -917,43 +939,50 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return obj, nil
 	}
 
-	// If we can't find a snapshot record for this particular PV, it most likely wasn't a PV that Ark
-	// could snapshot, so return early instead of trying to restore from a snapshot.
-	backupInfo, found := r.volumeBackups[pvName]
-	if !found {
+	log := r.logger.WithFields(logrus.Fields{"persistentVolume": pvName})
+
+	var foundSnapshot *volume.Snapshot
+	for _, snapshot := range r.volumeSnapshots {
+		if snapshot.Spec.PersistentVolumeName == pvName {
+			foundSnapshot = snapshot
+			break
+		}
+	}
+	if foundSnapshot == nil {
+		log.Info("skipping no snapshot found")
 		return obj, nil
 	}
 
-	// Past this point, we expect to be doing a restore
-
-	if r.blockStore == nil {
-		return nil, errors.New("you must configure a persistentVolumeProvider to restore PersistentVolumes from snapshots")
-	}
-
-	log := r.logger.WithFields(
-		logrus.Fields{
-			"persistentVolume": pvName,
-			"snapshot":         backupInfo.SnapshotID,
-		},
-	)
-
-	log.Info("restoring persistent volume from snapshot")
-	volumeID, err := r.blockStore.CreateVolumeFromSnapshot(backupInfo.SnapshotID, backupInfo.Type, backupInfo.AvailabilityZone, backupInfo.Iops)
+	location, err := r.snapshotLocationLister.VolumeSnapshotLocations(r.backupNamespace).Get(foundSnapshot.Spec.Location)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
+
+	blockStore, err := r.blockStoreGetter.GetBlockStore(location.Spec.Provider)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	if err := blockStore.Init(location.Spec.Config); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	volumeID, err := blockStore.CreateVolumeFromSnapshot(foundSnapshot.Status.ProviderSnapshotID, foundSnapshot.Spec.VolumeType, foundSnapshot.Spec.VolumeAZ, foundSnapshot.Spec.VolumeIOPS)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	log = log.WithFields(logrus.Fields{"snapshot": foundSnapshot.Status.ProviderSnapshotID})
 	log.Info("successfully restored persistent volume from snapshot")
-
-	updated1, err := r.blockStore.SetVolumeID(obj, volumeID)
+	// used to be update1 which is then cast to Unstructured and returned
+	updated1, err := blockStore.SetVolumeID(obj, volumeID)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
-
 	updated2, ok := updated1.(*unstructured.Unstructured)
 	if !ok {
 		return nil, errors.Errorf("unexpected type %T", updated1)
 	}
-
 	return updated2, nil
 }
 
