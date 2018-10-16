@@ -459,7 +459,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	}
 
 	log.Info("Snapshotting PersistentVolume")
-	snapshot := volumeSnapshot(ib.backupRequest.Backup, volumeID, volumeType, pvFailureDomainZone, location, iops)
+	snapshot := volumeSnapshot(ib.backupRequest.Backup, metadata.GetName(), volumeID, volumeType, pvFailureDomainZone, location, iops)
 
 	var errs []error
 	snapshotID, err := blockStore.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
@@ -477,16 +477,17 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	return kubeerrs.NewAggregate(errs)
 }
 
-func volumeSnapshot(backup *api.Backup, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
+func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
 	return &volume.Snapshot{
 		Spec: volume.SnapshotSpec{
-			BackupName:       backup.Name,
-			BackupUID:        string(backup.UID),
-			Location:         location,
-			ProviderVolumeID: volumeID,
-			VolumeType:       volumeType,
-			VolumeAZ:         az,
-			VolumeIOPS:       iops,
+			BackupName:           backup.Name,
+			BackupUID:            string(backup.UID),
+			Location:             location,
+			PersistentVolumeName: volumeName,
+			ProviderVolumeID:     volumeID,
+			VolumeType:           volumeType,
+			VolumeAZ:             az,
+			VolumeIOPS:           iops,
 		},
 		Status: volume.SnapshotStatus{
 			Phase: volume.SnapshotPhaseNew,

@@ -68,17 +68,18 @@ var nonRestorableResources = []string{
 type restoreController struct {
 	*genericController
 
-	namespace             string
-	restoreClient         arkv1client.RestoresGetter
-	backupClient          arkv1client.BackupsGetter
-	restorer              restore.Restorer
-	pvProviderExists      bool
-	backupLister          listers.BackupLister
-	restoreLister         listers.RestoreLister
-	backupLocationLister  listers.BackupStorageLocationLister
-	restoreLogLevel       logrus.Level
-	defaultBackupLocation string
-	metrics               *metrics.ServerMetrics
+	namespace              string
+	restoreClient          arkv1client.RestoresGetter
+	backupClient           arkv1client.BackupsGetter
+	restorer               restore.Restorer
+	pvProviderExists       bool
+	backupLister           listers.BackupLister
+	restoreLister          listers.RestoreLister
+	backupLocationLister   listers.BackupStorageLocationLister
+	snapshotLocationLister listers.VolumeSnapshotLocationLister
+	restoreLogLevel        logrus.Level
+	defaultBackupLocation  string
+	metrics                *metrics.ServerMetrics
 
 	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -92,6 +93,7 @@ func NewRestoreController(
 	restorer restore.Restorer,
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
+	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
@@ -100,18 +102,19 @@ func NewRestoreController(
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &restoreController{
-		genericController:     newGenericController("restore", logger),
-		namespace:             namespace,
-		restoreClient:         restoreClient,
-		backupClient:          backupClient,
-		restorer:              restorer,
-		pvProviderExists:      pvProviderExists,
-		backupLister:          backupInformer.Lister(),
-		restoreLister:         restoreInformer.Lister(),
-		backupLocationLister:  backupLocationInformer.Lister(),
-		restoreLogLevel:       restoreLogLevel,
-		defaultBackupLocation: defaultBackupLocation,
-		metrics:               metrics,
+		genericController:      newGenericController("restore", logger),
+		namespace:              namespace,
+		restoreClient:          restoreClient,
+		backupClient:           backupClient,
+		restorer:               restorer,
+		pvProviderExists:       pvProviderExists,
+		backupLister:           backupInformer.Lister(),
+		restoreLister:          restoreInformer.Lister(),
+		backupLocationLister:   backupLocationInformer.Lister(),
+		snapshotLocationLister: snapshotLocationInformer.Lister(),
+		restoreLogLevel:        restoreLogLevel,
+		defaultBackupLocation:  defaultBackupLocation,
+		metrics:                metrics,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -124,6 +127,7 @@ func NewRestoreController(
 		backupInformer.Informer().HasSynced,
 		restoreInformer.Informer().HasSynced,
 		backupLocationInformer.Informer().HasSynced,
+		snapshotLocationInformer.Informer().HasSynced,
 	)
 
 	restoreInformer.Informer().AddEventHandler(
@@ -233,6 +237,7 @@ func (c *restoreController) processRestore(key string) error {
 		restore,
 		actions,
 		info,
+		pluginManager,
 	)
 
 	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
@@ -482,6 +487,7 @@ func (c *restoreController) runRestore(
 	restore *api.Restore,
 	actions []restore.ItemAction,
 	info backupInfo,
+	pluginManager plugin.Manager,
 ) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -531,10 +537,18 @@ func (c *restoreController) runRestore(
 	}
 	defer closeAndRemoveFile(resultsFile, c.logger)
 
+	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
+		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreFailure = err
+		return
+	}
+
 	// Any return statement above this line means a total restore failure
 	// Some failures after this line *may* be a total restore failure
 	log.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, backupFile, actions)
+	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
 	log.Info("restore completed")
 
 	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
