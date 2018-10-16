@@ -241,29 +241,30 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
 	if backupStoreErr != nil {
 		errs = append(errs, backupStoreErr.Error())
-		// TODO need to not proceed since backupStore will be nil
 	}
 
-	log.Info("Removing PV snapshots")
-	if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
-		errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
-	} else {
-		blockStores := make(map[string]cloudprovider.BlockStore)
+	if backupStore != nil {
+		log.Info("Removing PV snapshots")
+		if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
+			errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
+		} else {
+			blockStores := make(map[string]cloudprovider.BlockStore)
 
-		for _, snapshot := range snapshots {
-			log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
+			for _, snapshot := range snapshots {
+				log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
 
-			blockStore, ok := blockStores[snapshot.Spec.Location]
-			if !ok {
-				if blockStore, err = blockStoreForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
-					errs = append(errs, err.Error())
-					continue
+				blockStore, ok := blockStores[snapshot.Spec.Location]
+				if !ok {
+					if blockStore, err = blockStoreForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
+						errs = append(errs, err.Error())
+						continue
+					}
+					blockStores[snapshot.Spec.Location] = blockStore
 				}
-				blockStores[snapshot.Spec.Location] = blockStore
-			}
 
-			if err := blockStore.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
-				errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
+				if err := blockStore.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
+					errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
+				}
 			}
 		}
 	}
@@ -275,9 +276,11 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
-	log.Info("Removing backup from backup storage")
-	if err := backupStore.DeleteBackup(backup.Name); err != nil {
-		errs = append(errs, err.Error())
+	if backupStore != nil {
+		log.Info("Removing backup from backup storage")
+		if err := backupStore.DeleteBackup(backup.Name); err != nil {
+			errs = append(errs, err.Error())
+		}
 	}
 
 	log.Info("Removing restores")
