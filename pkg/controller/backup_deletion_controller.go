@@ -51,13 +51,13 @@ type backupDeletionController struct {
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
 	backupClient              arkv1client.BackupsGetter
-	blockStore                cloudprovider.BlockStore
 	restoreLister             listers.RestoreLister
 	restoreClient             arkv1client.RestoresGetter
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
 	backupLocationLister      listers.BackupStorageLocationLister
+	snapshotLocationLister    listers.VolumeSnapshotLocationLister
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) plugin.Manager
@@ -70,13 +70,13 @@ func NewBackupDeletionController(
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
-	blockStore cloudprovider.BlockStore,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
+	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 ) Interface {
 	c := &backupDeletionController{
@@ -84,13 +84,13 @@ func NewBackupDeletionController(
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
-		blockStore:                blockStore,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
 		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
 		backupLocationLister:      backupLocationInformer.Lister(),
+		snapshotLocationLister:    snapshotLocationInformer.Lister(),
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -107,6 +107,7 @@ func NewBackupDeletionController(
 		restoreInformer.Informer().HasSynced,
 		podvolumeBackupInformer.Informer().HasSynced,
 		backupLocationInformer.Informer().HasSynced,
+		snapshotLocationInformer.Informer().HasSynced,
 	)
 	c.processRequestFunc = c.processRequest
 
@@ -223,17 +224,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
-	// If the backup includes snapshots but we don't currently have a PVProvider, we don't
-	// want to orphan the snapshots so skip deletion.
-	if c.blockStore == nil && len(backup.Status.VolumeBackups) > 0 {
-		req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
-			r.Status.Errors = []string{"unable to delete backup because it includes PV snapshots and Ark is not configured with a PersistentVolumeProvider"}
-		})
-
-		return err
-	}
-
 	// Set backup status to Deleting
 	backup, err = c.patchBackup(backup, func(b *v1.Backup) {
 		b.Status.Phase = v1.BackupPhaseDeleting
@@ -245,11 +235,36 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	var errs []string
 
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
+	if backupStoreErr != nil {
+		errs = append(errs, backupStoreErr.Error())
+		// TODO need to not proceed since backupStore will be nil
+	}
+
 	log.Info("Removing PV snapshots")
-	for _, volumeBackup := range backup.Status.VolumeBackups {
-		log.WithField("snapshotID", volumeBackup.SnapshotID).Info("Removing snapshot associated with backup")
-		if err := c.blockStore.DeleteSnapshot(volumeBackup.SnapshotID); err != nil {
-			errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", volumeBackup.SnapshotID).Error())
+	if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
+		errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
+	} else {
+		blockStores := make(map[string]cloudprovider.BlockStore)
+
+		for _, snapshot := range snapshots {
+			log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
+
+			blockStore, ok := blockStores[snapshot.Spec.Location]
+			if !ok {
+				if blockStore, err = blockStoreForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
+					errs = append(errs, err.Error())
+					continue
+				}
+				blockStores[snapshot.Spec.Location] = blockStore
+			}
+
+			if err := blockStore.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
+				errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
+			}
 		}
 	}
 
@@ -261,14 +276,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	log.Info("Removing backup from backup storage")
-	pluginManager := c.newPluginManager(log)
-	defer pluginManager.CleanupClients()
-
-	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
-	if backupStoreErr != nil {
-		errs = append(errs, backupStoreErr.Error())
-	}
-
 	if err := backupStore.DeleteBackup(backup.Name); err != nil {
 		errs = append(errs, err.Error())
 	}
@@ -326,6 +333,28 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	return nil
+}
+
+func blockStoreForSnapshotLocation(
+	namespace, snapshotLocationName string,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	pluginManager plugin.Manager,
+) (cloudprovider.BlockStore, error) {
+	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", snapshotLocationName)
+	}
+
+	blockStore, err := pluginManager.GetBlockStore(snapshotLocation.Spec.Provider)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error getting block store for provider %s", snapshotLocation.Spec.Provider)
+	}
+
+	if err = blockStore.Init(snapshotLocation.Spec.Config); err != nil {
+		return nil, errors.Wrapf(err, "error initializing block store for volume snapshot location %s", snapshotLocationName)
+	}
+
+	return blockStore, nil
 }
 
 func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {

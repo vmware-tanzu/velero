@@ -697,13 +697,13 @@ func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocatio
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
-			nil,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
 			newPluginManager,
 		)
 		wg.Add(1)

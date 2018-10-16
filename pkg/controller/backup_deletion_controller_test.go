@@ -42,6 +42,7 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
 	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
@@ -53,13 +54,13 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Ark().V1().DeleteBackupRequests(),
 		client.ArkV1(), // deleteBackupRequestClient
 		client.ArkV1(), // backupClient
-		nil,            // blockStore
 		sharedInformers.Ark().V1().Restores(),
 		client.ArkV1(), // restoreClient
 		NewBackupTracker(),
 		nil, // restic repository manager
 		sharedInformers.Ark().V1().PodVolumeBackups(),
 		sharedInformers.Ark().V1().BackupStorageLocations(),
+		sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 		nil, // new plugin manager func
 	).(*backupDeletionController)
 
@@ -139,13 +140,13 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Ark().V1().DeleteBackupRequests(),
 			client.ArkV1(), // deleteBackupRequestClient
 			client.ArkV1(), // backupClient
-			blockStore,
 			sharedInformers.Ark().V1().Restores(),
 			client.ArkV1(), // restoreClient
 			NewBackupTracker(),
 			nil, // restic repository manager
 			sharedInformers.Ark().V1().PodVolumeBackups(),
 			sharedInformers.Ark().V1().BackupStorageLocations(),
+			sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
 		).(*backupDeletionController),
 
@@ -323,47 +324,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		assert.Equal(t, expectedActions, td.client.Actions())
 	})
 
-	t.Run("no block store, backup has snapshots", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
-		td.controller.blockStore = nil
-
-		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
-			backup := arktest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap-1").Backup
-			return true, backup, nil
-		})
-
-		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
-			return true, td.req, nil
-		})
-
-		err := td.controller.processRequest(td.req)
-		require.NoError(t, err)
-
-		expectedActions := []core.Action{
-			core.NewPatchAction(
-				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
-				td.req.Namespace,
-				td.req.Name,
-				[]byte(`{"status":{"phase":"InProgress"}}`),
-			),
-			core.NewGetAction(
-				v1.SchemeGroupVersion.WithResource("backups"),
-				td.req.Namespace,
-				td.req.Spec.BackupName,
-			),
-			core.NewPatchAction(
-				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
-				td.req.Namespace,
-				td.req.Name,
-				[]byte(`{"status":{"errors":["unable to delete backup because it includes PV snapshots and Ark is not configured with a PersistentVolumeProvider"],"phase":"Processed"}}`),
-			),
-		}
-
-		assert.Equal(t, expectedActions, td.client.Actions())
-	})
-
 	t.Run("full delete, no errors", func(t *testing.T) {
-		backup := arktest.NewTestBackup().WithName("foo").WithSnapshot("pv-1", "snap-1").Backup
+		backup := arktest.NewTestBackup().WithName("foo").Backup
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
@@ -393,6 +355,17 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		}
 		require.NoError(t, td.sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
 
+		snapshotLocation := &v1.VolumeSnapshotLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      "vsl-1",
+			},
+			Spec: v1.VolumeSnapshotLocationSpec{
+				Provider: "provider-1",
+			},
+		}
+		require.NoError(t, td.sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(snapshotLocation))
+
 		// Clear out req labels to make sure the controller adds them
 		td.req.Labels = make(map[string]string)
 
@@ -409,6 +382,23 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
+		snapshots := []*volume.Snapshot{
+			{
+				Spec: volume.SnapshotSpec{
+					Location: "vsl-1",
+				},
+				Status: volume.SnapshotStatus{
+					ProviderSnapshotID: "snap-1",
+				},
+			},
+		}
+
+		pluginManager := &pluginmocks.Manager{}
+		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
+		pluginManager.On("CleanupClients")
+		td.controller.newPluginManager = func(logrus.FieldLogger) plugin.Manager { return pluginManager }
+
+		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
@@ -593,13 +583,13 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Ark().V1().DeleteBackupRequests(),
 				client.ArkV1(), // deleteBackupRequestClient
 				client.ArkV1(), // backupClient
-				nil,            // blockStore
 				sharedInformers.Ark().V1().Restores(),
 				client.ArkV1(), // restoreClient
 				NewBackupTracker(),
 				nil,
 				sharedInformers.Ark().V1().PodVolumeBackups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
+				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 				nil, // new plugin manager func
 			).(*backupDeletionController)
 
