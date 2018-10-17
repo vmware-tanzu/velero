@@ -198,8 +198,10 @@ func (c *backupSyncController) run() {
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
 				log.Debug("Backup already exists in cluster")
+				continue
 			case err != nil && !kuberrs.IsAlreadyExists(err):
 				log.WithError(errors.WithStack(err)).Error("Error syncing backup into cluster")
+				continue
 			default:
 				log.Debug("Synced backup into cluster")
 			}

@@ -24,20 +24,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
-
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
 	"github.com/heptio/ark/pkg/metrics"
 	"github.com/heptio/ark/pkg/persistence"
 	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
@@ -46,6 +36,16 @@ import (
 	"github.com/heptio/ark/pkg/restore"
 	"github.com/heptio/ark/pkg/util/collections"
 	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/volume"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
 )
 
 func TestFetchBackupInfo(t *testing.T) {
@@ -104,6 +104,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				restorer,
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
+				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 				false,
 				logger,
 				logrus.InfoLevel,
@@ -197,6 +198,7 @@ func TestProcessRestoreSkips(t *testing.T) {
 				restorer,
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
+				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 				false, // pvProviderExists
 				logger,
 				logrus.InfoLevel,
@@ -422,6 +424,7 @@ func TestProcessRestore(t *testing.T) {
 				restorer,
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
+				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 				test.allowRestoreSnapshots,
 				logger,
 				logrus.InfoLevel,
@@ -498,6 +501,16 @@ func TestProcessRestore(t *testing.T) {
 				backupStore.On("PutRestoreLog", test.backup.Name, test.restore.Name, mock.Anything).Return(test.putRestoreLogErr)
 
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
+
+				volumeSnapshots := []*volume.Snapshot{
+					{
+						Spec: volume.SnapshotSpec{
+							PersistentVolumeName: "test-pv",
+							BackupName:           test.backup.Name,
+						},
+					},
+				}
+				backupStore.On("GetBackupVolumeSnapshots", test.backup.Name).Return(volumeSnapshots, nil)
 			}
 
 			var (
@@ -629,6 +642,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		nil,
 		sharedInformers.Ark().V1().Backups(),
 		sharedInformers.Ark().V1().BackupStorageLocations(),
+		sharedInformers.Ark().V1().VolumeSnapshotLocations(),
 		false,
 		logger,
 		logrus.DebugLevel,
@@ -815,8 +829,11 @@ func (r *fakeRestorer) Restore(
 	log logrus.FieldLogger,
 	restore *api.Restore,
 	backup *api.Backup,
+	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
 	actions []restore.ItemAction,
+	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	blockStoreGetter restore.BlockStoreGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 	res := r.Called(log, restore, backup, backupReader, actions)
 

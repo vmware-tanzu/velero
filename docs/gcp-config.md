@@ -129,7 +129,7 @@ In the root of your Ark directory, run:
   ```
 
   [0]: namespace.md
-  [7]: backupstoragelocation-definition.md#gcp
+  [7]: api-types/backupstoragelocation.md#gcp
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
   [20]: faq.md

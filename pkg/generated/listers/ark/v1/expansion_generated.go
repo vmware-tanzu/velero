@@ -97,3 +97,11 @@ type ScheduleListerExpansion interface{}
 // ScheduleNamespaceListerExpansion allows custom methods to be added to
 // ScheduleNamespaceLister.
 type ScheduleNamespaceListerExpansion interface{}
+
+// VolumeSnapshotLocationListerExpansion allows custom methods to be added to
+// VolumeSnapshotLocationLister.
+type VolumeSnapshotLocationListerExpansion interface{}
+
+// VolumeSnapshotLocationNamespaceListerExpansion allows custom methods to be added to
+// VolumeSnapshotLocationNamespaceLister.
+type VolumeSnapshotLocationNamespaceListerExpansion interface{}

@@ -53,8 +53,8 @@ import (
 	"github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/heptio/ark/pkg/cmd"
+	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/signals"
 	"github.com/heptio/ark/pkg/controller"
 	arkdiscovery "github.com/heptio/ark/pkg/discovery"
@@ -80,19 +80,22 @@ type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation string
 	backupSyncPeriod, podVolumeOperationTimeout      time.Duration
 	restoreResourcePriorities                        []string
+	defaultVolumeSnapshotLocations                   map[string]string
 	restoreOnly                                      bool
 }
 
 func NewCommand() *cobra.Command {
 	var (
-		logLevelFlag = logging.LogLevelFlag(logrus.InfoLevel)
-		config       = serverConfig{
-			pluginDir:                 "/plugins",
-			metricsAddress:            defaultMetricsAddress,
-			defaultBackupLocation:     "default",
-			backupSyncPeriod:          defaultBackupSyncPeriod,
-			podVolumeOperationTimeout: defaultPodVolumeOperationTimeout,
-			restoreResourcePriorities: defaultRestorePriorities,
+		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
+		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
+		config                  = serverConfig{
+			pluginDir:                      "/plugins",
+			metricsAddress:                 defaultMetricsAddress,
+			defaultBackupLocation:          "default",
+			defaultVolumeSnapshotLocations: make(map[string]string),
+			backupSyncPeriod:               defaultBackupSyncPeriod,
+			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
+			restoreResourcePriorities:      defaultRestorePriorities,
 		}
 	)
 
@@ -128,6 +131,10 @@ func NewCommand() *cobra.Command {
 			}
 			namespace := getServerNamespace(namespaceFlag)
 
+			if volumeSnapshotLocations.Data() != nil {
+				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
+			}
+
 			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
 			cmd.CheckError(err)
 
@@ -143,6 +150,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
+	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
 
 	return command
 }
@@ -167,7 +175,6 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	arkClient             clientset.Interface
-	blockStore            cloudprovider.BlockStore
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       arkdiscovery.Helper
 	dynamicClient         dynamic.Interface
@@ -277,26 +284,58 @@ func (s *server) run() error {
 			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
 	}
 
-	if config.PersistentVolumeProvider == nil {
-		s.logger.Info("PersistentVolumeProvider config not provided, volume snapshots and restores are disabled")
-	} else {
-		s.logger.Info("Configuring cloud provider for snapshot service")
-		blockStore, err := getBlockStore(*config.PersistentVolumeProvider, s.pluginManager)
-		if err != nil {
-			return err
-		}
-		s.blockStore = blockStore
+	defaultVolumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
+	if err != nil {
+		return err
 	}
 
 	if err := s.initRestic(); err != nil {
 		return err
 	}
 
-	if err := s.runControllers(config); err != nil {
+	if err := s.runControllers(config, defaultVolumeSnapshotLocations); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace string, defaultVolumeSnapshotLocations map[string]string) (map[string]*api.VolumeSnapshotLocation, error) {
+	providerDefaults := make(map[string]*api.VolumeSnapshotLocation)
+	if len(defaultVolumeSnapshotLocations) == 0 {
+		return providerDefaults, nil
+	}
+
+	volumeSnapshotLocations, err := arkClient.ArkV1().VolumeSnapshotLocations(namespace).List(metav1.ListOptions{})
+	if err != nil {
+		return providerDefaults, errors.WithStack(err)
+	}
+
+	providerLocations := make(map[string][]*api.VolumeSnapshotLocation)
+	for i, vsl := range volumeSnapshotLocations.Items {
+		locations := providerLocations[vsl.Spec.Provider]
+		providerLocations[vsl.Spec.Provider] = append(locations, &volumeSnapshotLocations.Items[i])
+	}
+
+	for provider, locations := range providerLocations {
+		defaultLocation, ok := defaultVolumeSnapshotLocations[provider]
+		if !ok {
+			return providerDefaults, errors.Errorf("missing provider %s. When using default volume snapshot locations, one must exist for every known provider.", provider)
+		}
+
+		for _, location := range locations {
+			if location.ObjectMeta.Name == defaultLocation {
+				providerDefaults[provider] = location
+				break
+			}
+		}
+
+		if _, ok := providerDefaults[provider]; !ok {
+			return providerDefaults, errors.Errorf("%s is not a valid volume snapshot location for %s", defaultLocation, provider)
+		}
+	}
+
+	return providerDefaults, nil
 }
 
 func (s *server) applyConfigDefaults(c *api.Config) {
@@ -507,23 +546,6 @@ func (s *server) watchConfig(config *api.Config) {
 	})
 }
 
-func getBlockStore(cloudConfig api.CloudProviderConfig, manager plugin.Manager) (cloudprovider.BlockStore, error) {
-	if cloudConfig.Name == "" {
-		return nil, errors.New("block storage provider name must not be empty")
-	}
-
-	blockStore, err := manager.GetBlockStore(cloudConfig.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := blockStore.Init(cloudConfig.Config); err != nil {
-		return nil, err
-	}
-
-	return blockStore, nil
-}
-
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
@@ -572,7 +594,7 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) runControllers(config *api.Config) error {
+func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocations map[string]*api.VolumeSnapshotLocation) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
@@ -619,7 +641,6 @@ func (s *server) runControllers(config *api.Config) error {
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
-			s.blockStore,
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
 		)
@@ -629,13 +650,14 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().Backups(),
 			s.arkClient.ArkV1(),
 			backupper,
-			s.blockStore != nil,
 			s.logger,
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
+			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+			defaultVolumeSnapshotLocations,
 			s.metrics,
 		)
 		wg.Add(1)
@@ -675,13 +697,13 @@ func (s *server) runControllers(config *api.Config) error {
 			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
 			s.arkClient.ArkV1(), // deleteBackupRequestClient
 			s.arkClient.ArkV1(), // backupClient
-			s.blockStore,
 			s.sharedInformerFactory.Ark().V1().Restores(),
 			s.arkClient.ArkV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
 			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
 			newPluginManager,
 		)
 		wg.Add(1)
@@ -695,9 +717,7 @@ func (s *server) runControllers(config *api.Config) error {
 	restorer, err := restore.NewKubernetesRestorer(
 		s.discoveryHelper,
 		client.NewDynamicFactory(s.dynamicClient),
-		s.blockStore,
 		s.config.restoreResourcePriorities,
-		s.arkClient.ArkV1(),
 		s.kubeClient.CoreV1().Namespaces(),
 		s.resticManager,
 		s.config.podVolumeOperationTimeout,
@@ -713,7 +733,8 @@ func (s *server) runControllers(config *api.Config) error {
 		restorer,
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-		s.blockStore != nil,
+		s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+		false,
 		s.logger,
 		s.logLevel,
 		newPluginManager,
