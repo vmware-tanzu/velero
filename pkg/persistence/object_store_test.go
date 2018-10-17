@@ -18,6 +18,8 @@ package persistence
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -38,6 +40,7 @@ import (
 	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/util/encode"
 	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 type objectBackupStoreTestHarness struct {
@@ -302,6 +305,48 @@ func TestPutBackup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetBackupVolumeSnapshots(t *testing.T) {
+	harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+	// volumesnapshots file not found should not error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/ark-backup.json", newStringReadSeeker("foo"))
+	res, err := harness.GetBackupVolumeSnapshots("test-backup")
+	assert.NoError(t, err)
+	assert.Nil(t, res)
+
+	// volumesnapshots file containing invalid data should error
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumesnapshots.json.gz", newStringReadSeeker("foo"))
+	res, err = harness.GetBackupVolumeSnapshots("test-backup")
+	assert.NotNil(t, err)
+
+	// volumesnapshots file containing gzipped json data should return correctly
+	snapshots := []*volume.Snapshot{
+		{
+			Spec: volume.SnapshotSpec{
+				BackupName:           "test-backup",
+				PersistentVolumeName: "pv-1",
+			},
+		},
+		{
+			Spec: volume.SnapshotSpec{
+				BackupName:           "test-backup",
+				PersistentVolumeName: "pv-2",
+			},
+		},
+	}
+
+	obj := new(bytes.Buffer)
+	gzw := gzip.NewWriter(obj)
+
+	require.NoError(t, json.NewEncoder(gzw).Encode(snapshots))
+	require.NoError(t, gzw.Close())
+	require.NoError(t, harness.objectStore.PutObject(harness.bucket, "backups/test-backup/test-backup-volumesnapshots.json.gz", obj))
+
+	res, err = harness.GetBackupVolumeSnapshots("test-backup")
+	assert.NoError(t, err)
+	assert.EqualValues(t, snapshots, res)
 }
 
 func TestGetBackupContents(t *testing.T) {

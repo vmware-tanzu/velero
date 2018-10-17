@@ -17,6 +17,7 @@ limitations under the License.
 package persistence
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -233,8 +234,36 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, er
 	return backupObj, nil
 }
 
+func keyExists(objectStore cloudprovider.ObjectStore, bucket, prefix, key string) (bool, error) {
+	keys, err := objectStore.ListObjects(bucket, prefix)
+	if err != nil {
+		return false, err
+	}
+
+	var found bool
+	for _, existing := range keys {
+		if key == existing {
+			found = true
+			break
+		}
+	}
+
+	return found, nil
+}
+
 func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
 	key := s.layout.getBackupVolumeSnapshotsKey(name)
+
+	// if the volumesnapshots file doesn't exist, we don't want to return an error, since
+	// a legacy backup or a backup with no snapshots would not have this file, so check for
+	// its existence before attempting to get its contents.
+	ok, err := keyExists(s.objectStore, s.bucket, s.layout.getBackupDir(name), key)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if !ok {
+		return nil, nil
+	}
 
 	res, err := s.objectStore.GetObject(s.bucket, key)
 	if err != nil {
@@ -242,8 +271,14 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 	}
 	defer res.Close()
 
+	gzr, err := gzip.NewReader(res)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer gzr.Close()
+
 	var volumeSnapshots []*volume.Snapshot
-	if err := json.NewDecoder(res).Decode(&volumeSnapshots); err != nil {
+	if err := json.NewDecoder(gzr).Decode(&volumeSnapshots); err != nil {
 		return nil, errors.Wrap(err, "error decoding object data")
 	}
 
