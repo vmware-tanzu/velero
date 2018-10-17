@@ -440,6 +440,9 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 	if err := json.NewEncoder(gzw).Encode(backup.VolumeSnapshots); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding list of volume snapshots"))
 	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
 
 	if len(errs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
