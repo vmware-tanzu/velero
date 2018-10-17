@@ -141,7 +141,6 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-
 	backup := &api.Backup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: f.Namespace(),
