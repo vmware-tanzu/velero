@@ -62,6 +62,7 @@ type backupDeletionController struct {
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) plugin.Manager
 	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	snapshotLocationLister    listers.VolumeSnapshotLocationLister
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -70,13 +71,13 @@ func NewBackupDeletionController(
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
 	backupClient arkv1client.BackupsGetter,
-	blockStore cloudprovider.BlockStore,
 	restoreInformer informers.RestoreInformer,
 	restoreClient arkv1client.RestoresGetter,
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
+	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	newPluginManager func(logrus.FieldLogger) plugin.Manager,
 ) Interface {
 	c := &backupDeletionController{
@@ -84,7 +85,6 @@ func NewBackupDeletionController(
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
-		blockStore:                blockStore,
 		restoreLister:             restoreInformer.Lister(),
 		restoreClient:             restoreClient,
 		backupTracker:             backupTracker,
@@ -264,36 +264,47 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
-	if backupStoreErr != nil {
-		errs = append(errs, backupStoreErr.Error())
-	}
+	// look up the relevant locations on the Backup object
+	for _, locationName := range backup.Spec.VolumeSnapshotLocations {
+		volumeSnapshotLocation, err := c.snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(locationName)
+		if err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
 
-	if err := backupStore.DeleteBackup(backup.Name); err != nil {
-		errs = append(errs, err.Error())
-	}
+		backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, volumeSnapshotLocation.Name, log)
+		if backupStoreErr != nil {
+			errs = append(errs, backupStoreErr.Error())
+			continue
+		}
 
-	log.Info("Removing restores")
-	if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
-	} else {
-		for _, restore := range restores {
-			if restore.Spec.BackupName != backup.Name {
-				continue
-			}
+		if err := backupStore.DeleteBackup(backup.Name); err != nil {
+			errs = append(errs, err.Error())
+			continue
+		}
 
-			restoreLog := log.WithField("restore", kube.NamespaceAndName(restore))
+		log.Info("Removing restores")
+		if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
+		} else {
+			for _, restore := range restores {
+				if restore.Spec.BackupName != backup.Name {
+					continue
+				}
 
-			restoreLog.Info("Deleting restore log/results from backup storage")
-			if err := backupStore.DeleteRestore(restore.Name); err != nil {
-				errs = append(errs, err.Error())
-				// if we couldn't delete the restore files, don't delete the API object
-				continue
-			}
+				restoreLog := log.WithField("restore", kube.NamespaceAndName(restore))
 
-			restoreLog.Info("Deleting restore referencing backup")
-			if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
-				errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(restore)).Error())
+				restoreLog.Info("Deleting restore log/results from backup storage")
+				if err := backupStore.DeleteRestore(restore.Name); err != nil {
+					errs = append(errs, err.Error())
+					// if we couldn't delete the restore files, don't delete the API object
+					continue
+				}
+
+				restoreLog.Info("Deleting restore referencing backup")
+				if err := c.restoreClient.Restores(restore.Namespace).Delete(restore.Name, &metav1.DeleteOptions{}); err != nil {
+					errs = append(errs, errors.Wrapf(err, "error deleting restore %s", kube.NamespaceAndName(restore)).Error())
+				}
 			}
 		}
 	}
@@ -328,8 +339,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	return nil
 }
 
-func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
-	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
+func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, storageLocation string, log logrus.FieldLogger) (persistence.BackupStore, error) {
+	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(storageLocation)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -341,6 +352,7 @@ func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, plugi
 
 	return backupStore, nil
 }
+
 func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
