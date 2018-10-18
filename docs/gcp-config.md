@@ -124,7 +124,8 @@ Specify the following values in the example files:
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/gcp/00-ark-config.yaml
+  kubectl apply -f examples/gcp/05-ark-backupstoragelocation.yaml
+  kubectl apply -f examples/gcp/06-ark-volumesnapshotlocation.yaml
   kubectl apply -f examples/gcp/10-deployment.yaml
   ```
 

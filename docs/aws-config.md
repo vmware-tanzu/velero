@@ -139,13 +139,14 @@ kubectl create secret generic cloud-credentials \
 
 Specify the following values in the example files:
 
-* In `examples/aws/00-ark-config.yaml`:
-
-  * Replace `<YOUR_REGION>`. See the [Config definition][6] for details.
-
 * In `examples/aws/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3 backup storage, region is optional and will be queried from the AWS S3 API if not provided). See the [BackupStorageLocation definition][21] for details.
+
+* In `examples/aws/06-ark-volumesnapshotlocation.yaml`:
+
+  * Replace `<YOUR_REGION>`. See the [VolumeSnapshotLocation definition][6] for details.
+
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
@@ -181,7 +182,8 @@ Specify the following values in the example files:
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/aws/00-ark-config.yaml
+  kubectl apply -f examples/aws/05-ark-backupstoragelocation.yaml
+  kubectl apply -f examples/aws/06-ark-volumesnapshotlocation.yaml
   kubectl apply -f examples/aws/10-deployment.yaml
   ```
 
@@ -300,7 +302,7 @@ It can be set up for Ark by creating a role that will have required permissions,
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
-[6]: config-definition.md#aws
+[6]: api-types/volumesnapshotlocation.md#aws
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [20]: faq.md
 [21]: api-types/backupstoragelocation.md#aws

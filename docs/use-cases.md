@@ -30,7 +30,7 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 *Using Backups and Restores*
 
-Heptio Ark can help you port your resources from one cluster to another, as long as you point each Ark Config to the same cloud object storage. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. **Note that Heptio Ark does not support the migration of persistent volumes across cloud providers.**
+Heptio Ark can help you port your resources from one cluster to another, as long as you point each Ark instance to the same cloud object storage location. In this scenario, we are also assuming that your clusters are hosted by the same cloud provider. **Note that Heptio Ark does not support the migration of persistent volumes across cloud providers.**
 
 1. *(Cluster 1)* Assuming you haven't already been checkpointing your data with the Ark `schedule` operation, you need to first back up your entire cluster (replacing `<BACKUP-NAME>` as desired):
 
@@ -39,7 +39,7 @@ Heptio Ark can help you port your resources from one cluster to another, as long
    ```
    The default TTL is 30 days (720 hours); you can use the `--ttl` flag to change this as necessary.
 
-2. *(Cluster 2)* Make sure that the `persistentVolumeProvider` and `backupStorageProvider` fields in the Ark Config match the ones from *Cluster 1*, so that your new Ark server instance is pointing to the same bucket.
+2. *(Cluster 2)* Make sure that the `BackupStorageLocation` and `VolumeSnapshotLocation` CRDs match the ones from *Cluster 1*, so that your new Ark server instance is pointing to the same bucket.
 
 3. *(Cluster 2)* Make sure that the Ark Backup object has been created. Ark resources are synced with the backup files available in cloud storage.
 

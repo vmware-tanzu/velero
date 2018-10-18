@@ -1,6 +1,6 @@
 # How Ark Works
 
-Each Ark operation -- on-demand backup, scheduled backup, restore -- is a custom resource, defined with a Kubernetes [Custom Resource Definition (CRD)][20] and stored in [etcd][22]. The config custom resource specifies core information and options such as cloud provider settings. Ark also includes controllers that process the custom resources to perform backups, restores, and all related operations.
+Each Ark operation -- on-demand backup, scheduled backup, restore -- is a custom resource, defined with a Kubernetes [Custom Resource Definition (CRD)][20] and stored in [etcd][22]. Ark also includes controllers that process the custom resources to perform backups, restores, and all related operations.
 
 You can back up or restore all objects in your cluster, or you can filter objects by type, namespace, and/or label.
 
@@ -66,8 +66,9 @@ This allows restore functionality to work in a cluster migration scenario, where
 
 Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
 
+[10]: hooks.md
 [19]: /docs/img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
-[10]: hooks.md
+

@@ -36,10 +36,6 @@ func (c *FakeArkV1) BackupStorageLocations(namespace string) v1.BackupStorageLoc
 	return &FakeBackupStorageLocations{c, namespace}
 }
 
-func (c *FakeArkV1) Configs(namespace string) v1.ConfigInterface {
-	return &FakeConfigs{c, namespace}
-}
-
 func (c *FakeArkV1) DeleteBackupRequests(namespace string) v1.DeleteBackupRequestInterface {
 	return &FakeDeleteBackupRequests{c, namespace}
 }

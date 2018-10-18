@@ -24,7 +24,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -74,6 +73,9 @@ import (
 const (
 	// the port where prometheus metrics are exposed
 	defaultMetricsAddress = ":8085"
+
+	defaultBackupSyncPeriod          = time.Minute
+	defaultPodVolumeOperationTimeout = 60 * time.Minute
 )
 
 type serverConfig struct {
@@ -267,19 +269,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	originalConfig, err := s.loadConfig()
-	if err != nil {
-		return err
-	}
-
-	// watchConfig needs to examine the unmodified original config, so we keep that around as a
-	// separate object, and instead apply defaults to a clone.
-	config := originalConfig.DeepCopy()
-	s.applyConfigDefaults(config)
-
-	s.watchConfig(originalConfig)
-
-	if _, err = s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
+	if _, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).
 			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
 	}
@@ -293,7 +283,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.runControllers(config, defaultVolumeSnapshotLocations); err != nil {
+	if err := s.runControllers(defaultVolumeSnapshotLocations); err != nil {
 		return err
 	}
 
@@ -336,23 +326,6 @@ func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace 
 	}
 
 	return providerDefaults, nil
-}
-
-func (s *server) applyConfigDefaults(c *api.Config) {
-	if s.config.backupSyncPeriod == 0 {
-		s.config.backupSyncPeriod = defaultBackupSyncPeriod
-	}
-
-	if s.config.podVolumeOperationTimeout == 0 {
-		s.config.podVolumeOperationTimeout = defaultPodVolumeOperationTimeout
-	}
-
-	if len(s.config.restoreResourcePriorities) == 0 {
-		s.config.restoreResourcePriorities = defaultRestorePriorities
-		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using default resource priorities")
-	} else {
-		s.logger.WithField("priorities", s.config.restoreResourcePriorities).Info("Using given resource priorities")
-	}
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -464,34 +437,6 @@ func (s *server) validateBackupStorageLocations() error {
 	return nil
 }
 
-func (s *server) loadConfig() (*api.Config, error) {
-	s.logger.Info("Retrieving Ark configuration")
-	var (
-		config *api.Config
-		err    error
-	)
-	for {
-		config, err = s.arkClient.ArkV1().Configs(s.namespace).Get("default", metav1.GetOptions{})
-		if err == nil {
-			break
-		}
-		if !apierrors.IsNotFound(err) {
-			s.logger.WithError(err).Error("Error retrieving configuration")
-		} else {
-			s.logger.Info("Configuration not found")
-		}
-		s.logger.Info("Will attempt to retrieve configuration again in 5 seconds")
-		time.Sleep(5 * time.Second)
-	}
-	s.logger.Info("Successfully retrieved Ark configuration")
-	return config, nil
-}
-
-const (
-	defaultBackupSyncPeriod          = time.Minute
-	defaultPodVolumeOperationTimeout = 60 * time.Minute
-)
-
 // - Namespaces go first because all namespaced resources depend on them.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
@@ -511,39 +456,6 @@ var defaultRestorePriorities = []string{
 	"limitranges",
 	"pods",
 	"replicaset",
-}
-
-// watchConfig adds an update event handler to the Config shared informer, invoking s.cancelFunc
-// when it sees a change.
-func (s *server) watchConfig(config *api.Config) {
-	s.sharedInformerFactory.Ark().V1().Configs().Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			updated := newObj.(*api.Config)
-			s.logger.WithField("name", kube.NamespaceAndName(updated)).Debug("received updated config")
-
-			if updated.Name != config.Name {
-				s.logger.WithField("name", updated.Name).Debug("Config watch channel received other config")
-				return
-			}
-
-			// Objects retrieved via Get() don't have their Kind or APIVersion set. Objects retrieved via
-			// Watch(), including those from shared informer event handlers, DO have their Kind and
-			// APIVersion set. To prevent the DeepEqual() call below from considering Kind or APIVersion
-			// as the source of a change, set config.Kind and config.APIVersion to match the values from
-			// the updated Config.
-			if config.Kind != updated.Kind {
-				config.Kind = updated.Kind
-			}
-			if config.APIVersion != updated.APIVersion {
-				config.APIVersion = updated.APIVersion
-			}
-
-			if !reflect.DeepEqual(config, updated) {
-				s.logger.Info("Detected a config change. Gracefully shutting down")
-				s.cancelFunc()
-			}
-		},
-	})
 }
 
 func (s *server) initRestic() error {
@@ -594,7 +506,7 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) runControllers(config *api.Config, defaultVolumeSnapshotLocations map[string]*api.VolumeSnapshotLocation) error {
+func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]*api.VolumeSnapshotLocation) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx

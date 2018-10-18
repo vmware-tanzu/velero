@@ -33,8 +33,6 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
     kubectl apply -f examples/minio/
     ```
 
-    NOTE: If you get an error about Config creation, wait for a minute, then run the commands again.
-
 1. Deploy the example nginx application:
 
     ```bash
