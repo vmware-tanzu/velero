@@ -1,9 +1,14 @@
 # Changelog
 
-#### [v0.9.8-beta.1](https://github.com/heptio/ark/releases/tag/v0.9.8-beta.1) - 2018-10-10
+#### [v0.9.8](https://github.com/heptio/ark/releases/tag/v0.9.8) - 2018-10-18
 
 #### Bug Fixes
   * Discard service account token volume mounts from init containers on restore (#910, @james-powis)
+  * Support --include-cluster-resources flag when creating schedule (#942, @captjt)
+  * Remove logic to get a GCP project (#926, @shubheksha)
+  * Only try to back up PVCs linked PV if the PVC's phase is Bound (#920, @skriss)
+  * Claim ownership of new AWS volumes on Kubernetes cluster being restored into (#801, @ljakimczuk)
+  * Remove timeout check when taking snapshots (#928, @carlisia)
 
 #### [v0.9.7](https://github.com/heptio/ark/releases/tag/v0.9.7) - 2018-10-04
 
