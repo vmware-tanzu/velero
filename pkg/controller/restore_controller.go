@@ -488,7 +488,9 @@ func (c *restoreController) runRestore(
 	actions []restore.ItemAction,
 	info backupInfo,
 	pluginManager plugin.Manager,
-) (restoreWarnings, restoreErrors api.RestoreResult, restoreFailure error) {
+) (api.RestoreResult, api.RestoreResult, error) {
+	var restoreWarnings, restoreErrors api.RestoreResult
+	var restoreFailure error
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		c.logger.
@@ -501,7 +503,7 @@ func (c *restoreController) runRestore(
 			WithError(errors.WithStack(err)).
 			Error("Error creating log temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 	gzippedLogFile := gzip.NewWriter(logFile)
 	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
@@ -524,7 +526,7 @@ func (c *restoreController) runRestore(
 		log.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
@@ -533,7 +535,7 @@ func (c *restoreController) runRestore(
 		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 	defer closeAndRemoveFile(resultsFile, c.logger)
 
@@ -542,7 +544,7 @@ func (c *restoreController) runRestore(
 		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 
 	// Any return statement above this line means a total restore failure
@@ -558,7 +560,7 @@ func (c *restoreController) runRestore(
 	// Reset the offset to 0 for reading
 	if _, err = logFile.Seek(0, 0); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 
 	if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
@@ -574,19 +576,19 @@ func (c *restoreController) runRestore(
 
 	if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 	gzippedResultsFile.Close()
 
 	if _, err = resultsFile.Seek(0, 0); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
-		return
+		return restoreWarnings, restoreErrors, restoreFailure
 	}
 	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
 	}
 
-	return
+	return restoreWarnings, restoreErrors, restoreFailure
 }
 
 func downloadToTempFile(
