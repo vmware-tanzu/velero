@@ -25,6 +25,8 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 - A working install of Ark version 0.10.0 or later. See [Set up Ark][2]
 - A local clone of [the latest release tag of the Ark repository][3]
+- Ark's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
+
 
 ### Instructions
 
@@ -243,3 +245,4 @@ on to running other init containers/the main containers.
 [3]: https://github.com/heptio/ark/releases/
 [4]: https://kubernetes.io/docs/concepts/storage/volumes/#local
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
+[6]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
