@@ -446,6 +446,8 @@ func (s *server) validateBackupStorageLocations() error {
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have restic restores run before controllers adopt the pods.
+// - Custom Resource Definitions come before Custom Resource so that they can be
+//   restored with their corresponding CRD.
 var defaultRestorePriorities = []string{
 	"namespaces",
 	"persistentvolumes",
@@ -456,6 +458,7 @@ var defaultRestorePriorities = []string{
 	"limitranges",
 	"pods",
 	"replicaset",
+	"customresourcedefinitions",
 }
 
 func (s *server) initRestic() error {
