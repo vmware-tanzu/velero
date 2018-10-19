@@ -45,6 +45,11 @@ func (location *TestVolumeSnapshotLocation) WithName(name string) *TestVolumeSna
 	return location
 }
 
+func (location *TestVolumeSnapshotLocation) WithProvider(name string) *TestVolumeSnapshotLocation {
+	location.Spec.Provider = name
+	return location
+}
+
 func (location *TestVolumeSnapshotLocation) WithProviderConfig(info []LocationInfo) []*TestVolumeSnapshotLocation {
 	var locations []*TestVolumeSnapshotLocation
 

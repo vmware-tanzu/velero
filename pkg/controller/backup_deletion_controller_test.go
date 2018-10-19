@@ -324,6 +324,139 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		assert.Equal(t, expectedActions, td.client.Actions())
 	})
 
+	t.Run("pre-v0.10 backup with snapshots, no errors", func(t *testing.T) {
+		backup := arktest.NewTestBackup().WithName("foo").Backup
+		backup.UID = "uid"
+		backup.Spec.StorageLocation = "primary"
+		backup.Status.VolumeBackups = map[string]*v1.VolumeBackupInfo{
+			"pv-1": {
+				SnapshotID: "snap-1",
+			},
+		}
+
+		restore1 := arktest.NewTestRestore("heptio-ark", "restore-1", v1.RestorePhaseCompleted).WithBackup("foo").Restore
+		restore2 := arktest.NewTestRestore("heptio-ark", "restore-2", v1.RestorePhaseCompleted).WithBackup("foo").Restore
+		restore3 := arktest.NewTestRestore("heptio-ark", "restore-3", v1.RestorePhaseCompleted).WithBackup("some-other-backup").Restore
+
+		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
+
+		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore1)
+		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore2)
+		td.sharedInformers.Ark().V1().Restores().Informer().GetStore().Add(restore3)
+
+		location := &v1.BackupStorageLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      backup.Spec.StorageLocation,
+			},
+			Spec: v1.BackupStorageLocationSpec{
+				Provider: "objStoreProvider",
+				StorageType: v1.StorageType{
+					ObjectStorage: &v1.ObjectStorageLocation{
+						Bucket: "bucket",
+					},
+				},
+			},
+		}
+		require.NoError(t, td.sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+
+		snapshotLocation := &v1.VolumeSnapshotLocation{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: backup.Namespace,
+				Name:      "vsl-1",
+			},
+			Spec: v1.VolumeSnapshotLocationSpec{
+				Provider: "provider-1",
+			},
+		}
+		require.NoError(t, td.sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(snapshotLocation))
+
+		// Clear out req labels to make sure the controller adds them
+		td.req.Labels = make(map[string]string)
+
+		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+		td.blockStore.SnapshotsTaken.Insert("snap-1")
+
+		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
+			return true, td.req, nil
+		})
+
+		td.client.PrependReactor("patch", "backups", func(action core.Action) (bool, runtime.Object, error) {
+			return true, backup, nil
+		})
+
+		pluginManager := &pluginmocks.Manager{}
+		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
+		pluginManager.On("CleanupClients")
+		td.controller.newPluginManager = func(logrus.FieldLogger) plugin.Manager { return pluginManager }
+
+		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
+		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
+		td.backupStore.On("DeleteRestore", "restore-2").Return(nil)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"metadata":{"labels":{"ark.heptio.com/backup-name":"foo"}},"status":{"phase":"InProgress"}}`),
+			),
+			core.NewGetAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"metadata":{"labels":{"ark.heptio.com/backup-uid":"uid"}}}`),
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+				[]byte(`{"status":{"phase":"Deleting"}}`),
+			),
+			core.NewDeleteAction(
+				v1.SchemeGroupVersion.WithResource("restores"),
+				td.req.Namespace,
+				"restore-1",
+			),
+			core.NewDeleteAction(
+				v1.SchemeGroupVersion.WithResource("restores"),
+				td.req.Namespace,
+				"restore-2",
+			),
+			core.NewDeleteAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				[]byte(`{"status":{"phase":"Processed"}}`),
+			),
+			core.NewDeleteCollectionAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				pkgbackup.NewDeleteBackupRequestListOptions(td.req.Spec.BackupName, "uid"),
+			),
+		}
+
+		arktest.CompareActions(t, expectedActions, td.client.Actions())
+
+		// Make sure snapshot was deleted
+		assert.Equal(t, 0, td.blockStore.SnapshotsTaken.Len())
+	})
+
 	t.Run("full delete, no errors", func(t *testing.T) {
 		backup := arktest.NewTestBackup().WithName("foo").Backup
 		backup.UID = "uid"

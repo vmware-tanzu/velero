@@ -237,8 +237,7 @@ func (kr *kubernetesRestorer) Restore(
 
 	pvRestorer := &pvRestorer{
 		logger:                 log,
-		backupName:             restore.Spec.BackupName,
-		backupNamespace:        backup.Namespace,
+		backup:                 backup,
 		snapshotVolumes:        backup.Spec.SnapshotVolumes,
 		restorePVs:             restore.Spec.RestorePVs,
 		volumeSnapshots:        volumeSnapshots,
@@ -907,13 +906,72 @@ type PVRestorer interface {
 
 type pvRestorer struct {
 	logger                 logrus.FieldLogger
-	backupName             string
-	backupNamespace        string
+	backup                 *api.Backup
 	snapshotVolumes        *bool
 	restorePVs             *bool
 	volumeSnapshots        []*volume.Snapshot
 	blockStoreGetter       BlockStoreGetter
 	snapshotLocationLister listers.VolumeSnapshotLocationLister
+}
+
+type snapshotInfo struct {
+	providerSnapshotID string
+	volumeType         string
+	volumeAZ           string
+	volumeIOPS         *int64
+	location           *api.VolumeSnapshotLocation
+}
+
+func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister) (*snapshotInfo, error) {
+	// pre-v0.10 backup
+	if backup.Status.VolumeBackups != nil {
+		volumeBackup := backup.Status.VolumeBackups[pvName]
+		if volumeBackup == nil {
+			return nil, nil
+		}
+
+		locations, err := snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).List(labels.Everything())
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+		if len(locations) != 1 {
+			return nil, errors.Errorf("unable to restore pre-v0.10 volume snapshot because exactly one volume snapshot location must exist, got %d", len(locations))
+		}
+
+		return &snapshotInfo{
+			providerSnapshotID: volumeBackup.SnapshotID,
+			volumeType:         volumeBackup.Type,
+			volumeAZ:           volumeBackup.AvailabilityZone,
+			volumeIOPS:         volumeBackup.Iops,
+			location:           locations[0],
+		}, nil
+	}
+
+	// v0.10+ backup
+	var pvSnapshot *volume.Snapshot
+	for _, snapshot := range volumeSnapshots {
+		if snapshot.Spec.PersistentVolumeName == pvName {
+			pvSnapshot = snapshot
+			break
+		}
+	}
+
+	if pvSnapshot == nil {
+		return nil, nil
+	}
+
+	loc, err := snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(pvSnapshot.Spec.Location)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &snapshotInfo{
+		providerSnapshotID: pvSnapshot.Status.ProviderSnapshotID,
+		volumeType:         pvSnapshot.Spec.VolumeType,
+		volumeAZ:           pvSnapshot.Spec.VolumeAZ,
+		volumeIOPS:         pvSnapshot.Spec.VolumeIOPS,
+		location:           loc,
+	}, nil
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -942,40 +1000,31 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 
 	log := r.logger.WithFields(logrus.Fields{"persistentVolume": pvName})
 
-	var foundSnapshot *volume.Snapshot
-	for _, snapshot := range r.volumeSnapshots {
-		if snapshot.Spec.PersistentVolumeName == pvName {
-			foundSnapshot = snapshot
-			break
-		}
+	snapshotInfo, err := getSnapshotInfo(pvName, r.backup, r.volumeSnapshots, r.snapshotLocationLister)
+	if err != nil {
+		return nil, err
 	}
-	if foundSnapshot == nil {
-		log.Info("skipping no snapshot found")
+	if snapshotInfo == nil {
+		log.Infof("No snapshot found for persistent volume")
 		return obj, nil
 	}
 
-	location, err := r.snapshotLocationLister.VolumeSnapshotLocations(r.backupNamespace).Get(foundSnapshot.Spec.Location)
+	blockStore, err := r.blockStoreGetter.GetBlockStore(snapshotInfo.location.Spec.Provider)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	blockStore, err := r.blockStoreGetter.GetBlockStore(location.Spec.Provider)
+	if err := blockStore.Init(snapshotInfo.location.Spec.Config); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	volumeID, err := blockStore.CreateVolumeFromSnapshot(snapshotInfo.providerSnapshotID, snapshotInfo.volumeType, snapshotInfo.volumeAZ, snapshotInfo.volumeIOPS)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if err := blockStore.Init(location.Spec.Config); err != nil {
-		return nil, errors.WithStack(err)
-	}
+	log.WithField("providerSnapshotID", snapshotInfo.providerSnapshotID).Info("successfully restored persistent volume from snapshot")
 
-	volumeID, err := blockStore.CreateVolumeFromSnapshot(foundSnapshot.Status.ProviderSnapshotID, foundSnapshot.Spec.VolumeType, foundSnapshot.Spec.VolumeAZ, foundSnapshot.Spec.VolumeIOPS)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	log = log.WithFields(logrus.Fields{"snapshot": foundSnapshot.Status.ProviderSnapshotID})
-	log.Info("successfully restored persistent volume from snapshot")
-	// used to be update1 which is then cast to Unstructured and returned
 	updated1, err := blockStore.SetVolumeID(obj, volumeID)
 	if err != nil {
 		return nil, errors.WithStack(err)

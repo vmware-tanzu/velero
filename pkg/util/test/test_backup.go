@@ -105,6 +105,21 @@ func (b *TestBackup) WithSnapshot(pv string, snapshot string) *TestBackup {
 	return b
 }
 
+func (b *TestBackup) WithVolumeBackupInfo(pv, snapshotID, volumeType, az string, iops *int64) *TestBackup {
+	if b.Status.VolumeBackups == nil {
+		b.Status.VolumeBackups = make(map[string]*v1.VolumeBackupInfo)
+	}
+
+	b.Status.VolumeBackups[pv] = &v1.VolumeBackupInfo{
+		SnapshotID:       snapshotID,
+		Type:             volumeType,
+		AvailabilityZone: az,
+		Iops:             iops,
+	}
+
+	return b
+}
+
 func (b *TestBackup) WithSnapshotVolumes(value bool) *TestBackup {
 	b.Spec.SnapshotVolumes = &value
 	return b
@@ -141,7 +156,7 @@ func (b *TestBackup) WithStorageLocation(location string) *TestBackup {
 	return b
 }
 
-func (b *TestBackup) WithVolumeSnapshotLocations(locations []string) *TestBackup {
+func (b *TestBackup) WithVolumeSnapshotLocations(locations ...string) *TestBackup {
 	b.Spec.VolumeSnapshotLocations = locations
 	return b
 }

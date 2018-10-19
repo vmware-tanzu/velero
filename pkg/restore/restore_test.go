@@ -23,6 +23,7 @@ import (
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
 	"github.com/heptio/ark/pkg/kuberesource"
@@ -635,6 +636,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 						volumeID:  "volume-1",
 					},
 					snapshotLocationLister: snapshotLocationLister,
+					backup:                 &api.Backup{},
 				},
 			}
 
@@ -1190,31 +1192,31 @@ func TestIsCompleted(t *testing.T) {
 	}
 }
 
-func TestExecutePVAction(t *testing.T) {
-	iops := int64(1000)
-
-	locationsFake := map[string]*api.VolumeSnapshotLocation{
-		"default": arktest.NewTestVolumeSnapshotLocation().WithName("default-name").VolumeSnapshotLocation,
+func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volumeIOPS int64) *volume.Snapshot {
+	return &volume.Snapshot{
+		Spec: volume.SnapshotSpec{
+			PersistentVolumeName: pvName,
+			Location:             location,
+			VolumeType:           volumeType,
+			VolumeAZ:             volumeAZ,
+			VolumeIOPS:           &volumeIOPS,
+		},
+		Status: volume.SnapshotStatus{
+			ProviderSnapshotID: snapshotID,
+		},
 	}
+}
 
-	var locations []string
-	for key := range locationsFake {
-		locations = append(locations, key)
-	}
-
+func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 	tests := []struct {
-		name              string
-		obj               *unstructured.Unstructured
-		restore           *api.Restore
-		backup            *arktest.TestBackup
-		volumeSnapshots   []*volume.Snapshot
-		locations         map[string]*api.VolumeSnapshotLocation
-		volumeMap         map[api.VolumeBackupInfo]string
-		noBlockStore      bool
-		expectedErr       bool
-		expectedRes       *unstructured.Unstructured
-		volumeID          string
-		expectSetVolumeID bool
+		name            string
+		obj             *unstructured.Unstructured
+		restore         *api.Restore
+		backup          *api.Backup
+		volumeSnapshots []*volume.Snapshot
+		locations       []*api.VolumeSnapshotLocation
+		expectedErr     bool
+		expectedRes     *unstructured.Unstructured
 	}{
 		{
 			name:        "no name should error",
@@ -1232,145 +1234,209 @@ func TestExecutePVAction(t *testing.T) {
 			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false),
+			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false).Backup,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").Unstructured,
 		},
 		{
-			name:    "not restoring, return early",
+			name:    "restore.spec.restorePVs=false, return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
+			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
 			volumeSnapshots: []*volume.Snapshot{
-				{
-					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
-					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
-				},
+				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
 			},
-			locations:   locationsFake,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+			},
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
-			name:        "restoring, return without error if there is no PV->BackupInfo map",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			name:        "backup.status.volumeBackups non-nil and no entry for PV: return early",
+			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
-			locations:   locationsFake,
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			backup:      arktest.NewTestBackup().WithName("backup-1").WithSnapshot("non-matching-pv", "snap").Backup,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
-			name:    "restoring, return early if there is PV->BackupInfo map but no entry for this PV",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			name:    "backup.status.volumeBackups has entry for PV, >1 VSLs configured: return error",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
-			volumeSnapshots: []*volume.Snapshot{
-				{
-					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "another-pv", VolumeType: "gp", VolumeIOPS: &iops},
-					Status: volume.SnapshotStatus{ProviderSnapshotID: "another-snap-1"},
-				},
+			backup:  arktest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap").Backup,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
-			locations:   locationsFake,
-			expectedErr: false,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			expectedErr: true,
 		},
 		{
-			name:      "volume type and IOPS are correctly passed to CreateVolume",
-			obj:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
-			restore:   arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:    arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
-			locations: locationsFake,
-			volumeSnapshots: []*volume.Snapshot{
-				{
-					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
-					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
-				},
+			name:    "volumeSnapshots is empty: return early",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
-			volumeMap:         map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1", Type: "gp", Iops: &iops}: "volume-1"},
-			volumeID:          "volume-1",
-			expectedErr:       false,
-			expectSetVolumeID: true,
-			expectedRes:       NewTestUnstructured().WithName("pv-1").WithSpec("xyz").Unstructured,
+			volumeSnapshots: []*volume.Snapshot{},
+			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
-			name:    "restoring, blockStore=nil, backup has at least 1 snapshot -> error",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
-			restore: arktest.NewDefaultTestRestore().Restore,
-			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithVolumeSnapshotLocations(locations),
-			volumeSnapshots: []*volume.Snapshot{
-				{
-					Spec:   volume.SnapshotSpec{BackupName: "backup1", Location: "default-name", ProviderVolumeID: "volume-1", PersistentVolumeName: "pv-1", VolumeType: "gp", VolumeIOPS: &iops},
-					Status: volume.SnapshotStatus{ProviderSnapshotID: "snap-1"},
-				},
+			name:    "volumeSnapshots doesn't have a snapshot for PV: return early",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
-			noBlockStore: true,
-			expectedErr:  true,
-			expectedRes:  NewTestUnstructured().WithName("pv-1").WithSpecField("awsElasticBlockStore", make(map[string]interface{})).Unstructured,
+			volumeSnapshots: []*volume.Snapshot{
+				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
+				newSnapshot("non-matching-pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
+			},
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
 			var (
-				blockStoreGetter     BlockStoreGetter
-				testBlockStoreGetter *fakeBlockStoreGetter
-
-				client                 = fake.NewSimpleClientset()
-				sharedInformers        = informers.NewSharedInformerFactory(client, 0)
-				snapshotLocationLister = sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister()
+				client                   = fake.NewSimpleClientset()
+				snapshotLocationInformer = informers.NewSharedInformerFactory(client, 0).Ark().V1().VolumeSnapshotLocations()
 			)
 
-			if !test.noBlockStore {
-				testBlockStoreGetter = &fakeBlockStoreGetter{
-					volumeMap: test.volumeMap,
-					volumeID:  test.volumeID,
-				}
-				testBlockStoreGetter.GetBlockStore("default")
-				blockStoreGetter = testBlockStoreGetter
-				for _, location := range test.locations {
-					require.NoError(t, sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location))
-				}
-			} else {
-				assert.Equal(t, nil, blockStoreGetter)
+			r := &pvRestorer{
+				logger:                 arktest.NewLogger(),
+				restorePVs:             tc.restore.Spec.RestorePVs,
+				snapshotLocationLister: snapshotLocationInformer.Lister(),
+			}
+			if tc.backup != nil {
+				r.backup = tc.backup
+				r.snapshotVolumes = tc.backup.Spec.SnapshotVolumes
+			}
+
+			for _, loc := range tc.locations {
+				require.NoError(t, snapshotLocationInformer.Informer().GetStore().Add(loc))
+			}
+
+			res, err := r.executePVAction(tc.obj)
+			switch tc.expectedErr {
+			case true:
+				assert.Nil(t, res)
+				assert.NotNil(t, err)
+			case false:
+				assert.Equal(t, tc.expectedRes, res)
+				assert.Nil(t, err)
+			}
+		})
+	}
+}
+
+func int64Ptr(val int) *int64 {
+	r := int64(val)
+	return &r
+}
+
+type providerToBlockStoreMap map[string]cloudprovider.BlockStore
+
+func (g providerToBlockStoreMap) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+	if bs, ok := g[provider]; !ok {
+		return nil, errors.New("block store not found for provider")
+	} else {
+		return bs, nil
+	}
+}
+
+func TestExecutePVAction_SnapshotRestores(t *testing.T) {
+	tests := []struct {
+		name               string
+		obj                *unstructured.Unstructured
+		restore            *api.Restore
+		backup             *api.Backup
+		volumeSnapshots    []*volume.Snapshot
+		locations          []*api.VolumeSnapshotLocation
+		expectedProvider   string
+		expectedSnapshotID string
+		expectedVolumeType string
+		expectedVolumeAZ   string
+		expectedVolumeIOPS *int64
+		expectedSnapshot   *volume.Snapshot
+	}{
+		{
+			name:    "pre-v0.10 backup with .status.volumeBackups with entry for PV and single VSL executes restore",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup: arktest.NewTestBackup().WithName("backup-1").
+				WithVolumeBackupInfo("pv-1", "snap-1", "type-1", "az-1", int64Ptr(1)).
+				WithVolumeBackupInfo("pv-2", "snap-2", "type-2", "az-2", int64Ptr(2)).
+				Backup,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
+			},
+			expectedProvider:   "provider-1",
+			expectedSnapshotID: "snap-1",
+			expectedVolumeType: "type-1",
+			expectedVolumeAZ:   "az-1",
+			expectedVolumeIOPS: int64Ptr(1),
+		},
+		{
+			name:    "v0.10+ backup with a matching volume.Snapshot for PV executes restore",
+			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
+			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			locations: []*api.VolumeSnapshotLocation{
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
+				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").WithProvider("provider-2").VolumeSnapshotLocation,
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				newSnapshot("pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
+				newSnapshot("pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
+			},
+			expectedProvider:   "provider-1",
+			expectedSnapshotID: "snap-1",
+			expectedVolumeType: "type-1",
+			expectedVolumeAZ:   "az-1",
+			expectedVolumeIOPS: int64Ptr(1),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				blockStore       = new(cloudprovidermocks.BlockStore)
+				blockStoreGetter = providerToBlockStoreMap(map[string]cloudprovider.BlockStore{
+					tc.expectedProvider: blockStore,
+				})
+				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Ark().V1().VolumeSnapshotLocations()
+			)
+
+			for _, loc := range tc.locations {
+				require.NoError(t, locationsInformer.Informer().GetStore().Add(loc))
 			}
 
 			r := &pvRestorer{
-				logger:                 logging.DefaultLogger(logrus.DebugLevel),
-				backupName:             "backup1",
-				backupNamespace:        api.DefaultNamespace,
-				restorePVs:             test.restore.Spec.RestorePVs,
-				snapshotLocationLister: snapshotLocationLister,
+				logger:                 arktest.NewLogger(),
+				backup:                 tc.backup,
+				volumeSnapshots:        tc.volumeSnapshots,
+				snapshotLocationLister: locationsInformer.Lister(),
 				blockStoreGetter:       blockStoreGetter,
 			}
-			if test.backup != nil {
-				backup := test.backup.DeepCopy()
-				backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
 
-				r.snapshotVolumes = test.backup.Spec.SnapshotVolumes
-				r.volumeSnapshots = test.volumeSnapshots
-			}
+			blockStore.On("Init", mock.Anything).Return(nil)
+			blockStore.On("CreateVolumeFromSnapshot", tc.expectedSnapshotID, tc.expectedVolumeType, tc.expectedVolumeAZ, tc.expectedVolumeIOPS).Return("volume-1", nil)
+			blockStore.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
-			res, err := r.executePVAction(test.obj)
+			_, err := r.executePVAction(tc.obj)
+			assert.NoError(t, err)
 
-			if test.expectedErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-
-			if test.expectSetVolumeID {
-				assert.Equal(t, test.volumeID, testBlockStoreGetter.fakeBlockStore.VolumeIDSet)
-			} else {
-				assert.Equal(t, "", testBlockStoreGetter.fakeBlockStore.VolumeIDSet)
-			}
-			assert.Equal(t, test.expectedRes, res)
+			blockStore.AssertExpectations(t)
 		})
 	}
 }
