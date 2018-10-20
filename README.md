@@ -31,7 +31,7 @@ If you encounter issues, review the [troubleshooting docs][30], [file an issue][
 
 Thanks for taking the time to join our community and start contributing!
 
-Feedback and discussion is available on [the mailing list][24].
+Feedback and discussion are available on [the mailing list][24].
 
 ### Before you start
 
