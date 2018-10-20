@@ -26,15 +26,6 @@ import (
 	"sort"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
-
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
@@ -47,6 +38,13 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -83,6 +81,11 @@ type restoreController struct {
 
 	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+}
+
+type apiRestoreResult struct {
+	warnings api.RestoreResult
+	errors   api.RestoreResult
 }
 
 func NewRestoreController(
@@ -233,20 +236,20 @@ func (c *restoreController) processRestore(key string) error {
 	log.Debug("Running restore")
 
 	// execution & upload of restore
-	restoreWarnings, restoreErrors, restoreFailure := c.runRestore(
+	apiRestoreResults, restoreFailure := c.runRestore(
 		restore,
 		actions,
 		info,
 		pluginManager,
 	)
 
-	restore.Status.Warnings = len(restoreWarnings.Ark) + len(restoreWarnings.Cluster)
-	for _, w := range restoreWarnings.Namespaces {
+	restore.Status.Warnings = len(apiRestoreResults.warnings.Ark) + len(apiRestoreResults.warnings.Cluster)
+	for _, w := range apiRestoreResults.warnings.Namespaces {
 		restore.Status.Warnings += len(w)
 	}
 
-	restore.Status.Errors = len(restoreErrors.Ark) + len(restoreErrors.Cluster)
-	for _, e := range restoreErrors.Namespaces {
+	restore.Status.Errors = len(apiRestoreResults.errors.Ark) + len(apiRestoreResults.errors.Cluster)
+	for _, e := range apiRestoreResults.errors.Namespaces {
 		restore.Status.Errors += len(e)
 	}
 
@@ -488,7 +491,7 @@ func (c *restoreController) runRestore(
 	actions []restore.ItemAction,
 	info backupInfo,
 	pluginManager plugin.Manager,
-) (api.RestoreResult, api.RestoreResult, error) {
+) (apiRestoreResult, error) {
 	var restoreWarnings, restoreErrors api.RestoreResult
 	var restoreFailure error
 	logFile, err := ioutil.TempFile("", "")
@@ -503,7 +506,7 @@ func (c *restoreController) runRestore(
 			WithError(errors.WithStack(err)).
 			Error("Error creating log temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	gzippedLogFile := gzip.NewWriter(logFile)
 	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
@@ -526,7 +529,7 @@ func (c *restoreController) runRestore(
 		log.WithError(err).Error("Error downloading backup")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
@@ -535,7 +538,7 @@ func (c *restoreController) runRestore(
 		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	defer closeAndRemoveFile(resultsFile, c.logger)
 
@@ -544,7 +547,7 @@ func (c *restoreController) runRestore(
 		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
 		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
 		restoreFailure = err
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 
 	// Any return statement above this line means a total restore failure
@@ -560,7 +563,7 @@ func (c *restoreController) runRestore(
 	// Reset the offset to 0 for reading
 	if _, err = logFile.Seek(0, 0); err != nil {
 		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 
 	if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
@@ -576,19 +579,19 @@ func (c *restoreController) runRestore(
 
 	if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	gzippedResultsFile.Close()
 
 	if _, err = resultsFile.Seek(0, 0); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
-		return restoreWarnings, restoreErrors, restoreFailure
+		return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
 	}
 
-	return restoreWarnings, restoreErrors, restoreFailure
+	return apiRestoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 }
 
 func downloadToTempFile(
