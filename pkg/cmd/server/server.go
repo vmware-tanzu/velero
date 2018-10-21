@@ -454,6 +454,7 @@ const (
 )
 
 // - Namespaces go first because all namespaced resources depend on them.
+// - Storage Classes are needed to create PVs and PVCs correctly.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
 // - Secrets and config maps go before pods or controllers so they can be mounted
@@ -464,6 +465,7 @@ const (
 //	 have restic restores run before controllers adopt the pods.
 var defaultRestorePriorities = []string{
 	"namespaces",
+	"storageclasses",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"secrets",
