@@ -43,7 +43,6 @@ import (
 	"github.com/heptio/ark/pkg/persistence"
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/boolptr"
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
@@ -72,7 +71,6 @@ type restoreController struct {
 	restoreClient          arkv1client.RestoresGetter
 	backupClient           arkv1client.BackupsGetter
 	restorer               restore.Restorer
-	pvProviderExists       bool
 	backupLister           listers.BackupLister
 	restoreLister          listers.RestoreLister
 	backupLocationLister   listers.BackupStorageLocationLister
@@ -94,7 +92,6 @@ func NewRestoreController(
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
-	pvProviderExists bool,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) plugin.Manager,
@@ -107,7 +104,6 @@ func NewRestoreController(
 		restoreClient:          restoreClient,
 		backupClient:           backupClient,
 		restorer:               restorer,
-		pvProviderExists:       pvProviderExists,
 		backupLister:           backupInformer.Lister(),
 		restoreLister:          restoreInformer.Lister(),
 		backupLocationLister:   backupLocationInformer.Lister(),
@@ -300,11 +296,6 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	// validate included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(restore.Spec.IncludedNamespaces, restore.Spec.ExcludedNamespaces) {
 		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
-	}
-
-	// validate that PV provider exists if we're restoring PVs
-	if boolptr.IsSetToTrue(restore.Spec.RestorePVs) && !c.pvProviderExists {
-		restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Server is not configured for PV snapshot restores")
 	}
 
 	// validate that exactly one of BackupName and ScheduleName have been specified

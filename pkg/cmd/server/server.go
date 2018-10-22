@@ -649,7 +649,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]*api.V
 		s.sharedInformerFactory.Ark().V1().Backups(),
 		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
 		s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
-		false,
 		s.logger,
 		s.logLevel,
 		newPluginManager,
