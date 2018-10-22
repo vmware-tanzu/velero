@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
@@ -29,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, volumeDetails bool, arkClient clientset.Interface) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, arkClient clientset.Interface) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -100,7 +99,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 
 		if len(podVolumeRestores) > 0 {
 			d.Println()
-			describePodVolumeRestores(d, podVolumeRestores, volumeDetails)
+			describePodVolumeRestores(d, podVolumeRestores, details)
 		}
 	})
 }
@@ -114,7 +113,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, arkClient clients
 	var buf bytes.Buffer
 	var resultMap map[string]v1.RestoreResult
 
-	if err := downloadrequest.Stream(arkClient.ArkV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, 30*time.Second); err != nil {
+	if err := downloadrequest.Stream(arkClient.ArkV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}
@@ -148,7 +147,7 @@ func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, det
 	if details {
 		d.Printf("Restic Restores:\n")
 	} else {
-		d.Printf("Restic Restores (specify --volume-details for more information):\n")
+		d.Printf("Restic Restores (specify --details for more information):\n")
 	}
 
 	// separate restores by phase (combining <none> and New into a single group)

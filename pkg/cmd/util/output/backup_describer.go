@@ -17,16 +17,27 @@ limitations under the License.
 package output
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
+	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	"github.com/heptio/ark/pkg/volume"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DescribeBackup describes a backup in human-readable format.
-func DescribeBackup(backup *arkv1api.Backup, deleteRequests []arkv1api.DeleteBackupRequest, podVolumeBackups []arkv1api.PodVolumeBackup, volumeDetails bool) string {
+func DescribeBackup(
+	backup *arkv1api.Backup,
+	deleteRequests []arkv1api.DeleteBackupRequest,
+	podVolumeBackups []arkv1api.PodVolumeBackup,
+	details bool,
+	arkClient clientset.Interface,
+) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
 
@@ -41,7 +52,7 @@ func DescribeBackup(backup *arkv1api.Backup, deleteRequests []arkv1api.DeleteBac
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup.Status)
+		DescribeBackupStatus(d, backup, details, arkClient)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -50,7 +61,7 @@ func DescribeBackup(backup *arkv1api.Backup, deleteRequests []arkv1api.DeleteBac
 
 		if len(podVolumeBackups) > 0 {
 			d.Println()
-			DescribePodVolumeBackups(d, podVolumeBackups, volumeDetails)
+			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
 	})
 }
@@ -167,7 +178,9 @@ func DescribeBackupSpec(d *Describer, spec arkv1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, status arkv1api.BackupStatus) {
+func DescribeBackupStatus(d *Describer, backup *arkv1api.Backup, details bool, arkClient clientset.Interface) {
+	status := backup.Status
+
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
 
 	d.Println()
@@ -197,22 +210,54 @@ func DescribeBackupStatus(d *Describer, status arkv1api.BackupStatus) {
 	}
 
 	d.Println()
-	if len(status.VolumeBackups) == 0 {
-		d.Printf("Persistent Volumes: <none included>\n")
-	} else {
+	if len(status.VolumeBackups) > 0 {
+		// pre-v0.10 backup
 		d.Printf("Persistent Volumes:\n")
 		for pvName, info := range status.VolumeBackups {
-			d.Printf("\t%s:\n", pvName)
-			d.Printf("\t\tSnapshot ID:\t%s\n", info.SnapshotID)
-			d.Printf("\t\tType:\t%s\n", info.Type)
-			d.Printf("\t\tAvailability Zone:\t%s\n", info.AvailabilityZone)
-			iops := "<N/A>"
-			if info.Iops != nil {
-				iops = fmt.Sprintf("%d", *info.Iops)
-			}
-			d.Printf("\t\tIOPS:\t%s\n", iops)
+			printSnapshot(d, pvName, info.SnapshotID, info.Type, info.AvailabilityZone, info.Iops)
 		}
+		return
 	}
+
+	if status.VolumeSnapshotsAttempted > 0 {
+		// v0.10+ backup
+		if !details {
+			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
+			return
+		}
+
+		buf := new(bytes.Buffer)
+		if err := downloadrequest.Stream(arkClient.ArkV1(), backup.Namespace, backup.Name, arkv1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout); err != nil {
+			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
+			return
+		}
+
+		var snapshots []*volume.Snapshot
+		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
+			d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
+			return
+		}
+
+		d.Printf("Persistent Volumes:\n")
+		for _, snap := range snapshots {
+			printSnapshot(d, snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS)
+		}
+		return
+	}
+
+	d.Printf("Persistent Volumes: <none included>\n")
+}
+
+func printSnapshot(d *Describer, pvName, snapshotID, volumeType, volumeAZ string, iops *int64) {
+	d.Printf("\t%s:\n", pvName)
+	d.Printf("\t\tSnapshot ID:\t%s\n", snapshotID)
+	d.Printf("\t\tType:\t%s\n", volumeType)
+	d.Printf("\t\tAvailability Zone:\t%s\n", volumeAZ)
+	iopsString := "<N/A>"
+	if iops != nil {
+		iopsString = fmt.Sprintf("%d", *iops)
+	}
+	d.Printf("\t\tIOPS:\t%s\n", iopsString)
 }
 
 // DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
@@ -256,7 +301,7 @@ func DescribePodVolumeBackups(d *Describer, backups []arkv1api.PodVolumeBackup, 
 	if details {
 		d.Printf("Restic Backups:\n")
 	} else {
-		d.Printf("Restic Backups (specify --volume-details for more information):\n")
+		d.Printf("Restic Backups (specify --details for more information):\n")
 	}
 
 	// separate backups by phase (combining <none> and New into a single group)

@@ -48,6 +48,7 @@ import (
 	"github.com/heptio/ark/pkg/util/encode"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 const backupVersion = 1
@@ -397,6 +398,13 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// Mark completion timestamp before serializing and uploading.
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
 	backup.Status.CompletionTimestamp.Time = c.clock.Now()
+
+	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
+	for _, snap := range backup.VolumeSnapshots {
+		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
+			backup.Status.VolumeSnapshotsCompleted++
+		}
+	}
 
 	errs = append(errs, persistBackup(backup, backupFile, logFile, backupStore, c.logger)...)
 	errs = append(errs, recordBackupMetrics(backup.Backup, backupFile, c.metrics))
