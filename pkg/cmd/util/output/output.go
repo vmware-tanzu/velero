@@ -19,6 +19,7 @@ package output
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -31,6 +32,8 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/util/encode"
 )
+
+const downloadRequestTimeout = 30 * time.Second
 
 // BindFlags defines a set of output-specific flags within the provided
 // FlagSet.

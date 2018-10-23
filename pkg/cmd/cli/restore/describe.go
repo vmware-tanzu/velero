@@ -32,8 +32,8 @@ import (
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	var (
-		listOptions   metav1.ListOptions
-		volumeDetails bool
+		listOptions metav1.ListOptions
+		details     bool
 	)
 
 	c := &cobra.Command{
@@ -64,7 +64,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, volumeDetails, arkClient)
+				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, details, arkClient)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -77,7 +77,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	}
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
-	c.Flags().BoolVar(&volumeDetails, "volume-details", volumeDetails, "display details of restic volume restores")
+	c.Flags().BoolVar(&details, "details", details, "display additional detail in the command output")
 
 	return c
 }

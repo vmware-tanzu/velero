@@ -349,6 +349,8 @@ func (s *objectBackupStore) GetDownloadURL(target arkv1api.DownloadTarget) (stri
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupContentsKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindBackupLog:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupLogKey(target.Name), DownloadURLTTL)
+	case arkv1api.DownloadTargetKindBackupVolumeSnapshots:
+		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupVolumeSnapshotsKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindRestoreLog:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreLogKey(target.Name), DownloadURLTTL)
 	case arkv1api.DownloadTargetKindRestoreResults:

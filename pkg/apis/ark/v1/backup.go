@@ -195,6 +195,14 @@ type BackupStatus struct {
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
 	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+
+	// VolumeSnapshotsAttempted is the total number of attempted
+	// volume snapshots for this backup.
+	VolumeSnapshotsAttempted int `json:"volumeSnapshotsAttempted"`
+
+	// VolumeSnapshotsCompleted is the total number of successfully
+	// completed volume snapshots for this backup.
+	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted"`
 }
 
 // VolumeBackupInfo captures the required information about
