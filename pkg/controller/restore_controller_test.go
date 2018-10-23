@@ -105,7 +105,6 @@ func TestFetchBackupInfo(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
-				false,
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
@@ -199,7 +198,6 @@ func TestProcessRestoreSkips(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
-				false, // pvProviderExists
 				logger,
 				logrus.InfoLevel,
 				nil,
@@ -226,7 +224,6 @@ func TestProcessRestore(t *testing.T) {
 		restore                         *api.Restore
 		backup                          *api.Backup
 		restorerError                   error
-		allowRestoreSnapshots           bool
 		expectedErr                     bool
 		expectedPhase                   string
 		expectedValidationErrors        []string
@@ -311,25 +308,6 @@ func TestProcessRestore(t *testing.T) {
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
-		},
-		{
-			name:                  "valid restore with RestorePVs=true gets executed when allowRestoreSnapshots=true",
-			location:              arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
-			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:                arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
-			allowRestoreSnapshots: true,
-			expectedErr:           false,
-			expectedPhase:         string(api.RestorePhaseInProgress),
-			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithRestorePVs(true).Restore,
-		},
-		{
-			name:                     "restore with RestorePVs=true fails validation when allowRestoreSnapshots=false",
-			location:                 arktest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
-			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).WithRestorePVs(true).Restore,
-			backup:                   arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
-			expectedErr:              false,
-			expectedPhase:            string(api.RestorePhaseFailedValidation),
-			expectedValidationErrors: []string{"Server is not configured for PV snapshot restores"},
 		},
 		{
 			name:          "restoration of nodes is not supported",
@@ -425,7 +403,6 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers.Ark().V1().Backups(),
 				sharedInformers.Ark().V1().BackupStorageLocations(),
 				sharedInformers.Ark().V1().VolumeSnapshotLocations(),
-				test.allowRestoreSnapshots,
 				logger,
 				logrus.InfoLevel,
 				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
@@ -751,7 +728,6 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		sharedInformers.Ark().V1().Backups(),
 		sharedInformers.Ark().V1().BackupStorageLocations(),
 		sharedInformers.Ark().V1().VolumeSnapshotLocations(),
-		false,
 		logger,
 		logrus.DebugLevel,
 		nil,
