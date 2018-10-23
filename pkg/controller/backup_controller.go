@@ -428,6 +428,9 @@ func recordBackupMetrics(backup *api.Backup, backupFile *os.File, serverMetrics 
 	backupDuration := backup.Status.CompletionTimestamp.Time.Sub(backup.Status.StartTimestamp.Time)
 	backupDurationSeconds := float64(backupDuration / time.Second)
 	serverMetrics.RegisterBackupDuration(backupScheduleName, backupDurationSeconds)
+	serverMetrics.RegisterVolumeSnapshotAttempts(backupScheduleName, backup.Status.VolumeSnapshotsAttempted)
+	serverMetrics.RegisterVolumeSnapshotSuccesses(backupScheduleName, backup.Status.VolumeSnapshotsCompleted)
+	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
 
 	return err
 }
