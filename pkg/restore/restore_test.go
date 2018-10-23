@@ -813,21 +813,40 @@ status:
 	tests := []struct {
 		name                          string
 		haveSnapshot                  bool
+		legacyBackup                  bool
 		reclaimPolicy                 string
 		expectPVCVolumeName           bool
 		expectedPVCAnnotationsMissing sets.String
 		expectPVCreation              bool
 	}{
 		{
-			name:                "have snapshot, reclaim policy delete",
+			name:                "legacy backup, have snapshot, reclaim policy delete",
 			haveSnapshot:        true,
+			legacyBackup:        true,
 			reclaimPolicy:       "Delete",
 			expectPVCVolumeName: true,
 			expectPVCreation:    true,
 		},
 		{
-			name:                "have snapshot, reclaim policy retain",
+			name:                "non-legacy backup, have snapshot, reclaim policy delete",
 			haveSnapshot:        true,
+			legacyBackup:        false,
+			reclaimPolicy:       "Delete",
+			expectPVCVolumeName: true,
+			expectPVCreation:    true,
+		},
+		{
+			name:                "legacy backup, have snapshot, reclaim policy retain",
+			haveSnapshot:        true,
+			legacyBackup:        true,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    true,
+		},
+		{
+			name:                "non-legacy backup, have snapshot, reclaim policy retain",
+			haveSnapshot:        true,
+			legacyBackup:        false,
 			reclaimPolicy:       "Retain",
 			expectPVCVolumeName: true,
 			expectPVCreation:    true,
@@ -880,7 +899,7 @@ status:
 			require.NoError(t, err)
 
 			backup := &api.Backup{}
-			if test.haveSnapshot {
+			if test.haveSnapshot && test.legacyBackup {
 				backup.Status.VolumeBackups = map[string]*api.VolumeBackupInfo{
 					"pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce": {
 						SnapshotID: "snap",
@@ -912,6 +931,17 @@ status:
 				log:            arktest.NewLogger(),
 				pvsToProvision: sets.NewString(),
 				pvRestorer:     pvRestorer,
+			}
+
+			if test.haveSnapshot && !test.legacyBackup {
+				ctx.volumeSnapshots = append(ctx.volumeSnapshots, &volume.Snapshot{
+					Spec: volume.SnapshotSpec{
+						PersistentVolumeName: "pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce",
+					},
+					Status: volume.SnapshotStatus{
+						ProviderSnapshotID: "snap",
+					},
+				})
 			}
 
 			pvWatch := new(mockWatch)
