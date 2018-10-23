@@ -17,8 +17,9 @@ limitations under the License.
 package client
 
 import (
-	"github.com/heptio/ark/pkg/cmd/cli/client/config"
 	"github.com/spf13/cobra"
+
+	"github.com/heptio/ark/pkg/cmd/cli/client/config"
 )
 
 func NewCommand() *cobra.Command {

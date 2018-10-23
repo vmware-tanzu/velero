@@ -21,16 +21,6 @@ import (
 	"testing"
 	"time"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/logging"
-	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/heptio/ark/pkg/volume"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -47,6 +37,17 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
+	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
+	"github.com/heptio/ark/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/ark/pkg/util/logging"
+	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/ark/pkg/volume"
 )
 
 func TestPrioritizeResources(t *testing.T) {

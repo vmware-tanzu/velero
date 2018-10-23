@@ -19,11 +19,12 @@ package backup
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/kuberesource"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/heptio/ark/pkg/kuberesource"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestPodActionAppliesTo(t *testing.T) {

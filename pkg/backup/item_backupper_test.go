@@ -24,12 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -43,6 +37,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/cloudprovider"
+	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
+	"github.com/heptio/ark/pkg/util/collections"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestBackupItemSkips(t *testing.T) {

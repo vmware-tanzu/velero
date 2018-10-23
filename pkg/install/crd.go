@@ -19,10 +19,10 @@ package install
 import (
 	"fmt"
 
-	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
-
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
 // CRDs returns a list of the CRD types for all of the required Ark CRDs

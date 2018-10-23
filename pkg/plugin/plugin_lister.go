@@ -17,10 +17,11 @@ package plugin
 
 import (
 	plugin "github.com/hashicorp/go-plugin"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+
+	proto "github.com/heptio/ark/pkg/plugin/generated"
 )
 
 // PluginIdenitifer uniquely identifies a plugin by command, kind, and name.

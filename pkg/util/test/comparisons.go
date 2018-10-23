@@ -24,11 +24,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/equality"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
+	"k8s.io/apimachinery/pkg/api/equality"
 	core "k8s.io/client-go/testing"
 )
 

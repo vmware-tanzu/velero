@@ -19,16 +19,15 @@ package controller
 import (
 	"time"
 
-	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	pkgbackup "github.com/heptio/ark/pkg/backup"
 	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
 	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"

@@ -20,8 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	kubectlcmd "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd"
 	"github.com/spf13/cobra"
+
+	kubectlcmd "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd"
 )
 
 func NewCommand() *cobra.Command {

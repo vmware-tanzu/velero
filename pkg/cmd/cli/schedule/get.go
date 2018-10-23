@@ -18,7 +18,6 @@ package schedule
 
 import (
 	"github.com/spf13/cobra"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"

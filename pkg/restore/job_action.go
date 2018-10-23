@@ -18,7 +18,6 @@ package restore
 
 import (
 	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"

@@ -19,10 +19,10 @@ package restore
 import (
 	"testing"
 
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/runtime"
+
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestPodActionExecute(t *testing.T) {

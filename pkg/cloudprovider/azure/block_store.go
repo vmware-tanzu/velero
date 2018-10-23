@@ -31,7 +31,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/cloudprovider"

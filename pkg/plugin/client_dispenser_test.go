@@ -18,10 +18,11 @@ package plugin
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+
+	"github.com/heptio/ark/pkg/util/test"
 )
 
 type fakeClient struct {

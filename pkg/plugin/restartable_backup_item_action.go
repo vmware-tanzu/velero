@@ -16,10 +16,11 @@ limitations under the License.
 package plugin
 
 import (
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/backup"
 )
 
 // restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with

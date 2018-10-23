@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/spf13/cobra"
+
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/spf13/cobra"
 )
 
 func NewGetCommand() *cobra.Command {

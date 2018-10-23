@@ -19,8 +19,9 @@ package backup
 import (
 	"fmt"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
 )
 
 // NewDeleteBackupRequest creates a DeleteBackupRequest for the backup identified by name and uid.

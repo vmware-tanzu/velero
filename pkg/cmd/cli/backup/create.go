@@ -20,10 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -33,6 +31,7 @@ import (
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	"github.com/heptio/ark/pkg/cmd/util/output"
 	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
