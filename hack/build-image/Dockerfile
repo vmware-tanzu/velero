@@ -19,4 +19,8 @@ RUN apk add --update --no-cache git bash && \
     cd /go/src/k8s.io && \
     git clone -b kubernetes-1.11.0 https://github.com/kubernetes/code-generator && \
     git clone -b kubernetes-1.11.0 https://github.com/kubernetes/apimachinery && \
+    go get golang.org/x/tools/cmd/goimports && \
+    cd /go/src/golang.org/x/tools && \
+    git checkout 40a48ad93fbe707101afb2099b738471f70594ec && \
+    go install ./cmd/goimports && \
     echo chmod -R a+w /go
