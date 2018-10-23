@@ -20,11 +20,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
-
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func svcJSON(ports ...corev1api.ServicePort) string {

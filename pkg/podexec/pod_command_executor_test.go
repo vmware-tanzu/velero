@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -34,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestNewPodCommandExecutor(t *testing.T) {

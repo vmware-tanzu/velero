@@ -19,16 +19,17 @@ package backup
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/restic"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/ark/pkg/discovery"
+	"github.com/heptio/ark/pkg/podexec"
+	"github.com/heptio/ark/pkg/restic"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestBackupGroupBacksUpCorrectResourcesInCorrectOrder(t *testing.T) {

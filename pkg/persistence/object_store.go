@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
-
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"

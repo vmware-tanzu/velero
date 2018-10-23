@@ -19,13 +19,14 @@ package plugin
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/restore/mocks"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/ark/pkg/restore/mocks"
 )
 
 func TestRestartableGetRestoreItemAction(t *testing.T) {

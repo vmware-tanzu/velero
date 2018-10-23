@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 #
 # Copyright 2017 the Heptio Ark contributors.
 #
@@ -14,13 +14,54 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HACK_DIR=$(dirname "${BASH_SOURCE}")
+set -o errexit
+set -o nounset
+set -o pipefail
 
-echo "Updating formatting"
+if [[ ${1:-} == '--verify' ]]; then
+  # List file diffs that need formatting updates
+  MODE='-d'
+  ACTION='Verifying'
+else
+  # Write formatting updates to files
+  MODE='-w'
+  ACTION='Updating'
+fi
 
-gofmt -w -s $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
+if ! command -v goimports > /dev/null; then
+  echo 'goimports is missing - please run "go get golang.org/x/tools/cmd/goimports"'
+  exit 1
+fi
 
-command -v goimports > /dev/null || go get golang.org/x/tools/cmd/goimports
-goimports -w -d $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
+files="$(find . -type f -name '*.go' -not -path './vendor/*' -not -path './pkg/generated/*' -not -name 'zz_generated*')"
+echo "${ACTION} gofmt"
+for file in ${files}; do
+  output=$(gofmt "${MODE}" -s "${file}")
+  if [[ -n "${output}" ]]; then
+    VERIFY_FMT_FAILED=1
+    echo "${output}"
+  fi
+done
+if [[ -n "${VERIFY_FMT_FAILED:-}" ]]; then
+  echo "${ACTION} gofmt - failed! Please run 'make update'."
+else
+  echo "${ACTION} gofmt - done!"
+fi
 
-echo "Success!"
+echo "${ACTION} goimports"
+for file in ${files}; do
+  output=$(goimports "${MODE}" -local github.com/heptio/ark "${file}")
+  if [[ -n "${output}" ]]; then
+    VERIFY_IMPORTS_FAILED=1
+    echo "${output}"
+  fi
+done
+if [[ -n "${VERIFY_IMPORTS_FAILED:-}" ]]; then
+  echo "${ACTION} goimports - failed! Please run 'make update'."
+else
+  echo "${ACTION} goimports - done!"
+fi
+
+if [[ -n "${VERIFY_FMT_FAILED:-}" || -n "${VERIFY_IMPORTS_FAILED:-}" ]]; then
+  exit 1
+fi

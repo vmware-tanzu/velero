@@ -20,11 +20,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/backup/mocks"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,6 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/heptio/ark/pkg/apis/ark/v1"
+	"github.com/heptio/ark/pkg/backup"
+	"github.com/heptio/ark/pkg/backup/mocks"
+	proto "github.com/heptio/ark/pkg/plugin/generated"
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 func TestBackupItemActionGRPCServerExecute(t *testing.T) {

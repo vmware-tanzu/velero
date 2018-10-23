@@ -19,8 +19,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
 	"github.com/pkg/errors"
+
+	"github.com/heptio/ark/pkg/cloudprovider"
 )
 
 // restartableObjectStore is an object store for a given implementation (such as "aws"). It is associated with

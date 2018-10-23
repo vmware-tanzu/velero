@@ -22,7 +22,6 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"

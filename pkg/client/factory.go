@@ -22,7 +22,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
-
 	"k8s.io/client-go/kubernetes"
 
 	"github.com/heptio/ark/pkg/apis/ark/v1"

@@ -21,9 +21,10 @@ import (
 	"testing"
 
 	hcplugin "github.com/hashicorp/go-plugin"
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/heptio/ark/pkg/util/test"
 )
 
 func TestNewClientBuilder(t *testing.T) {

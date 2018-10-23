@@ -20,9 +20,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/heptio/ark/pkg/util/filesystem"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/heptio/ark/pkg/util/filesystem"
 )
 
 // Registry manages information about available plugins.

@@ -20,12 +20,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/heptio/ark/pkg/util/test"
 )
 
 type mockRegistry struct {

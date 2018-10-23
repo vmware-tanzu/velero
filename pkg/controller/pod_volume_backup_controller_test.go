@@ -20,10 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/stretchr/testify/require"
 )
 
 func TestPVBHandler(t *testing.T) {

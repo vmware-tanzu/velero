@@ -23,12 +23,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
 	"github.com/heptio/ark/pkg/client"
 	"github.com/heptio/ark/pkg/cmd/util/flag"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // DeleteOptions contains parameters used for deleting a restore.

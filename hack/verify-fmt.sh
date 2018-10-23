@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 #
 # Copyright 2017 the Heptio Ark contributors.
 #
@@ -14,19 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-HACK_DIR=$(dirname "${BASH_SOURCE}")
-
-echo "Verifying gofmt"
-files=$(gofmt -l -s $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*"))
-if [[ -n "${files}" ]]; then
-  echo "The following files need gofmt updating - please run 'make update'"
-  echo "${files}"
-  exit 1
-fi
-echo "Success!"
-
-echo "Verifying goimports"
-command -v goimports > /dev/null || go get golang.org/x/tools/cmd/goimports
-goimports -l $(find . -type f -name "*.go" -not -path "./vendor/*" -not -path "./pkg/generated/*" -not -name "zz_generated*")
-echo "Success!"
-
+HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
+"${HACK_DIR}"/update-fmt.sh --verify

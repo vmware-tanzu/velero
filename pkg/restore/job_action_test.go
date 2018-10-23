@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	arktest "github.com/heptio/ark/pkg/util/test"

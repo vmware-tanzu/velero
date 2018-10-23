@@ -22,6 +22,16 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/cache"
+
 	"github.com/heptio/ark/pkg/apis/ark/v1"
 	pkgbackup "github.com/heptio/ark/pkg/backup"
 	"github.com/heptio/ark/pkg/cloudprovider"
@@ -32,15 +42,6 @@ import (
 	"github.com/heptio/ark/pkg/plugin"
 	"github.com/heptio/ark/pkg/restic"
 	"github.com/heptio/ark/pkg/util/kube"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/clock"
-	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/client-go/tools/cache"
 )
 
 const resticTimeout = time.Minute

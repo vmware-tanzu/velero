@@ -20,10 +20,11 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/heptio/ark/pkg/util/test"
 )
 
 func TestNewRegistry(t *testing.T) {

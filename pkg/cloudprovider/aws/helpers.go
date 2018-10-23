@@ -20,11 +20,10 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/pkg/errors"
-
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/pkg/errors"
 )
 
 // GetBucketRegion returns the AWS region that a bucket is in, or an error

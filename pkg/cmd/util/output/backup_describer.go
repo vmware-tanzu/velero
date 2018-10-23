@@ -23,11 +23,12 @@ import (
 	"sort"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
 	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
 	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
 	"github.com/heptio/ark/pkg/volume"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // DescribeBackup describes a backup in human-readable format.

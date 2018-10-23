@@ -28,9 +28,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/heptio/ark/pkg/buildinfo"
 	"github.com/heptio/ark/pkg/cmd"
-	"github.com/spf13/cobra"
 )
 
 const (

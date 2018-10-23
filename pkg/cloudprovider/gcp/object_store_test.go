@@ -21,8 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	arktest "github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
+
+	arktest "github.com/heptio/ark/pkg/util/test"
 )
 
 type mockWriteCloser struct {

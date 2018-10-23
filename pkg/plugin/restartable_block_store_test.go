@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/heptio/ark/pkg/cloudprovider/mocks"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/heptio/ark/pkg/cloudprovider/mocks"
 )
 
 func TestRestartableGetBlockStore(t *testing.T) {

@@ -18,8 +18,9 @@ package plugin
 import (
 	"testing"
 
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/heptio/ark/pkg/util/test"
 )
 
 func TestClientLogger(t *testing.T) {
