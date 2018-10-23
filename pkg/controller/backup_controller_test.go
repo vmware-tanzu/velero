@@ -398,21 +398,21 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	}{
 		{
 			name:            "location name does not correspond to any existing location",
-			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations([]string{"random-name"}),
+			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations("random-name"),
 			locations:       arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
 			expectedErrors:  "error getting volume snapshot location named random-name: volumesnapshotlocation.ark.heptio.com \"random-name\" not found",
 			expectedSuccess: false,
 		},
 		{
 			name:                                "duplicate locationName per provider: should filter out dups",
-			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames),
+			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames...),
 			locations:                           arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
 			expectedVolumeSnapshotLocationNames: []string{dupLocationNames[0]},
 			expectedSuccess:                     true,
 		},
 		{
 			name:            "multiple location names per provider",
-			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(multipleLocationNames),
+			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(multipleLocationNames...),
 			locations:       arktest.NewTestVolumeSnapshotLocation().WithName(multipleLocationNames[0]).WithProviderConfig(multipleLocationList),
 			expectedErrors:  "more than one VolumeSnapshotLocation name specified for provider aws: aws-us-east-1; unexpected name was aws-us-west-1",
 			expectedSuccess: false,
@@ -431,7 +431,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 		},
 		{
 			name:                                "multiple location names for a provider, default location name for another provider",
-			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames),
+			backup:                              arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations(dupLocationNames...),
 			locations:                           arktest.NewTestVolumeSnapshotLocation().WithName(dupLocationNames[0]).WithProviderConfig(dupLocationList),
 			defaultLocations:                    defaultLocationsFake,
 			expectedVolumeSnapshotLocationNames: []string{dupLocationNames[0], defaultLocationsFake["fake-provider"].Name},

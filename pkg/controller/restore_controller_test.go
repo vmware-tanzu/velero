@@ -626,6 +626,114 @@ func TestProcessRestore(t *testing.T) {
 	}
 }
 
+func TestValidateAndComplete(t *testing.T) {
+	tests := []struct {
+		name              string
+		storageLocation   *api.BackupStorageLocation
+		snapshotLocations []*api.VolumeSnapshotLocation
+		backup            *api.Backup
+		volumeSnapshots   []*volume.Snapshot
+		restore           *api.Restore
+		expectedErrs      []string
+	}{
+		{
+			name:            "backup with .status.volumeBackups and no volumesnapshots.json file does not error",
+			storageLocation: arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			backup:          arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("loc-1").WithSnapshot("pv-1", "snap-1").Backup,
+			volumeSnapshots: nil,
+			restore:         arktest.NewDefaultTestRestore().WithBackup("backup-1").Restore,
+			expectedErrs:    nil,
+		},
+		{
+			name:            "backup with no .status.volumeBackups and volumesnapshots.json file does not error",
+			storageLocation: arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			backup:          arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("loc-1").Backup,
+			volumeSnapshots: []*volume.Snapshot{{}},
+			restore:         arktest.NewDefaultTestRestore().WithBackup("backup-1").Restore,
+			expectedErrs:    nil,
+		},
+		{
+			name:            "backup with both .status.volumeBackups and volumesnapshots.json file errors",
+			storageLocation: arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			backup:          arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("loc-1").WithSnapshot("pv-1", "snap-1").Backup,
+			volumeSnapshots: []*volume.Snapshot{{}},
+			restore:         arktest.NewDefaultTestRestore().WithBackup("backup-1").Restore,
+			expectedErrs:    []string{"Backup must not have both .status.volumeBackups and a volumesnapshots.json.gz file in object storage"},
+		},
+		{
+			name:            "backup with .status.volumeBackups, and >1 volume snapshot locations exist, errors",
+			storageLocation: arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			snapshotLocations: []*api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "vsl-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "vsl-2",
+					},
+				},
+			},
+			backup:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("loc-1").WithSnapshot("pv-1", "snap-1").Backup,
+			restore:      arktest.NewDefaultTestRestore().WithBackup("backup-1").Restore,
+			expectedErrs: []string{"Cannot restore backup with .status.volumeBackups when more than one volume snapshot location exists"},
+		},
+		{
+			name:            "backup with .status.volumeBackups, and 1 volume snapshot location exists, does not error",
+			storageLocation: arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			snapshotLocations: []*api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      "vsl-1",
+					},
+				},
+			},
+			backup:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("loc-1").WithSnapshot("pv-1", "snap-1").Backup,
+			restore:      arktest.NewDefaultTestRestore().WithBackup("backup-1").Restore,
+			expectedErrs: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				clientset       = fake.NewSimpleClientset()
+				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
+				logger          = arktest.NewLogger()
+				backupStore     = &persistencemocks.BackupStore{}
+				controller      = &restoreController{
+					genericController: &genericController{
+						logger: logger,
+					},
+					namespace:              api.DefaultNamespace,
+					backupLister:           sharedInformers.Ark().V1().Backups().Lister(),
+					backupLocationLister:   sharedInformers.Ark().V1().BackupStorageLocations().Lister(),
+					snapshotLocationLister: sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister(),
+					newBackupStore: func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+						return backupStore, nil
+					},
+				}
+			)
+
+			require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(tc.storageLocation))
+			require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(tc.backup))
+			for _, loc := range tc.snapshotLocations {
+				require.NoError(t, sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(loc))
+			}
+			backupStore.On("GetBackupVolumeSnapshots", tc.backup.Name).Return(tc.volumeSnapshots, nil)
+
+			controller.validateAndComplete(tc.restore, nil)
+
+			assert.Equal(t, tc.expectedErrs, tc.restore.Status.ValidationErrors)
+		})
+	}
+
+}
+
 func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	var (
 		client          = fake.NewSimpleClientset()
