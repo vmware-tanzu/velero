@@ -163,16 +163,27 @@ func (c *backupSyncController) run() {
 
 			// use the controller's namespace when getting the backup because that's where we
 			// are syncing backups to, regardless of the namespace of the cloud backup.
-			_, err := c.backupClient.Backups(c.namespace).Get(backupName, metav1.GetOptions{})
+			backup, err := c.backupClient.Backups(c.namespace).Get(backupName, metav1.GetOptions{})
 			if err == nil {
 				log.Debug("Backup already exists in cluster")
+
+				if backup.Spec.StorageLocation != "" {
+					continue
+				}
+
+				// pre-v0.10 backups won't initially have a .spec.storageLocation so fill it in
+				log.Debug("Patching backup's .spec.storageLocation because it's missing")
+				if err := patchStorageLocation(backup, c.backupClient.Backups(c.namespace), location.Name); err != nil {
+					log.WithError(err).Error("Error patching backup's .spec.storageLocation")
+				}
+
 				continue
 			}
 			if !kuberrs.IsNotFound(err) {
 				log.WithError(errors.WithStack(err)).Error("Error getting backup from client, proceeding with sync into cluster")
 			}
 
-			backup, err := backupStore.GetBackupMetadata(backupName)
+			backup, err = backupStore.GetBackupMetadata(backupName)
 			if err != nil {
 				log.WithError(errors.WithStack(err)).Error("Error getting backup metadata from backup store")
 				continue
@@ -231,6 +242,25 @@ func (c *backupSyncController) run() {
 			continue
 		}
 	}
+}
+
+func patchStorageLocation(backup *arkv1api.Backup, client arkv1client.BackupInterface, location string) error {
+	patch := map[string]interface{}{
+		"spec": map[string]interface{}{
+			"storageLocation": location,
+		},
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	if _, err := client.Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
+		return errors.WithStack(err)
+	}
+
+	return nil
 }
 
 // deleteOrphanedBackups deletes backup objects from Kubernetes that have the specified location

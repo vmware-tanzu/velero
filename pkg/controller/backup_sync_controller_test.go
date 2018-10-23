@@ -141,8 +141,23 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			existingBackups: []*arkv1api.Backup{
 				// add a label to each existing backup so we can differentiate it from the cloud
 				// backup during verification
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").WithStorageLocation("location-1").Backup,
+				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel("i-exist", "true").WithStorageLocation("location-2").Backup,
+			},
+		},
+		{
+			name:      "existing backups without a StorageLocation get it filled in",
+			namespace: "ns-1",
+			locations: defaultLocationsList("ns-1"),
+			cloudBackups: map[string][]*arkv1api.Backup{
+				"bucket-1": {
+					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+				},
+			},
+			existingBackups: []*arkv1api.Backup{
+				// add a label to each existing backup so we can differentiate it from the cloud
+				// backup during verification
 				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").Backup,
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel("i-exist", "true").Backup,
 			},
 		},
 		{
@@ -219,6 +234,17 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			c.run()
 
 			for bucket, backups := range test.cloudBackups {
+				// figure out which location this bucket is for; we need this for verification
+				// purposes later
+				var location *arkv1api.BackupStorageLocation
+				for _, loc := range test.locations {
+					if loc.Spec.ObjectStorage.Bucket == bucket {
+						location = loc
+						break
+					}
+				}
+				require.NotNil(t, location)
+
 				for _, cloudBackup := range backups {
 					obj, err := client.ArkV1().Backups(test.namespace).Get(cloudBackup.Name, metav1.GetOptions{})
 					require.NoError(t, err)
@@ -235,19 +261,19 @@ func TestBackupSyncControllerRun(t *testing.T) {
 					if existing != nil {
 						// if this cloud backup already exists in the cluster, make sure that what we get from the
 						// client is the existing backup, not the cloud one.
-						assert.Equal(t, existing, obj)
+
+						// verify that the in-cluster backup has its storage location populated, if it's not already.
+						expected := existing.DeepCopy()
+						expected.Spec.StorageLocation = location.Name
+
+						assert.Equal(t, expected, obj)
 					} else {
 						// verify that the GC finalizer is removed
 						assert.Equal(t, stringslice.Except(cloudBackup.Finalizers, gcFinalizer), obj.Finalizers)
 
 						// verify that the storage location field and label are set properly
-						for _, location := range test.locations {
-							if location.Spec.ObjectStorage.Bucket == bucket {
-								assert.Equal(t, location.Name, obj.Spec.StorageLocation)
-								assert.Equal(t, location.Name, obj.Labels[arkv1api.StorageLocationLabel])
-								break
-							}
-						}
+						assert.Equal(t, location.Name, obj.Spec.StorageLocation)
+						assert.Equal(t, location.Name, obj.Labels[arkv1api.StorageLocationLabel])
 					}
 				}
 			}
