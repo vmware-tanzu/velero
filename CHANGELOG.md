@@ -1,5 +1,10 @@
 # Changelog
 
+#### [v0.9.9](https://github.com/heptio/ark/releases/tag/v0.9.9) - 2018-10-24
+
+#### Bug Fixes
+  * Check if initContainers key exists before attempting to remove volume mounts. (#927, @skriss)
+
 #### [v0.9.8](https://github.com/heptio/ark/releases/tag/v0.9.8) - 2018-10-18
 
 #### Bug Fixes
