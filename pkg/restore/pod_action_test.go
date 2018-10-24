@@ -41,50 +41,46 @@ func TestPodActionExecute(t *testing.T) {
 			name: "nodeName (only) should be deleted from spec",
 			obj: NewTestUnstructured().WithName("pod-1").WithSpec("nodeName", "foo").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
-				WithSpecField("initContainers", []interface{}{}).
 				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").WithSpec("foo").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
-				WithSpecField("initContainers", []interface{}{}).
 				Unstructured,
 		},
 		{
-			name: "volumes matching prefix ServiceAccount-token- should be deleted",
+			name: "volumes matching prefix <service account name>-token- should be deleted",
 			obj: NewTestUnstructured().WithName("pod-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
 					map[string]interface{}{"name": "foo-token-foo"},
-				}).WithSpecField("containers", []interface{}{}).Unstructured,
+				}).
+				WithSpecField("containers", []interface{}{}).
+				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("initContainers", []interface{}{}).
 				WithSpecField("volumes", []interface{}{
 					map[string]interface{}{"name": "foo"},
-				}).WithSpecField("containers", []interface{}{}).Unstructured,
+				}).
+				WithSpecField("containers", []interface{}{}).
+				Unstructured,
 		},
 		{
-			name: "container volumeMounts matching prefix ServiceAccount-token- should be deleted",
+			name: "container volumeMounts matching prefix <service account name>-token- should be deleted",
 			obj: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
-				WithSpecField("initContainers", []interface{}{}).
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+					map[string]interface{}{"name": "foo-token-foo"},
+				}).
 				WithSpecField("containers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
-							map[string]interface{}{
-								"name": "foo",
-							},
-							map[string]interface{}{
-								"name": "foo-token-foo",
-							},
+							map[string]interface{}{"name": "foo"},
+							map[string]interface{}{"name": "foo-token-foo"},
 						},
 					},
 				}).
@@ -92,34 +88,32 @@ func TestPodActionExecute(t *testing.T) {
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
-				WithSpecField("initContainers", []interface{}{}).
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+				}).
 				WithSpecField("containers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
-							map[string]interface{}{
-								"name": "foo",
-							},
+							map[string]interface{}{"name": "foo"},
 						},
 					},
 				}).
 				Unstructured,
 		},
 		{
-			name: "initContainer volumeMounts matching prefix ServiceAccount-token- should be deleted",
+			name: "initContainer volumeMounts matching prefix <service account name>-token- should be deleted",
 			obj: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+					map[string]interface{}{"name": "foo-token-foo"},
+				}).
 				WithSpecField("initContainers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
-							map[string]interface{}{
-								"name": "foo",
-							},
-							map[string]interface{}{
-								"name": "foo-token-foo",
-							},
+							map[string]interface{}{"name": "foo"},
+							map[string]interface{}{"name": "foo-token-foo"},
 						},
 					},
 				}).
@@ -127,17 +121,38 @@ func TestPodActionExecute(t *testing.T) {
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("svc-1").
 				WithSpec("serviceAccountName", "foo").
-				WithSpecField("volumes", []interface{}{}).
 				WithSpecField("containers", []interface{}{}).
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+				}).
 				WithSpecField("initContainers", []interface{}{
 					map[string]interface{}{
 						"volumeMounts": []interface{}{
-							map[string]interface{}{
-								"name": "foo",
-							},
+							map[string]interface{}{"name": "foo"},
 						},
 					},
 				}).
+				Unstructured,
+		},
+		{
+			name: "containers and initContainers with no volume mounts should not error",
+			obj: NewTestUnstructured().WithName("pod-1").
+				WithSpec("serviceAccountName", "foo").
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+					map[string]interface{}{"name": "foo-token-foo"},
+				}).
+				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
+				Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pod-1").
+				WithSpec("serviceAccountName", "foo").
+				WithSpecField("volumes", []interface{}{
+					map[string]interface{}{"name": "foo"},
+				}).
+				WithSpecField("containers", []interface{}{}).
+				WithSpecField("initContainers", []interface{}{}).
 				Unstructured,
 		},
 	}
@@ -146,11 +161,17 @@ func TestPodActionExecute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			action := NewPodAction(arktest.NewLogger())
 
-			res, _, err := action.Execute(test.obj, nil)
+			res, warning, err := action.Execute(test.obj, nil)
 
-			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
+			assert.Nil(t, warning)
+
+			if test.expectedErr {
+				assert.NotNil(t, err, "expected an error")
+			} else {
+				assert.Nil(t, err, "expected no error, got %v", err)
 			}
+
+			assert.Equal(t, test.expectedRes, res)
 		})
 	}
 }
