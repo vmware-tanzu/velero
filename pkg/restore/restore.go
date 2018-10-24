@@ -259,6 +259,7 @@ func (kr *kubernetesRestorer) Restore(
 		resticRestorer:       resticRestorer,
 		pvsToProvision:       sets.NewString(),
 		pvRestorer:           pvRestorer,
+		volumeSnapshots:      volumeSnapshots,
 	}
 
 	return restoreCtx.execute()
@@ -343,6 +344,7 @@ type context struct {
 	resourceWatches      []watch.Interface
 	pvsToProvision       sets.String
 	pvRestorer           PVRestorer
+	volumeSnapshots      []*volume.Snapshot
 }
 
 func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
@@ -671,13 +673,24 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if groupResource == kuberesource.PersistentVolumes {
-			_, found := ctx.backup.Status.VolumeBackups[name]
-			reclaimPolicy, err := collections.GetString(obj.Object, "spec.persistentVolumeReclaimPolicy")
-			if err == nil && !found && reclaimPolicy == "Delete" {
+			var hasSnapshot bool
+
+			if len(ctx.backup.Status.VolumeBackups) > 0 {
+				// pre-v0.10 backup
+				_, hasSnapshot = ctx.backup.Status.VolumeBackups[name]
+			} else {
+				// v0.10+ backup
+				for _, snapshot := range ctx.volumeSnapshots {
+					if snapshot.Spec.PersistentVolumeName == name {
+						hasSnapshot = true
+						break
+					}
+				}
+			}
+
+			if !hasSnapshot && hasDeleteReclaimPolicy(obj.Object) {
 				ctx.log.Infof("Not restoring PV because it doesn't have a snapshot and its reclaim policy is Delete.")
-
 				ctx.pvsToProvision.Insert(name)
-
 				continue
 			}
 
@@ -857,6 +870,15 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 	}
 
 	return warnings, errs
+}
+
+func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
+	reclaimPolicy, err := collections.GetString(obj, "spec.persistentVolumeReclaimPolicy")
+	if err != nil {
+		return false
+	}
+
+	return reclaimPolicy == "Delete"
 }
 
 func waitForReady(
