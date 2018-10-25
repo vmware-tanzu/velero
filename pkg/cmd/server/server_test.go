@@ -80,37 +80,51 @@ func TestDefaultVolumeSnapshotLocations(t *testing.T) {
 
 	defaultVolumeSnapshotLocations := make(map[string]string)
 
-	// No defaults
-	volumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
-	assert.Equal(t, 0, len(volumeSnapshotLocations))
+	// No default: a default VSL does not need to be specified if there’s only one vsl for a given provider
+	volumeSnapshotLocations, err := getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	assert.Equal(t, 1, len(volumeSnapshotLocations))
 	assert.NoError(t, err)
 
-	// Bad location
-	defaultVolumeSnapshotLocations["provider1"] = "badlocation"
-	volumeSnapshotLocations, err = getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	// 1 default
+	defaultVolumeSnapshotLocations["provider1"] = "location1"
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	assert.Equal(t, 1, len(volumeSnapshotLocations))
+	assert.NoError(t, err)
+
+	// No default fails when there’s more than one vsl for a that provider
+	defaultVolumeSnapshotLocations = make(map[string]string)
+	location3 := &v1.VolumeSnapshotLocation{ObjectMeta: metav1.ObjectMeta{Name: "location3"}, Spec: v1.VolumeSnapshotLocationSpec{Provider: "provider1"}}
+	arkClient.ArkV1().VolumeSnapshotLocations(namespace).Create(location3)
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
 	assert.Equal(t, 0, len(volumeSnapshotLocations))
 	assert.Error(t, err)
 
-	// Bad provider
+	// Non-existing provider given in a < 2 vsl scenario
+	defaultVolumeSnapshotLocations["provider1"] = "badlocation"
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	assert.Equal(t, 1, len(volumeSnapshotLocations))
+	assert.NoError(t, err)
+
+	// Non-existing provider given in a < 2 vsls scenario
 	defaultVolumeSnapshotLocations["provider2"] = "badlocation"
-	volumeSnapshotLocations, err = getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
-	assert.Equal(t, 0, len(volumeSnapshotLocations))
-	assert.Error(t, err)
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	assert.Equal(t, 1, len(volumeSnapshotLocations))
+	assert.NoError(t, err)
 
 	// Good provider, good location
 	delete(defaultVolumeSnapshotLocations, "provider2")
 	defaultVolumeSnapshotLocations["provider1"] = "location1"
-	volumeSnapshotLocations, err = getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
 	assert.Equal(t, 1, len(volumeSnapshotLocations))
 	assert.NoError(t, err)
 
 	location2 := &v1.VolumeSnapshotLocation{ObjectMeta: metav1.ObjectMeta{Name: "location2"}, Spec: v1.VolumeSnapshotLocationSpec{Provider: "provider2"}}
 	arkClient.ArkV1().VolumeSnapshotLocations(namespace).Create(location2)
 
-	// Mutliple Provider/Location 1 good, 1 bad
+	// Mutliple Provider/Location 1 good, 1 bad, < 2 vsls
 	defaultVolumeSnapshotLocations["provider2"] = "badlocation"
-	volumeSnapshotLocations, err = getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
-	assert.Error(t, err)
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	assert.NoError(t, err)
 
 	location21 := &v1.VolumeSnapshotLocation{ObjectMeta: metav1.ObjectMeta{Name: "location2-1"}, Spec: v1.VolumeSnapshotLocationSpec{Provider: "provider2"}}
 	arkClient.ArkV1().VolumeSnapshotLocations(namespace).Create(location21)
@@ -120,9 +134,9 @@ func TestDefaultVolumeSnapshotLocations(t *testing.T) {
 
 	// Mutliple Provider/Location all good
 	defaultVolumeSnapshotLocations["provider2"] = "location2"
-	volumeSnapshotLocations, err = getDefaultVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
+	volumeSnapshotLocations, err = getVolumeSnapshotLocations(arkClient, namespace, defaultVolumeSnapshotLocations)
 	assert.Equal(t, 2, len(volumeSnapshotLocations))
 	assert.NoError(t, err)
-	assert.Equal(t, volumeSnapshotLocations["provider1"].ObjectMeta.Name, "location1")
-	assert.Equal(t, volumeSnapshotLocations["provider2"].ObjectMeta.Name, "location2")
+	assert.Equal(t, "location1", volumeSnapshotLocations["provider1"].ObjectMeta.Name)
+	assert.Equal(t, "location2", volumeSnapshotLocations["provider2"].ObjectMeta.Name)
 }

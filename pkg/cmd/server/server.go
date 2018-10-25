@@ -273,7 +273,7 @@ func (s *server) run() error {
 			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
 	}
 
-	defaultVolumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
+	defaultVolumeSnapshotLocations, err := getVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
 	if err != nil {
 		return err
 	}
@@ -289,15 +289,10 @@ func (s *server) run() error {
 	return nil
 }
 
-func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace string, defaultVolumeSnapshotLocations map[string]string) (map[string]*api.VolumeSnapshotLocation, error) {
-	providerDefaults := make(map[string]*api.VolumeSnapshotLocation)
-	if len(defaultVolumeSnapshotLocations) == 0 {
-		return providerDefaults, nil
-	}
-
+func getVolumeSnapshotLocations(arkClient clientset.Interface, namespace string, defaultVolumeSnapshotLocations map[string]string) (map[string]*api.VolumeSnapshotLocation, error) {
 	volumeSnapshotLocations, err := arkClient.ArkV1().VolumeSnapshotLocations(namespace).List(metav1.ListOptions{})
 	if err != nil {
-		return providerDefaults, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
 	providerLocations := make(map[string][]*api.VolumeSnapshotLocation)
@@ -306,25 +301,34 @@ func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace 
 		providerLocations[vsl.Spec.Provider] = append(locations, &volumeSnapshotLocations.Items[i])
 	}
 
+	verifiedVolumeSnapshotLocations := make(map[string]*api.VolumeSnapshotLocation)
 	for provider, locations := range providerLocations {
 		defaultLocation, ok := defaultVolumeSnapshotLocations[provider]
-		if !ok {
-			return providerDefaults, errors.Errorf("missing provider %s. When using default volume snapshot locations, one must exist for every known provider.", provider)
-		}
+		if !ok { // no default provided
+			for _, location := range locations {
+				// require a default VSL to be specified only if there’s more than one vsl for a given provider
+				if verifiedVolumeSnapshotLocations[provider] != nil {
+					return nil, errors.Errorf("a default volume snapshot location is required for %s since more than 1 location exists for provider %s", verifiedVolumeSnapshotLocations[provider].Name, provider)
+				}
 
-		for _, location := range locations {
-			if location.ObjectMeta.Name == defaultLocation {
-				providerDefaults[provider] = location
-				break
+				verifiedVolumeSnapshotLocations[provider] = location
 			}
-		}
+		} else {
+			for _, location := range locations {
 
-		if _, ok := providerDefaults[provider]; !ok {
-			return providerDefaults, errors.Errorf("%s is not a valid volume snapshot location for %s", defaultLocation, provider)
+				verifiedVolumeSnapshotLocations[provider] = location
+				if location.ObjectMeta.Name == defaultLocation {
+					break
+				}
+			}
+
+			if _, ok := verifiedVolumeSnapshotLocations[provider]; !ok {
+				return nil, errors.Errorf("%s is not a valid volume snapshot location for %s", defaultLocation, provider)
+			}
 		}
 	}
 
-	return providerDefaults, nil
+	return verifiedVolumeSnapshotLocations, nil
 }
 
 // namespaceExists returns nil if namespace can be successfully
