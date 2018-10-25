@@ -233,3 +233,6 @@ clean:
 	docker rmi $(BUILDER_IMAGE)
 
 ci: all verify test
+
+goreleaser:
+	hack/goreleaser.sh
