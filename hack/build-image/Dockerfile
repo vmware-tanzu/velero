@@ -17,6 +17,7 @@ FROM golang:1.10-alpine3.8
 RUN apk add --update --no-cache git bash && \
     mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
+    git config --global advice.detachedHead false && \
     git clone -b kubernetes-1.11.0 https://github.com/kubernetes/code-generator && \
     git clone -b kubernetes-1.11.0 https://github.com/kubernetes/apimachinery && \
     go get golang.org/x/tools/cmd/goimports && \
