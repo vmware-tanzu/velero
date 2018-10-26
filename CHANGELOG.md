@@ -1,5 +1,8 @@
 # Changelog
 
+#### [v0.10.0-beta.1](https://github.com/heptio/ark/releases/tag/v0.10.0-beta.1) - 2018-10-26
+  * [CHANGELOG-0.10.md][1]
+
 #### [v0.9.9](https://github.com/heptio/ark/releases/tag/v0.9.9) - 2018-10-24
 
 #### Bug Fixes
@@ -305,3 +308,5 @@ Bug fixes:
 
 #### [v0.3.0](https://github.com/heptio/ark/tree/v0.3.0) - 2017-08-03
   * Initial Release
+
+[1]: https://github.com/heptio/ark/blob/master/changelogs/CHANGELOG-0.10.md
