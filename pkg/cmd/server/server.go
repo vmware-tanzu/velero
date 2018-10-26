@@ -273,58 +273,15 @@ func (s *server) run() error {
 			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
 	}
 
-	defaultVolumeSnapshotLocations, err := getDefaultVolumeSnapshotLocations(s.arkClient, s.namespace, s.config.defaultVolumeSnapshotLocations)
-	if err != nil {
-		return err
-	}
-
 	if err := s.initRestic(); err != nil {
 		return err
 	}
 
-	if err := s.runControllers(defaultVolumeSnapshotLocations); err != nil {
+	if err := s.runControllers(s.config.defaultVolumeSnapshotLocations); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func getDefaultVolumeSnapshotLocations(arkClient clientset.Interface, namespace string, defaultVolumeSnapshotLocations map[string]string) (map[string]*api.VolumeSnapshotLocation, error) {
-	providerDefaults := make(map[string]*api.VolumeSnapshotLocation)
-	if len(defaultVolumeSnapshotLocations) == 0 {
-		return providerDefaults, nil
-	}
-
-	volumeSnapshotLocations, err := arkClient.ArkV1().VolumeSnapshotLocations(namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return providerDefaults, errors.WithStack(err)
-	}
-
-	providerLocations := make(map[string][]*api.VolumeSnapshotLocation)
-	for i, vsl := range volumeSnapshotLocations.Items {
-		locations := providerLocations[vsl.Spec.Provider]
-		providerLocations[vsl.Spec.Provider] = append(locations, &volumeSnapshotLocations.Items[i])
-	}
-
-	for provider, locations := range providerLocations {
-		defaultLocation, ok := defaultVolumeSnapshotLocations[provider]
-		if !ok {
-			return providerDefaults, errors.Errorf("missing provider %s. When using default volume snapshot locations, one must exist for every known provider.", provider)
-		}
-
-		for _, location := range locations {
-			if location.ObjectMeta.Name == defaultLocation {
-				providerDefaults[provider] = location
-				break
-			}
-		}
-
-		if _, ok := providerDefaults[provider]; !ok {
-			return providerDefaults, errors.Errorf("%s is not a valid volume snapshot location for %s", defaultLocation, provider)
-		}
-	}
-
-	return providerDefaults, nil
 }
 
 // namespaceExists returns nil if namespace can be successfully
@@ -510,7 +467,7 @@ func (s *server) initRestic() error {
 	return nil
 }
 
-func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]*api.VolumeSnapshotLocation) error {
+func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
