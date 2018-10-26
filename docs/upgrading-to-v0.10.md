@@ -77,6 +77,6 @@ kubectl delete crd configs.ark.heptio.com
 ```
 
 
-[1]: /docs/api-types/backupstoragelocation.md
-[2]: /docs/api-types/volumesnapshotlocation.md
-[3]: /docs/storage-layout-reorg-v0.10.md
+[1]: /api-types/backupstoragelocation.md
+[2]: /api-types/volumesnapshotlocation.md
+[3]: storage-layout-reorg-v0.10.md
