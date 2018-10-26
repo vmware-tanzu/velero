@@ -30,6 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -65,7 +66,7 @@ type backupController struct {
 	backupLocationLister     listers.BackupStorageLocationLister
 	defaultBackupLocation    string
 	snapshotLocationLister   listers.VolumeSnapshotLocationLister
-	defaultSnapshotLocations map[string]*api.VolumeSnapshotLocation
+	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
 	newBackupStore           func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
@@ -81,7 +82,7 @@ func NewBackupController(
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
 	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
-	defaultSnapshotLocations map[string]*api.VolumeSnapshotLocation,
+	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupController{
@@ -298,7 +299,8 @@ func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.R
 // - each location name in .spec.volumeSnapshotLocations exists as a location
 // - exactly 1 location per provider
 // - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
-//   is not explicitly specified for the provider
+//   is not explicitly specified for the provider (if there's only one location for the provider,
+//   it will automatically be used)
 func (c *backupController) validateAndGetSnapshotLocations(backup *api.Backup) (map[string]*api.VolumeSnapshotLocation, []string) {
 	errors := []string{}
 	providerLocations := make(map[string]*api.VolumeSnapshotLocation)
@@ -328,11 +330,51 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *api.Backup) (
 		return nil, errors
 	}
 
-	for provider, defaultLocation := range c.defaultSnapshotLocations {
-		// if a location name for a given provider does not already exist, add the provider's default
-		if _, ok := providerLocations[provider]; !ok {
-			providerLocations[provider] = defaultLocation
+	allLocations, err := c.snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).List(labels.Everything())
+	if err != nil {
+		errors = append(errors, fmt.Sprintf("error listing volume snapshot locations: %v", err))
+		return nil, errors
+	}
+
+	// build a map of provider->list of all locations for the provider
+	allProviderLocations := make(map[string][]*api.VolumeSnapshotLocation)
+	for i := range allLocations {
+		loc := allLocations[i]
+		allProviderLocations[loc.Spec.Provider] = append(allProviderLocations[loc.Spec.Provider], loc)
+	}
+
+	// go through each provider and make sure we have/can get a VSL
+	// for it
+	for provider, locations := range allProviderLocations {
+		if _, ok := providerLocations[provider]; ok {
+			// backup's spec had a location named for this provider
+			continue
 		}
+
+		if len(locations) > 1 {
+			// more than one possible location for the provider: check
+			// the defaults
+			defaultLocation := c.defaultSnapshotLocations[provider]
+			if defaultLocation == "" {
+				errors = append(errors, fmt.Sprintf("provider %s has more than one possible volume snapshot location, and none were specified explicitly or as a default", provider))
+				continue
+			}
+			location, err := c.snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(defaultLocation)
+			if err != nil {
+				errors = append(errors, fmt.Sprintf("error getting volume snapshot location named %s: %v", defaultLocation, err))
+				continue
+			}
+
+			providerLocations[provider] = location
+			continue
+		}
+
+		// exactly one location for the provider: use it
+		providerLocations[provider] = locations[0]
+	}
+
+	if len(errors) > 0 {
+		return nil, errors
 	}
 
 	return providerLocations, nil
