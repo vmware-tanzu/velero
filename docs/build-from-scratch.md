@@ -93,11 +93,12 @@ When running Heptio Ark, you will need to account for the following (all of whic
 * Cloud provider credentials
   * Read/write access to volumes
   * Read/write access to object storage for backup data
-* A [Config object][8] definition for the Ark server
+* A [BackupStorageLocation][20] object definition for the Ark server
+* (Optional) A [VolumeSnapshotLocation][21] object definition for the Ark server, to take PV snapshots
 
 ### Create a cluster
 
-To provision a cluster on `aws` using Amazon’s official CloudFormation templates, here are two options:
+To provision a cluster on AWS using Amazon’s official CloudFormation templates, here are two options:
 
 * EC2 [Quick Start for Kubernetes][17]
 
@@ -138,7 +139,11 @@ You may create resources on a cluster using our [example configurations][19].
 
 ##### Example
 
-Here is how to setup using an existing cluster in AWS: At the root of the Ark repo, edit `examples/aws/00-ark-config.yaml` to point to your AWS S3 bucket and region. Note: you can run `aws s3api list-buckets` to get the name of all your buckets.
+Here is how to setup using an existing cluster in AWS: At the root of the Ark repo:
+
+- Edit `examples/aws/05-ark-backupstoragelocation.yaml` to point to your AWS S3 bucket and region. Note: you can run `aws s3api list-buckets` to get the name of all your buckets.
+
+- (Optional) Edit `examples/aws/06-ark-volumesnapshotlocation.yaml` to point to your AWS region.
 
 Then run the commands below.
 
@@ -148,12 +153,23 @@ Then run the commands below.
 kubectl apply -f examples/common/00-prereqs.yaml
 ```
 
-`00-ark-config.yaml` is a sample Ark config resource for AWS:
+`10-deployment.yaml` is a sample Ark config resource for AWS:
 
 ```bash
-kubectl apply -f examples/aws/00-ark-config.yaml
+kubectl apply -f examples/aws/10-deployment.yaml
 ```
 
+And `05-ark-backupstoragelocation.yaml` specifies the location of your backup storage, together with the optional `06-ark-volumesnapshotlocation.yaml`:
+
+```bash
+kubectl apply -f examples/aws/05-ark-backupstoragelocation.yaml
+```
+
+or
+
+```bash
+kubectl apply -f examples/aws/05-ark-backupstoragelocation.yaml examples/aws/06-ark-volumesnapshotlocation.yaml
+```
 
 ### 3. Start the Ark server
 
@@ -205,3 +221,5 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [17]: https://aws.amazon.com/quickstart/architecture/heptio-kubernetes/
 [18]: https://eksctl.io/
 [19]: ../examples/README.md
+[20]: /api-types/backupstoragelocation.md
+[21]: /api-types/volumesnapshotlocation.md

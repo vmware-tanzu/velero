@@ -41,6 +41,8 @@ spec:
             - /ark
           args:
             - server
+            ## uncomment following line and specify values if needed for multiple provider snapshot locations
+            # - --default-volume-snapshot-locations=<provider-1:location-1,provider-2:location-2,...>
           envFrom:
             - secretRef:
                 name: cloud-credentials

@@ -147,6 +147,9 @@ Specify the following values in the example files:
 
   * Replace `<YOUR_REGION>`. See the [VolumeSnapshotLocation definition][6] for details.
 
+* (Optional, use only to specify multiple volume snapshot locations) In `examples/aws/10-deployment.yaml` (or `examples/aws/10-deployment-kube2iam.yaml`, as appropriate):
+
+  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 

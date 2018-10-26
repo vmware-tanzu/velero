@@ -1,6 +1,6 @@
 # Run Ark on GCP
 
-You can run Kubernetes on Google Cloud Platform in either of: 
+You can run Kubernetes on Google Cloud Platform in either: 
 
 * Kubernetes on Google Compute Engine virtual machines
 * Google Kubernetes Engine 
@@ -9,7 +9,7 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 
 ## Create GCS bucket
 
-Heptio Ark requires an object storage bucket in which to store backups, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing the <YOUR_BUCKET> placeholder with the name of your bucket:
+Heptio Ark requires an object storage bucket in which to store backups, preferably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing the <YOUR_BUCKET> placeholder with the name of your bucket:
 
 ```bash
 BUCKET=<YOUR_BUCKET>
@@ -107,7 +107,7 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-_Note: If you use a custom namespace, replace `heptio-ark` with the name of the custom namespace_
+**Note: If you use a custom namespace, replace `heptio-ark` with the name of the custom namespace**
 
 Specify the following values in the example files:
 
@@ -118,6 +118,10 @@ Specify the following values in the example files:
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
+
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `examples/gcp/10-deployment.yaml`:
+
+  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
 ## Start the server
 

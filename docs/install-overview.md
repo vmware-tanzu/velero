@@ -6,6 +6,12 @@ In version 0.7.0 and later, you can run Ark in any namespace, which requires add
 
 In version 0.9.0 and later, you can use Ark's integration with restic, which requires additional setup. See [restic instructions][20].
 
+## Customize configuration
+
+Whether you run Ark on a cloud provider or on-premises, if you have more than one volume snapshot location for a given volume provider, you can specify its default location for backups by setting a server flag in your Ark deployment YAML.
+
+For details, see the documentation topics for individual cloud providers.
+
 ## Cloud provider
 
 The Ark repository includes a set of example YAML files that specify the settings for each supported cloud provider. For provider-specific instructions, see:
