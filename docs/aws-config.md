@@ -191,7 +191,7 @@ In the root of your Ark directory, run:
 
 [Kube2iam](https://github.com/jtblin/kube2iam) is a Kubernetes application that allows managing AWS IAM permissions for pod via annotations rather than operating on API keys.
 
-> This path assumes you have `kube2iam` already running in your Kubernetes cluster. If that is not the case, please install it first, following the docs here: https://github.com/jtblin/kube2iam
+> This path assumes you have `kube2iam` already running in your Kubernetes cluster. If that is not the case, please install it first, following the docs here: [https://github.com/jtblin/kube2iam](https://github.com/jtblin/kube2iam)
 
 It can be set up for Ark by creating a role that will have required permissions, and later by adding the permissions annotation on the ark deployment to define which role it should use internally.
 
@@ -278,7 +278,7 @@ It can be set up for Ark by creating a role that will have required permissions,
       --policy-name heptio-ark-policy \
       --policy-document file://./heptio-ark-policy.json
     ```
-4. Update AWS_ACCOUNT_ID & HEPTIO_ARK_ROLE_NAME in the file `examples/aws/10-deployment-kube2iam.yaml`:
+4. Update `AWS_ACCOUNT_ID` & `HEPTIO_ARK_ROLE_NAME` in the file `examples/aws/10-deployment-kube2iam.yaml`:
 
     ```
     ---
@@ -294,7 +294,7 @@ It can be set up for Ark by creating a role that will have required permissions,
                 labels:
                     component: ark
                 annotations:
-                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/heptio-ark
+                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<HEPTIO_ARK_ROLE_NAME>
     ...
     ```
 
