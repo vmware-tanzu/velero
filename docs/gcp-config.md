@@ -1,6 +1,6 @@
 # Run Ark on GCP
 
-You can run Kubernetes on Google Cloud Platform in either of: 
+You can run Kubernetes on Google Cloud Platform in either: 
 
 * Kubernetes on Google Compute Engine virtual machines
 * Google Kubernetes Engine 
@@ -9,7 +9,7 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 
 ## Create GCS bucket
 
-Heptio Ark requires an object storage bucket in which to store backups, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing the <YOUR_BUCKET> placeholder with the name of your bucket:
+Heptio Ark requires an object storage bucket in which to store backups, preferably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create a GCS bucket, replacing the <YOUR_BUCKET> placeholder with the name of your bucket:
 
 ```bash
 BUCKET=<YOUR_BUCKET>
