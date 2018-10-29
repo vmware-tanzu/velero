@@ -3,6 +3,7 @@ baseurl: /ark
 google_analytics: FILL_OUT
 latest: v0.9.0
 versions:
+- v0.10.0-beta.1
 - v0.9.0
 - v0.8.1
 - v0.8.0
@@ -29,6 +30,11 @@ defaults:
   values:
     version: master
     gh: https://github.com/heptio/ark/tree/master
+- scope:
+    path: v0.10.0-beta.1
+  values:
+    version: v0.10.0-beta.1
+    gh: https:/github.com/heptio/ark/tree/v0.10.0-beta.1
 - scope:
     path: v0.9.0
   values:
