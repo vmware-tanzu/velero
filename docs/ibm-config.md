@@ -57,8 +57,6 @@ Specify the following values in the example files:
 
   * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>` and `<YOUR_URL_ACCESS_POINT>`. See the [BackupStorageLocation definition][6] for details.
 
-
-
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.

@@ -133,6 +133,9 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 
   * Replace `<YOUR_TIMEOUT>`. See the [VolumeSnapshotLocation definition][8] for details.
 
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `examples/azure/00-ark-deployment.yaml`:
+
+  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
 ## Start the server
 

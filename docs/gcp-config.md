@@ -107,7 +107,7 @@ kubectl create secret generic cloud-credentials \
     --from-file cloud=credentials-ark
 ```
 
-_Note: If you use a custom namespace, replace `heptio-ark` with the name of the custom namespace_
+**Note: If you use a custom namespace, replace `heptio-ark` with the name of the custom namespace**
 
 Specify the following values in the example files:
 
@@ -118,6 +118,10 @@ Specify the following values in the example files:
 * (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
+
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `examples/gcp/10-deployment.yaml`:
+
+  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
 ## Start the server
 
