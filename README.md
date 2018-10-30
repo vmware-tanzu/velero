@@ -19,6 +19,10 @@ Ark consists of:
 
 You can run Ark in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
 
+## Breaking changes
+
+Ark version 0.10.0 introduces a number of breaking changes. Before you upgrade to version 0.10.0, make sure to read [the documentation on upgrading](upgrading-to-v0.10.md).
+
 ## More information
 
 [The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Ark, and more.
