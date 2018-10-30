@@ -607,6 +607,10 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
 			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
 
+			// Assume the persistentvolume doesn't already exist in the cluster.
+			var empty *unstructured.Unstructured
+			resourceClient.On("Get", newTestPV().PersistentVolume.Name, metav1.GetOptions{}).Return(empty, nil)
+
 			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
 
@@ -818,9 +822,10 @@ status:
 		expectPVCVolumeName           bool
 		expectedPVCAnnotationsMissing sets.String
 		expectPVCreation              bool
+		expectPVFound                 bool
 	}{
 		{
-			name:                "legacy backup, have snapshot, reclaim policy delete",
+			name:                "legacy backup, have snapshot, reclaim policy delete, no existing PV found",
 			haveSnapshot:        true,
 			legacyBackup:        true,
 			reclaimPolicy:       "Delete",
@@ -828,7 +833,7 @@ status:
 			expectPVCreation:    true,
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy delete",
+			name:                "non-legacy backup, have snapshot, reclaim policy delete, no existing PV found",
 			haveSnapshot:        true,
 			legacyBackup:        false,
 			reclaimPolicy:       "Delete",
@@ -836,7 +841,16 @@ status:
 			expectPVCreation:    true,
 		},
 		{
-			name:                "legacy backup, have snapshot, reclaim policy retain",
+			name:                "non-legacy backup, have snapshot, reclaim policy delete, existing PV found",
+			haveSnapshot:        true,
+			legacyBackup:        false,
+			reclaimPolicy:       "Delete",
+			expectPVCVolumeName: true,
+			expectPVCreation:    false,
+			expectPVFound:       true,
+		},
+		{
+			name:                "legacy backup, have snapshot, reclaim policy retain, no existing PV found",
 			haveSnapshot:        true,
 			legacyBackup:        true,
 			reclaimPolicy:       "Retain",
@@ -844,7 +858,16 @@ status:
 			expectPVCreation:    true,
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain",
+			name:                "legacy backup, have snapshot, reclaim policy retain, existing PV found",
+			haveSnapshot:        true,
+			legacyBackup:        true,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    false,
+			expectPVFound:       true,
+		},
+		{
+			name:                "non-legacy backup, have snapshot, reclaim policy retain, no existing PV found",
 			haveSnapshot:        true,
 			legacyBackup:        false,
 			reclaimPolicy:       "Retain",
@@ -852,18 +875,44 @@ status:
 			expectPVCreation:    true,
 		},
 		{
-			name:                          "no snapshot, reclaim policy delete",
+			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
+			haveSnapshot:        true,
+			legacyBackup:        false,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    false,
+			expectPVFound:       true,
+		},
+		{
+			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
+			haveSnapshot:        true,
+			legacyBackup:        false,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    false,
+			expectPVFound:       true,
+		},
+		{
+			name:                          "no snapshot, reclaim policy delete, no existing PV",
 			haveSnapshot:                  false,
 			reclaimPolicy:                 "Delete",
 			expectPVCVolumeName:           false,
 			expectedPVCAnnotationsMissing: sets.NewString("pv.kubernetes.io/bind-completed", "pv.kubernetes.io/bound-by-controller"),
 		},
 		{
-			name:                "no snapshot, reclaim policy retain",
+			name:                "no snapshot, reclaim policy retain, no existing PV found",
 			haveSnapshot:        false,
 			reclaimPolicy:       "Retain",
 			expectPVCVolumeName: true,
 			expectPVCreation:    true,
+		},
+		{
+			name:                "no snapshot, reclaim policy retain, existing PV found",
+			haveSnapshot:        false,
+			reclaimPolicy:       "Retain",
+			expectPVCVolumeName: true,
+			expectPVCreation:    false,
+			expectPVFound:       true,
 		},
 	}
 	for _, test := range tests {
@@ -951,6 +1000,17 @@ status:
 			require.NoError(t, err)
 			unstructuredPV := &unstructured.Unstructured{Object: unstructuredPVMap}
 
+			if test.expectPVFound {
+				pvClient.On("Get", unstructuredPV.GetName(), metav1.GetOptions{}).Return(unstructuredPV, nil)
+				pvClient.On("Create", mock.Anything).Return(unstructuredPV, k8serrors.NewAlreadyExists(kuberesource.PersistentVolumes, unstructuredPV.GetName()))
+			}
+
+			// Only set up the client expectation if the test has the proper prerequisites
+			if test.haveSnapshot || test.reclaimPolicy != "Delete" {
+				var empty *unstructured.Unstructured
+				pvClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(empty, nil)
+			}
+
 			pvToRestore := unstructuredPV.DeepCopy()
 			restoredPV := unstructuredPV.DeepCopy()
 
@@ -985,9 +1045,14 @@ status:
 			warnings, errors := ctx.restoreResource("persistentvolumes", "", "foo/resources/persistentvolumes/cluster/")
 
 			assert.Empty(t, warnings.Ark)
-			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
+
+			if test.expectPVFound {
+				assert.Equal(t, 1, len(warnings.Cluster))
+			} else {
+				assert.Empty(t, warnings.Cluster)
+			}
 
 			// Prep PVC restore
 			// Handle expectations
