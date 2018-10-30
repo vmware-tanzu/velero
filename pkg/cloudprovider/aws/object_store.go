@@ -18,6 +18,7 @@ package aws
 
 import (
 	"io"
+	"sort"
 	"strconv"
 	"time"
 
@@ -186,6 +187,11 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
+
+	// ensure that returned objects are in a consistent order so that the deletion logic deletes the objects before
+	// the pseudo-folder prefix object for s3 providers (such as Quobyte) that return the pseudo-folder as an object.
+	// See https://github.com/heptio/ark/pull/999
+	sort.Sort(sort.Reverse(sort.StringSlice(ret)))
 
 	return ret, nil
 }
