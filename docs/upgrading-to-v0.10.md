@@ -66,11 +66,13 @@ the existing `Config` resource as necessary.
     `--restic-timeout` | 1h | how long backups/restores of pod volumes should be allowed to run before timing out (previously `podVolumeOperationTimeout` in the `Config` resource in pre-v0.10 versions)
     `--restore-only` | false | run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled
 
-7. Apply your updated Ark deployment YAML to your cluster and ensure the pod starts up successfully.
+7.If you are using any plugins, update the Ark deployment YAML to reference the latest image tag for your plugins. This can be found under the `initContainers` section of your deployment YAML.
 
-8. If you're using Ark's restic integration, ensure the daemon set pods have been re-created with the latest Ark image (if your daemon set YAML is using the `:latest` tag, you can delete the pods so they're recreated with an updated image).
+8. Apply your updated Ark deployment YAML to your cluster and ensure the pod(s) starts up successfully.
 
-9. Once you've confirmed all of your settings have been migrated over correctly, delete the Config CRD:
+9. If you're using Ark's restic integration, ensure the daemon set pods have been re-created with the latest Ark image (if your daemon set YAML is using the `:latest` tag, you can delete the pods so they're recreated with an updated image).
+
+10. Once you've confirmed all of your settings have been migrated over correctly, delete the Config CRD:
 ```bash
 kubectl delete -n heptio-ark config --all
 kubectl delete crd configs.ark.heptio.com
