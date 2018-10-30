@@ -18,15 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# $PUBLISH must explicitly be set to 'true' for goreleaser
-# to publish the release to GitHub.
-if [ "${PUBLISH:-}" != "true" ]; then
-    SKIP_PUBLISH="--skip-publish"
-else
-    SKIP_PUBLISH=""
-fi
-
-if [ -z "${GITHUB_TOKEN}" ]; then
+if [[ -z "${GITHUB_TOKEN}" ]]; then
     echo "GITHUB_TOKEN must be set"
     exit 1
 fi
@@ -46,7 +38,15 @@ else
     export GIT_TREE_STATE=dirty
 fi
 
-goreleaser release \
-    --rm-dist \
-    --release-notes="${RELEASE_NOTES_FILE}" \
-    "${SKIP_PUBLISH}"
+# $PUBLISH must explicitly be set to 'true' for goreleaser
+# to publish the release to GitHub.
+if [[ "${PUBLISH:-}" != "true" ]]; then
+    goreleaser release \
+        --rm-dist \
+        --release-notes="${RELEASE_NOTES_FILE}" \
+        --skip-publish
+else
+    goreleaser release \
+        --rm-dist \
+        --release-notes="${RELEASE_NOTES_FILE}"
+fi
