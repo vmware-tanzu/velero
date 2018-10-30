@@ -50,7 +50,7 @@ Alternatively, you might be able to use the Service's `spec.loadBalancerIP` fiel
 ### Ark reports `custom resource not found` errors when starting up.
 
 Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `examples/common/00-prereqs.yaml` file to create these defintions, then restart Ark.
+the `examples/common/00-prereqs.yaml` file to create these definitions, then restart Ark.
 
 ### `ark backup logs` returns a `SignatureDoesNotMatch` error
 
@@ -69,3 +69,4 @@ Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
 [4]: https://github.com/heptio/ark/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
 [25]: https://kubernetes.slack.com/messages/ark-dr
+[26]: get-started.md#minikube-configuration

@@ -4,9 +4,9 @@ The following example sets up the Ark server and client, then backs up and resto
 
 For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
 
-**NOTE** The example lets you explore basic Ark functionality. In the real world, however, you would back your cluster up to external storage.
+**NOTE** The example lets you explore basic Ark functionality. Configuring Minio for production is out of scope.
 
-See [Set up Ark on your platform][3] for how to configure Ark for a production environment. 
+See [Set up Ark on your platform][3] for how to configure Ark for a production environment.
 
 ### Prerequisites
 
@@ -26,7 +26,9 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
 
 ### Set up server
 
-1. Start the server and the local storage service. In the root directory of Ark, run:
+These instructions start the Ark server and a Minio instance that is accessible from within the cluster only. See the following section for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `ark describe` commands.
+
+1.  Start the server and the local storage service. In the root directory of Ark, run:
 
     ```bash
     kubectl apply -f examples/common/00-prereqs.yaml
@@ -45,6 +47,53 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
     kubectl get deployments -l component=ark --namespace=heptio-ark
     kubectl get deployments --namespace=nginx-example
     ```
+
+### (Optional) Expose Minio outside your cluster
+
+When you run commands to get logs or describe a backup, the Ark server generates a pre-signed URL to download the requested items. To access these URLs from outside the cluster -- that is, from your Ark client -- you need to make Minio available outside the cluster. You can:
+
+- Change the Minio Service type from `ClusterIP` to `NodePort`.
+- Set up Ingress for your cluster, keeping Minio Service type `ClusterIP`.
+
+In Ark 0.10, you can also specify the value of a new `publicUrl` field for the pre-signed URL in your backup storage config.
+
+#### Expose Minio with Service of type NodePort
+
+The Minio deployment by default specifies a Service of type `ClusterIP`. You can change this to `NodePort` to easily expose a cluster service externally if you can reach the node from your Ark client.
+
+You must also get the Minio URL, which you can then specify as the value of the new `publicUrl` field in your backup storage config.
+
+1.  In `examples/minio/00-minio-deployment.yaml`, change the value of Service `spec.type` from `ClusterIP` to `NodePort`.
+
+1.  Get the Minio URL:
+
+    - if you're running Minikube:
+
+      ```shell
+      minikube service minio --namespace=heptio-ark --url
+      ```
+
+    - in any other environment:
+
+      1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Ark client.
+
+      1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
+
+          ```shell
+          kubectl -n heptio-ark get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
+          ```
+
+1.  In `examples/minio/05-ark-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide this Minio URL as the value of the `publicUrl` field. You must include the `http://` or `https://` prefix.
+
+#### Work with Ingress
+
+Configuring Ingress for your cluster is out of scope for the Ark documentation. If you have already set up Ingress, however, it makes sense to continue with it while you run the example Ark configuration with Minio.
+
+In this case: 
+
+1.  Keep the Service type as `ClusterIP`.
+
+1.  In `examples/minio/05-ark-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide the URL and port of your Ingress as the value of the `publicUrl` field.
 
 ### Install client
 
