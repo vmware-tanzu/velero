@@ -36,9 +36,9 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -X "github.com/heptio/ark/pkg/buildinfo.Version={{ .Version }}" -X "github.com/heptio/ark/pkg/buildinfo.GitSHA={{ .Env.GIT_SHA }}" -X "github.com/heptio/ark/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
+      - -X "github.com/heptio/ark/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/ark/pkg/buildinfo.GitSHA={{ .Env.GIT_SHA }}" -X "github.com/heptio/ark/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
 archive:
-  name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+  name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
   files:
     - LICENSE
     - examples/**/*
