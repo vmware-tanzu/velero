@@ -372,6 +372,8 @@ const (
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have restic restores run before controllers adopt the pods.
+// - Custom Resource Definitions come before Custom Resource so that they can be
+//   restored with their corresponding CRD.
 var defaultResourcePriorities = []string{
 	"namespaces",
 	"persistentvolumes",
@@ -382,6 +384,7 @@ var defaultResourcePriorities = []string{
 	"limitranges",
 	"pods",
 	"replicaset",
+	"customresourcedefinitions",
 }
 
 func applyConfigDefaults(c *api.Config, logger logrus.FieldLogger) {
