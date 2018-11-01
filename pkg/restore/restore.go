@@ -674,30 +674,41 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 				continue
 			}
 
-			// restore the PV from snapshot (if applicable)
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
-			if err != nil {
-				addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", fullPath, err))
+			// Check if the PV exists in the cluster before attempting to create
+			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+			pv, err := resourceClient.Get(name, metav1.GetOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
 				continue
 			}
-			obj = updatedObj
 
-			if resourceWatch == nil {
-				resourceWatch, err = resourceClient.Watch(metav1.ListOptions{})
+			// PV's existence will be recorded later. Jest skip volume restore logic
+			if pv == nil {
+				// restore the PV from snapshot (if applicable)
+				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
-					addToResult(&errs, namespace, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
-					return warnings, errs
+					addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", fullPath, err))
+					continue
 				}
-				ctx.resourceWatches = append(ctx.resourceWatches, resourceWatch)
-				ctx.resourceWaitGroup.Add(1)
-				go func() {
-					defer ctx.resourceWaitGroup.Done()
+				obj = updatedObj
 
-					if _, err := waitForReady(resourceWatch.ResultChan(), name, isPVReady, time.Minute, ctx.log); err != nil {
-						ctx.log.Warnf("Timeout reached waiting for persistent volume %s to become ready", name)
-						addArkError(&warnings, fmt.Errorf("timeout reached waiting for persistent volume %s to become ready", name))
+				if resourceWatch == nil {
+					resourceWatch, err = resourceClient.Watch(metav1.ListOptions{})
+					if err != nil {
+						addToResult(&errs, namespace, fmt.Errorf("error watching for namespace %q, resource %q: %v", namespace, &groupResource, err))
+						return warnings, errs
 					}
-				}()
+					ctx.resourceWatches = append(ctx.resourceWatches, resourceWatch)
+					ctx.resourceWaitGroup.Add(1)
+					go func() {
+						defer ctx.resourceWaitGroup.Done()
+
+						if _, err := waitForReady(resourceWatch.ResultChan(), name, isPVReady, time.Minute, ctx.log); err != nil {
+							ctx.log.Warnf("Timeout reached waiting for persistent volume %s to become ready", name)
+							addArkError(&warnings, fmt.Errorf("timeout reached waiting for persistent volume %s to become ready", name))
+						}
+					}()
+				}
 			}
 		}
 
