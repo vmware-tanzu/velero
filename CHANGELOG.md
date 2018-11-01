@@ -3,6 +3,15 @@
 #### [v0.10.0-beta.1](https://github.com/heptio/ark/releases/tag/v0.10.0-beta.1) - 2018-10-26
   * [CHANGELOG-0.10.md][1]
 
+#### [v0.9.10](https://github.com/heptio/ark/releases/tag/v0.9.10) - 2018-11-01
+
+#### Bug Fixes
+    * restore storageclasses before pvs and pvcs (#594, @shubheksha)
+    * AWS: Ensure that the order returned by ListObjects is consistent (#999, @bashofmann)
+    * Add CRDs to list of prioritized resources (#424, @domenicrosati)
+    * Verify PV doesn't exist before creating new volume (#609, @nrb)
+    * Update README.md - Grammar mistake corrected (#1018, @midhunbiju)
+
 #### [v0.9.9](https://github.com/heptio/ark/releases/tag/v0.9.9) - 2018-10-24
 
 #### Bug Fixes
