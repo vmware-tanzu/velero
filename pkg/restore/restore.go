@@ -740,6 +740,12 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 		}
 
+		// clear out non-core metadata fields & status
+		if obj, err = resetMetadataAndStatus(obj); err != nil {
+			addToResult(&errs, namespace, err)
+			continue
+		}
+
 		for _, action := range applicableActions {
 			if !action.selector.Matches(labels.Set(obj.GetLabels())) {
 				continue
@@ -763,12 +769,6 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			}
 
 			obj = unstructuredObj
-		}
-
-		// clear out non-core metadata fields & status
-		if obj, err = resetMetadataAndStatus(obj); err != nil {
-			addToResult(&errs, namespace, err)
-			continue
 		}
 
 		// necessary because we may have remapped the namespace
