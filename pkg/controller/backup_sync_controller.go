@@ -122,7 +122,7 @@ func shouldSync(location *arkv1api.BackupStorageLocation, now time.Time, backupS
 }
 
 func (c *backupSyncController) run() {
-	c.logger.Info("Checking for backup storage locations to sync into cluster")
+	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
 	locations, err := c.backupStorageLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
 	if err != nil {

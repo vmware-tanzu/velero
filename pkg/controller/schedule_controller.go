@@ -246,7 +246,7 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 	)
 
 	if !isDue {
-		log.WithField("nextRunTime", nextRunTime).Info("Schedule is not due, skipping")
+		log.WithField("nextRunTime", nextRunTime).Debug("Schedule is not due, skipping")
 		return nil
 	}
 
