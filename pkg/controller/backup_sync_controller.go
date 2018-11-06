@@ -121,6 +121,27 @@ func shouldSync(location *arkv1api.BackupStorageLocation, now time.Time, backupS
 	return false, ""
 }
 
+// orderedBackupLocations returns a new slice with the default backup location first (if it exists),
+// followed by the rest of the locations in no particular order.
+func orderedBackupLocations(locations []*arkv1api.BackupStorageLocation, defaultLocationName string) []*arkv1api.BackupStorageLocation {
+	var result []*arkv1api.BackupStorageLocation
+
+	for i := range locations {
+		if locations[i].Name == defaultLocationName {
+			// put the default location first
+			result = append(result, locations[i])
+			// append everything before the default
+			result = append(result, locations[:i]...)
+			// append everything after the default
+			result = append(result, locations[i+1:]...)
+
+			return result
+		}
+	}
+
+	return locations
+}
+
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 

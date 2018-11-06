@@ -28,7 +28,6 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -397,17 +396,11 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 }
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
-// find it, it tries to retrieve it from one of the backup storage locations.
+// find it, it returns an error.
 func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
 	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return backupInfo{}, errors.WithStack(err)
-		}
-
-		log := c.logger.WithField("backupName", backupName)
-		log.Debug("Backup not found in backupLister, checking each backup location directly, starting with default...")
-		return c.fetchFromBackupStorage(backupName, pluginManager)
+		return backupInfo{}, err
 	}
 
 	location, err := c.backupLocationLister.BackupStorageLocations(c.namespace).Get(backup.Spec.StorageLocation)
@@ -424,50 +417,6 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 		backup:      backup,
 		backupStore: backupStore,
 	}, nil
-}
-
-// fetchFromBackupStorage checks each backup storage location, starting with the default,
-// looking for a backup that matches the given backup name.
-func (c *restoreController) fetchFromBackupStorage(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
-	locations, err := c.backupLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
-	if err != nil {
-		return backupInfo{}, errors.WithStack(err)
-	}
-
-	orderedLocations := orderedBackupLocations(locations, c.defaultBackupLocation)
-
-	log := c.logger.WithField("backupName", backupName)
-	for _, location := range orderedLocations {
-		info, err := c.backupInfoForLocation(location, backupName, pluginManager)
-		if err != nil {
-			log.WithField("locationName", location.Name).WithError(err).Error("Unable to fetch backup from object storage location")
-			continue
-		}
-		return info, nil
-	}
-
-	return backupInfo{}, errors.New("not able to fetch from backup storage")
-}
-
-// orderedBackupLocations returns a new slice with the default backup location first (if it exists),
-// followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locations []*api.BackupStorageLocation, defaultLocationName string) []*api.BackupStorageLocation {
-	var result []*api.BackupStorageLocation
-
-	for i := range locations {
-		if locations[i].Name == defaultLocationName {
-			// put the default location first
-			result = append(result, locations[i])
-			// append everything before the default
-			result = append(result, locations[:i]...)
-			// append everything after the default
-			result = append(result, locations[i+1:]...)
-
-			return result
-		}
-	}
-
-	return locations
 }
 
 func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLocation, backupName string, pluginManager plugin.Manager) (backupInfo, error) {

@@ -287,7 +287,7 @@ func TestProcessRestore(t *testing.T) {
 			restore:                         NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Restore,
 			expectedErr:                     false,
 			expectedPhase:                   string(api.RestorePhaseFailedValidation),
-			expectedValidationErrors:        []string{"Error retrieving backup: not able to fetch from backup storage"},
+			expectedValidationErrors:        []string{"Error retrieving backup: backup.ark.heptio.com \"backup-1\" not found"},
 			backupStoreGetBackupMetadataErr: errors.New("no backup here"),
 		},
 		{
