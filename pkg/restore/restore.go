@@ -696,14 +696,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 			// Check if the PV exists in the cluster before attempting to create
 			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-			pv, err := resourceClient.Get(name, metav1.GetOptions{})
-			if err != nil && !apierrors.IsNotFound(err) {
-				addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
-				continue
-			}
+			_, err := resourceClient.Get(name, metav1.GetOptions{})
 
 			// PV's existence will be recorded later. Just skip the volume restore logic.
-			if pv == nil {
+			if apierrors.IsNotFound(err) {
 				// restore the PV from snapshot (if applicable)
 				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
@@ -729,6 +725,9 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 						}
 					}()
 				}
+			} else if err != nil {
+				addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
+				continue
 			}
 		}
 
