@@ -13,6 +13,9 @@
 # limitations under the License.
 
 dist: _output
+before:
+  hooks:
+    - ./hack/set-example-tags.sh
 builds:
   - main: ./cmd/ark/main.go
     env:
@@ -41,7 +44,7 @@ archive:
   name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
   files:
     - LICENSE
-    - examples/**/*
+    - config/**/*
 checksum:
   name_template: 'CHECKSUM'
 snapshot:
