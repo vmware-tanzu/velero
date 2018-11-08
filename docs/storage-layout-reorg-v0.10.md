@@ -2,7 +2,7 @@
 
 ## Overview
 
-Ark v0.10 includes breaking changes to where data is stored in your object storage bucket. You'll need to run a [one-time migration procedure](#upgrading-to-v0.10)
+Ark v0.10 includes breaking changes to where data is stored in your object storage bucket. You'll need to run a [one-time migration procedure](#upgrading-to-v010)
 if you're upgrading from prior versions of Ark.
 
 ## Details
