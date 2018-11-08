@@ -1007,8 +1007,7 @@ status:
 
 			// Only set up the client expectation if the test has the proper prerequisites
 			if test.haveSnapshot || test.reclaimPolicy != "Delete" {
-				var empty *unstructured.Unstructured
-				pvClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(empty, nil)
+				pvClient.On("Get", unstructuredPV.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, unstructuredPV.GetName()))
 			}
 
 			pvToRestore := unstructuredPV.DeepCopy()
