@@ -43,7 +43,7 @@ After you set up the Ark server, try these examples:
 1. Start the sample nginx app:
 
     ```bash
-    kubectl apply -f examples/nginx-app/base.yaml
+    kubectl apply -f config/nginx-app/base.yaml
     ```
 
 1. Create a backup:
@@ -73,7 +73,7 @@ After you set up the Ark server, try these examples:
 1. Start the sample nginx app:
 
     ```bash
-    kubectl apply -f examples/nginx-app/with-pv.yaml
+    kubectl apply -f config/nginx-app/with-pv.yaml
     ```
 
 1. Create a backup with PV snapshotting:

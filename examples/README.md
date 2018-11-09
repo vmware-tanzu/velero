@@ -1,6 +1,6 @@
 # Examples
 
-The YAML config files in this directory can be used to quickly deploy a containerized Ark deployment.
+This directory contains sample YAML config files for running Ark on each core provider. Starting with v0.10, these files are packaged into [the Ark release tarballs][2], and we highly recommend that you use the packaged versions of these files to ensure compatibility with the released code. 
 
 * `common/`: Contains manifests to set up Ark. Can be used across cloud provider platforms. (Note that Azure requires its own deployment file due to its unique way of loading credentials).
 
@@ -10,3 +10,4 @@ The YAML config files in this directory can be used to quickly deploy a containe
 
 [0]: https://github.com/minio/minio
 [1]: /README.md#quickstart
+[2]: https://github.com/heptio/ark/releases
