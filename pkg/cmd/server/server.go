@@ -75,6 +75,10 @@ const (
 
 	defaultBackupSyncPeriod          = time.Minute
 	defaultPodVolumeOperationTimeout = 60 * time.Minute
+
+	// server's client default qps and burst
+	defaultClientQPS   float32 = 20.0
+	defaultClientBurst int     = 30
 )
 
 type serverConfig struct {
@@ -83,6 +87,8 @@ type serverConfig struct {
 	restoreResourcePriorities                        []string
 	defaultVolumeSnapshotLocations                   map[string]string
 	restoreOnly                                      bool
+	clientQPS                                        float32
+	clientBurst                                      int
 }
 
 func NewCommand() *cobra.Command {
@@ -97,6 +103,8 @@ func NewCommand() *cobra.Command {
 			backupSyncPeriod:               defaultBackupSyncPeriod,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
+			clientQPS:                      defaultClientQPS,
+			clientBurst:                    defaultClientBurst,
 		}
 	)
 
@@ -152,6 +160,8 @@ func NewCommand() *cobra.Command {
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
 	command.Flags().StringVar(&config.defaultBackupLocation, "default-backup-storage-location", config.defaultBackupLocation, "name of the default backup storage location")
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
+	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
+	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
 
 	return command
 }
@@ -196,6 +206,15 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 	if err != nil {
 		return nil, err
 	}
+	if config.clientQPS < 0.0 {
+		return nil, errors.New("client-qps must be positive")
+	}
+	clientConfig.QPS = config.clientQPS
+
+	if config.clientBurst <= 0 {
+		return nil, errors.New("client-burst must be positive")
+	}
+	clientConfig.Burst = config.clientBurst
 
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
