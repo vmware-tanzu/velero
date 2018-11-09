@@ -25,7 +25,7 @@ import (
 )
 
 func TestNewLogger(t *testing.T) {
-	l := NewLogger().(*logrus.Logger)
+	l := NewLogger(logrus.InfoLevel).(*logrus.Logger)
 
 	expectedFormatter := &logrus.JSONFormatter{
 		FieldMap: logrus.FieldMap{

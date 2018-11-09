@@ -24,8 +24,9 @@ import (
 
 // NewLogger returns a logger that is suitable for use within an
 // Velero plugin.
-func NewLogger() logrus.FieldLogger {
+func NewLogger(level logrus.Level) logrus.FieldLogger {
 	logger := logrus.New()
+	logger.Level = level
 	/*
 		!!!DO NOT SET THE OUTPUT TO STDOUT!!!
 

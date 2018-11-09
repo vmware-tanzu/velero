@@ -17,6 +17,9 @@ limitations under the License.
 package plugin
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
@@ -28,16 +31,22 @@ import (
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	veleroplugin "github.com/heptio/velero/pkg/plugin"
 	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/util/logging"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
-	logger := veleroplugin.NewLogger()
+	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
 
 	c := &cobra.Command{
 		Use:    "run-plugins",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
+			logLevel := logLevelFlag.Parse()
+			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
+
+			logger := veleroplugin.NewLogger(logLevel)
+
 			logger.Debug("Executing run-plugins command")
 
 			veleroplugin.NewServer(logger).
@@ -58,6 +67,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 				Serve()
 		},
 	}
+
+	c.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
 
 	return c
 }
