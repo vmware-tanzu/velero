@@ -21,6 +21,7 @@ import (
 	"unicode"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -503,7 +504,7 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 		expectedErr bool
 	}{
 		{
-			name: "only default tokens present",
+			name: "only default token",
 			fromCluster: arktest.UnstructuredOrDie(
 				`{
 					"apiVersion": "v1",
@@ -517,6 +518,8 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 					]
 				}`,
 			),
+			// fromBackup doesn't have the default token because it is expected to already have been removed
+			// by the service account action
 			fromBackup: arktest.UnstructuredOrDie(
 				`{
 					"kind": "ServiceAccount",
@@ -525,9 +528,7 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 						"namespace": "ns1",
 						"name": "default"
 					},
-					"secrets": [
-						{ "name": "default-token-xzy12" }
-					]
+					"secrets": []
 				}`,
 			),
 			expectedRes: arktest.UnstructuredOrDie(
@@ -561,7 +562,8 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 					]
 				}`,
 			),
-
+			// fromBackup doesn't have the default token because it is expected to already have been removed
+			// by the service account action
 			fromBackup: arktest.UnstructuredOrDie(
 				`{
 					"kind": "ServiceAccount",
@@ -571,7 +573,6 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 						"name": "default"
 					},
 					"secrets": [
-						{ "name": "default-token-xzy12" },
 						{ "name": "my-old-secret" },
 						{ "name": "secrete"}
 					]
@@ -621,7 +622,8 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 					]
 				}`,
 			),
-
+			// fromBackup doesn't have the default token because it is expected to already have been removed
+			// by the service account action
 			fromBackup: arktest.UnstructuredOrDie(
 				`{
 					"kind": "ServiceAccount",
@@ -645,9 +647,7 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 							"a6": "v6"
 						}
 					},
-					"secrets": [
-						{ "name": "default-token-xzy12" }
-					]
+					"secrets": []
 				}`,
 			),
 			expectedRes: arktest.UnstructuredOrDie(
@@ -682,11 +682,10 @@ func TestMergeServiceAccountBasic(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(b *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			result, err := mergeServiceAccounts(test.fromCluster, test.fromBackup)
-			if err != nil {
-				assert.Equal(t, test.expectedRes, result)
-			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedRes, result)
 		})
 	}
 }

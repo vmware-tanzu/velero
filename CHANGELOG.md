@@ -7,8 +7,9 @@
   * Delete spec.priority in pod restore action (#879, @mwieczorek)
   * Added brew reference (#1051, @omerlh)
   * Update to go 1.11 (#1069, @gliptak)
-  * Initialize empty schedule metrics on server init (#1054, @cbeneke) 
+  * Initialize empty schedule metrics on server init (#1054, @cbeneke)
   * Update CHANGELOGs (#1063, @wwitzel3)
+  * Remove default token from all service accounts (#1048, @ncdc)
 
 ## Current release:
   * [CHANGELOG-0.10.md][8]

@@ -54,6 +54,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("restic", newResticRestoreItemAction).
 				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
+				RegisterRestoreItemAction("serviceaccount", newServiceAccountRestoreItemAction).
 				Serve()
 		},
 	}
@@ -132,4 +133,8 @@ func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) 
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewServiceAction(logger), nil
+}
+
+func newServiceAccountRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewServiceAccountAction(logger), nil
 }
