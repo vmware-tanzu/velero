@@ -42,7 +42,7 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	}
 	if command == os.Args[0] {
 		// For plugins compiled into the ark executable, we need to run "ark run-plugins"
-		b.commandArgs = []string{"run-plugins"}
+		b.commandArgs = []string{"run-plugins", "--log-level", logLevel.String()}
 	}
 	return b
 }

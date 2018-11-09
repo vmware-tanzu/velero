@@ -37,7 +37,7 @@ func TestNewClientBuilder(t *testing.T) {
 
 	cb = newClientBuilder(os.Args[0], logger, logLevel)
 	assert.Equal(t, cb.commandName, os.Args[0])
-	assert.Equal(t, []string{"run-plugins"}, cb.commandArgs)
+	assert.Equal(t, []string{"run-plugins", "--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 }
 
