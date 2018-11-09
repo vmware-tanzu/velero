@@ -2,7 +2,8 @@
 
 - We've introduced two new custom resource definitions, `BackupStorageLocation` and `VolumeSnapshotLocation`, that replace the `Config` CRD from
 previous versions. As part of this, you may now configure more than one possible location for where backups and snapshots are stored, and when you
-create a `Backup` you can select the location where you'd like that particular backup to be stored.
+create a `Backup` you can select the location where you'd like that particular backup to be stored. See the [Locations documentation][2] for an overview
+of this feature.
 - Ark's plugin system has been significantly refactored to improve robustness and ease of development. Plugin processes are now automatically restarted
 if they unexpectedly terminate. Additionally, plugin binaries can now contain more than one plugin implementation (e.g. and object store *and* a block store,
 or many backup item actions).
@@ -190,3 +191,4 @@ need to be updated for v0.10.
 - 	[f5eac0b4](https://github.com/heptio/ark/commit/f5eac0b4)	Update vendored library code for Kubernetes 1.11
 
 [1]: https://github.com/heptio/ark/blob/master/docs/upgrading-to-v0.10.md
+[2]: locations.md

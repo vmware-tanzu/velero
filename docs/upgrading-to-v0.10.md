@@ -19,6 +19,8 @@ some miscellaneous Ark settings. In v0.10, we've eliminated this CRD and replace
 When upgrading to v0.10, you'll need to transfer the configuration information that you currently have in the `Config` CRD
 into the above. We'll cover exactly how to do this below.
 
+For a general overview of this change, see the [Locations documentation][4].
+
 ### Reorganization of data in object storage
 
 We've made [changes to the layout of data stored in object storage][3] for simplicity and extensibility. You'll need to
@@ -82,3 +84,4 @@ kubectl delete crd configs.ark.heptio.com
 [1]: /api-types/backupstoragelocation.md
 [2]: /api-types/volumesnapshotlocation.md
 [3]: storage-layout-reorg-v0.10.md
+[4]: locations.md
