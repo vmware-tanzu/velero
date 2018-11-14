@@ -63,6 +63,9 @@ metadata:
   labels:
     component: minio
 spec:
+  # ClusterIP is recommended for production environments.
+  # Change to NodePort if needed per documentation,
+  # but only if you run Minio in a test/trial environment, for example with Minikube.
   type: ClusterIP
   ports:
     - port: 9000

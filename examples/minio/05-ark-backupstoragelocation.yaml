@@ -26,5 +26,8 @@ spec:
     region: minio
     s3ForcePathStyle: "true"
     s3Url: http://minio.heptio-ark.svc:9000
+    # Uncomment the following line and provide the value of an externally
+    # available URL for downloading logs, running Ark describe, and more.
+    # publicUrl: https://minio.mycluster.com
     
 
