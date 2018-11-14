@@ -34,6 +34,7 @@ import (
 
 const (
 	s3URLKey            = "s3Url"
+	publicURLKey        = "publicUrl"
 	kmsKeyIDKey         = "kmsKeyId"
 	s3ForcePathStyleKey = "s3ForcePathStyle"
 	bucketKey           = "bucket"
@@ -42,6 +43,7 @@ const (
 type objectStore struct {
 	log        logrus.FieldLogger
 	s3         *s3.S3
+	preSignS3  *s3.S3
 	s3Uploader *s3manager.Uploader
 	kmsKeyID   string
 }
@@ -54,6 +56,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	var (
 		region              = config[regionKey]
 		s3URL               = config[s3URLKey]
+		publicURL           = config[publicURLKey]
 		kmsKeyID            = config[kmsKeyIDKey]
 		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
 
@@ -83,20 +86,52 @@ func (o *objectStore) Init(config map[string]string) error {
 		}
 	}
 
+	serverConfig, err := newAWSConfig(s3URL, region, s3ForcePathStyle)
+	if err != nil {
+		return err
+	}
+
+	serverSession, err := getSession(serverConfig)
+	if err != nil {
+		return err
+	}
+
+	o.s3 = s3.New(serverSession)
+	o.s3Uploader = s3manager.NewUploader(serverSession)
+	o.kmsKeyID = kmsKeyID
+
+	if publicURL != "" {
+		publicConfig, err := newAWSConfig(publicURL, region, s3ForcePathStyle)
+		if err != nil {
+			return err
+		}
+		publicSession, err := getSession(publicConfig)
+		if err != nil {
+			return err
+		}
+		o.preSignS3 = s3.New(publicSession)
+	} else {
+		o.preSignS3 = o.s3
+	}
+
+	return nil
+}
+
+func newAWSConfig(url, region string, forcePathStyle bool) (*aws.Config, error) {
 	awsConfig := aws.NewConfig().
 		WithRegion(region).
-		WithS3ForcePathStyle(s3ForcePathStyle)
+		WithS3ForcePathStyle(forcePathStyle)
 
-	if s3URL != "" {
-		if !IsValidS3URLScheme(s3URL) {
-			return errors.Errorf("Invalid s3Url: %s", s3URL)
+	if url != "" {
+		if !IsValidS3URLScheme(url) {
+			return nil, errors.Errorf("Invalid s3 url: %s", url)
 		}
 
 		awsConfig = awsConfig.WithEndpointResolver(
 			endpoints.ResolverFunc(func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
 				if service == endpoints.S3ServiceID {
 					return endpoints.ResolvedEndpoint{
-						URL: s3URL,
+						URL: url,
 					}, nil
 				}
 
@@ -105,16 +140,7 @@ func (o *objectStore) Init(config map[string]string) error {
 		)
 	}
 
-	sess, err := getSession(awsConfig)
-	if err != nil {
-		return err
-	}
-
-	o.s3 = s3.New(sess)
-	o.s3Uploader = s3manager.NewUploader(sess)
-	o.kmsKeyID = kmsKeyID
-
-	return nil
+	return awsConfig, nil
 }
 
 func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
@@ -208,7 +234,7 @@ func (o *objectStore) DeleteObject(bucket, key string) error {
 }
 
 func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	req, _ := o.s3.GetObjectRequest(&s3.GetObjectInput{
+	req, _ := o.preSignS3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
