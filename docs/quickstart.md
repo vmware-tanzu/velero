@@ -50,6 +50,13 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
 
 Make sure that you install somewhere in your PATH.
 
+#### MacOS
+
+On Mac you can use HomeBrew to install ark CLI, by running the following command:
+```
+brew install ark
+```
+
 ### Back up
 
 1. Create a backup for any object that matches the `app=nginx` label selector:
