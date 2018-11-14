@@ -16,29 +16,31 @@ See [Set up Ark on your platform][3] for how to configure Ark for a production e
 
 ### Download
 
-Clone or fork the Ark repository:
+1. Download the [latest release's][26] tarball for your platform.
 
-```
-git clone git@github.com:heptio/ark.git
-```
+1. Extract the tarball:
+    ```bash
+    tar -xzf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    ```
+    We'll refer to the directory you extracted to as the "Ark directory" in subsequent steps.
 
-NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The master branch is under active development and might not be stable.
+1. Move the `ark` binary from the Ark directory to somewhere in your PATH.
 
 ### Set up server
 
 These instructions start the Ark server and a Minio instance that is accessible from within the cluster only. See the following section for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `ark describe` commands.
 
-1.  Start the server and the local storage service. In the root directory of Ark, run:
+1.  Start the server and the local storage service. In the Ark directory, run:
 
     ```bash
-    kubectl apply -f examples/common/00-prereqs.yaml
-    kubectl apply -f examples/minio/
+    kubectl apply -f config/common/00-prereqs.yaml
+    kubectl apply -f config/minio/
     ```
 
 1. Deploy the example nginx application:
 
     ```bash
-    kubectl apply -f examples/nginx-app/base.yaml
+    kubectl apply -f config/nginx-app/base.yaml
     ```
 
 1. Check to see that both the Ark and nginx deployments are successfully created:
@@ -94,12 +96,6 @@ In this case:
 1.  Keep the Service type as `ClusterIP`.
 
 1.  In `examples/minio/05-ark-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide the URL and port of your Ingress as the value of the `publicUrl` field.
-
-### Install client
-
-[Download the client][26].
-
-Make sure that you install somewhere in your PATH.
 
 ### Back up
 
@@ -204,9 +200,9 @@ snapshots, it is safe to remove the `heptio-ark` namespace and everything else c
 example:
 
 ```
-kubectl delete -f examples/common/
-kubectl delete -f examples/minio/
-kubectl delete -f examples/nginx-app/base.yaml
+kubectl delete -f config/common/
+kubectl delete -f config/minio/
+kubectl delete -f config/nginx-app/base.yaml
 ```
 
 [3]: install-overview.md

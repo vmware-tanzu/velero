@@ -123,10 +123,10 @@ For more information, see [the AWS documentation on IAM users][14].
 
 ## Credentials and configuration
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
+In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
-kubectl apply -f examples/common/00-prereqs.yaml
+kubectl apply -f config/common/00-prereqs.yaml
 ```
 
 Create a Secret. In the directory of the credentials file you just created, run:
@@ -139,23 +139,23 @@ kubectl create secret generic cloud-credentials \
 
 Specify the following values in the example files:
 
-* In `examples/aws/05-ark-backupstoragelocation.yaml`:
+* In `config/aws/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3 backup storage, region is optional and will be queried from the AWS S3 API if not provided). See the [BackupStorageLocation definition][21] for details.
 
-* In `examples/aws/06-ark-volumesnapshotlocation.yaml`:
+* In `config/aws/06-ark-volumesnapshotlocation.yaml`:
 
   * Replace `<YOUR_REGION>`. See the [VolumeSnapshotLocation definition][6] for details.
 
-* (Optional, use only to specify multiple volume snapshot locations) In `examples/aws/10-deployment.yaml` (or `examples/aws/10-deployment-kube2iam.yaml`, as appropriate):
+* (Optional, use only to specify multiple volume snapshot locations) In `config/aws/10-deployment.yaml` (or `config/aws/10-deployment-kube2iam.yaml`, as appropriate):
 
   * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
-* (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
+* (Optional) If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
 
-* (Optional) If you have multiple clusters and you want to support migration of resources between them, in file `examples/aws/10-deployment.yaml`:
+* (Optional) If you have multiple clusters and you want to support migration of resources between them, in file `config/aws/10-deployment.yaml`:
 
     * Uncomment the environment variable `AWS_CLUSTER_NAME` and replace `<YOUR_CLUSTER_NAME>` with the current cluster's name. When restoring backup, it will make Ark (and cluster it's running on) claim ownership of AWS volumes created from snapshots taken on different cluster.
     The best way to get the current cluster's name is to either check it with used deployment tool or to read it directly from the EC2 instances tags. 
@@ -185,9 +185,9 @@ Specify the following values in the example files:
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/aws/05-ark-backupstoragelocation.yaml
-  kubectl apply -f examples/aws/06-ark-volumesnapshotlocation.yaml
-  kubectl apply -f examples/aws/10-deployment.yaml
+  kubectl apply -f config/aws/05-ark-backupstoragelocation.yaml
+  kubectl apply -f config/aws/06-ark-volumesnapshotlocation.yaml
+  kubectl apply -f config/aws/10-deployment.yaml
   ```
 
 ## ALTERNATIVE: Setup permissions using kube2iam
@@ -281,7 +281,7 @@ It can be set up for Ark by creating a role that will have required permissions,
       --policy-name heptio-ark-policy \
       --policy-document file://./heptio-ark-policy.json
     ```
-4. Update `AWS_ACCOUNT_ID` & `HEPTIO_ARK_ROLE_NAME` in the file `examples/aws/10-deployment-kube2iam.yaml`:
+4. Update `AWS_ACCOUNT_ID` & `HEPTIO_ARK_ROLE_NAME` in the file `config/aws/10-deployment-kube2iam.yaml`:
 
     ```
     ---
@@ -301,7 +301,7 @@ It can be set up for Ark by creating a role that will have required permissions,
     ...
     ```
 
-5. Run Ark deployment using the file `examples/aws/10-deployment-kube2iam.yaml`.
+5. Run Ark deployment using the file `config/aws/10-deployment-kube2iam.yaml`.
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
