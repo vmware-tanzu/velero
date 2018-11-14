@@ -1,6 +1,6 @@
 # Changelog
 
-#### [v0.10.0-beta.1](https://github.com/heptio/ark/releases/tag/v0.10.0-beta.1) - 2018-10-26
+#### [v0.10.0](https://github.com/heptio/ark/releases/tag/v0.10.0) - 2018-11-15
   * [CHANGELOG-0.10.md][1]
 
 #### [v0.9.11](https://github.com/heptio/ark/releases/tag/v0.9.11) - 2018-11-08

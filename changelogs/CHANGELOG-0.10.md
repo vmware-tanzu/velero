@@ -32,7 +32,32 @@ need to be updated for v0.10.
 - The organization of Ark data in object storage has changed. Existing data will need to be moved around to conform to the new layout.
 
 ### All Changes
-
+-   [b9de44ff](https://github.com/heptio/ark/commit/b9de44ff)	update docs to reference config/ dir within release tarballs
+-   [eace0255](https://github.com/heptio/ark/commit/eace0255)	goreleaser: update example image tags to match version being released
+-   [cff02159](https://github.com/heptio/ark/commit/cff02159)	add rbac content, rework get-started for NodePort and publicUrl, add versioning information
+-   [fa14255e](https://github.com/heptio/ark/commit/fa14255e)	add content for docs issue 819
+-   [22959071](https://github.com/heptio/ark/commit/22959071)	add doc explaining locations
+-   [e5556fe6](https://github.com/heptio/ark/commit/e5556fe6)	Added qps and burst to server's client
+-   [9ae861c9](https://github.com/heptio/ark/commit/9ae861c9)	Support a separate URL base for pre-signed URLs
+-   [698420b6](https://github.com/heptio/ark/commit/698420b6)	Update storage-layout-reorg-v0.10.md
+-   [6c9e1f18](https://github.com/heptio/ark/commit/6c9e1f18)	lower some noisy logs to debug level
+-   [318fd8a8](https://github.com/heptio/ark/commit/318fd8a8)	add troubleshooting for loadbalancer restores
+-   [defb8aa8](https://github.com/heptio/ark/commit/defb8aa8)	remove code that checks directly for a backup from restore controller
+-   [7abe1156](https://github.com/heptio/ark/commit/7abe1156)	Move clearing up of metadata before plugin's actions
+-   [ec013e6f](https://github.com/heptio/ark/commit/ec013e6f)	Document upgrading plugins in the deployment
+-   [d6162e94](https://github.com/heptio/ark/commit/d6162e94)	fix goreleaser bugs
+-   [a15df276](https://github.com/heptio/ark/commit/a15df276)	Add correct link and change role
+-   [46bed015](https://github.com/heptio/ark/commit/46bed015)	add 0.10 breaking changes warning to readme in master
+-   [e3a7d6a2](https://github.com/heptio/ark/commit/e3a7d6a2)	add content for issue 994
+-   [400911e9](https://github.com/heptio/ark/commit/400911e9)	address docs issue #978
+-   [b818cc27](https://github.com/heptio/ark/commit/b818cc27)	don't require a default provider VSL if there's only 1
+-   [90638086](https://github.com/heptio/ark/commit/90638086)	v0.10 changelog
+-   [6e2166c4](https://github.com/heptio/ark/commit/6e2166c4)	add docs page on versions and upgrading
+-   [18b434cb](https://github.com/heptio/ark/commit/18b434cb)	goreleaser scripts for building/creating a release on a workstation
+-   [bb65d67a](https://github.com/heptio/ark/commit/bb65d67a)	update restic prerequisite with min k8s version
+-   [b5a2ccd5](https://github.com/heptio/ark/commit/b5a2ccd5)	Silence git detached HEAD advice in build container
+-   [67749141](https://github.com/heptio/ark/commit/67749141)	instructions for upgrading to v0.10
+-   [516422c2](https://github.com/heptio/ark/commit/516422c2)	sync controller: fill in missing .spec.storageLocation
 - 	[195e6aaf](https://github.com/heptio/ark/commit/195e6aaf)	fix bug preventing PV snapshots from v0.10 backups from restoring
 - 	[bca58516](https://github.com/heptio/ark/commit/bca58516)	Run 'make update' to update formatting
 - 	[573ce7d0](https://github.com/heptio/ark/commit/573ce7d0)	Update formatting script
