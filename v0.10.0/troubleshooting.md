@@ -1,6 +1,13 @@
 # Troubleshooting
 
-These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
+These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server.
+
+See also:
+
+- [Debug installation/setup issues][2]
+- [Debug restores][1]
+
+## General troubleshooting information
 
 In `ark` version >= `0.1.0`, you can use the `ark bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `ark` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
 
@@ -12,7 +19,7 @@ Some general commands for troubleshooting that may be helpful:
 * `ark restore logs <restoreName>` - fetch the logs for this specific restore. Useful for viewing failures and warnings, including resources that could not be restored.
 * `kubectl logs deployment/ark -n heptio-ark` - fetch the logs of the Ark server pod. This provides the output of the Ark server processes.
 
-## Getting ark debug logs
+### Getting ark debug logs
 
 You can increase the verbosity of the Ark server by editing your Ark deployment to look like this:
 
@@ -32,17 +39,18 @@ kubectl edit deployment/ark -n heptio-ark
 ...
 ```
 
+## Known issue with restoring LoadBalancer Service
 
-## [Debug installation/setup issues][2]
+Because of how Kubernetes handles Service objects of `type=LoadBalancer`, when you restore these objects you might encounter an issue with changed values for Service UIDs. Kubernetes automatically generates the name of the cloud resource based on the Service UID, which is different when restored, resulting in a different name for the cloud load balancer. If the DNS CNAME for your application points to the DNS name of your cloud load balancer, you'll need to update the CNAME pointer when you perform an Ark restore.
 
-## [Debug restores][1]
+Alternatively, you might be able to use the Service's `spec.loadBalancerIP` field to keep connections valid, if your cloud provider supports this value. See [the Kubernetes documentation about Services of Type LoadBalancer](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer).
 
 ## Miscellaneous issues
 
 ### Ark reports `custom resource not found` errors when starting up.
 
 Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `examples/common/00-prereqs.yaml` file to create these defintions, then restart Ark.
+the `config/common/00-prereqs.yaml` file to create these definitions, then restart Ark.
 
 ### `ark backup logs` returns a `SignatureDoesNotMatch` error
 

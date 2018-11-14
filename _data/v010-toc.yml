@@ -3,16 +3,20 @@ toc:
     subfolderitems:
       - page: About Ark
         url: /index.html
-      - page: Upgrade to version 0.10
-        url: /upgrading-to-v0.10
       - page: Getting started
-        url: /quickstart
+        url: /get-started
       - page: Get the right Ark version
         url: /versions
       - page: How Ark works
         url: /about
       - page: Supported platforms
         url: /support-matrix
+  - title: Upgrade
+    subfolderitems:
+      - page: Upgrade to version 0.10
+        url: /upgrading-to-v0.10
+      - page: About locations (new!)
+        url: /locations
   - title: Install
     subfolderitems:
       - page: Set up Ark
@@ -25,8 +29,6 @@ toc:
         url: /azure-config
       - page: IBM Cloud Object Store
         url: /ibm-config
-      - page: Configuration reference
-        url: /config-definition
       - page: Restic Setup
         url: /restic#setup
   - title: Troubleshooting
@@ -60,6 +62,6 @@ toc:
   - title: Tutorials
     subfolderitems:
       - page: Disaster Recovery
-        url: /use-cases
+        url: /disaster-case
       - page: Cluster migration
-        url: /use-cases.html#cluster-migration
+        url: /migration-case

@@ -1,14 +1,14 @@
-## Getting started
+# Getting started
 
 The following example sets up the Ark server and client, then backs up and restores a sample application.
 
 For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
 
-**NOTE** The example lets you explore basic Ark functionality. In the real world, however, you would back your cluster up to external storage.
+**NOTE** The example lets you explore basic Ark functionality. Configuring Minio for production is out of scope.
 
-See [Set up Ark on your platform][3] for how to configure Ark for a production environment. 
+See [Set up Ark on your platform][3] for how to configure Ark for a production environment.
 
-### Prerequisites
+## Prerequisites
 
 * Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run `ark backup delete`.
 * A DNS server on the cluster
@@ -16,27 +16,31 @@ See [Set up Ark on your platform][3] for how to configure Ark for a production e
 
 ### Download
 
-Clone or fork the Ark repository:
+1. Download the [latest release's][26] tarball for your platform.
 
-```
-git clone git@github.com:heptio/ark.git
-```
+1. Extract the tarball:
+    ```bash
+    tar -xzf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    ```
+    We'll refer to the directory you extracted to as the "Ark directory" in subsequent steps.
 
-NOTE: Make sure to check out the appropriate version. We recommend that you check out the latest tagged version. The master branch is under active development and might not be stable.
+1. Move the `ark` binary from the Ark directory to somewhere in your PATH.
 
-### Set up server
+## Set up server
 
-1. Start the server and the local storage service. In the root directory of Ark, run:
+These instructions start the Ark server and a Minio instance that is accessible from within the cluster only. See the following section for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `ark describe` commands.
+
+1.  Start the server and the local storage service. In the Ark directory, run:
 
     ```bash
-    kubectl apply -f examples/common/00-prereqs.yaml
-    kubectl apply -f examples/minio/
+    kubectl apply -f config/common/00-prereqs.yaml
+    kubectl apply -f config/minio/
     ```
 
 1. Deploy the example nginx application:
 
     ```bash
-    kubectl apply -f examples/nginx-app/base.yaml
+    kubectl apply -f config/nginx-app/base.yaml
     ```
 
 1. Check to see that both the Ark and nginx deployments are successfully created:
@@ -46,13 +50,54 @@ NOTE: Make sure to check out the appropriate version. We recommend that you chec
     kubectl get deployments --namespace=nginx-example
     ```
 
-### Install client
+## (Optional) Expose Minio outside your cluster
 
-[Download the client][26].
+When you run commands to get logs or describe a backup, the Ark server generates a pre-signed URL to download the requested items. To access these URLs from outside the cluster -- that is, from your Ark client -- you need to make Minio available outside the cluster. You can:
 
-Make sure that you install somewhere in your PATH.
+- Change the Minio Service type from `ClusterIP` to `NodePort`.
+- Set up Ingress for your cluster, keeping Minio Service type `ClusterIP`.
 
-### Back up
+In Ark 0.10, you can also specify the value of a new `publicUrl` field for the pre-signed URL in your backup storage config.
+
+### Expose Minio with Service of type NodePort
+
+The Minio deployment by default specifies a Service of type `ClusterIP`. You can change this to `NodePort` to easily expose a cluster service externally if you can reach the node from your Ark client.
+
+You must also get the Minio URL, which you can then specify as the value of the new `publicUrl` field in your backup storage config.
+
+1.  In `examples/minio/00-minio-deployment.yaml`, change the value of Service `spec.type` from `ClusterIP` to `NodePort`.
+
+1.  Get the Minio URL:
+
+    - if you're running Minikube:
+
+      ```shell
+      minikube service minio --namespace=heptio-ark --url
+      ```
+
+    - in any other environment:
+
+      1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Ark client.
+
+      1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
+
+          ```shell
+          kubectl -n heptio-ark get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
+          ```
+
+1.  In `examples/minio/05-ark-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide this Minio URL as the value of the `publicUrl` field. You must include the `http://` or `https://` prefix.
+
+### Work with Ingress
+
+Configuring Ingress for your cluster is out of scope for the Ark documentation. If you have already set up Ingress, however, it makes sense to continue with it while you run the example Ark configuration with Minio.
+
+In this case: 
+
+1.  Keep the Service type as `ClusterIP`.
+
+1.  In `examples/minio/05-ark-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide the URL and port of your Ingress as the value of the `publicUrl` field.
+
+## Back up
 
 1. Create a backup for any object that matches the `app=nginx` label selector:
 
@@ -98,7 +143,7 @@ Make sure that you install somewhere in your PATH.
     
     NOTE: You might need to wait for a few minutes for the namespace to be fully cleaned up.
 
-### Restore
+## Restore
 
 1. Run:
 
@@ -131,7 +176,7 @@ ark restore describe <RESTORE_NAME>
 
 For more information, see [the debugging information][18].
 
-### Clean up
+## Clean up
 
 If you want to delete any backups you created, including data in object storage and persistent
 volume snapshots, you can run:
@@ -155,9 +200,9 @@ snapshots, it is safe to remove the `heptio-ark` namespace and everything else c
 example:
 
 ```
-kubectl delete -f examples/common/
-kubectl delete -f examples/minio/
-kubectl delete -f examples/nginx-app/base.yaml
+kubectl delete -f config/common/
+kubectl delete -f config/minio/
+kubectl delete -f config/nginx-app/base.yaml
 ```
 
 [3]: install-overview.md

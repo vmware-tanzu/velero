@@ -105,10 +105,10 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
 
 ## Credentials and configuration
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML file to specify the namespace. See [Run in custom namespace][0].
+In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML file to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
-kubectl apply -f examples/common/00-prereqs.yaml
+kubectl apply -f config/common/00-prereqs.yaml
 ```
 
 Now you need to create a Secret that contains all the environment variables you just set. The command looks like the following:
@@ -125,15 +125,15 @@ kubectl create secret generic cloud-credentials \
 
 Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
 
-* In file `examples/azure/05-ark-backupstoragelocation.yaml`:
+* In file `config/azure/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BLOB_CONTAINER>`, `<YOUR_STORAGE_RESOURCE_GROUP>`, and `<YOUR_STORAGE_ACCOUNT>`. See the [BackupStorageLocation definition][21] for details.
 
-* In file `examples/azure/06-ark-volumesnapshotlocation.yaml`:
+* In file `config/azure/06-ark-volumesnapshotlocation.yaml`:
 
   * Replace `<YOUR_TIMEOUT>`. See the [VolumeSnapshotLocation definition][8] for details.
 
-* (Optional, use only if you need to specify multiple volume snapshot locations) In `examples/azure/00-ark-deployment.yaml`:
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/azure/00-ark-deployment.yaml`:
 
   * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
@@ -142,7 +142,7 @@ Now that you have your Azure credentials stored in a Secret, you need to replace
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/azure/
+  kubectl apply -f config/azure/
   ```
 
 [0]: namespace.md

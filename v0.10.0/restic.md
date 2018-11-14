@@ -30,20 +30,20 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 ### Instructions
 
-1. Download an updated Ark client from the [latest release][3], and move it to a location in your PATH.
+1. Ensure you've [downloaded & extracted the latest release][3].
 
-1. From the Ark root directory, run the following to create new custom resource definitions:
+1. In the Ark directory (i.e. where you extracted the release tarball), run the following to create new custom resource definitions:
 
     ```bash
-    kubectl apply -f examples/common/00-prereqs.yaml
+    kubectl apply -f config/common/00-prereqs.yaml
     ```
 
 1. Run one of the following for your platform to create the daemonset:
 
-    - AWS: `kubectl apply -f examples/aws/20-restic-daemonset.yaml`
-    - Azure: `kubectl apply -f examples/azure/20-restic-daemonset.yaml`
-    - GCP: `kubectl apply -f examples/gcp/20-restic-daemonset.yaml`
-    - Minio: `kubectl apply -f examples/minio/30-restic-daemonset.yaml`
+    - AWS: `kubectl apply -f config/aws/20-restic-daemonset.yaml`
+    - Azure: `kubectl apply -f config/azure/20-restic-daemonset.yaml`
+    - GCP: `kubectl apply -f config/gcp/20-restic-daemonset.yaml`
+    - Minio: `kubectl apply -f config/minio/30-restic-daemonset.yaml`
 
 You're now ready to use Ark with restic.
 

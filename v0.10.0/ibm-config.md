@@ -37,10 +37,10 @@ Several comments:
 
 ## Credentials and configuration
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
+In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
-kubectl apply -f examples/common/00-prereqs.yaml
+kubectl apply -f config/common/00-prereqs.yaml
 ```
 
 Create a Secret. In the directory of the credentials file you just created, run:
@@ -53,11 +53,11 @@ kubectl create secret generic cloud-credentials \
 
 Specify the following values in the example files:
 
-* In `examples/ibm/05-ark-backupstoragelocation.yaml`:
+* In `config/ibm/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>` and `<YOUR_URL_ACCESS_POINT>`. See the [BackupStorageLocation definition][6] for details.
 
-* (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
+* (Optional) If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.
 
@@ -66,8 +66,8 @@ Specify the following values in the example files:
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/ibm/05-ark-backupstoragelocation.yaml
-  kubectl apply -f examples/ibm/10-deployment.yaml
+  kubectl apply -f config/ibm/05-ark-backupstoragelocation.yaml
+  kubectl apply -f config/ibm/10-deployment.yaml
   ```
 
   [0]: namespace.md
