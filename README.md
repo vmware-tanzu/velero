@@ -21,7 +21,7 @@ You can run Ark in clusters on a cloud provider or on-premises. For detailed inf
 
 ## Breaking changes
 
-Ark version 0.10.0 introduces a number of breaking changes. Before you upgrade to version 0.10.0, make sure to read [the documentation on upgrading](upgrading-to-v0.10.md).
+Ark version 0.10.0 introduces a number of breaking changes. Before you upgrade to version 0.10.0, make sure to read [the documentation on upgrading](docs/upgrading-to-v0.10.md).
 
 ## More information
 
