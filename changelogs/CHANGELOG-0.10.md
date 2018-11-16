@@ -1,5 +1,12 @@
-### Highlights
+  - [v0.10.0](#v0100)
 
+## v0.10.0
+#### 2018-11-15
+
+### Download
+- https://github.com/heptio/ark/releases/tag/v0.10.0
+
+### Highlights
 - We've introduced two new custom resource definitions, `BackupStorageLocation` and `VolumeSnapshotLocation`, that replace the `Config` CRD from
 previous versions. As part of this, you may now configure more than one possible location for where backups and snapshots are stored, and when you
 create a `Backup` you can select the location where you'd like that particular backup to be stored. See the [Locations documentation][2] for an overview
