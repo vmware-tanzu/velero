@@ -26,6 +26,13 @@ See [Set up Ark on your platform][3] for how to configure Ark for a production e
 
 1. Move the `ark` binary from the Ark directory to somewhere in your PATH.
 
+#### MacOS Installation
+
+On Mac, you can use [HomeBrew](https://brew.sh) to install the `ark` client:
+```bash
+brew install ark
+```
+
 ### Set up server
 
 These instructions start the Ark server and a Minio instance that is accessible from within the cluster only. See the following section for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `ark describe` commands.
