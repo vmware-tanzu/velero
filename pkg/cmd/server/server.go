@@ -502,6 +502,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}()
 	s.metrics = metrics.NewServerMetrics()
 	s.metrics.RegisterAllMetrics()
+	// Initialize manual backup metrics
+	s.metrics.InitSchedule("")
 
 	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
 		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
