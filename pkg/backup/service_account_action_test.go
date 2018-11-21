@@ -173,7 +173,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 	clusterRoleBindingListers := map[string]ClusterRoleBindingLister{
 		rbac.SchemeGroupVersion.Version:     FakeV1ClusterRoleBindingLister{v1crbs: v1crbs},
 		rbacbeta.SchemeGroupVersion.Version: FakeV1beta1ClusterRoleBindingLister{v1beta1crbs: v1beta1crbs},
-		"": noopClusterRoleBindingLister{},
+		"":                                  noopClusterRoleBindingLister{},
 	}
 
 	for _, test := range tests {
@@ -215,7 +215,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 				}
 			}
 			`),
-			crbs: nil,
+			crbs:                    nil,
 			expectedAdditionalItems: nil,
 		},
 		{
@@ -423,7 +423,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 				}
 			}
 			`),
-			crbs: nil,
+			crbs:                    nil,
 			expectedAdditionalItems: nil,
 		},
 		{

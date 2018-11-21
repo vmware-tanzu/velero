@@ -472,7 +472,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 
 func TestBackupResourceOnlyIncludesSpecifiedNamespaces(t *testing.T) {
 	req := &Request{
-		Backup: &v1.Backup{},
+		Backup:                    &v1.Backup{},
 		NamespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("ns-1"),
 		ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 	}

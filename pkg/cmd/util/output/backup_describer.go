@@ -350,7 +350,7 @@ func groupByPhase(backups []arkv1api.PodVolumeBackup) map[string][]arkv1api.PodV
 		arkv1api.PodVolumeBackupPhaseFailed:     string(arkv1api.PodVolumeBackupPhaseFailed),
 		arkv1api.PodVolumeBackupPhaseInProgress: "In Progress",
 		arkv1api.PodVolumeBackupPhaseNew:        string(arkv1api.PodVolumeBackupPhaseNew),
-		"": string(arkv1api.PodVolumeBackupPhaseNew),
+		"":                                      string(arkv1api.PodVolumeBackupPhaseNew),
 	}
 
 	for _, backup := range backups {

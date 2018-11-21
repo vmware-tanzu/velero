@@ -81,7 +81,7 @@ func NewClusterRoleBindingListerMap(clientset kubernetes.Interface) map[string]C
 	return map[string]ClusterRoleBindingLister{
 		rbac.SchemeGroupVersion.Version:     v1ClusterRoleBindingLister{client: clientset.RbacV1().ClusterRoleBindings()},
 		rbacbeta.SchemeGroupVersion.Version: v1beta1ClusterRoleBindingLister{client: clientset.RbacV1beta1().ClusterRoleBindings()},
-		"": noopClusterRoleBindingLister{},
+		"":                                  noopClusterRoleBindingLister{},
 	}
 }
 

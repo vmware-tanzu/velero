@@ -105,8 +105,8 @@ func NewRepositoryManager(
 		repoInformerSynced:           repoInformer.Informer().HasSynced,
 		backupLocationLister:         backupLocationInformer.Lister(),
 		backupLocationInformerSynced: backupLocationInformer.Informer().HasSynced,
-		log: log,
-		ctx: ctx,
+		log:                          log,
+		ctx:                          ctx,
 
 		repoLocker:  newRepoLocker(),
 		repoEnsurer: newRepositoryEnsurer(repoInformer, repoClient, log),

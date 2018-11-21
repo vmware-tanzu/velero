@@ -377,7 +377,7 @@ func TestProcessRestore(t *testing.T) {
 			expectedPhase:                   string(api.RestorePhaseInProgress),
 			expectedFinalPhase:              string(api.RestorePhaseFailed),
 			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
-			backup: arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:                          arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
 		},
 	}
 
