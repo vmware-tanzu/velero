@@ -196,7 +196,7 @@ func groupRestoresByPhase(restores []v1.PodVolumeRestore) map[string][]v1.PodVol
 		v1.PodVolumeRestorePhaseFailed:     string(v1.PodVolumeRestorePhaseFailed),
 		v1.PodVolumeRestorePhaseInProgress: "In Progress",
 		v1.PodVolumeRestorePhaseNew:        string(v1.PodVolumeRestorePhaseNew),
-		"": string(v1.PodVolumeRestorePhaseNew),
+		"":                                 string(v1.PodVolumeRestorePhaseNew),
 	}
 
 	for _, restore := range restores {

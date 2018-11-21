@@ -251,13 +251,13 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		discoveryClient:       arkClient.Discovery(),
 		dynamicClient:         dynamicClient,
 		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(arkClient, 0, informers.WithNamespace(namespace)),
-		ctx:            ctx,
-		cancelFunc:     cancelFunc,
-		logger:         logger,
-		logLevel:       logger.Level,
-		pluginRegistry: pluginRegistry,
-		pluginManager:  pluginManager,
-		config:         config,
+		ctx:                   ctx,
+		cancelFunc:            cancelFunc,
+		logger:                logger,
+		logLevel:              logger.Level,
+		pluginRegistry:        pluginRegistry,
+		pluginManager:         pluginManager,
+		config:                config,
 	}
 
 	return s, nil

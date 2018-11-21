@@ -54,7 +54,7 @@ func TestBackupGroupBacksUpCorrectResourcesInCorrectOrder(t *testing.T) {
 	).Return(resourceBackupper)
 
 	gb := &defaultGroupBackupper{
-		log: arktest.NewLogger(),
+		log:                      arktest.NewLogger(),
 		resourceBackupperFactory: resourceBackupperFactory,
 	}
 

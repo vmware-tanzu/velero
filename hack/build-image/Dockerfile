@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.10-alpine3.8
+FROM golang:1.11-alpine3.8
 
 RUN apk add --update --no-cache git bash && \
     mkdir -p /go/src/k8s.io && \

@@ -303,8 +303,8 @@ func TestGetBackupItemActions(t *testing.T) {
 			names: []string{},
 		},
 		{
-			name:  "Error getting restartable process",
-			names: []string{"a", "b", "c"},
+			name:                       "Error getting restartable process",
+			names:                      []string{"a", "b", "c"},
 			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
 			expectedError:              "newRestartableProcess",
 		},
@@ -395,8 +395,8 @@ func TestGetRestoreItemActions(t *testing.T) {
 			names: []string{},
 		},
 		{
-			name:  "Error getting restartable process",
-			names: []string{"a", "b", "c"},
+			name:                       "Error getting restartable process",
+			names:                      []string{"a", "b", "c"},
 			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
 			expectedError:              "newRestartableProcess",
 		},

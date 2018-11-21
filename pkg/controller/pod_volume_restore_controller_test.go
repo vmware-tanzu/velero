@@ -424,7 +424,7 @@ func TestIsPVRNew(t *testing.T) {
 	pvr := &arkv1api.PodVolumeRestore{}
 
 	expectationByStatus := map[arkv1api.PodVolumeRestorePhase]bool{
-		"": true,
+		"":                                       true,
 		arkv1api.PodVolumeRestorePhaseNew:        true,
 		arkv1api.PodVolumeRestorePhaseInProgress: false,
 		arkv1api.PodVolumeRestorePhaseCompleted:  false,
