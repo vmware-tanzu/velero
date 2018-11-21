@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"sync"
@@ -79,6 +80,8 @@ const (
 	// server's client default qps and burst
 	defaultClientQPS   float32 = 20.0
 	defaultClientBurst int     = 30
+
+	defaultProfilerAddress = "localhost:6060"
 )
 
 type serverConfig struct {
@@ -89,6 +92,7 @@ type serverConfig struct {
 	restoreOnly                                      bool
 	clientQPS                                        float32
 	clientBurst                                      int
+	profilerAddress                                  string
 }
 
 func NewCommand() *cobra.Command {
@@ -105,6 +109,7 @@ func NewCommand() *cobra.Command {
 			restoreResourcePriorities:      defaultRestorePriorities,
 			clientQPS:                      defaultClientQPS,
 			clientBurst:                    defaultClientBurst,
+			profilerAddress:                defaultProfilerAddress,
 		}
 	)
 
@@ -162,6 +167,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
 	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
+	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
 
 	return command
 }
@@ -267,6 +273,10 @@ func (s *server) run() error {
 	defer s.pluginManager.CleanupClients()
 
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
+
+	if s.config.profilerAddress != "" {
+		go s.runProfiler()
+	}
 
 	// Since s.namespace, which specifies where backups/restores/schedules/etc. should live,
 	// *could* be different from the namespace where the Ark server pod runs, check to make
@@ -686,6 +696,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	wg.Wait()
 
 	return nil
+}
+
+func (s *server) runProfiler() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+
+	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
+	}
 }
 
 // TODO(1.0): remove
