@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
@@ -40,11 +41,23 @@ const (
 	bucketKey           = "bucket"
 )
 
+type s3Client interface {
+	HeadObject(input *s3.HeadObjectInput) (*s3.HeadObjectOutput, error)
+	GetObject(input *s3.GetObjectInput) (*s3.GetObjectOutput, error)
+	ListObjectsV2Pages(input *s3.ListObjectsV2Input, fn func(*s3.ListObjectsV2Output, bool) bool) error
+	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	GetObjectRequest(input *s3.GetObjectInput) (req *request.Request, output *s3.GetObjectOutput)
+}
+
+type s3Uploader interface {
+	Upload(req *s3manager.UploadInput, options ...func(*s3manager.Uploader)) (*s3manager.UploadOutput, error)
+}
+
 type objectStore struct {
 	log        logrus.FieldLogger
-	s3         *s3.S3
-	preSignS3  *s3.S3
-	s3Uploader *s3manager.Uploader
+	s3         s3Client
+	preSignS3  s3Client
+	s3Uploader s3Uploader
 	kmsKeyID   string
 }
 
