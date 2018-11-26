@@ -40,12 +40,20 @@ func TestPodActionExecute(t *testing.T) {
 		{
 			name: "nodeName (only) should be deleted from spec",
 			obj: NewTestUnstructured().WithName("pod-1").WithSpec("nodeName", "foo").
-				WithSpec("serviceAccountName", "foo").
 				WithSpecField("containers", []interface{}{}).
 				Unstructured,
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pod-1").WithSpec("foo").
-				WithSpec("serviceAccountName", "foo").
+				WithSpecField("containers", []interface{}{}).
+				Unstructured,
+		},
+		{
+			name: "priority (only) should be deleted from spec",
+			obj: NewTestUnstructured().WithName("pod-1").WithSpec("priority", "foo").
+				WithSpecField("containers", []interface{}{}).
+				Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithName("pod-1").WithSpec("foo").
 				WithSpecField("containers", []interface{}{}).
 				Unstructured,
 		},

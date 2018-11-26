@@ -1605,6 +1605,9 @@ func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
 }
 
 func (obj *testUnstructured) WithSpec(fields ...string) *testUnstructured {
+	if _, found := obj.Object["spec"]; found {
+		panic("spec already set - you probably didn't mean to do this twice!")
+	}
 	return obj.withMap("spec", fields...)
 }
 

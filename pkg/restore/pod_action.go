@@ -50,6 +50,9 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 	a.logger.Debug("deleting spec.NodeName")
 	delete(spec, "nodeName")
 
+	a.logger.Debug("deleting spec.priority")
+	delete(spec, "priority")
+
 	// if there are no volumes, then there can't be any volume mounts, so we're done.
 	if !collections.Exists(spec, "volumes") {
 		return obj, nil, nil
