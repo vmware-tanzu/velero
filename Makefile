@@ -113,6 +113,7 @@ shell: build-dirs build-image
 	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
 	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
 	@docker run \
+		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
