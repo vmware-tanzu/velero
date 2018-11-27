@@ -2,8 +2,8 @@
 
 ## Updating CHANGELOG.md
 
-Authors are expected include an entry to the CHANGLOG.md under the `Development release` heading
-with their pull requests. During the process of creating a new release entries from the root changelog will be
+Authors are expected include an entry to the CHANGELOG.md under the `Development release` heading
+with their pull requests. During the process of creating a new release, entries from CHANGELOG.md will be
 moved to the changelog for the release.
 
 ## DCO Sign off

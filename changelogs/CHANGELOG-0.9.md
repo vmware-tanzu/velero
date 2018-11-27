@@ -23,7 +23,7 @@
 ## v0.9.10
 #### 2018-11-01
 ### Download
-  - https://github.com/heptio/ark/releases/tag/v0.9.10) - 2018-11-01
+  - https://github.com/heptio/ark/releases/tag/v0.9.10
 
 ### Bug Fixes
   * restore storageclasses before pvs and pvcs (#594, @shubheksha)

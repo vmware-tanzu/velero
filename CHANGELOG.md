@@ -1,5 +1,7 @@
 ## Development release:
 
+  * _Example: Add XYZ support (@user, #issue)_
+
 ## Current release:
   * [CHANGELOG-0.10.md][8]
 
