@@ -221,5 +221,5 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [17]: https://aws.amazon.com/quickstart/architecture/heptio-kubernetes/
 [18]: https://eksctl.io/
 [19]: ../examples/README.md
-[20]: /api-types/backupstoragelocation.md
-[21]: /api-types/volumesnapshotlocation.md
+[20]: api-types/backupstoragelocation.md
+[21]: api-types/volumesnapshotlocation.md
