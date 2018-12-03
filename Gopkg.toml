@@ -120,3 +120,11 @@
 [[constraint]]
   name = "github.com/hashicorp/go-plugin"
   branch = "master"
+
+[[constraint]]
+  name = "google.golang.org/grpc"
+  version = "~1.16.0"
+
+[[constraint]]
+  name = "github.com/golang/protobuf"
+  version = "~1.2.0"
