@@ -20,8 +20,8 @@ spec:
   provider: aws
   objectStorage:
     bucket: myBucket
-    config:
-      region: us-west-2
+  config:
+    region: us-west-2
 ```
 
 ### Parameter Reference
@@ -36,13 +36,13 @@ The configurable parameters are as follows:
 | `objectStorage` | ObjectStorageLocation | Specification of the object storage for the given provider. |
 | `objectStorage/bucket` | String | Required Field | The storage bucket where backups are to be uploaded. |
 | `objectStorage/prefix` | String | Optional Field | The directory inside a storage bucket where backups are to be uploaded. |
-| `objectStorage/config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
+| `config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
 
 #### AWS
 
 **(Or other S3-compatible storage)**
 
-##### objectStorage/config
+##### config
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ The configurable parameters are as follows:
 
 #### Azure
 
-##### objectStorage/config
+##### config
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
