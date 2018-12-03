@@ -69,3 +69,4 @@ No parameters required.
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
