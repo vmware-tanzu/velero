@@ -146,7 +146,7 @@ In the root of your Ark directory, run:
   ```
 
 [0]: namespace.md
-[8]: /docs/api-types/volumesnapshotlocation.md#azure
+[8]: api-types/volumesnapshotlocation.md#azure
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
 [18]: https://docs.microsoft.com/en-us/cli/azure/install-azure-cli
 [19]: https://docs.microsoft.com/en-us/azure/architecture/best-practices/naming-conventions#storage
