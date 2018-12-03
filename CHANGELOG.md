@@ -1,6 +1,13 @@
 ## Development release:
 
-  * _Example: Add XYZ support (@user, #issue)_
+  * _Example: Add XYZ support (#issue, @user)_
+
+  ### Bug Fixes / Other Changes
+    * Delete spec.priority in pod restore action (#879, @mwieczorek)
+    * Added brew reference (#1051, @omerlh)
+    * Update to go 1.11 (#1069, @gliptak)
+    * Initialize empty schedule metrics on server init (#1054, @cbeneke) 
+    * Update CHANGELOGs (#1063, @wwitzel3)
 
 ## Current release:
   * [CHANGELOG-0.10.md][8]
