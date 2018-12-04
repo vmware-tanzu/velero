@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
@@ -38,18 +39,28 @@ const (
 	kmsKeyIDKey         = "kmsKeyId"
 	s3ForcePathStyleKey = "s3ForcePathStyle"
 	bucketKey           = "bucket"
+	signatureVersionKey = "signatureVersion"
 )
 
 type objectStore struct {
-	log        logrus.FieldLogger
-	s3         *s3.S3
-	preSignS3  *s3.S3
-	s3Uploader *s3manager.Uploader
-	kmsKeyID   string
+	log              logrus.FieldLogger
+	s3               *s3.S3
+	preSignS3        *s3.S3
+	s3Uploader       *s3manager.Uploader
+	kmsKeyID         string
+	signatureVersion string
 }
 
 func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
 	return &objectStore{log: logger}
+}
+
+func isValidSignatureVersion(signatureVersion string) bool {
+	switch signatureVersion {
+	case "1", "4":
+		return true
+	}
+	return false
 }
 
 func (o *objectStore) Init(config map[string]string) error {
@@ -59,6 +70,7 @@ func (o *objectStore) Init(config map[string]string) error {
 		publicURL           = config[publicURLKey]
 		kmsKeyID            = config[kmsKeyIDKey]
 		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
+		signatureVersion    = config[signatureVersionKey]
 
 		// note that bucket is automatically added to the config map
 		// by the server from the ObjectStorageProviderConfig so
@@ -99,6 +111,13 @@ func (o *objectStore) Init(config map[string]string) error {
 	o.s3 = s3.New(serverSession)
 	o.s3Uploader = s3manager.NewUploader(serverSession)
 	o.kmsKeyID = kmsKeyID
+
+	if signatureVersion != "" {
+		if !isValidSignatureVersion(signatureVersion) {
+			return errors.Errorf("invalid signature version: %s", signatureVersion)
+		}
+		o.signatureVersion = signatureVersion
+	}
 
 	if publicURL != "" {
 		publicConfig, err := newAWSConfig(publicURL, region, s3ForcePathStyle)
@@ -238,6 +257,11 @@ func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (st
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
+
+	if o.signatureVersion == "1" {
+		req.Handlers.Sign.Remove(v4.SignRequestHandler)
+		req.Handlers.Sign.PushBackNamed(v1SignRequestHandler)
+	}
 
 	return req.Presign(ttl)
 }

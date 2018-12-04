@@ -20,6 +20,9 @@ _Note that these providers are not regularly tested by the Ark team._
  * [Minio][9]
  * Ceph RADOS v12.2.7
  * [DigitalOcean][7]
+ * Quobyte
+
+_Some storage providers, like Quobyte, may need a different [signature algorithm version][15]._
 
 ## Volume Snapshot Providers
 
@@ -52,3 +55,4 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [12]: https://github.com/aws/aws-sdk-go/aws
 [13]: https://portworx.slack.com/messages/px-k8s
 [14]: https://github.com/portworx/ark-plugin/issues
+[15]: api-types/backupstoragelocation.md#aws

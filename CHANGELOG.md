@@ -10,7 +10,8 @@
   * Initialize empty schedule metrics on server init (#1054, @cbeneke)
   * Update CHANGELOGs (#1063, @wwitzel3)
   * Remove default token from all service accounts (#1048, @ncdc)
-
+  * Allow to use AWS Signature v1 for creating signed AWS urls (#811, @bashofmann)
+  
 ## Current release:
   * [CHANGELOG-0.10.md][8]
 
