@@ -17,7 +17,6 @@ package restore
 
 import (
 	"encoding/json"
-	"strings"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -30,7 +29,6 @@ import (
 )
 
 // mergeServiceAccount takes a backed up serviceaccount and merges attributes into the current in-cluster service account.
-// The default token secret from the backed up serviceaccount will be ignored in favor of the one already present.
 // Labels and Annotations on the backed up version but not on the in-cluster version will be merged. If a key is specified in both, the in-cluster version is retained.
 func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	desired := new(corev1api.ServiceAccount)
@@ -42,15 +40,6 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 	backupSA := new(corev1api.ServiceAccount)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(fromBackup.UnstructuredContent(), backupSA); err != nil {
 		return nil, errors.Wrap(err, "unable to convert from backed up service account unstructured to serviceaccount")
-	}
-
-	for i := len(backupSA.Secrets) - 1; i >= 0; i-- {
-		secret := &backupSA.Secrets[i]
-		if strings.HasPrefix(secret.Name, backupSA.Name+"-token-") {
-			// Copy all secrets *except* -token-
-			backupSA.Secrets = append(backupSA.Secrets[:i], backupSA.Secrets[i+1:]...)
-			break
-		}
 	}
 
 	desired.Secrets = mergeObjectReferenceSlices(desired.Secrets, backupSA.Secrets)
