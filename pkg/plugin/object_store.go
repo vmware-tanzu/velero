@@ -24,7 +24,9 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 
+	"github.com/heptio/ark/pkg/arkerrors"
 	"github.com/heptio/ark/pkg/cloudprovider"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
 )
@@ -74,9 +76,12 @@ func newObjectStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) int
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
 func (c *ObjectStoreGRPCClient) Init(config map[string]string) error {
-	_, err := c.grpcClient.Init(context.Background(), &proto.InitRequest{Plugin: c.plugin, Config: config})
+	_, err := c.grpcClient.Init(context.Background(), &proto.InitObjectStoreRequest{Plugin: c.plugin, Config: config})
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 // PutObject creates a new object using the data in body within the specified
@@ -112,23 +117,43 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, error) {
 	stream, err := c.grpcClient.GetObject(context.Background(), &proto.GetObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key})
 	if err != nil {
-		return nil, err
+		// Because the response is a stream, any error received here means the attempt to initiate the stream
+		// with the server failed, before entering the server's handler function (GetObject). Errors returned
+		// from withing the server's handler function are returned by stream.Recv().
+		return nil, errors.WithStack(err)
+	}
+
+	// If the GetObject server code returns an error, it isn't the 'err' above. Instead,
+	// it comes when calling Recv. Because of this, we have to try to receive the first
+	// chunk and check for an error.
+	firstChunk, err := stream.Recv()
+	if err != nil {
+		return nil, fromServerError(err, detailHandlerFunc(func(details []interface{}) error {
+			for _, detail := range details {
+				if nfe, ok := detail.(*proto.ObjectNotFound); ok {
+					return cloudprovider.NewNotFoundError(nfe.Bucket, nfe.Key)
+				}
+			}
+			return nil
+		}))
 	}
 
 	receive := func() ([]byte, error) {
 		data, err := stream.Recv()
 		if err != nil {
-			return nil, err
+			// client-side: always wrap errors using fromServerError
+			return nil, fromServerError(err)
 		}
 
 		return data.Data, nil
 	}
 
 	close := func() error {
-		return stream.CloseSend()
+		// client-side: always wrap errors using fromServerError
+		return fromServerError(stream.CloseSend())
 	}
 
-	return &StreamReadCloser{receive: receive, close: close}, nil
+	return NewStreamReadCloser(firstChunk.Data, receive, close), nil
 }
 
 // ListCommonPrefixes gets a list of all object key prefixes that come
@@ -216,7 +241,14 @@ func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore,
 // Init prepares the ObjectStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
-func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (*proto.Empty, error) {
+func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitObjectStoreRequest) (result *proto.InitObjectStoreResponse, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			recoveredErr := arkerrors.Recover(r)
+			err = newGRPCError(codes.Unknown, recoveredErr)
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -226,7 +258,7 @@ func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return &proto.InitObjectStoreResponse{}, nil
 }
 
 // PutObject creates a new object using the data in body within the specified
@@ -269,34 +301,56 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 		return err
 	}
 
-	return stream.SendAndClose(&proto.Empty{})
+	return stream.SendAndClose(&proto.PutObjectResponse{})
 }
 
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
-func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) error {
+func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			recoveredErr := arkerrors.Recover(r)
+			err = newGRPCError(codes.Unknown, recoveredErr)
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return err
+		// server-side: always wrap errors with newGRPCError
+		return newGRPCError(codes.Unknown, err)
 	}
 
 	rdr, err := impl.GetObject(req.Bucket, req.Key)
-	if err != nil {
-		return err
+	if cpe := cloudprovider.ToNotFoundError(err); cpe != nil {
+		objectNotFoundDetails := &proto.ObjectNotFound{
+			Bucket: cpe.Bucket(),
+			Key:    cpe.Key(),
+		}
+
+		// server-side: always wrap errors with newGRPCError
+		return newGRPCError(codes.NotFound, err, objectNotFoundDetails)
 	}
+	if err != nil {
+		// server-side: always wrap errors with newGRPCError
+		return newGRPCError(codes.Unknown, err)
+	}
+	// Must close the ReadCloser that impl.GetObject returns
+	defer rdr.Close()
 
 	chunk := make([]byte, byteChunkSize)
 	for {
 		n, err := rdr.Read(chunk)
 		if err != nil && err != io.EOF {
-			return err
+			// server-side: always wrap errors with newGRPCError
+			return newGRPCError(codes.Unknown, err)
 		}
 		if n == 0 {
 			return nil
 		}
 
 		if err := stream.Send(&proto.Bytes{Data: chunk[0:n]}); err != nil {
-			return err
+			// server-side: always wrap errors with newGRPCError
+			return newGRPCError(codes.Unknown, err)
 		}
 	}
 }

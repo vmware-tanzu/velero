@@ -39,6 +39,14 @@ type StreamReadCloser struct {
 	close   CloseFunc
 }
 
+func NewStreamReadCloser(firstChunk []byte, receive ReceiveFunc, close CloseFunc) *StreamReadCloser {
+	return &StreamReadCloser{
+		buf:     bytes.NewBuffer(firstChunk),
+		receive: receive,
+		close:   close,
+	}
+}
+
 func (s *StreamReadCloser) Read(p []byte) (n int, err error) {
 	for {
 		// if buf exists and holds at least as much as we're trying to read,

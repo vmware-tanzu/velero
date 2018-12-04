@@ -18,6 +18,7 @@ package logging
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -45,26 +46,68 @@ func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
 	)
 
 	if errObj, exists = entry.Data[logrus.ErrorKey]; !exists {
+		// If there is no error field in the entry, return early.
+		return nil
+	}
+	if _, exists := entry.Data[errorFileField]; exists {
+		// If there is already an error file field, preserve it instead of overwriting it. This field will already exist if
+		// the log message occurred in the server half of a plugin.
+		return nil
+	}
+	if _, exists := entry.Data[errorFunctionField]; exists {
+		// If there is already an error function field, preserve it instead of overwriting it. This field will already exist if
+		// the log message occurred in the server half of a plugin.
 		return nil
 	}
 
 	err, ok := errObj.(error)
 	if !ok {
-		return errors.New("object logged as error does not satisfy error interface")
+		return errors.Errorf("object logged as error does not satisfy error interface; type=%T", errObj)
+	}
+
+	// If the error is an errorLocationProvider, use that information. This applies to errors from plugins.
+	if elp, ok := err.(errorLocationProvider); ok {
+		el := elp.ErrorLocation()
+		entry.Data[errorFileField] = removeArkPackagePrefix(el.FileAndLine())
+		entry.Data[errorFunctionField] = el.Function
+		return nil
 	}
 
 	stackErr := getInnermostTrace(err)
 
 	if stackErr != nil {
 		stackTrace := stackErr.StackTrace()
-		functionName := fmt.Sprintf("%n", stackTrace[0])
-		fileAndLine := fmt.Sprintf("%s:%d", stackTrace[0], stackTrace[0])
+		// There is not a format specifier that gets the full path of the file
+		// (see https://github.com/pkg/errors/issues/136). We use %+v which prints
+		// out "FunctionName\n\tFile:Line" and then we parse it into each part.
+		functionNameAndFileAndLine := fmt.Sprintf("%+v", stackTrace[0])
+		newLine := strings.Index(functionNameAndFileAndLine, "\n")
+		functionName := functionNameAndFileAndLine[0:newLine]
+		tab := strings.LastIndex(functionNameAndFileAndLine, "\t")
+		fileAndLine := removeArkPackagePrefix(functionNameAndFileAndLine[tab+1:])
 
 		entry.Data[errorFileField] = fileAndLine
 		entry.Data[errorFunctionField] = functionName
 	}
 
 	return nil
+}
+
+// errorLocationProvider returns an ErrorLocation.
+type errorLocationProvider interface {
+	ErrorLocation() ErrorLocation
+}
+
+// ErrorLocation represents the file, line, and function where an error occurred.
+type ErrorLocation struct {
+	File     string
+	Line     int32
+	Function string
+}
+
+// FileAndLine returns the string representation of the error location's file and line.
+func (e ErrorLocation) FileAndLine() string {
+	return fmt.Sprintf("%s:%d", e.File, e.Line)
 }
 
 type stackTracer interface {

@@ -26,6 +26,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testErrorLocationProvider struct{}
+
+func (p *testErrorLocationProvider) ErrorLocation() ErrorLocation {
+	return ErrorLocation{
+		File:     "file.go",
+		Line:     int32(123),
+		Function: "MyFunction",
+	}
+}
+
+func (p *testErrorLocationProvider) Error() string {
+	return "testErrorLocationProvider error!"
+}
+
 func TestFire(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -54,8 +68,30 @@ func TestFire(t *testing.T) {
 			preEntryFields: map[string]interface{}{logrus.ErrorKey: pkgerrs.New("a pkg/errors error")},
 			expectedEntryFields: map[string]interface{}{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
-				errorFileField:     "",
-				errorFunctionField: "TestFire",
+				errorFileField:     "pkg/util/logging/error_location_hook_test.go:68",
+				errorFunctionField: "github.com/heptio/ark/pkg/util/logging.TestFire",
+			},
+		},
+		{
+			name: "already have error file and function fields",
+			preEntryFields: map[string]interface{}{
+				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
+				errorFileField:     "some_file.go:123",
+				errorFunctionField: "SomeFunction",
+			},
+			expectedEntryFields: map[string]interface{}{
+				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
+				errorFileField:     "some_file.go:123",
+				errorFunctionField: "SomeFunction",
+			},
+		},
+		{
+			name:           "errorLocationProvider",
+			preEntryFields: map[string]interface{}{logrus.ErrorKey: &testErrorLocationProvider{}},
+			expectedEntryFields: map[string]interface{}{
+				logrus.ErrorKey:    &testErrorLocationProvider{},
+				errorFileField:     (&testErrorLocationProvider{}).ErrorLocation().FileAndLine(),
+				errorFunctionField: (&testErrorLocationProvider{}).ErrorLocation().Function,
 			},
 		},
 	}
@@ -79,9 +115,6 @@ func TestFire(t *testing.T) {
 				assert.True(t, found, "expected key not found: %s", key)
 
 				switch key {
-				// test existence of this field only since testing the value
-				// is fragile
-				case errorFileField:
 				case logrus.ErrorKey:
 					if err, ok := expectedValue.(error); ok {
 						assert.Equal(t, err.Error(), actualValue.(error).Error())

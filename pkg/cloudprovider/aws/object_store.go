@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -187,11 +188,29 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	}
 
 	res, err := o.s3.GetObject(req)
+	if isNoSuchKeyError(err) {
+		// wrap the error to give it a stack trace for here
+		return nil, errors.WithStack(cloudprovider.NewNotFoundError(bucket, key))
+	}
 	if err != nil {
+		// wrap the error to give it a stack trace for here
 		return nil, errors.Wrapf(err, "error getting object %s", key)
 	}
 
 	return res.Body, nil
+}
+
+func isNoSuchKeyError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	aerr, ok := err.(awserr.Error)
+	if !ok {
+		return false
+	}
+
+	return aerr.Code() == s3.ErrCodeNoSuchKey
 }
 
 func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {

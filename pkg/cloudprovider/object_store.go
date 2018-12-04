@@ -17,8 +17,11 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"fmt"
 	"io"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 // ObjectStore exposes basic object-storage operations required
@@ -59,4 +62,42 @@ type ObjectStore interface {
 
 	// CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
 	CreateSignedURL(bucket, key string, ttl time.Duration) (string, error)
+}
+
+// NotFoundError indicates an object could not be found in object storage.
+type NotFoundError struct {
+	bucket string
+	key    string
+}
+
+// NewNotFoundError creates a new NotFoundError.
+func NewNotFoundError(bucket, key string) error {
+	return &NotFoundError{
+		bucket: bucket,
+		key:    key,
+	}
+}
+
+func (e *NotFoundError) Error() string {
+	return fmt.Sprintf("%s/%s not found", e.bucket, e.key)
+}
+
+// Bucket returns the bucket.
+func (e *NotFoundError) Bucket() string {
+	return e.bucket
+}
+
+// Key returns the key.
+func (e *NotFoundError) Key() string {
+	return e.key
+}
+
+// ToNotFoundError returns a *NotFoundError if err or its cause is a *NotFoundError. Otherwise, ToNotFoundError returns
+// nil.
+func ToNotFoundError(err error) *NotFoundError {
+	if e, ok := errors.Cause(err).(*NotFoundError); ok {
+		return e
+	}
+
+	return nil
 }

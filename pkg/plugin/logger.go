@@ -50,6 +50,9 @@ func NewLogger() logrus.FieldLogger {
 	// server logger that the location has been set within a hook.
 	logger.Hooks.Add((&logging.LogLocationHook{}).WithLoggerName("plugin"))
 
+	// make sure we attempt to record the error location
+	logger.Hooks.Add(&logging.ErrorLocationHook{})
+
 	// this hook adjusts the string representation of WarnLevel to "warn"
 	// rather than "warning" to make it parseable by go-plugin within the
 	// Ark server code

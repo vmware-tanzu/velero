@@ -3,11 +3,22 @@ package generated;
 
 import "Shared.proto";
 
+message InitObjectStoreRequest {
+    string plugin = 1;
+    map<string, string> config = 2;
+}
+
+message InitObjectStoreResponse {
+}
+
 message PutObjectRequest {
     string plugin = 1;
     string bucket = 2;
     string key = 3;
     bytes body = 4;
+}
+
+message PutObjectResponse {
 }
 
 message GetObjectRequest {
@@ -18,6 +29,11 @@ message GetObjectRequest {
 
 message Bytes {
     bytes data = 1;
+}
+
+message ObjectNotFound {
+    string bucket = 1;
+    string key = 2;
 }
 
 message ListCommonPrefixesRequest {
@@ -43,7 +59,7 @@ message ListObjectsResponse {
 
 message DeleteObjectRequest {
     string plugin = 1;
-    string bucket = 2;  
+    string bucket = 2;
     string key = 3;
 }
 
@@ -60,8 +76,8 @@ message CreateSignedURLResponse {
 }
 
 service ObjectStore {
-    rpc Init(InitRequest) returns (Empty);
-    rpc PutObject(stream PutObjectRequest) returns (Empty);
+    rpc Init(InitObjectStoreRequest) returns (InitObjectStoreResponse);
+    rpc PutObject(stream PutObjectRequest) returns (PutObjectResponse);
     rpc GetObject(GetObjectRequest) returns (stream Bytes);
     rpc ListCommonPrefixes(ListCommonPrefixesRequest) returns (ListCommonPrefixesResponse);
     rpc ListObjects(ListObjectsRequest) returns (ListObjectsResponse);

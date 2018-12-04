@@ -18,6 +18,7 @@ package azure
 
 import (
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -131,6 +132,19 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
+func isNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	ae, ok := err.(storage.AzureStorageServiceError)
+	if !ok {
+		return false
+	}
+
+	return ae.StatusCode == http.StatusNotFound
+}
+
 func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
@@ -143,6 +157,9 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	}
 
 	res, err := blob.Get(nil)
+	if isNotFoundError(err) {
+		return nil, errors.WithStack(cloudprovider.NewNotFoundError(bucket, key))
+	}
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

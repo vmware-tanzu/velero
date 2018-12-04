@@ -27,9 +27,13 @@ It has these top-level messages:
 	GetVolumeIDResponse
 	SetVolumeIDRequest
 	SetVolumeIDResponse
+	InitObjectStoreRequest
+	InitObjectStoreResponse
 	PutObjectRequest
+	PutObjectResponse
 	GetObjectRequest
 	Bytes
+	ObjectNotFound
 	ListCommonPrefixesRequest
 	ListCommonPrefixesResponse
 	ListObjectsRequest
@@ -45,6 +49,9 @@ It has these top-level messages:
 	InitRequest
 	AppliesToRequest
 	AppliesToResponse
+	Error
+	StackFrame
+	Stack
 */
 package generated
 

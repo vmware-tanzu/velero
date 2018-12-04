@@ -14,24 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package aws
+package azure
 
 import (
+	"net/http"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsValidSignatureVersion(t *testing.T) {
-	assert.True(t, isValidSignatureVersion("1"))
-	assert.True(t, isValidSignatureVersion("4"))
-	assert.False(t, isValidSignatureVersion("3"))
-}
-
-func TestIsNoSuchKeyError(t *testing.T) {
+func TestIsNotFoundError(t *testing.T) {
 	tests := []struct {
 		name     string
 		err      error
@@ -43,25 +37,25 @@ func TestIsNoSuchKeyError(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "non aws error",
+			name:     "non azure error",
 			err:      errors.Errorf("foo"),
 			expected: false,
 		},
 		{
-			name:     "aws error, wrong code",
-			err:      awserr.New("some-code", "some-message", nil),
+			name:     "azure error, wrong code",
+			err:      storage.AzureStorageServiceError{StatusCode: http.StatusInternalServerError},
 			expected: false,
 		},
 		{
-			name:     "aws error, right code",
-			err:      awserr.New(s3.ErrCodeNoSuchKey, "some-message", nil),
+			name:     "azure error, right code",
+			err:      storage.AzureStorageServiceError{StatusCode: http.StatusNotFound},
 			expected: true,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := isNoSuchKeyError(tc.err)
+			actual := isNotFoundError(tc.err)
 			assert.Equal(t, tc.expected, actual)
 		})
 	}

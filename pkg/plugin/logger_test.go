@@ -37,6 +37,7 @@ func TestNewLogger(t *testing.T) {
 
 	expectedHooks := []logrus.Hook{
 		(&logging.LogLocationHook{}).WithLoggerName("plugin"),
+		&logging.ErrorLocationHook{},
 		&logging.HcLogLevelHook{},
 	}
 

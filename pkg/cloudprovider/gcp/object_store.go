@@ -115,6 +115,9 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 
 func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	r, err := o.client.Bucket(bucket).Object(key).NewReader(context.Background())
+	if err == storage.ErrObjectNotExist {
+		return nil, errors.WithStack(cloudprovider.NewNotFoundError(bucket, key))
+	}
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
