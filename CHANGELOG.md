@@ -2,12 +2,13 @@
 
   * _Example: Add XYZ support (#issue, @user)_
 
-  ### Bug Fixes / Other Changes
-    * Delete spec.priority in pod restore action (#879, @mwieczorek)
-    * Added brew reference (#1051, @omerlh)
-    * Update to go 1.11 (#1069, @gliptak)
-    * Initialize empty schedule metrics on server init (#1054, @cbeneke) 
-    * Update CHANGELOGs (#1063, @wwitzel3)
+### Bug Fixes / Other Changes
+  * add multizone/regional support to gcp (#765, @wwitzel3)
+  * Delete spec.priority in pod restore action (#879, @mwieczorek)
+  * Added brew reference (#1051, @omerlh)
+  * Update to go 1.11 (#1069, @gliptak)
+  * Initialize empty schedule metrics on server init (#1054, @cbeneke) 
+  * Update CHANGELOGs (#1063, @wwitzel3)
 
 ## Current release:
   * [CHANGELOG-0.10.md][8]

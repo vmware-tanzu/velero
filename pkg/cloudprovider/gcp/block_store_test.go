@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -149,6 +150,65 @@ func TestGetSnapshotTags(t *testing.T) {
 			for k, v := range expectedMap {
 				assert.Equal(t, v, actualMap[k])
 			}
+		})
+	}
+}
+
+func TestRegionHelpers(t *testing.T) {
+	tests := []struct {
+		name                string
+		volumeAZ            string
+		expectedRegion      string
+		expectedIsMultiZone bool
+		expectedError       error
+	}{
+		{
+			name:                "valid multizone(2) tag",
+			volumeAZ:            "us-central1-a__us-central1-b",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: true,
+			expectedError:       nil,
+		},
+		{
+			name:                "valid multizone(4) tag",
+			volumeAZ:            "us-central1-a__us-central1-b__us-central1-f__us-central1-e",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: true,
+			expectedError:       nil,
+		},
+		{
+			name:                "valid single zone tag",
+			volumeAZ:            "us-central1-a",
+			expectedRegion:      "us-central1",
+			expectedIsMultiZone: false,
+			expectedError:       nil,
+		},
+		{
+			name:                "invalid single zone tag",
+			volumeAZ:            "us^central1^a",
+			expectedRegion:      "",
+			expectedIsMultiZone: false,
+			expectedError:       errors.Errorf("failed to parse region from zone: %q", "us^central1^a"),
+		},
+		{
+			name:                "invalid multizone tag",
+			volumeAZ:            "us^central1^a__us^central1^b",
+			expectedRegion:      "",
+			expectedIsMultiZone: true,
+			expectedError:       errors.Errorf("failed to parse region from zone: %q", "us^central1^a__us^central1^b"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.expectedIsMultiZone, isMultiZone(test.volumeAZ))
+			region, err := parseRegion(test.volumeAZ)
+			if test.expectedError == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.Equal(t, test.expectedError.Error(), err.Error())
+			}
+			assert.Equal(t, test.expectedRegion, region)
 		})
 	}
 }
