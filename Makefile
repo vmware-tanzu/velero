@@ -196,30 +196,6 @@ endif
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
-release: all-tar-bin checksum
-
-checksum:
-	@cd _output/release; \
-	sha256sum *.tar.gz > CHECKSUM; \
-	cat CHECKSUM; \
-	sha256sum CHECKSUM
-
-all-tar-bin: $(addprefix tar-bin-, $(CLI_PLATFORMS))
-
-tar-bin-%:
-	$(MAKE) ARCH=$* VERSION=$(VERSION) tar-bin
-
-GIT_DESCRIBE = $(shell git describe --tags --always --dirty)
-tar-bin: build
-	mkdir -p _output/release
-
-# We do the subshell & wildcard ls so we can pick up $(BIN).exe for windows
-	(cd _output/bin/$(GOOS)/$(GOARCH) && ls $(BIN)*) | \
-		tar \
-			-C _output/bin/$(GOOS)/$(GOARCH) \
-			--files-from=- \
-			-zcf _output/release/$(BIN)-$(GIT_DESCRIBE)-$(GOOS)-$(GOARCH).tar.gz
-
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build
@@ -233,7 +209,9 @@ clean:
 	docker rmi $(BUILDER_IMAGE)
 
 ci: all verify test
+
 changelog:
 	hack/changelog.sh
-goreleaser:
+
+release:
 	hack/goreleaser.sh
