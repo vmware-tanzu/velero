@@ -90,6 +90,14 @@ type ScheduleListerExpansion interface{}
 // ScheduleNamespaceLister.
 type ScheduleNamespaceListerExpansion interface{}
 
+// ServerStatusRequestListerExpansion allows custom methods to be added to
+// ServerStatusRequestLister.
+type ServerStatusRequestListerExpansion interface{}
+
+// ServerStatusRequestNamespaceListerExpansion allows custom methods to be added to
+// ServerStatusRequestNamespaceLister.
+type ServerStatusRequestNamespaceListerExpansion interface{}
+
 // VolumeSnapshotLocationListerExpansion allows custom methods to be added to
 // VolumeSnapshotLocationLister.
 type VolumeSnapshotLocationListerExpansion interface{}

@@ -681,6 +681,17 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		wg.Done()
 	}()
 
+	serverStatusRequestController := controller.NewServerStatusRequestController(
+		s.logger,
+		s.arkClient.ArkV1(),
+		s.sharedInformerFactory.Ark().V1().ServerStatusRequests(),
+	)
+	wg.Add(1)
+	go func() {
+		serverStatusRequestController.Run(ctx, 1)
+		wg.Done()
+	}()
+
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 

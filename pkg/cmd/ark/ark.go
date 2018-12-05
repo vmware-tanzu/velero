@@ -62,7 +62,7 @@ operations can also be performed as 'ark backup get' and 'ark schedule create'.`
 		schedule.NewCommand(f),
 		restore.NewCommand(f),
 		server.NewCommand(),
-		version.NewCommand(),
+		version.NewCommand(f),
 		get.NewCommand(f),
 		describe.NewCommand(f),
 		create.NewCommand(f),

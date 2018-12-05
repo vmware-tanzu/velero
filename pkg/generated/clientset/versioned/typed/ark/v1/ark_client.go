@@ -36,6 +36,7 @@ type ArkV1Interface interface {
 	ResticRepositoriesGetter
 	RestoresGetter
 	SchedulesGetter
+	ServerStatusRequestsGetter
 	VolumeSnapshotLocationsGetter
 }
 
@@ -78,6 +79,10 @@ func (c *ArkV1Client) Restores(namespace string) RestoreInterface {
 
 func (c *ArkV1Client) Schedules(namespace string) ScheduleInterface {
 	return newSchedules(c, namespace)
+}
+
+func (c *ArkV1Client) ServerStatusRequests(namespace string) ServerStatusRequestInterface {
+	return newServerStatusRequests(c, namespace)
 }
 
 func (c *ArkV1Client) VolumeSnapshotLocations(namespace string) VolumeSnapshotLocationInterface {
