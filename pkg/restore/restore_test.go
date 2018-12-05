@@ -1880,10 +1880,10 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+	metadata, err := collections.GetMap(input.Item.UnstructuredContent(), "metadata")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if _, found := metadata["labels"]; !found {
@@ -1892,18 +1892,18 @@ func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (ru
 
 	metadata["labels"].(map[string]interface{})["fake-restorer"] = "foo"
 
-	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	unstructuredObj, ok := input.Item.(*unstructured.Unstructured)
 	if !ok {
-		return nil, nil, errors.New("Unexpected type")
+		return nil, errors.New("Unexpected type")
 	}
 
 	// want the baseline functionality too
 	res, err := resetMetadataAndStatus(unstructuredObj)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return res, nil, nil
+	return NewRestoreItemActionExecuteOutput(res), nil
 }
 
 type fakeNamespaceClient struct {

@@ -18,9 +18,7 @@ package restore
 
 import (
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/collections"
 )
 
@@ -38,7 +36,7 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *jobAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	fieldDeletions := map[string]string{
 		"spec.selector.matchLabels":     "controller-uid",
 		"spec.template.metadata.labels": "controller-uid",
@@ -46,7 +44,7 @@ func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 
 	for k, v := range fieldDeletions {
 		a.logger.Debugf("Getting %s", k)
-		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
+		labels, err := collections.GetMap(input.Item.UnstructuredContent(), k)
 		if err != nil {
 			a.logger.WithError(err).Debugf("Unable to get %s", k)
 		} else {
@@ -54,5 +52,5 @@ func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		}
 	}
 
-	return obj, nil, nil
+	return NewRestoreItemActionExecuteOutput(input.Item), nil
 }

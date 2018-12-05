@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -169,17 +170,21 @@ func TestPodActionExecute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			action := NewPodAction(velerotest.NewLogger())
 
-			res, warning, err := action.Execute(test.obj, nil)
-
-			assert.Nil(t, warning)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           test.obj,
+				ItemFromBackup: test.obj,
+				Restore:        nil,
+			})
 
 			if test.expectedErr {
 				assert.NotNil(t, err, "expected an error")
-			} else {
-				assert.Nil(t, err, "expected no error, got %v", err)
+				return
 			}
+			assert.Nil(t, err, "expected no error, got %v", err)
 
-			assert.Equal(t, test.expectedRes, res)
+			require.NotNil(t, res)
+			assert.Nil(t, res.Warning)
+			assert.Equal(t, test.expectedRes, res.UpdatedItem)
 		})
 	}
 }

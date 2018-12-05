@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/collections"
 )
 
@@ -45,10 +44,10 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+func (a *serviceAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+	spec, err := collections.GetMap(input.Item.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
@@ -56,10 +55,10 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 		delete(spec, "clusterIP")
 	}
 
-	if err := deleteNodePorts(obj, &spec); err != nil {
-		return nil, nil, err
+	if err := deleteNodePorts(input.Item, &spec); err != nil {
+		return nil, err
 	}
-	return obj, nil, nil
+	return NewRestoreItemActionExecuteOutput(input.Item), nil
 }
 
 func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {

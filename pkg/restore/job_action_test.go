@@ -124,10 +124,14 @@ func TestJobActionExecute(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			action := NewJobAction(velerotest.NewLogger())
 
-			res, _, err := action.Execute(test.obj, nil)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           test.obj,
+				ItemFromBackup: test.obj,
+				Restore:        nil,
+			})
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
-				assert.Equal(t, test.expectedRes, res)
+				assert.Equal(t, test.expectedRes, res.UpdatedItem)
 			}
 		})
 	}

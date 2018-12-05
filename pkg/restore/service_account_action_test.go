@@ -89,12 +89,16 @@ func TestServiceAccountActionExecute(t *testing.T) {
 			require.NoError(t, err)
 
 			action := NewServiceAccountAction(test.NewLogger())
-			res, warning, err := action.Execute(&unstructured.Unstructured{Object: saUnstructured}, nil)
-			require.NoError(t, warning)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: saUnstructured},
+				ItemFromBackup: &unstructured.Unstructured{Object: saUnstructured},
+				Restore:        nil,
+			})
+			require.NoError(t, res.Warning)
 			require.NoError(t, err)
 
 			var resSA *corev1.ServiceAccount
-			err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UnstructuredContent(), &resSA)
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &resSA)
 			require.NoError(t, err)
 
 			actual := []string{}

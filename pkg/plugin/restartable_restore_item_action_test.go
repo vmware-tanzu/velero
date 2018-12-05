@@ -98,18 +98,25 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 }
 
 func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
-	r := new(v1.Restore)
-
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"color": "blue",
 		},
 	}
 
-	pvToReturn := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"color": "green",
+	input := &restore.RestoreItemActionExecuteInput{
+		Item:           pv,
+		ItemFromBackup: pv,
+		Restore:        new(v1.Restore),
+	}
+
+	output := &restore.RestoreItemActionExecuteOutput{
+		UpdatedItem: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"color": "green",
+			},
 		},
+		Warning: errors.Errorf("delegate warning"),
 	}
 
 	runRestartableDelegateTests(
@@ -132,9 +139,9 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 		},
 		restartableDelegateTest{
 			function:                "Execute",
-			inputs:                  []interface{}{pv, r},
-			expectedErrorOutputs:    []interface{}{nil, nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{pvToReturn, errors.Errorf("delegate warning"), errors.Errorf("delegate error")},
+			inputs:                  []interface{}{input},
+			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{output, errors.Errorf("delegate error")},
 		},
 	)
 }

@@ -20,9 +20,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/collections"
 )
 
@@ -40,11 +38,11 @@ func (a *podAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *podAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	a.logger.Debug("getting spec")
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	spec, err := collections.GetMap(input.Item.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	a.logger.Debug("deleting spec.NodeName")
@@ -55,38 +53,38 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 
 	// if there are no volumes, then there can't be any volume mounts, so we're done.
 	if !collections.Exists(spec, "volumes") {
-		return obj, nil, nil
+		return NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	serviceAccountName, err := collections.GetString(spec, "serviceAccountName")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	prefix := serviceAccountName + "-token-"
 
 	// remove the service account token from volumes
 	a.logger.Debug("iterating over volumes")
 	if err := removeItemsWithNamePrefix(spec, "volumes", prefix, a.logger); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	// remove the service account token volume mount from all containers
 	a.logger.Debug("iterating over containers")
 	if err := removeVolumeMounts(spec, "containers", prefix, a.logger); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if !collections.Exists(spec, "initContainers") {
-		return obj, nil, nil
+		return NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	// remove the service account token volume mount from all init containers
 	a.logger.Debug("iterating over init containers")
 	if err := removeVolumeMounts(spec, "initContainers", prefix, a.logger); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return obj, nil, nil
+	return NewRestoreItemActionExecuteOutput(input.Item), nil
 }
 
 // removeItemsWithNamePrefix iterates through the collection stored at 'key' in 'unstructuredObj'

@@ -24,7 +24,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	proto "github.com/heptio/velero/pkg/plugin/generated"
@@ -38,6 +37,8 @@ type RestoreItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	*pluginBase
 }
+
+var _ restore.ItemAction = &RestoreItemActionGRPCClient{}
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin(options ...pluginOption) *RestoreItemActionPlugin {
@@ -84,31 +85,37 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, err
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	itemJSON, err := json.Marshal(item.UnstructuredContent())
+func (c *RestoreItemActionGRPCClient) Execute(input *restore.RestoreItemActionExecuteInput) (*restore.RestoreItemActionExecuteOutput, error) {
+	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	restoreJSON, err := json.Marshal(restore)
+	itemFromBackupJSON, err := json.Marshal(input.ItemFromBackup.UnstructuredContent())
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+
+	restoreJSON, err := json.Marshal(input.Restore)
+	if err != nil {
+		return nil, err
 	}
 
 	req := &proto.RestoreExecuteRequest{
-		Plugin:  c.plugin,
-		Item:    itemJSON,
-		Restore: restoreJSON,
+		Plugin:         c.plugin,
+		Item:           itemJSON,
+		ItemFromBackup: itemFromBackupJSON,
+		Restore:        restoreJSON,
 	}
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var updatedItem unstructured.Unstructured
 	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var warning error
@@ -116,7 +123,10 @@ func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore
 		warning = errors.New(res.Warning)
 	}
 
-	return &updatedItem, warning, nil
+	return &restore.RestoreItemActionExecuteOutput{
+		UpdatedItem: &updatedItem,
+		Warning:     warning,
+	}, nil
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -176,31 +186,40 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 	}
 
 	var (
-		item    unstructured.Unstructured
-		restore api.Restore
+		item           unstructured.Unstructured
+		itemFromBackup unstructured.Unstructured
+		restoreObj     api.Restore
 	)
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
 		return nil, err
 	}
 
-	if err := json.Unmarshal(req.Restore, &restore); err != nil {
+	if err := json.Unmarshal(req.ItemFromBackup, &itemFromBackup); err != nil {
 		return nil, err
 	}
 
-	res, warning, err := impl.Execute(&item, &restore)
+	if err := json.Unmarshal(req.Restore, &restoreObj); err != nil {
+		return nil, err
+	}
+
+	executeOutput, err := impl.Execute(&restore.RestoreItemActionExecuteInput{
+		Item:           &item,
+		ItemFromBackup: &itemFromBackup,
+		Restore:        &restoreObj,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	updatedItem, err := json.Marshal(res)
+	updatedItem, err := json.Marshal(executeOutput.UpdatedItem)
 	if err != nil {
 		return nil, err
 	}
 
 	var warnMessage string
-	if warning != nil {
-		warnMessage = warning.Error()
+	if executeOutput.Warning != nil {
+		warnMessage = executeOutput.Warning.Error()
 	}
 
 	return &proto.RestoreExecuteResponse{
