@@ -24,8 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type podAction struct {
@@ -42,10 +40,10 @@ func (a *podAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *podAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	pod := new(v1.Pod)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
-		return nil, nil, errors.WithStack(err)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), pod); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	pod.Spec.NodeName = ""
@@ -83,8 +81,8 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

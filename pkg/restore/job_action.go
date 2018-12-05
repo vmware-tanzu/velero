@@ -22,8 +22,6 @@ import (
 	batchv1api "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type jobAction struct {
@@ -40,10 +38,10 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *velerov1api.Restore) (runtime.Unstructured, error, error) {
+func (a *jobAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	job := new(batchv1api.Job)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), job); err != nil {
-		return nil, nil, errors.WithStack(err)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), job); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	if job.Spec.Selector != nil {
@@ -53,8 +51,8 @@ func (a *jobAction) Execute(obj runtime.Unstructured, restore *velerov1api.Resto
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

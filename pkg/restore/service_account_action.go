@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
@@ -43,13 +42,13 @@ func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *serviceAccountAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *serviceAccountAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing serviceAccountAction")
 	defer a.logger.Info("Done executing serviceAccountAction")
 
 	var serviceAccount corev1.ServiceAccount
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &serviceAccount); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert serviceaccount from runtime.Unstructured")
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &serviceAccount); err != nil {
+		return nil, errors.Wrap(err, "unable to convert serviceaccount from runtime.Unstructured")
 	}
 
 	log := a.logger.WithField("serviceaccount", kube.NamespaceAndName(&serviceAccount))
@@ -72,8 +71,8 @@ func (a *serviceAccountAction) Execute(obj runtime.Unstructured, restore *api.Re
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&serviceAccount)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert serviceaccount to runtime.Unstructured")
+		return nil, errors.Wrap(err, "unable to convert serviceaccount to runtime.Unstructured")
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

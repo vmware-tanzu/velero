@@ -137,11 +137,15 @@ func TestJobActionExecute(t *testing.T) {
 			unstructuredJob, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, _, err := action.Execute(&unstructured.Unstructured{Object: unstructuredJob}, nil)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: unstructuredJob},
+				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredJob},
+				Restore:        nil,
+			})
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				var job batchv1api.Job
-				require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UnstructuredContent(), &job))
+				require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &job))
 
 				assert.Equal(t, test.expectedRes, job)
 			}

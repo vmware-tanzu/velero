@@ -197,17 +197,21 @@ func TestPodActionExecute(t *testing.T) {
 			unstructuredPod, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, warning, err := action.Execute(&unstructured.Unstructured{Object: unstructuredPod}, nil)
-			assert.Nil(t, warning)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: unstructuredPod},
+				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredPod},
+				Restore:        nil,
+			})
+			assert.Nil(t, res.Warning)
 
 			if test.expectedErr {
 				assert.NotNil(t, err, "expected an error")
-			} else {
-				assert.Nil(t, err, "expected no error, got %v", err)
+				return
 			}
+			assert.Nil(t, err, "expected no error, got %v", err)
 
 			var pod corev1api.Pod
-			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UnstructuredContent(), &pod))
+			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &pod))
 
 			assert.Equal(t, test.expectedRes, pod)
 		})

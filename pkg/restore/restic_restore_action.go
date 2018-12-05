@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
@@ -59,13 +58,13 @@ func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *resticRestoreAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing resticRestoreAction")
 	defer a.logger.Info("Done executing resticRestoreAction")
 
 	var pod corev1.Pod
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pod); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &pod); err != nil {
+		return nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
 	}
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
@@ -73,7 +72,7 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 	volumeSnapshots := restic.GetPodSnapshotAnnotations(&pod)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No restic snapshot ID annotations found")
-		return obj, nil, nil
+		return NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log.Info("Restic snapshot ID annotations found")
@@ -81,7 +80,7 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 	initContainer := corev1.Container{
 		Name:  restic.InitContainer,
 		Image: a.initContainerImage,
-		Args:  []string{string(restore.UID)},
+		Args:  []string{string(input.Restore.UID)},
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAMESPACE",
@@ -118,8 +117,8 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
+		return nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
