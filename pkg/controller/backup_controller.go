@@ -51,8 +51,6 @@ import (
 	"github.com/heptio/ark/pkg/volume"
 )
 
-const backupVersion = 1
-
 type backupController struct {
 	*genericController
 
@@ -245,7 +243,7 @@ func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.R
 	}
 
 	// set backup version
-	request.Status.Version = backupVersion
+	request.Status.Version = pkgbackup.BackupVersion
 
 	// calculate expiration
 	if request.Spec.TTL.Duration > 0 {
