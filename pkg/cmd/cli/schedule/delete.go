@@ -110,7 +110,7 @@ func Run(o *cli.DeleteOptions) error {
 			errs = append(errs, errors.WithStack(err))
 			continue
 		}
-		fmt.Printf("Schedule deleted: %v/n", s.Name)
+		fmt.Printf("Schedule deleted: %v\n", s.Name)
 	}
 	return kubeerrs.NewAggregate(errs)
 }
