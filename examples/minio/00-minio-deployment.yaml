@@ -112,7 +112,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "mc --config-folder=/config config host add ark http://minio:9000 minio minio123 && mc --config-folder=/config mb -p ark/ark"
+        - "mc --config-dir=/config config host add ark http://minio:9000 minio minio123 && mc --config-dir=/config mb -p ark/ark"
         volumeMounts:
         - name: config
           mountPath: "/config"
