@@ -49,6 +49,12 @@ By default, `ark backup create` makes disk snapshots of any persistent volumes. 
 
 ![19]
 
+## Backed-up API versions
+
+Ark backs up resources using the Kubernetes API server's *preferred version* for each group/resource. When restoring a resource, this same API group/version must exist in the target cluster in order for the restore to be successful.
+
+For example, if the cluster being backed up has a `gizmos` resource in the `things` API group, with group/versions `things/v1alpha1`, `things/v1beta1`, and `things/v1`, and the server's preferred group/version is `things/v1`, then all `gizmos` will be backed up from the `things/v1` API endpoint. When backups from this cluster are restored, the target cluster **must** have the `things/v1` endpoint in order for `gizmos` to be restored. Note that `things/v1` **does not** need to be the preferred version in the target cluster; it just needs to exist.
+
 ## Set a backup to expire
 
 When you create a backup, you can specify a TTL by adding the flag `--ttl <DURATION>`. If Ark sees that an existing backup resource is expired, it removes:
@@ -67,7 +73,8 @@ This allows restore functionality to work in a cluster migration scenario, where
 Likewise, if a backup object exists in Kubernetes but not in object storage, it will be deleted from Kubernetes since the backup tarball no longer exists.
 
 [10]: hooks.md
-[19]: /img/backup-process.png
+[19]: /docs/img/backup-process.png
 [20]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#customresourcedefinitions
 [21]: https://kubernetes.io/docs/concepts/api-extension/custom-resources/#custom-controllers
 [22]: https://github.com/coreos/etcd
+

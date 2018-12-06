@@ -2,6 +2,11 @@
 # (TOC). You'll want to use this after any revamps to information architecture, to ensure
 # that the navigation for older versions still work.
 #
+# NOTA BENE FOR RELEASES AFTER 0.10: start with master-toc.yml to create the new TOC.
+# This is a break with previous TOC practice. IFF you make no other changes to the doc structure,
+# then rename master-toc.yml to v011-toc.yml, and change the mapping for the master branch here also.
+# Then you'll be back on track with previous practice and you can delete this comment (lines 5-8).
+#
 # Below is a commented out example of what this may look like:
 
 # v0.9.0: old
@@ -9,7 +14,7 @@
 # v0.11.0: default
 # v0.12.0: default
 
-master: v010-toc
+master: master-toc
 v0.10.0: v010-toc
 v0.9.0: v9-toc
 v0.8.1: v8-1-toc
