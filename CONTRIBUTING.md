@@ -1,10 +1,15 @@
 # Contributing
 
-## Updating CHANGELOG.md
+## CHANGELOG 
 
-Authors are expected include an entry to the CHANGELOG.md under the `Development release` heading
-with their pull requests. During the process of creating a new release, entries from CHANGELOG.md will be
-moved to the changelog for the release.
+Authors are expected to include a changelog file with their pull requests. The changelog file
+should be a new file created in the `changelogs/unreleased` folder. The file should follow the
+naming convention of `pr-username` and the contents of the file should be your text for the
+changelog.
+
+    ark/changelogs/unreleased   <- folder
+        000-username            <- file
+
 
 ## DCO Sign off
 

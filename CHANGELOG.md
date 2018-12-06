@@ -1,6 +1,6 @@
 ## Development release:
 
-  * _Example: Add XYZ support (#issue, @user)_
+  * [Unreleased Changes][9]
 
 ### Bug Fixes / Other Changes
   * add multizone/regional support to gcp (#765, @wwitzel3)
@@ -24,6 +24,7 @@
   * [CHANGELOG-0.4.md][2]
   * [CHANGELOG-0.3.md][1]
 
+[9]: https://github.com/heptio/ark/blob/master/changelogs/unreleased
 [8]: https://github.com/heptio/ark/blob/master/changelogs/CHANGELOG-0.10.md
 [7]: https://github.com/heptio/ark/blob/master/changelogs/CHANGELOG-0.9.md
 [6]: https://github.com/heptio/ark/blob/master/changelogs/CHANGELOG-0.8.md
