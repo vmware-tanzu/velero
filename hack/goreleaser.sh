@@ -29,8 +29,6 @@ if [ -z "${RELEASE_NOTES_FILE}" ]; then
     exit 1
 fi
 
-export GIT_SHA=$(git describe --tags --always)
-
 GIT_DIRTY=$(git status --porcelain 2> /dev/null)
 if [[ -z "${GIT_DIRTY}" ]]; then
     export GIT_TREE_STATE=clean
