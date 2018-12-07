@@ -29,6 +29,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -274,7 +275,11 @@ func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.R
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
 	if storageLocation, err := c.backupLocationLister.BackupStorageLocations(request.Namespace).Get(request.Spec.StorageLocation); err != nil {
-		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Error getting backup storage location: %v", err))
+		if apierrors.IsNotFound(err) {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err))
+		} else {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting backup storage location: %v", err))
+		}
 	} else {
 		request.StorageLocation = storageLocation
 	}
@@ -309,7 +314,11 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *api.Backup) (
 		// validate each locationName exists as a VolumeSnapshotLocation
 		location, err := c.snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).Get(locationName)
 		if err != nil {
-			errors = append(errors, fmt.Sprintf("error getting volume snapshot location named %s: %v", locationName, err))
+			if apierrors.IsNotFound(err) {
+				errors = append(errors, fmt.Sprintf("a VolumeSnapshotLocation CRD for the location %s with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: %v", locationName, err))
+			} else {
+				errors = append(errors, fmt.Sprintf("error getting volume snapshot location named %s: %v", locationName, err))
+			}
 			continue
 		}
 

@@ -299,7 +299,7 @@ func (s *server) run() error {
 
 	if _, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).
-			Warnf("Default backup storage location %q not found; backups must explicitly specify a location", s.config.defaultBackupLocation)
+			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
 	}
 
 	if err := s.initRestic(); err != nil {

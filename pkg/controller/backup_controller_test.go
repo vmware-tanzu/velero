@@ -150,7 +150,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("nonexistent").Backup,
-			expectedErrs: []string{"Error getting backup storage location: backupstoragelocation.ark.heptio.com \"nonexistent\" not found"},
+			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.ark.heptio.com \"nonexistent\" not found"},
 		},
 	}
 
@@ -370,8 +370,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
 				arktest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
 			},
-			expectedErrors:  "error getting volume snapshot location named random-name: volumesnapshotlocation.ark.heptio.com \"random-name\" not found",
-			expectedSuccess: false,
+			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocation.ark.heptio.com \"random-name\" not found", expectedSuccess: false,
 		},
 		{
 			name:   "duplicate locationName per provider: should filter out dups",
