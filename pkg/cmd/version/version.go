@@ -30,8 +30,7 @@ func NewCommand() *cobra.Command {
 		Short: "Print the ark version and associated image",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("Version: %s\n", buildinfo.Version)
-			fmt.Printf("Git commit: %s\n", buildinfo.GitSHA)
-			fmt.Printf("Git tree state: %s\n", buildinfo.GitTreeState)
+			fmt.Printf("Git commit: %s\n", buildinfo.FormattedGitSHA())
 		},
 	}
 

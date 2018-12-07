@@ -71,7 +71,7 @@ about: Tell us about a problem you are experiencing
 
 **Environment:**
 
-- Ark version (use ` + "`ark version`" + `):{{.ArkVersion}} {{.GitCommit}} {{.GitTreeState}}
+- Ark version (use ` + "`ark version`" + `):{{.ArkVersion}} {{.GitCommit}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
 {{- if .KubectlVersion}}
 ` + "```" + `
@@ -109,7 +109,6 @@ func NewCommand() *cobra.Command {
 type ArkBugInfo struct {
 	ArkVersion     string
 	GitCommit      string
-	GitTreeState   string
 	RuntimeOS      string
 	RuntimeArch    string
 	KubectlVersion string
@@ -162,8 +161,7 @@ func getKubectlVersion() (string, error) {
 func newBugInfo(kubectlVersion string) *ArkBugInfo {
 	return &ArkBugInfo{
 		ArkVersion:     buildinfo.Version,
-		GitCommit:      buildinfo.GitSHA,
-		GitTreeState:   buildinfo.GitTreeState,
+		GitCommit:      buildinfo.FormattedGitSHA(),
 		RuntimeOS:      runtime.GOOS,
 		RuntimeArch:    runtime.GOARCH,
 		KubectlVersion: kubectlVersion}
