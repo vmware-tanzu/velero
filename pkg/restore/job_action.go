@@ -38,7 +38,7 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, []ResourceIdentifier, error, error) {
 	fieldDeletions := map[string]string{
 		"spec.selector.matchLabels":     "controller-uid",
 		"spec.template.metadata.labels": "controller-uid",
@@ -54,5 +54,5 @@ func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 		}
 	}
 
-	return obj, nil, nil
+	return obj, nil, nil, nil
 }

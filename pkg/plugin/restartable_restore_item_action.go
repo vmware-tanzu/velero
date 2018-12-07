@@ -78,10 +78,10 @@ func (r *restartableRestoreItemAction) AppliesTo() (restore.ResourceSelector, er
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableRestoreItemAction) Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error) {
+func (r *restartableRestoreItemAction) Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, additionalItems []restore.ResourceIdentifier, warning error, err error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	return delegate.Execute(obj, restore)

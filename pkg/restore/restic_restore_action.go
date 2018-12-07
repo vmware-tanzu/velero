@@ -59,13 +59,13 @@ func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, []ResourceIdentifier, error, error) {
 	a.logger.Info("Executing resticRestoreAction")
 	defer a.logger.Info("Done executing resticRestoreAction")
 
 	var pod corev1.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &pod); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
+		return nil, nil, nil, errors.Wrap(err, "unable to convert pod from runtime.Unstructured")
 	}
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
@@ -73,7 +73,7 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 	volumeSnapshots := restic.GetPodSnapshotAnnotations(&pod)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No restic snapshot ID annotations found")
-		return obj, nil, nil
+		return obj, nil, nil, nil
 	}
 
 	log.Info("Restic snapshot ID annotations found")
@@ -118,8 +118,8 @@ func (a *resticRestoreAction) Execute(obj runtime.Unstructured, restore *api.Res
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
+		return nil, nil, nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return &unstructured.Unstructured{Object: res}, nil, nil, nil
 }

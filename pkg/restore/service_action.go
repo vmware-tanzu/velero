@@ -45,10 +45,10 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, []ResourceIdentifier, error, error) {
 	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
@@ -57,9 +57,9 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 	}
 
 	if err := deleteNodePorts(obj, &spec); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return obj, nil, nil
+	return obj, nil, nil, nil
 }
 
 func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {

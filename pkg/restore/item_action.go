@@ -18,9 +18,20 @@ package restore
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 )
+
+// TODO: consolidate this ResourceIdentifier and backup.ResourceIdentifier into a single struct, as
+// part of reducing the import surface of plugins.
+
+// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
+type ResourceIdentifier struct {
+	schema.GroupResource
+	Namespace string
+	Name      string
+}
 
 // ItemAction is an actor that performs an operation on an individual item being restored.
 type ItemAction interface {
@@ -30,11 +41,12 @@ type ItemAction interface {
 	AppliesTo() (ResourceSelector, error)
 
 	// Execute allows the ItemAction to perform arbitrary logic with the item being restored,
-	// including mutating the item itself prior to restore. The item (unmodified or modified)
-	// should be returned, along with a warning (which will be logged but will not prevent
-	// the item from being restored) or error (which will be logged and will prevent the item
-	// from being restored) if applicable.
-	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error)
+	// including mutating the item itself prior to restore. The item (unmodified or modified) should
+	// be returned, along with an optional slice of ResourceIdentifiers specifying additional related
+	// items that should be restored, a warning (which will be logged but will not prevent the item
+	// from being restored) or error (which will be logged and will prevent the item from being
+	// restored) if applicable.
+	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, additionalItems []ResourceIdentifier, warning error, err error)
 }
 
 // ResourceSelector is a collection of included/excluded namespaces,

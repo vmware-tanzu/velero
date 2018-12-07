@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	api "github.com/heptio/ark/pkg/apis/ark/v1"
 	proto "github.com/heptio/ark/pkg/plugin/generated"
@@ -84,18 +85,18 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, err
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, r *api.Restore) (runtime.Unstructured, []restore.ResourceIdentifier, error, error) {
 	itemJSON, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	restoreJSON, err := json.Marshal(restore)
+	restoreJSON, err := json.Marshal(r)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	req := &proto.RestoreExecuteRequest{
+	req := &proto.RestoreItemActionExecuteRequest{
 		Plugin:  c.plugin,
 		Item:    itemJSON,
 		Restore: restoreJSON,
@@ -103,12 +104,12 @@ func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var updatedItem unstructured.Unstructured
 	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var warning error
@@ -116,7 +117,22 @@ func (c *RestoreItemActionGRPCClient) Execute(item runtime.Unstructured, restore
 		warning = errors.New(res.Warning)
 	}
 
-	return &updatedItem, warning, nil
+	var additionalItems []restore.ResourceIdentifier
+
+	for _, itm := range res.AdditionalItems {
+		newItem := restore.ResourceIdentifier{
+			GroupResource: schema.GroupResource{
+				Group:    itm.Group,
+				Resource: itm.Resource,
+			},
+			Namespace: itm.Namespace,
+			Name:      itm.Name,
+		}
+
+		additionalItems = append(additionalItems, newItem)
+	}
+
+	return &updatedItem, additionalItems, warning, nil
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -169,7 +185,7 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 	}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreExecuteRequest) (*proto.RestoreExecuteResponse, error) {
+func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (*proto.RestoreItemActionExecuteResponse, error) {
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -188,14 +204,21 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, err
 	}
 
-	res, warning, err := impl.Execute(&item, &restore)
+	updatedItem, additionalItems, warning, err := impl.Execute(&item, &restore)
 	if err != nil {
 		return nil, err
 	}
 
-	updatedItem, err := json.Marshal(res)
-	if err != nil {
-		return nil, err
+	// If the plugin implementation returned a nil updatedItem (meaning no modifications), reset updatedItem to the
+	// original item.
+	var updatedItemJSON []byte
+	if updatedItem == nil {
+		updatedItemJSON = req.Item
+	} else {
+		updatedItemJSON, err = json.Marshal(updatedItem.UnstructuredContent())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var warnMessage string
@@ -203,8 +226,23 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		warnMessage = warning.Error()
 	}
 
-	return &proto.RestoreExecuteResponse{
-		Item:    updatedItem,
+	res := &proto.RestoreItemActionExecuteResponse{
+		Item:    updatedItemJSON,
 		Warning: warnMessage,
-	}, nil
+	}
+
+	for _, item := range additionalItems {
+		res.AdditionalItems = append(res.AdditionalItems, restoreResourceIdentifierToProto(item))
+	}
+
+	return res, nil
+}
+
+func restoreResourceIdentifierToProto(id restore.ResourceIdentifier) *proto.ResourceIdentifier {
+	return &proto.ResourceIdentifier{
+		Group:     id.Group,
+		Resource:  id.Resource,
+		Namespace: id.Namespace,
+		Name:      id.Name,
+	}
 }

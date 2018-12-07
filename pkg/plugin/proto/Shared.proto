@@ -19,3 +19,10 @@ message AppliesToResponse {
     repeated string excludedResources = 4;
     string selector = 5;
 }
+
+message ResourceIdentifier {
+    string group = 1;
+    string resource = 2;
+    string namespace = 3;
+    string name = 4;
+}
