@@ -86,4 +86,4 @@ rearrange any pre-v0.10 data as part of the upgrade. We've provided a script to 
 [2]: api-types/volumesnapshotlocation.md
 [3]: storage-layout-reorg-v0.10.md
 [4]: locations.md
-[5]: quickstart.md#download
+[5]: get-started.md#download
