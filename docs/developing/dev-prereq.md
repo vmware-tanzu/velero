@@ -1,4 +1,4 @@
-
+# Set up
 
 ## Prerequisites
 
@@ -7,9 +7,7 @@
 * kubectl installed
 * [Go][5] installed (minimum version 1.8)
 
-### Prerequisites 
-
-When running Heptio Ark, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
+Also make sure you have:
 
 * Appropriate RBAC permissions in the cluster
   * Read access for all data from the source cluster and namespaces
@@ -20,7 +18,9 @@ When running Heptio Ark, you will need to account for the following (all of whic
 * A [BackupStorageLocation][20] object definition for the Ark server
 * (Optional) A [VolumeSnapshotLocation][21] object definition for the Ark server, to take PV snapshots
 
-## Getting the source
+For detailed examples, see the YAML files in the [examples directory][6].
+
+## Get source
 
 ```bash
 mkdir $HOME/go
@@ -30,5 +30,15 @@ go get github.com/heptio/ark
 
 Where `go` is your [import path][4] for Go.
 
-For Go development, it is recommended to add the Go import path (`$HOME/go` in this example) to your path.
+For Go development, it's a good idea to add the Go import path (`$HOME/go` in this example) to your path.
+
+## Extras
+
+If you add, edit, or remove protobuf message or service definitions, you must run [generate-proto.sh][13] to regenerate files. These changes require the [proto compiler][14].
+
+[4]: https://blog.golang.org/organizing-go-code
+[5]: https://golang.org/doc/install
+[6]: https://github.com/heptio/ark/tree/master/examples
+[13]: https://github.com/heptio/ark/blob/master/hack/generate-proto.sh
+[14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
 
