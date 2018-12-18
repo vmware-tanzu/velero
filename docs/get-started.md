@@ -8,6 +8,8 @@ For simplicity, the example uses Minio, an S3-compatible storage service that ru
 
 See [Set up Ark on your platform][3] for how to configure Ark for a production environment.
 
+If you encounter issues with installing or configuring, see [Debugging Installation Issues](debugging-install.md).
+
 ### Prerequisites
 
 * Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run `ark backup delete`.
