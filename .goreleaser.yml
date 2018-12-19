@@ -39,7 +39,7 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -X "github.com/heptio/ark/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/ark/pkg/buildinfo.GitSHA={{ .Env.GIT_SHA }}" -X "github.com/heptio/ark/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
+      - -X "github.com/heptio/ark/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/ark/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/ark/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
 archive:
   name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
   files:
@@ -47,8 +47,6 @@ archive:
     - config/**/*
 checksum:
   name_template: 'CHECKSUM'
-snapshot:
-  name_template: "{{ .Env.GIT_SHA }}"
 release:
   github:
     owner: heptio

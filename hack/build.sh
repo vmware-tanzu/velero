@@ -41,7 +41,7 @@ fi
 
 export CGO_ENABLED=0
 
-GIT_SHA=$(git describe --tags --always)
+GIT_SHA=$(git rev-parse HEAD)
 GIT_DIRTY=$(git status --porcelain 2> /dev/null)
 if [[ -z "${GIT_DIRTY}" ]]; then
   GIT_TREE_STATE=clean
