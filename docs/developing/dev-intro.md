@@ -9,9 +9,18 @@ This guide provides more details about how to get started extending Ark or contr
 - [Run][5]
 - [Test][6]
 
+## Extending Ark
+
+Ark also includes mechanisms for extending the core functionality to meet your individual backup/restore needs:
+
+* [Hooks][27] allow you to specify commands to be executed within running pods during a backup. This is useful if you need to run a workload-specific command prior to taking a backup (for example, to flush disk buffers or to freeze a database).
+* [Plugins][28] allow you to develop custom object/block storage back-ends or per-item backup/restore actions that can execute arbitrary logic, including modifying the items being backed up/restored. Plugins can be used by Ark without needing to be compiled into the core Ark binary.
+
 [1]: https://github.com/heptio/ark/LICENSE
 [2]: https://github.com/heptio/ark/CONTRIBUTING.md
 [3]: dev-prereq.md
 [4]: build.md
 [5]: dev-run.md
 [6]: dev-test.md
+[27]: hooks.md
+[28]: plugins.md
