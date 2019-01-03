@@ -37,8 +37,6 @@ TAG_LATEST ?= false
 ### These variables should not need tweaking.
 ###
 
-SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
-
 CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64
 CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64
 
@@ -63,7 +61,7 @@ IMAGE = $(REGISTRY)/$(BIN)
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all: 
+all:
 	@$(MAKE) build
 	@$(MAKE) build BIN=ark-restic-restore-helper
 
@@ -181,12 +179,12 @@ push-name:
 SKIP_TESTS ?=
 test: build-dirs
 ifneq ($(SKIP_TESTS), 1)
-	@$(MAKE) shell CMD="-c 'hack/test.sh $(SRC_DIRS)'"
+	@$(MAKE) shell CMD="-c 'hack/test.sh $(WHAT)'"
 endif
 
 test-local: build-dirs
 ifneq ($(SKIP_TESTS), 1)
-	hack/test.sh $(SRC_DIRS)
+	hack/test.sh $(WHAT)
 endif
 
 verify:
