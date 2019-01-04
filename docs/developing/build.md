@@ -52,6 +52,8 @@ files (clientset, listers, shared informers, docs) are up to date.
 
 If you need to add or update the vendored dependencies, see [Vendoring dependencies][11].
 
+TODO: does this belong in prerequisites instead?
+
 [0]: ../README.md
 [7]: #run
 [8]: config-definition.md

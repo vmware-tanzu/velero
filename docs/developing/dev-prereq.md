@@ -20,6 +20,8 @@ Also make sure you have:
 
 For detailed examples, see the YAML files in the [examples directory][6].
 
+TODO FROM JFR: how much introductory/explanatory material should be provided here? This is an audience question. To date, it seems as though outside contributors to Ark have been primarily folks deeply familiar with K8s and the dev environment it requires. PR #1131 got me started wondering about k8s newcomers -- although that user seems not to have been a potential code contributor (at least, not yet). IFF y'all want to support newcomer contributions, I think there's quite a bit of material missing. See also TODOs in other files.
+
 ## Get source
 
 ```bash
