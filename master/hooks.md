@@ -51,7 +51,7 @@ spec.
 We are going to walk through using both pre and post hooks for freezing a file system. Freezing the
 file system is useful to ensure that all pending disk I/O operations have completed prior to taking a snapshot.
 
-We will be using [example/nginx-app/with-pv.yaml][2] for this example. Follow the [steps for your provider][3] to
+We will be using [examples/nginx-app/with-pv.yaml][2] for this example. Follow the [steps for your provider][3] to
 setup this example.
 
 ### Annotations

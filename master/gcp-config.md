@@ -93,10 +93,10 @@ To integrate Heptio Ark with GCP, create an Ark-specific [Service Account][15]:
 If you run Google Kubernetes Engine (GKE), make sure that your current IAM user is a cluster-admin. This role is required to create RBAC objects.
 See [the GKE documentation][22] for more information.
 
-In the Ark root directory, run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
+In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
-kubectl apply -f examples/common/00-prereqs.yaml
+kubectl apply -f config/common/00-prereqs.yaml
 ```
 
 Create a Secret. In the directory of the credentials file you just created, run:
@@ -111,15 +111,15 @@ kubectl create secret generic cloud-credentials \
 
 Specify the following values in the example files:
 
-* In file `examples/gcp/05-ark-backupstoragelocation.yaml`:
+* In file `config/gcp/05-ark-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BUCKET>`. See the [BackupStorageLocation definition][7] for details.
 
-* (Optional) If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
+* (Optional) If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
 
-* (Optional, use only if you need to specify multiple volume snapshot locations) In `examples/gcp/10-deployment.yaml`:
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/gcp/10-deployment.yaml`:
 
   * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
@@ -128,9 +128,9 @@ Specify the following values in the example files:
 In the root of your Ark directory, run:
 
   ```bash
-  kubectl apply -f examples/gcp/05-ark-backupstoragelocation.yaml
-  kubectl apply -f examples/gcp/06-ark-volumesnapshotlocation.yaml
-  kubectl apply -f examples/gcp/10-deployment.yaml
+  kubectl apply -f config/gcp/05-ark-backupstoragelocation.yaml
+  kubectl apply -f config/gcp/06-ark-volumesnapshotlocation.yaml
+  kubectl apply -f config/gcp/10-deployment.yaml
   ```
 
   [0]: namespace.md

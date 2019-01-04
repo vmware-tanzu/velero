@@ -15,7 +15,7 @@ rootBucket/
 
 ## Example backup JSON file
 
-```
+```json
 {
   "kind": "Backup",
   "apiVersion": "ark.heptio.com/v1",
