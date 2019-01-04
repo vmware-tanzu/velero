@@ -1,0 +1,5 @@
+# Documentation
+
+Make sure to add appropriate documentation for your contributions. Feature documentation should be added to the /docs directory of the master or feature branch. The core Ark contributors build the docs site typically with each release, so you'll typically see your docs published at heptio.github.io/ark when we release a new version that includes your contribution.
+
+TODO: Add some content -- probably in another topic -- about when/how contributions that aren't bug fixes are published/released? Also consider adding a link to the develop guide at the top of CONTRIBUTING.md. Not everybody is familiar with the notion of the DCO. Jorge and Jennifer discussed long ago the possibility of creating separate files for CONTRIBUTING (higher level) and DCO -- a la https://github.com/envoyproxy/envoy/blob/master/CONTRIBUTING.md. (In fact, the whole Envoy approach to CONTRIBUTING is worth looking at. Different from what's proposed here, but you might want to borrow bits. Or move wholesale to it instead oof this PR. Policies and expectations, yes, hugely important. See also https://github.com/nayafia/contributing-template)
