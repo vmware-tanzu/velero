@@ -17,11 +17,13 @@ limitations under the License.
 package restore
 
 import (
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	batchv1api "k8s.io/api/batch/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type jobAction struct {
@@ -38,21 +40,21 @@ func (a *jobAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *jobAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	fieldDeletions := map[string]string{
-		"spec.selector.matchLabels":     "controller-uid",
-		"spec.template.metadata.labels": "controller-uid",
+func (a *jobAction) Execute(obj runtime.Unstructured, restore *velerov1api.Restore) (runtime.Unstructured, error, error) {
+	job := new(batchv1api.Job)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), job); err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
-	for k, v := range fieldDeletions {
-		a.logger.Debugf("Getting %s", k)
-		labels, err := collections.GetMap(obj.UnstructuredContent(), k)
-		if err != nil {
-			a.logger.WithError(err).Debugf("Unable to get %s", k)
-		} else {
-			delete(labels, v)
-		}
+	if job.Spec.Selector != nil {
+		delete(job.Spec.Selector.MatchLabels, "controller-uid")
+	}
+	delete(job.Spec.Template.ObjectMeta.Labels, "controller-uid")
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(job)
+	if err != nil {
+		return nil, nil, errors.WithStack(err)
 	}
 
-	return obj, nil, nil
+	return &unstructured.Unstructured{Object: res}, nil, nil
 }

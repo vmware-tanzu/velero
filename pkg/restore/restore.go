@@ -839,21 +839,25 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		}
 
 		if groupResource == kuberesource.PersistentVolumeClaims {
-			spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-			if err != nil {
+			pvc := new(v1.PersistentVolumeClaim)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
 				addToResult(&errs, namespace, err)
 				continue
 			}
 
-			if volumeName, exists := spec["volumeName"]; exists && ctx.pvsToProvision.Has(volumeName.(string)) {
-				ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, volumeName)
+			if pvc.Spec.VolumeName != "" && ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
+				ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, pvc.Spec.VolumeName)
 
-				delete(spec, "volumeName")
+				pvc.Spec.VolumeName = ""
+				delete(pvc.Annotations, "pv.kubernetes.io/bind-completed")
+				delete(pvc.Annotations, "pv.kubernetes.io/bound-by-controller")
 
-				annotations := obj.GetAnnotations()
-				delete(annotations, "pv.kubernetes.io/bind-completed")
-				delete(annotations, "pv.kubernetes.io/bound-by-controller")
-				obj.SetAnnotations(annotations)
+				res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvc)
+				if err != nil {
+					addToResult(&errs, namespace, err)
+					continue
+				}
+				obj.Object = res
 			}
 		}
 
@@ -992,12 +996,8 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 }
 
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
-	reclaimPolicy, err := collections.GetString(obj, "spec.persistentVolumeReclaimPolicy")
-	if err != nil {
-		return false
-	}
-
-	return reclaimPolicy == "Delete"
+	policy, _, _ := unstructured.NestedString(obj, "spec", "persistentVolumeReclaimPolicy")
+	return policy == string(v1.PersistentVolumeReclaimDelete)
 }
 
 func waitForReady(
@@ -1120,9 +1120,13 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
-		return nil, errors.WithStack(err)
+	res, ok := obj.Object["spec"]
+	if !ok {
+		return nil, errors.New("spec not found")
+	}
+	spec, ok := res.(map[string]interface{})
+	if !ok {
+		return nil, errors.Errorf("spec was of type %T, expected map[string]interface{}", res)
 	}
 
 	delete(spec, "claimRef")
@@ -1177,18 +1181,18 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 }
 
 func isPVReady(obj runtime.Unstructured) bool {
-	phase, err := collections.GetString(obj.UnstructuredContent(), "status.phase")
-	if err != nil {
-		return false
-	}
-
+	phase, _, _ := unstructured.NestedString(obj.UnstructuredContent(), "status", "phase")
 	return phase == string(v1.VolumeAvailable)
 }
 
 func resetMetadataAndStatus(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
-	if err != nil {
-		return nil, err
+	res, ok := obj.Object["metadata"]
+	if !ok {
+		return nil, errors.New("metadata not found")
+	}
+	metadata, ok := res.(map[string]interface{})
+	if !ok {
+		return nil, errors.Errorf("metadata was of type %T, expected map[string]interface{}", res)
 	}
 
 	for k := range metadata {

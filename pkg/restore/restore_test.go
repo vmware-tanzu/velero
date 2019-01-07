@@ -1054,9 +1054,7 @@ status:
 				pvClient.On("Watch", metav1.ListOptions{}).Return(pvWatch, nil)
 				pvWatchChan := make(chan watch.Event, 1)
 				readyPV := restoredPV.DeepCopy()
-				readyStatus, err := collections.GetMap(readyPV.Object, "status")
-				require.NoError(t, err)
-				readyStatus["phase"] = string(v1.VolumeAvailable)
+				require.NoError(t, unstructured.SetNestedField(readyPV.UnstructuredContent(), string(v1.VolumeAvailable), "status", "phase"))
 				pvWatchChan <- watch.Event{
 					Type:   watch.Modified,
 					Object: readyPV,
@@ -2135,16 +2133,19 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	metadata, err := collections.GetMap(obj.UnstructuredContent(), "metadata")
+	labels, found, err := unstructured.NestedMap(obj.UnstructuredContent(), "metadata", "labels")
 	if err != nil {
 		return nil, nil, err
 	}
-
-	if _, found := metadata["labels"]; !found {
-		metadata["labels"] = make(map[string]interface{})
+	if !found {
+		labels = make(map[string]interface{})
 	}
 
-	metadata["labels"].(map[string]interface{})["fake-restorer"] = "foo"
+	labels["fake-restorer"] = "foo"
+
+	if err := unstructured.SetNestedField(obj.UnstructuredContent(), labels, "metadata", "labels"); err != nil {
+		return nil, nil, err
+	}
 
 	unstructuredObj, ok := obj.(*unstructured.Unstructured)
 	if !ok {
