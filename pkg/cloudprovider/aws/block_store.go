@@ -27,11 +27,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/heptio/velero/pkg/cloudprovider"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const regionKey = "region"
@@ -254,26 +255,39 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
 
-func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.awsElasticBlockStore") {
+func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.AWSElasticBlockStore == nil {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
-	if err != nil {
-		return "", err
+	if pv.Spec.AWSElasticBlockStore.VolumeID == "" {
+		return "", errors.New(".spec.awsElasticBlockStore.volumeID not found")
 	}
 
-	return ebsVolumeIDRegex.FindString(volumeID), nil
+	return ebsVolumeIDRegex.FindString(pv.Spec.AWSElasticBlockStore.VolumeID), nil
 }
 
-func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	aws, err := collections.GetMap(pv.UnstructuredContent(), "spec.awsElasticBlockStore")
-	if err != nil {
-		return nil, err
+func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	aws["volumeID"] = volumeID
+	if pv.Spec.AWSElasticBlockStore == nil {
+		return nil, errors.New(".spec.awsElasticBlockStore not found")
+	}
 
-	return pv, nil
+	pv.Spec.AWSElasticBlockStore.VolumeID = volumeID
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &unstructured.Unstructured{Object: res}, nil
 }
