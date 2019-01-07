@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	core "k8s.io/client-go/testing"
@@ -35,7 +36,6 @@ import (
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
-	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -159,13 +159,13 @@ func TestProcessSchedule(t *testing.T) {
 					}
 
 					// these are the fields that may be updated by the controller
-					phase, err := collections.GetString(patchMap, "status.phase")
-					if err == nil {
+					phase, found, err := unstructured.NestedString(patchMap, "status", "phase")
+					if err == nil && found {
 						res.Status.Phase = api.SchedulePhase(phase)
 					}
 
-					lastBackupStr, err := collections.GetString(patchMap, "status.lastBackup")
-					if err == nil {
+					lastBackupStr, found, err := unstructured.NestedString(patchMap, "status", "lastBackup")
+					if err == nil && found {
 						parsed, err := time.Parse(time.RFC3339, lastBackupStr)
 						if err != nil {
 							t.Logf("error parsing status.lastBackup: %s\n", err)

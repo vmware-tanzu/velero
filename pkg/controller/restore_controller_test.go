@@ -30,6 +30,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
@@ -45,7 +46,6 @@ import (
 	"github.com/heptio/velero/pkg/plugin"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	"github.com/heptio/velero/pkg/restore"
-	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
@@ -440,10 +440,14 @@ func TestProcessRestore(t *testing.T) {
 						return false, nil, err
 					}
 
-					phase, err := collections.GetString(patchMap, "status.phase")
+					phase, found, err := unstructured.NestedString(patchMap, "status", "phase")
 					if err != nil {
 						t.Logf("error getting status.phase: %s\n", err)
 						return false, nil, err
+					}
+					if !found {
+						t.Logf("status.phase not found")
+						return false, nil, errors.New("status.phase not found")
 					}
 
 					res := test.restore.DeepCopy()
@@ -453,7 +457,8 @@ func TestProcessRestore(t *testing.T) {
 
 					res.Status.Phase = api.RestorePhase(phase)
 
-					if backupName, err := collections.GetString(patchMap, "spec.backupName"); err == nil {
+					backupName, found, err := unstructured.NestedString(patchMap, "spec", "backupName")
+					if err == nil && found {
 						res.Spec.BackupName = backupName
 					}
 
