@@ -23,13 +23,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	kapiv1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -83,11 +83,16 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 		return errors.New("hook is required")
 	}
 
+	pod := new(corev1api.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item, pod); err != nil {
+		return errors.WithStack(err)
+	}
+
 	if hook.Container == "" {
-		if err := setDefaultHookContainer(item, hook); err != nil {
+		if err := setDefaultHookContainer(pod, hook); err != nil {
 			return err
 		}
-	} else if err := ensureContainerExists(item, hook.Container); err != nil {
+	} else if err := ensureContainerExists(pod, hook.Container); err != nil {
 		return err
 	}
 
@@ -124,7 +129,7 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 		Name(name).
 		SubResource("exec")
 
-	req.VersionedParams(&kapiv1.PodExecOptions{
+	req.VersionedParams(&corev1api.PodExecOptions{
 		Container: hook.Container,
 		Command:   hook.Command,
 		Stdout:    true,
@@ -169,21 +174,9 @@ func (e *defaultPodCommandExecutor) ExecutePodCommand(log logrus.FieldLogger, it
 	return err
 }
 
-func ensureContainerExists(pod map[string]interface{}, container string) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
-	}
-	for _, obj := range containers {
-		c, ok := obj.(map[string]interface{})
-		if !ok {
-			return errors.Errorf("unexpected type for container %T", obj)
-		}
-		name, ok := c["name"].(string)
-		if !ok {
-			return errors.Errorf("unexpected type for container name %T", c["name"])
-		}
-		if name == container {
+func ensureContainerExists(pod *corev1api.Pod, container string) error {
+	for _, c := range pod.Spec.Containers {
+		if c.Name == container {
 			return nil
 		}
 	}
@@ -191,26 +184,12 @@ func ensureContainerExists(pod map[string]interface{}, container string) error {
 	return errors.Errorf("no such container: %q", container)
 }
 
-func setDefaultHookContainer(pod map[string]interface{}, hook *api.ExecHook) error {
-	containers, err := collections.GetSlice(pod, "spec.containers")
-	if err != nil {
-		return err
-	}
-
-	if len(containers) < 1 {
+func setDefaultHookContainer(pod *corev1api.Pod, hook *api.ExecHook) error {
+	if len(pod.Spec.Containers) < 1 {
 		return errors.New("need at least 1 container")
 	}
 
-	container, ok := containers[0].(map[string]interface{})
-	if !ok {
-		return errors.Errorf("unexpected type for container %T", pod)
-	}
-
-	name, ok := container["name"].(string)
-	if !ok {
-		return errors.Errorf("unexpected type for container name %T", container["name"])
-	}
-	hook.Container = name
+	hook.Container = pod.Spec.Containers[0].Name
 
 	return nil
 }
