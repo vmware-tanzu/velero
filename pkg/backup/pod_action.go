@@ -19,12 +19,11 @@ package backup
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/api/meta"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 // podAction implements ItemAction.
@@ -51,48 +50,27 @@ func (a *podAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 	a.log.Info("Executing podAction")
 	defer a.log.Info("Done executing podAction")
 
-	pod := item.UnstructuredContent()
-	if !collections.Exists(pod, "spec.volumes") {
+	pod := new(corev1api.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), pod); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	if len(pod.Spec.Volumes) == 0 {
 		a.log.Info("pod has no volumes")
 		return item, nil, nil
 	}
 
-	metadata, err := meta.Accessor(item)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "unable to access pod metadata")
-	}
-
-	volumes, err := collections.GetSlice(pod, "spec.volumes")
-	if err != nil {
-		return nil, nil, errors.WithMessage(err, "error getting spec.volumes")
-	}
-
-	var errs []error
 	var additionalItems []ResourceIdentifier
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {
+			a.log.Infof("Adding pvc %s to additionalItems", volume.PersistentVolumeClaim.ClaimName)
 
-	for i := range volumes {
-		volume, ok := volumes[i].(map[string]interface{})
-		if !ok {
-			errs = append(errs, errors.Errorf("unexpected type %T", volumes[i]))
-			continue
+			additionalItems = append(additionalItems, ResourceIdentifier{
+				GroupResource: kuberesource.PersistentVolumeClaims,
+				Namespace:     pod.Namespace,
+				Name:          volume.PersistentVolumeClaim.ClaimName,
+			})
 		}
-		if !collections.Exists(volume, "persistentVolumeClaim.claimName") {
-			continue
-		}
-
-		claimName, err := collections.GetString(volume, "persistentVolumeClaim.claimName")
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		a.log.Infof("Adding pvc %s to additionalItems", claimName)
-
-		additionalItems = append(additionalItems, ResourceIdentifier{
-			GroupResource: kuberesource.PersistentVolumeClaims,
-			Namespace:     metadata.GetNamespace(),
-			Name:          claimName,
-		})
 	}
 
 	return item, additionalItems, nil
