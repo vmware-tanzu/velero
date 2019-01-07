@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 // mergeServiceAccount takes a backed up serviceaccount and merges attributes into the current in-cluster service account.
@@ -46,9 +44,9 @@ func mergeServiceAccounts(fromCluster, fromBackup *unstructured.Unstructured) (*
 
 	desired.ImagePullSecrets = mergeLocalObjectReferenceSlices(desired.ImagePullSecrets, backupSA.ImagePullSecrets)
 
-	desired.Labels = collections.MergeMaps(desired.Labels, backupSA.Labels)
+	desired.Labels = mergeMaps(desired.Labels, backupSA.Labels)
 
-	desired.Annotations = collections.MergeMaps(desired.Annotations, backupSA.Annotations)
+	desired.Annotations = mergeMaps(desired.Annotations, backupSA.Annotations)
 
 	desiredUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(desired)
 	if err != nil {
@@ -89,6 +87,24 @@ func mergeLocalObjectReferenceSlices(first, second []corev1api.LocalObjectRefere
 		}
 		if !exists {
 			first = append(first, s)
+		}
+	}
+
+	return first
+}
+
+// mergeMaps takes two map[string]string and merges missing keys from the second into the first.
+// If a key already exists, its value is not overwritten.
+func mergeMaps(first, second map[string]string) map[string]string {
+	// If the first map passed in is empty, just use all of the second map's data
+	if first == nil {
+		first = map[string]string{}
+	}
+
+	for k, v := range second {
+		_, ok := first[k]
+		if !ok {
+			first[k] = v
 		}
 	}
 
