@@ -27,7 +27,7 @@ import (
 )
 
 func TestGetVolumeID(t *testing.T) {
-	b := &blockStore{}
+	b := &BlockStore{}
 
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
@@ -55,7 +55,7 @@ func TestGetVolumeID(t *testing.T) {
 }
 
 func TestSetVolumeID(t *testing.T) {
-	b := &blockStore{
+	b := &BlockStore{
 		disksResourceGroup: "rg",
 		subscription:       "sub",
 	}
@@ -98,7 +98,7 @@ func TestSetVolumeID(t *testing.T) {
 // the `parseFullSnapshotName` function, and remove case for legacy
 // format
 func TestParseSnapshotName(t *testing.T) {
-	b := &blockStore{
+	b := &BlockStore{
 		subscription:       "default-sub",
 		disksResourceGroup: "default-rg-legacy",
 	}

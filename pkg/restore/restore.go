@@ -47,10 +47,11 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/boolptr"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -60,10 +61,6 @@ import (
 	"github.com/heptio/velero/pkg/volume"
 )
 
-type BlockStoreGetter interface {
-	GetBlockStore(name string) (cloudprovider.BlockStore, error)
-}
-
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
@@ -72,9 +69,9 @@ type Restorer interface {
 		backup *api.Backup,
 		volumeSnapshots []*volume.Snapshot,
 		backupReader io.Reader,
-		actions []ItemAction,
+		actions []actioninterface.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
-		blockStoreGetter BlockStoreGetter,
+		blockStoreGetter volumeinterface.BlockStoreGetter,
 	) (api.RestoreResult, api.RestoreResult)
 }
 
@@ -182,9 +179,9 @@ func (kr *kubernetesRestorer) Restore(
 	backup *api.Backup,
 	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
-	actions []ItemAction,
+	actions []actioninterface.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
@@ -287,14 +284,14 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 }
 
 type resolvedAction struct {
-	ItemAction
+	actioninterface.RestoreItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
 	selector                  labels.Selector
 }
 
-func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []actioninterface.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {
@@ -314,7 +311,7 @@ func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAc
 		}
 
 		res := resolvedAction{
-			ItemAction:                action,
+			RestoreItemAction:         action,
 			resourceIncludesExcludes:  resources,
 			namespaceIncludesExcludes: namespaces,
 			selector:                  selector,
@@ -337,7 +334,7 @@ type context struct {
 	fileSystem           filesystem.Interface
 	namespaceClient      corev1.NamespaceInterface
 	actions              []resolvedAction
-	blockStoreGetter     BlockStoreGetter
+	blockStoreGetter     volumeinterface.BlockStoreGetter
 	resticRestorer       restic.Restorer
 	globalWaitGroup      velerosync.ErrorGroup
 	resourceWaitGroup    sync.WaitGroup
@@ -941,7 +938,7 @@ type pvRestorer struct {
 	snapshotVolumes        *bool
 	restorePVs             *bool
 	volumeSnapshots        []*volume.Snapshot
-	blockStoreGetter       BlockStoreGetter
+	blockStoreGetter       volumeinterface.BlockStoreGetter
 	snapshotLocationLister listers.VolumeSnapshotLocationLister
 }
 

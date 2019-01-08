@@ -61,7 +61,7 @@ func TestClientFor(t *testing.T) {
 
 	cd := newClientDispenser(logger, clientConn, initFunc)
 
-	actual := cd.clientFor("pod")
+	actual := cd.ClientFor("pod")
 	require.IsType(t, &fakeClient{}, actual)
 	typed := actual.(*fakeClient)
 	assert.Equal(t, 1, count)
@@ -74,7 +74,7 @@ func TestClientFor(t *testing.T) {
 	assert.Equal(t, clientConn, typed.clientConn)
 
 	// Make sure we reuse a previous client
-	actual = cd.clientFor("pod")
+	actual = cd.ClientFor("pod")
 	require.IsType(t, &fakeClient{}, actual)
 	typed = actual.(*fakeClient)
 	assert.Equal(t, 1, count)

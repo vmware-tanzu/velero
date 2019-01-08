@@ -23,16 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Handshake is configuration information that allows go-plugin clients and servers to perform a handshake.
-//
-// TODO(ncdc): this should probably be a function so it can't be mutated, and we should probably move it to
-// handshake.go.
-var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  1,
-	MagicCookieKey:   "ARK_PLUGIN",
-	MagicCookieValue: "hello",
-}
-
 // Server serves registered plugin implementations.
 type Server interface {
 	// RegisterBackupItemAction registers a backup item action.
@@ -46,7 +36,6 @@ type Server interface {
 
 	// RegisterBlockStores registers multiple block stores.
 	RegisterBlockStores(map[string]HandlerInitializer) Server
-
 	// RegisterObjectStore registers an object store.
 	RegisterObjectStore(name string, initializer HandlerInitializer) Server
 

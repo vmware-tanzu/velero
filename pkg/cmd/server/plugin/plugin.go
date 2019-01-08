@@ -20,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/ark/pkg/backup/backupaction"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cloudprovider/aws"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
@@ -87,11 +87,11 @@ func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewBackupPVAction(logger), nil
+	return backupaction.NewBackupPVAction(logger), nil
 }
 
 func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPodAction(logger), nil
+	return backupaction.NewPodAction(logger), nil
 }
 
 func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
@@ -107,9 +107,9 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 			return nil, err
 		}
 
-		action, err := backup.NewServiceAccountAction(
+		action, err := backupaction.NewServiceAccountAction(
 			logger,
-			backup.NewClusterRoleBindingListerMap(clientset),
+			backupaction.NewClusterRoleBindingListerMap(clientset),
 			discoveryHelper)
 		if err != nil {
 			return nil, err
@@ -120,21 +120,21 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 }
 
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewJobAction(logger), nil
+	return restoreaction.NewJobAction(logger), nil
 }
 
 func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewPodAction(logger), nil
+	return restoreaction.NewPodAction(logger), nil
 }
 
 func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewResticRestoreAction(logger), nil
+	return restoreaction.NewResticRestoreAction(logger), nil
 }
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAction(logger), nil
+	return restoreaction.NewServiceAction(logger), nil
 }
 
 func newServiceAccountRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewServiceAccountAction(logger), nil
+	return restoreaction.NewServiceAccountAction(logger), nil
 }

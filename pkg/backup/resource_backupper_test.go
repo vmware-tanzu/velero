@@ -30,6 +30,7 @@ import (
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -228,7 +229,7 @@ func TestBackupResource(t *testing.T) {
 			},
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:               newFakeAction("pods"),
+					BackupItemAction:         newFakeAction("pods"),
 					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 				},
 			},
@@ -390,7 +391,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 				ResolvedActions: []resolvedAction{
 					{
-						ItemAction:               newFakeAction("pods"),
+						BackupItemAction:         newFakeAction("pods"),
 						resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 					},
 				},
@@ -648,7 +649,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,

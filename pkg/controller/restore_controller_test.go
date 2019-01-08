@@ -42,9 +42,11 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/ark/pkg/pluginmanagement/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -109,12 +111,12 @@ func TestFetchBackupInfo(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 
-			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*api.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 
@@ -407,12 +409,12 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
 
-			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*api.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 
@@ -917,9 +919,9 @@ func (r *fakeRestorer) Restore(
 	backup *api.Backup,
 	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
-	actions []restore.ItemAction,
+	actions []actioninterface.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	blockStoreGetter restore.BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 	res := r.Called(log, restore, backup, backupReader, actions)
 

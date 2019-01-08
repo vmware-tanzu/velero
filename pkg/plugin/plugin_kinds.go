@@ -46,7 +46,6 @@ const (
 )
 
 // allPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
-// kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
 var allPluginKinds = sets.NewString(
 	PluginKindObjectStore.String(),
 	PluginKindBlockStore.String(),

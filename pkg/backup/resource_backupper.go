@@ -29,6 +29,7 @@ import (
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -46,7 +47,7 @@ type resourceBackupperFactory interface {
 		tarWriter tarWriter,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		blockStoreGetter volumeinterface.BlockStoreGetter,
 	) resourceBackupper
 }
 
@@ -63,7 +64,7 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) resourceBackupper {
 	return &defaultResourceBackupper{
 		log:                   log,
@@ -98,7 +99,7 @@ type defaultResourceBackupper struct {
 	resticBackupper       restic.Backupper
 	resticSnapshotTracker *pvcSnapshotTracker
 	itemBackupperFactory  itemBackupperFactory
-	blockStoreGetter      BlockStoreGetter
+	blockStoreGetter      volumeinterface.BlockStoreGetter
 }
 
 // backupResource backs up all the objects for a given group-version-resource.

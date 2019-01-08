@@ -44,7 +44,8 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -60,7 +61,7 @@ type backupController struct {
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
-	newPluginManager         func(logrus.FieldLogger) plugin.Manager
+	newPluginManager         func(logrus.FieldLogger) pluginmanagement.Manager
 	backupTracker            BackupTracker
 	backupLocationLister     listers.BackupStorageLocationLister
 	defaultBackupLocation    string
@@ -76,7 +77,7 @@ func NewBackupController(
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) pluginmanagement.Manager,
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,

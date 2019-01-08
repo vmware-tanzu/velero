@@ -34,12 +34,13 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
 )
@@ -61,8 +62,8 @@ type backupDeletionController struct {
 	snapshotLocationLister    listers.VolumeSnapshotLocationLister
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
-	newPluginManager          func(logrus.FieldLogger) plugin.Manager
-	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newPluginManager          func(logrus.FieldLogger) pluginmanagement.Manager
+	newBackupStore            func(*v1.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -78,7 +79,7 @@ func NewBackupDeletionController(
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) pluginmanagement.Manager,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -270,7 +271,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 			} else {
-				blockStores := make(map[string]cloudprovider.BlockStore)
+				blockStores := make(map[string]volumeinterface.BlockStore)
 
 				for _, snapshot := range snapshots {
 					log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
@@ -364,8 +365,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 func blockStoreForSnapshotLocation(
 	namespace, snapshotLocationName string,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	pluginManager plugin.Manager,
-) (cloudprovider.BlockStore, error) {
+	pluginManager pluginmanagement.Manager,
+) (volumeinterface.BlockStore, error) {
 	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", snapshotLocationName)
@@ -383,7 +384,7 @@ func blockStoreForSnapshotLocation(
 	return blockStore, nil
 }
 
-func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
+func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager pluginmanagement.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
 	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
 	if err != nil {
 		return nil, errors.WithStack(err)

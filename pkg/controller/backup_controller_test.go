@@ -40,7 +40,10 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -50,7 +53,7 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []pkgbackup.ItemAction, blockStoreGetter pkgbackup.BlockStoreGetter) error {
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []actioninterface.BackupItemAction, blockStoreGetter volumeinterface.BlockStoreGetter) error {
 	args := b.Called(logger, backup, backupFile, actions, blockStoreGetter)
 	return args.Error(0)
 }
@@ -304,8 +307,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupTracker:          NewBackupTracker(),
 				metrics:                metrics.NewServerMetrics(),
 				clock:                  clock.NewFakeClock(now),
-				newPluginManager:       func(logrus.FieldLogger) plugin.Manager { return pluginManager },
-				newBackupStore: func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+				newPluginManager:       func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
+				newBackupStore: func(*v1.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStore, nil
 				},
 				backupper: backupper,
@@ -314,7 +317,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 
-			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []pkgbackup.ItemAction(nil), pluginManager).Return(nil)
+			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []actioninterface.BackupItemAction(nil), pluginManager).Return(nil)
 
 			// Ensure we have a CompletionTimestamp when uploading.
 			// Failures will display the bytes in buf.

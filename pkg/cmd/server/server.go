@@ -61,7 +61,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/restore"
@@ -200,8 +200,8 @@ type server struct {
 	cancelFunc            context.CancelFunc
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
-	pluginRegistry        plugin.Registry
-	pluginManager         plugin.Manager
+	pluginRegistry        pluginmanagement.Registry
+	pluginManager         pluginmanagement.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
@@ -232,11 +232,11 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		return nil, errors.WithStack(err)
 	}
 
-	pluginRegistry := plugin.NewRegistry(config.pluginDir, logger, logger.Level)
+	pluginRegistry := pluginmanagement.NewRegistry(config.pluginDir, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
+	pluginManager := pluginmanagement.NewManager(logger, logger.Level, pluginRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -515,8 +515,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// Initialize manual backup metrics
 	s.metrics.InitSchedule("")
 
-	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
-		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+	newPluginManager := func(logger logrus.FieldLogger) pluginmanagement.Manager {
+		return pluginmanagement.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
 
 	backupSyncController := controller.NewBackupSyncController(

@@ -26,7 +26,7 @@ import (
 func TestClientLogger(t *testing.T) {
 	base := &pluginBase{}
 	logger := test.NewLogger()
-	f := clientLogger(logger)
+	f := ClientLogger(logger)
 	f(base)
 	assert.Equal(t, logger, base.clientLogger)
 }

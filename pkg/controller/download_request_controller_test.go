@@ -32,8 +32,9 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/ark/pkg/pluginmanagement/mocks"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -59,7 +60,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 			informerFactory.Velero().V1().Restores(),
 			informerFactory.Velero().V1().BackupStorageLocations(),
 			informerFactory.Velero().V1().Backups(),
-			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+			func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
 			velerotest.NewLogger(),
 		).(*downloadRequestController)
 	)
@@ -68,7 +69,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 	require.NoError(t, err)
 	controller.clock = clock.NewFakeClock(clockTime)
 
-	controller.newBackupStore = func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	controller.newBackupStore = func(*v1.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 

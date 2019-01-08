@@ -27,6 +27,7 @@ import (
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -97,7 +98,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,

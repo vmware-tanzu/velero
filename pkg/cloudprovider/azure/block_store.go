@@ -33,7 +33,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/util/collections"
 )
 
@@ -46,7 +45,7 @@ const (
 	disksResource     = "disks"
 )
 
-type blockStore struct {
+type BlockStore struct {
 	log                logrus.FieldLogger
 	disks              *disk.DisksClient
 	snaps              *disk.SnapshotsClient
@@ -66,11 +65,11 @@ func (si *snapshotIdentifier) String() string {
 	return getComputeResourceName(si.subscription, si.resourceGroup, snapshotsResource, si.name)
 }
 
-func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
-	return &blockStore{log: logger}
+func NewBlockStore(logger logrus.FieldLogger) *BlockStore {
+	return &BlockStore{log: logger}
 }
 
-func (b *blockStore) Init(config map[string]string) error {
+func (b *BlockStore) Init(config map[string]string) error {
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
 	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
@@ -123,7 +122,7 @@ func (b *blockStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	snapshotIdentifier, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return "", err
@@ -163,7 +162,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return diskName, nil
 }
 
-func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := b.disks.Get(b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
@@ -172,7 +171,7 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return string(res.AccountType), nil, nil
 }
 
-func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
 	diskInfo, err := b.disks.Get(b.disksResourceGroup, volumeID)
 	if err != nil {
@@ -246,7 +245,7 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
 	snapshotInfo, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return err
@@ -285,7 +284,7 @@ var snapshotURIRegexp = regexp.MustCompile(
 //
 // TODO(1.0) remove this function and replace usage with `parseFullSnapshotName` since
 // we won't support the legacy snapshot name format for 1.0.
-func (b *blockStore) parseSnapshotName(name string) (*snapshotIdentifier, error) {
+func (b *BlockStore) parseSnapshotName(name string) (*snapshotIdentifier, error) {
 	switch {
 	// legacy format - name only (not fully-qualified)
 	case !strings.Contains(name, "/"):
@@ -335,7 +334,7 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 	return snapshotID, nil
 }
 
-func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (b *BlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
 		return "", nil
 	}
@@ -348,7 +347,7 @@ func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	return volumeID, nil
 }
 
-func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *BlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
 	if err != nil {
 		return nil, err

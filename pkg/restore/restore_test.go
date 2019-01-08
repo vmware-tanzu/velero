@@ -39,11 +39,11 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
-	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -452,7 +452,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("configmaps"),
+					RestoreItemAction:         newFakeAction("configmaps"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -468,7 +468,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("foo-resource"),
+					RestoreItemAction:         newFakeAction("foo-resource"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -1439,9 +1439,9 @@ func int64Ptr(val int) *int64 {
 	return &r
 }
 
-type providerToBlockStoreMap map[string]cloudprovider.BlockStore
+type providerToBlockStoreMap map[string]volumeinterface.BlockStore
 
-func (g providerToBlockStoreMap) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+func (g providerToBlockStoreMap) GetBlockStore(provider string) (volumeinterface.BlockStore, error) {
 	if bs, ok := g[provider]; !ok {
 		return nil, errors.New("block store not found for provider")
 	} else {
@@ -1506,7 +1506,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
 				blockStore       = new(cloudprovidermocks.BlockStore)
-				blockStoreGetter = providerToBlockStoreMap(map[string]cloudprovider.BlockStore{
+				blockStoreGetter = providerToBlockStoreMap(map[string]volumeinterface.BlockStore{
 					tc.expectedProvider: blockStore,
 				})
 				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
@@ -1860,7 +1860,7 @@ type fakeBlockStoreGetter struct {
 	volumeID       string
 }
 
-func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (volumeinterface.BlockStore, error) {
 	if r.fakeBlockStore == nil {
 		r.fakeBlockStore = &velerotest.FakeBlockStore{
 			RestorableVolumes: r.volumeMap,
@@ -1874,8 +1874,8 @@ func newFakeAction(resource string) *fakeAction {
 	return &fakeAction{resource}
 }
 
-func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (r *fakeAction) AppliesTo() (actioninterface.ResourceSelector, error) {
+	return actioninterface.ResourceSelector{
 		IncludedResources: []string{r.resource},
 	}, nil
 }

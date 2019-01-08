@@ -40,8 +40,9 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
@@ -80,8 +81,8 @@ type restoreController struct {
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
 
-	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
-	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newPluginManager func(logger logrus.FieldLogger) pluginmanagement.Manager
+	newBackupStore   func(*api.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 type restoreResult struct {
@@ -99,7 +100,7 @@ func NewRestoreController(
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) pluginmanagement.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
@@ -278,7 +279,7 @@ type backupInfo struct {
 	backupStore persistence.BackupStore
 }
 
-func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager plugin.Manager) backupInfo {
+func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager pluginmanagement.Manager) backupInfo {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -402,7 +403,7 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
-func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+func (c *restoreController) fetchBackupInfo(backupName string, pluginManager pluginmanagement.Manager) (backupInfo, error) {
 	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
 		return backupInfo{}, err
@@ -424,11 +425,36 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 	}, nil
 }
 
+func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLocation, backupName string, pluginManager pluginmanagement.Manager) (backupInfo, error) {
+	backupStore, err := persistence.NewObjectBackupStore(location, pluginManager, c.logger)
+	if err != nil {
+		return backupInfo{}, err
+	}
+
+	backup, err := backupStore.GetBackupMetadata(backupName)
+	if err != nil {
+		return backupInfo{}, err
+	}
+
+	// ResourceVersion needs to be cleared in order to create the object in the API
+	backup.ResourceVersion = ""
+	// Clear out the namespace, in case the backup was made in a different cluster, with a different namespace
+	backup.Namespace = ""
+
+	backupCreated, err := c.backupClient.Backups(c.namespace).Create(backup)
+	if err != nil {
+		return backupInfo{}, errors.WithStack(err)
+	}
+
+	return backupInfo{
+		backup:      backupCreated,
+		backupStore: backupStore,
+	}, nil
 func (c *restoreController) runRestore(
 	restore *api.Restore,
-	actions []restore.ItemAction,
+	actions []actioninterface.RestoreItemAction,
 	info backupInfo,
-	pluginManager plugin.Manager,
+	pluginManager pluginmanagement.Manager,
 ) (restoreResult, error) {
 	var restoreWarnings, restoreErrors api.RestoreResult
 	var restoreFailure error

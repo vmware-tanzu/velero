@@ -28,6 +28,7 @@ import (
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 )
@@ -44,7 +45,7 @@ type groupBackupperFactory interface {
 		tarWriter tarWriter,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		blockStoreGetter volumeinterface.BlockStoreGetter,
 	) groupBackupper
 }
 
@@ -61,7 +62,7 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) groupBackupper {
 	return &defaultGroupBackupper{
 		log:                   log,
@@ -96,7 +97,7 @@ type defaultGroupBackupper struct {
 	resticBackupper          restic.Backupper
 	resticSnapshotTracker    *pvcSnapshotTracker
 	resourceBackupperFactory resourceBackupperFactory
-	blockStoreGetter         BlockStoreGetter
+	blockStoreGetter         volumeinterface.BlockStoreGetter
 }
 
 // backupGroup backs up a single API group.

@@ -30,7 +30,7 @@ import (
 )
 
 func TestGetVolumeID(t *testing.T) {
-	b := &blockStore{}
+	b := &BlockStore{}
 
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
@@ -70,7 +70,7 @@ func TestGetVolumeID(t *testing.T) {
 }
 
 func TestSetVolumeID(t *testing.T) {
-	b := &blockStore{}
+	b := &BlockStore{}
 
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{},

@@ -35,7 +35,8 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/ark/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
@@ -48,8 +49,8 @@ type downloadRequestController struct {
 	clock                 clock.Clock
 	backupLocationLister  listers.BackupStorageLocationLister
 	backupLister          listers.BackupLister
-	newPluginManager      func(logrus.FieldLogger) plugin.Manager
-	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newPluginManager      func(logrus.FieldLogger) pluginmanagement.Manager
+	newBackupStore        func(*v1.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -59,7 +60,7 @@ func NewDownloadRequestController(
 	restoreInformer informers.RestoreInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	backupInformer informers.BackupInformer,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) pluginmanagement.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{

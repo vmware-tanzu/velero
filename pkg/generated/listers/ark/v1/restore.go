@@ -1,5 +1,9 @@
 /*
+<<<<<<< HEAD
 Copyright the Heptio Ark contributors.
+=======
+Copyright 2019 the Heptio Ark contributors.
+>>>>>>> Refactor plugin structure
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

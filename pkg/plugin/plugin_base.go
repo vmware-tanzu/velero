@@ -33,7 +33,7 @@ func newPluginBase(options ...pluginOption) *pluginBase {
 
 type pluginOption func(base *pluginBase)
 
-func clientLogger(logger logrus.FieldLogger) pluginOption {
+func ClientLogger(logger logrus.FieldLogger) pluginOption {
 	return func(base *pluginBase) {
 		base.clientLogger = logger
 	}

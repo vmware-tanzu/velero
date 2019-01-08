@@ -34,9 +34,9 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/volume"
@@ -52,7 +52,7 @@ type itemBackupperFactory interface {
 		discoveryHelper discovery.Helper,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		blockStoreGetter volumeinterface.BlockStoreGetter,
 	) ItemBackupper
 }
 
@@ -67,7 +67,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	blockStoreGetter volumeinterface.BlockStoreGetter,
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
 		backupRequest:         backupRequest,
@@ -102,11 +102,11 @@ type defaultItemBackupper struct {
 	discoveryHelper       discovery.Helper
 	resticBackupper       restic.Backupper
 	resticSnapshotTracker *pvcSnapshotTracker
-	blockStoreGetter      BlockStoreGetter
+	blockStoreGetter      volumeinterface.BlockStoreGetter
 
 	itemHookHandler             itemHookHandler
 	additionalItemBackupper     ItemBackupper
-	snapshotLocationBlockStores map[string]cloudprovider.BlockStore
+	snapshotLocationBlockStores map[string]volumeinterface.BlockStore
 }
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
@@ -345,7 +345,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 // blockStore instantiates and initializes a BlockStore given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotLocation) (cloudprovider.BlockStore, error) {
+func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotLocation) (volumeinterface.BlockStore, error) {
 	if bs, ok := ib.snapshotLocationBlockStores[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -360,7 +360,7 @@ func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotL
 	}
 
 	if ib.snapshotLocationBlockStores == nil {
-		ib.snapshotLocationBlockStores = make(map[string]cloudprovider.BlockStore)
+		ib.snapshotLocationBlockStores = make(map[string]volumeinterface.BlockStore)
 	}
 	ib.snapshotLocationBlockStores[snapshotLocation.Name] = bs
 
@@ -408,7 +408,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	var (
 		volumeID, location string
-		blockStore         cloudprovider.BlockStore
+		blockStore         volumeinterface.BlockStore
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {
