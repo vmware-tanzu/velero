@@ -118,35 +118,4 @@ func deleteNodePorts(service *corev1api.Service) error {
 	}
 
 	return nil
-
-	// preservedPorts, err := getPreservedPorts(obj)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// res, found, err := unstructured.NestedFieldNoCopy(obj.UnstructuredContent(), "spec", "ports")
-	// if err != nil {
-	// 	return errors.WithStack(err)
-	// }
-	// if !found {
-	// 	return errors.New(".spec.ports not found")
-	// }
-
-	// ports, ok := res.([]interface{})
-	// if !ok {
-	// 	return errors.Errorf("unexpected type for .spec.ports %T", res)
-	// }
-
-	// for _, port := range ports {
-	// 	p := port.(map[string]interface{})
-	// 	var name string
-	// 	if nameVal, ok := p["name"]; ok {
-	// 		name = nameVal.(string)
-	// 	}
-	// 	if preservedPorts[name] {
-	// 		continue
-	// 	}
-	// 	delete(p, "nodePort")
-	// }
-	// return nil
 }
