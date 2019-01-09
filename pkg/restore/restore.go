@@ -793,7 +793,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		// and which backup they came from
 		addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
-		ctx.log.Infof("Restoring %s: %v", obj.GroupVersionKind().Kind, name)
+		ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 		createdObj, restoreErr := resourceClient.Create(obj)
 		if apierrors.IsAlreadyExists(restoreErr) {
 			fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
@@ -848,6 +848,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 					addToResult(&warnings, namespace, e)
 				}
 			}
+			ctx.log.Infof("Unable to restore %s: %v because it already exists and is identical to the backed up copy", obj.GroupVersionKind().Kind, name)
 			continue
 		}
 		// Error was something other than an AlreadyExists
