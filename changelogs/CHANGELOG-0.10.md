@@ -1,4 +1,27 @@
+  - [v0.10.1](#v0101)
   - [v0.10.0](#v0100)
+
+## v0.10.1
+#### 2019-01-10
+
+### Download
+- https://github.com/heptio/ark/releases/tag/v0.10.1
+
+### Changes
+  * Fix minio setup job command (#1118, @acbramley)
+  * Add debugging-install link in doc get-started.md (#1131, @hex108)
+  * `ark version`: show full git SHA & combine git tree state indicator with git SHA line (#1124, @skriss)
+  * Delete spec.priority in pod restore action (#879, @mwieczorek)
+  * Allow to use AWS Signature v1 for creating signed AWS urls (#811, @bashofmann)
+  * add multizone/regional support to gcp (#765, @wwitzel3)
+  * Fixed the newline output when deleting a schedule. (#1120, @jwhitcraft)
+  * Remove obsolete make targets and rename 'make goreleaser' to 'make release' (#1114, @skriss)
+  * Update to go 1.11 (#1069, @gliptak)
+  * Update CHANGELOGs (#1063, @wwitzel3)
+  * Initialize empty schedule metrics on server init (#1054, @cbeneke)
+  * Added brew reference (#1051, @omerlh)
+  * Remove default token from all service accounts (#1048, @ncdc)
+  * Add pprof support to the Ark server (#234, @ncdc)
 
 ## v0.10.0
 #### 2018-11-15
