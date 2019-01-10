@@ -23,7 +23,7 @@ import (
 
 // BackupCommand returns a Command for running a restic backup.
 func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]string) *Command {
-	// --hostname flag is provided with a generic value because restic uses the hostname
+	// --host flag is provided with a generic value because restic uses the host
 	// to find a parent snapshot, and by default it will be the name of the daemonset pod
 	// where the `restic backup` command is run. If this pod is recreated, we want to continue
 	// taking incremental backups rather than triggering a full one due to a new pod name.
@@ -34,7 +34,7 @@ func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]st
 		PasswordFile:   passwordFile,
 		Dir:            path,
 		Args:           []string{"."},
-		ExtraFlags:     append(backupTagFlags(tags), "--hostname=velero"),
+		ExtraFlags:     append(backupTagFlags(tags), "--host=velero"),
 	}
 }
 
