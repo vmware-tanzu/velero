@@ -1,1 +1,0 @@
-Remove obsolete make targets and rename 'make goreleaser' to 'make release'
