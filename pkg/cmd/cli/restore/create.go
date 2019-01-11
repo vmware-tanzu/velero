@@ -78,6 +78,7 @@ type CreateOptions struct {
 	NamespaceMappings       flag.Map
 	Selector                flag.LabelSelector
 	IncludeClusterResources flag.OptionalBool
+	AlwaysProvisionPVs      flag.OptionalBool
 	Wait                    bool
 
 	client arkclient.Interface
@@ -110,6 +111,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the restore")
 	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.AlwaysProvisionPVs, "always-provision-pvs", "", "dynamically provision all pvs regardless its snapshot availability and reclaim policy")
+	f.NoOptDefVal = "false"
 
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
 }
@@ -189,6 +193,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			NamespaceMapping:        o.NamespaceMappings.Data(),
 			LabelSelector:           o.Selector.LabelSelector,
 			RestorePVs:              o.RestoreVolumes.Value,
+			AlwaysProvisionPVs:		 o.AlwaysProvisionPVs.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
 	}

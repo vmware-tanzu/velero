@@ -56,9 +56,13 @@ type RestoreSpec struct {
 	// or nil, all objects are included. Optional.
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
-	// RestorePVs specifies whether to restore all included
-	// PVs from snapshot (via the cloudprovider).
+	// RestorePVs specifies whether to provision all included
+	// PVs nonetheless .
 	RestorePVs *bool `json:"restorePVs,omitempty"`
+
+	// AlwaysProvisionPVs specifies whether to provision all included
+	// PVs regardless its reclaim policy or snapshot availability
+	AlwaysProvisionPVs *bool `json:"alwaysProvisionPVs,omitempty"`
 
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the restore. If null, defaults
