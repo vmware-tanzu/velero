@@ -193,7 +193,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			NamespaceMapping:        o.NamespaceMappings.Data(),
 			LabelSelector:           o.Selector.LabelSelector,
 			RestorePVs:              o.RestoreVolumes.Value,
-			AlwaysProvisionPVs:		 o.AlwaysProvisionPVs.Value,
+			AlwaysProvisionPVs:      o.AlwaysProvisionPVs.Value,
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 		},
 	}
