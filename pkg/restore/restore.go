@@ -583,8 +583,6 @@ func addToResult(r *api.RestoreResult, ns string, e error) {
 func (ctx *context) restoreResource(resource, namespace, resourcePath string) (api.RestoreResult, api.RestoreResult) {
 	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
 
-	var alwaysProvisionPVs = false
-
 	if ctx.restore.Spec.IncludeClusterResources != nil && !*ctx.restore.Spec.IncludeClusterResources && namespace == "" {
 		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
 		return warnings, errs
@@ -690,7 +688,13 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 				}
 			}
 
-			if alwaysProvisionPVs || (!hasSnapshot && hasDeleteReclaimPolicy(obj.Object)) {
+			if ctx.restore.Spec.AlwaysProvisionPVs != nil && *ctx.restore.Spec.AlwaysProvisionPVs {
+				ctx.log.Infof("Not restoring PV because always provisioning option was set.")
+				ctx.pvsToProvision.Insert(name)
+				continue
+			}
+
+			if !hasSnapshot && hasDeleteReclaimPolicy(obj.Object) {
 				ctx.log.Infof("Not restoring PV because it doesn't have a snapshot and its reclaim policy is Delete.")
 				ctx.pvsToProvision.Insert(name)
 				continue
