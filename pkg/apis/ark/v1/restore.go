@@ -56,8 +56,8 @@ type RestoreSpec struct {
 	// or nil, all objects are included. Optional.
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
-	// RestorePVs specifies whether to provision all included
-	// PVs nonetheless .
+	// RestorePVs specifies whether to restore all included
+	// PVs from snapshot (via the cloudprovider).
 	RestorePVs *bool `json:"restorePVs,omitempty"`
 
 	// AlwaysProvisionPVs specifies whether to provision all included
