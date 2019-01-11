@@ -1092,6 +1092,15 @@ func (in *RestoreSpec) DeepCopyInto(out *RestoreSpec) {
 			**out = **in
 		}
 	}
+	if in.AlwaysProvisionPVs != nil {
+		in, out := &in.AlwaysProvisionPVs, &out.AlwaysProvisionPVs
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(bool)
+			**out = **in
+		}
+	}
 	if in.IncludeClusterResources != nil {
 		in, out := &in.IncludeClusterResources, &out.IncludeClusterResources
 		if *in == nil {
