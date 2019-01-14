@@ -3,12 +3,12 @@
 
 package generated
 
-import (
-	context "context"
-	fmt "fmt"
-	math "math"
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
 
-	proto "github.com/golang/protobuf/proto"
+import (
+	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
 )
 
@@ -17,45 +17,16 @@ var _ = proto.Marshal
 var _ = fmt.Errorf
 var _ = math.Inf
 
-// This is a compile-time assertion to ensure that this generated file
-// is compatible with the proto package it is being compiled against.
-// A compilation error at this line likely means your copy of the
-// proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
-
 type RestoreExecuteRequest struct {
-	Plugin               string   `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	Item                 []byte   `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
-	Restore              []byte   `protobuf:"bytes,3,opt,name=restore,proto3" json:"restore,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Plugin  string `protobuf:"bytes,1,opt,name=plugin" json:"plugin,omitempty"`
+	Item    []byte `protobuf:"bytes,2,opt,name=item,proto3" json:"item,omitempty"`
+	Restore []byte `protobuf:"bytes,3,opt,name=restore,proto3" json:"restore,omitempty"`
 }
 
-func (m *RestoreExecuteRequest) Reset()         { *m = RestoreExecuteRequest{} }
-func (m *RestoreExecuteRequest) String() string { return proto.CompactTextString(m) }
-func (*RestoreExecuteRequest) ProtoMessage()    {}
-func (*RestoreExecuteRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d398a33f1080c362, []int{0}
-}
-
-func (m *RestoreExecuteRequest) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RestoreExecuteRequest.Unmarshal(m, b)
-}
-func (m *RestoreExecuteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RestoreExecuteRequest.Marshal(b, m, deterministic)
-}
-func (m *RestoreExecuteRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RestoreExecuteRequest.Merge(m, src)
-}
-func (m *RestoreExecuteRequest) XXX_Size() int {
-	return xxx_messageInfo_RestoreExecuteRequest.Size(m)
-}
-func (m *RestoreExecuteRequest) XXX_DiscardUnknown() {
-	xxx_messageInfo_RestoreExecuteRequest.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RestoreExecuteRequest proto.InternalMessageInfo
+func (m *RestoreExecuteRequest) Reset()                    { *m = RestoreExecuteRequest{} }
+func (m *RestoreExecuteRequest) String() string            { return proto.CompactTextString(m) }
+func (*RestoreExecuteRequest) ProtoMessage()               {}
+func (*RestoreExecuteRequest) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 func (m *RestoreExecuteRequest) GetPlugin() string {
 	if m != nil {
@@ -79,37 +50,14 @@ func (m *RestoreExecuteRequest) GetRestore() []byte {
 }
 
 type RestoreExecuteResponse struct {
-	Item                 []byte   `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
-	Warning              string   `protobuf:"bytes,2,opt,name=warning,proto3" json:"warning,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
+	Item    []byte `protobuf:"bytes,1,opt,name=item,proto3" json:"item,omitempty"`
+	Warning string `protobuf:"bytes,2,opt,name=warning" json:"warning,omitempty"`
 }
 
-func (m *RestoreExecuteResponse) Reset()         { *m = RestoreExecuteResponse{} }
-func (m *RestoreExecuteResponse) String() string { return proto.CompactTextString(m) }
-func (*RestoreExecuteResponse) ProtoMessage()    {}
-func (*RestoreExecuteResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_d398a33f1080c362, []int{1}
-}
-
-func (m *RestoreExecuteResponse) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_RestoreExecuteResponse.Unmarshal(m, b)
-}
-func (m *RestoreExecuteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_RestoreExecuteResponse.Marshal(b, m, deterministic)
-}
-func (m *RestoreExecuteResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RestoreExecuteResponse.Merge(m, src)
-}
-func (m *RestoreExecuteResponse) XXX_Size() int {
-	return xxx_messageInfo_RestoreExecuteResponse.Size(m)
-}
-func (m *RestoreExecuteResponse) XXX_DiscardUnknown() {
-	xxx_messageInfo_RestoreExecuteResponse.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_RestoreExecuteResponse proto.InternalMessageInfo
+func (m *RestoreExecuteResponse) Reset()                    { *m = RestoreExecuteResponse{} }
+func (m *RestoreExecuteResponse) String() string            { return proto.CompactTextString(m) }
+func (*RestoreExecuteResponse) ProtoMessage()               {}
+func (*RestoreExecuteResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func (m *RestoreExecuteResponse) GetItem() []byte {
 	if m != nil {
@@ -130,27 +78,6 @@ func init() {
 	proto.RegisterType((*RestoreExecuteResponse)(nil), "generated.RestoreExecuteResponse")
 }
 
-func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor_d398a33f1080c362) }
-
-var fileDescriptor_d398a33f1080c362 = []byte{
-	// 230 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x0f, 0x4a, 0x2d, 0x2e,
-	0xc9, 0x2f, 0x4a, 0xf5, 0x2c, 0x49, 0xcd, 0x75, 0x4c, 0x2e, 0xc9, 0xcc, 0xcf, 0xd3, 0x2b, 0x28,
-	0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x4c, 0x4f, 0xcd, 0x4b, 0x2d, 0x4a, 0x2c, 0x49, 0x4d, 0x91, 0xe2,
-	0x09, 0xce, 0x48, 0x2c, 0x4a, 0x4d, 0x81, 0x48, 0x28, 0xc5, 0x72, 0x89, 0x42, 0xf5, 0xb8, 0x56,
-	0xa4, 0x26, 0x97, 0x96, 0xa4, 0x06, 0xa5, 0x16, 0x96, 0xa6, 0x16, 0x97, 0x08, 0x89, 0x71, 0xb1,
-	0x15, 0xe4, 0x94, 0xa6, 0x67, 0xe6, 0x49, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x06, 0x41, 0x79, 0x42,
-	0x42, 0x5c, 0x2c, 0x99, 0x25, 0xa9, 0xb9, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x3c, 0x41, 0x60, 0xb6,
-	0x90, 0x04, 0x17, 0x7b, 0x11, 0xc4, 0x10, 0x09, 0x66, 0xb0, 0x30, 0x8c, 0xab, 0xe4, 0xc6, 0x25,
-	0x86, 0x6e, 0x7c, 0x71, 0x41, 0x7e, 0x5e, 0x71, 0x2a, 0xdc, 0x1c, 0x46, 0x54, 0x73, 0xca, 0x13,
-	0x8b, 0xf2, 0x32, 0xf3, 0xd2, 0xc1, 0xc6, 0x73, 0x06, 0xc1, 0xb8, 0x46, 0xab, 0x19, 0xb9, 0x04,
-	0x31, 0xfc, 0x26, 0xe4, 0xc6, 0xc5, 0xe9, 0x58, 0x50, 0x90, 0x93, 0x99, 0x5a, 0x1c, 0x92, 0x2f,
-	0x24, 0xad, 0x07, 0xf7, 0xa3, 0x1e, 0x5c, 0x14, 0xea, 0x1b, 0x29, 0x19, 0xec, 0x92, 0x50, 0xb7,
-	0xf8, 0x71, 0xb1, 0x43, 0x9d, 0x27, 0xa4, 0x80, 0xa4, 0x10, 0x6b, 0xc0, 0x48, 0x29, 0xe2, 0x51,
-	0x01, 0x31, 0x2f, 0x89, 0x0d, 0x1c, 0xb6, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0xaa, 0xe5,
-	0x97, 0xa4, 0x8f, 0x01, 0x00, 0x00,
-}
-
 // Reference imports to suppress errors if they are not otherwise used.
 var _ context.Context
 var _ grpc.ClientConn
@@ -159,9 +86,8 @@ var _ grpc.ClientConn
 // is compatible with the grpc package it is being compiled against.
 const _ = grpc.SupportPackageIsVersion4
 
-// RestoreItemActionClient is the client API for RestoreItemAction service.
-//
-// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
+// Client API for RestoreItemAction service
+
 type RestoreItemActionClient interface {
 	AppliesTo(ctx context.Context, in *AppliesToRequest, opts ...grpc.CallOption) (*AppliesToResponse, error)
 	Execute(ctx context.Context, in *RestoreExecuteRequest, opts ...grpc.CallOption) (*RestoreExecuteResponse, error)
@@ -177,7 +103,7 @@ func NewRestoreItemActionClient(cc *grpc.ClientConn) RestoreItemActionClient {
 
 func (c *restoreItemActionClient) AppliesTo(ctx context.Context, in *AppliesToRequest, opts ...grpc.CallOption) (*AppliesToResponse, error) {
 	out := new(AppliesToResponse)
-	err := c.cc.Invoke(ctx, "/generated.RestoreItemAction/AppliesTo", in, out, opts...)
+	err := grpc.Invoke(ctx, "/generated.RestoreItemAction/AppliesTo", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -186,14 +112,15 @@ func (c *restoreItemActionClient) AppliesTo(ctx context.Context, in *AppliesToRe
 
 func (c *restoreItemActionClient) Execute(ctx context.Context, in *RestoreExecuteRequest, opts ...grpc.CallOption) (*RestoreExecuteResponse, error) {
 	out := new(RestoreExecuteResponse)
-	err := c.cc.Invoke(ctx, "/generated.RestoreItemAction/Execute", in, out, opts...)
+	err := grpc.Invoke(ctx, "/generated.RestoreItemAction/Execute", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// RestoreItemActionServer is the server API for RestoreItemAction service.
+// Server API for RestoreItemAction service
+
 type RestoreItemActionServer interface {
 	AppliesTo(context.Context, *AppliesToRequest) (*AppliesToResponse, error)
 	Execute(context.Context, *RestoreExecuteRequest) (*RestoreExecuteResponse, error)
@@ -254,4 +181,25 @@ var _RestoreItemAction_serviceDesc = grpc.ServiceDesc{
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "RestoreItemAction.proto",
+}
+
+func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor4) }
+
+var fileDescriptor4 = []byte{
+	// 230 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0x0f, 0x4a, 0x2d, 0x2e,
+	0xc9, 0x2f, 0x4a, 0xf5, 0x2c, 0x49, 0xcd, 0x75, 0x4c, 0x2e, 0xc9, 0xcc, 0xcf, 0xd3, 0x2b, 0x28,
+	0xca, 0x2f, 0xc9, 0x17, 0xe2, 0x4c, 0x4f, 0xcd, 0x4b, 0x2d, 0x4a, 0x2c, 0x49, 0x4d, 0x91, 0xe2,
+	0x09, 0xce, 0x48, 0x2c, 0x4a, 0x4d, 0x81, 0x48, 0x28, 0xc5, 0x72, 0x89, 0x42, 0xf5, 0xb8, 0x56,
+	0xa4, 0x26, 0x97, 0x96, 0xa4, 0x06, 0xa5, 0x16, 0x96, 0xa6, 0x16, 0x97, 0x08, 0x89, 0x71, 0xb1,
+	0x15, 0xe4, 0x94, 0xa6, 0x67, 0xe6, 0x49, 0x30, 0x2a, 0x30, 0x6a, 0x70, 0x06, 0x41, 0x79, 0x42,
+	0x42, 0x5c, 0x2c, 0x99, 0x25, 0xa9, 0xb9, 0x12, 0x4c, 0x0a, 0x8c, 0x1a, 0x3c, 0x41, 0x60, 0xb6,
+	0x90, 0x04, 0x17, 0x7b, 0x11, 0xc4, 0x10, 0x09, 0x66, 0xb0, 0x30, 0x8c, 0xab, 0xe4, 0xc6, 0x25,
+	0x86, 0x6e, 0x7c, 0x71, 0x41, 0x7e, 0x5e, 0x71, 0x2a, 0xdc, 0x1c, 0x46, 0x54, 0x73, 0xca, 0x13,
+	0x8b, 0xf2, 0x32, 0xf3, 0xd2, 0xc1, 0xc6, 0x73, 0x06, 0xc1, 0xb8, 0x46, 0xab, 0x19, 0xb9, 0x04,
+	0x31, 0xfc, 0x26, 0xe4, 0xc6, 0xc5, 0xe9, 0x58, 0x50, 0x90, 0x93, 0x99, 0x5a, 0x1c, 0x92, 0x2f,
+	0x24, 0xad, 0x07, 0xf7, 0xa3, 0x1e, 0x5c, 0x14, 0xea, 0x1b, 0x29, 0x19, 0xec, 0x92, 0x50, 0xb7,
+	0xf8, 0x71, 0xb1, 0x43, 0x9d, 0x27, 0xa4, 0x80, 0xa4, 0x10, 0x6b, 0xc0, 0x48, 0x29, 0xe2, 0x51,
+	0x01, 0x31, 0x2f, 0x89, 0x0d, 0x1c, 0xb6, 0xc6, 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0xaa, 0xe5,
+	0x97, 0xa4, 0x8f, 0x01, 0x00, 0x00,
 }
