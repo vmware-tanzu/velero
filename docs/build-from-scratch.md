@@ -59,7 +59,7 @@ Run `make update` to regenerate files if you make the following changes:
 
 Run [generate-proto.sh][13] to regenerate files if you make the following changes:
 
-* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14]. 
+* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14] and compiler plugin `protoc-gen-go` version v1.0.0. 
 
 ### Cross compiling
 
