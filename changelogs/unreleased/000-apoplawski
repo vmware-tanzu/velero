@@ -1,0 +1,2 @@
+Added a new flag to ark-cli: --always-provision-pvs which enables the user
+to decide if he/she wants to dynamically provision all the persistent volumes.
