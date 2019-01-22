@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
@@ -40,6 +41,9 @@ import (
 	"github.com/heptio/ark/pkg/util/collections"
 	kubeutil "github.com/heptio/ark/pkg/util/kube"
 )
+
+// BackupVersion is the current backup version for Ark.
+const BackupVersion = 1
 
 // Backupper performs backups.
 type Backupper interface {
@@ -221,6 +225,10 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 	log := logger.WithField("backup", kubeutil.NamespaceAndName(backupRequest))
 	log.Info("Starting backup")
 
+	if err := kb.writeBackupVersion(tw); err != nil {
+		return errors.WithStack(err)
+	}
+
 	backupRequest.NamespaceIncludesExcludes = getNamespaceIncludesExcludes(backupRequest.Backup)
 	log.Infof("Including namespaces: %s", backupRequest.NamespaceIncludesExcludes.IncludesString())
 	log.Infof("Excluding namespaces: %s", backupRequest.NamespaceIncludesExcludes.ExcludesString())
@@ -290,6 +298,26 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 	}
 
 	return err
+}
+
+func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
+	versionFile := filepath.Join(api.MetadataDir, "version")
+	versionString := fmt.Sprintf("%d\n", BackupVersion)
+
+	hdr := &tar.Header{
+		Name:     versionFile,
+		Size:     int64(len(versionString)),
+		Typeflag: tar.TypeReg,
+		Mode:     0644,
+		ModTime:  time.Now(),
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		return errors.WithStack(err)
+	}
+	if _, err := tw.Write([]byte(versionString)); err != nil {
+		return errors.WithStack(err)
+	}
+	return nil
 }
 
 type tarWriter interface {
