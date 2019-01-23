@@ -36,4 +36,6 @@ type RestoreExpansion interface{}
 
 type ScheduleExpansion interface{}
 
+type ServerStatusRequestExpansion interface{}
+
 type VolumeSnapshotLocationExpansion interface{}

@@ -64,6 +64,10 @@ func (c *FakeArkV1) Schedules(namespace string) v1.ScheduleInterface {
 	return &FakeSchedules{c, namespace}
 }
 
+func (c *FakeArkV1) ServerStatusRequests(namespace string) v1.ServerStatusRequestInterface {
+	return &FakeServerStatusRequests{c, namespace}
+}
+
 func (c *FakeArkV1) VolumeSnapshotLocations(namespace string) v1.VolumeSnapshotLocationInterface {
 	return &FakeVolumeSnapshotLocations{c, namespace}
 }
