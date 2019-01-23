@@ -266,7 +266,7 @@ func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	}
 
 	if pv.Spec.AWSElasticBlockStore.VolumeID == "" {
-		return "", errors.New(".spec.awsElasticBlockStore.volumeID not found")
+		return "", errors.New("spec.awsElasticBlockStore.volumeID not found")
 	}
 
 	return ebsVolumeIDRegex.FindString(pv.Spec.AWSElasticBlockStore.VolumeID), nil
@@ -279,7 +279,7 @@ func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID s
 	}
 
 	if pv.Spec.AWSElasticBlockStore == nil {
-		return nil, errors.New(".spec.awsElasticBlockStore not found")
+		return nil, errors.New("spec.awsElasticBlockStore not found")
 	}
 
 	pv.Spec.AWSElasticBlockStore.VolumeID = volumeID

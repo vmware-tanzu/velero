@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -66,26 +65,6 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 	}
 
 	return &unstructured.Unstructured{Object: res}, nil, nil
-}
-
-func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
-	preservedPorts := map[string]bool{}
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if lac, ok := metadata.GetAnnotations()[annotationLastAppliedConfig]; ok {
-		var svc corev1api.Service
-		if err := json.Unmarshal([]byte(lac), &svc); err != nil {
-			return nil, errors.WithStack(err)
-		}
-		for _, port := range svc.Spec.Ports {
-			if port.NodePort > 0 {
-				preservedPorts[port.Name] = true
-			}
-		}
-	}
-	return preservedPorts, nil
 }
 
 func deleteNodePorts(service *corev1api.Service) error {

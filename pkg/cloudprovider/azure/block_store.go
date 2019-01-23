@@ -347,7 +347,7 @@ func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	}
 
 	if pv.Spec.AzureDisk.DiskName == "" {
-		return "", errors.New(".spec.azureDisk.diskName not found")
+		return "", errors.New("spec.azureDisk.diskName not found")
 	}
 
 	return pv.Spec.AzureDisk.DiskName, nil
@@ -360,7 +360,7 @@ func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID s
 	}
 
 	if pv.Spec.AzureDisk == nil {
-		return nil, errors.New(".spec.azureDisk not found")
+		return nil, errors.New("spec.azureDisk not found")
 	}
 
 	pv.Spec.AzureDisk.DiskName = volumeID

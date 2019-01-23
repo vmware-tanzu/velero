@@ -51,15 +51,6 @@ func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (run
 	pod.Spec.NodeName = ""
 	pod.Spec.Priority = nil
 
-	// if there are no volumes, then there can't be any volume mounts, so we're done.
-	if len(pod.Spec.Volumes) == 0 {
-		res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
-		if err != nil {
-			return nil, nil, errors.WithStack(err)
-		}
-		return &unstructured.Unstructured{Object: res}, nil, nil
-	}
-
 	serviceAccountTokenPrefix := pod.Spec.ServiceAccountName + "-token-"
 
 	var preservedVolumes []v1.Volume

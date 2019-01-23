@@ -458,7 +458,7 @@ func TestProcessRestore(t *testing.T) {
 					res.Status.Phase = api.RestorePhase(phase)
 
 					backupName, found, err := unstructured.NestedString(patchMap, "spec", "backupName")
-					if err == nil && found {
+					if found {
 						res.Spec.BackupName = backupName
 					}
 

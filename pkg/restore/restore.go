@@ -1120,6 +1120,9 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return nil, errors.New("PersistentVolume is missing its name")
 	}
 
+	// It's simpler to just access the spec through the unstructured object than to convert
+	// to structured and back here, especially since the SetVolumeID(...) call below needs
+	// the unstructured representation (and does a conversion internally).
 	res, ok := obj.Object["spec"]
 	if !ok {
 		return nil, errors.New("spec not found")

@@ -304,7 +304,7 @@ func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	}
 
 	if pv.Spec.GCEPersistentDisk.PDName == "" {
-		return "", errors.New(".spec.gcePersistentDisk.pdName not found")
+		return "", errors.New("spec.gcePersistentDisk.pdName not found")
 	}
 
 	return pv.Spec.GCEPersistentDisk.PDName, nil
@@ -317,7 +317,7 @@ func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID s
 	}
 
 	if pv.Spec.GCEPersistentDisk == nil {
-		return nil, errors.New(".spec.gcePersistentDisk not found")
+		return nil, errors.New("spec.gcePersistentDisk not found")
 	}
 
 	pv.Spec.GCEPersistentDisk.PDName = volumeID
