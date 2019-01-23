@@ -129,7 +129,7 @@ func NewCommand() *cobra.Command {
 
 			// Velero's DefaultLogger logs to stdout, so all is good there.
 			logger := logging.DefaultLogger(logLevel)
-			logger.Infof("Starting Velero server %s", buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			// NOTE: the namespace flag is bound to velero's persistent flags when the root velero command
 			// creates the client Factory and binds the Factory's flags. We're not using a Factory here in
