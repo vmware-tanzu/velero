@@ -398,12 +398,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		}
 	}
 
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	pvFailureDomainZone := metadata.GetLabels()[zoneLabel]
+	pvFailureDomainZone := pv.Labels[zoneLabel]
 	if pvFailureDomainZone == "" {
 		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
 	}
@@ -446,7 +441,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	tags := map[string]string{
 		"velero.io/backup": ib.backupRequest.Name,
-		"velero.io/pv":     metadata.GetName(),
+		"velero.io/pv":     pv.Name,
 	}
 
 	log.Info("Getting volume information")
@@ -457,7 +452,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	}
 
 	log.Info("Snapshotting PersistentVolume")
-	snapshot := volumeSnapshot(ib.backupRequest.Backup, metadata.GetName(), volumeID, volumeType, pvFailureDomainZone, location, iops)
+	snapshot := volumeSnapshot(ib.backupRequest.Backup, pv.Name, volumeID, volumeType, pvFailureDomainZone, location, iops)
 
 	var errs []error
 	snapshotID, err := blockStore.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
