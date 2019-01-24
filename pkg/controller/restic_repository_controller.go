@@ -162,10 +162,10 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 	})
 }
 
-// ensureRepo first checks the repo, and returns if check passes. If it fails,
-// attempts to init the repo, and returns the result.
+// ensureRepo first tries to connect to the repo, and returns if it succeeds. If it fails,
+// it attempts to init the repo, and returns the result.
 func ensureRepo(repo *v1.ResticRepository, repoManager restic.RepositoryManager) error {
-	if repoManager.CheckRepo(repo) == nil {
+	if repoManager.ConnectToRepo(repo) == nil {
 		return nil
 	}
 

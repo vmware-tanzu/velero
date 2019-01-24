@@ -84,6 +84,13 @@ func InitCommand(repoIdentifier string) *Command {
 	}
 }
 
+func StatsCommand(repoIdentifier string) *Command {
+	return &Command{
+		Command:        "stats",
+		RepoIdentifier: repoIdentifier,
+	}
+}
+
 func CheckCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "check",
