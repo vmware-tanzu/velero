@@ -387,6 +387,8 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		return errors.WithStack(err)
 	}
 
+	log = log.WithField("persistentVolume", pv.Name)
+
 	// If this PV is claimed, see if we've already taken a (restic) snapshot of the contents
 	// of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
@@ -412,16 +414,13 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {
+		log := log.WithField("volumeSnapshotLocation", snapshotLocation.Name)
+
 		bs, err := ib.blockStore(snapshotLocation)
 		if err != nil {
-			log.WithError(err).WithField("volumeSnapshotLocation", snapshotLocation).Error("Error getting block store for volume snapshot location")
+			log.WithError(err).Error("Error getting block store for volume snapshot location")
 			continue
 		}
-
-		log := log.WithFields(map[string]interface{}{
-			"volumeSnapshotLocation": snapshotLocation.Name,
-			"persistentVolume":       metadata.GetName(),
-		})
 
 		if volumeID, err = bs.GetVolumeID(obj); err != nil {
 			log.WithError(err).Errorf("Error attempting to get volume ID for persistent volume")

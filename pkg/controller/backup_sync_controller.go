@@ -103,22 +103,22 @@ func shouldSync(location *velerov1api.BackupStorageLocation, now time.Time, back
 
 	revision, err := backupStore.GetRevision()
 	if err != nil {
-		log.WithError(err).Info("Error getting backup store's revision, syncing")
+		log.WithError(err).Debugf("Unable to get backup store's revision file, syncing (this is not an error if a v0.10+ backup has not yet been taken into this location)")
 		return true, ""
 	}
 	log = log.WithField("revision", revision)
 
 	if location.Status.LastSyncedTime.Add(time.Hour).Before(now) {
-		log.Infof("Backup location hasn't been synced in more than %s, syncing", time.Hour)
+		log.Debugf("Backup location hasn't been synced in more than %s, syncing", time.Hour)
 		return true, revision
 	}
 
 	if string(location.Status.LastSyncedRevision) != revision {
-		log.Info("Backup location hasn't been synced since its last modification, syncing")
+		log.Debugf("Backup location hasn't been synced since its last modification, syncing")
 		return true, revision
 	}
 
-	log.Debug("Backup location's contents haven't changed since last sync, not syncing")
+	log.Debugf("Backup location's contents haven't changed since last sync, not syncing")
 	return false, ""
 }
 
@@ -170,6 +170,7 @@ func (c *backupSyncController) run() {
 		if !ok {
 			continue
 		}
+		log.Infof("Syncing contents of backup store into cluster")
 
 		res, err := backupStore.ListBackups()
 		if err != nil {
