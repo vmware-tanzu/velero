@@ -96,6 +96,13 @@ func TestInitCommand(t *testing.T) {
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
+func TestStatsCommand(t *testing.T) {
+	c := StatsCommand("repo-id")
+
+	assert.Equal(t, "stats", c.Command)
+	assert.Equal(t, "repo-id", c.RepoIdentifier)
+}
+
 func TestCheckCommand(t *testing.T) {
 	c := CheckCommand("repo-id")
 

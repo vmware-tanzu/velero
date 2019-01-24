@@ -42,6 +42,12 @@ type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
 	InitRepo(repo *arkv1api.ResticRepository) error
 
+	// ConnectToRepo runs the 'restic stats' command against the
+	// specified repo, and returns an error if it fails. This is
+	// intended to be used to ensure that the repo exists/can be
+	// authenticated to.
+	ConnectToRepo(repo *arkv1api.ResticRepository) error
+
 	// CheckRepo checks the specified repo for errors.
 	CheckRepo(repo *arkv1api.ResticRepository) error
 
@@ -168,6 +174,14 @@ func (rm *repositoryManager) InitRepo(repo *arkv1api.ResticRepository) error {
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
 	return rm.exec(InitCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+}
+
+func (rm *repositoryManager) ConnectToRepo(repo *arkv1api.ResticRepository) error {
+	// restic stats requires a non-exclusive lock
+	rm.repoLocker.Lock(repo.Name)
+	defer rm.repoLocker.Unlock(repo.Name)
+
+	return rm.exec(StatsCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) CheckRepo(repo *arkv1api.ResticRepository) error {
