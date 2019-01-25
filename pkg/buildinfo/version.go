@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package buildinfo holds build-time information like the ark version.
+// Package buildinfo holds build-time information like the velero version.
 // This is a separate package so that other packages can import it without
 // worrying about introducing circular dependencies.
 package buildinfo
@@ -22,7 +22,7 @@ package buildinfo
 import "fmt"
 
 var (
-	// Version is the current version of Ark, set by the go linker's -X flag at build time.
+	// Version is the current version of Velero, set by the go linker's -X flag at build time.
 	Version string
 
 	// GitSHA is the actual commit that is being built, set by the go linker's -X flag at build time.

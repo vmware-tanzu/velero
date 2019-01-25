@@ -15,10 +15,10 @@
 # limitations under the License.
 
 # The binary to build (just the basename).
-BIN ?= ark
+BIN ?= velero
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/heptio/ark
+PKG := github.com/heptio/velero
 
 # Where to push the docker image.
 REGISTRY ?= gcr.io/heptio-images
@@ -63,7 +63,7 @@ IMAGE = $(REGISTRY)/$(BIN)
 # If you want to build AND push all containers, see the 'all-push' rule.
 all:
 	@$(MAKE) build
-	@$(MAKE) build BIN=ark-restic-restore-helper
+	@$(MAKE) build BIN=velero-restic-restore-helper
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
@@ -104,7 +104,7 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 
 TTY := $(shell tty -s && echo "-t")
 
-BUILDER_IMAGE := ark-builder
+BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
@@ -146,7 +146,7 @@ endif
 
 all-containers:
 	$(MAKE) container
-	$(MAKE) container BIN=ark-restic-restore-helper
+	$(MAKE) container BIN=velero-restic-restore-helper
 	$(MAKE) build-fsfreeze
 
 container: verify test .container-$(DOTFILE_IMAGE) container-name
@@ -160,7 +160,7 @@ container-name:
 
 all-push:
 	$(MAKE) push
-	$(MAKE) push BIN=ark-restic-restore-helper
+	$(MAKE) push BIN=velero-restic-restore-helper
 	$(MAKE) push-fsfreeze
 
 

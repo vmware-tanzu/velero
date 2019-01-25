@@ -25,8 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
 )
 
 func NewRemoveCommand(f client.Factory) *cobra.Command {
@@ -40,16 +40,16 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			arkDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(arkDeployment, metav1.GetOptions{})
+			veleroDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(veleroDeployment, metav1.GetOptions{})
 			if err != nil {
 				cmd.CheckError(err)
 			}
 
-			original, err := json.Marshal(arkDeploy)
+			original, err := json.Marshal(veleroDeploy)
 			cmd.CheckError(err)
 
 			var (
-				initContainers = arkDeploy.Spec.Template.Spec.InitContainers
+				initContainers = veleroDeploy.Spec.Template.Spec.InitContainers
 				index          = -1
 			)
 
@@ -61,18 +61,18 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 			}
 
 			if index == -1 {
-				cmd.CheckError(errors.Errorf("init container %s not found in Ark server deployment", args[0]))
+				cmd.CheckError(errors.Errorf("init container %s not found in Velero server deployment", args[0]))
 			}
 
-			arkDeploy.Spec.Template.Spec.InitContainers = append(initContainers[0:index], initContainers[index+1:]...)
+			veleroDeploy.Spec.Template.Spec.InitContainers = append(initContainers[0:index], initContainers[index+1:]...)
 
-			updated, err := json.Marshal(arkDeploy)
+			updated, err := json.Marshal(veleroDeploy)
 			cmd.CheckError(err)
 
 			patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(arkDeploy.Namespace).Patch(arkDeploy.Name, types.MergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1beta1().Deployments(veleroDeploy.Namespace).Patch(veleroDeploy.Name, types.MergePatchType, patchBytes)
 			cmd.CheckError(err)
 		},
 	}

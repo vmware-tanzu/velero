@@ -26,13 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/cmd/util/output"
-	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/cmd/util/output"
+	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -42,13 +42,13 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " [RESTORE_NAME] [--from-backup BACKUP_NAME | --from-schedule SCHEDULE_NAME]",
 		Short: "Create a restore",
 		Example: `  # create a restore named "restore-1" from backup "backup-1"
-  ark restore create restore-1 --from-backup backup-1
+  velero restore create restore-1 --from-backup backup-1
 
   # create a restore with a default name ("backup-1-<timestamp>") from backup "backup-1"
-  ark restore create --from-backup backup-1
+  velero restore create --from-backup backup-1
  
   # create a restore from the latest successful backup triggered by schedule "schedule-1"
-  ark restore create --from-schedule schedule-1
+  velero restore create --from-schedule schedule-1
   `,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
@@ -80,7 +80,7 @@ type CreateOptions struct {
 	IncludeClusterResources flag.OptionalBool
 	Wait                    bool
 
-	client arkclient.Interface
+	client veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -150,16 +150,16 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.client == nil {
 		// This should never happen
-		return errors.New("Ark client is not set; unable to proceed")
+		return errors.New("Velero client is not set; unable to proceed")
 	}
 
 	switch {
 	case o.BackupName != "":
-		if _, err := o.client.ArkV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().Backups(f.Namespace()).Get(o.BackupName, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	case o.ScheduleName != "":
-		if _, err := o.client.ArkV1().Schedules(f.Namespace()).Get(o.ScheduleName, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().Schedules(f.Namespace()).Get(o.ScheduleName, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -170,7 +170,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	if o.client == nil {
 		// This should never happen
-		return errors.New("Ark client is not set; unable to proceed")
+		return errors.New("Velero client is not set; unable to proceed")
 	}
 
 	restore := &api.Restore{
@@ -237,7 +237,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go restoreInformer.Run(stop)
 	}
 
-	restore, err := o.client.ArkV1().Restores(restore.Namespace).Create(restore)
+	restore, err := o.client.VeleroV1().Restores(restore.Namespace).Create(restore)
 	if err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				}
 
 				if restore.Status.Phase != api.RestorePhaseNew && restore.Status.Phase != api.RestorePhaseInProgress {
-					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `ark restore describe %s` and `ark restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
+					fmt.Printf("\nRestore completed with status: %s. You may check for more information using the commands `velero restore describe %s` and `velero restore logs %s`.\n", restore.Status.Phase, restore.Name, restore.Name)
 					return nil
 				}
 			}
@@ -268,7 +268,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	// Not waiting
 
-	fmt.Printf("Run `ark restore describe %s` or `ark restore logs %s` for more details.\n", restore.Name, restore.Name)
+	fmt.Printf("Run `velero restore describe %s` or `velero restore logs %s` for more details.\n", restore.Name, restore.Name)
 
 	return nil
 }

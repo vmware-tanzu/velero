@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARK_ROOT=$(dirname ${BASH_SOURCE})/..
-BIN=${ARK_ROOT}/_output/bin
+VELERO_ROOT=$(dirname ${BASH_SOURCE})/..
+BIN=${VELERO_ROOT}/_output/bin
 
 mkdir -p ${BIN}
 
@@ -29,7 +29,7 @@ fi
 
 OUTPUT_ISSUE_FILE="$1"
 if [[ -z "${OUTPUT_ISSUE_FILE}" ]]; then
-  OUTPUT_ISSUE_FILE=${ARK_ROOT}/.github/ISSUE_TEMPLATE/bug_report.md
+  OUTPUT_ISSUE_FILE=${VELERO_ROOT}/.github/ISSUE_TEMPLATE/bug_report.md
 fi
 
 ${BIN}/issue-tmpl-gen ${OUTPUT_ISSUE_FILE} 

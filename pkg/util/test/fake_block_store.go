@@ -22,7 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type FakeBlockStore struct {

@@ -26,14 +26,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func GenZshCompletion(out io.Writer, ark *cobra.Command) {
+func GenZshCompletion(out io.Writer, velero *cobra.Command) {
 
-	zshHead := "#compdef ark\n"
+	zshHead := "#compdef velero\n"
 
 	out.Write([]byte(zshHead))
 
 	zshInitialization := `
-__ark_bash_source() {
+__velero_bash_source() {
 	alias shopt=':'
 	alias _expand=_bash_expand
 	alias _complete=_bash_comp
@@ -41,7 +41,7 @@ __ark_bash_source() {
 	setopt kshglob noshglob braceexpand
 	source "$@"
 }
-__ark_type() {
+__velero_type() {
 	# -t is not supported by zsh
 	if [ "$1" == "-t" ]; then
 		shift
@@ -49,14 +49,14 @@ __ark_type() {
 		# "compopt +-o nospace" is used in the code to toggle trailing
 		# spaces. We don't support that, but leave trailing spaces on
 		# all the time
-		if [ "$1" = "__ark_compopt" ]; then
+		if [ "$1" = "__velero_compopt" ]; then
 			echo builtin
 			return 0
 		fi
 	fi
 	type "$@"
 }
-__ark_compgen() {
+__velero_compgen() {
 	local completions w
 	completions=( $(compgen "$@") ) || return $?
 	# filter by given word as prefix
@@ -73,10 +73,10 @@ __ark_compgen() {
 		fi
 	done
 }
-__ark_compopt() {
+__velero_compopt() {
 	true # don't do anything. Not supported by bashcompinit in zsh
 }
-__ark_ltrim_colon_completions()
+__velero_ltrim_colon_completions()
 {
 	if [[ "$1" == *:* && "$COMP_WORDBREAKS" == *:* ]]; then
 		# Remove colon-word prefix from COMPREPLY items
@@ -87,15 +87,15 @@ __ark_ltrim_colon_completions()
 		done
 	fi
 }
-__ark_get_comp_words_by_ref() {
+__velero_get_comp_words_by_ref() {
 	cur="${COMP_WORDS[COMP_CWORD]}"
 	prev="${COMP_WORDS[${COMP_CWORD}-1]}"
 	words=("${COMP_WORDS[@]}")
 	cword=("${COMP_CWORD[@]}")
 }
-__ark_filedir() {
+__velero_filedir() {
 	local RET OLD_IFS w qw
-	__ark_debug "_filedir $@ cur=$cur"
+	__velero_debug "_filedir $@ cur=$cur"
 	if [[ "$1" = \~* ]]; then
 		# somehow does not work. Maybe, zsh does not call this at all
 		eval echo "$1"
@@ -110,13 +110,13 @@ __ark_filedir() {
 		RET=( $(compgen -f) )
 	fi
 	IFS="$OLD_IFS"
-	IFS="," __ark_debug "RET=${RET[@]} len=${#RET[@]}"
+	IFS="," __velero_debug "RET=${RET[@]} len=${#RET[@]}"
 	for w in ${RET[@]}; do
 		if [[ ! "${w}" = "${cur}"* ]]; then
 			continue
 		fi
 		if eval "[[ \"\${w}\" = *.$1 || -d \"\${w}\" ]]"; then
-			qw="$(__ark_quote "${w}")"
+			qw="$(__velero_quote "${w}")"
 			if [ -d "${w}" ]; then
 				COMPREPLY+=("${qw}/")
 			else
@@ -125,7 +125,7 @@ __ark_filedir() {
 		fi
 	done
 }
-__ark_quote() {
+__velero_quote() {
     if [[ $1 == \'* || $1 == \"* ]]; then
         # Leave out first character
         printf %q "${1:1}"
@@ -141,33 +141,33 @@ if sed --help 2>&1 | grep -q GNU; then
 	LWORD='\<'
 	RWORD='\>'
 fi
-__ark_convert_bash_to_zsh() {
+__velero_convert_bash_to_zsh() {
 	sed \
 	-e 's/declare -F/whence -w/' \
 	-e 's/_get_comp_words_by_ref "\$@"/_get_comp_words_by_ref "\$*"/' \
 	-e 's/local \([a-zA-Z0-9_]*\)=/local \1; \1=/' \
 	-e 's/flags+=("\(--.*\)=")/flags+=("\1"); two_word_flags+=("\1")/' \
 	-e 's/must_have_one_flag+=("\(--.*\)=")/must_have_one_flag+=("\1")/' \
-	-e "s/${LWORD}_filedir${RWORD}/__ark_filedir/g" \
-	-e "s/${LWORD}_get_comp_words_by_ref${RWORD}/__ark_get_comp_words_by_ref/g" \
-	-e "s/${LWORD}__ltrim_colon_completions${RWORD}/__ark_ltrim_colon_completions/g" \
-	-e "s/${LWORD}compgen${RWORD}/__ark_compgen/g" \
-	-e "s/${LWORD}compopt${RWORD}/__ark_compopt/g" \
+	-e "s/${LWORD}_filedir${RWORD}/__velero_filedir/g" \
+	-e "s/${LWORD}_get_comp_words_by_ref${RWORD}/__velero_get_comp_words_by_ref/g" \
+	-e "s/${LWORD}__ltrim_colon_completions${RWORD}/__velero_ltrim_colon_completions/g" \
+	-e "s/${LWORD}compgen${RWORD}/__velero_compgen/g" \
+	-e "s/${LWORD}compopt${RWORD}/__velero_compopt/g" \
 	-e "s/${LWORD}declare${RWORD}/builtin declare/g" \
-	-e "s/\\\$(type${RWORD}/\$(__ark_type/g" \
+	-e "s/\\\$(type${RWORD}/\$(__velero_type/g" \
 	<<'BASH_COMPLETION_EOF'
 `
 	out.Write([]byte(zshInitialization))
 
 	buf := new(bytes.Buffer)
-	ark.GenBashCompletion(buf)
+	velero.GenBashCompletion(buf)
 	out.Write(buf.Bytes())
 
 	zshTail := `
 BASH_COMPLETION_EOF
 }
-__ark_bash_source <(__ark_convert_bash_to_zsh)
-_complete ark 2>/dev/null
+__velero_bash_source <(__velero_convert_bash_to_zsh)
+_complete velero 2>/dev/null
 `
 	out.Write([]byte(zshTail))
 }

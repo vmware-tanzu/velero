@@ -81,7 +81,7 @@ type Patcher interface {
 	Patch(name string, data []byte) (*unstructured.Unstructured, error)
 }
 
-// Dynamic contains client methods that Ark needs for backing up and restoring resources.
+// Dynamic contains client methods that Velero needs for backing up and restoring resources.
 type Dynamic interface {
 	Creator
 	Lister

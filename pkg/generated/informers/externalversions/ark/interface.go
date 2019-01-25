@@ -19,8 +19,8 @@ limitations under the License.
 package ark
 
 import (
-	v1 "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	internalinterfaces "github.com/heptio/ark/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/ark/v1"
+	internalinterfaces "github.com/heptio/velero/pkg/generated/informers/externalversions/internalinterfaces"
 )
 
 // Interface provides access to each of this group's versions.

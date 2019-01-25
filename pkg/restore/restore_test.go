@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -38,16 +38,16 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/logging"
-	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/heptio/ark/pkg/volume"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 func TestPrioritizeResources(t *testing.T) {
@@ -89,7 +89,7 @@ func TestPrioritizeResources(t *testing.T) {
 		},
 	}
 
-	logger := arktest.NewLogger()
+	logger := velerotest.NewLogger()
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestPrioritizeResources(t *testing.T) {
 				helperResourceList = append(helperResourceList, resourceList)
 			}
 
-			helper := arktest.NewFakeDiscoveryHelper(true, nil)
+			helper := velerotest.NewFakeDiscoveryHelper(true, nil)
 			helper.ResourceList = helperResourceList
 
 			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
@@ -127,7 +127,7 @@ func TestPrioritizeResources(t *testing.T) {
 func TestRestoreNamespaceFiltering(t *testing.T) {
 	tests := []struct {
 		name                 string
-		fileSystem           *arktest.FakeFileSystem
+		fileSystem           *velerotest.FakeFileSystem
 		baseDir              string
 		restore              *api.Restore
 		expectedReadDirs     []string
@@ -135,7 +135,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 	}{
 		{
 			name:             "namespacesToRestore having * restores all namespaces",
-			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -146,7 +146,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:             "namespacesToRestore properly filters",
-			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -157,7 +157,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:             "namespacesToRestore properly filters with exclusion filter",
-			fileSystem:       arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:          "bak",
 			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
 			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
@@ -168,7 +168,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		},
 		{
 			name:       "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem: arktest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
+			fileSystem: velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
 			baseDir:    "bak",
 			restore: &api.Restore{
 				Spec: api.RestoreSpec{
@@ -186,7 +186,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			log := arktest.NewLogger()
+			log := velerotest.NewLogger()
 
 			ctx := &context{
 				restore:              test.restore,
@@ -198,10 +198,10 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
-			assert.Empty(t, errors.Ark)
+			assert.Empty(t, errors.Velero)
 			assert.Empty(t, errors.Cluster)
 			assert.Empty(t, errors.Namespaces)
 			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
@@ -212,7 +212,7 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 func TestRestorePriority(t *testing.T) {
 	tests := []struct {
 		name                 string
-		fileSystem           *arktest.FakeFileSystem
+		fileSystem           *velerotest.FakeFileSystem
 		restore              *api.Restore
 		baseDir              string
 		prioritizedResources []schema.GroupResource
@@ -221,7 +221,7 @@ func TestRestorePriority(t *testing.T) {
 	}{
 		{
 			name:       "cluster test",
-			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
 			baseDir:    "bak",
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			prioritizedResources: []schema.GroupResource{
@@ -233,7 +233,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name:       "resource priorities are applied",
-			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
+			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
@@ -245,7 +245,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name:       "basic namespace",
-			fileSystem: arktest.NewFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
+			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
 			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
 			baseDir:    "bak",
 			prioritizedResources: []schema.GroupResource{
@@ -257,7 +257,7 @@ func TestRestorePriority(t *testing.T) {
 		},
 		{
 			name: "error in a single resource doesn't terminate restore immediately, but is returned",
-			fileSystem: arktest.NewFakeFileSystem().
+			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
 				WithDirectory("bak/resources/c/namespaces/ns-1"),
 			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
@@ -278,7 +278,7 @@ func TestRestorePriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			log := arktest.NewLogger()
+			log := velerotest.NewLogger()
 
 			ctx := &context{
 				restore:              test.restore,
@@ -290,7 +290,7 @@ func TestRestorePriority(t *testing.T) {
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, test.expectedErrors, errors)
@@ -306,20 +306,20 @@ func TestNamespaceRemapping(t *testing.T) {
 		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
 		prioritizedResources = []schema.GroupResource{{Resource: "namespaces"}, {Resource: "configmaps"}}
 		labelSelector        = labels.NewSelector()
-		fileSystem           = arktest.NewFakeFileSystem().
+		fileSystem           = velerotest.NewFakeFileSystem().
 					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
 					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
 		expectedNS   = "ns-2"
 		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap)
 	)
 
-	resourceClient := &arktest.FakeDynamicClient{}
+	resourceClient := &velerotest.FakeDynamicClient{}
 	for i := range expectedObjs {
 		addRestoreLabels(&expectedObjs[i], "", "")
 		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
 	}
 
-	dynamicFactory := &arktest.FakeDynamicFactory{}
+	dynamicFactory := &velerotest.FakeDynamicFactory{}
 	resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
 	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
@@ -334,15 +334,15 @@ func TestNamespaceRemapping(t *testing.T) {
 		prioritizedResources: prioritizedResources,
 		restore:              restore,
 		backup:               &api.Backup{},
-		log:                  arktest.NewLogger(),
+		log:                  velerotest.NewLogger(),
 	}
 
 	warnings, errors := ctx.restoreFromDir(baseDir)
 
-	assert.Empty(t, warnings.Ark)
+	assert.Empty(t, warnings.Velero)
 	assert.Empty(t, warnings.Cluster)
 	assert.Empty(t, warnings.Namespaces)
-	assert.Empty(t, errors.Ark)
+	assert.Empty(t, errors.Velero)
 	assert.Empty(t, errors.Cluster)
 	assert.Empty(t, errors.Namespaces)
 
@@ -371,7 +371,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		resourcePath            string
 		labelSelector           labels.Selector
 		includeClusterResources *bool
-		fileSystem              *arktest.FakeFileSystem
+		fileSystem              *velerotest.FakeFileSystem
 		actions                 []resolvedAction
 		expectedErrors          api.RestoreResult
 		expectedObjs            []unstructured.Unstructured
@@ -381,7 +381,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem: arktest.NewFakeFileSystem().
+			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedObjs: toUnstructured(
@@ -393,7 +393,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			name:         "no such directory causes error",
 			namespace:    "ns-1",
 			resourcePath: "configmaps",
-			fileSystem:   arktest.NewFakeFileSystem(),
+			fileSystem:   velerotest.NewFakeFileSystem(),
 			expectedErrors: api.RestoreResult{
 				Namespaces: map[string][]string{
 					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
@@ -404,14 +404,14 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			name:         "empty directory is no-op",
 			namespace:    "ns-1",
 			resourcePath: "configmaps",
-			fileSystem:   arktest.NewFakeFileSystem().WithDirectory("configmaps"),
+			fileSystem:   velerotest.NewFakeFileSystem().WithDirectory("configmaps"),
 		},
 		{
 			name:          "unmarshall failure does not cause immediate return",
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem: arktest.NewFakeFileSystem().
+			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
 			expectedErrors: api.RestoreResult{
@@ -426,7 +426,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "bar"})),
-			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
+			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ConfigMap),
 		},
 		{
@@ -434,14 +434,14 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "not-bar"})),
-			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
+			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 		},
 		{
 			name:          "namespace is remapped",
 			namespace:     "ns-2",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
+			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
 			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap),
 		},
 		{
@@ -449,7 +449,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
 					ItemAction:                newFakeAction("configmaps"),
@@ -465,7 +465,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:     "ns-1",
 			resourcePath:  "configmaps",
 			labelSelector: labels.NewSelector(),
-			fileSystem:    arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
 					ItemAction:                newFakeAction("foo-resource"),
@@ -482,7 +482,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: falsePtr,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 		},
 		{
 			name:                    "namespaced resources are not skipped when IncludeClusterResources=false",
@@ -490,7 +490,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: falsePtr,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
@@ -499,7 +499,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
 		},
 		{
@@ -508,7 +508,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: truePtr,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
@@ -517,7 +517,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "persistentvolumes",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
 			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
 		},
 		{
@@ -526,7 +526,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "configmaps",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
 		},
 		{
@@ -535,7 +535,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "serviceaccounts",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem:              arktest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
+			fileSystem:              velerotest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
 			expectedObjs:            toUnstructured(newTestServiceAccount().ServiceAccount),
 		},
 		{
@@ -544,7 +544,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "pods",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem: arktest.NewFakeFileSystem().
+			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile(
 					"pods/pod.json",
 					NewTestUnstructured().
@@ -569,7 +569,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			resourcePath:            "pods",
 			labelSelector:           labels.NewSelector(),
 			includeClusterResources: nil,
-			fileSystem: arktest.NewFakeFileSystem().
+			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile(
 					"pods/pod.json",
 					NewTestUnstructured().
@@ -586,18 +586,18 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 	var (
 		client                 = fake.NewSimpleClientset()
 		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
-		snapshotLocationLister = sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister()
+		snapshotLocationLister = sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister()
 	)
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &arktest.FakeDynamicClient{}
+			resourceClient := &velerotest.FakeDynamicClient{}
 			for i := range test.expectedObjs {
 				addRestoreLabels(&test.expectedObjs[i], "my-restore", "my-backup")
 				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
 			}
 
-			dynamicFactory := &arktest.FakeDynamicFactory{}
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
 
 			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
@@ -633,7 +633,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				log:    arktest.NewLogger(),
+				log:    velerotest.NewLogger(),
 				pvRestorer: &pvRestorer{
 					logger: logging.DefaultLogger(logrus.DebugLevel),
 					blockStoreGetter: &fakeBlockStoreGetter{
@@ -647,7 +647,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, test.expectedErrors, errors)
@@ -682,7 +682,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &arktest.FakeDynamicClient{}
+			resourceClient := &velerotest.FakeDynamicClient{}
 			defer resourceClient.AssertExpectations(t)
 			name := fromCluster.GetName()
 
@@ -703,7 +703,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 				resourceClient.On("Patch", name, test.expectedPatch).Return(test.fromBackup, nil)
 			}
 
-			dynamicFactory := &arktest.FakeDynamicFactory{}
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
 
 			resource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
@@ -713,7 +713,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
 				actions:        []resolvedAction{},
-				fileSystem: arktest.NewFakeFileSystem().
+				fileSystem: velerotest.NewFakeFileSystem().
 					WithFile("foo/resources/serviceaccounts/namespaces/ns-1/sa-1.json", fromBackupJSON),
 				selector: labels.NewSelector(),
 				restore: &api.Restore{
@@ -727,11 +727,11 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 					},
 				},
 				backup: &api.Backup{},
-				log:    arktest.NewLogger(),
+				log:    velerotest.NewLogger(),
 			}
 			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
@@ -917,16 +917,16 @@ status:
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			dynamicFactory := &arktest.FakeDynamicFactory{}
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
 			gv := schema.GroupVersion{Group: "", Version: "v1"}
 
-			pvClient := &arktest.FakeDynamicClient{}
+			pvClient := &velerotest.FakeDynamicClient{}
 			defer pvClient.AssertExpectations(t)
 
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, "").Return(pvClient, nil)
 
-			pvcClient := &arktest.FakeDynamicClient{}
+			pvcClient := &velerotest.FakeDynamicClient{}
 			defer pvcClient.AssertExpectations(t)
 
 			pvcResource := metav1.APIResource{Name: "persistentvolumeclaims", Namespaced: true}
@@ -962,7 +962,7 @@ status:
 			ctx := &context{
 				dynamicFactory: dynamicFactory,
 				actions:        []resolvedAction{},
-				fileSystem: arktest.NewFakeFileSystem().
+				fileSystem: velerotest.NewFakeFileSystem().
 					WithFile("foo/resources/persistentvolumes/cluster/pv.json", pvBytes).
 					WithFile("foo/resources/persistentvolumeclaims/default/pvc.json", pvcBytes),
 				selector: labels.NewSelector(),
@@ -977,7 +977,7 @@ status:
 					},
 				},
 				backup:         backup,
-				log:            arktest.NewLogger(),
+				log:            velerotest.NewLogger(),
 				pvsToProvision: sets.NewString(),
 				pvRestorer:     pvRestorer,
 			}
@@ -1043,7 +1043,7 @@ status:
 			// Restore PV
 			warnings, errors := ctx.restoreResource("persistentvolumes", "", "foo/resources/persistentvolumes/cluster/")
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
 
@@ -1078,7 +1078,7 @@ status:
 			// Restore PVC
 			warnings, errors = ctx.restoreResource("persistentvolumeclaims", "default", "foo/resources/persistentvolumeclaims/default/")
 
-			assert.Empty(t, warnings.Ark)
+			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
@@ -1277,7 +1277,7 @@ func TestIsCompleted(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			u := arktest.UnstructuredOrDie(test.content)
+			u := velerotest.UnstructuredOrDie(test.content)
 			backup, err := isCompleted(u, test.groupResource)
 
 			if assert.Equal(t, test.expectedErr, err != nil) {
@@ -1316,39 +1316,39 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:        "no name should error",
 			obj:         NewTestUnstructured().WithMetadata().Unstructured,
-			restore:     arktest.NewDefaultTestRestore().Restore,
+			restore:     velerotest.NewDefaultTestRestore().Restore,
 			expectedErr: true,
 		},
 		{
 			name:        "no spec should error",
 			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
-			restore:     arktest.NewDefaultTestRestore().Restore,
+			restore:     velerotest.NewDefaultTestRestore().Restore,
 			expectedErr: true,
 		},
 		{
 			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
+			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false).Backup,
+			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false).Backup,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:    "restore.spec.restorePVs=false, return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:  velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
 			},
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
 			},
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
@@ -1356,29 +1356,29 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:        "backup.status.volumeBackups non-nil and no entry for PV: return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore:     arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      arktest.NewTestBackup().WithName("backup-1").WithSnapshot("non-matching-pv", "snap").Backup,
+			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:      velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("non-matching-pv", "snap").Backup,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
 			name:    "backup.status.volumeBackups has entry for PV, >1 VSLs configured: return error",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap").Backup,
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap").Backup,
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
 			expectedErr: true,
 		},
 		{
 			name:    "volumeSnapshots is empty: return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
 			volumeSnapshots: []*volume.Snapshot{},
 			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
@@ -1386,11 +1386,11 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:    "volumeSnapshots doesn't have a snapshot for PV: return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
@@ -1404,11 +1404,11 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
 				client                   = fake.NewSimpleClientset()
-				snapshotLocationInformer = informers.NewSharedInformerFactory(client, 0).Ark().V1().VolumeSnapshotLocations()
+				snapshotLocationInformer = informers.NewSharedInformerFactory(client, 0).Velero().V1().VolumeSnapshotLocations()
 			)
 
 			r := &pvRestorer{
-				logger:                 arktest.NewLogger(),
+				logger:                 velerotest.NewLogger(),
 				restorePVs:             tc.restore.Spec.RestorePVs,
 				snapshotLocationLister: snapshotLocationInformer.Lister(),
 			}
@@ -1467,13 +1467,13 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		{
 			name:    "pre-v0.10 backup with .status.volumeBackups with entry for PV and single VSL executes restore",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup: arktest.NewTestBackup().WithName("backup-1").
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup: velerotest.NewTestBackup().WithName("backup-1").
 				WithVolumeBackupInfo("pv-1", "snap-1", "type-1", "az-1", int64Ptr(1)).
 				WithVolumeBackupInfo("pv-2", "snap-2", "type-2", "az-2", int64Ptr(2)).
 				Backup,
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
 			},
 			expectedProvider:   "provider-1",
 			expectedSnapshotID: "snap-1",
@@ -1484,11 +1484,11 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		{
 			name:    "v0.10+ backup with a matching volume.Snapshot for PV executes restore",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: arktest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  arktest.NewTestBackup().WithName("backup-1").Backup,
+			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,
 			locations: []*api.VolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
-				arktest.NewTestVolumeSnapshotLocation().WithName("loc-2").WithProvider("provider-2").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
+				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").WithProvider("provider-2").VolumeSnapshotLocation,
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
@@ -1509,7 +1509,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 				blockStoreGetter = providerToBlockStoreMap(map[string]cloudprovider.BlockStore{
 					tc.expectedProvider: blockStore,
 				})
-				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Ark().V1().VolumeSnapshotLocations()
+				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
 			)
 
 			for _, loc := range tc.locations {
@@ -1517,7 +1517,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			}
 
 			r := &pvRestorer{
-				logger:                 arktest.NewLogger(),
+				logger:                 velerotest.NewLogger(),
 				backup:                 tc.backup,
 				volumeSnapshots:        tc.volumeSnapshots,
 				snapshotLocationLister: locationsInformer.Lister(),
@@ -1855,14 +1855,14 @@ type fakeAction struct {
 }
 
 type fakeBlockStoreGetter struct {
-	fakeBlockStore *arktest.FakeBlockStore
+	fakeBlockStore *velerotest.FakeBlockStore
 	volumeMap      map[api.VolumeBackupInfo]string
 	volumeID       string
 }
 
 func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
 	if r.fakeBlockStore == nil {
-		r.fakeBlockStore = &arktest.FakeBlockStore{
+		r.fakeBlockStore = &velerotest.FakeBlockStore{
 			RestorableVolumes: r.volumeMap,
 			VolumeID:          r.volumeID,
 		}

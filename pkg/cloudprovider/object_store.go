@@ -22,7 +22,7 @@ import (
 )
 
 // ObjectStore exposes basic object-storage operations required
-// by Ark.
+// by Velero.
 type ObjectStore interface {
 	// Init prepares the ObjectStore for usage using the provided map of
 	// configuration key-value pairs. It returns an error if the ObjectStore

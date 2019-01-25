@@ -19,7 +19,7 @@ package output
 import (
 	"fmt"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 func DescribeSchedule(schedule *v1.Schedule) string {

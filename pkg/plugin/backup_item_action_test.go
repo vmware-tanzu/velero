@@ -28,11 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/backup/mocks"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/backup/mocks"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestBackupItemActionGRPCServerExecute(t *testing.T) {
@@ -72,7 +72,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 	invalidBackup := []byte("this is gibberish json")
 	validBackup := []byte(`
 	{
-		"apiVersion": "ark.heptio.com/v1",
+		"apiVersion": "velero.io/v1",
 		"kind": "Backup",
 		"metadata": {
 			"namespace": "myns",
@@ -154,7 +154,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 			}
 
 			s := &BackupItemActionGRPCServer{mux: &serverMux{
-				serverLog: arktest.NewLogger(),
+				serverLog: velerotest.NewLogger(),
 				handlers: map[string]interface{}{
 					"xyz": itemAction,
 				},

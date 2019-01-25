@@ -33,17 +33,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/collections"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/metrics"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/util/collections"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	"github.com/heptio/velero/pkg/util/logging"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -54,20 +55,22 @@ var nonRestorableResources = []string{
 	"events.events.k8s.io",
 
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
-	// https://github.com/heptio/ark/issues/622
+	// https://github.com/heptio/velero/issues/622
 	"backups.ark.heptio.com",
+	"backups.velero.io",
 
 	// Restores are cluster-specific, and don't have value moving across clusters.
-	// https://github.com/heptio/ark/issues/622
+	// https://github.com/heptio/velero/issues/622
 	"restores.ark.heptio.com",
+	"restores.velero.io",
 }
 
 type restoreController struct {
 	*genericController
 
 	namespace              string
-	restoreClient          arkv1client.RestoresGetter
-	backupClient           arkv1client.BackupsGetter
+	restoreClient          velerov1client.RestoresGetter
+	backupClient           velerov1client.BackupsGetter
 	restorer               restore.Restorer
 	backupLister           listers.BackupLister
 	restoreLister          listers.RestoreLister
@@ -88,8 +91,8 @@ type restoreResult struct {
 func NewRestoreController(
 	namespace string,
 	restoreInformer informers.RestoreInformer,
-	restoreClient arkv1client.RestoresGetter,
-	backupClient arkv1client.BackupsGetter,
+	restoreClient velerov1client.RestoresGetter,
+	backupClient velerov1client.BackupsGetter,
 	restorer restore.Restorer,
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
@@ -238,12 +241,14 @@ func (c *restoreController) processRestore(key string) error {
 		pluginManager,
 	)
 
-	restore.Status.Warnings = len(restoreRes.warnings.Ark) + len(restoreRes.warnings.Cluster)
+	//TODO(1.0): Remove warnings.Ark
+	restore.Status.Warnings = len(restoreRes.warnings.Velero) + len(restoreRes.warnings.Cluster) + len(restoreRes.warnings.Ark)
 	for _, w := range restoreRes.warnings.Namespaces {
 		restore.Status.Warnings += len(w)
 	}
 
-	restore.Status.Errors = len(restoreRes.errors.Ark) + len(restoreRes.errors.Cluster)
+	//TODO (1.0): Remove errors.Ark
+	restore.Status.Errors = len(restoreRes.errors.Velero) + len(restoreRes.errors.Cluster) + len(restoreRes.errors.Ark)
 	for _, e := range restoreRes.errors.Namespaces {
 		restore.Status.Errors += len(e)
 	}
@@ -310,7 +315,7 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 	// the schedule
 	if restore.Spec.ScheduleName != "" {
 		selector := labels.SelectorFromSet(labels.Set(map[string]string{
-			"ark-schedule": restore.Spec.ScheduleName,
+			velerov1api.ScheduleNameLabel: restore.Spec.ScheduleName,
 		}))
 
 		backups, err := c.backupLister.Backups(c.namespace).List(selector)
@@ -358,7 +363,7 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 
 	// Fill in the ScheduleName so it's easier to consume for metrics.
 	if restore.Spec.ScheduleName == "" {
-		restore.Spec.ScheduleName = info.backup.GetLabels()["ark-schedule"]
+		restore.Spec.ScheduleName = info.backup.GetLabels()[velerov1api.ScheduleNameLabel]
 	}
 
 	return info
@@ -419,33 +424,6 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 	}, nil
 }
 
-func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLocation, backupName string, pluginManager plugin.Manager) (backupInfo, error) {
-	backupStore, err := persistence.NewObjectBackupStore(location, pluginManager, c.logger)
-	if err != nil {
-		return backupInfo{}, err
-	}
-
-	backup, err := backupStore.GetBackupMetadata(backupName)
-	if err != nil {
-		return backupInfo{}, err
-	}
-
-	// ResourceVersion needs to be cleared in order to create the object in the API
-	backup.ResourceVersion = ""
-	// Clear out the namespace, in case the backup was made in a different cluster, with a different namespace
-	backup.Namespace = ""
-
-	backupCreated, err := c.backupClient.Backups(c.namespace).Create(backup)
-	if err != nil {
-		return backupInfo{}, errors.WithStack(err)
-	}
-
-	return backupInfo{
-		backup:      backupCreated,
-		backupStore: backupStore,
-	}, nil
-}
-
 func (c *restoreController) runRestore(
 	restore *api.Restore,
 	actions []restore.ItemAction,
@@ -465,7 +443,7 @@ func (c *restoreController) runRestore(
 			).
 			WithError(errors.WithStack(err)).
 			Error("Error creating log temp file")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
 		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 	gzippedLogFile := gzip.NewWriter(logFile)
@@ -487,7 +465,7 @@ func (c *restoreController) runRestore(
 	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
 	if err != nil {
 		log.WithError(err).Error("Error downloading backup")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
 		restoreFailure = err
 		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
@@ -496,7 +474,7 @@ func (c *restoreController) runRestore(
 	resultsFile, err := ioutil.TempFile("", "")
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
 		restoreFailure = err
 		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
@@ -505,7 +483,7 @@ func (c *restoreController) runRestore(
 	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
-		restoreErrors.Ark = append(restoreErrors.Ark, err.Error())
+		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
 		restoreFailure = err
 		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
@@ -516,13 +494,13 @@ func (c *restoreController) runRestore(
 	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
 	log.Info("restore completed")
 
-	// Try to upload the log file. This is best-effort. If we fail, we'll add to the ark errors.
+	// Try to upload the log file. This is best-effort. If we fail, we'll add to the velero errors.
 	if err := gzippedLogFile.Close(); err != nil {
 		c.logger.WithError(err).Error("error closing gzippedLogFile")
 	}
 	// Reset the offset to 0 for reading
 	if _, err = logFile.Seek(0, 0); err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error resetting log file offset to 0: %v", err))
+		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error resetting log file offset to 0: %v", err))
 		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 	}
 
@@ -589,7 +567,7 @@ func downloadToTempFile(
 	return file, nil
 }
 
-func patchRestore(original, updated *api.Restore, client arkv1client.RestoresGetter) (*api.Restore, error) {
+func patchRestore(original, updated *api.Restore, client velerov1client.RestoresGetter) (*api.Restore, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original restore")

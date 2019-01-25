@@ -18,7 +18,7 @@ package plugin
 
 import plugin "github.com/hashicorp/go-plugin"
 
-// Interface represents an Ark plugin.
+// Interface represents a Velero plugin.
 type Interface interface {
 	plugin.Plugin
 

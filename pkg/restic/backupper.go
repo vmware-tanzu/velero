@@ -27,14 +27,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/boolptr"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/util/boolptr"
 )
 
 // Backupper can execute restic backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all annotated volumes in a pod.
-	BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error)
+	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error)
 }
 
 type backupper struct {
@@ -42,7 +42,7 @@ type backupper struct {
 	repoManager *repositoryManager
 	repoEnsurer *repositoryEnsurer
 
-	results     map[string]chan *arkv1api.PodVolumeBackup
+	results     map[string]chan *velerov1api.PodVolumeBackup
 	resultsLock sync.Mutex
 }
 
@@ -58,15 +58,15 @@ func newBackupper(
 		repoManager: repoManager,
 		repoEnsurer: repoEnsurer,
 
-		results: make(map[string]chan *arkv1api.PodVolumeBackup),
+		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
 
 	podVolumeBackupInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(_, obj interface{}) {
-				pvb := obj.(*arkv1api.PodVolumeBackup)
+				pvb := obj.(*velerov1api.PodVolumeBackup)
 
-				if pvb.Status.Phase == arkv1api.PodVolumeBackupPhaseCompleted || pvb.Status.Phase == arkv1api.PodVolumeBackupPhaseFailed {
+				if pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseCompleted || pvb.Status.Phase == velerov1api.PodVolumeBackupPhaseFailed {
 					b.resultsLock.Lock()
 					defer b.resultsLock.Unlock()
 
@@ -88,7 +88,7 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
+func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
 	// get volumes to backup from pod's annotations
 	volumesToBackup := GetVolumesToBackup(pod)
 	if len(volumesToBackup) == 0 {
@@ -105,7 +105,7 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 	b.repoManager.repoLocker.Lock(repo.Name)
 	defer b.repoManager.repoLocker.Unlock(repo.Name)
 
-	resultsChan := make(chan *arkv1api.PodVolumeBackup)
+	resultsChan := make(chan *velerov1api.PodVolumeBackup)
 
 	b.resultsLock.Lock()
 	b.results[resultsKey(pod.Namespace, pod.Name)] = resultsChan
@@ -137,7 +137,7 @@ func (b *backupper) BackupPodVolumes(backup *arkv1api.Backup, pod *corev1api.Pod
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
 
-		if err := errorOnly(b.repoManager.arkClient.ArkV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
+		if err := errorOnly(b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -153,9 +153,9 @@ ForEachVolume:
 			break ForEachVolume
 		case res := <-resultsChan:
 			switch res.Status.Phase {
-			case arkv1api.PodVolumeBackupPhaseCompleted:
+			case velerov1api.PodVolumeBackupPhaseCompleted:
 				volumeSnapshots[res.Spec.Volume] = res.Status.SnapshotID
-			case arkv1api.PodVolumeBackupPhaseFailed:
+			case velerov1api.PodVolumeBackupPhaseFailed:
 				errs = append(errs, errors.Errorf("pod volume backup failed: %s", res.Status.Message))
 				delete(volumeSnapshots, res.Spec.Volume)
 			}
@@ -183,14 +183,14 @@ func isHostPathVolume(podVolumes map[string]corev1api.Volume, volumeName string)
 	return volume.HostPath != nil
 }
 
-func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *arkv1api.PodVolumeBackup {
-	return &arkv1api.PodVolumeBackup{
+func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *velerov1api.PodVolumeBackup {
+	return &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
 			GenerateName: backup.Name + "-",
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: arkv1api.SchemeGroupVersion.String(),
+					APIVersion: velerov1api.SchemeGroupVersion.String(),
 					Kind:       "Backup",
 					Name:       backup.Name,
 					UID:        backup.UID,
@@ -198,11 +198,11 @@ func newPodVolumeBackup(backup *arkv1api.Backup, pod *corev1api.Pod, volumeName,
 				},
 			},
 			Labels: map[string]string{
-				arkv1api.BackupNameLabel: backup.Name,
-				arkv1api.BackupUIDLabel:  string(backup.UID),
+				velerov1api.BackupNameLabel: backup.Name,
+				velerov1api.BackupUIDLabel:  string(backup.UID),
 			},
 		},
-		Spec: arkv1api.PodVolumeBackupSpec{
+		Spec: velerov1api.PodVolumeBackupSpec{
 			Node: pod.Spec.NodeName,
 			Pod: corev1api.ObjectReference{
 				Kind:      "Pod",

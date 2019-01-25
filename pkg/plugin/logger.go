@@ -19,11 +19,11 @@ package plugin
 import (
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/heptio/velero/pkg/util/logging"
 )
 
 // NewLogger returns a logger that is suitable for use within an
-// Ark plugin.
+// Velero plugin.
 func NewLogger() logrus.FieldLogger {
 	logger := logrus.New()
 	/*
@@ -31,7 +31,7 @@ func NewLogger() logrus.FieldLogger {
 
 		go-plugin uses stdout for a communications protocol between client and server.
 
-		stderr is used for log messages from server to client. The ark server makes sure they are logged to stdout.
+		stderr is used for log messages from server to client. The velero server makes sure they are logged to stdout.
 	*/
 
 	// we use the JSON formatter because go-plugin will parse incoming
@@ -41,18 +41,18 @@ func NewLogger() logrus.FieldLogger {
 			// this is the hclog-compatible message field
 			logrus.FieldKeyMsg: "@message",
 		},
-		// Ark server already adds timestamps when emitting logs, so
+		// Velero server already adds timestamps when emitting logs, so
 		// don't do it within the plugin.
 		DisableTimestamp: true,
 	}
 
-	// set a logger name for the location hook which will signal to the Ark
+	// set a logger name for the location hook which will signal to the Velero
 	// server logger that the location has been set within a hook.
 	logger.Hooks.Add((&logging.LogLocationHook{}).WithLoggerName("plugin"))
 
 	// this hook adjusts the string representation of WarnLevel to "warn"
 	// rather than "warning" to make it parseable by go-plugin within the
-	// Ark server code
+	// Velero server code
 	logger.Hooks.Add(&logging.HcLogLevelHook{})
 
 	return logger

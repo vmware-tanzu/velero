@@ -32,14 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/volume"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/podexec"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 type itemBackupperFactory interface {
@@ -446,8 +446,8 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	log = log.WithField("volumeID", volumeID)
 
 	tags := map[string]string{
-		"ark.heptio.com/backup": ib.backupRequest.Name,
-		"ark.heptio.com/pv":     metadata.GetName(),
+		"velero.io/backup": ib.backupRequest.Name,
+		"velero.io/pv":     metadata.GetName(),
 	}
 
 	log.Info("Getting volume information")

@@ -24,9 +24,9 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/kuberesource"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/kuberesource"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestBackupPVAction(t *testing.T) {
@@ -39,7 +39,7 @@ func TestBackupPVAction(t *testing.T) {
 
 	backup := &v1.Backup{}
 
-	a := NewBackupPVAction(arktest.NewLogger())
+	a := NewBackupPVAction(velerotest.NewLogger())
 
 	// no spec.volumeName should result in no error
 	// and no additional items

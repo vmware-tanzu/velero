@@ -22,10 +22,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
 )
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
@@ -36,10 +36,10 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 		Short: "Get backup logs",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			arkClient, err := f.Client()
+			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), args[0], v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), args[0], v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
 			cmd.CheckError(err)
 		},
 	}

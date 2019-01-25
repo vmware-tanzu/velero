@@ -19,16 +19,16 @@ package plugin
 import (
 	"encoding/json"
 
-	"github.com/hashicorp/go-plugin"
+	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	"github.com/heptio/ark/pkg/restore"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/restore"
 )
 
 // RestoreItemActionPlugin is an implementation of go-plugin's Plugin

@@ -22,7 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	kubectlcmd "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd"
+	kubectlcmd "github.com/heptio/velero/third_party/kubernetes/pkg/kubectl/cmd"
 )
 
 func NewCommand() *cobra.Command {
@@ -33,11 +33,11 @@ func NewCommand() *cobra.Command {
 
 Auto completion supports both bash and zsh. Output is to STDOUT.
 
-Load the ark completion code for bash into the current shell -
-source <(ark completion bash)
+Load the velero completion code for bash into the current shell -
+source <(velero completion bash)
 
-Load the ark completion code for zsh into the current shell -
-source <(ark completion zsh)
+Load the velero completion code for zsh into the current shell -
+source <(velero completion zsh)
 `,
 		Args:      cobra.ExactArgs(1),
 		ValidArgs: []string{"bash", "zsh"},

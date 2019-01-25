@@ -14,7 +14,7 @@ about: Suggest an idea for this project
 
 **Environment:**
 
-- Ark version (use `ark version`):
+- Velero version (use `velero version`):
 - Kubernetes version (use `kubectl version`):
 - Kubernetes installer & version:
 - Cloud provider or hardware configuration:

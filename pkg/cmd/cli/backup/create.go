@@ -25,13 +25,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/cmd/util/output"
-	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	"github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/cmd/util/output"
+	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -71,7 +71,7 @@ type CreateOptions struct {
 	StorageLocation         string
 	SnapshotLocations       []string
 
-	client arkclient.Interface
+	client veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -115,13 +115,13 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 
 	if o.StorageLocation != "" {
-		if _, err := o.client.ArkV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
 
 	for _, loc := range o.SnapshotLocations {
-		if _, err := o.client.ArkV1().VolumeSnapshotLocations(f.Namespace()).Get(loc, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(loc, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -204,7 +204,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err := o.client.ArkV1().Backups(backup.Namespace).Create(backup)
+	_, err := o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
 	if err != nil {
 		return err
 	}
@@ -226,7 +226,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				}
 
 				if backup.Status.Phase != api.BackupPhaseNew && backup.Status.Phase != api.BackupPhaseInProgress {
-					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `ark backup describe %s` and `ark backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
+					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}
 			}
@@ -235,7 +235,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	// Not waiting
 
-	fmt.Printf("Run `ark backup describe %s` or `ark backup logs %s` for more details.\n", backup.Name, backup.Name)
+	fmt.Printf("Run `velero backup describe %s` or `velero backup logs %s` for more details.\n", backup.Name, backup.Name)
 
 	return nil
 }

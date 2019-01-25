@@ -32,12 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/metrics"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/metrics"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 const (
@@ -48,8 +49,8 @@ type scheduleController struct {
 	*genericController
 
 	namespace       string
-	schedulesClient arkv1client.SchedulesGetter
-	backupsClient   arkv1client.BackupsGetter
+	schedulesClient velerov1client.SchedulesGetter
+	backupsClient   velerov1client.BackupsGetter
 	schedulesLister listers.ScheduleLister
 	clock           clock.Clock
 	metrics         *metrics.ServerMetrics
@@ -57,8 +58,8 @@ type scheduleController struct {
 
 func NewScheduleController(
 	namespace string,
-	schedulesClient arkv1client.SchedulesGetter,
-	backupsClient arkv1client.BackupsGetter,
+	schedulesClient velerov1client.SchedulesGetter,
+	backupsClient velerov1client.BackupsGetter,
 	schedulesInformer informers.ScheduleInformer,
 	logger logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
@@ -293,7 +294,6 @@ func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
 		},
 	}
 
-	// add schedule labels and 'ark-schedule' label to the backup
 	addLabelsToBackup(item, backup)
 
 	return backup
@@ -304,12 +304,12 @@ func addLabelsToBackup(item *api.Schedule, backup *api.Backup) {
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels["ark-schedule"] = item.Name
+	labels[velerov1api.ScheduleNameLabel] = item.Name
 
 	backup.Labels = labels
 }
 
-func patchSchedule(original, updated *api.Schedule, client arkv1client.SchedulesGetter) (*api.Schedule, error) {
+func patchSchedule(original, updated *api.Schedule, client velerov1client.SchedulesGetter) (*api.Schedule, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original schedule")

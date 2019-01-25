@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
+	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 )
 
 func TestRestartableGetObjectStore(t *testing.T) {

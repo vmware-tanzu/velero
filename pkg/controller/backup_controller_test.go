@@ -33,17 +33,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	pkgbackup "github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/persistence"
-	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin"
-	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
-	"github.com/heptio/ark/pkg/util/logging"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/metrics"
+	"github.com/heptio/velero/pkg/persistence"
+	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
+	"github.com/heptio/velero/pkg/plugin"
+	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 type fakeBackupper struct {
@@ -70,27 +70,27 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		{
 			name:        "backup not found in lister returns error",
 			key:         "nonexistent/backup",
-			expectedErr: "error getting backup: backup.ark.heptio.com \"backup\" not found",
+			expectedErr: "error getting backup: backup.velero.io \"backup\" not found",
 		},
 		{
 			name:   "FailedValidation backup is not processed",
-			key:    "heptio-ark/backup-1",
-			backup: arktest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseFailedValidation).Backup,
+			key:    "velero/backup-1",
+			backup: velerotest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseFailedValidation).Backup,
 		},
 		{
 			name:   "InProgress backup is not processed",
-			key:    "heptio-ark/backup-1",
-			backup: arktest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseInProgress).Backup,
+			key:    "velero/backup-1",
+			backup: velerotest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseInProgress).Backup,
 		},
 		{
 			name:   "Completed backup is not processed",
-			key:    "heptio-ark/backup-1",
-			backup: arktest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseCompleted).Backup,
+			key:    "velero/backup-1",
+			backup: velerotest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseCompleted).Backup,
 		},
 		{
 			name:   "Failed backup is not processed",
-			key:    "heptio-ark/backup-1",
-			backup: arktest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseFailed).Backup,
+			key:    "velero/backup-1",
+			backup: velerotest.NewTestBackup().WithName("backup-1").WithPhase(v1.BackupPhaseFailed).Backup,
 		},
 	}
 
@@ -103,11 +103,11 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 
 			c := &backupController{
 				genericController: newGenericController("backup-test", logger),
-				lister:            sharedInformers.Ark().V1().Backups().Lister(),
+				lister:            sharedInformers.Velero().V1().Backups().Lister(),
 			}
 
 			if test.backup != nil {
-				require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup))
+				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 			}
 
 			err := c.processBackup(test.key)
@@ -127,7 +127,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
-	defaultBackupLocation := arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
+	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
 
 	tests := []struct {
 		name           string
@@ -137,20 +137,20 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 	}{
 		{
 			name:           "invalid included/excluded resources fails validation",
-			backup:         arktest.NewTestBackup().WithName("backup-1").WithIncludedResources("foo").WithExcludedResources("foo").Backup,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").WithIncludedResources("foo").WithExcludedResources("foo").Backup,
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: foo"},
 		},
 		{
 			name:           "invalid included/excluded namespaces fails validation",
-			backup:         arktest.NewTestBackup().WithName("backup-1").WithIncludedNamespaces("foo").WithExcludedNamespaces("foo").Backup,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").WithIncludedNamespaces("foo").WithExcludedNamespaces("foo").Backup,
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: foo"},
 		},
 		{
 			name:         "non-existent backup location fails validation",
-			backup:       arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("nonexistent").Backup,
-			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.ark.heptio.com \"nonexistent\" not found"},
+			backup:       velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("nonexistent").Backup,
+			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
 		},
 	}
 
@@ -164,26 +164,26 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
-				client:                 clientset.ArkV1(),
-				lister:                 sharedInformers.Ark().V1().Backups().Lister(),
-				backupLocationLister:   sharedInformers.Ark().V1().BackupStorageLocations().Lister(),
-				snapshotLocationLister: sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister(),
+				client:                 clientset.VeleroV1(),
+				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
+				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 			}
 
 			require.NotNil(t, test.backup)
-			require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup))
+			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 
 			if test.backupLocation != nil {
-				_, err := clientset.ArkV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
+				_, err := clientset.VeleroV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
 				require.NoError(t, err)
 
-				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
+				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
 			}
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 
-			res, err := clientset.ArkV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
+			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			assert.Equal(t, v1.BackupPhaseFailedValidation, res.Status.Phase)
@@ -198,7 +198,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := arktest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
+	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -212,14 +212,14 @@ func TestProcessBackupCompletions(t *testing.T) {
 	}{
 		{
 			name:           "backup with no backup location gets the default",
-			backup:         arktest.NewTestBackup().WithName("backup-1").Backup,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").Backup,
 			backupLocation: defaultBackupLocation,
 			expectedResult: &v1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"ark.heptio.com/storage-location": "loc-1",
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: v1.BackupSpec{
@@ -235,14 +235,14 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:           "backup with a specific backup location keeps it",
-			backup:         arktest.NewTestBackup().WithName("backup-1").WithStorageLocation("alt-loc").Backup,
-			backupLocation: arktest.NewTestBackupStorageLocation().WithName("alt-loc").BackupStorageLocation,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("alt-loc").Backup,
+			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("alt-loc").BackupStorageLocation,
 			expectedResult: &v1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"ark.heptio.com/storage-location": "alt-loc",
+						"velero.io/storage-location": "alt-loc",
 					},
 				},
 				Spec: v1.BackupSpec{
@@ -258,14 +258,14 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:           "backup with a TTL has expiration set",
-			backup:         arktest.NewTestBackup().WithName("backup-1").WithTTL(10 * time.Minute).Backup,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").WithTTL(10 * time.Minute).Backup,
 			backupLocation: defaultBackupLocation,
 			expectedResult: &v1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"ark.heptio.com/storage-location": "loc-1",
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: v1.BackupSpec{
@@ -296,10 +296,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
-				client:                 clientset.ArkV1(),
-				lister:                 sharedInformers.Ark().V1().Backups().Lister(),
-				backupLocationLister:   sharedInformers.Ark().V1().BackupStorageLocations().Lister(),
-				snapshotLocationLister: sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister(),
+				client:                 clientset.VeleroV1(),
+				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
+				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				backupTracker:          NewBackupTracker(),
 				metrics:                metrics.NewServerMetrics(),
@@ -325,26 +325,26 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
-			require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(test.backup))
+			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
-			_, err := clientset.ArkV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
+			_, err := clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
 			require.NoError(t, err)
 
-			require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(defaultBackupLocation))
+			require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(defaultBackupLocation))
 
 			// add the test's backup storage location to the clientset and the informer/lister store
 			// if it's different than the default
 			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
-				_, err := clientset.ArkV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
+				_, err := clientset.VeleroV1().BackupStorageLocations(test.backupLocation.Namespace).Create(test.backupLocation)
 				require.NoError(t, err)
 
-				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
+				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation))
 			}
 
 			require.NoError(t, c.processBackup(fmt.Sprintf("%s/%s", test.backup.Namespace, test.backup.Name)))
 
-			res, err := clientset.ArkV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
+			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			assert.Equal(t, test.expectedResult, res)
@@ -355,8 +355,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	tests := []struct {
 		name                                string
-		backup                              *arktest.TestBackup
-		locations                           []*arktest.TestVolumeSnapshotLocation
+		backup                              *velerotest.TestBackup
+		locations                           []*velerotest.TestVolumeSnapshotLocation
 		defaultLocations                    map[string]string
 		expectedVolumeSnapshotLocationNames []string // adding these in the expected order will allow to test with better msgs in case of a test failure
 		expectedErrors                      string
@@ -364,76 +364,76 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	}{
 		{
 			name:   "location name does not correspond to any existing location",
-			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations("random-name"),
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			backup: velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations("random-name"),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
 			},
-			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocation.ark.heptio.com \"random-name\" not found", expectedSuccess: false,
+			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocation.velero.io \"random-name\" not found", expectedSuccess: false,
 		},
 		{
 			name:   "duplicate locationName per provider: should filter out dups",
-			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1"),
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+			backup: velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew).WithVolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1"),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:   "multiple non-dupe location names per provider should error",
-			backup: arktest.NewTestBackup().WithName("backup1").WithVolumeSnapshotLocations("aws-us-east-1", "aws-us-west-1"),
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			backup: velerotest.NewTestBackup().WithName("backup1").WithVolumeSnapshotLocations("aws-us-east-1", "aws-us-west-1"),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
 			},
 			expectedErrors:  "more than one VolumeSnapshotLocation name specified for provider aws: aws-us-west-1; unexpected name was aws-us-east-1",
 			expectedSuccess: false,
 		},
 		{
 			name:   "no location name for the provider exists, only one VSL for the provider: use it",
-			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+			backup: velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:   "no location name for the provider exists, no default, more than one VSL for the provider: error",
-			backup: arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+			backup: velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
 			},
 			expectedErrors: "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
 		},
 		{
 			name:             "no location name for the provider exists, more than one VSL for the provider: the provider's default should be added",
-			backup:           arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			backup:           velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
 			defaultLocations: map[string]string{"aws": "aws-us-east-1"},
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithName("aws-us-east-1").WithProvider("aws"),
-				arktest.NewTestVolumeSnapshotLocation().WithName("aws-us-west-1").WithProvider("aws"),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithName("aws-us-east-1").WithProvider("aws"),
+				velerotest.NewTestVolumeSnapshotLocation().WithName("aws-us-west-1").WithProvider("aws"),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:            "no existing location name and no default location name given",
-			backup:          arktest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
+			backup:          velerotest.NewTestBackup().WithName("backup1").WithPhase(v1.BackupPhaseNew),
 			expectedSuccess: true,
 		},
 		{
 			name:             "multiple location names for a provider, default location name for another provider",
-			backup:           arktest.NewTestBackup().WithName("backup1").WithVolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1"),
+			backup:           velerotest.NewTestBackup().WithName("backup1").WithVolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1"),
 			defaultLocations: map[string]string{"fake-provider": "some-name"},
-			locations: []*arktest.TestVolumeSnapshotLocation{
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				arktest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			locations: []*velerotest.TestVolumeSnapshotLocation{
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1", "some-name"},
 			expectedSuccess:                     true,
@@ -448,7 +448,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			)
 
 			c := &backupController{
-				snapshotLocationLister:   sharedInformers.Ark().V1().VolumeSnapshotLocations().Lister(),
+				snapshotLocationLister:   sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultSnapshotLocations: test.defaultLocations,
 			}
 
@@ -456,7 +456,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			backup := test.backup.DeepCopy()
 			backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Ark().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location.VolumeSnapshotLocation))
+				require.NoError(t, sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location.VolumeSnapshotLocation))
 			}
 
 			providerLocations, errs := c.validateAndGetSnapshotLocations(backup)

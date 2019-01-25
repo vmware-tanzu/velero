@@ -1,21 +1,21 @@
 # Image tagging policy
 
-This document describes Ark's image tagging policy.
+This document describes Velero's image tagging policy.
 
 ## Released versions
 
-`gcr.io/heptio-images/ark:<SemVer>`
+`gcr.io/heptio-images/velero:<SemVer>`
 
-Ark follows the [Semantic Versioning](http://semver.org/) standard for releases. Each tag in the `github.com/heptio/ark` repository has a matching image, e.g. `gcr.io/heptio-images/ark:v0.8.0`.
+Velero follows the [Semantic Versioning](http://semver.org/) standard for releases. Each tag in the `github.com/heptio/velero` repository has a matching image, e.g. `gcr.io/heptio-images/velero:v0.11.0`.
 
 ### Latest
 
-`gcr.io/heptio-images/ark:latest`
+`gcr.io/heptio-images/velero:latest`
 
-The `latest` tag follows the most recently released version of Ark.
+The `latest` tag follows the most recently released version of Velero.
 
 ## Development
 
-`gcr.io/heptio-images/ark:master`
+`gcr.io/heptio-images/velero:master`
 
 The `master` tag follows the latest commit to land on the `master` branch.

@@ -22,14 +22,14 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
-// CRDs returns a list of the CRD types for all of the required Ark CRDs
+// CRDs returns a list of the CRD types for all of the required Velero CRDs
 func CRDs() []*apiextv1beta1.CustomResourceDefinition {
 	var crds []*apiextv1beta1.CustomResourceDefinition
 
-	for kind, typeInfo := range arkv1.CustomResources() {
+	for kind, typeInfo := range velerov1api.CustomResources() {
 		crds = append(crds, crd(kind, typeInfo.PluralName))
 	}
 
@@ -39,11 +39,11 @@ func CRDs() []*apiextv1beta1.CustomResourceDefinition {
 func crd(kind, plural string) *apiextv1beta1.CustomResourceDefinition {
 	return &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s.%s", plural, arkv1.GroupName),
+			Name: fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
 		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
-			Group:   arkv1.GroupName,
-			Version: arkv1.SchemeGroupVersion.Version,
+			Group:   velerov1api.GroupName,
+			Version: velerov1api.SchemeGroupVersion.Version,
 			Scope:   apiextv1beta1.NamespaceScoped,
 			Names: apiextv1beta1.CustomResourceDefinitionNames{
 				Plural: plural,

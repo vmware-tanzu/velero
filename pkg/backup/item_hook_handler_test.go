@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/util/collections"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 type mockItemHookHandler struct {
@@ -58,7 +58,7 @@ func TestHandleHooksSkips(t *testing.T) {
 		},
 		{
 			name: "pod without annotation / no spec hooks",
-			item: arktest.UnstructuredOrDie(
+			item: velerotest.UnstructuredOrDie(
 				`
 				{
 					"apiVersion": "v1",
@@ -74,7 +74,7 @@ func TestHandleHooksSkips(t *testing.T) {
 		{
 			name:          "spec hooks not applicable",
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(
+			item: velerotest.UnstructuredOrDie(
 				`
 				{
 					"apiVersion": "v1",
@@ -115,7 +115,7 @@ func TestHandleHooksSkips(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			podCommandExecutor := &arktest.MockPodCommandExecutor{}
+			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			h := &defaultItemHookHandler{
@@ -123,7 +123,7 @@ func TestHandleHooksSkips(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks, hookPhasePre)
+			err := h.handleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, hookPhasePre)
 			assert.NoError(t, err)
 		})
 	}
@@ -145,7 +145,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, no annotation, spec (multiple pre hooks) = run spec",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -195,7 +195,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, no annotation, spec (multiple post hooks) = run spec",
 			phase:         hookPhasePost,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -245,7 +245,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (legacy), no spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -253,8 +253,8 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"hook.backup.ark.heptio.com/container": "c",
-					"hook.backup.ark.heptio.com/command": "/bin/ls"
+					"hook.backup.velero.io/container": "c",
+					"hook.backup.velero.io/command": "/bin/ls"
 				}
 			}
 		}`),
@@ -267,7 +267,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (pre), no spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -275,8 +275,8 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"pre.hook.backup.ark.heptio.com/container": "c",
-					"pre.hook.backup.ark.heptio.com/command": "/bin/ls"
+					"pre.hook.backup.velero.io/container": "c",
+					"pre.hook.backup.velero.io/command": "/bin/ls"
 				}
 			}
 		}`),
@@ -289,7 +289,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation (post), no spec = run annotation",
 			phase:         hookPhasePost,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -297,8 +297,8 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"post.hook.backup.ark.heptio.com/container": "c",
-					"post.hook.backup.ark.heptio.com/command": "/bin/ls"
+					"post.hook.backup.velero.io/container": "c",
+					"post.hook.backup.velero.io/command": "/bin/ls"
 				}
 			}
 		}`),
@@ -311,7 +311,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation & spec = run annotation",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -319,8 +319,8 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"hook.backup.ark.heptio.com/container": "c",
-					"hook.backup.ark.heptio.com/command": "/bin/ls"
+					"hook.backup.velero.io/container": "c",
+					"hook.backup.velero.io/command": "/bin/ls"
 				}
 			}
 		}`),
@@ -346,7 +346,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation, onError=fail = return error",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -354,9 +354,9 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"hook.backup.ark.heptio.com/container": "c",
-					"hook.backup.ark.heptio.com/command": "/bin/ls",
-					"hook.backup.ark.heptio.com/on-error": "Fail"
+					"hook.backup.velero.io/container": "c",
+					"hook.backup.velero.io/command": "/bin/ls",
+					"hook.backup.velero.io/on-error": "Fail"
 				}
 			}
 		}`),
@@ -372,7 +372,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, annotation, onError=continue = return nil",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -380,9 +380,9 @@ func TestHandleHooks(t *testing.T) {
 				"namespace": "ns",
 				"name": "name",
 				"annotations": {
-					"hook.backup.ark.heptio.com/container": "c",
-					"hook.backup.ark.heptio.com/command": "/bin/ls",
-					"hook.backup.ark.heptio.com/on-error": "Continue"
+					"hook.backup.velero.io/container": "c",
+					"hook.backup.velero.io/command": "/bin/ls",
+					"hook.backup.velero.io/on-error": "Continue"
 				}
 			}
 		}`),
@@ -398,7 +398,7 @@ func TestHandleHooks(t *testing.T) {
 			name:          "pod, spec, onError=fail = don't run other hooks",
 			phase:         hookPhasePre,
 			groupResource: "pods",
-			item: arktest.UnstructuredOrDie(`
+			item: velerotest.UnstructuredOrDie(`
 		{
 			"apiVersion": "v1",
 			"kind": "Pod",
@@ -460,7 +460,7 @@ func TestHandleHooks(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			podCommandExecutor := &arktest.MockPodCommandExecutor{}
+			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			h := &defaultItemHookHandler{
@@ -490,7 +490,7 @@ func TestHandleHooks(t *testing.T) {
 			}
 
 			groupResource := schema.ParseGroupResource(test.groupResource)
-			err := h.handleHooks(arktest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
+			err := h.handleHooks(velerotest.NewLogger(), groupResource, test.item, test.hooks, test.phase)
 
 			if test.expectedError != nil {
 				assert.EqualError(t, err, test.expectedError.Error())
@@ -593,6 +593,37 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				expectedHook: &v1.ExecHook{
 					Container: "some-container",
 					Command:   []string{"/usr/bin/foo"},
+				},
+			},
+			{
+				name: "legacy ark-based annotations are supported",
+				annotations: map[string]string{
+					phasedKey(phase, arkPodBackupHookContainerAnnotationKey): "some-container",
+					phasedKey(phase, arkPodBackupHookCommandAnnotationKey):   "/usr/bin/foo",
+				},
+				expectedHook: &v1.ExecHook{
+					Container: "some-container",
+					Command:   []string{"/usr/bin/foo"},
+				},
+			},
+			{
+				name: "when both current and legacy ark-based annotations are specified, current takes precedence",
+				annotations: map[string]string{
+					phasedKey(phase, podBackupHookContainerAnnotationKey): "current-container",
+					phasedKey(phase, podBackupHookCommandAnnotationKey):   "/usr/bin/current",
+					phasedKey(phase, podBackupHookOnErrorAnnotationKey):   string(v1.HookErrorModeContinue),
+					phasedKey(phase, podBackupHookTimeoutAnnotationKey):   "10m",
+
+					phasedKey(phase, arkPodBackupHookContainerAnnotationKey): "legacy-container",
+					phasedKey(phase, arkPodBackupHookCommandAnnotationKey):   "/usr/bin/legacy",
+					phasedKey(phase, arkPodBackupHookOnErrorAnnotationKey):   string(v1.HookErrorModeFail),
+					phasedKey(phase, arkPodBackupHookTimeoutAnnotationKey):   "5m",
+				},
+				expectedHook: &v1.ExecHook{
+					Container: "current-container",
+					Command:   []string{"/usr/bin/current"},
+					OnError:   v1.HookErrorModeContinue,
+					Timeout:   metav1.Duration{Duration: 10 * time.Minute},
 				},
 			},
 		}

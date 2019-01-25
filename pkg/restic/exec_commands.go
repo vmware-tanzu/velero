@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/heptio/ark/pkg/util/exec"
+	"github.com/heptio/velero/pkg/util/exec"
 )
 
 // GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot

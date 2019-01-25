@@ -43,10 +43,10 @@ func argsToFields(args ...interface{}) logrus.Fields {
 		switch args[i] {
 		case "time", "timestamp", "level":
 			// remove `time` & `timestamp` because this info will be added
-			// by the Ark logger and we don't want to have duplicated
+			// by the Velero logger and we don't want to have duplicated
 			// fields.
 			//
-			// remove `level` because it'll be added by the Ark logger based
+			// remove `level` because it'll be added by the Velero logger based
 			// on the call we make (and go-plugin is determining which level
 			// to log at based on the hclog-compatible `@level` field which
 			// we're adding via HcLogLevelHook).

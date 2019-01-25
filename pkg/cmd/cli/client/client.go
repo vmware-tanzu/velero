@@ -19,13 +19,13 @@ package client
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/cmd/cli/client/config"
+	"github.com/heptio/velero/pkg/cmd/cli/client/config"
 )
 
 func NewCommand() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "client",
-		Short: "Ark client related commands",
+		Short: "Velero client related commands",
 	}
 
 	c.AddCommand(

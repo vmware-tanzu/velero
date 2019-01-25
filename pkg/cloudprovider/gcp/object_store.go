@@ -30,7 +30,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"

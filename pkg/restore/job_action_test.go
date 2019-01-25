@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestJobActionExecute(t *testing.T) {
@@ -122,7 +122,7 @@ func TestJobActionExecute(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			action := NewJobAction(arktest.NewLogger())
+			action := NewJobAction(velerotest.NewLogger())
 
 			res, _, err := action.Execute(test.obj, nil)
 

@@ -62,7 +62,7 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deployment {
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/ark:latest",
+		image: "gcr.io/heptio-images/velero:latest",
 	}
 
 	for _, opt := range opts {
@@ -77,7 +77,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 	}
 
 	deployment := &appsv1beta1.Deployment{
-		ObjectMeta: objectMeta(namespace, "ark"),
+		ObjectMeta: objectMeta(namespace, "velero"),
 		Spec: appsv1beta1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -86,15 +86,15 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
-					ServiceAccountName: "ark",
+					ServiceAccountName: "velero",
 					Containers: []corev1.Container{
 						{
-							Name:            "ark",
+							Name:            "velero",
 							Image:           c.image,
 							Ports:           containerPorts(),
 							ImagePullPolicy: pullPolicy,
 							Command: []string{
-								"/ark",
+								"/velero",
 							},
 							Args: []string{
 								"server",

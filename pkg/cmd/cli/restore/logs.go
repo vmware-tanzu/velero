@@ -24,11 +24,11 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
-	arkclient "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
+	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
@@ -42,9 +42,9 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 			l := NewLogsOptions()
 			cmd.CheckError(l.Complete(args))
 			cmd.CheckError(l.Validate(f))
-			arkClient, err := f.Client()
+			veleroClient, err := f.Client()
 			cmd.CheckError(err)
-			err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), args[0], v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), args[0], v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
 			cmd.CheckError(err)
 		},
 	}
@@ -58,7 +58,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 type LogsOptions struct {
 	RestoreName string
 
-	client arkclient.Interface
+	client veleroclient.Interface
 }
 
 // NewLogsOptions returns a new instance of LogsOptions
@@ -82,7 +82,7 @@ func (l *LogsOptions) Validate(f client.Factory) error {
 	}
 	l.client = c
 
-	r, err := l.client.ArkV1().Restores(f.Namespace()).Get(l.RestoreName, metav1.GetOptions{})
+	r, err := l.client.VeleroV1().Restores(f.Namespace()).Get(l.RestoreName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

@@ -20,10 +20,10 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/output"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
@@ -36,19 +36,19 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			arkClient, err := f.Client()
+			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
 			var repos *api.ResticRepositoryList
 			if len(args) > 0 {
 				repos = new(api.ResticRepositoryList)
 				for _, name := range args {
-					repo, err := arkClient.Ark().ResticRepositories(f.Namespace()).Get(name, metav1.GetOptions{})
+					repo, err := veleroClient.VeleroV1().ResticRepositories(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					repos.Items = append(repos.Items, *repo)
 				}
 			} else {
-				repos, err = arkClient.ArkV1().ResticRepositories(f.Namespace()).List(listOptions)
+				repos, err = veleroClient.VeleroV1().ResticRepositories(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 

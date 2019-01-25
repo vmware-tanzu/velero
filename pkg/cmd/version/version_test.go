@@ -25,11 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	v1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	"github.com/heptio/ark/pkg/serverstatusrequest"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	v1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/heptio/velero/pkg/serverstatusrequest"
 )
 
 func TestPrintVersion(t *testing.T) {
@@ -54,7 +54,7 @@ func TestPrintVersion(t *testing.T) {
 	tests := []struct {
 		name                string
 		clientOnly          bool
-		serverStatusRequest *arkv1.ServerStatusRequest
+		serverStatusRequest *velerov1.ServerStatusRequest
 		getterError         error
 		want                string
 	}{
@@ -90,10 +90,10 @@ func TestPrintVersion(t *testing.T) {
 
 			// getServerStatus should only be called when clientOnly = false
 			if !tc.clientOnly {
-				serverStatusGetter.On("getServerStatus", client.ArkV1()).Return(tc.serverStatusRequest, tc.getterError)
+				serverStatusGetter.On("getServerStatus", client.VeleroV1()).Return(tc.serverStatusRequest, tc.getterError)
 			}
 
-			printVersion(buf, tc.clientOnly, client.ArkV1(), serverStatusGetter)
+			printVersion(buf, tc.clientOnly, client.VeleroV1(), serverStatusGetter)
 
 			assert.Equal(t, tc.want, buf.String())
 		})
@@ -106,15 +106,15 @@ type mockServerStatusGetter struct {
 }
 
 // getServerStatus provides a mock function with given fields: client
-func (_m *mockServerStatusGetter) getServerStatus(client v1.ServerStatusRequestsGetter) (*arkv1.ServerStatusRequest, error) {
+func (_m *mockServerStatusGetter) getServerStatus(client v1.ServerStatusRequestsGetter) (*velerov1.ServerStatusRequest, error) {
 	ret := _m.Called(client)
 
-	var r0 *arkv1.ServerStatusRequest
-	if rf, ok := ret.Get(0).(func(v1.ServerStatusRequestsGetter) *arkv1.ServerStatusRequest); ok {
+	var r0 *velerov1.ServerStatusRequest
+	if rf, ok := ret.Get(0).(func(v1.ServerStatusRequestsGetter) *velerov1.ServerStatusRequest); ok {
 		r0 = rf(client)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*arkv1.ServerStatusRequest)
+			r0 = ret.Get(0).(*velerov1.ServerStatusRequest)
 		}
 	}
 

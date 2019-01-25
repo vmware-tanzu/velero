@@ -24,14 +24,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/velero/pkg/util/test"
 )
 
 func TestNewClientBuilder(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
-	cb := newClientBuilder("ark", logger, logLevel)
-	assert.Equal(t, cb.commandName, "ark")
+	cb := newClientBuilder("velero", logger, logLevel)
+	assert.Equal(t, cb.commandName, "velero")
 	assert.Empty(t, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
@@ -44,7 +44,7 @@ func TestNewClientBuilder(t *testing.T) {
 func TestClientConfig(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
-	cb := newClientBuilder("ark", logger, logLevel)
+	cb := newClientBuilder("velero", logger, logLevel)
 
 	expected := &hcplugin.ClientConfig{
 		HandshakeConfig:  Handshake,

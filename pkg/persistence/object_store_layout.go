@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// ObjectStoreLayout defines how Ark's persisted files map to
+// ObjectStoreLayout defines how Velero's persisted files map to
 // keys in an object storage bucket.
 type ObjectStoreLayout struct {
 	rootPrefix string
@@ -72,6 +72,11 @@ func (l *ObjectStoreLayout) getRestoreDir(restore string) string {
 }
 
 func (l *ObjectStoreLayout) getBackupMetadataKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, "velero-backup.json")
+}
+
+// TODO(1.0): remove
+func (l *ObjectStoreLayout) getLegacyBackupMetadataKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, "ark-backup.json")
 }
 

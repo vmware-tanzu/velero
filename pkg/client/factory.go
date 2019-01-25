@@ -24,15 +24,15 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/kubernetes"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
-// Factory knows how to create an ArkClient and Kubernetes client.
+// Factory knows how to create a VeleroClient and Kubernetes client.
 type Factory interface {
 	// BindFlags binds common flags (--kubeconfig, --namespace) to the passed-in FlagSet.
 	BindFlags(flags *pflag.FlagSet)
-	// Client returns an ArkClient. It uses the following priority to specify the cluster
+	// Client returns a VeleroClient. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	Client() (clientset.Interface, error)
 	// KubeClient returns a Kubernetes client. It uses the following priority to specify the cluster
@@ -67,7 +67,7 @@ func NewFactory(baseName string) Factory {
 	}
 
 	f.flags.StringVar(&f.kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
-	f.flags.StringVarP(&f.namespace, "namespace", "n", f.namespace, "The namespace in which Ark should operate")
+	f.flags.StringVarP(&f.namespace, "namespace", "n", f.namespace, "The namespace in which Velero should operate")
 	f.flags.StringVar(&f.kubecontext, "kubecontext", "", "The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)")
 
 	return f
@@ -83,11 +83,11 @@ func (f *factory) Client() (clientset.Interface, error) {
 		return nil, err
 	}
 
-	arkClient, err := clientset.NewForConfig(clientConfig)
+	veleroClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	return arkClient, nil
+	return veleroClient, nil
 }
 
 func (f *factory) KubeClient() (kubernetes.Interface, error) {

@@ -1,4 +1,4 @@
-# Heptio Ark Community Code of Conduct
+# Velero Community Code of Conduct
 
 ## Contributor Code of Conduct
 

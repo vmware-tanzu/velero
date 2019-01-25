@@ -32,16 +32,16 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	pkgbackup "github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/kube"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/kube"
 )
 
 const resticTimeout = time.Minute
@@ -49,11 +49,11 @@ const resticTimeout = time.Minute
 type backupDeletionController struct {
 	*genericController
 
-	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter
+	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
 	deleteBackupRequestLister listers.DeleteBackupRequestLister
-	backupClient              arkv1client.BackupsGetter
+	backupClient              velerov1client.BackupsGetter
 	restoreLister             listers.RestoreLister
-	restoreClient             arkv1client.RestoresGetter
+	restoreClient             velerov1client.RestoresGetter
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     listers.PodVolumeBackupLister
@@ -69,10 +69,10 @@ type backupDeletionController struct {
 func NewBackupDeletionController(
 	logger logrus.FieldLogger,
 	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
-	deleteBackupRequestClient arkv1client.DeleteBackupRequestsGetter,
-	backupClient arkv1client.BackupsGetter,
+	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
+	backupClient velerov1client.BackupsGetter,
 	restoreInformer informers.RestoreInformer,
-	restoreClient arkv1client.RestoresGetter,
+	restoreClient velerov1client.RestoresGetter,
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,

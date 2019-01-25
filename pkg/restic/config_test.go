@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 func TestGetRepoIdentifier(t *testing.T) {
@@ -31,11 +31,11 @@ func TestGetRepoIdentifier(t *testing.T) {
 		return "", errors.New("no region found")
 	}
 
-	backupLocation := &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation := &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "aws",
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket",
 					Prefix: "prefix",
 				},
@@ -49,11 +49,11 @@ func TestGetRepoIdentifier(t *testing.T) {
 		return "us-west-2", nil
 	}
 
-	backupLocation = &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "aws",
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket",
 				},
 			},
@@ -61,11 +61,11 @@ func TestGetRepoIdentifier(t *testing.T) {
 	}
 	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	backupLocation = &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "aws",
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket",
 					Prefix: "prefix",
 				},
@@ -74,14 +74,14 @@ func TestGetRepoIdentifier(t *testing.T) {
 	}
 	assert.Equal(t, "s3:s3-us-west-2.amazonaws.com/bucket/prefix/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	backupLocation = &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "aws",
 			Config: map[string]string{
 				"s3Url": "alternate-url",
 			},
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket",
 					Prefix: "prefix",
 				},
@@ -90,11 +90,11 @@ func TestGetRepoIdentifier(t *testing.T) {
 	}
 	assert.Equal(t, "s3:alternate-url/bucket/prefix/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	backupLocation = &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "azure",
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket",
 					Prefix: "prefix",
 				},
@@ -103,11 +103,11 @@ func TestGetRepoIdentifier(t *testing.T) {
 	}
 	assert.Equal(t, "azure:bucket:/prefix/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
-	backupLocation = &arkv1api.BackupStorageLocation{
-		Spec: arkv1api.BackupStorageLocationSpec{
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: "gcp",
-			StorageType: arkv1api.StorageType{
-				ObjectStorage: &arkv1api.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: "bucket-2",
 					Prefix: "prefix-2",
 				},

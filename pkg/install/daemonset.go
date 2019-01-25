@@ -26,7 +26,7 @@ import (
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/ark:latest",
+		image: "gcr.io/heptio-images/velero:latest",
 	}
 
 	for _, opt := range opts {
@@ -55,7 +55,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 					},
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: "ark",
+					ServiceAccountName: "velero",
 					Volumes: []corev1.Volume{
 						{
 							Name: "host-pods",
@@ -87,7 +87,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 									},
 								},
 								{
-									Name: "HEPTIO_ARK_NAMESPACE",
+									Name: "VELERO_NAMESPACE",
 									ValueFrom: &corev1.EnvVarSource{
 										FieldRef: &corev1.ObjectFieldSelector{
 											FieldPath: "metadata.namespace",

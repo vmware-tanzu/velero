@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/util/encode"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/util/encode"
 )
 
 const downloadRequestTimeout = 30 * time.Second
@@ -159,7 +159,7 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 }
 
 // NewPrinter returns a printer for doing human-readable table printing of
-// Ark objects.
+// Velero objects.
 func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
 	options := printers.PrintOptions{
 		NoHeaders:    flag.GetOptionalBoolFlag(cmd, "no-headers"),

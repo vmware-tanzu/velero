@@ -30,28 +30,28 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/persistence"
-	persistencemocks "github.com/heptio/ark/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin"
-	pluginmocks "github.com/heptio/ark/pkg/plugin/mocks"
-	"github.com/heptio/ark/pkg/util/stringslice"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/persistence"
+	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
+	"github.com/heptio/velero/pkg/plugin"
+	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/util/stringslice"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
-func defaultLocationsList(namespace string) []*arkv1api.BackupStorageLocation {
-	return []*arkv1api.BackupStorageLocation{
+func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation {
+	return []*velerov1api.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      "location-1",
 			},
-			Spec: arkv1api.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: arkv1api.StorageType{
-					ObjectStorage: &arkv1api.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-1",
 					},
 				},
@@ -62,10 +62,10 @@ func defaultLocationsList(namespace string) []*arkv1api.BackupStorageLocation {
 				Namespace: namespace,
 				Name:      "location-2",
 			},
-			Spec: arkv1api.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: arkv1api.StorageType{
-					ObjectStorage: &arkv1api.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-2",
 					},
 				},
@@ -78,9 +78,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	tests := []struct {
 		name            string
 		namespace       string
-		locations       []*arkv1api.BackupStorageLocation
-		cloudBackups    map[string][]*arkv1api.Backup
-		existingBackups []*arkv1api.Backup
+		locations       []*velerov1api.BackupStorageLocation
+		cloudBackups    map[string][]*velerov1api.Backup
+		existingBackups []*velerov1api.Backup
 	}{
 		{
 			name: "no cloud backups",
@@ -89,13 +89,13 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			name:      "normal case",
 			namespace: "ns-1",
 			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
 				},
 				"bucket-2": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
 				},
 			},
 		},
@@ -103,24 +103,24 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			name:      "gcFinalizer (only) gets removed on sync",
 			namespace: "ns-1",
 			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithFinalizers("a-finalizer", gcFinalizer, "some-other-finalizer").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithFinalizers("a-finalizer", gcFinalizer, "some-other-finalizer").Backup,
 				},
 			},
 		},
 		{
-			name:      "all synced backups get created in Ark server's namespace",
-			namespace: "heptio-ark",
-			locations: defaultLocationsList("heptio-ark"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			name:      "all synced backups get created in Velero server's namespace",
+			namespace: "velero",
+			locations: defaultLocationsList("velero"),
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
 				},
 				"bucket-2": {
-					arktest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
-					arktest.NewTestBackup().WithNamespace("heptio-ark").WithName("backup-4").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
+					velerotest.NewTestBackup().WithNamespace("velero").WithName("backup-4").Backup,
 				},
 			},
 		},
@@ -128,49 +128,49 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			name:      "new backups get synced when some cloud backups already exist in the cluster",
 			namespace: "ns-1",
 			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
 				},
 				"bucket-2": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").Backup,
 				},
 			},
-			existingBackups: []*arkv1api.Backup{
+			existingBackups: []*velerov1api.Backup{
 				// add a label to each existing backup so we can differentiate it from the cloud
 				// backup during verification
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").WithStorageLocation("location-1").Backup,
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel("i-exist", "true").WithStorageLocation("location-2").Backup,
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").WithStorageLocation("location-1").Backup,
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel("i-exist", "true").WithStorageLocation("location-2").Backup,
 			},
 		},
 		{
 			name:      "existing backups without a StorageLocation get it filled in",
 			namespace: "ns-1",
 			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
 				},
 			},
-			existingBackups: []*arkv1api.Backup{
+			existingBackups: []*velerov1api.Backup{
 				// add a label to each existing backup so we can differentiate it from the cloud
 				// backup during verification
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").Backup,
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").Backup,
 			},
 		},
 		{
 			name:      "backup storage location names and labels get updated",
 			namespace: "ns-1",
 			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*arkv1api.Backup{
+			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithStorageLocation("foo").WithLabel(arkv1api.StorageLocationLabel, "foo").Backup,
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithStorageLocation("foo").WithLabel(velerov1api.StorageLocationLabel, "foo").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
 				},
 				"bucket-2": {
-					arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithStorageLocation("bar").WithLabel(arkv1api.StorageLocationLabel, "bar").Backup,
+					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithStorageLocation("bar").WithLabel(velerov1api.StorageLocationLabel, "bar").Backup,
 				},
 			},
 		},
@@ -186,18 +186,18 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			)
 
 			c := NewBackupSyncController(
-				client.ArkV1(),
-				client.ArkV1(),
-				sharedInformers.Ark().V1().Backups(),
-				sharedInformers.Ark().V1().BackupStorageLocations(),
+				client.VeleroV1(),
+				client.VeleroV1(),
+				sharedInformers.Velero().V1().Backups(),
+				sharedInformers.Velero().V1().BackupStorageLocations(),
 				time.Duration(0),
 				test.namespace,
 				"",
 				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
-				arktest.NewLogger(),
+				velerotest.NewLogger(),
 			).(*backupSyncController)
 
-			c.newBackupStore = func(loc *arkv1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			}
@@ -205,7 +205,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			pluginManager.On("CleanupClients").Return(nil)
 
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Ark().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+				require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location))
 				backupStores[location.Name] = &persistencemocks.BackupStore{}
 			}
 
@@ -224,9 +224,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			}
 
 			for _, existingBackup := range test.existingBackups {
-				require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(existingBackup))
+				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(existingBackup))
 
-				_, err := client.ArkV1().Backups(test.namespace).Create(existingBackup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(existingBackup)
 				require.NoError(t, err)
 			}
 			client.ClearActions()
@@ -236,7 +236,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			for bucket, backups := range test.cloudBackups {
 				// figure out which location this bucket is for; we need this for verification
 				// purposes later
-				var location *arkv1api.BackupStorageLocation
+				var location *velerov1api.BackupStorageLocation
 				for _, loc := range test.locations {
 					if loc.Spec.ObjectStorage.Bucket == bucket {
 						location = loc
@@ -246,11 +246,11 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				require.NotNil(t, location)
 
 				for _, cloudBackup := range backups {
-					obj, err := client.ArkV1().Backups(test.namespace).Get(cloudBackup.Name, metav1.GetOptions{})
+					obj, err := client.VeleroV1().Backups(test.namespace).Get(cloudBackup.Name, metav1.GetOptions{})
 					require.NoError(t, err)
 
 					// did this cloud backup already exist in the cluster?
-					var existing *arkv1api.Backup
+					var existing *velerov1api.Backup
 					for _, obj := range test.existingBackups {
 						if obj.Name == cloudBackup.Name {
 							existing = obj
@@ -273,7 +273,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 						// verify that the storage location field and label are set properly
 						assert.Equal(t, location.Name, obj.Spec.StorageLocation)
-						assert.Equal(t, location.Name, obj.Labels[arkv1api.StorageLocationLabel])
+						assert.Equal(t, location.Name, obj.Labels[velerov1api.StorageLocationLabel])
 					}
 				}
 			}
@@ -285,7 +285,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 	tests := []struct {
 		name            string
 		cloudBackups    sets.String
-		k8sBackups      []*arktest.TestBackup
+		k8sBackups      []*velerotest.TestBackup
 		namespace       string
 		expectedDeletes sets.String
 	}{
@@ -293,10 +293,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupB").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupC").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupB").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupC").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
 			},
 			expectedDeletes: sets.NewString("backupA", "backupB", "backupC"),
 		},
@@ -304,10 +304,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "some overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
 			},
 			expectedDeletes: sets.NewString("backup-C"),
 		},
@@ -315,10 +315,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "all overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
 			},
 			expectedDeletes: sets.NewString(),
 		},
@@ -326,13 +326,13 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no overlapping backups but including backups that are not complete",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("Deleting").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseDeleting),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("Failed").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseFailed),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("FailedValidation").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseFailedValidation),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("InProgress").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseInProgress),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("New").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseNew),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("Deleting").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseDeleting),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("Failed").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailed),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("FailedValidation").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailedValidation),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("InProgress").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseInProgress),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("New").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseNew),
 			},
 			expectedDeletes: sets.NewString("backupA"),
 		},
@@ -340,10 +340,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "all overlapping backups and all backups that are not complete",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseFailed),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseFailedValidation),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseInProgress),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailed),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailedValidation),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseInProgress),
 			},
 			expectedDeletes: sets.NewString(),
 		},
@@ -351,13 +351,13 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no completed backups in other locations are deleted",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*arktest.TestBackup{
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(arkv1api.StorageLocationLabel, "default").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").WithLabel(arkv1api.StorageLocationLabel, "alternate").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-5").WithLabel(arkv1api.StorageLocationLabel, "alternate").WithPhase(arkv1api.BackupPhaseCompleted),
-				arktest.NewTestBackup().WithNamespace("ns-1").WithName("backup-6").WithLabel(arkv1api.StorageLocationLabel, "alternate").WithPhase(arkv1api.BackupPhaseCompleted),
+			k8sBackups: []*velerotest.TestBackup{
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-5").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
+				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-6").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
 			},
 			expectedDeletes: sets.NewString("backup-C"),
 		},
@@ -371,31 +371,31 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			)
 
 			c := NewBackupSyncController(
-				client.ArkV1(),
-				client.ArkV1(),
-				sharedInformers.Ark().V1().Backups(),
-				sharedInformers.Ark().V1().BackupStorageLocations(),
+				client.VeleroV1(),
+				client.VeleroV1(),
+				sharedInformers.Velero().V1().Backups(),
+				sharedInformers.Velero().V1().BackupStorageLocations(),
 				time.Duration(0),
 				test.namespace,
 				"",
 				nil, // new plugin manager func
-				arktest.NewLogger(),
+				velerotest.NewLogger(),
 			).(*backupSyncController)
 
 			expectedDeleteActions := make([]core.Action, 0)
 
 			for _, backup := range test.k8sBackups {
 				// add test backup to informer
-				require.NoError(t, sharedInformers.Ark().V1().Backups().Informer().GetStore().Add(backup.Backup), "Error adding backup to informer")
+				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup.Backup), "Error adding backup to informer")
 
 				// add test backup to client
-				_, err := client.Ark().Backups(test.namespace).Create(backup.Backup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(backup.Backup)
 				require.NoError(t, err, "Error adding backup to clientset")
 
 				// if we expect this backup to be deleted, set up the expected DeleteAction
 				if test.expectedDeletes.Has(backup.Name) {
 					actionDelete := core.NewDeleteAction(
-						arkv1api.SchemeGroupVersion.WithResource("backups"),
+						velerov1api.SchemeGroupVersion.WithResource("backups"),
 						test.namespace,
 						backup.Name,
 					)
@@ -403,7 +403,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				}
 			}
 
-			c.deleteOrphanedBackups("default", test.cloudBackups, arktest.NewLogger())
+			c.deleteOrphanedBackups("default", test.cloudBackups, velerotest.NewLogger())
 
 			numBackups, err := numBackups(t, client, c.namespace)
 			assert.NoError(t, err)
@@ -411,7 +411,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			expected := len(test.k8sBackups) - len(test.expectedDeletes)
 			assert.Equal(t, expected, numBackups)
 
-			arktest.CompareActions(t, expectedDeleteActions, getDeleteActions(client.Actions()))
+			velerotest.CompareActions(t, expectedDeleteActions, getDeleteActions(client.Actions()))
 		})
 	}
 }
@@ -421,7 +421,7 @@ func TestShouldSync(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		location            *arkv1api.BackupStorageLocation
+		location            *velerov1api.BackupStorageLocation
 		backupStoreRevision string
 		now                 time.Time
 		expectSync          bool
@@ -429,7 +429,7 @@ func TestShouldSync(t *testing.T) {
 	}{
 		{
 			name:                "BSL with no last-synced metadata should sync",
-			location:            &arkv1api.BackupStorageLocation{},
+			location:            &velerov1api.BackupStorageLocation{},
 			backupStoreRevision: "foo",
 			now:                 c.Now(),
 			expectSync:          true,
@@ -437,8 +437,8 @@ func TestShouldSync(t *testing.T) {
 		},
 		{
 			name: "BSL with unchanged revision last synced more than an hour ago should sync",
-			location: &arkv1api.BackupStorageLocation{
-				Status: arkv1api.BackupStorageLocationStatus{
+			location: &velerov1api.BackupStorageLocation{
+				Status: velerov1api.BackupStorageLocationStatus{
 					LastSyncedRevision: types.UID("foo"),
 					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-61 * time.Minute)},
 				},
@@ -450,8 +450,8 @@ func TestShouldSync(t *testing.T) {
 		},
 		{
 			name: "BSL with unchanged revision last synced less than an hour ago should not sync",
-			location: &arkv1api.BackupStorageLocation{
-				Status: arkv1api.BackupStorageLocationStatus{
+			location: &velerov1api.BackupStorageLocation{
+				Status: velerov1api.BackupStorageLocationStatus{
 					LastSyncedRevision: types.UID("foo"),
 					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-59 * time.Minute)},
 				},
@@ -462,8 +462,8 @@ func TestShouldSync(t *testing.T) {
 		},
 		{
 			name: "BSL with different revision than backup store last synced less than an hour ago should sync",
-			location: &arkv1api.BackupStorageLocation{
-				Status: arkv1api.BackupStorageLocationStatus{
+			location: &velerov1api.BackupStorageLocation{
+				Status: velerov1api.BackupStorageLocationStatus{
 					LastSyncedRevision: types.UID("foo"),
 					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-time.Minute)},
 				},
@@ -475,8 +475,8 @@ func TestShouldSync(t *testing.T) {
 		},
 		{
 			name: "BSL with different revision than backup store last synced more than an hour ago should sync",
-			location: &arkv1api.BackupStorageLocation{
-				Status: arkv1api.BackupStorageLocationStatus{
+			location: &velerov1api.BackupStorageLocation{
+				Status: velerov1api.BackupStorageLocationStatus{
 					LastSyncedRevision: types.UID("foo"),
 					LastSyncedTime:     metav1.Time{Time: c.Now().Add(-61 * time.Minute)},
 				},
@@ -497,7 +497,7 @@ func TestShouldSync(t *testing.T) {
 				backupStore.On("GetRevision").Return("", errors.New("object revision not found"))
 			}
 
-			shouldSync, rev := shouldSync(test.location, test.now, backupStore, arktest.NewLogger())
+			shouldSync, rev := shouldSync(test.location, test.now, backupStore, velerotest.NewLogger())
 			assert.Equal(t, test.expectSync, shouldSync)
 			assert.Equal(t, test.expectedRevision, rev)
 		})
@@ -517,7 +517,7 @@ func getDeleteActions(actions []core.Action) []core.Action {
 
 func numBackups(t *testing.T, c *fake.Clientset, ns string) (int, error) {
 	t.Helper()
-	existingK8SBackups, err := c.ArkV1().Backups(ns).List(metav1.ListOptions{})
+	existingK8SBackups, err := c.VeleroV1().Backups(ns).List(metav1.ListOptions{})
 	if err != nil {
 		return 0, err
 	}

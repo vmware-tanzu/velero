@@ -27,16 +27,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
-	"github.com/heptio/ark/pkg/volume"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 // BackupStore defines operations for creating, retrieving, and deleting
-// Ark backup and restore data in/from a persistent backup store.
+// Velero backup and restore data in/from a persistent backup store.
 type BackupStore interface {
 	IsValid() error
 	GetRevision() (string, error)
@@ -44,7 +46,7 @@ type BackupStore interface {
 	ListBackups() ([]string, error)
 
 	PutBackup(name string, metadata, contents, log, volumeSnapshots io.Reader) error
-	GetBackupMetadata(name string) (*arkv1api.Backup, error)
+	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 	DeleteBackup(name string) error
@@ -53,7 +55,7 @@ type BackupStore interface {
 	PutRestoreResults(backup, restore string, results io.Reader) error
 	DeleteRestore(name string) error
 
-	GetDownloadURL(target arkv1api.DownloadTarget) (string, error)
+	GetDownloadURL(target velerov1api.DownloadTarget) (string, error)
 }
 
 // DownloadURLTTL is how long a download URL is valid for.
@@ -72,7 +74,7 @@ type ObjectStoreGetter interface {
 	GetObjectStore(provider string) (cloudprovider.ObjectStore, error)
 }
 
-func NewObjectBackupStore(location *arkv1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
+func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
 	if location.Spec.ObjectStorage == nil {
 		return nil, errors.New("backup storage location does not use object storage")
 	}
@@ -205,10 +207,51 @@ func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volu
 	return nil
 }
 
-func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, error) {
-	key := s.layout.getBackupMetadataKey(name)
+func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup, error) {
+	// We need to determine whether the backup metadata file is the legacy ark.heptio.com
+	// one (named ark-backup.json) or the current velero.io one (named velero-backup.json).
+	// Listing all objects in the backup directory and searching for them is easiest, because
+	// GetObject() calls don't immediately return an error if the object is not found due to
+	// a bug related to the plugin infrastructure, and even if they did, it's difficult to
+	// distinguish between a 404 and a different error.
+	//
+	// TODO once the plugin/error-related bugs are fixed, simplify this code by just calling
+	// GetObject() to check existence of the metadata files.
+	keys, err := s.objectStore.ListObjects(s.bucket, s.layout.getBackupDir(name))
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
 
-	res, err := s.objectStore.GetObject(s.bucket, key)
+	var (
+		metadataKey       = s.layout.getBackupMetadataKey(name)
+		legacyMetadataKey = s.layout.getLegacyBackupMetadataKey(name)
+		legacyMetadata    bool
+	)
+
+	var found bool
+	for _, key := range keys {
+		switch key {
+		case metadataKey:
+			found = true
+		case legacyMetadataKey:
+			found = true
+			legacyMetadata = true
+		}
+
+		if found {
+			break
+		}
+	}
+
+	if legacyMetadata {
+		s.logger.WithField("backup", name).Debug("Legacy metadata file found, converting")
+		return s.getAndConvertLegacyBackupMetadata(legacyMetadataKey)
+	}
+
+	// TODO(1.0): remove everything in this method from here up, except the metadataKey
+	// declaration.
+
+	res, err := s.objectStore.GetObject(s.bucket, metadataKey)
 	if err != nil {
 		return nil, err
 	}
@@ -219,18 +262,60 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*arkv1api.Backup, er
 		return nil, errors.WithStack(err)
 	}
 
-	decoder := scheme.Codecs.UniversalDecoder(arkv1api.SchemeGroupVersion)
+	decoder := scheme.Codecs.UniversalDecoder(velerov1api.SchemeGroupVersion)
 	obj, _, err := decoder.Decode(data, nil, nil)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	backupObj, ok := obj.(*arkv1api.Backup)
+	backupObj, ok := obj.(*velerov1api.Backup)
 	if !ok {
-		return nil, errors.Errorf("unexpected type for %s/%s: %T", s.bucket, key, obj)
+		return nil, errors.Errorf("unexpected type for %s/%s: %T", s.bucket, metadataKey, obj)
 	}
 
 	return backupObj, nil
+}
+
+// TODO(1.0): remove
+func (s *objectBackupStore) getAndConvertLegacyBackupMetadata(key string) (*velerov1api.Backup, error) {
+	obj, err := s.objectStore.GetObject(s.bucket, key)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ioutil.ReadAll(obj)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res := new(unstructured.Unstructured)
+	if err := json.Unmarshal(data, &res); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	res.SetAPIVersion(velerov1api.SchemeGroupVersion.String())
+	res.SetLabels(convertMapKeys(res.GetLabels(), "ark.heptio.com", "velero.io"))
+	res.SetLabels(convertMapKeys(res.GetLabels(), "ark-schedule", velerov1api.ScheduleNameLabel))
+	res.SetAnnotations(convertMapKeys(res.GetAnnotations(), "ark.heptio.com", "velero.io"))
+
+	backup := new(velerov1api.Backup)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object, backup); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return backup, nil
+}
+
+// TODO(1.0): remove
+func convertMapKeys(m map[string]string, find, replace string) map[string]string {
+	for k, v := range m {
+		if updatedKey := strings.Replace(k, find, replace, -1); updatedKey != k {
+			m[updatedKey] = v
+			delete(m, k)
+		}
+	}
+
+	return m
 }
 
 func keyExists(objectStore cloudprovider.ObjectStore, bucket, prefix, key string) (bool, error) {
@@ -342,17 +427,17 @@ func (s *objectBackupStore) PutRestoreResults(backup string, restore string, res
 	return s.objectStore.PutObject(s.bucket, s.layout.getRestoreResultsKey(restore), results)
 }
 
-func (s *objectBackupStore) GetDownloadURL(target arkv1api.DownloadTarget) (string, error) {
+func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (string, error) {
 	switch target.Kind {
-	case arkv1api.DownloadTargetKindBackupContents:
+	case velerov1api.DownloadTargetKindBackupContents:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupContentsKey(target.Name), DownloadURLTTL)
-	case arkv1api.DownloadTargetKindBackupLog:
+	case velerov1api.DownloadTargetKindBackupLog:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupLogKey(target.Name), DownloadURLTTL)
-	case arkv1api.DownloadTargetKindBackupVolumeSnapshots:
+	case velerov1api.DownloadTargetKindBackupVolumeSnapshots:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getBackupVolumeSnapshotsKey(target.Name), DownloadURLTTL)
-	case arkv1api.DownloadTargetKindRestoreLog:
+	case velerov1api.DownloadTargetKindRestoreLog:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreLogKey(target.Name), DownloadURLTTL)
-	case arkv1api.DownloadTargetKindRestoreResults:
+	case velerov1api.DownloadTargetKindRestoreResults:
 		return s.objectStore.CreateSignedURL(s.bucket, s.layout.getRestoreResultsKey(target.Name), DownloadURLTTL)
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)

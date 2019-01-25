@@ -32,7 +32,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,19 +45,19 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/discovery"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/boolptr"
-	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/filesystem"
-	"github.com/heptio/ark/pkg/util/kube"
-	arksync "github.com/heptio/ark/pkg/util/sync"
-	"github.com/heptio/ark/pkg/volume"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/discovery"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/boolptr"
+	"github.com/heptio/velero/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/filesystem"
+	"github.com/heptio/velero/pkg/util/kube"
+	velerosync "github.com/heptio/velero/pkg/util/sync"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 type BlockStoreGetter interface {
@@ -339,7 +339,7 @@ type context struct {
 	actions              []resolvedAction
 	blockStoreGetter     BlockStoreGetter
 	resticRestorer       restic.Restorer
-	globalWaitGroup      arksync.ErrorGroup
+	globalWaitGroup      velerosync.ErrorGroup
 	resourceWaitGroup    sync.WaitGroup
 	resourceWatches      []watch.Interface
 	pvsToProvision       sets.String
@@ -373,17 +373,17 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	resourcesDir := filepath.Join(dir, api.ResourcesDir)
 	rde, err := ctx.fileSystem.DirExists(resourcesDir)
 	if err != nil {
-		addArkError(&errs, err)
+		addVeleroError(&errs, err)
 		return warnings, errs
 	}
 	if !rde {
-		addArkError(&errs, errors.New("backup does not contain top level resources directory"))
+		addVeleroError(&errs, errors.New("backup does not contain top level resources directory"))
 		return warnings, errs
 	}
 
 	resourceDirs, err := ctx.fileSystem.ReadDir(resourcesDir)
 	if err != nil {
-		addArkError(&errs, err)
+		addVeleroError(&errs, err)
 		return warnings, errs
 	}
 
@@ -423,7 +423,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 		clusterSubDir := filepath.Join(resourcePath, api.ClusterScopedDir)
 		clusterSubDirExists, err := ctx.fileSystem.DirExists(clusterSubDir)
 		if err != nil {
-			addArkError(&errs, err)
+			addVeleroError(&errs, err)
 			return warnings, errs
 		}
 		if clusterSubDirExists {
@@ -436,7 +436,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 		nsSubDir := filepath.Join(resourcePath, api.NamespaceScopedDir)
 		nsSubDirExists, err := ctx.fileSystem.DirExists(nsSubDir)
 		if err != nil {
-			addArkError(&errs, err)
+			addVeleroError(&errs, err)
 			return warnings, errs
 		}
 		if !nsSubDirExists {
@@ -445,7 +445,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 
 		nsDirs, err := ctx.fileSystem.ReadDir(nsSubDir)
 		if err != nil {
-			addArkError(&errs, err)
+			addVeleroError(&errs, err)
 			return warnings, errs
 		}
 
@@ -475,7 +475,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 				logger := ctx.log.WithField("namespace", nsName)
 				ns := getNamespace(logger, filepath.Join(dir, api.ResourcesDir, "namespaces", api.ClusterScopedDir, nsName+".json"), mappedNsName)
 				if _, err := kube.EnsureNamespaceExists(ns, ctx.namespaceClient); err != nil {
-					addArkError(&errs, err)
+					addVeleroError(&errs, err)
 					continue
 				}
 
@@ -501,10 +501,10 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	ctx.log.Debug("Done waiting on global wait group")
 
 	for _, err := range waitErrs {
-		// TODO not ideal to be adding these to Ark-level errors
+		// TODO not ideal to be adding these to Velero-level errors
 		// rather than a specific namespace, but don't have a way
 		// to track the namespace right now.
-		errs.Ark = append(errs.Ark, err.Error())
+		errs.Velero = append(errs.Velero, err.Error())
 	}
 
 	return warnings, errs
@@ -550,7 +550,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 // by appending the corresponding lists to one another.
 func merge(a, b *api.RestoreResult) {
 	a.Cluster = append(a.Cluster, b.Cluster...)
-	a.Ark = append(a.Ark, b.Ark...)
+	a.Velero = append(a.Velero, b.Velero...)
 	for k, v := range b.Namespaces {
 		if a.Namespaces == nil {
 			a.Namespaces = make(map[string][]string)
@@ -559,9 +559,9 @@ func merge(a, b *api.RestoreResult) {
 	}
 }
 
-// addArkError appends an error to the provided RestoreResult's Ark list.
-func addArkError(r *api.RestoreResult, err error) {
-	r.Ark = append(r.Ark, err.Error())
+// addVeleroError appends an error to the provided RestoreResult's Velero list.
+func addVeleroError(r *api.RestoreResult, err error) {
+	r.Velero = append(r.Velero, err.Error())
 }
 
 // addToResult appends an error to the provided RestoreResult, either within
@@ -659,7 +659,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			var err error
 			resourceClient, err = ctx.dynamicFactory.ClientForGroupVersionResource(obj.GroupVersionKind().GroupVersion(), resource, namespace)
 			if err != nil {
-				addArkError(&errs, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
+				addVeleroError(&errs, fmt.Errorf("error getting resource client for namespace %q, resource %q: %v", namespace, &groupResource, err))
 				return warnings, errs
 			}
 		}
@@ -721,7 +721,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 						if _, err := waitForReady(resourceWatch.ResultChan(), name, isPVReady, time.Minute, ctx.log); err != nil {
 							ctx.log.Warnf("Timeout reached waiting for persistent volume %s to become ready", name)
-							addArkError(&warnings, fmt.Errorf("timeout reached waiting for persistent volume %s to become ready", name))
+							addVeleroError(&warnings, fmt.Errorf("timeout reached waiting for persistent volume %s to become ready", name))
 						}
 					}()
 				}

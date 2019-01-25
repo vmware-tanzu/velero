@@ -21,25 +21,25 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type Builder struct {
-	serverStatusRequest arkv1api.ServerStatusRequest
+	serverStatusRequest velerov1api.ServerStatusRequest
 }
 
 func NewBuilder() *Builder {
 	return &Builder{
-		serverStatusRequest: arkv1api.ServerStatusRequest{
+		serverStatusRequest: velerov1api.ServerStatusRequest{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: arkv1api.SchemeGroupVersion.String(),
+				APIVersion: velerov1api.SchemeGroupVersion.String(),
 				Kind:       "ServerStatusRequest",
 			},
 		},
 	}
 }
 
-func (b *Builder) Build() *arkv1api.ServerStatusRequest {
+func (b *Builder) Build() *velerov1api.ServerStatusRequest {
 	return &b.serverStatusRequest
 }
 
@@ -58,7 +58,7 @@ func (b *Builder) GenerateName(name string) *Builder {
 	return b
 }
 
-func (b *Builder) Phase(phase arkv1api.ServerStatusRequestPhase) *Builder {
+func (b *Builder) Phase(phase velerov1api.ServerStatusRequestPhase) *Builder {
 	b.serverStatusRequest.Status.Phase = phase
 	return b
 }

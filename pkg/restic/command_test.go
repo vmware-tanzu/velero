@@ -48,7 +48,7 @@ func TestStringSlice(t *testing.T) {
 		ExtraFlags:     []string{"--foo=bar"},
 	}
 
-	require.NoError(t, os.Unsetenv("ARK_SCRATCH_DIR"))
+	require.NoError(t, os.Unsetenv("VELERO_SCRATCH_DIR"))
 	assert.Equal(t, []string{
 		"restic",
 		"cmd",
@@ -59,7 +59,7 @@ func TestStringSlice(t *testing.T) {
 		"--foo=bar",
 	}, c.StringSlice())
 
-	os.Setenv("ARK_SCRATCH_DIR", "/foo")
+	os.Setenv("VELERO_SCRATCH_DIR", "/foo")
 	assert.Equal(t, []string{
 		"restic",
 		"cmd",
@@ -71,7 +71,7 @@ func TestStringSlice(t *testing.T) {
 		"--foo=bar",
 	}, c.StringSlice())
 
-	require.NoError(t, os.Unsetenv("ARK_SCRATCH_DIR"))
+	require.NoError(t, os.Unsetenv("VELERO_SCRATCH_DIR"))
 }
 
 func TestString(t *testing.T) {
@@ -84,7 +84,7 @@ func TestString(t *testing.T) {
 		ExtraFlags:     []string{"--foo=bar"},
 	}
 
-	require.NoError(t, os.Unsetenv("ARK_SCRATCH_DIR"))
+	require.NoError(t, os.Unsetenv("VELERO_SCRATCH_DIR"))
 	assert.Equal(t, "restic cmd --repo=repo-id --password-file=/path/to/password-file arg-1 arg-2 --foo=bar", c.String())
 }
 
@@ -98,7 +98,7 @@ func TestCmd(t *testing.T) {
 		ExtraFlags:     []string{"--foo=bar"},
 	}
 
-	require.NoError(t, os.Unsetenv("ARK_SCRATCH_DIR"))
+	require.NoError(t, os.Unsetenv("VELERO_SCRATCH_DIR"))
 	execCmd := c.Cmd()
 
 	assert.Equal(t, c.StringSlice(), execCmd.Args)

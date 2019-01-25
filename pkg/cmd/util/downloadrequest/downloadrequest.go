@@ -28,11 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkclientv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
-func Stream(client arkclientv1.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration) error {
+func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration) error {
 	req := &v1.DownloadRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,

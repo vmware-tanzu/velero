@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
 const byteChunkSize = 16384

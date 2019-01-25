@@ -24,7 +24,7 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func svcJSON(ports ...corev1api.ServicePort) string {
@@ -181,7 +181,7 @@ func TestServiceActionExecute(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			action := NewServiceAction(arktest.NewLogger())
+			action := NewServiceAction(velerotest.NewLogger())
 
 			res, _, err := action.Execute(test.obj, nil)
 

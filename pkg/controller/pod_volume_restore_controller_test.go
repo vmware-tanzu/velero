@@ -29,12 +29,12 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkfake "github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	arkinformers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/restic"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerofake "github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	veleroinformers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/restic"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestPVRHandler(t *testing.T) {
@@ -42,47 +42,47 @@ func TestPVRHandler(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		obj           *arkv1api.PodVolumeRestore
+		obj           *velerov1api.PodVolumeRestore
 		pod           *corev1api.Pod
 		shouldEnqueue bool
 	}{
 		{
 			name: "InProgress phase pvr should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Status: arkv1api.PodVolumeRestoreStatus{
-					Phase: arkv1api.PodVolumeRestorePhaseInProgress,
+			obj: &velerov1api.PodVolumeRestore{
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseInProgress,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Completed phase pvr should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Status: arkv1api.PodVolumeRestoreStatus{
-					Phase: arkv1api.PodVolumeRestorePhaseCompleted,
+			obj: &velerov1api.PodVolumeRestore{
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseCompleted,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Failed phase pvr should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Status: arkv1api.PodVolumeRestoreStatus{
-					Phase: arkv1api.PodVolumeRestorePhaseFailed,
+			obj: &velerov1api.PodVolumeRestore{
+				Status: velerov1api.PodVolumeRestoreStatus{
+					Phase: velerov1api.PodVolumeRestorePhaseFailed,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Unable to get pvr's pod should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Spec: arkv1api.PodVolumeRestoreSpec{
+			obj: &velerov1api.PodVolumeRestore{
+				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
 						Name:      "pod-1",
 					},
 				},
-				Status: arkv1api.PodVolumeRestoreStatus{
+				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: "",
 				},
 			},
@@ -90,14 +90,14 @@ func TestPVRHandler(t *testing.T) {
 		},
 		{
 			name: "Empty phase pvr with pod not on node running init container should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Spec: arkv1api.PodVolumeRestoreSpec{
+			obj: &velerov1api.PodVolumeRestore{
+				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
 						Name:      "pod-1",
 					},
 				},
-				Status: arkv1api.PodVolumeRestoreStatus{
+				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: "",
 				},
 			},
@@ -130,14 +130,14 @@ func TestPVRHandler(t *testing.T) {
 		},
 		{
 			name: "Empty phase pvr with pod on node not running init container should not be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Spec: arkv1api.PodVolumeRestoreSpec{
+			obj: &velerov1api.PodVolumeRestore{
+				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
 						Name:      "pod-1",
 					},
 				},
-				Status: arkv1api.PodVolumeRestoreStatus{
+				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: "",
 				},
 			},
@@ -166,14 +166,14 @@ func TestPVRHandler(t *testing.T) {
 		},
 		{
 			name: "Empty phase pvr with pod on node running init container should be enqueued",
-			obj: &arkv1api.PodVolumeRestore{
-				Spec: arkv1api.PodVolumeRestoreSpec{
+			obj: &velerov1api.PodVolumeRestore{
+				Spec: velerov1api.PodVolumeRestoreSpec{
 					Pod: corev1api.ObjectReference{
 						Namespace: "ns-1",
 						Name:      "pod-1",
 					},
 				},
-				Status: arkv1api.PodVolumeRestoreStatus{
+				Status: velerov1api.PodVolumeRestoreStatus{
 					Phase: "",
 				},
 			},
@@ -211,7 +211,7 @@ func TestPVRHandler(t *testing.T) {
 			var (
 				podInformer = cache.NewSharedIndexInformer(nil, new(corev1api.Pod), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 				c           = &podVolumeRestoreController{
-					genericController: newGenericController("pod-volume-restore", arktest.NewLogger()),
+					genericController: newGenericController("pod-volume-restore", velerotest.NewLogger()),
 					podLister:         corev1listers.NewPodLister(podInformer.GetIndexer()),
 					nodeName:          controllerNode,
 				}
@@ -239,7 +239,7 @@ func TestPodHandler(t *testing.T) {
 	tests := []struct {
 		name              string
 		pod               *corev1api.Pod
-		podVolumeRestores []*arkv1api.PodVolumeRestore
+		podVolumeRestores []*velerov1api.PodVolumeRestore
 		expectedEnqueues  sets.String
 	}{
 		{
@@ -268,13 +268,13 @@ func TestPodHandler(t *testing.T) {
 					},
 				},
 			},
-			podVolumeRestores: []*arkv1api.PodVolumeRestore{
+			podVolumeRestores: []*velerov1api.PodVolumeRestore{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns-1",
 						Name:      "pvr-1",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "uid",
+							velerov1api.PodUIDLabel: "uid",
 						},
 					},
 				},
@@ -283,7 +283,7 @@ func TestPodHandler(t *testing.T) {
 						Namespace: "ns-1",
 						Name:      "pvr-2",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "uid",
+							velerov1api.PodUIDLabel: "uid",
 						},
 					},
 				},
@@ -292,11 +292,11 @@ func TestPodHandler(t *testing.T) {
 						Namespace: "ns-1",
 						Name:      "pvr-3",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "uid",
+							velerov1api.PodUIDLabel: "uid",
 						},
 					},
-					Status: arkv1api.PodVolumeRestoreStatus{
-						Phase: arkv1api.PodVolumeRestorePhaseInProgress,
+					Status: velerov1api.PodVolumeRestoreStatus{
+						Phase: velerov1api.PodVolumeRestorePhaseInProgress,
 					},
 				},
 				{
@@ -304,7 +304,7 @@ func TestPodHandler(t *testing.T) {
 						Namespace: "ns-1",
 						Name:      "pvr-4",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "some-other-pod",
+							velerov1api.PodUIDLabel: "some-other-pod",
 						},
 					},
 				},
@@ -335,13 +335,13 @@ func TestPodHandler(t *testing.T) {
 					},
 				},
 			},
-			podVolumeRestores: []*arkv1api.PodVolumeRestore{
+			podVolumeRestores: []*velerov1api.PodVolumeRestore{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns-1",
 						Name:      "pvr-1",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "uid",
+							velerov1api.PodUIDLabel: "uid",
 						},
 					},
 				},
@@ -373,13 +373,13 @@ func TestPodHandler(t *testing.T) {
 					},
 				},
 			},
-			podVolumeRestores: []*arkv1api.PodVolumeRestore{
+			podVolumeRestores: []*velerov1api.PodVolumeRestore{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: "ns-1",
 						Name:      "pvr-1",
 						Labels: map[string]string{
-							arkv1api.PodUIDLabel: "uid",
+							velerov1api.PodUIDLabel: "uid",
 						},
 					},
 				},
@@ -390,12 +390,12 @@ func TestPodHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				client      = arkfake.NewSimpleClientset()
-				informers   = arkinformers.NewSharedInformerFactory(client, 0)
-				pvrInformer = informers.Ark().V1().PodVolumeRestores()
+				client      = velerofake.NewSimpleClientset()
+				informers   = veleroinformers.NewSharedInformerFactory(client, 0)
+				pvrInformer = informers.Velero().V1().PodVolumeRestores()
 				c           = &podVolumeRestoreController{
-					genericController:      newGenericController("pod-volume-restore", arktest.NewLogger()),
-					podVolumeRestoreLister: arkv1listers.NewPodVolumeRestoreLister(pvrInformer.Informer().GetIndexer()),
+					genericController:      newGenericController("pod-volume-restore", velerotest.NewLogger()),
+					podVolumeRestoreLister: velerov1listers.NewPodVolumeRestoreLister(pvrInformer.Informer().GetIndexer()),
 					nodeName:               controllerNode,
 				}
 			)
@@ -421,14 +421,14 @@ func TestPodHandler(t *testing.T) {
 }
 
 func TestIsPVRNew(t *testing.T) {
-	pvr := &arkv1api.PodVolumeRestore{}
+	pvr := &velerov1api.PodVolumeRestore{}
 
-	expectationByStatus := map[arkv1api.PodVolumeRestorePhase]bool{
-		"":                                       true,
-		arkv1api.PodVolumeRestorePhaseNew:        true,
-		arkv1api.PodVolumeRestorePhaseInProgress: false,
-		arkv1api.PodVolumeRestorePhaseCompleted:  false,
-		arkv1api.PodVolumeRestorePhaseFailed:     false,
+	expectationByStatus := map[velerov1api.PodVolumeRestorePhase]bool{
+		"":                                   true,
+		velerov1api.PodVolumeRestorePhaseNew: true,
+		velerov1api.PodVolumeRestorePhaseInProgress: false,
+		velerov1api.PodVolumeRestorePhaseCompleted:  false,
+		velerov1api.PodVolumeRestorePhaseFailed:     false,
 	}
 
 	for phase, expected := range expectationByStatus {

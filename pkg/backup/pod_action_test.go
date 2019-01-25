@@ -23,12 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/kuberesource"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/velero/pkg/kuberesource"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestPodActionAppliesTo(t *testing.T) {
-	a := NewPodAction(arktest.NewLogger())
+	a := NewPodAction(velerotest.NewLogger())
 
 	actual, err := a.AppliesTo()
 	require.NoError(t, err)
@@ -47,7 +47,7 @@ func TestPodActionExecute(t *testing.T) {
 	}{
 		{
 			name: "no spec.volumes",
-			pod: arktest.UnstructuredOrDie(`
+			pod: velerotest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",
@@ -60,7 +60,7 @@ func TestPodActionExecute(t *testing.T) {
 		},
 		{
 			name: "persistentVolumeClaim without claimName",
-			pod: arktest.UnstructuredOrDie(`
+			pod: velerotest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",
@@ -80,7 +80,7 @@ func TestPodActionExecute(t *testing.T) {
 		},
 		{
 			name: "full test, mix of volume types",
-			pod: arktest.UnstructuredOrDie(`
+			pod: velerotest.UnstructuredOrDie(`
 			{
 				"apiVersion": "v1",
 				"kind": "Pod",
@@ -118,7 +118,7 @@ func TestPodActionExecute(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			a := NewPodAction(arktest.NewLogger())
+			a := NewPodAction(velerotest.NewLogger())
 
 			updated, additionalItems, err := a.Execute(test.pod, nil)
 			require.NoError(t, err)

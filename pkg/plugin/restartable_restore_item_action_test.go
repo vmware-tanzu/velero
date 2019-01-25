@@ -24,9 +24,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/restore/mocks"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/restore/mocks"
 )
 
 func TestRestartableGetRestoreItemAction(t *testing.T) {

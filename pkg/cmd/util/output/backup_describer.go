@@ -25,19 +25,19 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	"github.com/heptio/ark/pkg/volume"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
 func DescribeBackup(
-	backup *arkv1api.Backup,
-	deleteRequests []arkv1api.DeleteBackupRequest,
-	podVolumeBackups []arkv1api.PodVolumeBackup,
+	backup *velerov1api.Backup,
+	deleteRequests []velerov1api.DeleteBackupRequest,
+	podVolumeBackups []velerov1api.PodVolumeBackup,
 	details bool,
-	arkClient clientset.Interface,
+	veleroClient clientset.Interface,
 ) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
@@ -45,7 +45,7 @@ func DescribeBackup(
 		d.Println()
 		phase := backup.Status.Phase
 		if phase == "" {
-			phase = arkv1api.BackupPhaseNew
+			phase = velerov1api.BackupPhaseNew
 		}
 		d.Printf("Phase:\t%s\n", phase)
 
@@ -53,7 +53,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup, details, arkClient)
+		DescribeBackupStatus(d, backup, details, veleroClient)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -68,7 +68,7 @@ func DescribeBackup(
 }
 
 // DescribeBackupSpec describes a backup spec in human-readable format.
-func DescribeBackupSpec(d *Describer, spec arkv1api.BackupSpec) {
+func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	// TODO make a helper for this and use it in all the describers.
 	d.Printf("Namespaces:\n")
 	var s string
@@ -179,7 +179,7 @@ func DescribeBackupSpec(d *Describer, spec arkv1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, backup *arkv1api.Backup, details bool, arkClient clientset.Interface) {
+func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface) {
 	status := backup.Status
 
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
@@ -228,7 +228,7 @@ func DescribeBackupStatus(d *Describer, backup *arkv1api.Backup, details bool, a
 		}
 
 		buf := new(bytes.Buffer)
-		if err := downloadrequest.Stream(arkClient.ArkV1(), backup.Namespace, backup.Name, arkv1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout); err != nil {
+		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout); err != nil {
 			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
 			return
 		}
@@ -262,7 +262,7 @@ func printSnapshot(d *Describer, pvName, snapshotID, volumeType, volumeAZ string
 }
 
 // DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
-func DescribeDeleteBackupRequests(d *Describer, requests []arkv1api.DeleteBackupRequest) {
+func DescribeDeleteBackupRequests(d *Describer, requests []velerov1api.DeleteBackupRequest) {
 	d.Printf("Deletion Attempts")
 	if count := failedDeletionCount(requests); count > 0 {
 		d.Printf(" (%d failed)", count)
@@ -287,10 +287,10 @@ func DescribeDeleteBackupRequests(d *Describer, requests []arkv1api.DeleteBackup
 	}
 }
 
-func failedDeletionCount(requests []arkv1api.DeleteBackupRequest) int {
+func failedDeletionCount(requests []velerov1api.DeleteBackupRequest) int {
 	var count int
 	for _, req := range requests {
-		if req.Status.Phase == arkv1api.DeleteBackupRequestPhaseProcessed && len(req.Status.Errors) > 0 {
+		if req.Status.Phase == velerov1api.DeleteBackupRequestPhaseProcessed && len(req.Status.Errors) > 0 {
 			count++
 		}
 	}
@@ -298,7 +298,7 @@ func failedDeletionCount(requests []arkv1api.DeleteBackupRequest) int {
 }
 
 // DescribePodVolumeBackups describes pod volume backups in human-readable format.
-func DescribePodVolumeBackups(d *Describer, backups []arkv1api.PodVolumeBackup, details bool) {
+func DescribePodVolumeBackups(d *Describer, backups []velerov1api.PodVolumeBackup, details bool) {
 	if details {
 		d.Printf("Restic Backups:\n")
 	} else {
@@ -310,10 +310,10 @@ func DescribePodVolumeBackups(d *Describer, backups []arkv1api.PodVolumeBackup, 
 
 	// go through phases in a specific order
 	for _, phase := range []string{
-		string(arkv1api.PodVolumeBackupPhaseCompleted),
-		string(arkv1api.PodVolumeBackupPhaseFailed),
+		string(velerov1api.PodVolumeBackupPhaseCompleted),
+		string(velerov1api.PodVolumeBackupPhaseFailed),
 		"In Progress",
-		string(arkv1api.PodVolumeBackupPhaseNew),
+		string(velerov1api.PodVolumeBackupPhaseNew),
 	} {
 		if len(backupsByPhase[phase]) == 0 {
 			continue
@@ -342,15 +342,15 @@ func DescribePodVolumeBackups(d *Describer, backups []arkv1api.PodVolumeBackup, 
 	}
 }
 
-func groupByPhase(backups []arkv1api.PodVolumeBackup) map[string][]arkv1api.PodVolumeBackup {
-	backupsByPhase := make(map[string][]arkv1api.PodVolumeBackup)
+func groupByPhase(backups []velerov1api.PodVolumeBackup) map[string][]velerov1api.PodVolumeBackup {
+	backupsByPhase := make(map[string][]velerov1api.PodVolumeBackup)
 
-	phaseToGroup := map[arkv1api.PodVolumeBackupPhase]string{
-		arkv1api.PodVolumeBackupPhaseCompleted:  string(arkv1api.PodVolumeBackupPhaseCompleted),
-		arkv1api.PodVolumeBackupPhaseFailed:     string(arkv1api.PodVolumeBackupPhaseFailed),
-		arkv1api.PodVolumeBackupPhaseInProgress: "In Progress",
-		arkv1api.PodVolumeBackupPhaseNew:        string(arkv1api.PodVolumeBackupPhaseNew),
-		"":                                      string(arkv1api.PodVolumeBackupPhaseNew),
+	phaseToGroup := map[velerov1api.PodVolumeBackupPhase]string{
+		velerov1api.PodVolumeBackupPhaseCompleted:  string(velerov1api.PodVolumeBackupPhaseCompleted),
+		velerov1api.PodVolumeBackupPhaseFailed:     string(velerov1api.PodVolumeBackupPhaseFailed),
+		velerov1api.PodVolumeBackupPhaseInProgress: "In Progress",
+		velerov1api.PodVolumeBackupPhaseNew:        string(velerov1api.PodVolumeBackupPhaseNew),
+		"":                                         string(velerov1api.PodVolumeBackupPhaseNew),
 	}
 
 	for _, backup := range backups {

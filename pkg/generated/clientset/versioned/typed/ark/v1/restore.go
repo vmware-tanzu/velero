@@ -19,8 +19,8 @@ limitations under the License.
 package v1
 
 import (
-	v1 "github.com/heptio/ark/pkg/apis/ark/v1"
-	scheme "github.com/heptio/ark/pkg/generated/clientset/versioned/scheme"
+	v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	scheme "github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

@@ -29,10 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/util/collections"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/podexec"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 type hookPhase string
@@ -145,10 +145,16 @@ func (h *defaultItemHookHandler) handleHooks(
 }
 
 const (
-	podBackupHookContainerAnnotationKey = "hook.backup.ark.heptio.com/container"
-	podBackupHookCommandAnnotationKey   = "hook.backup.ark.heptio.com/command"
-	podBackupHookOnErrorAnnotationKey   = "hook.backup.ark.heptio.com/on-error"
-	podBackupHookTimeoutAnnotationKey   = "hook.backup.ark.heptio.com/timeout"
+	podBackupHookContainerAnnotationKey = "hook.backup.velero.io/container"
+	podBackupHookCommandAnnotationKey   = "hook.backup.velero.io/command"
+	podBackupHookOnErrorAnnotationKey   = "hook.backup.velero.io/on-error"
+	podBackupHookTimeoutAnnotationKey   = "hook.backup.velero.io/timeout"
+
+	// TODO(1.0) remove all of the legacy ark annotations
+	arkPodBackupHookContainerAnnotationKey = "hook.backup.ark.heptio.com/container"
+	arkPodBackupHookCommandAnnotationKey   = "hook.backup.ark.heptio.com/command"
+	arkPodBackupHookOnErrorAnnotationKey   = "hook.backup.ark.heptio.com/on-error"
+	arkPodBackupHookTimeoutAnnotationKey   = "hook.backup.ark.heptio.com/timeout"
 )
 
 func phasedKey(phase hookPhase, key string) string {
@@ -162,9 +168,9 @@ func getHookAnnotation(annotations map[string]string, key string, phase hookPhas
 	return annotations[phasedKey(phase, key)]
 }
 
-// getPodExecHookFromAnnotations returns an ExecHook based on the annotations, as long as the
-// 'command' annotation is present. If it is absent, this returns nil.
-func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase) *api.ExecHook {
+// TODO(1.0): rename this function to getPodExecHookFromAnnotations (see
+// corresponding comment in getPodExecHookFromAnnotations)
+func getVeleroPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase) *api.ExecHook {
 	commandValue := getHookAnnotation(annotations, podBackupHookCommandAnnotationKey, phase)
 	if commandValue == "" {
 		return nil
@@ -202,6 +208,62 @@ func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhas
 		OnError:   onError,
 		Timeout:   metav1.Duration{Duration: timeout},
 	}
+}
+
+// TODO(1.0) delete this function
+func getArkPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase) *api.ExecHook {
+	commandValue := getHookAnnotation(annotations, arkPodBackupHookCommandAnnotationKey, phase)
+	if commandValue == "" {
+		return nil
+	}
+	var command []string
+	// check for json array
+	if commandValue[0] == '[' {
+		if err := json.Unmarshal([]byte(commandValue), &command); err != nil {
+			command = []string{commandValue}
+		}
+	} else {
+		command = append(command, commandValue)
+	}
+
+	container := getHookAnnotation(annotations, arkPodBackupHookContainerAnnotationKey, phase)
+
+	onError := api.HookErrorMode(getHookAnnotation(annotations, arkPodBackupHookOnErrorAnnotationKey, phase))
+	if onError != api.HookErrorModeContinue && onError != api.HookErrorModeFail {
+		onError = ""
+	}
+
+	var timeout time.Duration
+	timeoutString := getHookAnnotation(annotations, arkPodBackupHookTimeoutAnnotationKey, phase)
+	if timeoutString != "" {
+		if temp, err := time.ParseDuration(timeoutString); err == nil {
+			timeout = temp
+		} else {
+			// TODO: log error that we couldn't parse duration
+		}
+	}
+
+	return &api.ExecHook{
+		Container: container,
+		Command:   command,
+		OnError:   onError,
+		Timeout:   metav1.Duration{Duration: timeout},
+	}
+
+}
+
+// getPodExecHookFromAnnotations returns an ExecHook based on the annotations, as long as the
+// 'command' annotation is present. If it is absent, this returns nil.
+func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase) *api.ExecHook {
+	// TODO(1.0): delete this function implementation, as
+	// getVeleroPodExecHookFromAnnotations will be renamed
+	// in order to replace this implementation.
+
+	if hook := getVeleroPodExecHookFromAnnotations(annotations, phase); hook != nil {
+		return hook
+	}
+
+	return getArkPodExecHookFromAnnotations(annotations, phase)
 }
 
 type resourceHook struct {

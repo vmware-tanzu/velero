@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 type TestSchedule struct {

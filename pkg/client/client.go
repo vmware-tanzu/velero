@@ -24,7 +24,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/heptio/ark/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/buildinfo"
 )
 
 // Config returns a *rest.Config, using either the kubeconfig (if specified) or an in-cluster

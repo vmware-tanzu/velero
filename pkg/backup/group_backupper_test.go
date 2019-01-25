@@ -25,11 +25,11 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/restic"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/podexec"
+	"github.com/heptio/velero/pkg/restic"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestBackupGroupBacksUpCorrectResourcesInCorrectOrder(t *testing.T) {
@@ -54,7 +54,7 @@ func TestBackupGroupBacksUpCorrectResourcesInCorrectOrder(t *testing.T) {
 	).Return(resourceBackupper)
 
 	gb := &defaultGroupBackupper{
-		log:                      arktest.NewLogger(),
+		log:                      velerotest.NewLogger(),
 		resourceBackupperFactory: resourceBackupperFactory,
 	}
 

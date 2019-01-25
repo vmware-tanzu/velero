@@ -35,15 +35,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/collections"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/podexec"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/collections"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 var (
@@ -133,7 +133,7 @@ func TestResolveActions(t *testing.T) {
 				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
 				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
 			}
-			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
+			discoveryHelper := velerotest.NewFakeDiscoveryHelper(false, resources)
 
 			actual, err := resolveActions(test.input, discoveryHelper)
 			gotError := err != nil
@@ -202,7 +202,7 @@ func TestGetResourceIncludesExcludes(t *testing.T) {
 				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
 				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
 			}
-			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
+			discoveryHelper := velerotest.NewFakeDiscoveryHelper(false, resources)
 
 			actual := getResourceIncludesExcludes(discoveryHelper, test.includes, test.excludes)
 
@@ -470,8 +470,8 @@ func TestBackup(t *testing.T) {
 				Backup: test.backup,
 			}
 
-			discoveryHelper := &arktest.FakeDiscoveryHelper{
-				Mapper: &arktest.FakeMapper{
+			discoveryHelper := &velerotest.FakeDiscoveryHelper{
+				Mapper: &velerotest.FakeMapper{
 					Resources: map[schema.GroupVersionResource]schema.GroupVersionResource{
 						{Resource: "cm"}:    {Group: "", Version: "v1", Resource: "configmaps"},
 						{Resource: "csr"}:   {Group: "certificates.k8s.io", Version: "v1beta1", Resource: "certificatesigningrequests"},
@@ -485,9 +485,9 @@ func TestBackup(t *testing.T) {
 				},
 			}
 
-			dynamicFactory := new(arktest.FakeDynamicFactory)
+			dynamicFactory := new(velerotest.FakeDynamicFactory)
 
-			podCommandExecutor := &arktest.MockPodCommandExecutor{}
+			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
 			groupBackupperFactory := &mockGroupBackupperFactory{}
@@ -540,7 +540,7 @@ func TestBackup(t *testing.T) {
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	groupBackupperFactory := &mockGroupBackupperFactory{}
 	kb := &kubernetesBackupper{
-		discoveryHelper:       new(arktest.FakeDiscoveryHelper),
+		discoveryHelper:       new(velerotest.FakeDiscoveryHelper),
 		groupBackupperFactory: groupBackupperFactory,
 	}
 
@@ -563,7 +563,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, kb.Backup(arktest.NewLogger(), &Request{Backup: &v1.Backup{}}, &bytes.Buffer{}, nil, nil))
+	assert.NoError(t, kb.Backup(velerotest.NewLogger(), &Request{Backup: &v1.Backup{}}, &bytes.Buffer{}, nil, nil))
 
 	// mutate the cohabitatingResources map that was used in the first backup to simulate
 	// the first backup process having done so.
@@ -590,7 +590,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 		mock.Anything,
 	).Return(&mockGroupBackupper{})
 
-	assert.NoError(t, kb.Backup(arktest.NewLogger(), &Request{Backup: new(v1.Backup)}, new(bytes.Buffer), nil, nil))
+	assert.NoError(t, kb.Backup(velerotest.NewLogger(), &Request{Backup: new(v1.Backup)}, new(bytes.Buffer), nil, nil))
 	assert.NotEqual(t, firstCohabitatingResources, secondCohabitatingResources)
 	for _, resource := range secondCohabitatingResources {
 		assert.False(t, resource.seen)
@@ -770,7 +770,7 @@ func TestGetResourceHook(t *testing.T) {
 				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
 				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
 			}
-			discoveryHelper := arktest.NewFakeDiscoveryHelper(false, resources)
+			discoveryHelper := velerotest.NewFakeDiscoveryHelper(false, resources)
 
 			actual, err := getResourceHook(test.hookSpec, discoveryHelper)
 			require.NoError(t, err)

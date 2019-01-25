@@ -24,7 +24,7 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/heptio/ark/pkg/cmd/cli/bug"
+	"github.com/heptio/velero/pkg/cmd/cli/bug"
 )
 
 func main() {
@@ -38,7 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = tmpl.Execute(outFile, bug.ArkBugInfo{})
+	err = tmpl.Execute(outFile, bug.VeleroBugInfo{})
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/velero/pkg/util/test"
 )
 
 func TestServiceAccountActionAppliesTo(t *testing.T) {

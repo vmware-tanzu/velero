@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	CredentialsSecretName = "ark-restic-credentials"
+	CredentialsSecretName = "velero-restic-credentials"
 	CredentialsKey        = "repository-password"
 
 	encryptionKey = "static-passw0rd"

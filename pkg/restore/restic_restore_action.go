@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/kube"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/kube"
 )
 
 type resticRestoreAction struct {
@@ -50,7 +50,7 @@ func initContainerImage() string {
 	}
 
 	// TODO allow full image URL to be overriden via CLI flag.
-	return fmt.Sprintf("gcr.io/heptio-images/ark-restic-restore-helper:%s", tag)
+	return fmt.Sprintf("gcr.io/heptio-images/velero-restic-restore-helper:%s", tag)
 }
 
 func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {

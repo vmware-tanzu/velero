@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const regionKey = "region"
@@ -206,19 +206,19 @@ func getTagsForCluster(snapshotTags []*ec2.Tag) []*ec2.Tag {
 	return result
 }
 
-func getTags(arkTags map[string]string, volumeTags []*ec2.Tag) []*ec2.Tag {
+func getTags(veleroTags map[string]string, volumeTags []*ec2.Tag) []*ec2.Tag {
 	var result []*ec2.Tag
 
-	// set Ark-assigned tags
-	for k, v := range arkTags {
+	// set Velero-assigned tags
+	for k, v := range veleroTags {
 		result = append(result, ec2Tag(k, v))
 	}
 
 	// copy tags from volume to snapshot
 	for _, tag := range volumeTags {
-		// we want current Ark-assigned tags to overwrite any older versions
+		// we want current Velero-assigned tags to overwrite any older versions
 		// of them that may exist due to prior snapshots/restores
-		if _, found := arkTags[*tag.Key]; found {
+		if _, found := veleroTags[*tag.Key]; found {
 			continue
 		}
 

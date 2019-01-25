@@ -35,21 +35,21 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/boolptr"
-	arkexec "github.com/heptio/ark/pkg/util/exec"
-	"github.com/heptio/ark/pkg/util/filesystem"
-	"github.com/heptio/ark/pkg/util/kube"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/boolptr"
+	veleroexec "github.com/heptio/velero/pkg/util/exec"
+	"github.com/heptio/velero/pkg/util/filesystem"
+	"github.com/heptio/velero/pkg/util/kube"
 )
 
 type podVolumeRestoreController struct {
 	*genericController
 
-	podVolumeRestoreClient arkv1client.PodVolumeRestoresGetter
+	podVolumeRestoreClient velerov1client.PodVolumeRestoresGetter
 	podVolumeRestoreLister listers.PodVolumeRestoreLister
 	podLister              corev1listers.PodLister
 	secretLister           corev1listers.SecretLister
@@ -57,7 +57,7 @@ type podVolumeRestoreController struct {
 	backupLocationLister   listers.BackupStorageLocationLister
 	nodeName               string
 
-	processRestoreFunc func(*arkv1api.PodVolumeRestore) error
+	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
 	fileSystem         filesystem.Interface
 }
 
@@ -65,7 +65,7 @@ type podVolumeRestoreController struct {
 func NewPodVolumeRestoreController(
 	logger logrus.FieldLogger,
 	podVolumeRestoreInformer informers.PodVolumeRestoreInformer,
-	podVolumeRestoreClient arkv1client.PodVolumeRestoresGetter,
+	podVolumeRestoreClient velerov1client.PodVolumeRestoresGetter,
 	podInformer cache.SharedIndexInformer,
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
@@ -118,7 +118,7 @@ func NewPodVolumeRestoreController(
 }
 
 func (c *podVolumeRestoreController) pvrHandler(obj interface{}) {
-	pvr := obj.(*arkv1api.PodVolumeRestore)
+	pvr := obj.(*velerov1api.PodVolumeRestore)
 	log := loggerForPodVolumeRestore(c.logger, pvr)
 
 	if !isPVRNew(pvr) {
@@ -166,7 +166,7 @@ func (c *podVolumeRestoreController) podHandler(obj interface{}) {
 	}
 
 	selector := labels.Set(map[string]string{
-		arkv1api.PodUIDLabel: string(pod.UID),
+		velerov1api.PodUIDLabel: string(pod.UID),
 	}).AsSelector()
 
 	pvrs, err := c.podVolumeRestoreLister.List(selector)
@@ -190,8 +190,8 @@ func (c *podVolumeRestoreController) podHandler(obj interface{}) {
 	}
 }
 
-func isPVRNew(pvr *arkv1api.PodVolumeRestore) bool {
-	return pvr.Status.Phase == "" || pvr.Status.Phase == arkv1api.PodVolumeRestorePhaseNew
+func isPVRNew(pvr *velerov1api.PodVolumeRestore) bool {
+	return pvr.Status.Phase == "" || pvr.Status.Phase == velerov1api.PodVolumeRestorePhaseNew
 }
 
 func isPodOnNode(pod *corev1api.Pod, node string) bool {
@@ -199,7 +199,7 @@ func isPodOnNode(pod *corev1api.Pod, node string) bool {
 }
 
 func isResticInitContainerRunning(pod *corev1api.Pod) bool {
-	// no init containers, or the first one is not the ark restic one: return false
+	// no init containers, or the first one is not the velero restic one: return false
 	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
 		return false
 	}
@@ -237,7 +237,7 @@ func (c *podVolumeRestoreController) processQueueItem(key string) error {
 	return c.processRestoreFunc(reqCopy)
 }
 
-func loggerForPodVolumeRestore(baseLogger logrus.FieldLogger, req *arkv1api.PodVolumeRestore) logrus.FieldLogger {
+func loggerForPodVolumeRestore(baseLogger logrus.FieldLogger, req *velerov1api.PodVolumeRestore) logrus.FieldLogger {
 	log := baseLogger.WithFields(logrus.Fields{
 		"namespace": req.Namespace,
 		"name":      req.Name,
@@ -250,7 +250,7 @@ func loggerForPodVolumeRestore(baseLogger logrus.FieldLogger, req *arkv1api.PodV
 	return log
 }
 
-func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeRestore) error {
+func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRestore) error {
 	log := loggerForPodVolumeRestore(c.logger, req)
 
 	log.Info("Restore starting")
@@ -258,7 +258,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	var err error
 
 	// update status to InProgress
-	req, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(arkv1api.PodVolumeRestorePhaseInProgress))
+	req, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(velerov1api.PodVolumeRestorePhaseInProgress))
 	if err != nil {
 		log.WithError(err).Error("Error setting phase to InProgress")
 		return errors.WithStack(err)
@@ -291,7 +291,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	}
 
 	// update status to Completed
-	if _, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(arkv1api.PodVolumeRestorePhaseCompleted)); err != nil {
+	if _, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(velerov1api.PodVolumeRestorePhaseCompleted)); err != nil {
 		log.WithError(err).Error("Error setting phase to Completed")
 		return err
 	}
@@ -301,7 +301,7 @@ func (c *podVolumeRestoreController) processRestore(req *arkv1api.PodVolumeResto
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *arkv1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -327,17 +327,17 @@ func (c *podVolumeRestoreController) restorePodVolume(req *arkv1api.PodVolumeRes
 
 	var stdout, stderr string
 
-	if stdout, stderr, err = arkexec.RunCommand(resticCmd.Cmd()); err != nil {
+	if stdout, stderr, err = veleroexec.RunCommand(resticCmd.Cmd()); err != nil {
 		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
-	// Remove the .ark directory from the restored volume (it may contain done files from previous restores
+	// Remove the .velero directory from the restored volume (it may contain done files from previous restores
 	// of this volume, which we don't want to carry over). If this fails for any reason, log and continue, since
 	// this is non-essential cleanup (the done files are named based on restore UID and the init container looks
 	// for the one specific to the restore being executed).
-	if err := os.RemoveAll(filepath.Join(volumePath, ".ark")); err != nil {
-		log.WithError(err).Warnf("error removing .ark directory from directory %s", volumePath)
+	if err := os.RemoveAll(filepath.Join(volumePath, ".velero")); err != nil {
+		log.WithError(err).Warnf("error removing .velero directory from directory %s", volumePath)
 	}
 
 	var restoreUID types.UID
@@ -348,23 +348,23 @@ func (c *podVolumeRestoreController) restorePodVolume(req *arkv1api.PodVolumeRes
 		}
 	}
 
-	// Create the .ark directory within the volume dir so we can write a done file
+	// Create the .velero directory within the volume dir so we can write a done file
 	// for this restore.
-	if err := os.MkdirAll(filepath.Join(volumePath, ".ark"), 0755); err != nil {
-		return errors.Wrap(err, "error creating .ark directory for done file")
+	if err := os.MkdirAll(filepath.Join(volumePath, ".velero"), 0755); err != nil {
+		return errors.Wrap(err, "error creating .velero directory for done file")
 	}
 
-	// Write a done file with name=<restore-uid> into the just-created .ark dir
-	// within the volume. The ark restic init container on the pod is waiting
+	// Write a done file with name=<restore-uid> into the just-created .velero dir
+	// within the volume. The velero restic init container on the pod is waiting
 	// for this file to exist in each restored volume before completing.
-	if err := ioutil.WriteFile(filepath.Join(volumePath, ".ark", string(restoreUID)), nil, 0644); err != nil {
+	if err := ioutil.WriteFile(filepath.Join(volumePath, ".velero", string(restoreUID)), nil, 0644); err != nil {
 		return errors.Wrap(err, "error writing done file")
 	}
 
 	return nil
 }
 
-func (c *podVolumeRestoreController) patchPodVolumeRestore(req *arkv1api.PodVolumeRestore, mutate func(*arkv1api.PodVolumeRestore)) (*arkv1api.PodVolumeRestore, error) {
+func (c *podVolumeRestoreController) patchPodVolumeRestore(req *velerov1api.PodVolumeRestore, mutate func(*velerov1api.PodVolumeRestore)) (*velerov1api.PodVolumeRestore, error) {
 	// Record original json
 	oldData, err := json.Marshal(req)
 	if err != nil {
@@ -393,9 +393,9 @@ func (c *podVolumeRestoreController) patchPodVolumeRestore(req *arkv1api.PodVolu
 	return req, nil
 }
 
-func (c *podVolumeRestoreController) failRestore(req *arkv1api.PodVolumeRestore, msg string, log logrus.FieldLogger) error {
-	if _, err := c.patchPodVolumeRestore(req, func(pvr *arkv1api.PodVolumeRestore) {
-		pvr.Status.Phase = arkv1api.PodVolumeRestorePhaseFailed
+func (c *podVolumeRestoreController) failRestore(req *velerov1api.PodVolumeRestore, msg string, log logrus.FieldLogger) error {
+	if _, err := c.patchPodVolumeRestore(req, func(pvr *velerov1api.PodVolumeRestore) {
+		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 		pvr.Status.Message = msg
 	}); err != nil {
 		log.WithError(err).Error("Error setting phase to Failed")
@@ -404,8 +404,8 @@ func (c *podVolumeRestoreController) failRestore(req *arkv1api.PodVolumeRestore,
 	return nil
 }
 
-func updatePodVolumeRestorePhaseFunc(phase arkv1api.PodVolumeRestorePhase) func(r *arkv1api.PodVolumeRestore) {
-	return func(r *arkv1api.PodVolumeRestore) {
+func updatePodVolumeRestorePhaseFunc(phase velerov1api.PodVolumeRestorePhase) func(r *velerov1api.PodVolumeRestore) {
+	return func(r *velerov1api.PodVolumeRestore) {
 		r.Status.Phase = phase
 	}
 }

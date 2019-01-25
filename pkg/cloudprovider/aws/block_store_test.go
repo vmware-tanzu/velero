@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 func TestGetVolumeID(t *testing.T) {
@@ -180,31 +180,31 @@ func TestGetTagsForCluster(t *testing.T) {
 func TestGetTags(t *testing.T) {
 	tests := []struct {
 		name       string
-		arkTags    map[string]string
+		veleroTags map[string]string
 		volumeTags []*ec2.Tag
 		expected   []*ec2.Tag
 	}{
 		{
 			name:       "degenerate case (no tags)",
-			arkTags:    nil,
+			veleroTags: nil,
 			volumeTags: nil,
 			expected:   nil,
 		},
 		{
-			name: "ark tags only get applied",
-			arkTags: map[string]string{
-				"ark-key1": "ark-val1",
-				"ark-key2": "ark-val2",
+			name: "velero tags only get applied",
+			veleroTags: map[string]string{
+				"velero-key1": "velero-val1",
+				"velero-key2": "velero-val2",
 			},
 			volumeTags: nil,
 			expected: []*ec2.Tag{
-				ec2Tag("ark-key1", "ark-val1"),
-				ec2Tag("ark-key2", "ark-val2"),
+				ec2Tag("velero-key1", "velero-val1"),
+				ec2Tag("velero-key2", "velero-val2"),
 			},
 		},
 		{
-			name:    "volume tags only get applied",
-			arkTags: nil,
+			name:       "volume tags only get applied",
+			veleroTags: nil,
 			volumeTags: []*ec2.Tag{
 				ec2Tag("aws-key1", "aws-val1"),
 				ec2Tag("aws-key2", "aws-val2"),
@@ -215,27 +215,27 @@ func TestGetTags(t *testing.T) {
 			},
 		},
 		{
-			name:       "non-overlapping ark and volume tags both get applied",
-			arkTags:    map[string]string{"ark-key": "ark-val"},
+			name:       "non-overlapping velero and volume tags both get applied",
+			veleroTags: map[string]string{"velero-key": "velero-val"},
 			volumeTags: []*ec2.Tag{ec2Tag("aws-key", "aws-val")},
 			expected: []*ec2.Tag{
-				ec2Tag("ark-key", "ark-val"),
+				ec2Tag("velero-key", "velero-val"),
 				ec2Tag("aws-key", "aws-val"),
 			},
 		},
 		{
-			name: "when tags overlap, ark tags take precedence",
-			arkTags: map[string]string{
-				"ark-key":         "ark-val",
-				"overlapping-key": "ark-val",
+			name: "when tags overlap, velero tags take precedence",
+			veleroTags: map[string]string{
+				"velero-key":      "velero-val",
+				"overlapping-key": "velero-val",
 			},
 			volumeTags: []*ec2.Tag{
 				ec2Tag("aws-key", "aws-val"),
 				ec2Tag("overlapping-key", "aws-val"),
 			},
 			expected: []*ec2.Tag{
-				ec2Tag("ark-key", "ark-val"),
-				ec2Tag("overlapping-key", "ark-val"),
+				ec2Tag("velero-key", "velero-val"),
+				ec2Tag("overlapping-key", "velero-val"),
 				ec2Tag("aws-key", "aws-val"),
 			},
 		},
@@ -243,7 +243,7 @@ func TestGetTags(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getTags(test.arkTags, test.volumeTags)
+			res := getTags(test.veleroTags, test.volumeTags)
 
 			sort.Slice(res, func(i, j int) bool {
 				return *res[i].Key < *res[j].Key
