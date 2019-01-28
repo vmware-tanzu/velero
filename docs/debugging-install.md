@@ -20,6 +20,8 @@ kubectl -n heptio-ark logs deployment/ark
 ## AWS
 
 ### `NoCredentialProviders: no valid providers in chain`
+
+#### Using credentials
 This means that the secret containing the AWS IAM user credentials for Ark has not been created/mounted properly 
 into the Ark server pod. Ensure the following:
 * The `cloud-credentials` secret exists in the Ark server's namespace
@@ -33,6 +35,11 @@ into the Ark server pod. Ensure the following:
     ```
 * The `cloud-credentials` secret is defined as a volume for the Ark deployment
 * The `cloud-credentials` secret is being mounted into the Ark server pod at `/credentials`
+
+#### Using kube2iam
+This means that Ark can't read the content of the S3 bucket. Ensure the following:
+* There is a Trust Policy document allowing the role used by kube2iam to assume Ark's role, as stated in the AWS config documentation.
+* The new Ark role has all the permissions listed in the documentation regarding S3.
 
 
 ## Azure
