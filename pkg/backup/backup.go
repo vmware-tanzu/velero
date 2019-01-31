@@ -308,7 +308,7 @@ func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 		Name:     versionFile,
 		Size:     int64(len(versionString)),
 		Typeflag: tar.TypeReg,
-		Mode:     0644,
+		Mode:     0755,
 		ModTime:  time.Now(),
 	}
 	if err := tw.WriteHeader(hdr); err != nil {
