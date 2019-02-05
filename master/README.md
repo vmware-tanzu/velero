@@ -1,6 +1,6 @@
 # Velero
 
-![](/docs/img/velero.png)
+![3]
 
 [![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
@@ -54,6 +54,7 @@ See [the list of releases][6] to find out about feature changes.
 
 [1]: https://travis-ci.org/heptio/velero.svg?branch=master
 [2]: https://travis-ci.org/heptio/velero
+[3]: /img/velero.png
 
 [4]: https://github.com/heptio/velero/issues
 [5]: https://github.com/heptio/velero/blob/master/CONTRIBUTING.md
