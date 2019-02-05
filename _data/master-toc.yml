@@ -5,13 +5,13 @@
 toc:
   - title: Introduction
     subfolderitems:
-      - page: About Ark
+      - page: About Velero
         url: /index.html
       - page: Getting started
         url: /get-started
-      - page: Get the right Ark version
+      - page: Get the right Velero version
         url: /versions
-      - page: How Ark works
+      - page: How Velero works
         url: /about
       - page: Supported platforms
         url: /support-matrix
@@ -23,7 +23,7 @@ toc:
         url: /locations
   - title: Install
     subfolderitems:
-      - page: Set up Ark
+      - page: Set up Velero
         url: /install-overview
       - page: Expose Minio
         url: /expose-minio
@@ -47,7 +47,7 @@ toc:
         url: /debugging-restores
       - page: Troubleshoot Restic
         url: /restic#troubleshooting
-  - title: Customize Ark
+  - title: Customize Velero
     subfolderitems:
       - page: Build from source
         url: /build-from-scratch
