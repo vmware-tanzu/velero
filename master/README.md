@@ -1,35 +1,36 @@
-# Heptio Ark
+# Velero
 
-**Maintainers:** [Heptio][0]
+![](/docs/img/velero.png)
 
 [![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
+## Heptio Ark is now Velero!
+
+#### We're working on our first Velero release and instructions for migrating your Ark deployments to Velero. Stay tuned!
+
 ## Overview
 
-Ark gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Ark lets you:
+Velero gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Velero lets you:
 
 * Take backups of your cluster and restore in case of loss.
 * Copy cluster resources to other clusters.
 * Replicate your production environment for development and testing environments.
 
-Ark consists of:
+Velero consists of:
 
 * A server that runs on your cluster
 * A command-line client that runs locally
 
-You can run Ark in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
+You can run Velero in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
 
-## Breaking changes
-
-Ark version 0.10.0 introduces a number of breaking changes. Before you upgrade to version 0.10.0, make sure to read [the documentation on upgrading][98].
 
 ## More information
 
-[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Ark, and more.
+[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more.
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server. 
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
 ## Contributing
 
@@ -51,29 +52,26 @@ Feedback and discussion are available on [the mailing list][24].
 
 See [the list of releases][6] to find out about feature changes.
 
-[0]: https://github.com/heptio
-[1]: https://travis-ci.org/heptio/ark.svg?branch=master
-[2]: https://travis-ci.org/heptio/ark
+[1]: https://travis-ci.org/heptio/velero.svg?branch=master
+[2]: https://travis-ci.org/heptio/velero
 
-[4]: https://github.com/heptio/ark/issues
-[5]: https://github.com/heptio/ark/blob/master/CONTRIBUTING.md
-[6]: https://github.com/heptio/ark/releases
+[4]: https://github.com/heptio/velero/issues
+[5]: https://github.com/heptio/velero/blob/master/CONTRIBUTING.md
+[6]: https://github.com/heptio/velero/releases
 
-[8]: https://github.com/heptio/ark/blob/master/CODE_OF_CONDUCT.md
+[8]: https://github.com/heptio/velero/blob/master/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
 
+[24]: https://groups.google.com/forum/#!forum/projectvelero
+[25]: https://kubernetes.slack.com/messages/velero
+[26]: https://github.com/heptio/velero/blob/master/docs/zenhub.md
 
-[24]: http://j.hept.io/ark-list
-[25]: https://kubernetes.slack.com/messages/ark-dr
-[26]: https://github.com/heptio/ark/blob/master/docs/zenhub.md
 
-
-[29]: https://heptio.github.io/ark/
+[29]: https://heptio.github.io/velero/
 [30]: /troubleshooting.md
 
-[98]: /upgrading-to-v0.10.md
 [99]: /support-matrix.md

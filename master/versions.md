@@ -1,6 +1,6 @@
-# Upgrading Ark versions
+# Upgrading Velero versions
 
-Ark supports multiple concurrent versions. Whether you're setting up Ark for the first time or upgrading to a new version, you need to pay careful attention to versioning. This doc page is new as of version 0.10.0, and will be updated with information about subsequent releases.
+Velero supports multiple concurrent versions. Whether you're setting up Velero for the first time or upgrading to a new version, you need to pay careful attention to versioning. This doc page is new as of version 0.10.0, and will be updated with information about subsequent releases.
 
 ## Minor versions, patch versions
 
@@ -14,13 +14,13 @@ Breaking changes are documented in the release notes and in the documentation.
 
 - See [Upgrading to version 0.10.0][2]
 
-## Ark versions and Kubernetes versions
+## Velero versions and Kubernetes versions
 
-Not all Ark versions support all versions of Kubernetes. You should be aware of the following known limitations:
+Not all Velero versions support all versions of Kubernetes. You should be aware of the following known limitations:
 
-- Ark version 0.9.0 requires Kubernetes version 1.8 or later. In version 0.9.1, Ark was updated to support earlier versions.
+- Velero version 0.9.0 requires Kubernetes version 1.8 or later. In version 0.9.1, Velero was updated to support earlier versions.
 - Restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. See [Restic Integration][3].
 
-[1]: https://github.com/heptio/ark/releases
-[2]: upgrading-to-v0.10.md
+[1]: https://github.com/heptio/velero/releases
+[2]: https://heptio.github.io/velero/v0.10.0/upgrading-to-v0.10
 [3]: restic.md

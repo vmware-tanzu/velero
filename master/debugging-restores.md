@@ -5,7 +5,7 @@
 
 ## Example
 
-When Heptio Ark finishes a Restore, its status changes to "Completed" regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from `ark restore get`:
+When Velero finishes a Restore, its status changes to "Completed" regardless of whether or not there are issues during the process. The number of warnings and errors are indicated in the output columns from `velero restore get`:
 
 ```
 NAME                          BACKUP          STATUS      WARNINGS   ERRORS    CREATED                         SELECTOR
@@ -15,14 +15,14 @@ backup-test-2-20170726180514  backup-test-2   Completed   0          0         2
 backup-test-2-20170726180515  backup-test-2   Completed   0          1         2017-07-26 13:32:59 -0400 EDT   <none>
 ```
 
-To delve into the warnings and errors into more detail, you can use `ark restore describe`:
+To delve into the warnings and errors into more detail, you can use `velero restore describe`:
 ```
-ark restore describe backup-test-20170726180512
+velero restore describe backup-test-20170726180512
 ```
 The output looks like this:
 ```
 Name:         backup-test-20170726180512
-Namespace:    heptio-ark
+Namespace:    velero
 Labels:       <none>
 Annotations:  <none>
 
@@ -48,10 +48,10 @@ Phase:  Completed
 Validation errors:  <none>
 
 Warnings:
-  Ark:        <none>
+  Velero:     <none>
   Cluster:    <none>
   Namespaces:
-    heptio-ark:   serviceaccounts "ark" already exists
+    velero:       serviceaccounts "velero" already exists
                   serviceaccounts "default" already exists
     kube-public:  serviceaccounts "default" already exists
     kube-system:  serviceaccounts "attachdetach-controller" already exists
@@ -80,7 +80,7 @@ Warnings:
     default:      serviceaccounts "default" already exists
 
 Errors:
-  Ark:        <none>
+  Velero:     <none>
   Cluster:    <none>
   Namespaces: <none>
 ```
@@ -93,7 +93,7 @@ of them may have been pre-existing).
 
 Both errors and warnings are structured in the same way:
 
-* `Ark`: A list of system-related issues encountered by the Ark server (e.g. couldn't read directory).
+* `Velero`: A list of system-related issues encountered by the Velero server (e.g. couldn't read directory).
 
 * `Cluster`: A list of issues related to the restore of cluster-scoped resources.
 

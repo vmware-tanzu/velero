@@ -1,9 +1,9 @@
-# Run Ark on AWS
+# Run Velero on AWS
 
-To set up Ark on AWS, you:
+To set up Velero on AWS, you:
 
 * Create your S3 bucket
-* Create an AWS IAM user for Ark
+* Create an AWS IAM user for Velero
 * Configure the server
 * Create a Secret for your credentials
 
@@ -11,7 +11,7 @@ If you do not have the `aws` CLI locally installed, follow the [user guide][5] t
 
 ## Create S3 bucket
 
-Heptio Ark requires an object storage bucket to store backups in, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
+Velero requires an object storage bucket to store backups in, preferrably unique to a single Kubernetes cluster (see the [FAQ][20] for more details). Create an S3 bucket, replacing placeholders appropriately:
 
 ```bash
 aws s3api create-bucket \
@@ -34,16 +34,16 @@ For more information, see [the AWS documentation on IAM users][14].
 1. Create the IAM user:
 
     ```bash
-    aws iam create-user --user-name heptio-ark
+    aws iam create-user --user-name velero
     ```
     
-    > If you'll be using Ark to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `heptio-ark`.
+    > If you'll be using Velero to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
-2. Attach policies to give `heptio-ark` the necessary permissions:
+2. Attach policies to give `velero` the necessary permissions:
 
     ```bash
     BUCKET=<YOUR_BUCKET>
-    cat > heptio-ark-policy.json <<EOF
+    cat > velero-policy.json <<EOF
     {
         "Version": "2012-10-17",
         "Statement": [
@@ -86,15 +86,15 @@ For more information, see [the AWS documentation on IAM users][14].
     EOF
 
     aws iam put-user-policy \
-      --user-name heptio-ark \
-      --policy-name heptio-ark \
-      --policy-document file://heptio-ark-policy.json
+      --user-name velero \
+      --policy-name velero \
+      --policy-document file://velero-policy.json
     ```
 
 3. Create an access key for the user:
 
     ```bash
-    aws iam create-access-key --user-name heptio-ark
+    aws iam create-access-key --user-name velero
     ```
 
     The result should look like:
@@ -102,7 +102,7 @@ For more information, see [the AWS documentation on IAM users][14].
     ```json
      {
         "AccessKey": {
-              "UserName": "heptio-ark",
+              "UserName": "velero",
               "Status": "Active",
               "CreateDate": "2017-07-31T22:24:41.576Z",
               "SecretAccessKey": <AWS_SECRET_ACCESS_KEY>,
@@ -111,7 +111,7 @@ For more information, see [the AWS documentation on IAM users][14].
      }
     ```
 
-4. Create an Ark-specific credentials file (`credentials-ark`) in your local directory:
+4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
 
     ```
     [default]
@@ -123,7 +123,7 @@ For more information, see [the AWS documentation on IAM users][14].
 
 ## Credentials and configuration
 
-In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
+In the Velero directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
 kubectl apply -f config/common/00-prereqs.yaml
@@ -133,17 +133,17 @@ Create a Secret. In the directory of the credentials file you just created, run:
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_NAMESPACE> \
-    --from-file cloud=credentials-ark
+    --namespace <VELERO_NAMESPACE> \
+    --from-file cloud=credentials-velero
 ```
 
 Specify the following values in the example files:
 
-* In `config/aws/05-ark-backupstoragelocation.yaml`:
+* In `config/aws/05-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BUCKET>` and `<YOUR_REGION>` (for S3 backup storage, region is optional and will be queried from the AWS S3 API if not provided). See the [BackupStorageLocation definition][21] for details.
 
-* In `config/aws/06-ark-volumesnapshotlocation.yaml`:
+* In `config/aws/06-volumesnapshotlocation.yaml`:
 
   * Replace `<YOUR_REGION>`. See the [VolumeSnapshotLocation definition][6] for details.
 
@@ -157,7 +157,7 @@ Specify the following values in the example files:
 
 * (Optional) If you have multiple clusters and you want to support migration of resources between them, in file `config/aws/10-deployment.yaml`:
 
-    * Uncomment the environment variable `AWS_CLUSTER_NAME` and replace `<YOUR_CLUSTER_NAME>` with the current cluster's name. When restoring backup, it will make Ark (and cluster it's running on) claim ownership of AWS volumes created from snapshots taken on different cluster.
+    * Uncomment the environment variable `AWS_CLUSTER_NAME` and replace `<YOUR_CLUSTER_NAME>` with the current cluster's name. When restoring backup, it will make Velero (and cluster it's running on) claim ownership of AWS volumes created from snapshots taken on different cluster.
     The best way to get the current cluster's name is to either check it with used deployment tool or to read it directly from the EC2 instances tags. 
     
       The following listing shows how to get the cluster's nodes EC2 Tags. First, get the nodes external IDs (EC2 IDs):
@@ -182,11 +182,11 @@ Specify the following values in the example files:
 
 ## Start the server
 
-In the root of your Ark directory, run:
+In the root of your Velero directory, run:
 
   ```bash
-  kubectl apply -f config/aws/05-ark-backupstoragelocation.yaml
-  kubectl apply -f config/aws/06-ark-volumesnapshotlocation.yaml
+  kubectl apply -f config/aws/05-backupstoragelocation.yaml
+  kubectl apply -f config/aws/06-volumesnapshotlocation.yaml
   kubectl apply -f config/aws/10-deployment.yaml
   ```
 
@@ -196,12 +196,12 @@ In the root of your Ark directory, run:
 
 > This path assumes you have `kube2iam` already running in your Kubernetes cluster. If that is not the case, please install it first, following the docs here: [https://github.com/jtblin/kube2iam](https://github.com/jtblin/kube2iam)
 
-It can be set up for Ark by creating a role that will have required permissions, and later by adding the permissions annotation on the ark deployment to define which role it should use internally.
+It can be set up for Velero by creating a role that will have required permissions, and later by adding the permissions annotation on the velero deployment to define which role it should use internally.
 
 1. Create a Trust Policy document to allow the role being used for EC2 management & assume kube2iam role:
 
     ```bash
-    cat > heptio-ark-trust-policy.json <<EOF
+    cat > velero-trust-policy.json <<EOF
     {
         "Version": "2012-10-17",
         "Statement": [
@@ -227,14 +227,14 @@ It can be set up for Ark by creating a role that will have required permissions,
 2. Create the IAM role:
 
     ```bash
-    aws iam create-role --role-name heptio-ark --assume-role-policy-document file://./heptio-ark-trust-policy.json
+    aws iam create-role --role-name velero --assume-role-policy-document file://./velero-trust-policy.json
     ```
 
-3. Attach policies to give `heptio-ark` the necessary permissions:
+3. Attach policies to give `velero` the necessary permissions:
 
     ```bash
     BUCKET=<YOUR_BUCKET>
-    cat > heptio-ark-policy.json <<EOF
+    cat > velero-policy.json <<EOF
     {
         "Version": "2012-10-17",
         "Statement": [
@@ -277,31 +277,31 @@ It can be set up for Ark by creating a role that will have required permissions,
     EOF
 
     aws iam put-role-policy \
-      --role-name heptio-ark \
-      --policy-name heptio-ark-policy \
-      --policy-document file://./heptio-ark-policy.json
+      --role-name velero \
+      --policy-name velero-policy \
+      --policy-document file://./velero-policy.json
     ```
-4. Update `AWS_ACCOUNT_ID` & `HEPTIO_ARK_ROLE_NAME` in the file `config/aws/10-deployment-kube2iam.yaml`:
+4. Update `AWS_ACCOUNT_ID` & `VELERO_ROLE_NAME` in the file `config/aws/10-deployment-kube2iam.yaml`:
 
     ```
     ---
     apiVersion: apps/v1beta1
     kind: Deployment
     metadata:
-        namespace: heptio-ark
-        name: ark
+        namespace: velero
+        name: velero
     spec:
         replicas: 1
         template:
             metadata:
                 labels:
-                    component: ark
+                    component: velero
                 annotations:
-                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<HEPTIO_ARK_ROLE_NAME>
+                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
     ...
     ```
 
-5. Run Ark deployment using the file `config/aws/10-deployment-kube2iam.yaml`.
+5. Run Velero deployment using the file `config/aws/10-deployment-kube2iam.yaml`.
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
