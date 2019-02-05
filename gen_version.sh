@@ -7,9 +7,9 @@ fi
 VERSION=$1
 
 if [[ $VERSION != "master" ]]; then
-  GH_BASE_URL=https://github.com/heptio/ark/tags/$VERSION
+  GH_BASE_URL=https://github.com/heptio/velero/tags/$VERSION
 else
-  GH_BASE_URL=https://github.com/heptio/ark/branches/master
+  GH_BASE_URL=https://github.com/heptio/velero/branches/master
 fi
 
 svn export $GH_BASE_URL/docs/ $VERSION/ || (echo "Failed to copy docs for version $VERSION" && exit -1)
