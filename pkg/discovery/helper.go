@@ -28,21 +28,21 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 
-	kcmdutil "github.com/heptio/ark/third_party/kubernetes/pkg/kubectl/cmd/util"
+	kcmdutil "github.com/heptio/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // Helper exposes functions for interacting with the Kubernetes discovery
 // API.
 type Helper interface {
 	// Resources gets the current set of resources retrieved from discovery
-	// that are backuppable by Ark.
+	// that are backuppable by Velero.
 	Resources() []*metav1.APIResourceList
 
 	// ResourceFor gets a fully-resolved GroupVersionResource and an
 	// APIResource for the provided partially-specified GroupVersionResource.
 	ResourceFor(input schema.GroupVersionResource) (schema.GroupVersionResource, metav1.APIResource, error)
 
-	// Refresh pulls an updated set of Ark-backuppable resources from the
+	// Refresh pulls an updated set of Velero-backuppable resources from the
 	// discovery API.
 	Refresh() error
 

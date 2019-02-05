@@ -24,11 +24,11 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/cmd/util/output"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -110,7 +110,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	if _, err := client.ArkV1().VolumeSnapshotLocations(volumeSnapshotLocation.Namespace).Create(volumeSnapshotLocation); err != nil {
+	if _, err := client.VeleroV1().VolumeSnapshotLocations(volumeSnapshotLocation.Namespace).Create(volumeSnapshotLocation); err != nil {
 		return errors.WithStack(err)
 	}
 

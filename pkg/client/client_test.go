@@ -33,12 +33,12 @@ func TestBuildUserAgent(t *testing.T) {
 	}{
 		{
 			name:     "Test general interpolation in correct order",
-			command:  "ark",
+			command:  "velero",
 			os:       "darwin",
 			arch:     "amd64",
 			gitSha:   "abc123",
 			version:  "v0.1.1",
-			expected: "ark/v0.1.1 (darwin/amd64) abc123",
+			expected: "velero/v0.1.1 (darwin/amd64) abc123",
 		},
 	}
 

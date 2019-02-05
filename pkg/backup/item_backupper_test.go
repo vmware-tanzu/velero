@@ -38,12 +38,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	resticmocks "github.com/heptio/ark/pkg/restic/mocks"
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
+	"github.com/heptio/velero/pkg/util/collections"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestBackupItemSkips(t *testing.T) {
@@ -130,7 +129,7 @@ func TestBackupItemSkips(t *testing.T) {
 			unstructuredObj, unmarshalErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
 			require.NoError(t, unmarshalErr)
 			u := &unstructured.Unstructured{Object: unstructuredObj}
-			err := ib.backupItem(arktest.NewLogger(), u, test.groupResource)
+			err := ib.backupItem(velerotest.NewLogger(), u, test.groupResource)
 			assert.NoError(t, err)
 		})
 	}
@@ -150,8 +149,8 @@ func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t 
 		},
 	}
 
-	u := arktest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
-	err := ib.backupItem(arktest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
+	u := velerotest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
+	err := ib.backupItem(velerotest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
 	assert.NoError(t, err)
 }
 
@@ -170,7 +169,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 		customActionAdditionalItemIdentifiers []ResourceIdentifier
 		customActionAdditionalItems           []runtime.Unstructured
 		groupResource                         string
-		snapshottableVolumes                  map[string]api.VolumeBackupInfo
+		snapshottableVolumes                  map[string]v1.VolumeBackupInfo
 		snapshotError                         error
 		additionalItemError                   error
 		trackedPVCs                           sets.String
@@ -253,8 +252,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 				},
 			},
 			customActionAdditionalItems: []runtime.Unstructured{
-				arktest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				arktest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
 			},
 		},
 		{
@@ -279,8 +278,8 @@ func TestBackupItemNoSkips(t *testing.T) {
 				},
 			},
 			customActionAdditionalItems: []runtime.Unstructured{
-				arktest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				arktest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
+				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
+				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
 			},
 			additionalItemError: errors.New("foo"),
 		},
@@ -301,7 +300,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]api.VolumeBackupInfo{
+			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
@@ -315,7 +314,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			groupResource:             "persistentvolumes",
 			// empty snapshottableVolumes causes a blockStore to be created, but no
 			// snapshots are expected to be taken.
-			snapshottableVolumes: map[string]api.VolumeBackupInfo{},
+			snapshottableVolumes: map[string]v1.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
 		},
 		{
@@ -326,7 +325,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]api.VolumeBackupInfo{
+			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 			trackedPVCs: sets.NewString(key("another-pvc-ns", "another-pvc")),
@@ -337,14 +336,14 @@ func TestBackupItemNoSkips(t *testing.T) {
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               true,
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]api.VolumeBackupInfo{
+			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 			snapshotError: fmt.Errorf("failure"),
 		},
 		{
 			name:                      "pod's restic PVC volume backups (only) are tracked",
-			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.ark.heptio.com/backup-volumes": "volume-1,volume-2"}}}`,
+			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.velero.io/backup-volumes": "volume-1,volume-2"}}}`,
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			groupResource:             "pods",
 			expectError:               false,
@@ -375,7 +374,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				groupResource = schema.ParseGroupResource(test.groupResource)
 			}
 
-			item, err := arktest.GetAsMap(test.item)
+			item, err := velerotest.GetAsMap(test.item)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -406,13 +405,13 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 			}
 
-			podCommandExecutor := &arktest.MockPodCommandExecutor{}
+			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
 			defer podCommandExecutor.AssertExpectations(t)
 
-			dynamicFactory := &arktest.FakeDynamicFactory{}
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
 			defer dynamicFactory.AssertExpectations(t)
 
-			discoveryHelper := arktest.NewFakeDiscoveryHelper(true, nil)
+			discoveryHelper := velerotest.NewFakeDiscoveryHelper(true, nil)
 
 			blockStoreGetter := &blockStoreGetter{}
 
@@ -428,9 +427,9 @@ func TestBackupItemNoSkips(t *testing.T) {
 				blockStoreGetter,
 			).(*defaultItemBackupper)
 
-			var blockStore *arktest.FakeBlockStore
+			var blockStore *velerotest.FakeBlockStore
 			if test.snapshottableVolumes != nil {
-				blockStore = &arktest.FakeBlockStore{
+				blockStore = &velerotest.FakeBlockStore{
 					SnapshottableVolumes: test.snapshottableVolumes,
 					VolumeID:             "vol-abc123",
 					Error:                test.snapshotError,
@@ -462,7 +461,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				if test.additionalItemError != nil && i > 0 {
 					break
 				}
-				itemClient := &arktest.FakeDynamicClient{}
+				itemClient := &velerotest.FakeDynamicClient{}
 				defer itemClient.AssertExpectations(t)
 
 				dynamicFactory.On("ClientForGroupVersionResource", item.GroupResource.WithVersion("").GroupVersion(), metav1.APIResource{Name: item.Resource}, item.Namespace).Return(itemClient, nil)
@@ -472,7 +471,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(test.additionalItemError)
 			}
 
-			err = b.backupItem(arktest.NewLogger(), obj, groupResource)
+			err = b.backupItem(velerotest.NewLogger(), obj, groupResource)
 			gotError := err != nil
 			if e, a := test.expectError, gotError; e != a {
 				t.Fatalf("error: expected %t, got %t: %v", e, a, err)
@@ -504,7 +503,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			assert.False(t, w.headers[0].ModTime.IsZero(), "header.modTime set")
 			assert.Equal(t, 1, len(w.data), "# of data")
 
-			actual, err := arktest.GetAsMap(string(w.data[0]))
+			actual, err := velerotest.GetAsMap(string(w.data[0]))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -614,8 +613,8 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 			make(map[itemKey]struct{}),
 			nil,
 			w,
-			&arktest.FakeDynamicFactory{},
-			arktest.NewFakeDiscoveryHelper(true, nil),
+			&velerotest.FakeDynamicFactory{},
+			velerotest.NewFakeDiscoveryHelper(true, nil),
 			nil,
 			newPVCSnapshotTracker(),
 			nil,
@@ -628,11 +627,11 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 	expected.SetAnnotations(map[string]string{"foo": "bar"})
 
 	// method under test
-	require.NoError(t, b.backupItem(arktest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
+	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
 
 	// get the actual backed-up item
 	require.Len(t, w.data, 1)
-	actual, err := arktest.GetAsMap(string(w.data[0]))
+	actual, err := velerotest.GetAsMap(string(w.data[0]))
 	require.NoError(t, err)
 
 	assert.EqualValues(t, expected.Object, actual)
@@ -647,7 +646,7 @@ func TestResticAnnotationsPersist(t *testing.T) {
 					"namespace": "myns",
 					"name":      "bar",
 					"annotations": map[string]interface{}{
-						"backup.ark.heptio.com/backup-volumes": "volume-1,volume-2",
+						"backup.velero.io/backup-volumes": "volume-1,volume-2",
 					},
 				},
 			},
@@ -670,8 +669,8 @@ func TestResticAnnotationsPersist(t *testing.T) {
 			make(map[itemKey]struct{}),
 			nil,
 			w,
-			&arktest.FakeDynamicFactory{},
-			arktest.NewFakeDiscoveryHelper(true, nil),
+			&velerotest.FakeDynamicFactory{},
+			velerotest.NewFakeDiscoveryHelper(true, nil),
 			resticBackupper,
 			newPVCSnapshotTracker(),
 			nil,
@@ -691,16 +690,16 @@ func TestResticAnnotationsPersist(t *testing.T) {
 		annotations = make(map[string]string)
 	}
 	annotations["foo"] = "bar"
-	annotations["snapshot.ark.heptio.com/volume-1"] = "snapshot-1"
-	annotations["snapshot.ark.heptio.com/volume-2"] = "snapshot-2"
+	annotations["snapshot.velero.io/volume-1"] = "snapshot-1"
+	annotations["snapshot.velero.io/volume-2"] = "snapshot-2"
 	expected.SetAnnotations(annotations)
 
 	// method under test
-	require.NoError(t, b.backupItem(arktest.NewLogger(), obj, schema.ParseGroupResource("pods")))
+	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("pods")))
 
 	// get the actual backed-up item
 	require.Len(t, w.data, 1)
-	actual, err := arktest.GetAsMap(string(w.data[0]))
+	actual, err := velerotest.GetAsMap(string(w.data[0]))
 	require.NoError(t, err)
 
 	assert.EqualValues(t, expected.Object, actual)
@@ -788,7 +787,7 @@ func TestTakePVSnapshot(t *testing.T) {
 				},
 			}
 
-			blockStore := &arktest.FakeBlockStore{
+			blockStore := &velerotest.FakeBlockStore{
 				SnapshottableVolumes: test.volumeInfo,
 				VolumeID:             test.expectedVolumeID,
 			}
@@ -801,13 +800,13 @@ func TestTakePVSnapshot(t *testing.T) {
 				blockStoreGetter: &blockStoreGetter{blockStore: blockStore},
 			}
 
-			pv, err := arktest.GetAsMap(test.pv)
+			pv, err := velerotest.GetAsMap(test.pv)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			// method under test
-			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, arktest.NewLogger())
+			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, velerotest.NewLogger())
 
 			gotErr := err != nil
 

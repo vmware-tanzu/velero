@@ -27,10 +27,10 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestPodHasSnapshotAnnotation(t *testing.T) {
@@ -67,6 +67,16 @@ func TestPodHasSnapshotAnnotation(t *testing.T) {
 		{
 			name:        "has snapshot annotation, with suffix",
 			annotations: map[string]string{"foo": "bar", podAnnotationPrefix + "foo": "bar"},
+			expected:    true,
+		},
+		{
+			name:        "has legacy snapshot annotation only, with suffix",
+			annotations: map[string]string{podAnnotationLegacyPrefix + "foo": "bar"},
+			expected:    true,
+		},
+		{
+			name:        "has legacy and current snapshot annotations, with suffixes",
+			annotations: map[string]string{podAnnotationPrefix + "curr": "baz", podAnnotationLegacyPrefix + "foo": "bar"},
 			expected:    true,
 		},
 	}
@@ -115,6 +125,20 @@ func TestGetPodSnapshotAnnotations(t *testing.T) {
 			name:        "has snapshot annotation, with suffix",
 			annotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
 			expected:    map[string]string{"foo": "bar", "abc": "123"},
+		},
+		{
+			name:        "has legacy snapshot annotation only",
+			annotations: map[string]string{podAnnotationLegacyPrefix + "foo": "bar"},
+			expected:    map[string]string{"foo": "bar"},
+		},
+		{
+			name: "when current and legacy snapshot annotations exist, current wins",
+			annotations: map[string]string{
+				podAnnotationPrefix + "foo":       "current",
+				podAnnotationLegacyPrefix + "foo": "legacy",
+				podAnnotationLegacyPrefix + "bar": "baz",
+			},
+			expected: map[string]string{"foo": "current", "bar": "baz"},
 		},
 	}
 
@@ -195,6 +219,16 @@ func TestGetVolumesToBackup(t *testing.T) {
 			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
 			expected:    []string{"volume-1", "volume-2", "volume-3"},
 		},
+		{
+			name:        "legacy annotation",
+			annotations: map[string]string{"foo": "bar", volumesToBackupLegacyAnnotation: "volume-1"},
+			expected:    []string{"volume-1"},
+		},
+		{
+			name:        "when legacy and current annotations are both specified, current wins",
+			annotations: map[string]string{volumesToBackupAnnotation: "current", volumesToBackupLegacyAnnotation: "legacy"},
+			expected:    []string{"current"},
+		},
 	}
 
 	for _, test := range tests {
@@ -216,7 +250,7 @@ func TestGetVolumesToBackup(t *testing.T) {
 func TestGetSnapshotsInBackup(t *testing.T) {
 	tests := []struct {
 		name             string
-		podVolumeBackups []arkv1api.PodVolumeBackup
+		podVolumeBackups []velerov1api.PodVolumeBackup
 		expected         []SnapshotIdentifier
 	}{
 		{
@@ -226,61 +260,61 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 		},
 		{
 			name: "no pod volume backups with matching label",
-			podVolumeBackups: []arkv1api.PodVolumeBackup{
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{arkv1api.BackupNameLabel: "non-matching-backup-1"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{arkv1api.BackupNameLabel: "non-matching-backup-2"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
 				},
 			},
 			expected: nil,
 		},
 		{
 			name: "some pod volume backups with matching label",
-			podVolumeBackups: []arkv1api.PodVolumeBackup{
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{arkv1api.BackupNameLabel: "non-matching-backup-1"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{arkv1api.BackupNameLabel: "non-matching-backup-2"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb", Labels: map[string]string{arkv1api.BackupNameLabel: "backup-1"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-3"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-3"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb-2", Labels: map[string]string{arkv1api.BackupNameLabel: "backup-1"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb-2", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: "snap-4"},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-4"},
 				},
 				{
-					ObjectMeta: metav1.ObjectMeta{Name: "incomplete-or-failed-pvb", Labels: map[string]string{arkv1api.BackupNameLabel: "backup-1"}},
-					Spec: arkv1api.PodVolumeBackupSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "incomplete-or-failed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
 						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-2"},
 					},
-					Status: arkv1api.PodVolumeBackupStatus{SnapshotID: ""},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
 				},
 			},
 			expected: []SnapshotIdentifier{
@@ -301,17 +335,17 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				pvbInformer     = sharedInformers.Ark().V1().PodVolumeBackups()
-				arkBackup       = &arkv1api.Backup{}
+				pvbInformer     = sharedInformers.Velero().V1().PodVolumeBackups()
+				veleroBackup    = &velerov1api.Backup{}
 			)
 
-			arkBackup.Name = "backup-1"
+			veleroBackup.Name = "backup-1"
 
 			for _, pvb := range test.podVolumeBackups {
 				require.NoError(t, pvbInformer.Informer().GetStore().Add(pvb.DeepCopy()))
 			}
 
-			res, err := GetSnapshotsInBackup(arkBackup, pvbInformer.Lister())
+			res, err := GetSnapshotsInBackup(veleroBackup, pvbInformer.Lister())
 			assert.NoError(t, err)
 
 			// sort to ensure good compare of slices
@@ -337,10 +371,10 @@ func TestTempCredentialsFile(t *testing.T) {
 	var (
 		secretInformer = cache.NewSharedIndexInformer(nil, new(corev1api.Secret), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		secretLister   = corev1listers.NewSecretLister(secretInformer.GetIndexer())
-		fs             = arktest.NewFakeFileSystem()
+		fs             = velerotest.NewFakeFileSystem()
 		secret         = &corev1api.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "heptio-ark",
+				Namespace: "velero",
 				Name:      CredentialsSecretName,
 			},
 			Data: map[string][]byte{
@@ -350,14 +384,14 @@ func TestTempCredentialsFile(t *testing.T) {
 	)
 
 	// secret not in lister: expect an error
-	fileName, err := TempCredentialsFile(secretLister, "heptio-ark", "default", fs)
+	fileName, err := TempCredentialsFile(secretLister, "velero", "default", fs)
 	assert.Error(t, err)
 
 	// now add secret to lister
 	require.NoError(t, secretInformer.GetStore().Add(secret))
 
 	// secret in lister: expect temp file to be created with password
-	fileName, err = TempCredentialsFile(secretLister, "heptio-ark", "default", fs)
+	fileName, err = TempCredentialsFile(secretLister, "velero", "default", fs)
 	require.NoError(t, err)
 
 	contents, err := fs.ReadFile(fileName)

@@ -2,9 +2,9 @@
 
 ## 00-prereqs.yaml
 
-This file contains the prerequisites necessary to run the Ark server:
+This file contains the prerequisites necessary to run the Velero server:
 
-- `heptio-ark` namespace
-- `ark` service account
-- RBAC rules to grant permissions to the `ark` service account
-- CRDs for the Ark-specific resources (Backup, Schedule, Restore, etc.)
+- `velero` namespace
+- `velero` service account
+- RBAC rules to grant permissions to the `velero` service account
+- CRDs for the Velero-specific resources (Backup, Schedule, Restore, etc.)

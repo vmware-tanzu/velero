@@ -32,7 +32,7 @@ func TestBackupCommand(t *testing.T) {
 	assert.Equal(t, "path", c.Dir)
 	assert.Equal(t, []string{"."}, c.Args)
 
-	expected := []string{"--tag=foo=bar", "--tag=c=d", "--hostname=ark"}
+	expected := []string{"--tag=foo=bar", "--tag=c=d", "--hostname=velero"}
 	sort.Strings(expected)
 	sort.Strings(c.ExtraFlags)
 	assert.Equal(t, expected, c.ExtraFlags)

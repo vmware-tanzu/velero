@@ -28,15 +28,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
 )
 
 const (
 	pluginsVolumeName = "plugins"
-	arkDeployment     = "ark"
-	arkContainer      = "ark"
+	veleroDeployment  = "velero"
+	veleroContainer   = "velero"
 )
 
 func NewAddCommand(f client.Factory) *cobra.Command {
@@ -55,17 +55,17 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			arkDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(arkDeployment, metav1.GetOptions{})
+			veleroDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(veleroDeployment, metav1.GetOptions{})
 			if err != nil {
 				cmd.CheckError(err)
 			}
 
-			original, err := json.Marshal(arkDeploy)
+			original, err := json.Marshal(veleroDeploy)
 			cmd.CheckError(err)
 
 			// ensure the plugins volume & mount exist
 			volumeExists := false
-			for _, volume := range arkDeploy.Spec.Template.Spec.Volumes {
+			for _, volume := range veleroDeploy.Spec.Template.Spec.Volumes {
 				if volume.Name == pluginsVolumeName {
 					volumeExists = true
 					break
@@ -85,19 +85,19 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 					MountPath: "/plugins",
 				}
 
-				arkDeploy.Spec.Template.Spec.Volumes = append(arkDeploy.Spec.Template.Spec.Volumes, volume)
+				veleroDeploy.Spec.Template.Spec.Volumes = append(veleroDeploy.Spec.Template.Spec.Volumes, volume)
 
-				containers := arkDeploy.Spec.Template.Spec.Containers
+				containers := veleroDeploy.Spec.Template.Spec.Containers
 				containerIndex := -1
 				for x, container := range containers {
-					if container.Name == arkContainer {
+					if container.Name == veleroContainer {
 						containerIndex = x
 						break
 					}
 				}
 
 				if containerIndex < 0 {
-					cmd.CheckError(errors.New("ark container not found in ark deployment"))
+					cmd.CheckError(errors.New("velero container not found in velero deployment"))
 				}
 
 				containers[containerIndex].VolumeMounts = append(containers[containerIndex].VolumeMounts, volumeMount)
@@ -116,16 +116,16 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 				},
 			}
 
-			arkDeploy.Spec.Template.Spec.InitContainers = append(arkDeploy.Spec.Template.Spec.InitContainers, plugin)
+			veleroDeploy.Spec.Template.Spec.InitContainers = append(veleroDeploy.Spec.Template.Spec.InitContainers, plugin)
 
 			// create & apply the patch
-			updated, err := json.Marshal(arkDeploy)
+			updated, err := json.Marshal(veleroDeploy)
 			cmd.CheckError(err)
 
 			patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(arkDeploy.Namespace).Patch(arkDeploy.Name, types.MergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1beta1().Deployments(veleroDeploy.Namespace).Patch(veleroDeploy.Name, types.MergePatchType, patchBytes)
 			cmd.CheckError(err)
 		},
 	}

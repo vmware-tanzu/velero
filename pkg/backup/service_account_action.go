@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkdiscovery "github.com/heptio/ark/pkg/discovery"
-	"github.com/heptio/ark/pkg/kuberesource"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerodiscovery "github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/kuberesource"
 )
 
 // serviceAccountAction implements ItemAction.
@@ -37,7 +37,7 @@ type serviceAccountAction struct {
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper arkdiscovery.Helper) (ItemAction, error) {
+func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (ItemAction, error) {
 	// Look up the supported RBAC version
 	var supportedAPI metav1.GroupVersionForDiscovery
 	for _, ag := range discoveryHelper.APIGroups() {

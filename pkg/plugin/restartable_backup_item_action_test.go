@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/backup/mocks"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/backup/mocks"
 )
 
 func TestRestartableGetBackupItemAction(t *testing.T) {
@@ -115,7 +115,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 
 	additionalItems := []backup.ResourceIdentifier{
 		{
-			GroupResource: schema.GroupResource{Group: "ark.heptio.com", Resource: "backups"},
+			GroupResource: schema.GroupResource{Group: "velero.io", Resource: "backups"},
 		},
 	}
 

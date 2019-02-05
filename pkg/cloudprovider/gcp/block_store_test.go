@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	"github.com/heptio/velero/pkg/util/collections"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestGetVolumeID(t *testing.T) {
@@ -83,57 +83,57 @@ func TestSetVolumeID(t *testing.T) {
 func TestGetSnapshotTags(t *testing.T) {
 	tests := []struct {
 		name            string
-		arkTags         map[string]string
+		veleroTags      map[string]string
 		diskDescription string
 		expected        string
 	}{
 		{
 			name:            "degenerate case (no tags)",
-			arkTags:         nil,
+			veleroTags:      nil,
 			diskDescription: "",
 			expected:        "",
 		},
 		{
-			name: "ark tags only get applied",
-			arkTags: map[string]string{
-				"ark-key1": "ark-val1",
-				"ark-key2": "ark-val2",
+			name: "velero tags only get applied",
+			veleroTags: map[string]string{
+				"velero-key1": "velero-val1",
+				"velero-key2": "velero-val2",
 			},
 			diskDescription: "",
-			expected:        `{"ark-key1":"ark-val1","ark-key2":"ark-val2"}`,
+			expected:        `{"velero-key1":"velero-val1","velero-key2":"velero-val2"}`,
 		},
 		{
 			name:            "disk tags only get applied",
-			arkTags:         nil,
+			veleroTags:      nil,
 			diskDescription: `{"aws-key1":"aws-val1","aws-key2":"aws-val2"}`,
 			expected:        `{"aws-key1":"aws-val1","aws-key2":"aws-val2"}`,
 		},
 		{
-			name:            "non-overlapping ark and disk tags both get applied",
-			arkTags:         map[string]string{"ark-key": "ark-val"},
+			name:            "non-overlapping velero and disk tags both get applied",
+			veleroTags:      map[string]string{"velero-key": "velero-val"},
 			diskDescription: `{"aws-key":"aws-val"}`,
-			expected:        `{"ark-key":"ark-val","aws-key":"aws-val"}`,
+			expected:        `{"velero-key":"velero-val","aws-key":"aws-val"}`,
 		},
 		{
-			name: "when tags overlap, ark tags take precedence",
-			arkTags: map[string]string{
-				"ark-key":         "ark-val",
-				"overlapping-key": "ark-val",
+			name: "when tags overlap, velero tags take precedence",
+			veleroTags: map[string]string{
+				"velero-key":      "velero-val",
+				"overlapping-key": "velero-val",
 			},
 			diskDescription: `{"aws-key":"aws-val","overlapping-key":"aws-val"}`,
-			expected:        `{"ark-key":"ark-val","aws-key":"aws-val","overlapping-key":"ark-val"}`,
+			expected:        `{"velero-key":"velero-val","aws-key":"aws-val","overlapping-key":"velero-val"}`,
 		},
 		{
-			name:            "if disk description is invalid JSON, apply just ark tags",
-			arkTags:         map[string]string{"ark-key": "ark-val"},
+			name:            "if disk description is invalid JSON, apply just velero tags",
+			veleroTags:      map[string]string{"velero-key": "velero-val"},
 			diskDescription: `THIS IS INVALID JSON`,
-			expected:        `{"ark-key":"ark-val"}`,
+			expected:        `{"velero-key":"velero-val"}`,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getSnapshotTags(test.arkTags, test.diskDescription, arktest.NewLogger())
+			res := getSnapshotTags(test.veleroTags, test.diskDescription, velerotest.NewLogger())
 
 			if test.expected == "" {
 				assert.Equal(t, test.expected, res)

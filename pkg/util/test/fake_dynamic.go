@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 
-	"github.com/heptio/ark/pkg/client"
+	"github.com/heptio/velero/pkg/client"
 )
 
 type FakeDynamicFactory struct {

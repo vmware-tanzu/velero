@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 // restartableBlockStore is an object store for a given implementation (such as "aws"). It is associated with

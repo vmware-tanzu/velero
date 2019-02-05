@@ -17,7 +17,7 @@ before:
   hooks:
     - ./hack/set-example-tags.sh
 builds:
-  - main: ./cmd/ark/main.go
+  - main: ./cmd/velero/main.go
     env:
       - CGO_ENABLED=0
     goos:
@@ -39,7 +39,7 @@ builds:
       - goos: windows
         goarch: arm64
     ldflags:
-      - -X "github.com/heptio/ark/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/ark/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/ark/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
+      - -X "github.com/heptio/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
 archive:
   name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
   files:
@@ -50,5 +50,5 @@ checksum:
 release:
   github:
     owner: heptio
-    name: ark
+    name: velero
   draft: true

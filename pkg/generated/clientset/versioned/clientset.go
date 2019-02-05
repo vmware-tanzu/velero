@@ -19,7 +19,8 @@ limitations under the License.
 package versioned
 
 import (
-	arkv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/ark/v1"
+	velerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -30,13 +31,17 @@ type Interface interface {
 	ArkV1() arkv1.ArkV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Ark() arkv1.ArkV1Interface
+	VeleroV1() velerov1.VeleroV1Interface
+	// Deprecated: please explicitly pick a version if possible.
+	Velero() velerov1.VeleroV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	arkV1 *arkv1.ArkV1Client
+	arkV1    *arkv1.ArkV1Client
+	veleroV1 *velerov1.VeleroV1Client
 }
 
 // ArkV1 retrieves the ArkV1Client
@@ -48,6 +53,17 @@ func (c *Clientset) ArkV1() arkv1.ArkV1Interface {
 // Please explicitly pick a version.
 func (c *Clientset) Ark() arkv1.ArkV1Interface {
 	return c.arkV1
+}
+
+// VeleroV1 retrieves the VeleroV1Client
+func (c *Clientset) VeleroV1() velerov1.VeleroV1Interface {
+	return c.veleroV1
+}
+
+// Deprecated: Velero retrieves the default version of VeleroClient.
+// Please explicitly pick a version.
+func (c *Clientset) Velero() velerov1.VeleroV1Interface {
+	return c.veleroV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -70,6 +86,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.veleroV1, err = velerov1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	cs.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -83,6 +103,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
 	cs.arkV1 = arkv1.NewForConfigOrDie(c)
+	cs.veleroV1 = velerov1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -92,6 +113,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.arkV1 = arkv1.New(c)
+	cs.veleroV1 = velerov1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

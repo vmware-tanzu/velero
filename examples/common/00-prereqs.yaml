@@ -16,11 +16,11 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: backups.ark.heptio.com
+  name: backups.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -31,11 +31,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: schedules.ark.heptio.com
+  name: schedules.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -46,11 +46,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: restores.ark.heptio.com
+  name: restores.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -61,11 +61,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: downloadrequests.ark.heptio.com
+  name: downloadrequests.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -76,11 +76,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: deletebackuprequests.ark.heptio.com
+  name: deletebackuprequests.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -91,11 +91,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: podvolumebackups.ark.heptio.com
+  name: podvolumebackups.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -106,11 +106,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: podvolumerestores.ark.heptio.com
+  name: podvolumerestores.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -121,11 +121,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: resticrepositories.ark.heptio.com
+  name: resticrepositories.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -136,11 +136,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: backupstoragelocations.ark.heptio.com
+  name: backupstoragelocations.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -151,11 +151,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: volumesnapshotlocations.ark.heptio.com
+  name: volumesnapshotlocations.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -166,11 +166,11 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: serverstatusrequests.ark.heptio.com
+  name: serverstatusrequests.velero.io
   labels:
-    component: ark
+    component: velero
 spec:
-  group: ark.heptio.com
+  group: velero.io
   version: v1
   scope: Namespaced
   names:
@@ -180,28 +180,28 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: heptio-ark
+  name: velero
 
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: ark
-  namespace: heptio-ark
+  name: velero
+  namespace: velero
   labels:
-    component: ark
+    component: velero
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRoleBinding
 metadata:
-  name: ark
+  name: velero
   labels:
-    component: ark
+    component: velero
 subjects:
   - kind: ServiceAccount
-    namespace: heptio-ark
-    name: ark
+    namespace: velero
+    name: velero
 roleRef:
   kind: ClusterRole
   name: cluster-admin

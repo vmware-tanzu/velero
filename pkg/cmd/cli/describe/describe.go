@@ -19,17 +19,17 @@ package describe
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/cli/backup"
-	"github.com/heptio/ark/pkg/cmd/cli/restore"
-	"github.com/heptio/ark/pkg/cmd/cli/schedule"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd/cli/backup"
+	"github.com/heptio/velero/pkg/cmd/cli/restore"
+	"github.com/heptio/velero/pkg/cmd/cli/schedule"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "describe",
-		Short: "Describe ark resources",
-		Long:  "Describe ark resources",
+		Short: "Describe velero resources",
+		Long:  "Describe velero resources",
 	}
 
 	backupCommand := backup.NewDescribeCommand(f, "backups")

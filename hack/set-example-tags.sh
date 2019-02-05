@@ -30,7 +30,7 @@ rm -rf config/ && cp -r examples/ config/
 # the "-i'.bak'" flag to sed is necessary, with no space between the flag
 # and the value, for this to be compatible across BSD/OSX sed and GNU sed.
 # remove the ".bak" files afterwards (they're copies of the originals).
-find config/ -type f -name "*.yaml" | xargs sed -i'.bak' "s|gcr.io/heptio-images/ark:latest|gcr.io/heptio-images/ark:$GIT_TAG|g"
+find config/ -type f -name "*.yaml" | xargs sed -i'.bak' "s|gcr.io/heptio-images/velero:latest|gcr.io/heptio-images/velero:$GIT_TAG|g"
 find config/ -type f -name "*.bak" | xargs rm
 
 find config/ -type f -name "*.yaml" | xargs sed -i'.bak' "s|gcr.io/heptio-images/fsfreeze-pause:latest|gcr.io/heptio-images/fsfreeze-pause:$GIT_TAG|g"

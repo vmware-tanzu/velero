@@ -32,8 +32,8 @@ import (
 	"google.golang.org/api/googleapi"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const projectKey = "project"
@@ -133,7 +133,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	// tags.
 	//
 	// use the snapshot's description (which contains tags from the snapshotted disk
-	// plus Ark-specific tags) to set the new disk's description.
+	// plus Velero-specific tags) to set the new disk's description.
 	disk := &compute.Disk{
 		Name:           "restore-" + uuid.NewV4().String(),
 		SourceSnapshot: res.SelfLink,
@@ -243,7 +243,7 @@ func (b *blockStore) createRegionSnapshot(snapshotName, volumeID, volumeRegion s
 	return gceSnap.Name, nil
 }
 
-func getSnapshotTags(arkTags map[string]string, diskDescription string, log logrus.FieldLogger) string {
+func getSnapshotTags(veleroTags map[string]string, diskDescription string, log logrus.FieldLogger) string {
 	// Kubernetes uses the description field of GCP disks to store a JSON doc containing
 	// tags.
 	//
@@ -251,15 +251,15 @@ func getSnapshotTags(arkTags map[string]string, diskDescription string, log logr
 	// to set the snapshot's description.
 	var snapshotTags map[string]string
 	if err := json.Unmarshal([]byte(diskDescription), &snapshotTags); err != nil {
-		// error decoding the disk's description, so just use the Ark-assigned tags
+		// error decoding the disk's description, so just use the Velero-assigned tags
 		log.WithError(err).
-			Error("unable to decode disk's description as JSON, so only applying Ark-assigned tags to snapshot")
-		snapshotTags = arkTags
+			Error("unable to decode disk's description as JSON, so only applying Velero-assigned tags to snapshot")
+		snapshotTags = veleroTags
 	} else {
-		// merge Ark-assigned tags with the disk's tags (note that we want current
-		// Ark-assigned tags to overwrite any older versions of them that may exist
+		// merge Velero-assigned tags with the disk's tags (note that we want current
+		// Velero-assigned tags to overwrite any older versions of them that may exist
 		// due to prior snapshots/restores)
-		for k, v := range arkTags {
+		for k, v := range veleroTags {
 			snapshotTags[k] = v
 		}
 	}

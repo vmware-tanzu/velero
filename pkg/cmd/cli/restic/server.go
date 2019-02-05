@@ -31,15 +31,15 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/signals"
-	"github.com/heptio/ark/pkg/controller"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/util/logging"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/signals"
+	"github.com/heptio/velero/pkg/controller"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/logging"
 )
 
 func NewServerCommand(f client.Factory) *cobra.Command {
@@ -47,14 +47,14 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 
 	command := &cobra.Command{
 		Use:   "server",
-		Short: "Run the ark restic server",
-		Long:  "Run the ark restic server",
+		Short: "Run the velero restic server",
+		Long:  "Run the velero restic server",
 		Run: func(c *cobra.Command, args []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := logging.DefaultLogger(logLevel)
-			logger.Infof("Starting Ark restic server %s", buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero restic server %s", buildinfo.FormattedGitSHA())
 
 			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			cmd.CheckError(err)
@@ -69,15 +69,15 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 }
 
 type resticServer struct {
-	kubeClient          kubernetes.Interface
-	arkClient           clientset.Interface
-	arkInformerFactory  informers.SharedInformerFactory
-	kubeInformerFactory kubeinformers.SharedInformerFactory
-	podInformer         cache.SharedIndexInformer
-	secretInformer      cache.SharedIndexInformer
-	logger              logrus.FieldLogger
-	ctx                 context.Context
-	cancelFunc          context.CancelFunc
+	kubeClient            kubernetes.Interface
+	veleroClient          clientset.Interface
+	veleroInformerFactory informers.SharedInformerFactory
+	kubeInformerFactory   kubeinformers.SharedInformerFactory
+	podInformer           cache.SharedIndexInformer
+	secretInformer        cache.SharedIndexInformer
+	logger                logrus.FieldLogger
+	ctx                   context.Context
+	cancelFunc            context.CancelFunc
 }
 
 func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
@@ -91,7 +91,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 		return nil, errors.WithStack(err)
 	}
 
-	arkClient, err := clientset.NewForConfig(clientConfig)
+	veleroClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -109,14 +109,14 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	)
 
 	// use a stand-alone secrets informer so we can filter to only the restic credentials
-	// secret(s) within the heptio-ark namespace
+	// secret(s) within the velero namespace
 	//
-	// note: using an informer to access the single secret for all ark-managed
+	// note: using an informer to access the single secret for all velero-managed
 	// restic repositories is overkill for now, but will be useful when we move
 	// to fully-encrypted backups and have unique keys per repository.
 	secretInformer := corev1informers.NewFilteredSecretInformer(
 		kubeClient,
-		os.Getenv("HEPTIO_ARK_NAMESPACE"),
+		os.Getenv("VELERO_NAMESPACE"),
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
@@ -127,15 +127,15 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	return &resticServer{
-		kubeClient:          kubeClient,
-		arkClient:           arkClient,
-		arkInformerFactory:  informers.NewFilteredSharedInformerFactory(arkClient, 0, os.Getenv("HEPTIO_ARK_NAMESPACE"), nil),
-		kubeInformerFactory: kubeinformers.NewSharedInformerFactory(kubeClient, 0),
-		podInformer:         podInformer,
-		secretInformer:      secretInformer,
-		logger:              logger,
-		ctx:                 ctx,
-		cancelFunc:          cancelFunc,
+		kubeClient:            kubeClient,
+		veleroClient:          veleroClient,
+		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, os.Getenv("VELERO_NAMESPACE"), nil),
+		kubeInformerFactory:   kubeinformers.NewSharedInformerFactory(kubeClient, 0),
+		podInformer:           podInformer,
+		secretInformer:        secretInformer,
+		logger:                logger,
+		ctx:                   ctx,
+		cancelFunc:            cancelFunc,
 	}, nil
 }
 
@@ -148,12 +148,12 @@ func (s *resticServer) run() {
 
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
-		s.arkInformerFactory.Ark().V1().PodVolumeBackups(),
-		s.arkClient.ArkV1(),
+		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
+		s.veleroClient.VeleroV1(),
 		s.podInformer,
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
-		s.arkInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)
@@ -164,12 +164,12 @@ func (s *resticServer) run() {
 
 	restoreController := controller.NewPodVolumeRestoreController(
 		s.logger,
-		s.arkInformerFactory.Ark().V1().PodVolumeRestores(),
-		s.arkClient.ArkV1(),
+		s.veleroInformerFactory.Velero().V1().PodVolumeRestores(),
+		s.veleroClient.VeleroV1(),
 		s.podInformer,
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
-		s.arkInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)
@@ -178,7 +178,7 @@ func (s *resticServer) run() {
 		restoreController.Run(s.ctx, 1)
 	}()
 
-	go s.arkInformerFactory.Start(s.ctx.Done())
+	go s.veleroInformerFactory.Start(s.ctx.Done())
 	go s.kubeInformerFactory.Start(s.ctx.Done())
 	go s.podInformer.Run(s.ctx.Done())
 	go s.secretInformer.Run(s.ctx.Done())

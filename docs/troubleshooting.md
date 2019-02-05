@@ -1,6 +1,6 @@
 # Troubleshooting
 
-These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#ark-dr channel][25] on the Kubernetes Slack server.
+These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
 See also:
 
@@ -9,29 +9,29 @@ See also:
 
 ## General troubleshooting information
 
-In `ark` version >= `0.1.0`, you can use the `ark bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `ark` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
+In `velero` version >= `0.10.0`, you can use the `velero bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `velero` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
 
 Some general commands for troubleshooting that may be helpful:
 
-* `ark backup describe <backupName>` - describe the details of a backup
-* `ark backup logs <backupName>` - fetch the logs for this specific backup. Useful for viewing failures and warnings, including resources that could not be backed up.
-* `ark restore describe <restoreName>` - describe the details of a restore
-* `ark restore logs <restoreName>` - fetch the logs for this specific restore. Useful for viewing failures and warnings, including resources that could not be restored.
-* `kubectl logs deployment/ark -n heptio-ark` - fetch the logs of the Ark server pod. This provides the output of the Ark server processes.
+* `velero backup describe <backupName>` - describe the details of a backup
+* `velero backup logs <backupName>` - fetch the logs for this specific backup. Useful for viewing failures and warnings, including resources that could not be backed up.
+* `velero restore describe <restoreName>` - describe the details of a restore
+* `velero restore logs <restoreName>` - fetch the logs for this specific restore. Useful for viewing failures and warnings, including resources that could not be restored.
+* `kubectl logs deployment/velero -n velero` - fetch the logs of the Velero server pod. This provides the output of the Velero server processes.
 
-### Getting ark debug logs
+### Getting velero debug logs
 
-You can increase the verbosity of the Ark server by editing your Ark deployment to look like this:
+You can increase the verbosity of the Velero server by editing your Velero deployment to look like this:
 
 
 ```
-kubectl edit deployment/ark -n heptio-ark
+kubectl edit deployment/velero -n velero
 ...
    containers:
-     - name: ark
-       image: gcr.io/heptio-images/ark:latest
+     - name: velero
+       image: gcr.io/heptio-images/velero:latest
        command:
-         - /ark
+         - /velero
        args:
          - server
          - --log-level # Add this line
@@ -41,18 +41,18 @@ kubectl edit deployment/ark -n heptio-ark
 
 ## Known issue with restoring LoadBalancer Service
 
-Because of how Kubernetes handles Service objects of `type=LoadBalancer`, when you restore these objects you might encounter an issue with changed values for Service UIDs. Kubernetes automatically generates the name of the cloud resource based on the Service UID, which is different when restored, resulting in a different name for the cloud load balancer. If the DNS CNAME for your application points to the DNS name of your cloud load balancer, you'll need to update the CNAME pointer when you perform an Ark restore.
+Because of how Kubernetes handles Service objects of `type=LoadBalancer`, when you restore these objects you might encounter an issue with changed values for Service UIDs. Kubernetes automatically generates the name of the cloud resource based on the Service UID, which is different when restored, resulting in a different name for the cloud load balancer. If the DNS CNAME for your application points to the DNS name of your cloud load balancer, you'll need to update the CNAME pointer when you perform an Velero restore.
 
 Alternatively, you might be able to use the Service's `spec.loadBalancerIP` field to keep connections valid, if your cloud provider supports this value. See [the Kubernetes documentation about Services of Type LoadBalancer](https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer).
 
 ## Miscellaneous issues
 
-### Ark reports `custom resource not found` errors when starting up.
+### Velero reports `custom resource not found` errors when starting up.
 
-Ark's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `config/common/00-prereqs.yaml` file to create these definitions, then restart Ark.
+Velero's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
+the `config/common/00-prereqs.yaml` file to create these definitions, then restart Velero.
 
-### `ark backup logs` returns a `SignatureDoesNotMatch` error
+### `velero backup logs` returns a `SignatureDoesNotMatch` error
 
 Downloading artifacts from object storage utilizes temporary, signed URLs. In the case of S3-compatible
 providers, such as Ceph, there may be differences between their implementation and the official S3
@@ -66,6 +66,6 @@ Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
 
 [1]: debugging-restores.md
 [2]: debugging-install.md
-[4]: https://github.com/heptio/ark/issues
+[4]: https://github.com/heptio/velero/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
-[25]: https://kubernetes.slack.com/messages/ark-dr
+[25]: https://kubernetes.slack.com/messages/velero

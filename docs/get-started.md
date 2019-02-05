@@ -1,19 +1,19 @@
 ## Getting started
 
-The following example sets up the Ark server and client, then backs up and restores a sample application. 
+The following example sets up the Velero server and client, then backs up and restores a sample application. 
 
 For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. 
 For additional functionality with this setup, see the docs on how to [expose Minio outside your cluster][31].
 
-**NOTE** The example lets you explore basic Ark functionality. Configuring Minio for production is out of scope.
+**NOTE** The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.
 
-See [Set up Ark on your platform][3] for how to configure Ark for a production environment.
+See [Set up Velero on your platform][3] for how to configure Velero for a production environment.
 
 If you encounter issues with installing or configuring, see [Debugging Installation Issues](debugging-install.md).
 
 ### Prerequisites
 
-* Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run `ark backup delete`.
+* Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run `velero backup delete`.
 * A DNS server on the cluster
 * `kubectl` installed
 
@@ -25,22 +25,22 @@ If you encounter issues with installing or configuring, see [Debugging Installat
     ```bash
     tar -xzf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
     ```
-    We'll refer to the directory you extracted to as the "Ark directory" in subsequent steps.
+    We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
-1. Move the `ark` binary from the Ark directory to somewhere in your PATH.
+1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
 #### MacOS Installation
 
-On Mac, you can use [HomeBrew](https://brew.sh) to install the `ark` client:
+On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
 ```bash
-brew install ark
+brew install velero
 ```
 
 ### Set up server
 
-These instructions start the Ark server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `ark describe` commands.
+These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `velero describe` commands.
 
-1.  Start the server and the local storage service. In the Ark directory, run:
+1.  Start the server and the local storage service. In the Velero directory, run:
 
     ```bash
     kubectl apply -f config/common/00-prereqs.yaml
@@ -53,10 +53,10 @@ These instructions start the Ark server and a Minio instance that is accessible 
     kubectl apply -f config/nginx-app/base.yaml
     ```
 
-1. Check to see that both the Ark and nginx deployments are successfully created:
+1. Check to see that both the Velero and nginx deployments are successfully created:
 
     ```
-    kubectl get deployments -l component=ark --namespace=heptio-ark
+    kubectl get deployments -l component=velero --namespace=velero
     kubectl get deployments --namespace=nginx-example
     ```
 
@@ -65,25 +65,25 @@ These instructions start the Ark server and a Minio instance that is accessible 
 1. Create a backup for any object that matches the `app=nginx` label selector:
 
     ```
-    ark backup create nginx-backup --selector app=nginx
+    velero backup create nginx-backup --selector app=nginx
     ```
 
    Alternatively if you want to backup all objects *except* those matching the label `backup=ignore`:
 
    ```
-   ark backup create nginx-backup --selector 'backup notin (ignore)'
+   velero backup create nginx-backup --selector 'backup notin (ignore)'
    ```
 
 1. (Optional) Create regularly scheduled backups based on a cron expression using the `app=nginx` label selector:
 
     ```
-    ark schedule create nginx-daily --schedule="0 1 * * *" --selector app=nginx
+    velero schedule create nginx-daily --schedule="0 1 * * *" --selector app=nginx
     ```
 
     Alternatively, you can use some non-standard shorthand cron expressions:
 
     ```
-    ark schedule create nginx-daily --schedule="@daily" --selector app=nginx
+    velero schedule create nginx-daily --schedule="@daily" --selector app=nginx
     ```
 
     See the [cron package's documentation][30] for more usage examples.
@@ -111,13 +111,13 @@ These instructions start the Ark server and a Minio instance that is accessible 
 1. Run:
 
     ```
-    ark restore create --from-backup nginx-backup
+    velero restore create --from-backup nginx-backup
     ```
 
 1. Run:
 
     ```
-    ark restore get
+    velero restore get
     ```
 
     After the restore finishes, the output looks like the following:
@@ -134,7 +134,7 @@ After a successful restore, the `STATUS` column is `Completed`, and `WARNINGS` a
 If there are errors or warnings, you can look at them in detail:
 
 ```
-ark restore describe <RESTORE_NAME>
+velero restore describe <RESTORE_NAME>
 ```
 
 For more information, see [the debugging information][18].
@@ -145,21 +145,21 @@ If you want to delete any backups you created, including data in object storage 
 volume snapshots, you can run:
 
 ```
-ark backup delete BACKUP_NAME
+velero backup delete BACKUP_NAME
 ```
 
-This asks the Ark server to delete all backup data associated with `BACKUP_NAME`.  You need to do
-this for each backup you want to permanently delete. A future version of Ark will allow you to
+This asks the Velero server to delete all backup data associated with `BACKUP_NAME`.  You need to do
+this for each backup you want to permanently delete. A future version of Velero will allow you to
 delete multiple backups by name or label selector.
 
 Once fully removed, the backup is no longer visible when you run:
 
 ```
-ark backup get BACKUP_NAME
+velero backup get BACKUP_NAME
 ```
 
-If you want to uninstall Ark but preserve the backup data in object storage and persistent volume
-snapshots, it is safe to remove the `heptio-ark` namespace and everything else created for this
+If you want to uninstall Velero but preserve the backup data in object storage and persistent volume
+snapshots, it is safe to remove the `velero` namespace and everything else created for this
 example:
 
 ```
@@ -171,5 +171,5 @@ kubectl delete -f config/nginx-app/base.yaml
 [31]: expose-minio.md
 [3]: install-overview.md
 [18]: debugging-restores.md
-[26]: https://github.com/heptio/ark/releases
+[26]: https://github.com/heptio/velero/releases
 [30]: https://godoc.org/github.com/robfig/cron

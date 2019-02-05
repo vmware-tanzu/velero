@@ -19,19 +19,19 @@ package get
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/cli/backup"
-	"github.com/heptio/ark/pkg/cmd/cli/backuplocation"
-	"github.com/heptio/ark/pkg/cmd/cli/restore"
-	"github.com/heptio/ark/pkg/cmd/cli/schedule"
-	"github.com/heptio/ark/pkg/cmd/cli/snapshotlocation"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd/cli/backup"
+	"github.com/heptio/velero/pkg/cmd/cli/backuplocation"
+	"github.com/heptio/velero/pkg/cmd/cli/restore"
+	"github.com/heptio/velero/pkg/cmd/cli/schedule"
+	"github.com/heptio/velero/pkg/cmd/cli/snapshotlocation"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "get",
-		Short: "Get ark resources",
-		Long:  "Get ark resources",
+		Short: "Get velero resources",
+		Long:  "Get velero resources",
 	}
 
 	backupCommand := backup.NewGetCommand(f, "backups")

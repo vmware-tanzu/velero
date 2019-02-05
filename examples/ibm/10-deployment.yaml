@@ -16,29 +16,29 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark
-  name: ark
+  namespace: velero
+  name: velero
 spec:
   replicas: 1
   template:
     metadata:
       labels:
-        component: ark
+        component: velero
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8085"
         prometheus.io/path: "/metrics"
     spec:
       restartPolicy: Always
-      serviceAccountName: ark
+      serviceAccountName: velero
       containers:
-        - name: ark
-          image: gcr.io/heptio-images/ark:latest
+        - name: velero
+          image: gcr.io/heptio-images/velero:latest
           ports:
             - name: metrics
               containerPort: 8085
           command:
-            - /ark
+            - /velero
           args:
             - server
           volumeMounts:
@@ -51,7 +51,7 @@ spec:
           env:
             - name: AWS_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
-            - name: ARK_SCRATCH_DIR
+            - name: VELERO_SCRATCH_DIR
               value: /scratch
       volumes:
         - name: cloud-credentials

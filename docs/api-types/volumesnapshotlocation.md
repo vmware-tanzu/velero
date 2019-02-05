@@ -1,21 +1,21 @@
-# Ark Volume Snapshot Location
+# Velero Volume Snapshot Location
 
 ## Volume Snapshot Location
 
 A volume snapshot location is the location in which to store the volume snapshots created for a backup.
 
-Ark can be configured to take snapshots of volumes from multiple providers. Ark also allows you to configure multiple possible `VolumeSnapshotLocation` per provider, although you can only select one location per provider at backup time.
+Velero can be configured to take snapshots of volumes from multiple providers. Velero also allows you to configure multiple possible `VolumeSnapshotLocation` per provider, although you can only select one location per provider at backup time.
 
-Each VolumeSnapshotLocation describes a provider + location. These are represented in the cluster via the `VolumeSnapshotLocation` CRD. Ark must have at least one `VolumeSnapshotLocation` per cloud provider.
+Each VolumeSnapshotLocation describes a provider + location. These are represented in the cluster via the `VolumeSnapshotLocation` CRD. Velero must have at least one `VolumeSnapshotLocation` per cloud provider.
 
 A sample YAML `VolumeSnapshotLocation` looks like the following:
 
 ```yaml
-apiVersion: ark.heptio.com/v1
+apiVersion: velero.io/v1
 kind: VolumeSnapshotLocation
 metadata:
   name: aws-default
-  namespace: heptio-ark
+  namespace: velero
 spec:
   provider: aws
   config:
@@ -30,7 +30,7 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `provider` | String (Ark natively supports `aws`, `gcp`, and `azure`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the volume. |
+| `provider` | String (Velero natively supports `aws`, `gcp`, and `azure`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the volume. |
 | `config` | See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.
 
 #### AWS

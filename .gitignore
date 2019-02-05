@@ -27,7 +27,7 @@ _testmain.go
 
 debug
 
-/ark
+/velero
 .idea/
 
 .container-*

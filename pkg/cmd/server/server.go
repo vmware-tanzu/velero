@@ -48,26 +48,26 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/cmd/util/signals"
-	"github.com/heptio/ark/pkg/controller"
-	arkdiscovery "github.com/heptio/ark/pkg/discovery"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/podexec"
-	"github.com/heptio/ark/pkg/restic"
-	"github.com/heptio/ark/pkg/restore"
-	"github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
-	"github.com/heptio/ark/pkg/util/stringslice"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/cmd/util/signals"
+	"github.com/heptio/velero/pkg/controller"
+	velerodiscovery "github.com/heptio/velero/pkg/discovery"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/metrics"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/podexec"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/util/kube"
+	"github.com/heptio/velero/pkg/util/logging"
+	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
 const (
@@ -115,8 +115,8 @@ func NewCommand() *cobra.Command {
 
 	var command = &cobra.Command{
 		Use:   "server",
-		Short: "Run the ark server",
-		Long:  "Run the ark server",
+		Short: "Run the velero server",
+		Long:  "Run the velero server",
 		Run: func(c *cobra.Command, args []string) {
 			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
 			// set its output to stdout.
@@ -127,11 +127,11 @@ func NewCommand() *cobra.Command {
 			logrus.SetOutput(os.Stdout)
 			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			// Ark's DefaultLogger logs to stdout, so all is good there.
+			// Velero's DefaultLogger logs to stdout, so all is good there.
 			logger := logging.DefaultLogger(logLevel)
-			logger.Infof("Starting Ark server %s", buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero server %s", buildinfo.FormattedGitSHA())
 
-			// NOTE: the namespace flag is bound to ark's persistent flags when the root ark command
+			// NOTE: the namespace flag is bound to velero's persistent flags when the root velero command
 			// creates the client Factory and binds the Factory's flags. We're not using a Factory here in
 			// the server because the Factory gets its basename set at creation time, and the basename is
 			// used to construct the user-agent for clients. Also, the Factory's Namespace() method uses
@@ -157,9 +157,9 @@ func NewCommand() *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
-	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Ark plugins")
+	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Velero plugins")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "the address to expose prometheus metrics")
-	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Ark backups in object storage exist as Backup API objects in the cluster")
+	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster")
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled")
 	command.Flags().StringSliceVar(&config.restoreResourcePriorities, "restore-resource-priorities", config.restoreResourcePriorities, "desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources")
@@ -191,9 +191,9 @@ type server struct {
 	metricsAddress        string
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
-	arkClient             clientset.Interface
+	veleroClient          clientset.Interface
 	discoveryClient       discovery.DiscoveryInterface
-	discoveryHelper       arkdiscovery.Helper
+	discoveryHelper       velerodiscovery.Helper
 	dynamicClient         dynamic.Interface
 	sharedInformerFactory informers.SharedInformerFactory
 	ctx                   context.Context
@@ -227,7 +227,7 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		return nil, errors.WithStack(err)
 	}
 
-	arkClient, err := clientset.NewForConfig(clientConfig)
+	veleroClient, err := clientset.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -253,10 +253,10 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		metricsAddress:        config.metricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
-		arkClient:             arkClient,
-		discoveryClient:       arkClient.Discovery(),
+		veleroClient:          veleroClient,
+		discoveryClient:       veleroClient.Discovery(),
 		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(arkClient, 0, informers.WithNamespace(namespace)),
+		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(namespace)),
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		logger:                logger,
@@ -279,7 +279,7 @@ func (s *server) run() error {
 	}
 
 	// Since s.namespace, which specifies where backups/restores/schedules/etc. should live,
-	// *could* be different from the namespace where the Ark server pod runs, check to make
+	// *could* be different from the namespace where the Velero server pod runs, check to make
 	// sure it exists, and fail fast if it doesn't.
 	if err := s.namespaceExists(s.namespace); err != nil {
 		return err
@@ -289,7 +289,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.arkResourcesExist(); err != nil {
+	if err := s.veleroResourcesExist(); err != nil {
 		return err
 	}
 
@@ -297,7 +297,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	if _, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
+	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).
 			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
 	}
@@ -329,7 +329,7 @@ func (s *server) namespaceExists(namespace string) error {
 // initDiscoveryHelper instantiates the server's discovery helper and spawns a
 // goroutine to call Refresh() every 5 minutes.
 func (s *server) initDiscoveryHelper() error {
-	discoveryHelper, err := arkdiscovery.NewHelper(s.discoveryClient, s.logger)
+	discoveryHelper, err := velerodiscovery.NewHelper(s.discoveryClient, s.logger)
 	if err != nil {
 		return err
 	}
@@ -348,25 +348,25 @@ func (s *server) initDiscoveryHelper() error {
 	return nil
 }
 
-// arkResourcesExist checks for the existence of each Ark CRD via discovery
+// veleroResourcesExist checks for the existence of each Velero CRD via discovery
 // and returns an error if any of them don't exist.
-func (s *server) arkResourcesExist() error {
-	s.logger.Info("Checking existence of Ark custom resource definitions")
+func (s *server) veleroResourcesExist() error {
+	s.logger.Info("Checking existence of Velero custom resource definitions")
 
-	var arkGroupVersion *metav1.APIResourceList
+	var veleroGroupVersion *metav1.APIResourceList
 	for _, gv := range s.discoveryHelper.Resources() {
 		if gv.GroupVersion == api.SchemeGroupVersion.String() {
-			arkGroupVersion = gv
+			veleroGroupVersion = gv
 			break
 		}
 	}
 
-	if arkGroupVersion == nil {
-		return errors.Errorf("Ark API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
+	if veleroGroupVersion == nil {
+		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
 	}
 
 	foundResources := sets.NewString()
-	for _, resource := range arkGroupVersion.APIResources {
+	for _, resource := range veleroGroupVersion.APIResources {
 		foundResources.Insert(resource.Kind)
 	}
 
@@ -377,15 +377,15 @@ func (s *server) arkResourcesExist() error {
 			continue
 		}
 
-		errs = append(errs, errors.Errorf("custom resource %s not found in Ark API group %s", kind, api.SchemeGroupVersion))
+		errs = append(errs, errors.Errorf("custom resource %s not found in Velero API group %s", kind, api.SchemeGroupVersion))
 	}
 
 	if len(errs) > 0 {
-		errs = append(errs, errors.New("Ark custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
+		errs = append(errs, errors.New("Velero custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
 		return kubeerrs.NewAggregate(errs)
 	}
 
-	s.logger.Info("All Ark custom resource definitions exist")
+	s.logger.Info("All Velero custom resource definitions exist")
 	return nil
 }
 
@@ -394,7 +394,7 @@ func (s *server) arkResourcesExist() error {
 func (s *server) validateBackupStorageLocations() error {
 	s.logger.Info("Checking that all backup storage locations are valid")
 
-	locations, err := s.arkClient.ArkV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
+	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -409,7 +409,7 @@ func (s *server) validateBackupStorageLocations() error {
 
 		if err := backupStore.IsValid(); err != nil {
 			invalid = append(invalid, errors.Wrapf(err,
-				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Ark, please refer to https://heptio.github.io/ark/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
+				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Velero, please refer to https://heptio.github.io/velero/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
 				location.Name,
 			).Error())
 		}
@@ -451,9 +451,9 @@ var defaultRestorePriorities = []string{
 func (s *server) initRestic() error {
 	// warn if restic daemonset does not exist
 	if _, err := s.kubeClient.AppsV1().DaemonSets(s.namespace).Get(restic.DaemonSet, metav1.GetOptions{}); apierrors.IsNotFound(err) {
-		s.logger.Warn("Ark restic daemonset not found; restic backups/restores will not work until it's created")
+		s.logger.Warn("Velero restic daemonset not found; restic backups/restores will not work until it's created")
 	} else if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of ark restic daemonset")
+		s.logger.WithError(errors.WithStack(err)).Warn("Error checking for existence of velero restic daemonset")
 	}
 
 	// ensure the repo key secret is set up
@@ -462,9 +462,9 @@ func (s *server) initRestic() error {
 	}
 
 	// use a stand-alone secrets informer so we can filter to only the restic credentials
-	// secret(s) within the heptio-ark namespace
+	// secret(s) within the velero namespace
 	//
-	// note: using an informer to access the single secret for all ark-managed
+	// note: using an informer to access the single secret for all velero-managed
 	// restic repositories is overkill for now, but will be useful when we move
 	// to fully-encrypted backups and have unique keys per repository.
 	secretsInformer := corev1informers.NewFilteredSecretInformer(
@@ -481,11 +481,11 @@ func (s *server) initRestic() error {
 	res, err := restic.NewRepositoryManager(
 		s.ctx,
 		s.namespace,
-		s.arkClient,
+		s.veleroClient,
 		secretsInformer,
-		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
-		s.arkClient.ArkV1(),
-		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
+		s.veleroClient.VeleroV1(),
+		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 		s.logger,
 	)
 	if err != nil {
@@ -520,10 +520,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	backupSyncController := controller.NewBackupSyncController(
-		s.arkClient.ArkV1(),
-		s.arkClient.ArkV1(),
-		s.sharedInformerFactory.Ark().V1().Backups(),
-		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.veleroClient.VeleroV1(),
+		s.veleroClient.VeleroV1(),
+		s.sharedInformerFactory.Velero().V1().Backups(),
+		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 		s.config.backupSyncPeriod,
 		s.namespace,
 		s.config.defaultBackupLocation,
@@ -551,16 +551,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		cmd.CheckError(err)
 
 		backupController := controller.NewBackupController(
-			s.sharedInformerFactory.Ark().V1().Backups(),
-			s.arkClient.ArkV1(),
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.veleroClient.VeleroV1(),
 			backupper,
 			s.logger,
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
-			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 		)
@@ -572,9 +572,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		scheduleController := controller.NewScheduleController(
 			s.namespace,
-			s.arkClient.ArkV1(),
-			s.arkClient.ArkV1(),
-			s.sharedInformerFactory.Ark().V1().Schedules(),
+			s.veleroClient.VeleroV1(),
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().Schedules(),
 			s.logger,
 			s.metrics,
 		)
@@ -586,9 +586,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		gcController := controller.NewGCController(
 			s.logger,
-			s.sharedInformerFactory.Ark().V1().Backups(),
-			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
-			s.arkClient.ArkV1(),
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
+			s.veleroClient.VeleroV1(),
 		)
 		wg.Add(1)
 		go func() {
@@ -598,16 +598,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		backupDeletionController := controller.NewBackupDeletionController(
 			s.logger,
-			s.sharedInformerFactory.Ark().V1().DeleteBackupRequests(),
-			s.arkClient.ArkV1(), // deleteBackupRequestClient
-			s.arkClient.ArkV1(), // backupClient
-			s.sharedInformerFactory.Ark().V1().Restores(),
-			s.arkClient.ArkV1(), // restoreClient
+			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
+			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
+			s.veleroClient.VeleroV1(), // backupClient
+			s.sharedInformerFactory.Velero().V1().Restores(),
+			s.veleroClient.VeleroV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
-			s.sharedInformerFactory.Ark().V1().PodVolumeBackups(),
-			s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+			s.sharedInformerFactory.Velero().V1().PodVolumeBackups(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			newPluginManager,
 		)
 		wg.Add(1)
@@ -631,13 +631,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	restoreController := controller.NewRestoreController(
 		s.namespace,
-		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.arkClient.ArkV1(),
-		s.arkClient.ArkV1(),
+		s.sharedInformerFactory.Velero().V1().Restores(),
+		s.veleroClient.VeleroV1(),
+		s.veleroClient.VeleroV1(),
 		restorer,
-		s.sharedInformerFactory.Ark().V1().Backups(),
-		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Ark().V1().VolumeSnapshotLocations(),
+		s.sharedInformerFactory.Velero().V1().Backups(),
+		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 		s.logger,
 		s.logLevel,
 		newPluginManager,
@@ -652,11 +652,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}()
 
 	downloadRequestController := controller.NewDownloadRequestController(
-		s.arkClient.ArkV1(),
-		s.sharedInformerFactory.Ark().V1().DownloadRequests(),
-		s.sharedInformerFactory.Ark().V1().Restores(),
-		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
-		s.sharedInformerFactory.Ark().V1().Backups(),
+		s.veleroClient.VeleroV1(),
+		s.sharedInformerFactory.Velero().V1().DownloadRequests(),
+		s.sharedInformerFactory.Velero().V1().Restores(),
+		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Velero().V1().Backups(),
 		newPluginManager,
 		s.logger,
 	)
@@ -668,9 +668,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	resticRepoController := controller.NewResticRepositoryController(
 		s.logger,
-		s.sharedInformerFactory.Ark().V1().ResticRepositories(),
-		s.arkClient.ArkV1(),
-		s.sharedInformerFactory.Ark().V1().BackupStorageLocations(),
+		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
+		s.veleroClient.VeleroV1(),
+		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 		s.resticManager,
 	)
 	wg.Add(1)
@@ -683,8 +683,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	serverStatusRequestController := controller.NewServerStatusRequestController(
 		s.logger,
-		s.arkClient.ArkV1(),
-		s.sharedInformerFactory.Ark().V1().ServerStatusRequests(),
+		s.veleroClient.VeleroV1(),
+		s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
 	)
 	wg.Add(1)
 	go func() {
@@ -696,7 +696,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	go s.sharedInformerFactory.Start(ctx.Done())
 
 	// TODO(1.0): remove
-	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Ark().V1().Backups().Informer().HasSynced)
+	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Velero().V1().Backups().Informer().HasSynced)
 	s.removeDeprecatedGCFinalizer()
 
 	s.logger.Info("Server started successfully")
@@ -726,7 +726,7 @@ func (s *server) runProfiler() {
 func (s *server) removeDeprecatedGCFinalizer() {
 	const gcFinalizer = "gc.ark.heptio.com"
 
-	backups, err := s.sharedInformerFactory.Ark().V1().Backups().Lister().List(labels.Everything())
+	backups, err := s.sharedInformerFactory.Velero().V1().Backups().Lister().List(labels.Everything())
 	if err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
 		return
@@ -755,7 +755,7 @@ func (s *server) removeDeprecatedGCFinalizer() {
 			continue
 		}
 
-		_, err = s.arkClient.ArkV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
+		_, err = s.veleroClient.VeleroV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
 		}

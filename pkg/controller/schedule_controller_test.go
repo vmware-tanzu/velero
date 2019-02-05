@@ -30,12 +30,13 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions"
-	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/util/collections"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/metrics"
+	"github.com/heptio/velero/pkg/util/collections"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestProcessSchedule(t *testing.T) {
@@ -62,54 +63,54 @@ func TestProcessSchedule(t *testing.T) {
 		},
 		{
 			name:        "schedule with phase FailedValidation does not get processed",
-			schedule:    arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).Schedule,
+			schedule:    velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).Schedule,
 			expectedErr: false,
 		},
 		{
 			name:                     "schedule with phase New gets validated and failed if invalid",
-			schedule:                 arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
+			schedule:                 velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
 			expectedErr:              false,
 			expectedPhase:            string(api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase <blank> gets validated and failed if invalid",
-			schedule:                 arktest.NewTestSchedule("ns", "name").Schedule,
+			schedule:                 velerotest.NewTestSchedule("ns", "name").Schedule,
 			expectedErr:              false,
 			expectedPhase:            string(api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase Enabled gets re-validated and failed if invalid",
-			schedule:                 arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
+			schedule:                 velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
 			expectedErr:              false,
 			expectedPhase:            string(api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                 "schedule with phase New gets validated and triggers a backup",
-			schedule:             arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).WithCronSchedule("@every 5m").Schedule,
+			schedule:             velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).WithCronSchedule("@every 5m").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
 			expectedPhase:        string(api.SchedulePhaseEnabled),
-			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name:                 "schedule with phase Enabled gets re-validated and triggers a backup if valid",
-			schedule:             arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
+			schedule:             velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name: "schedule that's already run gets LastBackup updated",
-			schedule: arktest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
+			schedule: velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
 				WithCronSchedule("@every 5m").WithLastBackupTime("2000-01-01 00:00:00").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: arktest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel("ark-schedule", "name").Backup,
+			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 	}
@@ -119,14 +120,14 @@ func TestProcessSchedule(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
-				logger          = arktest.NewLogger()
+				logger          = velerotest.NewLogger()
 			)
 
 			c := NewScheduleController(
 				"namespace",
-				client.ArkV1(),
-				client.ArkV1(),
-				sharedInformers.Ark().V1().Schedules(),
+				client.VeleroV1(),
+				client.VeleroV1(),
+				sharedInformers.Velero().V1().Schedules(),
 				logger,
 				metrics.NewServerMetrics(),
 			)
@@ -142,7 +143,7 @@ func TestProcessSchedule(t *testing.T) {
 			c.clock = clock.NewFakeClock(testTime)
 
 			if test.schedule != nil {
-				sharedInformers.Ark().V1().Schedules().Informer().GetStore().Add(test.schedule)
+				sharedInformers.Velero().V1().Schedules().Informer().GetStore().Add(test.schedule)
 
 				// this is necessary so the Patch() call returns the appropriate object
 				client.PrependReactor("patch", "schedules", func(action core.Action) (bool, runtime.Object, error) {
@@ -217,7 +218,7 @@ func TestProcessSchedule(t *testing.T) {
 					},
 				}
 
-				arktest.ValidatePatch(t, actions[index], expected, decode)
+				velerotest.ValidatePatch(t, actions[index], expected, decode)
 
 				index++
 			}
@@ -244,7 +245,7 @@ func TestProcessSchedule(t *testing.T) {
 					},
 				}
 
-				arktest.ValidatePatch(t, actions[index], expected, decode)
+				velerotest.ValidatePatch(t, actions[index], expected, decode)
 			}
 		})
 	}
@@ -329,7 +330,7 @@ func TestGetNextRunTime(t *testing.T) {
 }
 
 func TestParseCronSchedule(t *testing.T) {
-	// From https://github.com/heptio/ark/issues/30, where we originally were using cron.Parse(),
+	// From https://github.com/heptio/velero/issues/30, where we originally were using cron.Parse(),
 	// which treats the first field as seconds, and not minutes. We want to use cron.ParseStandard()
 	// instead, which has the first field as minutes.
 
@@ -347,7 +348,7 @@ func TestParseCronSchedule(t *testing.T) {
 		},
 	}
 
-	logger := arktest.NewLogger()
+	logger := velerotest.NewLogger()
 
 	c, errs := parseCronSchedule(s, logger)
 	require.Empty(t, errs)
@@ -403,7 +404,7 @@ func TestGetBackup(t *testing.T) {
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
 					Labels: map[string]string{
-						"ark-schedule": "bar",
+						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
 				Spec: api.BackupSpec{},
@@ -426,7 +427,7 @@ func TestGetBackup(t *testing.T) {
 					Namespace: "foo",
 					Name:      "bar-20170725141500",
 					Labels: map[string]string{
-						"ark-schedule": "bar",
+						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
 				Spec: api.BackupSpec{},
@@ -456,7 +457,7 @@ func TestGetBackup(t *testing.T) {
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
 					Labels: map[string]string{
-						"ark-schedule": "bar",
+						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
 				Spec: api.BackupSpec{
@@ -490,9 +491,9 @@ func TestGetBackup(t *testing.T) {
 					Namespace: "foo",
 					Name:      "bar-20170725141500",
 					Labels: map[string]string{
-						"ark-schedule": "bar",
-						"bar":          "baz",
-						"foo":          "bar",
+						velerov1api.ScheduleNameLabel: "bar",
+						"bar":                         "baz",
+						"foo":                         "bar",
 					},
 				},
 				Spec: api.BackupSpec{},

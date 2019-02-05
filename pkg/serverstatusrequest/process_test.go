@@ -27,13 +27,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/generated/clientset/versioned/fake"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 )
 
 func statusRequestBuilder() *Builder {
-	return NewBuilder().Namespace(arkv1api.DefaultNamespace).Name("sr-1")
+	return NewBuilder().Namespace(velerov1api.DefaultNamespace).Name("sr-1")
 }
 
 func TestProcess(t *testing.T) {
@@ -47,8 +47,8 @@ func TestProcess(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		req            *arkv1api.ServerStatusRequest
-		expected       *arkv1api.ServerStatusRequest
+		req            *velerov1api.ServerStatusRequest
+		expected       *velerov1api.ServerStatusRequest
 		expectedErrMsg string
 	}{
 		{
@@ -56,25 +56,25 @@ func TestProcess(t *testing.T) {
 			req:  statusRequestBuilder().Build(),
 			expected: statusRequestBuilder().
 				ServerVersion(buildinfo.Version).
-				Phase(arkv1api.ServerStatusRequestPhaseProcessed).
+				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now).
 				Build(),
 		},
 		{
 			name: "server status request with phase=New gets processed",
 			req: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhaseNew).
+				Phase(velerov1api.ServerStatusRequestPhaseNew).
 				Build(),
 			expected: statusRequestBuilder().
 				ServerVersion(buildinfo.Version).
-				Phase(arkv1api.ServerStatusRequestPhaseProcessed).
+				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now).
 				Build(),
 		},
 		{
 			name: "server status request with phase=Processed gets deleted if expired",
 			req: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhaseProcessed).
+				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-61 * time.Second)).
 				Build(),
 			expected: nil,
@@ -82,21 +82,21 @@ func TestProcess(t *testing.T) {
 		{
 			name: "server status request with phase=Processed does not get deleted if not expired",
 			req: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhaseProcessed).
+				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
 				Build(),
 			expected: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhaseProcessed).
+				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
 				Build(),
 		},
 		{
 			name: "server status request with invalid phase returns an error",
 			req: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhase("an-invalid-phase")).
+				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
 				Build(),
 			expected: statusRequestBuilder().
-				Phase(arkv1api.ServerStatusRequestPhase("an-invalid-phase")).
+				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
 				Build(),
 			expectedErrMsg: "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
 		},
@@ -106,14 +106,14 @@ func TestProcess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.req)
 
-			err := Process(tc.req, client.ArkV1(), clock.NewFakeClock(now), logrus.StandardLogger())
+			err := Process(tc.req, client.VeleroV1(), clock.NewFakeClock(now), logrus.StandardLogger())
 			if tc.expectedErrMsg == "" {
 				assert.Nil(t, err)
 			} else {
 				assert.EqualError(t, err, tc.expectedErrMsg)
 			}
 
-			res, err := client.ArkV1().ServerStatusRequests(tc.req.Namespace).Get(tc.req.Name, metav1.GetOptions{})
+			res, err := client.VeleroV1().ServerStatusRequests(tc.req.Namespace).Get(tc.req.Name, metav1.GetOptions{})
 			if tc.expected == nil {
 				assert.Nil(t, res)
 				assert.True(t, apierrors.IsNotFound(err))

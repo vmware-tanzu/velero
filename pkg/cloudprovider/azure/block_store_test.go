@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 func TestGetVolumeID(t *testing.T) {
@@ -136,44 +136,44 @@ func TestGetComputeResourceName(t *testing.T) {
 
 func TestGetSnapshotTags(t *testing.T) {
 	tests := []struct {
-		name     string
-		arkTags  map[string]string
-		diskTags *map[string]*string
-		expected *map[string]*string
+		name       string
+		veleroTags map[string]string
+		diskTags   *map[string]*string
+		expected   *map[string]*string
 	}{
 		{
-			name:     "degenerate case (no tags)",
-			arkTags:  nil,
-			diskTags: nil,
-			expected: nil,
+			name:       "degenerate case (no tags)",
+			veleroTags: nil,
+			diskTags:   nil,
+			expected:   nil,
 		},
 		{
-			name: "ark tags only get applied",
-			arkTags: map[string]string{
-				"ark-key1": "ark-val1",
-				"ark-key2": "ark-val2",
-			},
-			diskTags: nil,
-			expected: &map[string]*string{
-				"ark-key1": stringPtr("ark-val1"),
-				"ark-key2": stringPtr("ark-val2"),
-			},
-		},
-		{
-			name: "slashes in ark tag keys get replaces with dashes",
-			arkTags: map[string]string{
-				"ark/key1":  "ark-val1",
-				"ark/key/2": "ark-val2",
+			name: "velero tags only get applied",
+			veleroTags: map[string]string{
+				"velero-key1": "velero-val1",
+				"velero-key2": "velero-val2",
 			},
 			diskTags: nil,
 			expected: &map[string]*string{
-				"ark-key1":  stringPtr("ark-val1"),
-				"ark-key-2": stringPtr("ark-val2"),
+				"velero-key1": stringPtr("velero-val1"),
+				"velero-key2": stringPtr("velero-val2"),
 			},
 		},
 		{
-			name:    "volume tags only get applied",
-			arkTags: nil,
+			name: "slashes in velero tag keys get replaces with dashes",
+			veleroTags: map[string]string{
+				"velero/key1":  "velero-val1",
+				"velero/key/2": "velero-val2",
+			},
+			diskTags: nil,
+			expected: &map[string]*string{
+				"velero-key1":  stringPtr("velero-val1"),
+				"velero-key-2": stringPtr("velero-val2"),
+			},
+		},
+		{
+			name:       "volume tags only get applied",
+			veleroTags: nil,
 			diskTags: &map[string]*string{
 				"azure-key1": stringPtr("azure-val1"),
 				"azure-key2": stringPtr("azure-val2"),
@@ -184,35 +184,35 @@ func TestGetSnapshotTags(t *testing.T) {
 			},
 		},
 		{
-			name:     "non-overlapping ark and volume tags both get applied",
-			arkTags:  map[string]string{"ark-key": "ark-val"},
-			diskTags: &map[string]*string{"azure-key": stringPtr("azure-val")},
+			name:       "non-overlapping velero and volume tags both get applied",
+			veleroTags: map[string]string{"velero-key": "velero-val"},
+			diskTags:   &map[string]*string{"azure-key": stringPtr("azure-val")},
 			expected: &map[string]*string{
-				"ark-key":   stringPtr("ark-val"),
-				"azure-key": stringPtr("azure-val"),
+				"velero-key": stringPtr("velero-val"),
+				"azure-key":  stringPtr("azure-val"),
 			},
 		},
 		{
-			name: "when tags overlap, ark tags take precedence",
-			arkTags: map[string]string{
-				"ark-key":         "ark-val",
-				"overlapping-key": "ark-val",
+			name: "when tags overlap, velero tags take precedence",
+			veleroTags: map[string]string{
+				"velero-key":      "velero-val",
+				"overlapping-key": "velero-val",
 			},
 			diskTags: &map[string]*string{
 				"azure-key":       stringPtr("azure-val"),
 				"overlapping-key": stringPtr("azure-val"),
 			},
 			expected: &map[string]*string{
-				"ark-key":         stringPtr("ark-val"),
+				"velero-key":      stringPtr("velero-val"),
 				"azure-key":       stringPtr("azure-val"),
-				"overlapping-key": stringPtr("ark-val"),
+				"overlapping-key": stringPtr("velero-val"),
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			res := getSnapshotTags(test.arkTags, test.diskTags)
+			res := getSnapshotTags(test.veleroTags, test.diskTags)
 
 			if test.expected == nil {
 				assert.Nil(t, res)

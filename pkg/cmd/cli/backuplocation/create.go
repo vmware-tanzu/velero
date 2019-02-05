@@ -24,11 +24,11 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	"github.com/heptio/ark/pkg/cmd/util/output"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -70,7 +70,7 @@ func NewCreateOptions() *CreateOptions {
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the backup storage provider (e.g. aws, azure, gcp)")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Ark data should be stored within the bucket. Optional.")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
 }
@@ -124,7 +124,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	if _, err := client.ArkV1().BackupStorageLocations(backupStorageLocation.Namespace).Create(backupStorageLocation); err != nil {
+	if _, err := client.VeleroV1().BackupStorageLocations(backupStorageLocation.Namespace).Create(backupStorageLocation); err != nil {
 		return errors.WithStack(err)
 	}
 

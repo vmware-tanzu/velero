@@ -21,9 +21,9 @@ import (
 	"path"
 	"strings"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider/aws"
-	"github.com/heptio/ark/pkg/persistence"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider/aws"
+	"github.com/heptio/velero/pkg/persistence"
 )
 
 type BackendType string
@@ -40,7 +40,7 @@ var getAWSBucketRegion = aws.GetBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
-func getRepoPrefix(location *arkv1api.BackupStorageLocation) string {
+func getRepoPrefix(location *velerov1api.BackupStorageLocation) string {
 	var provider, bucket, prefix, bucketAndPrefix string
 
 	if location.Spec.ObjectStorage != nil {
@@ -80,7 +80,7 @@ func getRepoPrefix(location *arkv1api.BackupStorageLocation) string {
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
 // restic commands for the given repository.
-func GetRepoIdentifier(location *arkv1api.BackupStorageLocation, name string) string {
+func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string) string {
 	prefix := getRepoPrefix(location)
 
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(prefix, "/"), name)

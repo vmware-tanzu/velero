@@ -19,8 +19,8 @@ package restic
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/cli/restic/repo"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd/cli/restic/repo"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {

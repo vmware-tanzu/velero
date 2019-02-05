@@ -34,12 +34,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	cloudprovidermocks "github.com/heptio/ark/pkg/cloudprovider/mocks"
-	"github.com/heptio/ark/pkg/util/encode"
-	arktest "github.com/heptio/ark/pkg/util/test"
-	"github.com/heptio/ark/pkg/volume"
+	arkv1api "github.com/heptio/velero/pkg/apis/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/util/encode"
+	velerotest "github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 type objectBackupStoreTestHarness struct {
@@ -58,7 +59,7 @@ func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTe
 			objectStore: objectStore,
 			bucket:      bucket,
 			layout:      NewObjectStoreLayout(prefix),
-			logger:      arktest.NewLogger(),
+			logger:      velerotest.NewLogger(),
 		},
 		objectStore: objectStore,
 		bucket:      bucket,
@@ -85,8 +86,8 @@ func TestIsValid(t *testing.T) {
 		{
 			name: "backup store with no prefix and only unsupported directories is invalid",
 			storageData: map[string][]byte{
-				"backup-1/ark-backup.json": {},
-				"backup-2/ark-backup.json": {},
+				"backup-1/velero-backup.json": {},
+				"backup-2/velero-backup.json": {},
 			},
 			expectErr: true,
 		},
@@ -94,18 +95,18 @@ func TestIsValid(t *testing.T) {
 			name:   "backup store with a prefix and only unsupported directories is invalid",
 			prefix: "backups",
 			storageData: map[string][]byte{
-				"backups/backup-1/ark-backup.json": {},
-				"backups/backup-2/ark-backup.json": {},
+				"backups/backup-1/velero-backup.json": {},
+				"backups/backup-2/velero-backup.json": {},
 			},
 			expectErr: true,
 		},
 		{
 			name: "backup store with no prefix and both supported and unsupported directories is invalid",
 			storageData: map[string][]byte{
-				"backups/backup-1/ark-backup.json": {},
-				"backups/backup-2/ark-backup.json": {},
-				"restores/restore-1/foo":           {},
-				"unsupported-dir/foo":              {},
+				"backups/backup-1/velero-backup.json": {},
+				"backups/backup-2/velero-backup.json": {},
+				"restores/restore-1/foo":              {},
+				"unsupported-dir/foo":                 {},
 			},
 			expectErr: true,
 		},
@@ -113,19 +114,19 @@ func TestIsValid(t *testing.T) {
 			name:   "backup store with a prefix and both supported and unsupported directories is invalid",
 			prefix: "cluster-1",
 			storageData: map[string][]byte{
-				"cluster-1/backups/backup-1/ark-backup.json": {},
-				"cluster-1/backups/backup-2/ark-backup.json": {},
-				"cluster-1/restores/restore-1/foo":           {},
-				"cluster-1/unsupported-dir/foo":              {},
+				"cluster-1/backups/backup-1/velero-backup.json": {},
+				"cluster-1/backups/backup-2/velero-backup.json": {},
+				"cluster-1/restores/restore-1/foo":              {},
+				"cluster-1/unsupported-dir/foo":                 {},
 			},
 			expectErr: true,
 		},
 		{
 			name: "backup store with no prefix and only supported directories is valid",
 			storageData: map[string][]byte{
-				"backups/backup-1/ark-backup.json": {},
-				"backups/backup-2/ark-backup.json": {},
-				"restores/restore-1/foo":           {},
+				"backups/backup-1/velero-backup.json": {},
+				"backups/backup-2/velero-backup.json": {},
+				"restores/restore-1/foo":              {},
 			},
 			expectErr: false,
 		},
@@ -133,9 +134,9 @@ func TestIsValid(t *testing.T) {
 			name:   "backup store with a prefix and only supported directories is valid",
 			prefix: "cluster-1",
 			storageData: map[string][]byte{
-				"cluster-1/backups/backup-1/ark-backup.json": {},
-				"cluster-1/backups/backup-2/ark-backup.json": {},
-				"cluster-1/restores/restore-1/foo":           {},
+				"cluster-1/backups/backup-1/velero-backup.json": {},
+				"cluster-1/backups/backup-2/velero-backup.json": {},
+				"cluster-1/restores/restore-1/foo":              {},
 			},
 			expectErr: false,
 		},
@@ -170,17 +171,17 @@ func TestListBackups(t *testing.T) {
 		{
 			name: "normal case",
 			storageData: map[string][]byte{
-				"backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"backups/backup-1/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
+				"backups/backup-2/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []string{"backup-1", "backup-2"},
 		},
 		{
 			name:   "normal case with backup store prefix",
-			prefix: "ark-backups/",
+			prefix: "velero-backups/",
 			storageData: map[string][]byte{
-				"ark-backups/backups/backup-1/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"ark-backups/backups/backup-2/ark-backup.json": encodeToBytes(&api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"velero-backups/backups/backup-1/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
+				"velero-backups/backups/backup-2/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
 			},
 			expectedRes: []string{"backup-1", "backup-2"},
 		},
@@ -196,7 +197,7 @@ func TestListBackups(t *testing.T) {
 
 			res, err := harness.ListBackups()
 
-			arktest.AssertErrorMatches(t, tc.expectedErr, err)
+			velerotest.AssertErrorMatches(t, tc.expectedErr, err)
 
 			sort.Strings(tc.expectedRes)
 			sort.Strings(res)
@@ -225,7 +226,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:   newStringReadSeeker("snapshots"),
 			expectedErr: "",
 			expectedKeys: []string{
-				"backups/backup-1/ark-backup.json",
+				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-logs.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
@@ -241,7 +242,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:   newStringReadSeeker("snapshots"),
 			expectedErr: "",
 			expectedKeys: []string{
-				"prefix-1/backups/backup-1/ark-backup.json",
+				"prefix-1/backups/backup-1/velero-backup.json",
 				"prefix-1/backups/backup-1/backup-1.tar.gz",
 				"prefix-1/backups/backup-1/backup-1-logs.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
@@ -274,7 +275,7 @@ func TestPutBackup(t *testing.T) {
 			snapshots:   newStringReadSeeker("snapshots"),
 			expectedErr: "",
 			expectedKeys: []string{
-				"backups/backup-1/ark-backup.json",
+				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"metadata/revision",
@@ -297,10 +298,158 @@ func TestPutBackup(t *testing.T) {
 
 			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log, tc.snapshots)
 
-			arktest.AssertErrorMatches(t, tc.expectedErr, err)
+			velerotest.AssertErrorMatches(t, tc.expectedErr, err)
 			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))
 			for _, key := range tc.expectedKeys {
 				assert.Contains(t, harness.objectStore.Data[harness.bucket], key)
+			}
+		})
+	}
+}
+
+func TestGetBackupMetadata(t *testing.T) {
+	tests := []struct {
+		name       string
+		backupName string
+		key        string
+		obj        metav1.Object
+		wantErr    error
+	}{
+		{
+			name:       "legacy metadata file returns correctly",
+			backupName: "foo",
+			key:        "backups/foo/ark-backup.json",
+			obj: &arkv1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: arkv1api.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: arkv1api.DefaultNamespace,
+					Name:      "foo",
+				},
+			},
+		},
+		{
+			name:       "current metadata file returns correctly",
+			backupName: "foo",
+			key:        "backups/foo/velero-backup.json",
+			obj: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: velerov1api.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "foo",
+				},
+			},
+		},
+		{
+			name:       "no metadata file returns an error",
+			backupName: "foo",
+			wantErr:    errors.New("key not found"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+			if tc.obj != nil {
+				jsonBytes, err := json.Marshal(tc.obj)
+				require.NoError(t, err)
+
+				require.NoError(t, harness.objectStore.PutObject(harness.bucket, tc.key, bytes.NewReader(jsonBytes)))
+			}
+
+			res, err := harness.GetBackupMetadata(tc.backupName)
+			if tc.wantErr != nil {
+				assert.Equal(t, tc.wantErr, err)
+			} else {
+				require.NoError(t, err)
+
+				assert.Equal(t, tc.obj.GetNamespace(), res.Namespace)
+				assert.Equal(t, tc.obj.GetName(), res.Name)
+			}
+		})
+	}
+}
+
+func TestGetAndConvertLegacyBackupMetadata(t *testing.T) {
+	tests := []struct {
+		name    string
+		key     string
+		obj     metav1.Object
+		want    *velerov1api.Backup
+		wantErr error
+	}{
+		{
+			name: "velerov1api group, labels and annotations all get converted",
+			key:  "backups/foo/ark-backup.json",
+			obj: &arkv1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: arkv1api.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: arkv1api.DefaultNamespace,
+					Name:      "foo",
+					Labels: map[string]string{
+						"ark.heptio.com/foo":        "bar",
+						"ark.heptio.com/tango":      "foxtrot",
+						"prefix.ark.heptio.com/zaz": "zoo",
+						"non-matching":              "no-change",
+					},
+					Annotations: map[string]string{
+						"ark.heptio.com/foo":        "bar",
+						"ark.heptio.com/tango":      "foxtrot",
+						"prefix.ark.heptio.com/zaz": "zoo",
+						"non-matching":              "no-change",
+					},
+				},
+			},
+			want: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: velerov1api.SchemeGroupVersion.String(),
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: arkv1api.DefaultNamespace,
+					Name:      "foo",
+					Labels: map[string]string{
+						"velero.io/foo":        "bar",
+						"velero.io/tango":      "foxtrot",
+						"prefix.velero.io/zaz": "zoo",
+						"non-matching":         "no-change",
+					},
+					Annotations: map[string]string{
+						"velero.io/foo":        "bar",
+						"velero.io/tango":      "foxtrot",
+						"prefix.velero.io/zaz": "zoo",
+						"non-matching":         "no-change",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			harness := newObjectBackupStoreTestHarness("test-bucket", "")
+
+			jsonBytes, err := json.Marshal(tc.obj)
+			require.NoError(t, err)
+
+			require.NoError(t, harness.objectStore.PutObject(harness.bucket, tc.key, bytes.NewReader(jsonBytes)))
+
+			res, err := harness.getAndConvertLegacyBackupMetadata(tc.key)
+			if tc.wantErr != nil {
+				assert.Equal(t, tc.wantErr, err)
+			} else {
+				require.NoError(t, err)
+
+				assert.Equal(t, tc.want, res)
 			}
 		})
 	}
@@ -310,7 +459,7 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 	harness := newObjectBackupStoreTestHarness("test-bucket", "")
 
 	// volumesnapshots file not found should not error
-	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/ark-backup.json", newStringReadSeeker("foo"))
+	harness.objectStore.PutObject(harness.bucket, "backups/test-backup/velero-backup.json", newStringReadSeeker("foo"))
 	res, err := harness.GetBackupVolumeSnapshots("test-backup")
 	assert.NoError(t, err)
 	assert.Nil(t, res)
@@ -375,7 +524,7 @@ func TestDeleteBackup(t *testing.T) {
 		},
 		{
 			name:   "normal case with backup store prefix",
-			prefix: "ark-backups/",
+			prefix: "velero-backups/",
 		},
 		{
 			name:         "some delete errors, do as much as we can",
@@ -391,11 +540,11 @@ func TestDeleteBackup(t *testing.T) {
 				objectStore: objectStore,
 				bucket:      "test-bucket",
 				layout:      NewObjectStoreLayout(test.prefix),
-				logger:      arktest.NewLogger(),
+				logger:      velerotest.NewLogger(),
 			}
 			defer objectStore.AssertExpectations(t)
 
-			objects := []string{test.prefix + "backups/bak/ark-backup.json", test.prefix + "backups/bak/bak.tar.gz", test.prefix + "backups/bak/bak.log.gz"}
+			objects := []string{test.prefix + "backups/bak/velero-backup.json", test.prefix + "backups/bak/bak.tar.gz", test.prefix + "backups/bak/bak.log.gz"}
 
 			objectStore.On("ListObjects", backupStore.bucket, test.prefix+"backups/bak/").Return(objects, test.listObjectsError)
 			for i, obj := range objects {
@@ -410,7 +559,7 @@ func TestDeleteBackup(t *testing.T) {
 
 			err := backupStore.DeleteBackup("bak")
 
-			arktest.AssertErrorMatches(t, test.expectedErr, err)
+			velerotest.AssertErrorMatches(t, test.expectedErr, err)
 		})
 	}
 }
@@ -418,57 +567,57 @@ func TestDeleteBackup(t *testing.T) {
 func TestGetDownloadURL(t *testing.T) {
 	tests := []struct {
 		name        string
-		targetKind  api.DownloadTargetKind
+		targetKind  velerov1api.DownloadTargetKind
 		targetName  string
 		prefix      string
 		expectedKey string
 	}{
 		{
 			name:        "backup contents",
-			targetKind:  api.DownloadTargetKindBackupContents,
+			targetKind:  velerov1api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup",
 			expectedKey: "backups/my-backup/my-backup.tar.gz",
 		},
 		{
 			name:        "backup log",
-			targetKind:  api.DownloadTargetKindBackupLog,
+			targetKind:  velerov1api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup",
 			expectedKey: "backups/my-backup/my-backup-logs.gz",
 		},
 		{
 			name:        "scheduled backup contents",
-			targetKind:  api.DownloadTargetKindBackupContents,
+			targetKind:  velerov1api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup-20170913154901",
 			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
 		},
 		{
 			name:        "scheduled backup log",
-			targetKind:  api.DownloadTargetKindBackupLog,
+			targetKind:  velerov1api.DownloadTargetKindBackupLog,
 			targetName:  "my-backup-20170913154901",
 			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 		},
 		{
 			name:        "backup contents with backup store prefix",
-			targetKind:  api.DownloadTargetKindBackupContents,
+			targetKind:  velerov1api.DownloadTargetKindBackupContents,
 			targetName:  "my-backup",
-			prefix:      "ark-backups/",
-			expectedKey: "ark-backups/backups/my-backup/my-backup.tar.gz",
+			prefix:      "velero-backups/",
+			expectedKey: "velero-backups/backups/my-backup/my-backup.tar.gz",
 		},
 		{
 			name:        "restore log",
-			targetKind:  api.DownloadTargetKindRestoreLog,
+			targetKind:  velerov1api.DownloadTargetKindRestoreLog,
 			targetName:  "b-20170913154901",
 			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-logs.gz",
 		},
 		{
 			name:        "restore results",
-			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetKind:  velerov1api.DownloadTargetKindRestoreResults,
 			targetName:  "b-20170913154901",
 			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-results.gz",
 		},
 		{
 			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
-			targetKind:  api.DownloadTargetKindRestoreResults,
+			targetKind:  velerov1api.DownloadTargetKindRestoreResults,
 			targetName:  "b-cool-20170913154901-20170913154902",
 			expectedKey: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
 		},
@@ -480,7 +629,7 @@ func TestGetDownloadURL(t *testing.T) {
 
 			require.NoError(t, harness.objectStore.PutObject("test-bucket", test.expectedKey, newStringReadSeeker("foo")))
 
-			url, err := harness.GetDownloadURL(api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
+			url, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
 			require.NoError(t, err)
 			assert.Equal(t, "a-url", url)
 		})

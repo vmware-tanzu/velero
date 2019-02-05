@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/cli"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/cli"
 )
 
 // NewDeleteCommand creates and returns a new cobra command for deleting restores.
@@ -39,19 +39,19 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete restores",
 		Example: `	# delete a restore named "restore-1"
-	ark restore delete restore-1
+	velero restore delete restore-1
 
 	# delete a restore named "restore-1" without prompting for confirmation
-	ark restore delete restore-1 --confirm
+	velero restore delete restore-1 --confirm
 
 	# delete restores named "restore-1" and "restore-2"
-	ark restore delete restore-1 restore-2
+	velero restore delete restore-1 restore-2
 
 	# delete all restores labelled with foo=bar"
-	ark restore delete --selector foo=bar
+	velero restore delete --selector foo=bar
 	
 	# delete all restores
-	ark restore delete --all`,
+	velero restore delete --all`,
 
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
@@ -70,14 +70,14 @@ func Run(o *cli.DeleteOptions) error {
 		return nil
 	}
 	var (
-		restores []*arkv1api.Restore
+		restores []*velerov1api.Restore
 		errs     []error
 	)
 
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			restore, err := o.Client.ArkV1().Restores(o.Namespace).Get(name, metav1.GetOptions{})
+			restore, err := o.Client.VeleroV1().Restores(o.Namespace).Get(name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -89,7 +89,7 @@ func Run(o *cli.DeleteOptions) error {
 		if o.Selector.LabelSelector != nil {
 			selector = o.Selector.String()
 		}
-		res, err := o.Client.ArkV1().Restores(o.Namespace).List(metav1.ListOptions{
+		res, err := o.Client.VeleroV1().Restores(o.Namespace).List(metav1.ListOptions{
 			LabelSelector: selector,
 		})
 		if err != nil {
@@ -105,7 +105,7 @@ func Run(o *cli.DeleteOptions) error {
 		return nil
 	}
 	for _, r := range restores {
-		err := o.Client.ArkV1().Restores(r.Namespace).Delete(r.Name, nil)
+		err := o.Client.VeleroV1().Restores(r.Namespace).Delete(r.Name, nil)
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue

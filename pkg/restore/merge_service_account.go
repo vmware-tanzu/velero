@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 // mergeServiceAccount takes a backed up serviceaccount and merges attributes into the current in-cluster service account.

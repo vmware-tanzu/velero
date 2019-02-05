@@ -26,10 +26,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
 )
 
 func NewDownloadCommand(f client.Factory) *cobra.Command {
@@ -94,7 +94,7 @@ func (o *DownloadOptions) Complete(args []string) error {
 }
 
 func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
-	arkClient, err := f.Client()
+	veleroClient, err := f.Client()
 	cmd.CheckError(err)
 
 	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
@@ -103,7 +103,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(arkClient.ArkV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
+	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

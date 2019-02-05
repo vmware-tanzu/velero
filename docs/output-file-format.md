@@ -1,15 +1,15 @@
 # Output file format
 
-A backup is a gzip-compressed tar file whose name matches the Backup API resource's `metadata.name` (what is specified during `ark backup create <NAME>`).
+A backup is a gzip-compressed tar file whose name matches the Backup API resource's `metadata.name` (what is specified during `velero backup create <NAME>`).
 
-In cloud object storage, each backup file is stored in its own subdirectory in the bucket specified in the Ark server configuration. This subdirectory includes an additional file called `ark-backup.json`. The JSON file lists all information about your associated Backup resource, including any default values. This gives you a complete historical record of the backup configuration. The JSON file also specifies `status.version`, which corresponds to the output file format.
+In cloud object storage, each backup file is stored in its own subdirectory in the bucket specified in the Velero server configuration. This subdirectory includes an additional file called `velero-backup.json`. The JSON file lists all information about your associated Backup resource, including any default values. This gives you a complete historical record of the backup configuration. The JSON file also specifies `status.version`, which corresponds to the output file format.
 
 The directory structure in your cloud storage looks something like:
 
 ```
 rootBucket/
     backup1234/
-        ark-backup.json
+        velero-backup.json
         backup1234.tar.gz
 ```
 
@@ -18,11 +18,11 @@ rootBucket/
 ```json
 {
   "kind": "Backup",
-  "apiVersion": "ark.heptio.com/v1",
+  "apiVersion": "velero.io/v1",
   "metadata": {
     "name": "test-backup",
-    "namespace": "heptio-ark",
-    "selfLink": "/apis/ark.heptio.com/v1/namespaces/heptio-ark/backups/testtest",
+    "namespace": "velero",
+    "selfLink": "/apis/velero.io/v1/namespaces/velero/backups/testtest",
     "uid": "a12345cb-75f5-11e7-b4c2-abcdef123456",
     "resourceVersion": "337075",
     "creationTimestamp": "2017-07-31T13:39:15Z"

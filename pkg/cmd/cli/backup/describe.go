@@ -23,12 +23,12 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	pkgbackup "github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/output"
-	"github.com/heptio/ark/pkg/restic"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/output"
+	"github.com/heptio/velero/pkg/restic"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
@@ -41,37 +41,37 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
 		Short: "Describe backups",
 		Run: func(c *cobra.Command, args []string) {
-			arkClient, err := f.Client()
+			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
 			var backups *v1.BackupList
 			if len(args) > 0 {
 				backups = new(v1.BackupList)
 				for _, name := range args {
-					backup, err := arkClient.Ark().Backups(f.Namespace()).Get(name, metav1.GetOptions{})
+					backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					backups.Items = append(backups.Items, *backup)
 				}
 			} else {
-				backups, err = arkClient.ArkV1().Backups(f.Namespace()).List(listOptions)
+				backups, err = veleroClient.VeleroV1().Backups(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 
 			first := true
 			for _, backup := range backups.Items {
 				deleteRequestListOptions := pkgbackup.NewDeleteBackupRequestListOptions(backup.Name, string(backup.UID))
-				deleteRequestList, err := arkClient.ArkV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
+				deleteRequestList, err := veleroClient.VeleroV1().DeleteBackupRequests(f.Namespace()).List(deleteRequestListOptions)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
-				opts := restic.NewPodVolumeBackupListOptions(backup.Name, string(backup.UID))
-				podVolumeBackupList, err := arkClient.ArkV1().PodVolumeBackups(f.Namespace()).List(opts)
+				opts := restic.NewPodVolumeBackupListOptions(backup.Name)
+				podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, arkClient)
+				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, veleroClient)
 				if first {
 					first = false
 					fmt.Print(s)

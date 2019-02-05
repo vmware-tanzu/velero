@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// HandlerInitializer is a function that initializes and returns a new instance of one of Ark's plugin interfaces
+// HandlerInitializer is a function that initializes and returns a new instance of one of Velero's plugin interfaces
 // (ObjectStore, BlockStore, BackupItemAction, RestoreItemAction).
 type HandlerInitializer func(logger logrus.FieldLogger) (interface{}, error)
 

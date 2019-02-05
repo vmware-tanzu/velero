@@ -27,35 +27,35 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	arkv1informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 )
 
-// repositoryEnsurer ensures that Ark restic repositories are created and ready.
+// repositoryEnsurer ensures that Velero restic repositories are created and ready.
 type repositoryEnsurer struct {
-	repoLister arkv1listers.ResticRepositoryLister
-	repoClient arkv1client.ResticRepositoriesGetter
+	repoLister velerov1listers.ResticRepositoryLister
+	repoClient velerov1client.ResticRepositoriesGetter
 
 	readyChansLock sync.Mutex
-	readyChans     map[string]chan *arkv1api.ResticRepository
+	readyChans     map[string]chan *velerov1api.ResticRepository
 }
 
-func newRepositoryEnsurer(repoInformer arkv1informers.ResticRepositoryInformer, repoClient arkv1client.ResticRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
+func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInformer, repoClient velerov1client.ResticRepositoriesGetter, log logrus.FieldLogger) *repositoryEnsurer {
 	r := &repositoryEnsurer{
 		repoLister: repoInformer.Lister(),
 		repoClient: repoClient,
-		readyChans: make(map[string]chan *arkv1api.ResticRepository),
+		readyChans: make(map[string]chan *velerov1api.ResticRepository),
 	}
 
 	repoInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			UpdateFunc: func(old, upd interface{}) {
-				oldObj := old.(*arkv1api.ResticRepository)
-				newObj := upd.(*arkv1api.ResticRepository)
+				oldObj := old.(*velerov1api.ResticRepository)
+				newObj := upd.(*velerov1api.ResticRepository)
 
-				if oldObj.Status.Phase != arkv1api.ResticRepositoryPhaseReady && newObj.Status.Phase == arkv1api.ResticRepositoryPhaseReady {
+				if oldObj.Status.Phase != velerov1api.ResticRepositoryPhaseReady && newObj.Status.Phase == velerov1api.ResticRepositoryPhaseReady {
 					r.readyChansLock.Lock()
 					defer r.readyChansLock.Unlock()
 
@@ -78,12 +78,12 @@ func newRepositoryEnsurer(repoInformer arkv1informers.ResticRepositoryInformer, 
 
 func repoLabels(volumeNamespace, backupLocation string) labels.Set {
 	return map[string]string{
-		arkv1api.ResticVolumeNamespaceLabel: volumeNamespace,
-		arkv1api.StorageLocationLabel:       backupLocation,
+		velerov1api.ResticVolumeNamespaceLabel: volumeNamespace,
+		velerov1api.StorageLocationLabel:       backupLocation,
 	}
 }
 
-func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*arkv1api.ResticRepository, error) {
+func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNamespace, backupLocation string) (*velerov1api.ResticRepository, error) {
 	selector := labels.SelectorFromSet(repoLabels(volumeNamespace, backupLocation))
 
 	repos, err := r.repoLister.ResticRepositories(namespace).List(selector)
@@ -94,7 +94,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		return nil, errors.Errorf("more than one ResticRepository found for workload namespace %q, backup storage location %q", volumeNamespace, backupLocation)
 	}
 	if len(repos) == 1 {
-		if repos[0].Status.Phase != arkv1api.ResticRepositoryPhaseReady {
+		if repos[0].Status.Phase != velerov1api.ResticRepositoryPhaseReady {
 			return nil, errors.New("restic repository is not ready")
 		}
 		return repos[0], nil
@@ -102,13 +102,13 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 
 	// no repo found: create one and wait for it to be ready
 
-	repo := &arkv1api.ResticRepository{
+	repo := &velerov1api.ResticRepository{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    namespace,
 			GenerateName: fmt.Sprintf("%s-%s-", volumeNamespace, backupLocation),
 			Labels:       repoLabels(volumeNamespace, backupLocation),
 		},
-		Spec: arkv1api.ResticRepositorySpec{
+		Spec: velerov1api.ResticRepositorySpec{
 			VolumeNamespace:       volumeNamespace,
 			BackupStorageLocation: backupLocation,
 			MaintenanceFrequency:  metav1.Duration{Duration: DefaultMaintenanceFrequency},
@@ -130,10 +130,10 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 }
 
-func (r *repositoryEnsurer) getReadyChan(name string) chan *arkv1api.ResticRepository {
+func (r *repositoryEnsurer) getReadyChan(name string) chan *velerov1api.ResticRepository {
 	r.readyChansLock.Lock()
 	defer r.readyChansLock.Unlock()
 
-	r.readyChans[name] = make(chan *arkv1api.ResticRepository)
+	r.readyChans[name] = make(chan *velerov1api.ResticRepository)
 	return r.readyChans[name]
 }

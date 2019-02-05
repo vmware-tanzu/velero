@@ -33,8 +33,8 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestNewPodCommandExecutor(t *testing.T) {
@@ -82,7 +82,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name:         "container not found",
-			item:         arktest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			item:         velerotest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -92,7 +92,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 		},
 		{
 			name:         "command missing",
-			item:         arktest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
+			item:         velerotest.UnstructuredOrDie(`{"kind":"Pod","spec":{"containers":[{"name":"foo"}]}}`).Object,
 			podNamespace: "ns",
 			podName:      "pod",
 			hookName:     "hook",
@@ -105,7 +105,7 @@ func TestExecutePodCommandMissingInputs(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			e := &defaultPodCommandExecutor{}
-			err := e.ExecutePodCommand(arktest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
+			err := e.ExecutePodCommand(velerotest.NewLogger(), test.item, test.podNamespace, test.podName, test.hookName, test.hook)
 			assert.Error(t, err)
 		})
 	}
@@ -161,7 +161,7 @@ func TestExecutePodCommand(t *testing.T) {
 				Timeout:   metav1.Duration{Duration: test.timeout},
 			}
 
-			pod, err := arktest.GetAsMap(`
+			pod, err := velerotest.GetAsMap(`
 {
 	"metadata": {
 		"namespace": "namespace",
@@ -209,7 +209,7 @@ func TestExecutePodCommand(t *testing.T) {
 			}
 			streamExecutor.On("Stream", expectedStreamOptions).Return(test.hookError)
 
-			err = podCommandExecutor.ExecutePodCommand(arktest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
+			err = podCommandExecutor.ExecutePodCommand(velerotest.NewLogger(), pod, "namespace", "name", "hookName", &hook)
 			if test.expectedError != "" {
 				assert.EqualError(t, err, test.expectedError)
 				return

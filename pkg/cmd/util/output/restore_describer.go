@@ -24,12 +24,12 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cmd/util/downloadrequest"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, arkClient clientset.Interface) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -96,7 +96,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		}
 
 		d.Println()
-		describeRestoreResults(d, restore, arkClient)
+		describeRestoreResults(d, restore, veleroClient)
 
 		if len(podVolumeRestores) > 0 {
 			d.Println()
@@ -105,7 +105,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 	})
 }
 
-func describeRestoreResults(d *Describer, restore *v1.Restore, arkClient clientset.Interface) {
+func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
 		d.Printf("Warnings:\t<none>\nErrors:\t<none>\n")
 		return
@@ -114,7 +114,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, arkClient clients
 	var buf bytes.Buffer
 	var resultMap map[string]v1.RestoreResult
 
-	if err := downloadrequest.Stream(arkClient.ArkV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}
@@ -131,7 +131,8 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, arkClient clients
 
 func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
 	d.Printf("%s:\n", name)
-	d.DescribeSlice(1, "Ark", result.Ark)
+	// TODO(1.0): only describe result.Velero
+	d.DescribeSlice(1, "Velero", append(result.Ark, result.Velero...))
 	d.DescribeSlice(1, "Cluster", result.Cluster)
 	if len(result.Namespaces) == 0 {
 		d.Printf("\tNamespaces: <none>\n")

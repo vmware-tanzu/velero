@@ -1,9 +1,9 @@
-# Run Ark on Azure
+# Run Velero on Azure
 
-To configure Ark on Azure, you:
+To configure Velero on Azure, you:
 
 * Create your Azure storage account and blob container
-* Create Azure service principal for Ark
+* Create Azure service principal for Velero
 * Configure the server
 * Create a Secret for your credentials
 
@@ -22,11 +22,11 @@ consider using Premium Managed Disks, which are SSD backed.
 
 ## Create Azure storage account and blob container
 
-Heptio Ark requires a storage account and blob container in which to store backups.
+Velero requires a storage account and blob container in which to store backups.
 
 The storage account can be created in the same Resource Group as your Kubernetes cluster or
 separated into its own Resource Group. The example below shows the storage account created in a
-separate `Ark_Backups` Resource Group.
+separate `Velero_Backups` Resource Group.
 
 The storage account needs to be created with a globally unique id since this is used for dns. In
 the sample script below, we're generating a random name using `uuidgen`, but you can come up with 
@@ -36,11 +36,11 @@ configured to only allow access via https.
 
 ```bash
 # Create a resource group for the backups storage account. Change the location as needed.
-AZURE_BACKUP_RESOURCE_GROUP=Ark_Backups
+AZURE_BACKUP_RESOURCE_GROUP=Velero_Backups
 az group create -n $AZURE_BACKUP_RESOURCE_GROUP --location WestUS
 
 # Create the storage account
-AZURE_STORAGE_ACCOUNT_ID="ark$(uuidgen | cut -d '-' -f5 | tr '[A-Z]' '[a-z]')"
+AZURE_STORAGE_ACCOUNT_ID="velero$(uuidgen | cut -d '-' -f5 | tr '[A-Z]' '[a-z]')"
 az storage account create \
     --name $AZURE_STORAGE_ACCOUNT_ID \
     --resource-group $AZURE_BACKUP_RESOURCE_GROUP \
@@ -51,10 +51,10 @@ az storage account create \
     --access-tier Hot
 ```
 
-Create the blob container named `ark`. Feel free to use a different name, preferably unique to a single Kubernetes cluster. See the [FAQ][20] for more details.
+Create the blob container named `velero`. Feel free to use a different name, preferably unique to a single Kubernetes cluster. See the [FAQ][20] for more details.
 
 ```bash
-az storage container create -n ark --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
+az storage container create -n velero --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 ```
 
 ## Get resource group for persistent volume snapshots
@@ -78,7 +78,7 @@ az storage container create -n ark --public-access off --account-name $AZURE_STO
 
 ## Create service principal
 
-To integrate Ark with Azure, you must create an Ark-specific [service principal][17].
+To integrate Velero with Azure, you must create an Velero-specific [service principal][17].
 
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
@@ -89,23 +89,23 @@ To integrate Ark with Azure, you must create an Ark-specific [service principal]
 
 1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
 
-    > If you'll be using Ark to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `heptio-ark`.
+    > If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
     ```bash
     # Create service principal and specify your own password
     AZURE_CLIENT_SECRET=super_secret_and_high_entropy_password_replace_me_with_your_own
-    az ad sp create-for-rbac --name "heptio-ark" --role "Contributor" --password $AZURE_CLIENT_SECRET
+    az ad sp create-for-rbac --name "velero" --role "Contributor" --password $AZURE_CLIENT_SECRET
 
     # Or create service principal and let the CLI generate a password for you. Make sure to capture the password.
-    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "heptio-ark" --role "Contributor" --query 'password' -o tsv`
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv`
 
     # After creating the service principal, obtain the client id
-    AZURE_CLIENT_ID=`az ad sp list --display-name "heptio-ark" --query '[0].appId' -o tsv`
+    AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
 ## Credentials and configuration
 
-In the Ark directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML file to specify the namespace. See [Run in custom namespace][0].
+In the Velero directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML file to specify the namespace. See [Run in custom namespace][0].
 
 ```bash
 kubectl apply -f config/common/00-prereqs.yaml
@@ -115,7 +115,7 @@ Now you need to create a Secret that contains all the environment variables you 
 
 ```bash
 kubectl create secret generic cloud-credentials \
-    --namespace <ARK_NAMESPACE> \
+    --namespace <VELERO_NAMESPACE> \
     --from-literal AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID} \
     --from-literal AZURE_TENANT_ID=${AZURE_TENANT_ID} \
     --from-literal AZURE_CLIENT_ID=${AZURE_CLIENT_ID} \
@@ -125,21 +125,21 @@ kubectl create secret generic cloud-credentials \
 
 Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
 
-* In file `config/azure/05-ark-backupstoragelocation.yaml`:
+* In file `config/azure/05-backupstoragelocation.yaml`:
 
   * Replace `<YOUR_BLOB_CONTAINER>`, `<YOUR_STORAGE_RESOURCE_GROUP>`, and `<YOUR_STORAGE_ACCOUNT>`. See the [BackupStorageLocation definition][21] for details.
 
-* In file `config/azure/06-ark-volumesnapshotlocation.yaml`:
+* In file `config/azure/06-volumesnapshotlocation.yaml`:
 
   * Replace `<YOUR_TIMEOUT>`. See the [VolumeSnapshotLocation definition][8] for details.
 
-* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/azure/00-ark-deployment.yaml`:
+* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/azure/00-deployment.yaml`:
 
   * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
 ## Start the server
 
-In the root of your Ark directory, run:
+In the root of your Velero directory, run:
 
   ```bash
   kubectl apply -f config/azure/

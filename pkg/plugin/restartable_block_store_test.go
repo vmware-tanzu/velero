@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/ark/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/cloudprovider/mocks"
 )
 
 func TestRestartableGetBlockStore(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 )
 
 // PluginKind is a type alias for a string that describes
-// the kind of an Ark-supported plugin.
+// the kind of a Velero-supported plugin.
 type PluginKind string
 
 // String returns the string for k.
@@ -45,8 +45,8 @@ const (
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
 
-// allPluginKinds contains all the valid plugin kinds that Ark supports, excluding PluginLister because that is not a
-// kind that a developer would ever need to implement (it's handled by Ark and the Ark plugin library code).
+// allPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
+// kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
 var allPluginKinds = sets.NewString(
 	PluginKindObjectStore.String(),
 	PluginKindBlockStore.String(),

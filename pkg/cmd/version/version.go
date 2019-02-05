@@ -27,12 +27,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	"github.com/heptio/ark/pkg/serverstatusrequest"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/heptio/velero/pkg/serverstatusrequest"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -44,28 +44,28 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "version",
-		Short: "Print the ark version and associated image",
+		Short: "Print the velero version and associated image",
 		Run: func(c *cobra.Command, args []string) {
-			var arkClient arkv1client.ServerStatusRequestsGetter
+			var veleroClient velerov1client.ServerStatusRequestsGetter
 
 			if !clientOnly {
 				client, err := f.Client()
 				cmd.CheckError(err)
 
-				arkClient = client.ArkV1()
+				veleroClient = client.VeleroV1()
 			}
 
-			printVersion(os.Stdout, clientOnly, arkClient, serverStatusGetter)
+			printVersion(os.Stdout, clientOnly, veleroClient, serverStatusGetter)
 		},
 	}
 
 	c.Flags().DurationVar(&serverStatusGetter.timeout, "timeout", serverStatusGetter.timeout, "maximum time to wait for server version to be reported")
-	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "only get ark client version, not server version")
+	c.Flags().BoolVar(&clientOnly, "client-only", clientOnly, "only get velero client version, not server version")
 
 	return c
 }
 
-func printVersion(w io.Writer, clientOnly bool, client arkv1client.ServerStatusRequestsGetter, serverStatusGetter serverStatusGetter) {
+func printVersion(w io.Writer, clientOnly bool, client velerov1client.ServerStatusRequestsGetter, serverStatusGetter serverStatusGetter) {
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())
@@ -85,7 +85,7 @@ func printVersion(w io.Writer, clientOnly bool, client arkv1client.ServerStatusR
 }
 
 type serverStatusGetter interface {
-	getServerStatus(client arkv1client.ServerStatusRequestsGetter) (*arkv1api.ServerStatusRequest, error)
+	getServerStatus(client velerov1client.ServerStatusRequestsGetter) (*velerov1api.ServerStatusRequest, error)
 }
 
 type defaultServerStatusGetter struct {
@@ -93,8 +93,8 @@ type defaultServerStatusGetter struct {
 	timeout   time.Duration
 }
 
-func (g *defaultServerStatusGetter) getServerStatus(client arkv1client.ServerStatusRequestsGetter) (*arkv1api.ServerStatusRequest, error) {
-	req := serverstatusrequest.NewBuilder().Namespace(g.namespace).GenerateName("ark-cli-").Build()
+func (g *defaultServerStatusGetter) getServerStatus(client velerov1client.ServerStatusRequestsGetter) (*velerov1api.ServerStatusRequest, error) {
+	req := serverstatusrequest.NewBuilder().Namespace(g.namespace).GenerateName("velero-cli-").Build()
 
 	created, err := client.ServerStatusRequests(g.namespace).Create(req)
 	if err != nil {
@@ -123,7 +123,7 @@ Loop:
 		case <-expired.C:
 			return nil, errors.New("timed out waiting for server status request to be processed")
 		case e := <-watcher.ResultChan():
-			updated, ok := e.Object.(*arkv1api.ServerStatusRequest)
+			updated, ok := e.Object.(*velerov1api.ServerStatusRequest)
 			if !ok {
 				return nil, errors.Errorf("unexpected type %T", e.Object)
 			}
@@ -138,7 +138,7 @@ Loop:
 			case watch.Deleted:
 				return nil, errors.New("server status request was unexpectedly deleted")
 			case watch.Modified:
-				if updated.Status.Phase == arkv1api.ServerStatusRequestPhaseProcessed {
+				if updated.Status.Phase == velerov1api.ServerStatusRequestPhaseProcessed {
 					req = updated
 					break Loop
 				}

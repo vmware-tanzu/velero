@@ -24,11 +24,11 @@ import (
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/cli/backup"
-	"github.com/heptio/ark/pkg/cmd/util/output"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/cli/backup"
+	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
@@ -47,7 +47,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 4                  | Month            | 1-12,*            |
 | 5                  | Day of Week      | 0-7,*             |`,
 
-		Example: `ark create schedule NAME --schedule="0 */6 * * *"`,
+		Example: `velero create schedule NAME --schedule="0 */6 * * *"`,
 		Args:    cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
@@ -94,7 +94,7 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	arkClient, err := f.Client()
+	veleroClient, err := f.Client()
 	if err != nil {
 		return err
 	}
@@ -126,7 +126,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	_, err = arkClient.ArkV1().Schedules(schedule.Namespace).Create(schedule)
+	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(schedule)
 	if err != nil {
 		return err
 	}

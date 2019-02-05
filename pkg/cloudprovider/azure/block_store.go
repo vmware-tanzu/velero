@@ -33,8 +33,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/util/collections"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const (
@@ -215,8 +215,8 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	return getComputeResourceName(b.subscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
-func getSnapshotTags(arkTags map[string]string, diskTags *map[string]*string) *map[string]*string {
-	if diskTags == nil && len(arkTags) == 0 {
+func getSnapshotTags(veleroTags map[string]string, diskTags *map[string]*string) *map[string]*string {
+	if diskTags == nil && len(veleroTags) == 0 {
 		return nil
 	}
 
@@ -229,10 +229,10 @@ func getSnapshotTags(arkTags map[string]string, diskTags *map[string]*string) *m
 		}
 	}
 
-	// merge Ark-assigned tags with the disk's tags (note that we want current
-	// Ark-assigned tags to overwrite any older versions of them that may exist
+	// merge Velero-assigned tags with the disk's tags (note that we want current
+	// Velero-assigned tags to overwrite any older versions of them that may exist
 	// due to prior snapshots/restores)
-	for k, v := range arkTags {
+	for k, v := range veleroTags {
 		// Azure does not allow slashes in tag keys, so replace
 		// with dash (inline with what Kubernetes does)
 		key := strings.Replace(k, "/", "-", -1)
@@ -291,7 +291,7 @@ func (b *blockStore) parseSnapshotName(name string) (*snapshotIdentifier, error)
 	case !strings.Contains(name, "/"):
 		return &snapshotIdentifier{
 			subscription: b.subscription,
-			// use the disksResourceGroup here because Ark only
+			// use the disksResourceGroup here because Velero only
 			// supported storing snapshots in that resource group
 			// when the legacy snapshot format was used.
 			resourceGroup: b.disksResourceGroup,

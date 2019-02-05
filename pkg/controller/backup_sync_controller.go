@@ -29,31 +29,31 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/util/stringslice"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
 type backupSyncController struct {
 	*genericController
 
-	backupClient                arkv1client.BackupsGetter
-	backupLocationClient        arkv1client.BackupStorageLocationsGetter
+	backupClient                velerov1client.BackupsGetter
+	backupLocationClient        velerov1client.BackupStorageLocationsGetter
 	backupLister                listers.BackupLister
 	backupStorageLocationLister listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
 	newPluginManager            func(logrus.FieldLogger) plugin.Manager
-	newBackupStore              func(*arkv1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupSyncController(
-	backupClient arkv1client.BackupsGetter,
-	backupLocationClient arkv1client.BackupStorageLocationsGetter,
+	backupClient velerov1client.BackupsGetter,
+	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	backupInformer informers.BackupInformer,
 	backupStorageLocationInformer informers.BackupStorageLocationInformer,
 	syncPeriod time.Duration,
@@ -92,9 +92,10 @@ func NewBackupSyncController(
 	return c
 }
 
+// TODO(1.0): remove this
 const gcFinalizer = "gc.ark.heptio.com"
 
-func shouldSync(location *arkv1api.BackupStorageLocation, now time.Time, backupStore persistence.BackupStore, log logrus.FieldLogger) (bool, string) {
+func shouldSync(location *velerov1api.BackupStorageLocation, now time.Time, backupStore persistence.BackupStore, log logrus.FieldLogger) (bool, string) {
 	log = log.WithFields(map[string]interface{}{
 		"lastSyncedRevision": location.Status.LastSyncedRevision,
 		"lastSyncedTime":     location.Status.LastSyncedTime.Time.Format(time.RFC1123Z),
@@ -123,8 +124,8 @@ func shouldSync(location *arkv1api.BackupStorageLocation, now time.Time, backupS
 
 // orderedBackupLocations returns a new slice with the default backup location first (if it exists),
 // followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locations []*arkv1api.BackupStorageLocation, defaultLocationName string) []*arkv1api.BackupStorageLocation {
-	var result []*arkv1api.BackupStorageLocation
+func orderedBackupLocations(locations []*velerov1api.BackupStorageLocation, defaultLocationName string) []*velerov1api.BackupStorageLocation {
+	var result []*velerov1api.BackupStorageLocation
 
 	for i := range locations {
 		if locations[i].Name == defaultLocationName {
@@ -223,7 +224,7 @@ func (c *backupSyncController) run() {
 			if backup.Labels == nil {
 				backup.Labels = make(map[string]string)
 			}
-			backup.Labels[arkv1api.StorageLocationLabel] = backup.Spec.StorageLocation
+			backup.Labels[velerov1api.StorageLocationLabel] = backup.Spec.StorageLocation
 
 			_, err = c.backupClient.Backups(backup.Namespace).Create(backup)
 			switch {
@@ -265,7 +266,7 @@ func (c *backupSyncController) run() {
 	}
 }
 
-func patchStorageLocation(backup *arkv1api.Backup, client arkv1client.BackupInterface, location string) error {
+func patchStorageLocation(backup *velerov1api.Backup, client velerov1client.BackupInterface, location string) error {
 	patch := map[string]interface{}{
 		"spec": map[string]interface{}{
 			"storageLocation": location,
@@ -288,7 +289,7 @@ func patchStorageLocation(backup *arkv1api.Backup, client arkv1client.BackupInte
 // and a phase of Completed, but no corresponding backup in object storage.
 func (c *backupSyncController) deleteOrphanedBackups(locationName string, cloudBackupNames sets.String, log logrus.FieldLogger) {
 	locationSelector := labels.Set(map[string]string{
-		arkv1api.StorageLocationLabel: locationName,
+		velerov1api.StorageLocationLabel: locationName,
 	}).AsSelector()
 
 	backups, err := c.backupLister.Backups(c.namespace).List(locationSelector)
@@ -302,7 +303,7 @@ func (c *backupSyncController) deleteOrphanedBackups(locationName string, cloudB
 
 	for _, backup := range backups {
 		log = log.WithField("backup", backup.Name)
-		if backup.Status.Phase != arkv1api.BackupPhaseCompleted || cloudBackupNames.Has(backup.Name) {
+		if backup.Status.Phase != velerov1api.BackupPhaseCompleted || cloudBackupNames.Has(backup.Name) {
 			continue
 		}
 

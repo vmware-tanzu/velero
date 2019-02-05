@@ -21,9 +21,9 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/cloudprovider"
-	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/restore"
 )
 
 // Manager manages the lifecycles of plugins.

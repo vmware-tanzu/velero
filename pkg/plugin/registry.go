@@ -23,7 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/util/filesystem"
+	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
 // Registry manages information about available plugins.
@@ -75,7 +75,7 @@ func (r *registry) DiscoverPlugins() error {
 		return err
 	}
 
-	// Start by adding ark's internal plugins
+	// Start by adding velero's internal plugins
 	commands := []string{os.Args[0]}
 	// Then add the discovered plugin executables
 	commands = append(commands, plugins...)

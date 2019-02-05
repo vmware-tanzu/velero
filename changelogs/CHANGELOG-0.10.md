@@ -245,5 +245,5 @@ need to be updated for v0.10.
 - 	[eabef085](https://github.com/heptio/ark/commit/eabef085)	Update generated Ark code based on the 1.11 k8s.io/code-generator script
 - 	[f5eac0b4](https://github.com/heptio/ark/commit/f5eac0b4)	Update vendored library code for Kubernetes 1.11
 
-[1]: https://github.com/heptio/ark/blob/master/docs/upgrading-to-v0.10.md
+[1]: https://heptio.github.io/velero/v0.10.0/upgrading-to-v0.10
 [2]: locations.md

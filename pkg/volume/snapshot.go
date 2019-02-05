@@ -17,7 +17,7 @@ limitations under the License.
 package volume
 
 // Snapshot stores information about a persistent volume snapshot taken as
-// part of an Ark backup.
+// part of a Velero backup.
 type Snapshot struct {
 	Spec SnapshotSpec `json:"spec"`
 
@@ -25,11 +25,11 @@ type Snapshot struct {
 }
 
 type SnapshotSpec struct {
-	// BackupName is the name of the Ark backup this snapshot
+	// BackupName is the name of the Velero backup this snapshot
 	// is associated with.
 	BackupName string `json:"backupName"`
 
-	// BackupUID is the UID of the Ark backup this snapshot
+	// BackupUID is the UID of the Velero backup this snapshot
 	// is associated with.
 	BackupUID string `json:"backupUID"`
 
@@ -64,7 +64,7 @@ type SnapshotStatus struct {
 	Phase SnapshotPhase `json:"phase,omitempty"`
 }
 
-// SnapshotPhase is the lifecyle phase of an Ark volume snapshot.
+// SnapshotPhase is the lifecyle phase of a Velero volume snapshot.
 type SnapshotPhase string
 
 const (

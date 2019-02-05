@@ -21,7 +21,7 @@ import (
 )
 
 // BlockStore exposes basic block-storage operations required
-// by Ark.
+// by Velero.
 type BlockStore interface {
 	// Init prepares the BlockStore for usage using the provided map of
 	// configuration key-value pairs. It returns an error if the BlockStore

@@ -49,10 +49,10 @@ spec:
       labels:
         app: nginx
       annotations:
-        pre.hook.backup.ark.heptio.com/container: fsfreeze
-        pre.hook.backup.ark.heptio.com/command: '["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]'
-        post.hook.backup.ark.heptio.com/container: fsfreeze
-        post.hook.backup.ark.heptio.com/command: '["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]'
+        pre.hook.backup.velero.io/container: fsfreeze
+        pre.hook.backup.velero.io/command: '["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]'
+        post.hook.backup.velero.io/container: fsfreeze
+        post.hook.backup.velero.io/command: '["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]'
     spec:
       volumes:
         - name: nginx-logs

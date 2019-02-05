@@ -1,16 +1,16 @@
 # Hooks
 
-Heptio Ark currently supports executing commands in containers in pods during a backup.
+Velero currently supports executing commands in containers in pods during a backup.
 
 ## Backup Hooks
 
 When performing a backup, you can specify one or more commands to execute in a container in a pod
 when that pod is being backed up.
 
-Ark versions prior to v0.7.0 only support hooks that execute prior to any custom action processing
+Velero versions prior to v0.7.0 only support hooks that execute prior to any custom action processing
 ("pre" hooks).
 
-As of version v0.7.0, Ark also supports "post" hooks - these execute after all custom actions have
+As of version v0.7.0, Velero also supports "post" hooks - these execute after all custom actions have
 completed, as well as after all the additional items specified by custom actions have been backed
 up.
 
@@ -18,28 +18,26 @@ There are two ways to specify hooks: annotations on the pod itself, and in the B
 
 ### Specifying Hooks As Pod Annotations
 
-You can use the following annotations on a pod to make Ark execute a hook when backing up the pod:
+You can use the following annotations on a pod to make Velero execute a hook when backing up the pod:
 
 #### Pre hooks
 
 | Annotation Name | Description |
 | --- | --- |
-| `pre.hook.backup.ark.heptio.com/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
-| `pre.hook.backup.ark.heptio.com/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
-| `pre.hook.backup.ark.heptio.com/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
-| `pre.hook.backup.ark.heptio.com/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
+| `pre.hook.backup.velero.io/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
+| `pre.hook.backup.velero.io/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
+| `pre.hook.backup.velero.io/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
+| `pre.hook.backup.velero.io/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
 
-Ark v0.7.0+ continues to support the original (deprecated) way to specify pre hooks - without the
-`pre.` prefix in the annotation names (e.g. `hook.backup.ark.heptio.com/container`).
 
 #### Post hooks (v0.7.0+)
 
 | Annotation Name | Description |
 | --- | --- |
-| `post.hook.backup.ark.heptio.com/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
-| `post.hook.backup.ark.heptio.com/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
-| `post.hook.backup.ark.heptio.com/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
-| `post.hook.backup.ark.heptio.com/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
+| `post.hook.backup.velero.io/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
+| `post.hook.backup.velero.io/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
+| `post.hook.backup.velero.io/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
+| `post.hook.backup.velero.io/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
 
 ### Specifying Hooks in the Backup Spec
 
@@ -56,25 +54,25 @@ setup this example.
 
 ### Annotations
 
-The Ark [example/nginx-app/with-pv.yaml][2] serves as an example of adding the pre and post hook annotations directly
+The Velero [example/nginx-app/with-pv.yaml][2] serves as an example of adding the pre and post hook annotations directly
 to your declarative deployment. Below is an example of what updating an object in place might look like.
 
 ```shell
 kubectl annotate pod -n nginx-example -l app=nginx \
-    pre.hook.backup.ark.heptio.com/command='["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]' \
-    pre.hook.backup.ark.heptio.com/container=fsfreeze \
-    post.hook.backup.ark.heptio.com/command='["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]' \
-    post.hook.backup.ark.heptio.com/container=fsfreeze
+    pre.hook.backup.velero.io/command='["/sbin/fsfreeze", "--freeze", "/var/log/nginx"]' \
+    pre.hook.backup.velero.io/container=fsfreeze \
+    post.hook.backup.velero.io/command='["/sbin/fsfreeze", "--unfreeze", "/var/log/nginx"]' \
+    post.hook.backup.velero.io/container=fsfreeze
 ```
 
-Now test the pre and post hooks by creating a backup. You can use the Ark logs to verify that the pre and post
+Now test the pre and post hooks by creating a backup. You can use the Velero logs to verify that the pre and post
 hooks are running and exiting without error.
 
 ```shell
-ark backup create nginx-hook-test
+velero backup create nginx-hook-test
 
-ark backup get nginx-hook-test
-ark backup logs nginx-hook-test | grep hookCommand
+velero backup get nginx-hook-test
+velero backup logs nginx-hook-test | grep hookCommand
 ```
 
 

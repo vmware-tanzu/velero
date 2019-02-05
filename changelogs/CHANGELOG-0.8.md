@@ -77,9 +77,9 @@
   here are the steps you can take to upgrade:
 
 1. Execute the steps from the **Credentials and configuration** section for your cloud:
-    * [AWS](https://heptio.github.io/ark/v0.8.0/aws-config#credentials-and-configuration)
-    * [Azure](https://heptio.github.io/ark/v0.8.0/azure-config#credentials-and-configuration)
-    * [GCP](https://heptio.github.io/ark/v0.8.0/gcp-config#credentials-and-configuration)
+    * [AWS](https://heptio.github.io/velero/v0.8.0/aws-config#credentials-and-configuration)
+    * [Azure](https://heptio.github.io/velero/v0.8.0/azure-config#credentials-and-configuration)
+    * [GCP](https://heptio.github.io/velero/v0.8.0/gcp-config#credentials-and-configuration)
 
     When you get to the secret creation step, if you don't have your `credentials-ark` file handy, 
     you can copy the existing secret from your `heptio-ark-server` namespace into the `heptio-ark` namespace:
@@ -95,6 +95,6 @@
     ```
 
 3. Execute the commands from the **Start the server** section for your cloud:
-    * [AWS](https://heptio.github.io/ark/v0.8.0/aws-config#start-the-server)
-    * [Azure](https://heptio.github.io/ark/v0.8.0/azure-config#start-the-server)
-    * [GCP](https://heptio.github.io/ark/v0.8.0/gcp-config#start-the-server)
+    * [AWS](https://heptio.github.io/velero/v0.8.0/aws-config#start-the-server)
+    * [Azure](https://heptio.github.io/velero/v0.8.0/azure-config#start-the-server)
+    * [GCP](https://heptio.github.io/velero/v0.8.0/gcp-config#start-the-server)

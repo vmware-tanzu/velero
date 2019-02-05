@@ -19,9 +19,11 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
-	arkv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	fakearkv1 "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1/fake"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	arkv1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/ark/v1"
+	fakearkv1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/ark/v1/fake"
+	velerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	fakevelerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -79,4 +81,14 @@ func (c *Clientset) ArkV1() arkv1.ArkV1Interface {
 // Ark retrieves the ArkV1Client
 func (c *Clientset) Ark() arkv1.ArkV1Interface {
 	return &fakearkv1.FakeArkV1{Fake: &c.Fake}
+}
+
+// VeleroV1 retrieves the VeleroV1Client
+func (c *Clientset) VeleroV1() velerov1.VeleroV1Interface {
+	return &fakevelerov1.FakeVeleroV1{Fake: &c.Fake}
+}
+
+// Velero retrieves the VeleroV1Client
+func (c *Clientset) Velero() velerov1.VeleroV1Interface {
+	return &fakevelerov1.FakeVeleroV1{Fake: &c.Fake}
 }

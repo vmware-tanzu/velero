@@ -33,7 +33,7 @@ type clientBuilder struct {
 }
 
 // newClientBuilder returns a new clientBuilder with commandName to name. If the command matches the currently running
-// process (i.e. ark), this also sets commandArgs to the internal Ark command to run plugins.
+// process (i.e. velero), this also sets commandArgs to the internal Velero command to run plugins.
 func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus.Level) *clientBuilder {
 	b := &clientBuilder{
 		commandName:  command,
@@ -41,7 +41,7 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 		pluginLogger: newLogrusAdapter(logger, logLevel),
 	}
 	if command == os.Args[0] {
-		// For plugins compiled into the ark executable, we need to run "ark run-plugins"
+		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
 		b.commandArgs = []string{"run-plugins"}
 	}
 	return b
@@ -67,7 +67,7 @@ func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 	}
 }
 
-// client creates a new go-plugin Client with support for all of Ark's plugin kinds (BackupItemAction, BlockStore,
+// client creates a new go-plugin Client with support for all of Velero's plugin kinds (BackupItemAction, BlockStore,
 // ObjectStore, PluginLister, RestoreItemAction).
 func (b *clientBuilder) client() *hcplugin.Client {
 	return hcplugin.NewClient(b.clientConfig())

@@ -19,7 +19,8 @@ limitations under the License.
 package fake
 
 import (
-	arkv1 "github.com/heptio/ark/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,4 +52,5 @@ func init() {
 // correctly.
 func AddToScheme(scheme *runtime.Scheme) {
 	arkv1.AddToScheme(scheme)
+	velerov1.AddToScheme(scheme)
 }

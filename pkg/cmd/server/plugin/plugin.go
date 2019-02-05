@@ -20,18 +20,18 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cloudprovider/aws"
-	"github.com/heptio/ark/pkg/cloudprovider/azure"
-	"github.com/heptio/ark/pkg/cloudprovider/gcp"
-	arkdiscovery "github.com/heptio/ark/pkg/discovery"
-	arkplugin "github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/restore"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cloudprovider/aws"
+	"github.com/heptio/velero/pkg/cloudprovider/azure"
+	"github.com/heptio/velero/pkg/cloudprovider/gcp"
+	velerodiscovery "github.com/heptio/velero/pkg/discovery"
+	veleroplugin "github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/restore"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
-	logger := arkplugin.NewLogger()
+	logger := veleroplugin.NewLogger()
 
 	c := &cobra.Command{
 		Use:    "run-plugins",
@@ -40,7 +40,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			logger.Debug("Executing run-plugins command")
 
-			arkplugin.NewServer(logger).
+			veleroplugin.NewServer(logger).
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
@@ -94,7 +94,7 @@ func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return backup.NewPodAction(logger), nil
 }
 
-func newServiceAccountBackupItemAction(f client.Factory) arkplugin.HandlerInitializer {
+func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		// TODO(ncdc): consider a k8s style WantsKubernetesClientSet initialization approach
 		clientset, err := f.KubeClient()
@@ -102,7 +102,7 @@ func newServiceAccountBackupItemAction(f client.Factory) arkplugin.HandlerInitia
 			return nil, err
 		}
 
-		discoveryHelper, err := arkdiscovery.NewHelper(clientset.Discovery(), logger)
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), logger)
 		if err != nil {
 			return nil, err
 		}

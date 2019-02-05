@@ -30,19 +30,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/util/kube"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/util/kube"
 )
 
 type downloadRequestController struct {
 	*genericController
 
-	downloadRequestClient arkv1client.DownloadRequestsGetter
+	downloadRequestClient velerov1client.DownloadRequestsGetter
 	downloadRequestLister listers.DownloadRequestLister
 	restoreLister         listers.RestoreLister
 	clock                 clock.Clock
@@ -54,7 +54,7 @@ type downloadRequestController struct {
 
 // NewDownloadRequestController creates a new DownloadRequestController.
 func NewDownloadRequestController(
-	downloadRequestClient arkv1client.DownloadRequestsGetter,
+	downloadRequestClient velerov1client.DownloadRequestsGetter,
 	downloadRequestInformer informers.DownloadRequestInformer,
 	restoreInformer informers.RestoreInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
@@ -223,7 +223,7 @@ func (c *downloadRequestController) resync() {
 	}
 }
 
-func patchDownloadRequest(original, updated *v1.DownloadRequest, client arkv1client.DownloadRequestsGetter) (*v1.DownloadRequest, error) {
+func patchDownloadRequest(original, updated *v1.DownloadRequest, client velerov1client.DownloadRequestsGetter) (*v1.DownloadRequest, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original download request")

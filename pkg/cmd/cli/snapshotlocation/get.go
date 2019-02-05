@@ -20,10 +20,10 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/util/output"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 
 func NewGetCommand(f client.Factory, use string) *cobra.Command {
@@ -34,18 +34,18 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
-			arkClient, err := f.Client()
+			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 			var locations *api.VolumeSnapshotLocationList
 			if len(args) > 0 {
 				locations = new(api.VolumeSnapshotLocationList)
 				for _, name := range args {
-					location, err := arkClient.Ark().VolumeSnapshotLocations(f.Namespace()).Get(name, metav1.GetOptions{})
+					location, err := veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					locations.Items = append(locations.Items, *location)
 				}
 			} else {
-				locations, err = arkClient.ArkV1().VolumeSnapshotLocations(f.Namespace()).List(listOptions)
+				locations, err = veleroClient.VeleroV1().VolumeSnapshotLocations(f.Namespace()).List(listOptions)
 				cmd.CheckError(err)
 			}
 			_, err = output.PrintWithFormat(c, locations)

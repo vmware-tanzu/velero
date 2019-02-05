@@ -27,14 +27,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/printers"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 var (
 	backupColumns = []string{"NAME", "STATUS", "CREATED", "EXPIRES", "STORAGE LOCATION", "SELECTOR"}
 )
 
-func printBackupList(list *arkv1api.BackupList, w io.Writer, options printers.PrintOptions) error {
+func printBackupList(list *velerov1api.BackupList, w io.Writer, options printers.PrintOptions) error {
 	sortBackupsByPrefixAndTimestamp(list)
 
 	for i := range list.Items {
@@ -45,7 +45,7 @@ func printBackupList(list *arkv1api.BackupList, w io.Writer, options printers.Pr
 	return nil
 }
 
-func sortBackupsByPrefixAndTimestamp(list *arkv1api.BackupList) {
+func sortBackupsByPrefixAndTimestamp(list *velerov1api.BackupList) {
 	// sort by default alphabetically, but if backups stem from a common schedule
 	// (detected by the presence of a 14-digit timestamp suffix), then within that
 	// group, sort by newest to oldest (i.e. prefix ASC, suffix DESC)
@@ -70,7 +70,7 @@ func sortBackupsByPrefixAndTimestamp(list *arkv1api.BackupList) {
 	})
 }
 
-func printBackup(backup *arkv1api.Backup, w io.Writer, options printers.PrintOptions) error {
+func printBackup(backup *velerov1api.Backup, w io.Writer, options printers.PrintOptions) error {
 	name := printers.FormatResourceName(options.Kind, backup.Name, options.WithKind)
 
 	if options.WithNamespace {
@@ -86,7 +86,7 @@ func printBackup(backup *arkv1api.Backup, w io.Writer, options printers.PrintOpt
 
 	status := backup.Status.Phase
 	if status == "" {
-		status = arkv1api.BackupPhaseNew
+		status = velerov1api.BackupPhaseNew
 	}
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero() {
 		status = "Deleting"

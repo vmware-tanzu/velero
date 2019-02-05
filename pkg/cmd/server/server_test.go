@@ -22,20 +22,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
-func TestArkResourcesExist(t *testing.T) {
+func TestVeleroResourcesExist(t *testing.T) {
 	var (
-		fakeDiscoveryHelper = &arktest.FakeDiscoveryHelper{}
+		fakeDiscoveryHelper = &velerotest.FakeDiscoveryHelper{}
 		server              = &server{
-			logger:          arktest.NewLogger(),
+			logger:          velerotest.NewLogger(),
 			discoveryHelper: fakeDiscoveryHelper,
 		}
 	)
 
-	// Ark API group doesn't exist in discovery: should error
+	// Velero API group doesn't exist in discovery: should error
 	fakeDiscoveryHelper.ResourceList = []*metav1.APIResourceList{
 		{
 			GroupVersion: "foo/v1",
@@ -47,25 +47,25 @@ func TestArkResourcesExist(t *testing.T) {
 			},
 		},
 	}
-	assert.Error(t, server.arkResourcesExist())
+	assert.Error(t, server.veleroResourcesExist())
 
-	// Ark API group doesn't contain any custom resources: should error
-	arkAPIResourceList := &metav1.APIResourceList{
+	// Velero API group doesn't contain any custom resources: should error
+	veleroAPIResourceList := &metav1.APIResourceList{
 		GroupVersion: v1.SchemeGroupVersion.String(),
 	}
 
-	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, arkAPIResourceList)
-	assert.Error(t, server.arkResourcesExist())
+	fakeDiscoveryHelper.ResourceList = append(fakeDiscoveryHelper.ResourceList, veleroAPIResourceList)
+	assert.Error(t, server.veleroResourcesExist())
 
-	// Ark API group contains all custom resources: should not error
+	// Velero API group contains all custom resources: should not error
 	for kind := range v1.CustomResources() {
-		arkAPIResourceList.APIResources = append(arkAPIResourceList.APIResources, metav1.APIResource{
+		veleroAPIResourceList.APIResources = append(veleroAPIResourceList.APIResources, metav1.APIResource{
 			Kind: kind,
 		})
 	}
-	assert.NoError(t, server.arkResourcesExist())
+	assert.NoError(t, server.veleroResourcesExist())
 
-	// Ark API group contains some but not all custom resources: should error
-	arkAPIResourceList.APIResources = arkAPIResourceList.APIResources[:3]
-	assert.Error(t, server.arkResourcesExist())
+	// Velero API group contains some but not all custom resources: should error
+	veleroAPIResourceList.APIResources = veleroAPIResourceList.APIResources[:3]
+	assert.Error(t, server.veleroResourcesExist())
 }

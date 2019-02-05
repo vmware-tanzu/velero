@@ -25,11 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/backup"
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd"
-	"github.com/heptio/ark/pkg/cmd/cli"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/cli"
 )
 
 // NewDeleteCommand creates a new command that deletes a backup.
@@ -40,19 +40,19 @@ func NewDeleteCommand(f client.Factory, use string) *cobra.Command {
 		Use:   fmt.Sprintf("%s [NAMES]", use),
 		Short: "Delete backups",
 		Example: `  # delete a backup named "backup-1"
-  ark backup delete backup-1
+  velero backup delete backup-1
 
   # delete a backup named "backup-1" without prompting for confirmation
-  ark backup delete backup-1 --confirm
+  velero backup delete backup-1 --confirm
 
   # delete backups named "backup-1" and "backup-2"
-  ark backup delete backup-1 backup-2
+  velero backup delete backup-1 backup-2
 
   # delete all backups triggered by schedule "schedule-1"
-  ark backup delete --selector ark-schedule=schedule-1
+  velero backup delete --selector velero.io/schedule-name=schedule-1
  
   # delete all backups
-  ark backup delete --all
+  velero backup delete --all
   `,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(f, args))
@@ -74,7 +74,7 @@ func Run(o *cli.DeleteOptions) error {
 	}
 
 	var (
-		backups []*arkv1api.Backup
+		backups []*velerov1api.Backup
 		errs    []error
 	)
 
@@ -82,7 +82,7 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			backup, err := o.Client.ArkV1().Backups(o.Namespace).Get(name, metav1.GetOptions{})
+			backup, err := o.Client.VeleroV1().Backups(o.Namespace).Get(name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -96,7 +96,7 @@ func Run(o *cli.DeleteOptions) error {
 			selector = o.Selector.String()
 		}
 
-		res, err := o.Client.ArkV1().Backups(o.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+		res, err := o.Client.VeleroV1().Backups(o.Namespace).List(metav1.ListOptions{LabelSelector: selector})
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -114,7 +114,7 @@ func Run(o *cli.DeleteOptions) error {
 	for _, b := range backups {
 		deleteRequest := backup.NewDeleteBackupRequest(b.Name, string(b.UID))
 
-		if _, err := o.Client.ArkV1().DeleteBackupRequests(o.Namespace).Create(deleteRequest); err != nil {
+		if _, err := o.Client.VeleroV1().DeleteBackupRequests(o.Namespace).Create(deleteRequest); err != nil {
 			errs = append(errs, err)
 			continue
 		}

@@ -37,19 +37,19 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	pkgbackup "github.com/heptio/ark/pkg/backup"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/metrics"
-	"github.com/heptio/ark/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/util/collections"
-	"github.com/heptio/ark/pkg/util/encode"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
-	"github.com/heptio/ark/pkg/util/logging"
-	"github.com/heptio/ark/pkg/volume"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/heptio/velero/pkg/backup"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/metrics"
+	"github.com/heptio/velero/pkg/persistence"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/util/collections"
+	"github.com/heptio/velero/pkg/util/encode"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	"github.com/heptio/velero/pkg/util/logging"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 type backupController struct {
@@ -57,7 +57,7 @@ type backupController struct {
 
 	backupper                pkgbackup.Backupper
 	lister                   listers.BackupLister
-	client                   arkv1client.BackupsGetter
+	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
 	newPluginManager         func(logrus.FieldLogger) plugin.Manager
@@ -67,12 +67,12 @@ type backupController struct {
 	snapshotLocationLister   listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
-	newBackupStore           func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
-	client arkv1client.BackupsGetter,
+	client velerov1client.BackupsGetter,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
@@ -112,10 +112,10 @@ func NewBackupController(
 	backupInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				backup := obj.(*api.Backup)
+				backup := obj.(*velerov1api.Backup)
 
 				switch backup.Status.Phase {
-				case "", api.BackupPhaseNew:
+				case "", velerov1api.BackupPhaseNew:
 					// only process new backups
 				default:
 					c.logger.WithFields(logrus.Fields{
@@ -162,7 +162,7 @@ func (c *backupController) processBackup(key string) error {
 	// InProgress, we still need this check so we can return nil to indicate we've finished processing
 	// this key (even though it was a no-op).
 	switch original.Status.Phase {
-	case "", api.BackupPhaseNew:
+	case "", velerov1api.BackupPhaseNew:
 		// only process new backups
 	default:
 		return nil
@@ -172,9 +172,9 @@ func (c *backupController) processBackup(key string) error {
 	request := c.prepareBackupRequest(original)
 
 	if len(request.Status.ValidationErrors) > 0 {
-		request.Status.Phase = api.BackupPhaseFailedValidation
+		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
-		request.Status.Phase = api.BackupPhaseInProgress
+		request.Status.Phase = velerov1api.BackupPhaseInProgress
 	}
 
 	// update status
@@ -186,7 +186,7 @@ func (c *backupController) processBackup(key string) error {
 	original = updatedBackup
 	request.Backup = updatedBackup.DeepCopy()
 
-	if request.Status.Phase == api.BackupPhaseFailedValidation {
+	if request.Status.Phase == velerov1api.BackupPhaseFailedValidation {
 		return nil
 	}
 
@@ -195,12 +195,12 @@ func (c *backupController) processBackup(key string) error {
 
 	log.Debug("Running backup")
 	// execution & upload of backup
-	backupScheduleName := request.GetLabels()["ark-schedule"]
+	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
 	c.metrics.RegisterBackupAttempt(backupScheduleName)
 
 	if err := c.runBackup(request); err != nil {
 		log.WithError(err).Error("backup failed")
-		request.Status.Phase = api.BackupPhaseFailed
+		request.Status.Phase = velerov1api.BackupPhaseFailed
 		c.metrics.RegisterBackupFailed(backupScheduleName)
 	} else {
 		c.metrics.RegisterBackupSuccess(backupScheduleName)
@@ -214,7 +214,7 @@ func (c *backupController) processBackup(key string) error {
 	return nil
 }
 
-func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter) (*api.Backup, error) {
+func patchBackup(original, updated *velerov1api.Backup, client velerov1client.BackupsGetter) (*velerov1api.Backup, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original backup")
@@ -238,7 +238,7 @@ func patchBackup(original, updated *api.Backup, client arkv1client.BackupsGetter
 	return res, nil
 }
 
-func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.Request {
+func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup: backup.DeepCopy(), // don't modify items in the cache
 	}
@@ -260,7 +260,7 @@ func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.R
 	if request.Labels == nil {
 		request.Labels = make(map[string]string)
 	}
-	request.Labels[api.StorageLocationLabel] = request.Spec.StorageLocation
+	request.Labels[velerov1api.StorageLocationLabel] = request.Spec.StorageLocation
 
 	// validate the included/excluded resources and namespaces
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
@@ -304,9 +304,9 @@ func (c *backupController) prepareBackupRequest(backup *api.Backup) *pkgbackup.R
 // - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
 //   is not explicitly specified for the provider (if there's only one location for the provider,
 //   it will automatically be used)
-func (c *backupController) validateAndGetSnapshotLocations(backup *api.Backup) (map[string]*api.VolumeSnapshotLocation, []string) {
+func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.Backup) (map[string]*velerov1api.VolumeSnapshotLocation, []string) {
 	errors := []string{}
-	providerLocations := make(map[string]*api.VolumeSnapshotLocation)
+	providerLocations := make(map[string]*velerov1api.VolumeSnapshotLocation)
 
 	for _, locationName := range backup.Spec.VolumeSnapshotLocations {
 		// validate each locationName exists as a VolumeSnapshotLocation
@@ -344,7 +344,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *api.Backup) (
 	}
 
 	// build a map of provider->list of all locations for the provider
-	allProviderLocations := make(map[string][]*api.VolumeSnapshotLocation)
+	allProviderLocations := make(map[string][]*velerov1api.VolumeSnapshotLocation)
 	for i := range allLocations {
 		loc := allLocations[i]
 		allProviderLocations[loc.Spec.Provider] = append(allProviderLocations[loc.Spec.Provider], loc)
@@ -434,9 +434,9 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// Do the actual backup
 	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
 		errs = append(errs, err)
-		backup.Status.Phase = api.BackupPhaseFailed
+		backup.Status.Phase = velerov1api.BackupPhaseFailed
 	} else {
-		backup.Status.Phase = api.BackupPhaseCompleted
+		backup.Status.Phase = velerov1api.BackupPhaseCompleted
 	}
 
 	if err := gzippedLogFile.Close(); err != nil {
@@ -462,8 +462,8 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	return kerrors.NewAggregate(errs)
 }
 
-func recordBackupMetrics(backup *api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {
-	backupScheduleName := backup.GetLabels()["ark-schedule"]
+func recordBackupMetrics(backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {
+	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 
 	var backupSizeBytes int64
 	var err error

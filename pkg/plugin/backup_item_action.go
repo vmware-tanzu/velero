@@ -19,7 +19,7 @@ package plugin
 import (
 	"encoding/json"
 
-	"github.com/hashicorp/go-plugin"
+	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkbackup "github.com/heptio/ark/pkg/backup"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerobackup "github.com/heptio/velero/pkg/backup"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
 // BackupItemActionPlugin is an implementation of go-plugin's Plugin
@@ -70,13 +70,13 @@ func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn
 	}
 }
 
-func (c *BackupItemActionGRPCClient) AppliesTo() (arkbackup.ResourceSelector, error) {
+func (c *BackupItemActionGRPCClient) AppliesTo() (velerobackup.ResourceSelector, error) {
 	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
 	if err != nil {
-		return arkbackup.ResourceSelector{}, err
+		return velerobackup.ResourceSelector{}, err
 	}
 
-	return arkbackup.ResourceSelector{
+	return velerobackup.ResourceSelector{
 		IncludedNamespaces: res.IncludedNamespaces,
 		ExcludedNamespaces: res.ExcludedNamespaces,
 		IncludedResources:  res.IncludedResources,
@@ -85,7 +85,7 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (arkbackup.ResourceSelector, er
 	}, nil
 }
 
-func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []arkbackup.ResourceIdentifier, error) {
+func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velerobackup.ResourceIdentifier, error) {
 	itemJSON, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
 		return nil, nil, err
@@ -112,10 +112,10 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 		return nil, nil, err
 	}
 
-	var additionalItems []arkbackup.ResourceIdentifier
+	var additionalItems []velerobackup.ResourceIdentifier
 
 	for _, itm := range res.AdditionalItems {
-		newItem := arkbackup.ResourceIdentifier{
+		newItem := velerobackup.ResourceIdentifier{
 			GroupResource: schema.GroupResource{
 				Group:    itm.Group,
 				Resource: itm.Resource,
@@ -146,13 +146,13 @@ type BackupItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *BackupItemActionGRPCServer) getImpl(name string) (arkbackup.ItemAction, error) {
+func (s *BackupItemActionGRPCServer) getImpl(name string) (velerobackup.ItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(arkbackup.ItemAction)
+	itemAction, ok := impl.(velerobackup.ItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a backup item action", impl)
 	}
@@ -224,7 +224,7 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	return res, nil
 }
 
-func backupResourceIdentifierToProto(id arkbackup.ResourceIdentifier) *proto.ResourceIdentifier {
+func backupResourceIdentifierToProto(id velerobackup.ResourceIdentifier) *proto.ResourceIdentifier {
 	return &proto.ResourceIdentifier{
 		Group:     id.Group,
 		Resource:  id.Resource,

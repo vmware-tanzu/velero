@@ -26,9 +26,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/heptio/ark/pkg/client"
-	"github.com/heptio/ark/pkg/cmd/util/flag"
-	clientset "github.com/heptio/ark/pkg/generated/clientset/versioned"
+	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
+	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
 // DeleteOptions contains parameters used for deleting a restore.
@@ -63,7 +63,7 @@ func (o *DeleteOptions) Complete(f client.Factory, args []string) error {
 // Validate validates the fields of the DeleteOptions struct.
 func (o *DeleteOptions) Validate(c *cobra.Command, f client.Factory, args []string) error {
 	if o.Client == nil {
-		return errors.New("Ark client is not set; unable to proceed")
+		return errors.New("Velero client is not set; unable to proceed")
 	}
 	var (
 		hasNames    = len(o.Names) > 0

@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const (
@@ -235,7 +235,7 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 
 	// ensure that returned objects are in a consistent order so that the deletion logic deletes the objects before
 	// the pseudo-folder prefix object for s3 providers (such as Quobyte) that return the pseudo-folder as an object.
-	// See https://github.com/heptio/ark/pull/999
+	// See https://github.com/heptio/velero/pull/999
 	sort.Sort(sort.Reverse(sort.StringSlice(ret)))
 
 	return ret, nil

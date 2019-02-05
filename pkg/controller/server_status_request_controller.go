@@ -26,12 +26,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	arkv1informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/serverstatusrequest"
-	kubeutil "github.com/heptio/ark/pkg/util/kube"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/serverstatusrequest"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 const statusRequestResyncPeriod = 5 * time.Minute
@@ -39,15 +39,15 @@ const statusRequestResyncPeriod = 5 * time.Minute
 type statusRequestController struct {
 	*genericController
 
-	client arkv1client.ServerStatusRequestsGetter
-	lister arkv1listers.ServerStatusRequestLister
+	client velerov1client.ServerStatusRequestsGetter
+	lister velerov1listers.ServerStatusRequestLister
 	clock  clock.Clock
 }
 
 func NewServerStatusRequestController(
 	logger logrus.FieldLogger,
-	client arkv1client.ServerStatusRequestsGetter,
-	informer arkv1informers.ServerStatusRequestInformer,
+	client velerov1client.ServerStatusRequestsGetter,
+	informer velerov1informers.ServerStatusRequestInformer,
 ) *statusRequestController {
 	c := &statusRequestController{
 		genericController: newGenericController("serverstatusrequest", logger),
@@ -66,7 +66,7 @@ func NewServerStatusRequestController(
 	informer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				req := obj.(*arkv1api.ServerStatusRequest)
+				req := obj.(*velerov1api.ServerStatusRequest)
 				key := kubeutil.NamespaceAndName(req)
 
 				c.logger.WithFields(logrus.Fields{

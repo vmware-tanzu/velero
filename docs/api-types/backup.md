@@ -2,12 +2,12 @@
 
 ## Use
 
-The `Backup` API type is used as a request for the Ark Server to perform a backup. Once created, the
-Ark Server immediately starts the backup process.
+The `Backup` API type is used as a request for the Velero Server to perform a backup. Once created, the
+Velero Server immediately starts the backup process.
 
 ## API GroupVersion
 
-Backup belongs to the API group version `ark.heptio.com/v1`.
+Backup belongs to the API group version `velero.io/v1`.
 
 ## Definition
 
@@ -15,15 +15,15 @@ Here is a sample `Backup` object with each of the fields documented:
 
 ```yaml
 # Standard Kubernetes API Version declaration. Required.
-apiVersion: ark.heptio.com/v1
+apiVersion: velero.io/v1
 # Standard Kubernetes Kind declaration. Required.
 kind: Backup
 # Standard Kubernetes metadata. Required.
 metadata:
   # Backup name. May be any valid Kubernetes object name. Required.
   name: a
-  # Backup namespace. Required. In version 0.7.0 and later, can be any string. Must be the namespace of the Ark server.
-  namespace: heptio-ark
+  # Backup namespace. Required. In version 0.7.0 and later, can be any string. Must be the namespace of the Velero server.
+  namespace: velero
 # Parameters about the backup. Required.
 spec:
   # Array of namespaces to include in the backup. If unspecified, all namespaces are included.
@@ -54,11 +54,11 @@ spec:
   # Individual objects must match this label selector to be included in the backup. Optional.
   labelSelector:
     matchLabels:
-      app: ark
+      app: velero
       component: server
   # Whether or not to snapshot volumes. This only applies to PersistentVolumes for Azure, GCE, and
-  # AWS. Valid values are true, false, and null/unset. If unset, Ark performs snapshots as long as
-  # a persistent volume provider is configured for Ark.
+  # AWS. Valid values are true, false, and null/unset. If unset, Velero performs snapshots as long as
+  # a persistent volume provider is configured for Velero.
   snapshotVolumes: null
   # Where to store the tarball and logs.
   storageLocation: aws-primary
@@ -92,7 +92,7 @@ spec:
         # This hook only applies to objects matching this label selector. Optional.
         labelSelector:
           matchLabels:
-            app: ark
+            app: velero
             component: server
         # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
         # DEPRECATED. Use pre instead.

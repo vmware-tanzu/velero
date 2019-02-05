@@ -1,6 +1,6 @@
-# Run Ark more securely with restrictive RBAC settings
+# Run Velero more securely with restrictive RBAC settings
 
-By default Ark runs with an RBAC policy of ClusterRole `cluster-admin`. This is to make sure that Ark can back up or restore anything in your cluster. But `cluster-admin` access is wide open -- it gives Ark components access to everything in your cluster. Depending on your environment and your security needs, you should consider whether to configure additional RBAC policies with more restrictive access. 
+By default Velero runs with an RBAC policy of ClusterRole `cluster-admin`. This is to make sure that Velero can back up or restore anything in your cluster. But `cluster-admin` access is wide open -- it gives Velero components access to everything in your cluster. Depending on your environment and your security needs, you should consider whether to configure additional RBAC policies with more restrictive access. 
 
 **Note:** Roles and RoleBindings are associated with a single namespaces, not with an entire cluster. PersistentVolume backups are associated only with an entire cluster. This means that any backups or restores that use a restrictive Role and RoleBinding pair can manage only the resources that belong to the namespace. You do not need a wide open RBAC policy to manage PersistentVolumes, however. You can configure a ClusterRole and ClusterRoleBinding that allow backups and restores only of PersistentVolumes, not of all objects in the cluster.
 
@@ -17,10 +17,10 @@ metadata:
   namespace: YOUR_NAMESPACE_HERE
   name: ROLE_NAME_HERE
   labels:
-    component: ark
+    component: velero
 rules:
   - apiGroups:
-      - ark.heptio.com
+      - velero.io
     verbs:
       - "*"
     resources:

@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/cloudprovider"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/cloudprovider"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
 // BlockStorePlugin is an implementation of go-plugin's Plugin

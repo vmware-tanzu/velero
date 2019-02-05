@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/printers"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 var (

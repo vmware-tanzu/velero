@@ -22,8 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	arktest "github.com/heptio/ark/pkg/util/test"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestPVBHandler(t *testing.T) {
@@ -31,13 +31,13 @@ func TestPVBHandler(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		obj           *arkv1api.PodVolumeBackup
+		obj           *velerov1api.PodVolumeBackup
 		shouldEnqueue bool
 	}{
 		{
 			name: "Empty phase pvb on same node should be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: controllerNode,
 				},
 			},
@@ -45,48 +45,48 @@ func TestPVBHandler(t *testing.T) {
 		},
 		{
 			name: "New phase pvb on same node should be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: controllerNode,
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseNew,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseNew,
 				},
 			},
 			shouldEnqueue: true,
 		},
 		{
 			name: "InProgress phase pvb on same node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: controllerNode,
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseInProgress,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseInProgress,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Completed phase pvb on same node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: controllerNode,
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseCompleted,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseCompleted,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Failed phase pvb on same node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: controllerNode,
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseFailed,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseFailed,
 				},
 			},
 			shouldEnqueue: false,
@@ -94,8 +94,8 @@ func TestPVBHandler(t *testing.T) {
 
 		{
 			name: "Empty phase pvb on different node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: "some-other-node",
 				},
 			},
@@ -103,48 +103,48 @@ func TestPVBHandler(t *testing.T) {
 		},
 		{
 			name: "New phase pvb on different node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: "some-other-node",
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseNew,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseNew,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "InProgress phase pvb on different node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: "some-other-node",
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseInProgress,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseInProgress,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Completed phase pvb on different node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: "some-other-node",
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseCompleted,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseCompleted,
 				},
 			},
 			shouldEnqueue: false,
 		},
 		{
 			name: "Failed phase pvb on different node should not be enqueued",
-			obj: &arkv1api.PodVolumeBackup{
-				Spec: arkv1api.PodVolumeBackupSpec{
+			obj: &velerov1api.PodVolumeBackup{
+				Spec: velerov1api.PodVolumeBackupSpec{
 					Node: "some-other-node",
 				},
-				Status: arkv1api.PodVolumeBackupStatus{
-					Phase: arkv1api.PodVolumeBackupPhaseFailed,
+				Status: velerov1api.PodVolumeBackupStatus{
+					Phase: velerov1api.PodVolumeBackupPhaseFailed,
 				},
 			},
 			shouldEnqueue: false,
@@ -154,7 +154,7 @@ func TestPVBHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			c := &podVolumeBackupController{
-				genericController: newGenericController("pod-volume-backup", arktest.NewLogger()),
+				genericController: newGenericController("pod-volume-backup", velerotest.NewLogger()),
 				nodeName:          controllerNode,
 			}
 

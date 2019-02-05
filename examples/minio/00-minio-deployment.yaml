@@ -16,7 +16,7 @@
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
-  namespace: heptio-ark
+  namespace: velero
   name: minio
   labels:
     component: minio
@@ -58,7 +58,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  namespace: heptio-ark
+  namespace: velero
   name: minio
   labels:
     component: minio
@@ -78,7 +78,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  namespace: heptio-ark
+  namespace: velero
   name: cloud-credentials
   labels:
     component: minio
@@ -92,7 +92,7 @@ stringData:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  namespace: heptio-ark
+  namespace: velero
   name: minio-setup
   labels:
     component: minio
@@ -112,7 +112,7 @@ spec:
         command:
         - /bin/sh
         - -c
-        - "mc --config-dir=/config config host add ark http://minio:9000 minio minio123 && mc --config-dir=/config mb -p ark/ark"
+        - "mc --config-dir=/config config host add velero http://minio:9000 minio minio123 && mc --config-dir=/config mb -p velero/velero"
         volumeMounts:
         - name: config
           mountPath: "/config"

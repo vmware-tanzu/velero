@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRemoveArkPackagePrefix(t *testing.T) {
-	assert.Equal(t, "pkg/foo.go", removeArkPackagePrefix("github.com/heptio/ark/pkg/foo.go"))
-	assert.Equal(t, "github.com/heptio/ark-plugin-example/foo.go", removeArkPackagePrefix("github.com/heptio/ark-plugin-example/foo.go"))
+func TestRemoveVeleroPackagePrefix(t *testing.T) {
+	assert.Equal(t, "pkg/foo.go", removeVeleroPackagePrefix("github.com/heptio/velero/pkg/foo.go"))
+	assert.Equal(t, "github.com/heptio/velero-plugin-example/foo.go", removeVeleroPackagePrefix("github.com/heptio/velero-plugin-example/foo.go"))
 }

@@ -28,16 +28,16 @@ const (
 	logSourceField          = "logSource"
 	logSourceSetMarkerField = "@logSourceSetBy"
 	logrusPackage           = "github.com/sirupsen/logrus"
-	arkPackage              = "github.com/heptio/ark/"
-	arkPackageLen           = len(arkPackage)
+	veleroPackage           = "github.com/heptio/velero/"
+	veleroPackageLen        = len(veleroPackage)
 )
 
 // LogLocationHook is a logrus hook that attaches location information
 // to log entries, i.e. the file and line number of the logrus log call.
-// This hook is designed for use in both the Ark server and Ark plugin
+// This hook is designed for use in both the Velero server and Velero plugin
 // implementations. When triggered within a plugin, a marker field will
 // be set on the log entry indicating that the location came from a plugin.
-// The Ark server instance will not overwrite location information if
+// The Velero server instance will not overwrite location information if
 // it sees this marker.
 type LogLocationHook struct {
 	loggerName string
@@ -60,7 +60,7 @@ func (h *LogLocationHook) Fire(entry *logrus.Entry) error {
 
 	// skip 2 frames:
 	//   runtime.Callers
-	//   github.com/heptio/ark/pkg/util/logging/(*LogLocationHook).Fire
+	//   github.com/heptio/velero/pkg/util/logging/(*LogLocationHook).Fire
 	n := runtime.Callers(2, pcs)
 
 	// re-slice pcs based on the number of entries written
@@ -87,15 +87,15 @@ func (h *LogLocationHook) Fire(entry *logrus.Entry) error {
 		}
 
 		// record the log statement location if we're within a plugin OR if
-		// we're in Ark server and not logging something that has the marker
+		// we're in Velero server and not logging something that has the marker
 		// set (which would indicate the log statement is coming from a plugin).
 		if h.loggerName != "" || getLogSourceSetMarker(entry) == "" {
-			file := removeArkPackagePrefix(frame.File)
+			file := removeVeleroPackagePrefix(frame.File)
 
 			entry.Data[logSourceField] = fmt.Sprintf("%s:%d", file, frame.Line)
 		}
 
-		// if we're in the Ark server, remove the marker field since we don't
+		// if we're in the Velero server, remove the marker field since we don't
 		// want to record it in the actual log.
 		if h.loggerName == "" {
 			delete(entry.Data, logSourceSetMarkerField)
@@ -120,10 +120,10 @@ func getLogSourceSetMarker(entry *logrus.Entry) string {
 	return fmt.Sprintf("%s", nameVal)
 }
 
-func removeArkPackagePrefix(file string) string {
-	if index := strings.Index(file, arkPackage); index != -1 {
-		// strip off .../github.com/heptio/ark/ so we just have pkg/...
-		return file[index+arkPackageLen:]
+func removeVeleroPackagePrefix(file string) string {
+	if index := strings.Index(file, veleroPackage); index != -1 {
+		// strip off .../github.com/heptio/velero/ so we just have pkg/...
+		return file[index+veleroPackageLen:]
 	}
 
 	return file

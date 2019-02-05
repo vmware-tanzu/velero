@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/ark/pkg/apis/ark/v1"
+	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"

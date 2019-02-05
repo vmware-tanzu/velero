@@ -27,10 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
-	arkv1api "github.com/heptio/ark/pkg/apis/ark/v1"
-	"github.com/heptio/ark/pkg/cloudprovider/azure"
-	arkv1listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/util/filesystem"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/cloudprovider/azure"
+	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
 const (
@@ -38,8 +38,12 @@ const (
 	InitContainer               = "restic-wait"
 	DefaultMaintenanceFrequency = 24 * time.Hour
 
-	podAnnotationPrefix       = "snapshot.ark.heptio.com/"
-	volumesToBackupAnnotation = "backup.ark.heptio.com/backup-volumes"
+	podAnnotationPrefix       = "snapshot.velero.io/"
+	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
+	// TODO(1.0) remove both legacy annotations
+	podAnnotationLegacyPrefix       = "snapshot.ark.heptio.com/"
+	volumesToBackupLegacyAnnotation = "backup.ark.heptio.com/backup-volumes"
 )
 
 // PodHasSnapshotAnnotation returns true if the object has an annotation
@@ -48,6 +52,11 @@ const (
 func PodHasSnapshotAnnotation(obj metav1.Object) bool {
 	for key := range obj.GetAnnotations() {
 		if strings.HasPrefix(key, podAnnotationPrefix) {
+			return true
+		}
+
+		// TODO(1.0): remove if statement & contents
+		if strings.HasPrefix(key, podAnnotationLegacyPrefix) {
 			return true
 		}
 	}
@@ -60,13 +69,26 @@ func PodHasSnapshotAnnotation(obj metav1.Object) bool {
 func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	var res map[string]string
 
+	insertSafe := func(k, v string) {
+		if res == nil {
+			res = make(map[string]string)
+		}
+		res[k] = v
+	}
+
 	for k, v := range obj.GetAnnotations() {
 		if strings.HasPrefix(k, podAnnotationPrefix) {
-			if res == nil {
-				res = make(map[string]string)
-			}
+			insertSafe(k[len(podAnnotationPrefix):], v)
+		}
 
-			res[k[len(podAnnotationPrefix):]] = v
+		if strings.HasPrefix(k, podAnnotationLegacyPrefix) {
+			volume := k[len(podAnnotationLegacyPrefix):]
+
+			// if it has the legacy prefix, only use it if there's not
+			// already a value in res for the volume
+			if _, ok := res[volume]; !ok {
+				insertSafe(volume, v)
+			}
 		}
 	}
 
@@ -95,7 +117,12 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue := annotations[volumesToBackupAnnotation]
+	backupsValue, ok := annotations[volumesToBackupAnnotation]
+	// TODO(1.0) remove the following if statement & contents
+	if !ok {
+		backupsValue = annotations[volumesToBackupLegacyAnnotation]
+	}
+
 	if backupsValue == "" {
 		return nil
 	}
@@ -104,7 +131,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 }
 
 // SnapshotIdentifier uniquely identifies a restic snapshot
-// taken by Ark.
+// taken by Velero.
 type SnapshotIdentifier struct {
 	// VolumeNamespace is the namespace of the pod/volume that
 	// the restic snapshot is for.
@@ -119,10 +146,10 @@ type SnapshotIdentifier struct {
 }
 
 // GetSnapshotsInBackup returns a list of all restic snapshot ids associated with
-// a given Ark backup.
-func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
+// a given Velero backup.
+func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister velerov1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
 	selector := labels.Set(map[string]string{
-		arkv1api.BackupNameLabel: backup.Name,
+		velerov1api.BackupNameLabel: backup.Name,
 	}).AsSelector()
 
 	podVolumeBackups, err := podVolumeBackupLister.List(selector)
@@ -149,14 +176,14 @@ func GetSnapshotsInBackup(backup *arkv1api.Backup, podVolumeBackupLister arkv1li
 // encryption key for the given repo and returns its path. The
 // caller should generally call os.Remove() to remove the file
 // when done with it.
-func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, repoName string, fs filesystem.Interface) (string, error) {
+func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespace, repoName string, fs filesystem.Interface) (string, error) {
 	secretGetter := NewListerSecretGetter(secretLister)
 
 	// For now, all restic repos share the same key so we don't need the repoName to fetch it.
 	// When we move to full-backup encryption, we'll likely have a separate key per restic repo
-	// (all within the Ark server's namespace) so GetRepositoryKey will need to take the repo
+	// (all within the Velero server's namespace) so GetRepositoryKey will need to take the repo
 	// name as an argument as well.
-	repoKey, err := GetRepositoryKey(secretGetter, arkNamespace)
+	repoKey, err := GetRepositoryKey(secretGetter, veleroNamespace)
 	if err != nil {
 		return "", err
 	}
@@ -183,18 +210,18 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, arkNamespace, 
 }
 
 // NewPodVolumeBackupListOptions creates a ListOptions with a label selector configured to
-// find PodVolumeBackups for the backup identified by name and uid.
-func NewPodVolumeBackupListOptions(name, uid string) metav1.ListOptions {
+// find PodVolumeBackups for the backup identified by name.
+func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", arkv1api.BackupNameLabel, name, arkv1api.BackupUIDLabel, uid),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, name),
 	}
 }
 
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
-// find PodVolumeRestores for the restore identified by name and uid.
-func NewPodVolumeRestoreListOptions(name, uid string) metav1.ListOptions {
+// find PodVolumeRestores for the restore identified by name.
+func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", arkv1api.RestoreNameLabel, name, arkv1api.RestoreUIDLabel, uid),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, name),
 	}
 }
 
@@ -202,7 +229,7 @@ func NewPodVolumeRestoreListOptions(name, uid string) metav1.ListOptions {
 // should be used when running a restic command for an Azure backend. This list is
 // the current environment, plus the Azure-specific variables restic needs, namely
 // a storage account name and key.
-func AzureCmdEnv(backupLocationLister arkv1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
+func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
 	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting backup storage location")

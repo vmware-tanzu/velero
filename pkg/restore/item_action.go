@@ -19,7 +19,7 @@ package restore
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 // ItemAction is an actor that performs an operation on an individual item being restored.

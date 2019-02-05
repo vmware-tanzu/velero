@@ -16,7 +16,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata: 
   name: restic
-  namespace: heptio-ark
+  namespace: velero
 spec:
   selector:
     matchLabels:
@@ -26,7 +26,7 @@ spec:
       labels:
         name: restic
     spec:
-      serviceAccountName: ark
+      serviceAccountName: velero
       securityContext:
         runAsUser: 0
       volumes:
@@ -39,10 +39,10 @@ spec:
         - name: scratch
           emptyDir: {}
       containers:
-        - name: ark
-          image: gcr.io/heptio-images/ark:latest
+        - name: velero
+          image: gcr.io/heptio-images/velero:latest
           command:
-            - /ark
+            - /velero
           args:
             - restic 
             - server
@@ -59,11 +59,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-            - name: HEPTIO_ARK_NAMESPACE
+            - name: VELERO_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: GOOGLE_APPLICATION_CREDENTIALS
               value: /credentials/cloud
-            - name: ARK_SCRATCH_DIR
+            - name: VELERO_SCRATCH_DIR
               value: /scratch

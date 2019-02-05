@@ -30,17 +30,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/ark/pkg/apis/ark/v1"
-	arkv1client "github.com/heptio/ark/pkg/generated/clientset/versioned/typed/ark/v1"
-	informers "github.com/heptio/ark/pkg/generated/informers/externalversions/ark/v1"
-	listers "github.com/heptio/ark/pkg/generated/listers/ark/v1"
-	"github.com/heptio/ark/pkg/restic"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/restic"
 )
 
 type resticRepositoryController struct {
 	*genericController
 
-	resticRepositoryClient arkv1client.ResticRepositoriesGetter
+	resticRepositoryClient velerov1client.ResticRepositoriesGetter
 	resticRepositoryLister listers.ResticRepositoryLister
 	backupLocationLister   listers.BackupStorageLocationLister
 	repositoryManager      restic.RepositoryManager
@@ -52,7 +52,7 @@ type resticRepositoryController struct {
 func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer informers.ResticRepositoryInformer,
-	resticRepositoryClient arkv1client.ResticRepositoriesGetter,
+	resticRepositoryClient velerov1client.ResticRepositoriesGetter,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	repositoryManager restic.RepositoryManager,
 ) Interface {

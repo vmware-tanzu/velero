@@ -24,7 +24,7 @@ import (
 
 func labels() map[string]string {
 	return map[string]string{
-		"component": "ark",
+		"component": "velero",
 	}
 }
 
@@ -55,20 +55,20 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 
 func ServiceAccount(namespace string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
-		ObjectMeta: objectMeta(namespace, "ark"),
+		ObjectMeta: objectMeta(namespace, "velero"),
 	}
 }
 
 func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
 	return &rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "ark",
+			Name: "velero",
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
 				Kind:      "ServiceAccount",
 				Namespace: namespace,
-				Name:      "ark",
+				Name:      "velero",
 			},
 		},
 		RoleRef: rbacv1beta1.RoleRef{
