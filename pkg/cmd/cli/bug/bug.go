@@ -71,7 +71,7 @@ about: Tell us about a problem you are experiencing
 
 **Environment:**
 
-- Velero version (use ` + "`velero version`" + `):{{.VeleroVersion}} {{.GitCommit}}
+- Velero version (use ` + "`ark version`" + `):{{.VeleroVersion}} {{.GitCommit}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
 {{- if .KubectlVersion}}
 ` + "```" + `
