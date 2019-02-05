@@ -1,10 +1,10 @@
 # Velero
 
-![](velero.png)
+![](/docs/img/velero.png)
 
 [![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
-## Heptio Ark is now Velero! 
+## Heptio Ark is now Velero!
 
 #### We're working on our first Velero release and instructions for migrating your Ark deployments to Velero. Stay tuned!
 
@@ -30,7 +30,7 @@ You can run Velero in clusters on a cloud provider or on-premises. For detailed 
 
 ## Troubleshooting
 
-If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server. 
+If you encounter issues, review the [troubleshooting docs][30], [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
 ## Contributing
 
