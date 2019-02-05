@@ -14,11 +14,11 @@ about: Tell us about a problem you are experiencing
 **The output of the following commands will help us better understand what's going on**:
 (Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
 
-* `kubectl logs deployment/velero -n velero`
-* `velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`
-* `velero backup logs <backupname>`
-* `velero restore describe <restorename>` or `kubectl get restore/<restorename> -n velero -o yaml`
-* `velero restore logs <restorename>`
+* `kubectl logs deployment/ark -n heptio-ark`
+* `ark backup describe <backupname>` or `kubectl get backup/<backupname> -n heptio-ark -o yaml`
+* `ark backup logs <backupname>`
+* `ark restore describe <restorename>` or `kubectl get restore/<restorename> -n heptio-ark -o yaml`
+* `ark restore logs <restorename>`
 
 
 **Anything else you would like to add:**
