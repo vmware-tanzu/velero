@@ -71,4 +71,4 @@ ark client config set namespace=<NAMESPACE_VALUE>
 
 
 
-[0]: quickstart.md#download
+[0]: get-started.md#download
