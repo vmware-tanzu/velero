@@ -188,13 +188,17 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			log := velerotest.NewLogger()
 
+			nsClient := &velerotest.FakeNamespaceClient{}
+
 			ctx := &context{
 				restore:              test.restore,
-				namespaceClient:      &fakeNamespaceClient{},
+				namespaceClient:      nsClient,
 				fileSystem:           test.fileSystem,
 				log:                  log,
 				prioritizedResources: test.prioritizedResources,
 			}
+
+			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
@@ -280,13 +284,17 @@ func TestRestorePriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			log := velerotest.NewLogger()
 
+			nsClient := &velerotest.FakeNamespaceClient{}
+
 			ctx := &context{
 				restore:              test.restore,
-				namespaceClient:      &fakeNamespaceClient{},
+				namespaceClient:      nsClient,
 				fileSystem:           test.fileSystem,
 				prioritizedResources: test.prioritizedResources,
 				log:                  log,
 			}
+
+			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
 
 			warnings, errors := ctx.restoreFromDir(test.baseDir)
 
@@ -324,18 +332,22 @@ func TestNamespaceRemapping(t *testing.T) {
 	gv := schema.GroupVersion{Group: "", Version: "v1"}
 	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
 
-	namespaceClient := &fakeNamespaceClient{}
+	nsClient := &velerotest.FakeNamespaceClient{}
 
 	ctx := &context{
 		dynamicFactory:       dynamicFactory,
 		fileSystem:           fileSystem,
 		selector:             labelSelector,
-		namespaceClient:      namespaceClient,
+		namespaceClient:      nsClient,
 		prioritizedResources: prioritizedResources,
 		restore:              restore,
 		backup:               &api.Backup{},
 		log:                  velerotest.NewLogger(),
 	}
+
+	nsClient.On("Get", "ns-2", metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "ns-2"))
+	ns := newTestNamespace("ns-2").Namespace
+	nsClient.On("Create", ns).Return(ns, nil)
 
 	warnings, errors := ctx.restoreFromDir(baseDir)
 
@@ -347,8 +359,7 @@ func TestNamespaceRemapping(t *testing.T) {
 	assert.Empty(t, errors.Namespaces)
 
 	// ensure the remapped NS (only) was created via the namespaceClient
-	assert.Equal(t, 1, len(namespaceClient.createdNamespaces))
-	assert.Equal(t, "ns-2", namespaceClient.createdNamespaces[0].Name)
+	nsClient.AssertExpectations(t)
 
 	// ensure that we did not try to create namespaces via dynamic client
 	dynamicFactory.AssertNotCalled(t, "ClientForGroupVersionResource", gv, metav1.APIResource{Name: "namespaces", Namespaced: true}, "")
@@ -606,11 +617,11 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
 			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
+			if test.resourcePath == "persistentvolumes" {
+				resourceClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, ""))
+			}
 
 			// Assume the persistentvolume doesn't already exist in the cluster.
-			var empty *unstructured.Unstructured
-			resourceClient.On("Get", newTestPV().PersistentVolume.Name, metav1.GetOptions{}).Return(empty, nil)
-
 			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
 			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
 
@@ -947,6 +958,14 @@ status:
 			pvcBytes, err := json.Marshal(pvcObj)
 			require.NoError(t, err)
 
+			unstructuredPVCMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
+			require.NoError(t, err)
+			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
+
+			nsClient := &velerotest.FakeNamespaceClient{}
+			ns := newTestNamespace(pvcObj.Namespace).Namespace
+			nsClient.On("Get", pvcObj.Namespace, mock.Anything).Return(ns, nil)
+
 			backup := &api.Backup{}
 			if test.haveSnapshot && test.legacyBackup {
 				backup.Status.VolumeBackups = map[string]*api.VolumeBackupInfo{
@@ -976,10 +995,11 @@ status:
 						Name:      "my-restore",
 					},
 				},
-				backup:         backup,
-				log:            velerotest.NewLogger(),
-				pvsToProvision: sets.NewString(),
-				pvRestorer:     pvRestorer,
+				backup:          backup,
+				log:             velerotest.NewLogger(),
+				pvsToProvision:  sets.NewString(),
+				pvRestorer:      pvRestorer,
+				namespaceClient: nsClient,
 			}
 
 			if test.haveSnapshot && !test.legacyBackup {
@@ -1001,8 +1021,12 @@ status:
 			unstructuredPV := &unstructured.Unstructured{Object: unstructuredPVMap}
 
 			if test.expectPVFound {
-				pvClient.On("Get", unstructuredPV.GetName(), metav1.GetOptions{}).Return(unstructuredPV, nil)
-				pvClient.On("Create", mock.Anything).Return(unstructuredPV, k8serrors.NewAlreadyExists(kuberesource.PersistentVolumes, unstructuredPV.GetName()))
+				// Copy the PV so that later modifcations don't affect what's returned by our faked calls.
+				inClusterPV := unstructuredPV.DeepCopy()
+				pvClient.On("Get", inClusterPV.GetName(), metav1.GetOptions{}).Return(inClusterPV, nil)
+				pvClient.On("Create", mock.Anything).Return(inClusterPV, k8serrors.NewAlreadyExists(kuberesource.PersistentVolumes, inClusterPV.GetName()))
+				inClusterPVC := unstructuredPVC.DeepCopy()
+				pvcClient.On("Get", pvcObj.Name, mock.Anything).Return(inClusterPVC, nil)
 			}
 
 			// Only set up the client expectation if the test has the proper prerequisites
@@ -1046,12 +1070,7 @@ status:
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
-
-			if test.expectPVFound {
-				assert.Equal(t, 1, len(warnings.Cluster))
-			} else {
-				assert.Empty(t, warnings.Cluster)
-			}
+			assert.Empty(t, warnings.Cluster)
 
 			// Prep PVC restore
 			// Handle expectations
@@ -1062,9 +1081,10 @@ status:
 				delete(pvcObj.Annotations, key)
 			}
 
-			unstructuredPVCMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
+			// Recreate the unstructured PVC since the object was edited.
+			unstructuredPVCMap, err = runtime.DefaultUnstructuredConverter.ToUnstructured(pvcObj)
 			require.NoError(t, err)
-			unstructuredPVC := &unstructured.Unstructured{Object: unstructuredPVCMap}
+			unstructuredPVC = &unstructured.Unstructured{Object: unstructuredPVCMap}
 
 			resetMetadataAndStatus(unstructuredPVC)
 			addRestoreLabels(unstructuredPVC, ctx.restore.Name, ctx.restore.Spec.BackupName)
@@ -1576,6 +1596,244 @@ func TestIsPVReady(t *testing.T) {
 	}
 }
 
+func TestShouldRestore(t *testing.T) {
+	pv := `apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    EXPORT_block: "\nEXPORT\n{\n\tExport_Id = 1;\n\tPath = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tPseudo
+      = /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce;\n\tAccess_Type = RW;\n\tSquash
+      = no_root_squash;\n\tSecType = sys;\n\tFilesystem_id = 1.1;\n\tFSAL {\n\t\tName
+      = VFS;\n\t}\n}\n"
+    Export_Id: "1"
+    Project_Id: "0"
+    Project_block: ""
+    Provisioner_Id: 5fdf4025-78a5-11e8-9ece-0242ac110004
+    kubernetes.io/createdby: nfs-dynamic-provisioner
+    pv.kubernetes.io/provisioned-by: example.com/nfs
+    volume.beta.kubernetes.io/mount-options: vers=4.1
+  creationTimestamp: 2018-06-25T18:27:35Z
+  finalizers:
+  - kubernetes.io/pv-protection
+  name: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  resourceVersion: "2576"
+  selfLink: /api/v1/persistentvolumes/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  uid: 6ecd24e4-78a5-11e8-a0d8-e2ad1e9734ce
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Mi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: nfs
+    namespace: default
+    resourceVersion: "2565"
+    uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+  nfs:
+    path: /export/pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+    server: 10.103.235.254
+  storageClassName: example-nfs
+status:
+  phase: Bound`
+
+	pvc := `apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    control-plane.alpha.kubernetes.io/leader: '{"holderIdentity":"5fdf5572-78a5-11e8-9ece-0242ac110004","leaseDurationSeconds":15,"acquireTime":"2018-06-25T18:27:35Z","renewTime":"2018-06-25T18:27:37Z","leaderTransitions":0}'
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"annotations":{},"name":"nfs","namespace":"default"},"spec":{"accessModes":["ReadWriteMany"],"resources":{"requests":{"storage":"1Mi"}},"storageClassName":"example-nfs"}}
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: example.com/nfs
+  creationTimestamp: 2018-06-25T18:27:28Z
+  finalizers:
+  - kubernetes.io/pvc-protection
+  name: nfs
+  namespace: default
+  resourceVersion: "2578"
+  selfLink: /api/v1/namespaces/default/persistentvolumeclaims/nfs
+  uid: 6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+  storageClassName: example-nfs
+  volumeName: pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce
+status:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Mi
+  phase: Bound`
+
+	tests := []struct {
+		name              string
+		expectNSFound     bool
+		expectPVFound     bool
+		pvPhase           string
+		expectPVCFound    bool
+		expectPVCGet      bool
+		expectPVCDeleting bool
+		expectNSGet       bool
+		expectNSDeleting  bool
+		nsPhase           v1.NamespacePhase
+		expectedResult    bool
+	}{
+		{
+			name:           "pv not found, no associated pvc or namespace",
+			expectedResult: true,
+		},
+		{
+			name:           "pv found, phase released",
+			pvPhase:        string(v1.VolumeReleased),
+			expectPVFound:  true,
+			expectedResult: false,
+		},
+		{
+			name:           "pv found, has associated pvc and namespace that's aren't deleting",
+			expectPVFound:  true,
+			expectPVCGet:   true,
+			expectNSGet:    true,
+			expectPVCFound: true,
+			expectedResult: false,
+		},
+		{
+			name:              "pv found, has associated pvc that's deleting, don't look up namespace",
+			expectPVFound:     true,
+			expectPVCGet:      true,
+			expectPVCFound:    true,
+			expectPVCDeleting: true,
+			expectedResult:    false,
+		},
+		{
+			name:           "pv found, has associated pvc that's not deleting, has associated namespace that's terminating",
+			expectPVFound:  true,
+			expectPVCGet:   true,
+			expectPVCFound: true,
+			expectNSGet:    true,
+			expectNSFound:  true,
+			nsPhase:        v1.NamespaceTerminating,
+			expectedResult: false,
+		},
+		{
+			name:             "pv found, has associated pvc that's not deleting, has associated namespace that has deletion timestamp",
+			expectPVFound:    true,
+			expectPVCGet:     true,
+			expectPVCFound:   true,
+			expectNSGet:      true,
+			expectNSFound:    true,
+			expectNSDeleting: true,
+			expectedResult:   false,
+		},
+		{
+			name:           "pv found, associated pvc not found, namespace not queried",
+			expectPVFound:  true,
+			expectPVCGet:   true,
+			expectedResult: false,
+		},
+		{
+			name:           "pv found, associated pvc found, namespace not found",
+			expectPVFound:  true,
+			expectPVCGet:   true,
+			expectPVCFound: true,
+			expectNSGet:    true,
+			expectedResult: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
+			gv := schema.GroupVersion{Group: "", Version: "v1"}
+
+			pvClient := &velerotest.FakeDynamicClient{}
+			defer pvClient.AssertExpectations(t)
+
+			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, "").Return(pvClient, nil)
+
+			pvcClient := &velerotest.FakeDynamicClient{}
+			defer pvcClient.AssertExpectations(t)
+
+			pvcResource := metav1.APIResource{Name: "persistentvolumeclaims", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, pvcResource, "default").Return(pvcClient, nil)
+
+			obj, _, err := scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pv), nil, &unstructured.Unstructured{})
+			pvObj := obj.(*unstructured.Unstructured)
+			require.NoError(t, err)
+
+			obj, _, err = scheme.Codecs.UniversalDecoder(v1.SchemeGroupVersion).Decode([]byte(pvc), nil, &unstructured.Unstructured{})
+			pvcObj := obj.(*unstructured.Unstructured)
+			require.NoError(t, err)
+
+			nsClient := &velerotest.FakeNamespaceClient{}
+			defer nsClient.AssertExpectations(t)
+			ns := newTestNamespace(pvcObj.GetNamespace()).Namespace
+
+			// Set up test expectations
+			if test.pvPhase != "" {
+				status, err := collections.GetMap(pvObj.UnstructuredContent(), "status")
+				require.NoError(t, err)
+				status["phase"] = test.pvPhase
+			}
+
+			if test.expectPVFound {
+				pvClient.On("Get", pvObj.GetName(), metav1.GetOptions{}).Return(pvObj, nil)
+			} else {
+				pvClient.On("Get", pvObj.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, pvObj.GetName()))
+			}
+
+			if test.expectPVCDeleting {
+				pvcObj.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
+			}
+
+			// the pv needs to be found before moving on to look for pvc/namespace
+			// however, even if the pv is found, we may be testing the PV's phase and not expecting
+			// the pvc/namespace to be looked up
+			if test.expectPVCGet {
+				if test.expectPVCFound {
+					pvcClient.On("Get", pvcObj.GetName(), metav1.GetOptions{}).Return(pvcObj, nil)
+				} else {
+					pvcClient.On("Get", pvcObj.GetName(), metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumeclaims"}, pvcObj.GetName()))
+				}
+			}
+
+			if test.nsPhase != "" {
+				ns.Status.Phase = test.nsPhase
+			}
+
+			if test.expectNSDeleting {
+				ns.SetDeletionTimestamp(&metav1.Time{Time: time.Now()})
+			}
+
+			if test.expectNSGet {
+				if test.expectNSFound {
+					nsClient.On("Get", pvcObj.GetNamespace(), mock.Anything).Return(ns, nil)
+				} else {
+					nsClient.On("Get", pvcObj.GetNamespace(), metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, pvcObj.GetNamespace()))
+				}
+			}
+
+			ctx := &context{
+				dynamicFactory:             dynamicFactory,
+				log:                        velerotest.NewLogger(),
+				namespaceClient:            nsClient,
+				resourceTerminatingTimeout: 1 * time.Millisecond,
+			}
+
+			result, err := ctx.shouldRestore(pvObj.GetName(), pvClient)
+
+			assert.Equal(t, test.expectedResult, result)
+		})
+
+	}
+}
+
 type testUnstructured struct {
 	*unstructured.Unstructured
 }
@@ -1784,10 +2042,6 @@ type testNamespace struct {
 func newTestNamespace(name string) *testNamespace {
 	return &testNamespace{
 		Namespace: &v1.Namespace{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "Namespace",
-			},
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
