@@ -1,7 +1,7 @@
 # Build from source
 
 * [Prerequisites][1]
-* [Download][2]
+* [Getting the source][2]
 * [Build][3]
 * [Test][12]
 * [Run][7]
@@ -16,6 +16,8 @@
 
 ## Getting the source
 
+### Option 1) Get latest (recommended)
+
 ```bash
 mkdir $HOME/go
 export GOPATH=$HOME/go
@@ -26,6 +28,8 @@ Where `go` is your [import path][4] for Go.
 
 For Go development, it is recommended to add the Go import path (`$HOME/go` in this example) to your path.
 
+### Option 2) Release archive
+Download the archive named `Source code` from the [release page][22] and extract it in your Go import path as `src/github.com/heptio/velero`.
 
 ## Build
 
@@ -40,6 +44,11 @@ make container
 ```
 
 To push your image to a registry, use `make push`.
+
+To build only the `velero` binary, run:
+```
+go build ./cmd/velero
+```
 
 ### Update generated files
 
@@ -204,7 +213,7 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 
 [0]: ../README.md
 [1]: #prerequisites
-[2]: #download
+[2]: #getting-the-source
 [3]: #build
 [4]: https://blog.golang.org/organizing-go-code
 [5]: https://golang.org/doc/install
@@ -223,3 +232,4 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [19]: ../examples/README.md
 [20]: api-types/backupstoragelocation.md
 [21]: api-types/volumesnapshotlocation.md
+[22]: https://github.com/heptio/velero/releases
