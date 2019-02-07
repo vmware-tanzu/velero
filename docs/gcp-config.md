@@ -67,6 +67,7 @@ To integrate Velero with GCP, create an Velero-specific [Service Account][15]:
         compute.snapshots.create
         compute.snapshots.useReadOnly
         compute.snapshots.delete
+        compute.zones.get
     )
 
     gcloud iam roles create velero.server \

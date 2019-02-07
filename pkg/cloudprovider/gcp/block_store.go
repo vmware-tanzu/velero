@@ -36,7 +36,10 @@ import (
 	"github.com/heptio/velero/pkg/util/collections"
 )
 
-const projectKey = "project"
+const (
+	projectKey    = "project"
+	zoneSeparator = "__"
+)
 
 type blockStore struct {
 	gce     *compute.Service
@@ -97,29 +100,45 @@ func extractProjectFromCreds() (string, error) {
 // by GKE when a storage class spans multiple availablity
 // zones.
 func isMultiZone(volumeAZ string) bool {
-	return strings.Contains(volumeAZ, "__")
+	return strings.Contains(volumeAZ, zoneSeparator)
 }
 
-// parseRegion parses a failure-domain tag with multiple regions
-// and returns a single region. Regions are sperated by double underscores (__).
+// parseRegion parses a failure-domain tag with multiple zones
+// and returns a single region. Zones are sperated by double underscores (__).
 // For example
 //     input: us-central1-a__us-central1-b
 //     return: us-central1
-// When a custom storage class spans multiple geographical regions,
-// such as us-central1 and us-west1 only the region matching the cluster is used
+// When a custom storage class spans multiple geographical zones,
+// such as us-central1 and us-west1 only the zone matching the cluster is used
 // in the failure-domain tag.
 // For example
 //     Cluster nodes in us-central1-c, us-central1-f
 //     Storage class zones us-central1-a, us-central1-f, us-east1-a, us-east1-d
 //     The failure-domain tag would be: us-central1-a__us-central1-f
 func parseRegion(volumeAZ string) (string, error) {
-	zones := strings.Split(volumeAZ, "__")
+	zones := strings.Split(volumeAZ, zoneSeparator)
 	zone := zones[0]
 	parts := strings.SplitAfterN(zone, "-", 3)
 	if len(parts) < 2 {
 		return "", errors.Errorf("failed to parse region from zone: %q", volumeAZ)
 	}
 	return parts[0] + strings.TrimSuffix(parts[1], "-"), nil
+}
+
+// Retrieve the URLs for zones via the GCP API.
+func (b *blockStore) getZoneURLs(volumeAZ string) ([]string, error) {
+	zones := strings.Split(volumeAZ, zoneSeparator)
+	var zoneURLs []string
+	for _, z := range zones {
+		zone, err := b.gce.Zones.Get(b.project, z).Do()
+		if err != nil {
+			return nil, errors.WithStack(err)
+		}
+
+		zoneURLs = append(zoneURLs, zone.SelfLink)
+	}
+
+	return zoneURLs, nil
 }
 
 func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
@@ -146,6 +165,15 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		if err != nil {
 			return "", err
 		}
+
+		// URLs for zones that the volume is replicated to within GCP
+		zoneURLs, err := b.getZoneURLs(volumeAZ)
+		if err != nil {
+			return "", err
+		}
+
+		disk.ReplicaZones = zoneURLs
+
 		if _, err = b.gce.RegionDisks.Insert(b.project, volumeRegion, disk).Do(); err != nil {
 			return "", errors.WithStack(err)
 		}
