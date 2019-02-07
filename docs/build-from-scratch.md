@@ -31,6 +31,8 @@ For Go development, it is recommended to add the Go import path (`$HOME/go` in t
 ### Option 2) Release archive
 Download the archive named `Source code` from the [release page][22] and extract it in your Go import path as `src/github.com/heptio/velero`.
 
+Note that the Makefile targets assume building from a git repository. When building from an archive, you will be limited to the `go build` commands described below.
+
 ## Build
 
 You can build your Velero image locally on the machine where you run your cluster, or you can push it to a private registry. This section covers both workflows.
