@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Heptio velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,11 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin"
 )
 
 // clientBuilder builds go-plugin Clients.

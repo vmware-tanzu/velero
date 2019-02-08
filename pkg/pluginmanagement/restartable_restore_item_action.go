@@ -20,8 +20,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 )
 
 // restartableRestoreItemAction is a restore item action for a given implementation (such as "pod"). It is associated with

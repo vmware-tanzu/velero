@@ -89,7 +89,7 @@ func TestPutObject(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			wc := newMockWriteCloser(test.writeErr, test.closeErr)
-			o := NewObjectStore(velerotest.NewLogger()).(*objectStore)
+			o := NewObjectStore(velerotest.NewLogger())
 			o.bucketWriter = newFakeWriter(wc)
 
 			err := o.PutObject("bucket", "key", strings.NewReader("contents"))

@@ -8,8 +8,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
 )
 
 // GRPCServer registers an ObjectStore gRPC server.

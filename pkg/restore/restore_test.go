@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Heptio velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,11 +39,12 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"

@@ -33,7 +33,7 @@ import (
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
 	"github.com/heptio/velero/pkg/volume"
 )
 
@@ -68,7 +68,7 @@ type objectBackupStore struct {
 	logger      logrus.FieldLogger
 }
 
-func NewObjectBackupStore(location *arkv1api.BackupStorageLocation, objectStoreGetter objectinterface.ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
+func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter objectinterface.ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
 	if location.Spec.ObjectStorage == nil {
 		return nil, errors.New("backup storage location does not use object storage")
 	}

@@ -27,7 +27,7 @@ import (
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	velerotest "github.com/heptio/velero/pkg/util/test"

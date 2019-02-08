@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	arkplugin "github.com/heptio/ark/pkg/plugin"
+	arkplugin "github.com/heptio/velero/pkg/plugin"
 )
 
 type ProcessFactory interface {

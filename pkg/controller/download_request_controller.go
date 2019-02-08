@@ -35,8 +35,8 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 

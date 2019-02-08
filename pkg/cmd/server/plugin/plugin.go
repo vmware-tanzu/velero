@@ -20,14 +20,14 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/ark/pkg/backup/backupaction"
+	"github.com/heptio/velero/pkg/backup/backupaction"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cloudprovider/aws"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	"github.com/heptio/velero/pkg/cloudprovider/gcp"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	veleroplugin "github.com/heptio/velero/pkg/plugin"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/restore/restoreaction"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {

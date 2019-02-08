@@ -21,8 +21,8 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
 )
 
 // restartableObjectStore is an object store for a given implementation (such as "aws"). It is associated with

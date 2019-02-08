@@ -40,9 +40,10 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
+	"github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
@@ -450,6 +451,8 @@ func (c *restoreController) backupInfoForLocation(location *api.BackupStorageLoc
 		backup:      backupCreated,
 		backupStore: backupStore,
 	}, nil
+}
+
 func (c *restoreController) runRestore(
 	restore *api.Restore,
 	actions []actioninterface.RestoreItemAction,

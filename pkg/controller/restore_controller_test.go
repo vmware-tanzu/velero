@@ -42,11 +42,11 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
-	pluginmocks "github.com/heptio/ark/pkg/pluginmanagement/mocks"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/velero/pkg/pluginmanagement/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -694,7 +694,7 @@ func TestValidateAndComplete(t *testing.T) {
 					backupLister:           sharedInformers.Velero().V1().Backups().Lister(),
 					backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 					snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-					newBackupStore: func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+					newBackupStore: func(*api.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 						return backupStore, nil
 					},
 				}

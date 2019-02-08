@@ -3,13 +3,13 @@ package plugin
 import (
 	"encoding/json"
 
-	"github.com/hashicorp/go-plugin"
+	plugin "github.com/hashicorp/go-plugin"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	proto "github.com/heptio/ark/pkg/plugin/generated"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
 // BlockStorePlugin is an implementation of go-plugin's Plugin

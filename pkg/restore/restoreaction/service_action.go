@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 	"github.com/heptio/velero/pkg/util/collections"
 )
 

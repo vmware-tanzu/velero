@@ -21,10 +21,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 )
 
 // Manager manages the lifecycles of plugins.

@@ -10,9 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	api "github.com/heptio/ark/pkg/apis/ark/v1"
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 )
 
 // RestoreItemActionPlugin is an implementation of go-plugin's Plugin

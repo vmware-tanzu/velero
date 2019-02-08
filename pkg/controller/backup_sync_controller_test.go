@@ -35,9 +35,9 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/velero/pkg/pluginmanagement/mocks"
 	"github.com/heptio/velero/pkg/util/stringslice"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -195,9 +195,10 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				test.namespace,
 				"",
 				func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
+				velerotest.NewLogger(),
 			).(*backupSyncController)
 
-			c.newBackupStore = func(loc *arkv1api.BackupStorageLocation, _ objectinterface.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(loc *velerov1api.BackupStorageLocation, _ objectinterface.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			}

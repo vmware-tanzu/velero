@@ -19,8 +19,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 )
 
 // restartableBlockStore is an object store for a given implementation (such as "aws"). It is associated with

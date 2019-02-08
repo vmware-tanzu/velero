@@ -44,8 +44,8 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -68,7 +68,7 @@ type backupController struct {
 	snapshotLocationLister   listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
-	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore           func(*velerov1api.BackupStorageLocation, objectinterface.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupController(

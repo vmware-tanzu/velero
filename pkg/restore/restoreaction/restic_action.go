@@ -27,7 +27,7 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
 )

@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/restore/restoreaction/mocks"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/restore/restoreaction/mocks"
 )
 
 func TestRestartableGetRestoreItemAction(t *testing.T) {

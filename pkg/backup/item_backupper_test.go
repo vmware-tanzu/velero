@@ -39,8 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"

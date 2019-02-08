@@ -24,7 +24,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 )
 
 // backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume

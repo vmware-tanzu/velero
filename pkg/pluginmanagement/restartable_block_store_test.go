@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/heptio/velero/pkg/cloudprovider/mocks"
-	"github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin"
 )
 
 func TestRestartableGetBlockStore(t *testing.T) {

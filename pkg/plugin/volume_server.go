@@ -8,8 +8,8 @@ import (
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	proto "github.com/heptio/ark/pkg/plugin/generated"
-	"github.com/heptio/ark/pkg/plugin/interface/volumeinterface"
+	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/interface/volumeinterface"
 )
 
 // GRPCServer registers a BlockStore gRPC server.

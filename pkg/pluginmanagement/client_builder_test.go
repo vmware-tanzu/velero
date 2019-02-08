@@ -24,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin"
 	"github.com/heptio/velero/pkg/util/test"
 )
 

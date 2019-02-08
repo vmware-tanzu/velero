@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/heptio/ark/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin"
 )
 
 type restartableDelegateTest struct {

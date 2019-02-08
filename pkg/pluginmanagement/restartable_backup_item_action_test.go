@@ -27,8 +27,8 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/backup/mocks"
-	"github.com/heptio/ark/pkg/plugin"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 )
 
 func TestRestartableGetBackupItemAction(t *testing.T) {

@@ -61,7 +61,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/ark/pkg/pluginmanagement"
+	"github.com/heptio/velero/pkg/pluginmanagement"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/restore"

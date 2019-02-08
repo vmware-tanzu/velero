@@ -28,7 +28,7 @@ import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/ark/pkg/plugin/interface/actioninterface"
+	"github.com/heptio/velero/pkg/plugin/interface/actioninterface"
 )
 
 // serviceAccountAction implements BackupItemAction.
@@ -37,7 +37,7 @@ type serviceAccountAction struct {
 	clusterRoleBindings []ClusterRoleBinding
 }
 
-func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper arkdiscovery.Helper) (actioninterface.BackupItemAction, error) {
+func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (actioninterface.BackupItemAction, error) {
 	// Look up the supported RBAC version
 	var supportedAPI metav1.GroupVersionForDiscovery
 	for _, ag := range discoveryHelper.APIGroups() {

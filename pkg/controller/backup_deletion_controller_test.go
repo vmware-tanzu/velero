@@ -38,9 +38,9 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/velero/pkg/pluginmanagement/mocks"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
@@ -147,7 +147,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Velero().V1().PodVolumeBackups(),
 			sharedInformers.Velero().V1().BackupStorageLocations(),
 			sharedInformers.Velero().V1().VolumeSnapshotLocations(),
-			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+			func(logrus.FieldLogger) pluginmanagement.Manager { return pluginManager },
 		).(*backupDeletionController),
 
 		req: req,

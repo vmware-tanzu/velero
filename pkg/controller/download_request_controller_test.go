@@ -32,9 +32,9 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/ark/pkg/plugin/interface/objectinterface"
-	"github.com/heptio/ark/pkg/pluginmanagement"
-	pluginmocks "github.com/heptio/ark/pkg/pluginmanagement/mocks"
+	"github.com/heptio/velero/pkg/plugin/interface/objectinterface"
+	"github.com/heptio/velero/pkg/pluginmanagement"
+	pluginmocks "github.com/heptio/velero/pkg/pluginmanagement/mocks"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
