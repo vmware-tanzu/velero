@@ -589,7 +589,7 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 
 	var shouldRestore bool
 	err := wait.PollImmediate(time.Second, ctx.resourceTerminatingTimeout, func() (bool, error) {
-		clusterPV, err := pvClient.Get(name, metav1.GetOptions{})
+		unstructuredPV, err := pvClient.Get(name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			pvLogger.Debug("PV not found, safe to restore")
 			// PV not found, can safely exit loop and proceed with restore.
@@ -598,15 +598,14 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 		}
 		if err != nil {
 			return false, errors.Wrapf(err, "could not retrieve in-cluster copy of PV %s", name)
-
-		}
-		phase, err := collections.GetString(clusterPV.UnstructuredContent(), "status.phase")
-		if err != nil {
-			// Break the loop since we couldn't read the phase
-			return false, errors.Wrapf(err, "error getting phase for in-cluster PV %s", name)
 		}
 
-		if phase == string(v1.VolumeReleased) || clusterPV.GetDeletionTimestamp() != nil {
+		clusterPV := new(v1.PersistentVolume)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, clusterPV); err != nil {
+			return false, errors.Wrap(err, "error converting PV from unstructured")
+		}
+
+		if clusterPV.Status.Phase == v1.VolumeReleased || clusterPV.DeletionTimestamp != nil {
 			// PV was found and marked for deletion, or it was released; wait for it to go away.
 			pvLogger.Debugf("PV found, but marked for deletion, waiting")
 			return false, nil
@@ -617,14 +616,13 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 		// trying to restore the PV
 		// Not doing so may result in the underlying PV disappearing but not restoring due to timing issues,
 		// then the PVC getting restored and showing as lost.
-		namespace, err := collections.GetString(clusterPV.UnstructuredContent(), "spec.claimRef.namespace")
-		if err != nil {
-			return false, errors.Wrapf(err, "error looking up namespace name for in-cluster PV %s", name)
+		if clusterPV.Spec.ClaimRef == nil {
+			pvLogger.Debugf("PV is not marked for deletion and is not claimed by a PVC")
+			return true, nil
 		}
-		pvcName, err := collections.GetString(clusterPV.UnstructuredContent(), "spec.claimRef.name")
-		if err != nil {
-			return false, errors.Wrapf(err, "error looking up persistentvolumeclaim for in-cluster PV %s", name)
-		}
+
+		namespace := clusterPV.Spec.ClaimRef.Namespace
+		pvcName := clusterPV.Spec.ClaimRef.Name
 
 		// Have to create the PVC client here because we don't know what namespace we're using til we get to this point.
 		// Using a dynamic client since it's easier to mock for testing
@@ -635,7 +633,6 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 		}
 
 		pvc, err := pvcClient.Get(pvcName, metav1.GetOptions{})
-
 		if apierrors.IsNotFound(err) {
 			pvLogger.Debugf("PVC %s for PV not found, waiting", pvcName)
 			// PVC wasn't found, but the PV still exists, so continue to wait.

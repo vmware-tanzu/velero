@@ -1775,9 +1775,7 @@ status:
 
 			// Set up test expectations
 			if test.pvPhase != "" {
-				status, err := collections.GetMap(pvObj.UnstructuredContent(), "status")
-				require.NoError(t, err)
-				status["phase"] = test.pvPhase
+				require.NoError(t, unstructured.SetNestedField(pvObj.Object, test.pvPhase, "status", "phase"))
 			}
 
 			if test.expectPVFound {
