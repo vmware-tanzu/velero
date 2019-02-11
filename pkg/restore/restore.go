@@ -900,7 +900,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 		// and which backup they came from
 		addRestoreLabels(obj, ctx.restore.Name, ctx.restore.Spec.BackupName)
 
-		ctx.log.Infof("Restoring %s: %v", obj.GroupVersionKind().Kind, name)
+		ctx.log.Infof("Attempting to restore %s: %v", obj.GroupVersionKind().Kind, name)
 		createdObj, restoreErr := resourceClient.Create(obj)
 		if apierrors.IsAlreadyExists(restoreErr) {
 			fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
@@ -922,34 +922,36 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			labels := obj.GetLabels()
 			addRestoreLabels(fromCluster, labels[api.RestoreNameLabel], labels[api.BackupNameLabel])
 
-			if !equality.Semantic.DeepEqual(fromCluster, obj) {
+			if equality.Semantic.DeepEqual(fromCluster, obj) {
+				ctx.log.Infof("Skipping restore of %s: %v because it already exists in the cluster and is unchanged from the backed up version", obj.GroupVersionKind().Kind, name)
+			} else {
 				switch groupResource {
 				case kuberesource.ServiceAccounts:
 					desired, err := mergeServiceAccounts(fromCluster, obj)
 					if err != nil {
 						ctx.log.Infof("error merging secrets for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
 						addToResult(&warnings, namespace, err)
-						continue
+						break
 					}
 
 					patchBytes, err := generatePatch(fromCluster, desired)
 					if err != nil {
 						ctx.log.Infof("error generating patch for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
 						addToResult(&warnings, namespace, err)
-						continue
+						break
 					}
 
 					if patchBytes == nil {
 						// In-cluster and desired state are the same, so move on to the next item
-						continue
+						break
 					}
 
 					_, err = resourceClient.Patch(name, patchBytes)
 					if err != nil {
 						addToResult(&warnings, namespace, err)
-					} else {
-						ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
+						break
 					}
+					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				default:
 					e := errors.Errorf("not restored: %s and is different from backed up version.", restoreErr)
 					addToResult(&warnings, namespace, e)
