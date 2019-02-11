@@ -19,6 +19,10 @@ package v1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // ScheduleSpec defines the specification for an Ark schedule
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ScheduleSpec struct {
 	// Template is the definition of the Backup to be run
 	// on the provided schedule
@@ -31,6 +35,10 @@ type ScheduleSpec struct {
 
 // SchedulePhase is a string representation of the lifecycle phase
 // of an Ark schedule
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type SchedulePhase string
 
 const (
@@ -48,6 +56,10 @@ const (
 )
 
 // ScheduleStatus captures the current state of an Ark schedule
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ScheduleStatus struct {
 	// Phase is the current phase of the Schedule
 	Phase SchedulePhase `json:"phase"`
@@ -66,6 +78,10 @@ type ScheduleStatus struct {
 
 // Schedule is an Ark resource that represents a pre-scheduled or
 // periodic Backup that should be run.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type Schedule struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -77,6 +93,10 @@ type Schedule struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ScheduleList is a list of Schedules.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ScheduleList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

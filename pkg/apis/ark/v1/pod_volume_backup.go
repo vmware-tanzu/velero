@@ -22,6 +22,10 @@ import (
 )
 
 // PodVolumeBackupSpec is the specification for a PodVolumeBackup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeBackupSpec struct {
 	// Node is the name of the node that the Pod is running on.
 	Node string `json:"node"`
@@ -46,6 +50,10 @@ type PodVolumeBackupSpec struct {
 }
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeBackupPhase string
 
 const (
@@ -56,6 +64,10 @@ const (
 )
 
 // PodVolumeBackupStatus is the current status of a PodVolumeBackup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeBackupStatus struct {
 	// Phase is the current state of the PodVolumeBackup.
 	Phase PodVolumeBackupPhase `json:"phase"`
@@ -73,6 +85,9 @@ type PodVolumeBackupStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeBackup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -84,6 +99,10 @@ type PodVolumeBackup struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodVolumeBackupList is a list of PodVolumeBackups.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeBackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

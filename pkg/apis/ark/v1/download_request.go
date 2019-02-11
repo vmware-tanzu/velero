@@ -19,12 +19,20 @@ package v1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // DownloadRequestSpec is the specification for a download request.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadRequestSpec struct {
 	// Target is what to download (e.g. logs for a backup).
 	Target DownloadTarget `json:"target"`
 }
 
 // DownloadTargetKind represents what type of file to download.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadTargetKind string
 
 const (
@@ -37,6 +45,10 @@ const (
 
 // DownloadTarget is the specification for what kind of file to download, and the name of the
 // resource with which it's associated.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadTarget struct {
 	// Kind is the type of file to download.
 	Kind DownloadTargetKind `json:"kind"`
@@ -45,6 +57,10 @@ type DownloadTarget struct {
 }
 
 // DownloadRequestPhase represents the lifecycle phase of a DownloadRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadRequestPhase string
 
 const (
@@ -57,6 +73,10 @@ const (
 )
 
 // DownloadRequestStatus is the current status of a DownloadRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadRequestStatus struct {
 	// Phase is the current state of the DownloadRequest.
 	Phase DownloadRequestPhase `json:"phase"`
@@ -71,6 +91,10 @@ type DownloadRequestStatus struct {
 
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -82,6 +106,10 @@ type DownloadRequest struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DownloadRequestList is a list of DownloadRequests.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DownloadRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

@@ -25,6 +25,10 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BackupStorageLocation is a location where Ark stores backup objects.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -36,6 +40,10 @@ type BackupStorageLocation struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BackupStorageLocationList is a list of BackupStorageLocations.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -44,11 +52,19 @@ type BackupStorageLocationList struct {
 
 // StorageType represents the type of storage that a backup location uses.
 // ObjectStorage must be non-nil, since it is currently the only supported StorageType.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type StorageType struct {
 	ObjectStorage *ObjectStorageLocation `json:"objectStorage,omitempty"`
 }
 
 // ObjectStorageLocation specifies the settings necessary to connect to a provider's object storage.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ObjectStorageLocation struct {
 	// Bucket is the bucket to use for object storage.
 	Bucket string `json:"bucket"`
@@ -58,6 +74,10 @@ type ObjectStorageLocation struct {
 }
 
 // BackupStorageLocationSpec defines the specification for an Ark BackupStorageLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocationSpec struct {
 	// Provider is the provider of the backup storage.
 	Provider string `json:"provider"`
@@ -69,6 +89,10 @@ type BackupStorageLocationSpec struct {
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of an Ark BackupStorageLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocationPhase string
 
 const (
@@ -80,6 +104,10 @@ const (
 )
 
 // BackupStorageLocationAccessMode represents the permissions for a BackupStorageLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocationAccessMode string
 
 const (
@@ -91,6 +119,10 @@ const (
 )
 
 // BackupStorageLocationStatus describes the current status of an Ark BackupStorageLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStorageLocationStatus struct {
 	Phase              BackupStorageLocationPhase      `json:"phase,omitempty"`
 	AccessMode         BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
