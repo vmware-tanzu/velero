@@ -176,6 +176,25 @@
   version = "v0.1.0"
 
 [[projects]]
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/blockstorage/v2/snapshots",
+    "openstack/blockstorage/v2/volumes",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/objectstorage/v1/accounts",
+    "openstack/objectstorage/v1/objects",
+    "openstack/utils",
+    "pagination",
+    "testhelper",
+    "testhelper/client"
+  ]
+  revision = "f29afc2cceca860199ee88cd355a4d0a37b3fad2"
+
+[[projects]]
   branch = "master"
   name = "github.com/gregjones/httpcache"
   packages = [
@@ -807,6 +826,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "7979aebee2c67e7fa68bddf050ef32b75a2f51145d26d00a54f6bf489af635a2"
+  inputs-digest = "005b13dd0ef03dba388c10efae4a2d668b18ee0b60985e97f9cf428affc8a302"
   solver-name = "gps-cdcl"
   solver-version = 1

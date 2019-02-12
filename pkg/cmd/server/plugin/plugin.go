@@ -25,6 +25,7 @@ import (
 	"github.com/heptio/velero/pkg/cloudprovider/aws"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	"github.com/heptio/velero/pkg/cloudprovider/gcp"
+	"github.com/heptio/velero/pkg/cloudprovider/openstack"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	veleroplugin "github.com/heptio/velero/pkg/plugin"
 	"github.com/heptio/velero/pkg/restore"
@@ -44,9 +45,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
+				RegisterObjectStore("openstack", newOpenstackObjectStore).
 				RegisterBlockStore("aws", newAwsBlockStore).
 				RegisterBlockStore("azure", newAzureBlockStore).
 				RegisterBlockStore("gcp", newGcpBlockStore).
+				RegisterBlockStore("openstack", newOpenstackBlockStore).
 				RegisterBackupItemAction("pv", newPVBackupItemAction).
 				RegisterBackupItemAction("pod", newPodBackupItemAction).
 				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
@@ -74,6 +77,10 @@ func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewObjectStore(logger), nil
 }
 
+func newOpenstackObjectStore(logger logrus.FieldLogger) (interface{}, error) {
+	return openstack.NewObjectStore(logger), nil
+}
+
 func newAwsBlockStore(logger logrus.FieldLogger) (interface{}, error) {
 	return aws.NewBlockStore(logger), nil
 }
@@ -84,6 +91,10 @@ func newAzureBlockStore(logger logrus.FieldLogger) (interface{}, error) {
 
 func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewBlockStore(logger), nil
+}
+
+func newOpenstackBlockStore(logger logrus.FieldLogger) (interface{}, error) {
+	return openstack.NewBlockStore(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
