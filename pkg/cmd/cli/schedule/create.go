@@ -37,7 +37,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	c := &cobra.Command{
 		Use:   use + " NAME --schedule",
 		Short: "Create a schedule",
-		Long: `The --schedule flag is required, in cron notation:
+		Long: `The --schedule flag is required, in cron notation, using UTC time:
 
 | Character Position | Character Period | Acceptable Values |
 | -------------------|:----------------:| -----------------:|
