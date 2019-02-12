@@ -32,7 +32,7 @@ spec:
       serviceAccountName: ark
       containers:
         - name: ark
-          image: drekle/ark:latest
+          image: gcr.io/heptio-images/ark:latest
           ports:
             - name: metrics
               containerPort: 8085

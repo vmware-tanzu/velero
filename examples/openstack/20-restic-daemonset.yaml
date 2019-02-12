@@ -40,7 +40,7 @@ spec:
           emptyDir: {}
       containers:
         - name: ark
-          image: drekle/ark:latest
+          image: gcr.io/heptio-images/ark:latest
           command:
             - /ark
           args:
