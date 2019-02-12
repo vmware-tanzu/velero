@@ -19,6 +19,10 @@ package v1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // RestoreSpec defines the specification for an Ark restore.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type RestoreSpec struct {
 	// BackupName is the unique name of the Ark backup to restore
 	// from.
@@ -68,6 +72,10 @@ type RestoreSpec struct {
 
 // RestorePhase is a string representation of the lifecycle phase
 // of an Ark restore
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type RestorePhase string
 
 const (
@@ -92,6 +100,10 @@ const (
 )
 
 // RestoreStatus captures the current status of an Ark restore
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type RestoreStatus struct {
 	// Phase is the current state of the Restore
 	Phase RestorePhase `json:"phase"`
@@ -115,6 +127,10 @@ type RestoreStatus struct {
 // RestoreResult is a collection of messages that were generated
 // during execution of a restore. This will typically store either
 // warning or error messages.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type RestoreResult struct {
 	// Ark is a slice of messages related to the operation of Ark
 	// itself (for example, messages related to connecting to the
@@ -135,6 +151,10 @@ type RestoreResult struct {
 
 // Restore is an Ark resource that represents the application of
 // resources from an Ark backup to a target Kubernetes cluster.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type Restore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -146,6 +166,10 @@ type Restore struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // RestoreList is a list of Restores.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type RestoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

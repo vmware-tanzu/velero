@@ -21,6 +21,10 @@ import (
 )
 
 // BackupSpec defines the specification for an Ark backup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupSpec struct {
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
@@ -67,6 +71,10 @@ type BackupSpec struct {
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupHooks struct {
 	// Resources are hooks that should be executed when backing up individual instances of a resource.
 	Resources []BackupResourceHookSpec `json:"resources"`
@@ -74,6 +82,10 @@ type BackupHooks struct {
 
 // BackupResourceHookSpec defines one or more BackupResourceHooks that should be executed based on
 // the rules defined for namespaces, resources, and label selector.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupResourceHookSpec struct {
 	// Name is the name of this hook.
 	Name string `json:"name"`
@@ -100,12 +112,20 @@ type BackupResourceHookSpec struct {
 }
 
 // BackupResourceHook defines a hook for a resource.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupResourceHook struct {
 	// Exec defines an exec hook.
 	Exec *ExecHook `json:"exec"`
 }
 
 // ExecHook is a hook that uses the pod exec API to execute a command in a container in a pod.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ExecHook struct {
 	// Container is the container in the pod where the command should be executed. If not specified,
 	// the pod's first container is used.
@@ -120,6 +140,10 @@ type ExecHook struct {
 }
 
 // HookErrorMode defines how Ark should treat an error from a hook.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type HookErrorMode string
 
 const (
@@ -133,6 +157,10 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of an Ark backup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupPhase string
 
 const (
@@ -160,6 +188,10 @@ const (
 )
 
 // BackupStatus captures the current status of an Ark backup.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupStatus struct {
 	// Version is the backup format version.
 	Version int `json:"version"`
@@ -208,6 +240,10 @@ type BackupStatus struct {
 // VolumeBackupInfo captures the required information about
 // a PersistentVolume at backup time to be able to restore
 // it later.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeBackupInfo struct {
 	// SnapshotID is the ID of the snapshot taken in the cloud
 	// provider API of this volume.
@@ -231,6 +267,10 @@ type VolumeBackupInfo struct {
 
 // Backup is an Ark resource that respresents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type Backup struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -242,6 +282,10 @@ type Backup struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // BackupList is a list of Backups.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

@@ -19,11 +19,19 @@ package v1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // DeleteBackupRequestSpec is the specification for which backups to delete.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DeleteBackupRequestSpec struct {
 	BackupName string `json:"backupName"`
 }
 
 // DeleteBackupRequestPhase represents the lifecycle phase of a DeleteBackupRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DeleteBackupRequestPhase string
 
 const (
@@ -36,6 +44,10 @@ const (
 )
 
 // DeleteBackupRequestStatus is the current status of a DeleteBackupRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DeleteBackupRequestStatus struct {
 	// Phase is the current state of the DeleteBackupRequest.
 	Phase DeleteBackupRequestPhase `json:"phase"`
@@ -47,6 +59,10 @@ type DeleteBackupRequestStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteBackupRequest is a request to delete one or more backups.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DeleteBackupRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -58,6 +74,10 @@ type DeleteBackupRequest struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // DeleteBackupRequestList is a list of DeleteBackupRequests.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type DeleteBackupRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

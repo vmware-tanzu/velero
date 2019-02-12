@@ -22,6 +22,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeSnapshotLocation is a location where Ark stores volume snapshots.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeSnapshotLocation struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -33,6 +37,10 @@ type VolumeSnapshotLocation struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // VolumeSnapshotLocationList is a list of VolumeSnapshotLocations.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeSnapshotLocationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
@@ -40,6 +48,10 @@ type VolumeSnapshotLocationList struct {
 }
 
 // VolumeSnapshotLocationSpec defines the specification for an Ark VolumeSnapshotLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeSnapshotLocationSpec struct {
 	// Provider is the provider of the volume storage.
 	Provider string `json:"provider"`
@@ -49,6 +61,10 @@ type VolumeSnapshotLocationSpec struct {
 }
 
 // VolumeSnapshotLocationPhase is the lifecyle phase of an Ark VolumeSnapshotLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeSnapshotLocationPhase string
 
 const (
@@ -60,6 +76,10 @@ const (
 )
 
 // VolumeSnapshotLocationStatus describes the current status of an Ark VolumeSnapshotLocation.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type VolumeSnapshotLocationStatus struct {
 	Phase VolumeSnapshotLocationPhase `json:"phase,omitempty"`
 }

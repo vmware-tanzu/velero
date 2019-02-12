@@ -22,6 +22,10 @@ import (
 )
 
 // PodVolumeRestoreSpec is the specification for a PodVolumeRestore.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeRestoreSpec struct {
 	// Pod is a reference to the pod containing the volume to be restored.
 	Pod corev1api.ObjectReference `json:"pod"`
@@ -41,6 +45,10 @@ type PodVolumeRestoreSpec struct {
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeRestorePhase string
 
 const (
@@ -51,6 +59,10 @@ const (
 )
 
 // PodVolumeRestoreStatus is the current status of a PodVolumeRestore.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeRestoreStatus struct {
 	// Phase is the current state of the PodVolumeRestore.
 	Phase PodVolumeRestorePhase `json:"phase"`
@@ -62,6 +74,10 @@ type PodVolumeRestoreStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeRestore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -73,6 +89,10 @@ type PodVolumeRestore struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodVolumeRestoreList is a list of PodVolumeRestores.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type PodVolumeRestoreList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

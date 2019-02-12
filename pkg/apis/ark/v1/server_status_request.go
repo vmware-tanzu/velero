@@ -23,6 +23,10 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // ServerStatusRequest is a request to access current status information about
 // the Ark server.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ServerStatusRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -32,10 +36,18 @@ type ServerStatusRequest struct {
 }
 
 // ServerStatusRequestSpec is the specification for a ServerStatusRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ServerStatusRequestSpec struct {
 }
 
 // ServerStatusRequestPhase represents the lifecycle phase of a ServerStatusRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ServerStatusRequestPhase string
 
 const (
@@ -46,6 +58,10 @@ const (
 )
 
 // ServerStatusRequestStatus is the current status of a ServerStatusRequest.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ServerStatusRequestStatus struct {
 	// Phase is the current lifecycle phase of the ServerStatusRequest.
 	Phase ServerStatusRequestPhase `json:"phase"`
@@ -61,6 +77,10 @@ type ServerStatusRequestStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServerStatusRequestList is a list of ServerStatusRequests.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ServerStatusRequestList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`

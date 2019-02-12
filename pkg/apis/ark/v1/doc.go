@@ -18,4 +18,7 @@ limitations under the License.
 
 // Package v1 is the v1 version of the API.
 // +groupName=ark.heptio.com
+//
+// Deprecated: Consumers should switch to github.com/heptio/velero/pkg/apis/velero/v1 instead.
+// This package will be removed in the v1.0 release.
 package v1

@@ -21,6 +21,10 @@ import (
 )
 
 // ResticRepositorySpec is the specification for a ResticRepository.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ResticRepositorySpec struct {
 	// VolumeNamespace is the namespace this restic repository contains
 	// pod volume backups for.
@@ -39,6 +43,10 @@ type ResticRepositorySpec struct {
 }
 
 // ResticRepositoryPhase represents the lifecycle phase of a ResticRepository.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ResticRepositoryPhase string
 
 const (
@@ -48,6 +56,10 @@ const (
 )
 
 // ResticRepositoryStatus is the current status of a ResticRepository.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ResticRepositoryStatus struct {
 	// Phase is the current state of the ResticRepository.
 	Phase ResticRepositoryPhase `json:"phase"`
@@ -62,6 +74,9 @@ type ResticRepositoryStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ResticRepository struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -73,6 +88,10 @@ type ResticRepository struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ResticRepositoryList is a list of ResticRepositories.
+//
+// Deprecated: Consumers should switch to the same type in
+// github.com/heptio/velero/pkg/apis/velero/v1 instead. This
+// type will be removed in the v1.0 release.
 type ResticRepositoryList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata"`
