@@ -25,7 +25,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 func runVcmdNoWrap(command string, args ...string) (string, string, error) {
 	var bout, berr bytes.Buffer
 	cmd := exec.Command(command, args...)
