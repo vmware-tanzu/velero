@@ -47,7 +47,7 @@ func RunVcmd(command string, args ...string) (string, string, error) {
 
 // RunSubVcommand is a utility function for Velero testing that executes a Cobra sub command
 func RunSubVcommand(t *testing.T, subCmds []*cobra.Command, command string, args ...string) {
-	subCmd := getSubCommand(t, subCmds, command)
+	subCmd := getSubVcommand(t, subCmds, command)
 	subCmd.SetArgs(args)
 	if err := subCmd.Execute(); err != nil {
 		t.Fatalf("Could not execute subcommand: %s", command)
@@ -56,7 +56,7 @@ func RunSubVcommand(t *testing.T, subCmds []*cobra.Command, command string, args
 
 // AssertSubVcillabdHasFlags is a utility function for Velero testing that assert if a Cobra sub command has expected flags
 func AssertSubVcommandHasFlags(t *testing.T, subCmds []*cobra.Command, command string, flags ...string) {
-	subCmd := getSubCommand(t, subCmds, command)
+	subCmd := getSubVcommand(t, subCmds, command)
 
 	for _, flag := range flags {
 		if subCmd.Flags().Lookup(flag) == nil {
