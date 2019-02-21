@@ -2,7 +2,7 @@
 
 **Maintainers:** [Heptio][0]
 
-[![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
+[![Build Status][1]][2]  
 
 ## Overview
 
@@ -72,7 +72,7 @@ See [the list of releases][6] to find out about feature changes.
 [26]: https://github.com/heptio/ark/blob/master/docs/zenhub.md
 
 
-[29]: https://heptio.github.io/ark/
+[29]: https://heptio.github.io/velero/
 [30]: /troubleshooting.md
 
 [99]: /support-matrix.md

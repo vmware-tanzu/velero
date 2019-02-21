@@ -36,3 +36,6 @@ debug
 _site/
 
 .vs
+
+logs/
+v*/issue-template-gen/

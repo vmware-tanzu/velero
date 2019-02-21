@@ -1,7 +1,3 @@
-# historically we haven't provided a new TOC for the master branch docs
-# but a doc reorg suggests that it would be useful at this point
-# for future docs builds: use this file as the basis for new version TOCs
-
 toc:
   - title: Introduction
     subfolderitems:
@@ -17,7 +13,7 @@ toc:
         url: /support-matrix
   - title: Upgrade
     subfolderitems:
-      - page: Upgrade from Ark to Velero 
+      - page: Upgrade from Ark to Velero
         url: /migrating-to-velero
       - page: About locations
         url: /locations
@@ -25,8 +21,6 @@ toc:
     subfolderitems:
       - page: Set up Velero
         url: /install-overview
-      - page: Expose Minio
-        url: /expose-minio
       - page: Run on AWS
         url: /aws-config
       - page: Run on GCP

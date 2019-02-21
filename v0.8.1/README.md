@@ -214,5 +214,5 @@ See [the list of releases][6] to find out about feature changes.
 [26]: https://github.com/heptio/ark/releases
 [27]: /hooks.md
 [28]: /plugins.md
-[29]: https://heptio.github.io/ark/v0.8.1/
+[29]: https://heptio.github.io/velero/v0.8.1/
 [30]: /troubleshooting.md
