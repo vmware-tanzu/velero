@@ -36,3 +36,5 @@ debug
 _site/
 
 .vs
+
+logs/
