@@ -31,19 +31,23 @@
 
 [[constraint]]
   name = "k8s.io/kubernetes"
-  version = "~1.11"
+  version = "~1.12"
 
 [[constraint]]
   name = "k8s.io/client-go"
-  version = "~8.0"
+  version = "~9.0"
 
 [[constraint]]
   name = "k8s.io/apimachinery"
-  version = "kubernetes-1.11.0"
+  version = "kubernetes-1.12.0"
 
 [[constraint]]
   name = "k8s.io/api"
-  version = "kubernetes-1.11.0"
+  version = "kubernetes-1.12.0"
+
+[[constraint]]
+  name = "k8s.io/apiextensions-apiserver"
+  version = "kubernetes-1.12.0"
 
 # vendor/k8s.io/apimachinery/pkg/runtime/serializer/json/json.go:104:16:
 # unknown field 'CaseSensitive' in struct literal of type jsoniter.Config
