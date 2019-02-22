@@ -17,12 +17,13 @@ limitations under the License.
 package azure
 
 import (
+	"context"
 	"io"
 	"os"
 	"strings"
 	"time"
 
-	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage"
+	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -68,7 +69,7 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
 	// 5. get storage key
-	res, err := storageAccountsClient.ListKeys(config[resourceGroupConfigKey], config[storageAccountConfigKey])
+	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", errors.WithStack(err)
 	}

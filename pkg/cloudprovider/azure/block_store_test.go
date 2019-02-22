@@ -138,8 +138,8 @@ func TestGetSnapshotTags(t *testing.T) {
 	tests := []struct {
 		name       string
 		veleroTags map[string]string
-		diskTags   *map[string]*string
-		expected   *map[string]*string
+		diskTags   map[string]*string
+		expected   map[string]*string
 	}{
 		{
 			name:       "degenerate case (no tags)",
@@ -154,7 +154,7 @@ func TestGetSnapshotTags(t *testing.T) {
 				"velero-key2": "velero-val2",
 			},
 			diskTags: nil,
-			expected: &map[string]*string{
+			expected: map[string]*string{
 				"velero-key1": stringPtr("velero-val1"),
 				"velero-key2": stringPtr("velero-val2"),
 			},
@@ -166,7 +166,7 @@ func TestGetSnapshotTags(t *testing.T) {
 				"velero/key/2": "velero-val2",
 			},
 			diskTags: nil,
-			expected: &map[string]*string{
+			expected: map[string]*string{
 				"velero-key1":  stringPtr("velero-val1"),
 				"velero-key-2": stringPtr("velero-val2"),
 			},
@@ -174,11 +174,11 @@ func TestGetSnapshotTags(t *testing.T) {
 		{
 			name:       "volume tags only get applied",
 			veleroTags: nil,
-			diskTags: &map[string]*string{
+			diskTags: map[string]*string{
 				"azure-key1": stringPtr("azure-val1"),
 				"azure-key2": stringPtr("azure-val2"),
 			},
-			expected: &map[string]*string{
+			expected: map[string]*string{
 				"azure-key1": stringPtr("azure-val1"),
 				"azure-key2": stringPtr("azure-val2"),
 			},
@@ -186,8 +186,8 @@ func TestGetSnapshotTags(t *testing.T) {
 		{
 			name:       "non-overlapping velero and volume tags both get applied",
 			veleroTags: map[string]string{"velero-key": "velero-val"},
-			diskTags:   &map[string]*string{"azure-key": stringPtr("azure-val")},
-			expected: &map[string]*string{
+			diskTags:   map[string]*string{"azure-key": stringPtr("azure-val")},
+			expected: map[string]*string{
 				"velero-key": stringPtr("velero-val"),
 				"azure-key":  stringPtr("azure-val"),
 			},
@@ -198,11 +198,11 @@ func TestGetSnapshotTags(t *testing.T) {
 				"velero-key":      "velero-val",
 				"overlapping-key": "velero-val",
 			},
-			diskTags: &map[string]*string{
+			diskTags: map[string]*string{
 				"azure-key":       stringPtr("azure-val"),
 				"overlapping-key": stringPtr("azure-val"),
 			},
-			expected: &map[string]*string{
+			expected: map[string]*string{
 				"velero-key":      stringPtr("velero-val"),
 				"azure-key":       stringPtr("azure-val"),
 				"overlapping-key": stringPtr("velero-val"),
@@ -219,9 +219,9 @@ func TestGetSnapshotTags(t *testing.T) {
 				return
 			}
 
-			assert.Equal(t, len(*test.expected), len(*res))
-			for k, v := range *test.expected {
-				assert.Equal(t, v, (*res)[k])
+			assert.Equal(t, len(test.expected), len(res))
+			for k, v := range test.expected {
+				assert.Equal(t, v, res[k])
 			}
 		})
 	}

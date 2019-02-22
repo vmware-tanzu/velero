@@ -25,11 +25,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/arm/disk"
+	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
-	"github.com/satori/uuid"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -130,22 +130,24 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	}
 
 	// Lookup snapshot info for its Location & Tags so we can apply them to the volume
-	snapshotInfo, err := b.snaps.Get(snapshotIdentifier.resourceGroup, snapshotIdentifier.name)
+	snapshotInfo, err := b.snaps.Get(context.TODO(), snapshotIdentifier.resourceGroup, snapshotIdentifier.name)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	diskName := "restore-" + uuid.NewV4().String()
 
-	disk := disk.Model{
+	disk := disk.Disk{
 		Name:     &diskName,
 		Location: snapshotInfo.Location,
-		Properties: &disk.Properties{
+		DiskProperties: &disk.DiskProperties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
 				SourceResourceID: stringPtr(snapshotIdentifier.String()),
 			},
-			AccountType: disk.StorageAccountTypes(volumeType),
+		},
+		Sku: &disk.DiskSku{
+			Name: disk.StorageAccountTypes(volumeType),
 		},
 		Tags: snapshotInfo.Tags,
 	}
@@ -153,28 +155,36 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.disks.CreateOrUpdate(b.disksResourceGroup, *disk.Name, disk, ctx.Done())
-
-	err = <-errChan
-
+	future, err := b.disks.CreateOrUpdate(ctx, b.disksResourceGroup, *disk.Name, disk)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
+	if err = future.WaitForCompletionRef(ctx, b.disks.Client); err != nil {
+		return "", errors.WithStack(err)
+	}
+	if _, err = future.Result(*b.disks); err != nil {
+		return "", errors.WithStack(err)
+	}
+
 	return diskName, nil
 }
 
 func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := b.disks.Get(b.disksResourceGroup, volumeID)
+	res, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
 	}
 
-	return string(res.AccountType), nil, nil
+	if res.Sku == nil {
+		return "", nil, errors.New("disk has a nil SKU")
+	}
+
+	return string(res.Sku.Name), nil, nil
 }
 
 func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
-	diskInfo, err := b.disks.Get(b.disksResourceGroup, volumeID)
+	diskInfo, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -192,7 +202,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 
 	snap := disk.Snapshot{
 		Name: &snapshotName,
-		Properties: &disk.Properties{
+		DiskProperties: &disk.DiskProperties{
 			CreationData: &disk.CreationData{
 				CreateOption:     disk.Copy,
 				SourceResourceID: &fullDiskName,
@@ -205,17 +215,21 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.snaps.CreateOrUpdate(b.snapsResourceGroup, *snap.Name, snap, ctx.Done())
-	err = <-errChan
-
+	future, err := b.snaps.CreateOrUpdate(ctx, b.snapsResourceGroup, *snap.Name, snap)
 	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	if err = future.WaitForCompletionRef(ctx, b.snaps.Client); err != nil {
+		return "", errors.WithStack(err)
+	}
+	if _, err = future.Result(*b.snaps); err != nil {
 		return "", errors.WithStack(err)
 	}
 
 	return getComputeResourceName(b.subscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
-func getSnapshotTags(veleroTags map[string]string, diskTags *map[string]*string) *map[string]*string {
+func getSnapshotTags(veleroTags map[string]string, diskTags map[string]*string) map[string]*string {
 	if diskTags == nil && len(veleroTags) == 0 {
 		return nil
 	}
@@ -224,7 +238,7 @@ func getSnapshotTags(veleroTags map[string]string, diskTags *map[string]*string)
 
 	// copy tags from disk to snapshot
 	if diskTags != nil {
-		for k, v := range *diskTags {
+		for k, v := range diskTags {
 			snapshotTags[k] = stringPtr(*v)
 		}
 	}
@@ -239,7 +253,7 @@ func getSnapshotTags(veleroTags map[string]string, diskTags *map[string]*string)
 		snapshotTags[key] = stringPtr(v)
 	}
 
-	return &snapshotTags
+	return snapshotTags
 }
 
 func stringPtr(s string) *string {
@@ -255,10 +269,15 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
-	_, errChan := b.snaps.Delete(snapshotInfo.resourceGroup, snapshotInfo.name, ctx.Done())
+	future, err := b.snaps.Delete(ctx, snapshotInfo.resourceGroup, snapshotInfo.name)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	if err = future.WaitForCompletionRef(ctx, b.snaps.Client); err != nil {
+		return errors.WithStack(err)
+	}
 
-	err = <-errChan
-
+	_, err = future.Result(*b.snaps)
 	// if it's a 404 (not found) error, we don't need to return an error
 	// since the snapshot is not there.
 	if azureErr, ok := err.(autorest.DetailedError); ok && azureErr.StatusCode == http.StatusNotFound {
