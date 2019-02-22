@@ -1,7 +1,7 @@
-// Package storage implements the Azure ARM Storage service API version 2017-10-01.
+// Package compute implements the Azure ARM Compute service API version 2018-04-01.
 //
-// The Azure Storage Management API.
-package storage
+// Compute Client
+package compute
 
 // Copyright (c) Microsoft and contributors.  All rights reserved.
 //
@@ -25,25 +25,25 @@ import (
 )
 
 const (
-	// DefaultBaseURI is the default URI used for the service Storage
+	// DefaultBaseURI is the default URI used for the service Compute
 	DefaultBaseURI = "https://management.azure.com"
 )
 
-// ManagementClient is the base client for Storage.
-type ManagementClient struct {
+// BaseClient is the base client for Compute.
+type BaseClient struct {
 	autorest.Client
 	BaseURI        string
 	SubscriptionID string
 }
 
-// New creates an instance of the ManagementClient client.
-func New(subscriptionID string) ManagementClient {
+// New creates an instance of the BaseClient client.
+func New(subscriptionID string) BaseClient {
 	return NewWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewWithBaseURI creates an instance of the ManagementClient client.
-func NewWithBaseURI(baseURI string, subscriptionID string) ManagementClient {
-	return ManagementClient{
+// NewWithBaseURI creates an instance of the BaseClient client.
+func NewWithBaseURI(baseURI string, subscriptionID string) BaseClient {
+	return BaseClient{
 		Client:         autorest.NewClientWithUserAgent(UserAgent()),
 		BaseURI:        baseURI,
 		SubscriptionID: subscriptionID,

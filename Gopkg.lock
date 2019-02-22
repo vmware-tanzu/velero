@@ -17,16 +17,17 @@
   version = "v0.11.0"
 
 [[projects]]
-  digest = "1:b9007f703ec9fe98a21ac92605a3126e6142d1a5fd87d5f7e1759f721f04230d"
+  digest = "1:5b71d15be52cbb93f5115f51ace93798204f6b4a3df0992d0b6da8644f505984"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
-    "arm/disk",
-    "services/storage/mgmt/2017-10-01/storage",
+    "services/compute/mgmt/2018-04-01/compute",
+    "services/storage/mgmt/2018-02-01/storage",
     "storage",
+    "version",
   ]
   pruneopts = "NUT"
-  revision = "2d1d76c9013c4feb6695a2346f0e66ea0ef77aa6"
-  version = "v11.3.0-beta"
+  revision = "520918e6c8e8e1064154f51d13e02fad92b287b8"
+  version = "v19.0.0"
 
 [[projects]]
   digest = "1:b825d8578481c8877ff3b9a3654d77a48577cc33e65f33c3678d7e3f134bf73d"
@@ -291,6 +292,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  digest = "1:13ada91f079028d1b4ca88e10a16439dcfa6541d26ed2e61e770f56d06301933"
+  name = "github.com/marstr/guid"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "8bd9a64bf37eb297b492a4101fb28e80ac0b290f"
+  version = "v1.1.0"
+
+[[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -406,12 +415,12 @@
   revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 
 [[projects]]
-  digest = "1:7ff9d791d48d8bafcfad8691d0f54dd3351d9d98e26a0f38a268479201022ca1"
-  name = "github.com/satori/uuid"
+  digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
+  name = "github.com/satori/go.uuid"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "879c5887cd475cd7864858769793b2ceb0d44feb"
-  version = "v1.1.0"
+  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
+  version = "v1.2.0"
 
 [[projects]]
   digest = "1:31c5d934770c8b0698c28eb8576cb39b14e2fcf3c5f2a6e8449116884cd92e3f"
@@ -963,8 +972,8 @@
   analyzer-version = 1
   input-imports = [
     "cloud.google.com/go/storage",
-    "github.com/Azure/azure-sdk-for-go/arm/disk",
-    "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2017-10-01/storage",
+    "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute",
+    "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage",
     "github.com/Azure/azure-sdk-for-go/storage",
     "github.com/Azure/go-autorest/autorest",
     "github.com/Azure/go-autorest/autorest/adal",
@@ -989,7 +998,7 @@
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/robfig/cron",
-    "github.com/satori/uuid",
+    "github.com/satori/go.uuid",
     "github.com/sirupsen/logrus",
     "github.com/spf13/afero",
     "github.com/spf13/cobra",
