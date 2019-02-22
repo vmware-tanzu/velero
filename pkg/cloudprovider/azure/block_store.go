@@ -269,20 +269,24 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
+	// we don't want to return an error if the snapshot doesn't exist, and
+	// the Delete(..) call does not return a clear error if that's the case,
+	// so first try to get it and return early if we get a 404.
+	_, err = b.snaps.Get(ctx, snapshotInfo.resourceGroup, snapshotInfo.name)
+	if azureErr, ok := err.(autorest.DetailedError); ok && azureErr.StatusCode == http.StatusNotFound {
+		b.log.WithField("snapshotID", snapshotID).Debug("Snapshot not found")
+		return nil
+	}
+
 	future, err := b.snaps.Delete(ctx, snapshotInfo.resourceGroup, snapshotInfo.name)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 	if err = future.WaitForCompletionRef(ctx, b.snaps.Client); err != nil {
+		b.log.WithError(err).Errorf("Error waiting for completion ref")
 		return errors.WithStack(err)
 	}
-
 	_, err = future.Result(*b.snaps)
-	// if it's a 404 (not found) error, we don't need to return an error
-	// since the snapshot is not there.
-	if azureErr, ok := err.(autorest.DetailedError); ok && azureErr.StatusCode == http.StatusNotFound {
-		return nil
-	}
 	if err != nil {
 		return errors.WithStack(err)
 	}
