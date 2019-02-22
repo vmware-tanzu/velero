@@ -49,17 +49,10 @@
   name = "k8s.io/apiextensions-apiserver"
   version = "kubernetes-1.12.0"
 
-# vendor/k8s.io/apimachinery/pkg/runtime/serializer/json/json.go:104:16:
-# unknown field 'CaseSensitive' in struct literal of type jsoniter.Config
+# k8s.io/client-go v9.0 uses f2b4162afba35581b6d4a50d3b8f34e33c144682 (released in v1.1.4)
 [[override]]
   name = "github.com/json-iterator/go"
-  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
-
-# vendor/k8s.io/client-go/plugin/pkg/client/auth/azure/azure.go:300:25:
-# cannot call non-function spt.Token (type adal.Token)
-[[override]]
-  name = "github.com/Azure/go-autorest"
-  revision = "1ff28809256a84bb6966640ff3d0371af82ccba4"
+  version = "~1.1.4"
 
 #
 # Cloud provider packages
@@ -71,6 +64,11 @@
 [[constraint]]
   name = "github.com/Azure/azure-sdk-for-go"
   version = "~11.3.0-beta"
+
+# k8s.io/client-go v9.0 uses bca49d5b51a50dc5bb17bbf6204c711c6dbded06 (v10.14.0)
+[[constraint]]
+  name = "github.com/Azure/go-autorest"
+  version = "~10.14.0"
 
 [[constraint]]
   name = "cloud.google.com/go"

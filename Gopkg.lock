@@ -29,7 +29,7 @@
   version = "v11.3.0-beta"
 
 [[projects]]
-  digest = "1:8fc5113397520cfaddc7d0db0d2195528592866dfe1e17e6c7b0b7243533f01a"
+  digest = "1:b825d8578481c8877ff3b9a3654d77a48577cc33e65f33c3678d7e3f134bf73d"
   name = "github.com/Azure/go-autorest"
   packages = [
     "autorest",
@@ -38,9 +38,11 @@
     "autorest/date",
     "autorest/to",
     "autorest/validation",
+    "version",
   ]
   pruneopts = "NUT"
-  revision = "1ff28809256a84bb6966640ff3d0371af82ccba4"
+  revision = "bca49d5b51a50dc5bb17bbf6204c711c6dbded06"
+  version = "v10.14.0"
 
 [[projects]]
   digest = "1:f41188abdb95b92995643a927f5bdd208389822a8e1aba00d85633ae51b85c85"
@@ -281,11 +283,12 @@
   revision = "0b12d6b5"
 
 [[projects]]
-  digest = "1:0243cffa4a3410f161ee613dfdd903a636d07e838a42d341da95d81f42cd1d41"
+  digest = "1:8e36686e8b139f8fe240c1d5cf3a145bc675c22ff8e707857cdd3ae17b00d728"
   name = "github.com/json-iterator/go"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "f2b4162afba35581b6d4a50d3b8f34e33c144682"
+  revision = "1624edc4454b8682399def8740d46db5e4362ba4"
+  version = "v1.1.5"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -312,12 +315,12 @@
   version = "1.0.3"
 
 [[projects]]
-  digest = "1:314a5881fab303a80d6d2e35a77000f2224bb50f09ef63a9aa4c1f9eaef985d8"
+  digest = "1:c6aca19413b13dc59c220ad7430329e2ec454cc310bc6d8de2c7e2b93c18a0f6"
   name = "github.com/modern-go/reflect2"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "1df9eeb2bb81f327b96228865c5687bc2194af3f"
-  version = "1.0.0"
+  revision = "4b7aa43c6742a2c18fdef89dd197aaae7dac7ccd"
+  version = "1.0.1"
 
 [[projects]]
   branch = "master"
