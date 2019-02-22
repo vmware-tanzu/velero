@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var schedulesResource = schema.GroupVersionResource{Group: "ark.heptio.com", Ver
 var schedulesKind = schema.GroupVersionKind{Group: "ark.heptio.com", Version: "v1", Kind: "Schedule"}
 
 // Get takes name of the schedule, and returns the corresponding schedule object, and an error if there is any.
-func (c *FakeSchedules) Get(name string, options v1.GetOptions) (result *ark_v1.Schedule, err error) {
+func (c *FakeSchedules) Get(name string, options v1.GetOptions) (result *arkv1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(schedulesResource, c.ns, name), &ark_v1.Schedule{})
+		Invokes(testing.NewGetAction(schedulesResource, c.ns, name), &arkv1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.Schedule), err
+	return obj.(*arkv1.Schedule), err
 }
 
 // List takes label and field selectors, and returns the list of Schedules that match those selectors.
-func (c *FakeSchedules) List(opts v1.ListOptions) (result *ark_v1.ScheduleList, err error) {
+func (c *FakeSchedules) List(opts v1.ListOptions) (result *arkv1.ScheduleList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(schedulesResource, schedulesKind, c.ns, opts), &ark_v1.ScheduleList{})
+		Invokes(testing.NewListAction(schedulesResource, schedulesKind, c.ns, opts), &arkv1.ScheduleList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeSchedules) List(opts v1.ListOptions) (result *ark_v1.ScheduleList, 
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.ScheduleList{ListMeta: obj.(*ark_v1.ScheduleList).ListMeta}
-	for _, item := range obj.(*ark_v1.ScheduleList).Items {
+	list := &arkv1.ScheduleList{ListMeta: obj.(*arkv1.ScheduleList).ListMeta}
+	for _, item := range obj.(*arkv1.ScheduleList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeSchedules) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a schedule and creates it.  Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Create(schedule *ark_v1.Schedule) (result *ark_v1.Schedule, err error) {
+func (c *FakeSchedules) Create(schedule *arkv1.Schedule) (result *arkv1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(schedulesResource, c.ns, schedule), &ark_v1.Schedule{})
+		Invokes(testing.NewCreateAction(schedulesResource, c.ns, schedule), &arkv1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.Schedule), err
+	return obj.(*arkv1.Schedule), err
 }
 
 // Update takes the representation of a schedule and updates it. Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Update(schedule *ark_v1.Schedule) (result *ark_v1.Schedule, err error) {
+func (c *FakeSchedules) Update(schedule *arkv1.Schedule) (result *arkv1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(schedulesResource, c.ns, schedule), &ark_v1.Schedule{})
+		Invokes(testing.NewUpdateAction(schedulesResource, c.ns, schedule), &arkv1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.Schedule), err
+	return obj.(*arkv1.Schedule), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSchedules) UpdateStatus(schedule *ark_v1.Schedule) (*ark_v1.Schedule, error) {
+func (c *FakeSchedules) UpdateStatus(schedule *arkv1.Schedule) (*arkv1.Schedule, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(schedulesResource, "status", c.ns, schedule), &ark_v1.Schedule{})
+		Invokes(testing.NewUpdateSubresourceAction(schedulesResource, "status", c.ns, schedule), &arkv1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.Schedule), err
+	return obj.(*arkv1.Schedule), err
 }
 
 // Delete takes name of the schedule and deletes it. Returns an error if one occurs.
 func (c *FakeSchedules) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(schedulesResource, c.ns, name), &ark_v1.Schedule{})
+		Invokes(testing.NewDeleteAction(schedulesResource, c.ns, name), &arkv1.Schedule{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeSchedules) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeSchedules) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(schedulesResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &ark_v1.ScheduleList{})
+	_, err := c.Fake.Invokes(action, &arkv1.ScheduleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched schedule.
-func (c *FakeSchedules) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *ark_v1.Schedule, err error) {
+func (c *FakeSchedules) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *arkv1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, data, subresources...), &ark_v1.Schedule{})
+		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, data, subresources...), &arkv1.Schedule{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.Schedule), err
+	return obj.(*arkv1.Schedule), err
 }

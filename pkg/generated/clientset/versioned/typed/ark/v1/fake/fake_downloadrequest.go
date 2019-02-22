@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var downloadrequestsResource = schema.GroupVersionResource{Group: "ark.heptio.co
 var downloadrequestsKind = schema.GroupVersionKind{Group: "ark.heptio.com", Version: "v1", Kind: "DownloadRequest"}
 
 // Get takes name of the downloadRequest, and returns the corresponding downloadRequest object, and an error if there is any.
-func (c *FakeDownloadRequests) Get(name string, options v1.GetOptions) (result *ark_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Get(name string, options v1.GetOptions) (result *arkv1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(downloadrequestsResource, c.ns, name), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewGetAction(downloadrequestsResource, c.ns, name), &arkv1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DownloadRequest), err
+	return obj.(*arkv1.DownloadRequest), err
 }
 
 // List takes label and field selectors, and returns the list of DownloadRequests that match those selectors.
-func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *ark_v1.DownloadRequestList, err error) {
+func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *arkv1.DownloadRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(downloadrequestsResource, downloadrequestsKind, c.ns, opts), &ark_v1.DownloadRequestList{})
+		Invokes(testing.NewListAction(downloadrequestsResource, downloadrequestsKind, c.ns, opts), &arkv1.DownloadRequestList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *ark_v1.Downloa
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.DownloadRequestList{ListMeta: obj.(*ark_v1.DownloadRequestList).ListMeta}
-	for _, item := range obj.(*ark_v1.DownloadRequestList).Items {
+	list := &arkv1.DownloadRequestList{ListMeta: obj.(*arkv1.DownloadRequestList).ListMeta}
+	for _, item := range obj.(*arkv1.DownloadRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeDownloadRequests) Watch(opts v1.ListOptions) (watch.Interface, erro
 }
 
 // Create takes the representation of a downloadRequest and creates it.  Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *FakeDownloadRequests) Create(downloadRequest *ark_v1.DownloadRequest) (result *ark_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Create(downloadRequest *arkv1.DownloadRequest) (result *arkv1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(downloadrequestsResource, c.ns, downloadRequest), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewCreateAction(downloadrequestsResource, c.ns, downloadRequest), &arkv1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DownloadRequest), err
+	return obj.(*arkv1.DownloadRequest), err
 }
 
 // Update takes the representation of a downloadRequest and updates it. Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *FakeDownloadRequests) Update(downloadRequest *ark_v1.DownloadRequest) (result *ark_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Update(downloadRequest *arkv1.DownloadRequest) (result *arkv1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(downloadrequestsResource, c.ns, downloadRequest), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewUpdateAction(downloadrequestsResource, c.ns, downloadRequest), &arkv1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DownloadRequest), err
+	return obj.(*arkv1.DownloadRequest), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDownloadRequests) UpdateStatus(downloadRequest *ark_v1.DownloadRequest) (*ark_v1.DownloadRequest, error) {
+func (c *FakeDownloadRequests) UpdateStatus(downloadRequest *arkv1.DownloadRequest) (*arkv1.DownloadRequest, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(downloadrequestsResource, "status", c.ns, downloadRequest), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewUpdateSubresourceAction(downloadrequestsResource, "status", c.ns, downloadRequest), &arkv1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DownloadRequest), err
+	return obj.(*arkv1.DownloadRequest), err
 }
 
 // Delete takes name of the downloadRequest and deletes it. Returns an error if one occurs.
 func (c *FakeDownloadRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(downloadrequestsResource, c.ns, name), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewDeleteAction(downloadrequestsResource, c.ns, name), &arkv1.DownloadRequest{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeDownloadRequests) Delete(name string, options *v1.DeleteOptions) er
 func (c *FakeDownloadRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(downloadrequestsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &ark_v1.DownloadRequestList{})
+	_, err := c.Fake.Invokes(action, &arkv1.DownloadRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched downloadRequest.
-func (c *FakeDownloadRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *ark_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *arkv1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(downloadrequestsResource, c.ns, name, data, subresources...), &ark_v1.DownloadRequest{})
+		Invokes(testing.NewPatchSubresourceAction(downloadrequestsResource, c.ns, name, data, subresources...), &arkv1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DownloadRequest), err
+	return obj.(*arkv1.DownloadRequest), err
 }

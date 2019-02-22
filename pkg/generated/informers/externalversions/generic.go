@@ -22,7 +22,7 @@ import (
 	"fmt"
 
 	v1 "github.com/heptio/velero/pkg/apis/ark/v1"
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -78,27 +78,27 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Ark().V1().VolumeSnapshotLocations().Informer()}, nil
 
 		// Group=velero.io, Version=v1
-	case velero_v1.SchemeGroupVersion.WithResource("backups"):
+	case velerov1.SchemeGroupVersion.WithResource("backups"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().Backups().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("backupstoragelocations"):
+	case velerov1.SchemeGroupVersion.WithResource("backupstoragelocations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().BackupStorageLocations().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("deletebackuprequests"):
+	case velerov1.SchemeGroupVersion.WithResource("deletebackuprequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().DeleteBackupRequests().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("downloadrequests"):
+	case velerov1.SchemeGroupVersion.WithResource("downloadrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().DownloadRequests().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("podvolumebackups"):
+	case velerov1.SchemeGroupVersion.WithResource("podvolumebackups"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().PodVolumeBackups().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("podvolumerestores"):
+	case velerov1.SchemeGroupVersion.WithResource("podvolumerestores"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().PodVolumeRestores().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("resticrepositories"):
+	case velerov1.SchemeGroupVersion.WithResource("resticrepositories"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().ResticRepositories().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("restores"):
+	case velerov1.SchemeGroupVersion.WithResource("restores"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().Restores().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("schedules"):
+	case velerov1.SchemeGroupVersion.WithResource("schedules"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().Schedules().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("serverstatusrequests"):
+	case velerov1.SchemeGroupVersion.WithResource("serverstatusrequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().ServerStatusRequests().Informer()}, nil
-	case velero_v1.SchemeGroupVersion.WithResource("volumesnapshotlocations"):
+	case velerov1.SchemeGroupVersion.WithResource("volumesnapshotlocations"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().VolumeSnapshotLocations().Informer()}, nil
 
 	}

@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var backupstoragelocationsResource = schema.GroupVersionResource{Group: "ark.hep
 var backupstoragelocationsKind = schema.GroupVersionKind{Group: "ark.heptio.com", Version: "v1", Kind: "BackupStorageLocation"}
 
 // Get takes name of the backupStorageLocation, and returns the corresponding backupStorageLocation object, and an error if there is any.
-func (c *FakeBackupStorageLocations) Get(name string, options v1.GetOptions) (result *ark_v1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Get(name string, options v1.GetOptions) (result *arkv1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(backupstoragelocationsResource, c.ns, name), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewGetAction(backupstoragelocationsResource, c.ns, name), &arkv1.BackupStorageLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.BackupStorageLocation), err
+	return obj.(*arkv1.BackupStorageLocation), err
 }
 
 // List takes label and field selectors, and returns the list of BackupStorageLocations that match those selectors.
-func (c *FakeBackupStorageLocations) List(opts v1.ListOptions) (result *ark_v1.BackupStorageLocationList, err error) {
+func (c *FakeBackupStorageLocations) List(opts v1.ListOptions) (result *arkv1.BackupStorageLocationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(backupstoragelocationsResource, backupstoragelocationsKind, c.ns, opts), &ark_v1.BackupStorageLocationList{})
+		Invokes(testing.NewListAction(backupstoragelocationsResource, backupstoragelocationsKind, c.ns, opts), &arkv1.BackupStorageLocationList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeBackupStorageLocations) List(opts v1.ListOptions) (result *ark_v1.B
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.BackupStorageLocationList{ListMeta: obj.(*ark_v1.BackupStorageLocationList).ListMeta}
-	for _, item := range obj.(*ark_v1.BackupStorageLocationList).Items {
+	list := &arkv1.BackupStorageLocationList{ListMeta: obj.(*arkv1.BackupStorageLocationList).ListMeta}
+	for _, item := range obj.(*arkv1.BackupStorageLocationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeBackupStorageLocations) Watch(opts v1.ListOptions) (watch.Interface
 }
 
 // Create takes the representation of a backupStorageLocation and creates it.  Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *FakeBackupStorageLocations) Create(backupStorageLocation *ark_v1.BackupStorageLocation) (result *ark_v1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Create(backupStorageLocation *arkv1.BackupStorageLocation) (result *arkv1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewCreateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &arkv1.BackupStorageLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.BackupStorageLocation), err
+	return obj.(*arkv1.BackupStorageLocation), err
 }
 
 // Update takes the representation of a backupStorageLocation and updates it. Returns the server's representation of the backupStorageLocation, and an error, if there is any.
-func (c *FakeBackupStorageLocations) Update(backupStorageLocation *ark_v1.BackupStorageLocation) (result *ark_v1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Update(backupStorageLocation *arkv1.BackupStorageLocation) (result *arkv1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewUpdateAction(backupstoragelocationsResource, c.ns, backupStorageLocation), &arkv1.BackupStorageLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.BackupStorageLocation), err
+	return obj.(*arkv1.BackupStorageLocation), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeBackupStorageLocations) UpdateStatus(backupStorageLocation *ark_v1.BackupStorageLocation) (*ark_v1.BackupStorageLocation, error) {
+func (c *FakeBackupStorageLocations) UpdateStatus(backupStorageLocation *arkv1.BackupStorageLocation) (*arkv1.BackupStorageLocation, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(backupstoragelocationsResource, "status", c.ns, backupStorageLocation), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewUpdateSubresourceAction(backupstoragelocationsResource, "status", c.ns, backupStorageLocation), &arkv1.BackupStorageLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.BackupStorageLocation), err
+	return obj.(*arkv1.BackupStorageLocation), err
 }
 
 // Delete takes name of the backupStorageLocation and deletes it. Returns an error if one occurs.
 func (c *FakeBackupStorageLocations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(backupstoragelocationsResource, c.ns, name), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewDeleteAction(backupstoragelocationsResource, c.ns, name), &arkv1.BackupStorageLocation{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeBackupStorageLocations) Delete(name string, options *v1.DeleteOptio
 func (c *FakeBackupStorageLocations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(backupstoragelocationsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &ark_v1.BackupStorageLocationList{})
+	_, err := c.Fake.Invokes(action, &arkv1.BackupStorageLocationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched backupStorageLocation.
-func (c *FakeBackupStorageLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *ark_v1.BackupStorageLocation, err error) {
+func (c *FakeBackupStorageLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *arkv1.BackupStorageLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(backupstoragelocationsResource, c.ns, name, data, subresources...), &ark_v1.BackupStorageLocation{})
+		Invokes(testing.NewPatchSubresourceAction(backupstoragelocationsResource, c.ns, name, data, subresources...), &arkv1.BackupStorageLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.BackupStorageLocation), err
+	return obj.(*arkv1.BackupStorageLocation), err
 }

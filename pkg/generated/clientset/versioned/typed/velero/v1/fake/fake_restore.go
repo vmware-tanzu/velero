@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var restoresResource = schema.GroupVersionResource{Group: "velero.io", Version: 
 var restoresKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "Restore"}
 
 // Get takes name of the restore, and returns the corresponding restore object, and an error if there is any.
-func (c *FakeRestores) Get(name string, options v1.GetOptions) (result *velero_v1.Restore, err error) {
+func (c *FakeRestores) Get(name string, options v1.GetOptions) (result *velerov1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(restoresResource, c.ns, name), &velero_v1.Restore{})
+		Invokes(testing.NewGetAction(restoresResource, c.ns, name), &velerov1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.Restore), err
+	return obj.(*velerov1.Restore), err
 }
 
 // List takes label and field selectors, and returns the list of Restores that match those selectors.
-func (c *FakeRestores) List(opts v1.ListOptions) (result *velero_v1.RestoreList, err error) {
+func (c *FakeRestores) List(opts v1.ListOptions) (result *velerov1.RestoreList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(restoresResource, restoresKind, c.ns, opts), &velero_v1.RestoreList{})
+		Invokes(testing.NewListAction(restoresResource, restoresKind, c.ns, opts), &velerov1.RestoreList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeRestores) List(opts v1.ListOptions) (result *velero_v1.RestoreList,
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velero_v1.RestoreList{ListMeta: obj.(*velero_v1.RestoreList).ListMeta}
-	for _, item := range obj.(*velero_v1.RestoreList).Items {
+	list := &velerov1.RestoreList{ListMeta: obj.(*velerov1.RestoreList).ListMeta}
+	for _, item := range obj.(*velerov1.RestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeRestores) Watch(opts v1.ListOptions) (watch.Interface, error) {
 }
 
 // Create takes the representation of a restore and creates it.  Returns the server's representation of the restore, and an error, if there is any.
-func (c *FakeRestores) Create(restore *velero_v1.Restore) (result *velero_v1.Restore, err error) {
+func (c *FakeRestores) Create(restore *velerov1.Restore) (result *velerov1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(restoresResource, c.ns, restore), &velero_v1.Restore{})
+		Invokes(testing.NewCreateAction(restoresResource, c.ns, restore), &velerov1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.Restore), err
+	return obj.(*velerov1.Restore), err
 }
 
 // Update takes the representation of a restore and updates it. Returns the server's representation of the restore, and an error, if there is any.
-func (c *FakeRestores) Update(restore *velero_v1.Restore) (result *velero_v1.Restore, err error) {
+func (c *FakeRestores) Update(restore *velerov1.Restore) (result *velerov1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(restoresResource, c.ns, restore), &velero_v1.Restore{})
+		Invokes(testing.NewUpdateAction(restoresResource, c.ns, restore), &velerov1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.Restore), err
+	return obj.(*velerov1.Restore), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeRestores) UpdateStatus(restore *velero_v1.Restore) (*velero_v1.Restore, error) {
+func (c *FakeRestores) UpdateStatus(restore *velerov1.Restore) (*velerov1.Restore, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(restoresResource, "status", c.ns, restore), &velero_v1.Restore{})
+		Invokes(testing.NewUpdateSubresourceAction(restoresResource, "status", c.ns, restore), &velerov1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.Restore), err
+	return obj.(*velerov1.Restore), err
 }
 
 // Delete takes name of the restore and deletes it. Returns an error if one occurs.
 func (c *FakeRestores) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(restoresResource, c.ns, name), &velero_v1.Restore{})
+		Invokes(testing.NewDeleteAction(restoresResource, c.ns, name), &velerov1.Restore{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeRestores) Delete(name string, options *v1.DeleteOptions) error {
 func (c *FakeRestores) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(restoresResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &velero_v1.RestoreList{})
+	_, err := c.Fake.Invokes(action, &velerov1.RestoreList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched restore.
-func (c *FakeRestores) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velero_v1.Restore, err error) {
+func (c *FakeRestores) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.Restore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, name, data, subresources...), &velero_v1.Restore{})
+		Invokes(testing.NewPatchSubresourceAction(restoresResource, c.ns, name, data, subresources...), &velerov1.Restore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.Restore), err
+	return obj.(*velerov1.Restore), err
 }

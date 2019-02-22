@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var volumesnapshotlocationsResource = schema.GroupVersionResource{Group: "velero
 var volumesnapshotlocationsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "VolumeSnapshotLocation"}
 
 // Get takes name of the volumeSnapshotLocation, and returns the corresponding volumeSnapshotLocation object, and an error if there is any.
-func (c *FakeVolumeSnapshotLocations) Get(name string, options v1.GetOptions) (result *velero_v1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Get(name string, options v1.GetOptions) (result *velerov1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(volumesnapshotlocationsResource, c.ns, name), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewGetAction(volumesnapshotlocationsResource, c.ns, name), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.VolumeSnapshotLocation), err
+	return obj.(*velerov1.VolumeSnapshotLocation), err
 }
 
 // List takes label and field selectors, and returns the list of VolumeSnapshotLocations that match those selectors.
-func (c *FakeVolumeSnapshotLocations) List(opts v1.ListOptions) (result *velero_v1.VolumeSnapshotLocationList, err error) {
+func (c *FakeVolumeSnapshotLocations) List(opts v1.ListOptions) (result *velerov1.VolumeSnapshotLocationList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(volumesnapshotlocationsResource, volumesnapshotlocationsKind, c.ns, opts), &velero_v1.VolumeSnapshotLocationList{})
+		Invokes(testing.NewListAction(volumesnapshotlocationsResource, volumesnapshotlocationsKind, c.ns, opts), &velerov1.VolumeSnapshotLocationList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeVolumeSnapshotLocations) List(opts v1.ListOptions) (result *velero_
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velero_v1.VolumeSnapshotLocationList{ListMeta: obj.(*velero_v1.VolumeSnapshotLocationList).ListMeta}
-	for _, item := range obj.(*velero_v1.VolumeSnapshotLocationList).Items {
+	list := &velerov1.VolumeSnapshotLocationList{ListMeta: obj.(*velerov1.VolumeSnapshotLocationList).ListMeta}
+	for _, item := range obj.(*velerov1.VolumeSnapshotLocationList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeVolumeSnapshotLocations) Watch(opts v1.ListOptions) (watch.Interfac
 }
 
 // Create takes the representation of a volumeSnapshotLocation and creates it.  Returns the server's representation of the volumeSnapshotLocation, and an error, if there is any.
-func (c *FakeVolumeSnapshotLocations) Create(volumeSnapshotLocation *velero_v1.VolumeSnapshotLocation) (result *velero_v1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Create(volumeSnapshotLocation *velerov1.VolumeSnapshotLocation) (result *velerov1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewCreateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.VolumeSnapshotLocation), err
+	return obj.(*velerov1.VolumeSnapshotLocation), err
 }
 
 // Update takes the representation of a volumeSnapshotLocation and updates it. Returns the server's representation of the volumeSnapshotLocation, and an error, if there is any.
-func (c *FakeVolumeSnapshotLocations) Update(volumeSnapshotLocation *velero_v1.VolumeSnapshotLocation) (result *velero_v1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Update(volumeSnapshotLocation *velerov1.VolumeSnapshotLocation) (result *velerov1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewUpdateAction(volumesnapshotlocationsResource, c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.VolumeSnapshotLocation), err
+	return obj.(*velerov1.VolumeSnapshotLocation), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeVolumeSnapshotLocations) UpdateStatus(volumeSnapshotLocation *velero_v1.VolumeSnapshotLocation) (*velero_v1.VolumeSnapshotLocation, error) {
+func (c *FakeVolumeSnapshotLocations) UpdateStatus(volumeSnapshotLocation *velerov1.VolumeSnapshotLocation) (*velerov1.VolumeSnapshotLocation, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(volumesnapshotlocationsResource, "status", c.ns, volumeSnapshotLocation), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewUpdateSubresourceAction(volumesnapshotlocationsResource, "status", c.ns, volumeSnapshotLocation), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.VolumeSnapshotLocation), err
+	return obj.(*velerov1.VolumeSnapshotLocation), err
 }
 
 // Delete takes name of the volumeSnapshotLocation and deletes it. Returns an error if one occurs.
 func (c *FakeVolumeSnapshotLocations) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(volumesnapshotlocationsResource, c.ns, name), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewDeleteAction(volumesnapshotlocationsResource, c.ns, name), &velerov1.VolumeSnapshotLocation{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeVolumeSnapshotLocations) Delete(name string, options *v1.DeleteOpti
 func (c *FakeVolumeSnapshotLocations) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(volumesnapshotlocationsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &velero_v1.VolumeSnapshotLocationList{})
+	_, err := c.Fake.Invokes(action, &velerov1.VolumeSnapshotLocationList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched volumeSnapshotLocation.
-func (c *FakeVolumeSnapshotLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velero_v1.VolumeSnapshotLocation, err error) {
+func (c *FakeVolumeSnapshotLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, data, subresources...), &velero_v1.VolumeSnapshotLocation{})
+		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, data, subresources...), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.VolumeSnapshotLocation), err
+	return obj.(*velerov1.VolumeSnapshotLocation), err
 }

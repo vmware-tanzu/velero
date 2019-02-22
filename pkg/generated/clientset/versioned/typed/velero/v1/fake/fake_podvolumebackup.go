@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var podvolumebackupsResource = schema.GroupVersionResource{Group: "velero.io", V
 var podvolumebackupsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "PodVolumeBackup"}
 
 // Get takes name of the podVolumeBackup, and returns the corresponding podVolumeBackup object, and an error if there is any.
-func (c *FakePodVolumeBackups) Get(name string, options v1.GetOptions) (result *velero_v1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Get(name string, options v1.GetOptions) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podvolumebackupsResource, c.ns, name), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewGetAction(podvolumebackupsResource, c.ns, name), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.PodVolumeBackup), err
+	return obj.(*velerov1.PodVolumeBackup), err
 }
 
 // List takes label and field selectors, and returns the list of PodVolumeBackups that match those selectors.
-func (c *FakePodVolumeBackups) List(opts v1.ListOptions) (result *velero_v1.PodVolumeBackupList, err error) {
+func (c *FakePodVolumeBackups) List(opts v1.ListOptions) (result *velerov1.PodVolumeBackupList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podvolumebackupsResource, podvolumebackupsKind, c.ns, opts), &velero_v1.PodVolumeBackupList{})
+		Invokes(testing.NewListAction(podvolumebackupsResource, podvolumebackupsKind, c.ns, opts), &velerov1.PodVolumeBackupList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakePodVolumeBackups) List(opts v1.ListOptions) (result *velero_v1.PodV
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velero_v1.PodVolumeBackupList{ListMeta: obj.(*velero_v1.PodVolumeBackupList).ListMeta}
-	for _, item := range obj.(*velero_v1.PodVolumeBackupList).Items {
+	list := &velerov1.PodVolumeBackupList{ListMeta: obj.(*velerov1.PodVolumeBackupList).ListMeta}
+	for _, item := range obj.(*velerov1.PodVolumeBackupList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakePodVolumeBackups) Watch(opts v1.ListOptions) (watch.Interface, erro
 }
 
 // Create takes the representation of a podVolumeBackup and creates it.  Returns the server's representation of the podVolumeBackup, and an error, if there is any.
-func (c *FakePodVolumeBackups) Create(podVolumeBackup *velero_v1.PodVolumeBackup) (result *velero_v1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Create(podVolumeBackup *velerov1.PodVolumeBackup) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewCreateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.PodVolumeBackup), err
+	return obj.(*velerov1.PodVolumeBackup), err
 }
 
 // Update takes the representation of a podVolumeBackup and updates it. Returns the server's representation of the podVolumeBackup, and an error, if there is any.
-func (c *FakePodVolumeBackups) Update(podVolumeBackup *velero_v1.PodVolumeBackup) (result *velero_v1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Update(podVolumeBackup *velerov1.PodVolumeBackup) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewUpdateAction(podvolumebackupsResource, c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.PodVolumeBackup), err
+	return obj.(*velerov1.PodVolumeBackup), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodVolumeBackups) UpdateStatus(podVolumeBackup *velero_v1.PodVolumeBackup) (*velero_v1.PodVolumeBackup, error) {
+func (c *FakePodVolumeBackups) UpdateStatus(podVolumeBackup *velerov1.PodVolumeBackup) (*velerov1.PodVolumeBackup, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podvolumebackupsResource, "status", c.ns, podVolumeBackup), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewUpdateSubresourceAction(podvolumebackupsResource, "status", c.ns, podVolumeBackup), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.PodVolumeBackup), err
+	return obj.(*velerov1.PodVolumeBackup), err
 }
 
 // Delete takes name of the podVolumeBackup and deletes it. Returns an error if one occurs.
 func (c *FakePodVolumeBackups) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podvolumebackupsResource, c.ns, name), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewDeleteAction(podvolumebackupsResource, c.ns, name), &velerov1.PodVolumeBackup{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakePodVolumeBackups) Delete(name string, options *v1.DeleteOptions) er
 func (c *FakePodVolumeBackups) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podvolumebackupsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &velero_v1.PodVolumeBackupList{})
+	_, err := c.Fake.Invokes(action, &velerov1.PodVolumeBackupList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podVolumeBackup.
-func (c *FakePodVolumeBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velero_v1.PodVolumeBackup, err error) {
+func (c *FakePodVolumeBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podvolumebackupsResource, c.ns, name, data, subresources...), &velero_v1.PodVolumeBackup{})
+		Invokes(testing.NewPatchSubresourceAction(podvolumebackupsResource, c.ns, name, data, subresources...), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.PodVolumeBackup), err
+	return obj.(*velerov1.PodVolumeBackup), err
 }

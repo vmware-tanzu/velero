@@ -21,11 +21,11 @@ package v1
 import (
 	time "time"
 
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	versioned "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/heptio/velero/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
@@ -57,20 +57,20 @@ func NewDownloadRequestInformer(client versioned.Interface, namespace string, re
 func NewFilteredDownloadRequestInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.VeleroV1().DownloadRequests(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.VeleroV1().DownloadRequests(namespace).Watch(options)
 			},
 		},
-		&velero_v1.DownloadRequest{},
+		&velerov1.DownloadRequest{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *downloadRequestInformer) defaultInformer(client versioned.Interface, re
 }
 
 func (f *downloadRequestInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&velero_v1.DownloadRequest{}, f.defaultInformer)
+	return f.factory.InformerFor(&velerov1.DownloadRequest{}, f.defaultInformer)
 }
 
 func (f *downloadRequestInformer) Lister() v1.DownloadRequestLister {
