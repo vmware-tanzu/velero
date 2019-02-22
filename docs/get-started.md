@@ -17,17 +17,21 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 * A DNS server on the cluster
 * `kubectl` installed
 
-### Download
+## Download Velero
 
-1. Download the [latest release's][26] tarball for your platform.
+1. Download the [latest release's](https://github.com/heptio/velero/releases) tarball for your client platform.
 
 1. Extract the tarball:
     ```bash
-    tar -xzf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
     ```
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
+
+_We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
+`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
+branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 #### MacOS Installation
 
