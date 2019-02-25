@@ -1,0 +1,1 @@
+Fix concurrency bug in code ensuring restic repository exists
