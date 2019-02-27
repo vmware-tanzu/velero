@@ -32,7 +32,7 @@ func TestBackupCommand(t *testing.T) {
 	assert.Equal(t, "path", c.Dir)
 	assert.Equal(t, []string{"."}, c.Args)
 
-	expected := []string{"--tag=foo=bar", "--tag=c=d", "--hostname=ark"}
+	expected := []string{"--tag=foo=bar", "--tag=c=d", "--host=ark"}
 	sort.Strings(expected)
 	sort.Strings(c.ExtraFlags)
 	assert.Equal(t, expected, c.ExtraFlags)
@@ -93,6 +93,13 @@ func TestInitCommand(t *testing.T) {
 	c := InitCommand("repo-id")
 
 	assert.Equal(t, "init", c.Command)
+	assert.Equal(t, "repo-id", c.RepoIdentifier)
+}
+
+func TestStatsCommand(t *testing.T) {
+	c := StatsCommand("repo-id")
+
+	assert.Equal(t, "stats", c.Command)
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
