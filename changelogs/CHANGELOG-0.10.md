@@ -1,5 +1,17 @@
+  - [v0.10.2](#v0102)
   - [v0.10.1](#v0101)
   - [v0.10.0](#v0100)
+
+## v0.10.2
+#### 2019-02-28
+
+### Download
+- https://github.com/heptio/ark/releases/tag/v0.10.2
+
+### Changes
+  * upgrade restic to v0.9.4 & replace --hostname flag with --host (#1156, @skriss)
+  * use 'restic stats' instead of 'restic check' to determine if repo exists (#1171, @skriss)
+  * Fix concurrency bug in code ensuring restic repository exists (#1235, @skriss)
 
 ## v0.10.1
 #### 2019-01-10
