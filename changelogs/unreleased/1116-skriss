@@ -1,1 +1,0 @@
-add ServerStatusRequest CRD and show server version in `ark version` output
