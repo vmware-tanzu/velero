@@ -1,1 +1,0 @@
-Set the zones for GCP regional disks on restore. This requires the `compute.zones.get` permission on the GCP serviceaccount in order to work correctly.

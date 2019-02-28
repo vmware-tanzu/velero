@@ -1,1 +1,0 @@
-upgrade restic to v0.9.4 & replace --hostname flag with --host
