@@ -284,6 +284,7 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 	if err != nil {
 		return err
 	}
+	defer rdr.Close()
 
 	chunk := make([]byte, byteChunkSize)
 	for {
