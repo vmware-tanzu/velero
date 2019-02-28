@@ -1,6 +1,6 @@
-![](/docs/img/velero.png)
+![100]
 
-[![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
+[![Build Status][1]][2]
 
 ## Overview
 
@@ -78,3 +78,4 @@ See [the list of releases][6] to find out about feature changes.
 [30]: /docs/troubleshooting.md
 
 [99]: /docs/support-matrix.md
+[100]: /docs/img/velero.png
