@@ -24,9 +24,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/heptio/velero/pkg/util/collections"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestGetVolumeID(t *testing.T) {
@@ -87,9 +87,11 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.awsElasticBlockStore.volumeID")
-	require.NoError(t, err)
-	assert.Equal(t, "vol-updated", actual)
+
+	res := new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.AWSElasticBlockStore)
+	assert.Equal(t, "vol-updated", res.Spec.AWSElasticBlockStore.VolumeID)
 }
 
 func TestGetTagsForCluster(t *testing.T) {

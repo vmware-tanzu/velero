@@ -19,11 +19,13 @@ package restore
 import (
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 type podAction struct {
@@ -41,94 +43,48 @@ func (a *podAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (a *podAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	a.logger.Debug("getting spec")
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
+	pod := new(v1.Pod)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pod); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	pod.Spec.NodeName = ""
+	pod.Spec.Priority = nil
+
+	serviceAccountTokenPrefix := pod.Spec.ServiceAccountName + "-token-"
+
+	var preservedVolumes []v1.Volume
+	for _, vol := range pod.Spec.Volumes {
+		if !strings.HasPrefix(vol.Name, serviceAccountTokenPrefix) {
+			preservedVolumes = append(preservedVolumes, vol)
+		}
+	}
+	pod.Spec.Volumes = preservedVolumes
+
+	for i, container := range pod.Spec.Containers {
+		var preservedVolumeMounts []v1.VolumeMount
+		for _, mount := range container.VolumeMounts {
+			if !strings.HasPrefix(mount.Name, serviceAccountTokenPrefix) {
+				preservedVolumeMounts = append(preservedVolumeMounts, mount)
+			}
+		}
+		pod.Spec.Containers[i].VolumeMounts = preservedVolumeMounts
+	}
+
+	for i, container := range pod.Spec.InitContainers {
+		var preservedVolumeMounts []v1.VolumeMount
+		for _, mount := range container.VolumeMounts {
+			if !strings.HasPrefix(mount.Name, serviceAccountTokenPrefix) {
+				preservedVolumeMounts = append(preservedVolumeMounts, mount)
+			}
+		}
+		pod.Spec.InitContainers[i].VolumeMounts = preservedVolumeMounts
+	}
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
-	a.logger.Debug("deleting spec.NodeName")
-	delete(spec, "nodeName")
-
-	a.logger.Debug("deleting spec.priority")
-	delete(spec, "priority")
-
-	// if there are no volumes, then there can't be any volume mounts, so we're done.
-	if !collections.Exists(spec, "volumes") {
-		return obj, nil, nil
-	}
-
-	serviceAccountName, err := collections.GetString(spec, "serviceAccountName")
-	if err != nil {
-		return nil, nil, err
-	}
-	prefix := serviceAccountName + "-token-"
-
-	// remove the service account token from volumes
-	a.logger.Debug("iterating over volumes")
-	if err := removeItemsWithNamePrefix(spec, "volumes", prefix, a.logger); err != nil {
-		return nil, nil, err
-	}
-
-	// remove the service account token volume mount from all containers
-	a.logger.Debug("iterating over containers")
-	if err := removeVolumeMounts(spec, "containers", prefix, a.logger); err != nil {
-		return nil, nil, err
-	}
-
-	if !collections.Exists(spec, "initContainers") {
-		return obj, nil, nil
-	}
-
-	// remove the service account token volume mount from all init containers
-	a.logger.Debug("iterating over init containers")
-	if err := removeVolumeMounts(spec, "initContainers", prefix, a.logger); err != nil {
-		return nil, nil, err
-	}
-
-	return obj, nil, nil
-}
-
-// removeItemsWithNamePrefix iterates through the collection stored at 'key' in 'unstructuredObj'
-// and removes any item that has a name that starts with 'prefix'.
-func removeItemsWithNamePrefix(unstructuredObj map[string]interface{}, key, prefix string, log logrus.FieldLogger) error {
-	var preservedItems []interface{}
-
-	if err := collections.ForEach(unstructuredObj, key, func(item map[string]interface{}) error {
-		name, err := collections.GetString(item, "name")
-		if err != nil {
-			return err
-		}
-
-		singularKey := strings.TrimSuffix(key, "s")
-		log := log.WithField(singularKey, name)
-
-		log.Debug("Checking " + singularKey)
-		switch {
-		case strings.HasPrefix(name, prefix):
-			log.Debug("Excluding ", singularKey)
-		default:
-			log.Debug("Preserving ", singularKey)
-			preservedItems = append(preservedItems, item)
-		}
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	unstructuredObj[key] = preservedItems
-	return nil
-}
-
-// removeVolumeMounts iterates through a slice of containers stored at 'containersKey' in
-// 'podSpec' and removes any volume mounts with a name starting with 'prefix'.
-func removeVolumeMounts(podSpec map[string]interface{}, containersKey, prefix string, log logrus.FieldLogger) error {
-	return collections.ForEach(podSpec, containersKey, func(container map[string]interface{}) error {
-		if !collections.Exists(container, "volumeMounts") {
-			return nil
-		}
-
-		return removeItemsWithNamePrefix(container, "volumeMounts", prefix, log)
-	})
+	return &unstructured.Unstructured{Object: res}, nil, nil
 }

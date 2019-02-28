@@ -31,10 +31,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/satori/uuid"
 	"github.com/sirupsen/logrus"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/cloudprovider"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const (
@@ -335,27 +336,40 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 	return snapshotID, nil
 }
 
-func (b *blockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
-	if !collections.Exists(pv.UnstructuredContent(), "spec.azureDisk") {
+func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if pv.Spec.AzureDisk == nil {
 		return "", nil
 	}
 
-	volumeID, err := collections.GetString(pv.UnstructuredContent(), "spec.azureDisk.diskName")
-	if err != nil {
-		return "", err
+	if pv.Spec.AzureDisk.DiskName == "" {
+		return "", errors.New("spec.azureDisk.diskName not found")
 	}
 
-	return volumeID, nil
+	return pv.Spec.AzureDisk.DiskName, nil
 }
 
-func (b *blockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
-	azure, err := collections.GetMap(pv.UnstructuredContent(), "spec.azureDisk")
-	if err != nil {
-		return nil, err
+func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
-	azure["diskName"] = volumeID
-	azure["diskURI"] = getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
+	if pv.Spec.AzureDisk == nil {
+		return nil, errors.New("spec.azureDisk not found")
+	}
 
-	return pv, nil
+	pv.Spec.AzureDisk.DiskName = volumeID
+	pv.Spec.AzureDisk.DataDiskURI = getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	return &unstructured.Unstructured{Object: res}, nil
 }

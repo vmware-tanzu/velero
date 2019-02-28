@@ -22,11 +22,11 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/collections"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -46,67 +46,55 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 }
 
 func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	spec, err := collections.GetMap(obj.UnstructuredContent(), "spec")
-	if err != nil {
+	service := new(corev1api.Service)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), service); err != nil {
+		return nil, nil, errors.WithStack(err)
+	}
+
+	if service.Spec.ClusterIP != "None" {
+		service.Spec.ClusterIP = ""
+	}
+
+	if err := deleteNodePorts(service); err != nil {
 		return nil, nil, err
 	}
 
-	// Since clusterIP is an optional key, we can ignore 'not found' errors. Also assuming it was a string already.
-	if val, _ := collections.GetString(spec, "clusterIP"); val != "None" {
-		delete(spec, "clusterIP")
-	}
-
-	if err := deleteNodePorts(obj, &spec); err != nil {
-		return nil, nil, err
-	}
-	return obj, nil, nil
-}
-
-func getPreservedPorts(obj runtime.Unstructured) (map[string]bool, error) {
-	preservedPorts := map[string]bool{}
-	metadata, err := meta.Accessor(obj)
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(service)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, nil, errors.WithStack(err)
 	}
-	if lac, ok := metadata.GetAnnotations()[annotationLastAppliedConfig]; ok {
-		var svc corev1api.Service
-		if err := json.Unmarshal([]byte(lac), &svc); err != nil {
-			return nil, errors.WithStack(err)
-		}
-		for _, port := range svc.Spec.Ports {
-			if port.NodePort > 0 {
-				preservedPorts[port.Name] = true
-			}
-		}
-	}
-	return preservedPorts, nil
+
+	return &unstructured.Unstructured{Object: res}, nil, nil
 }
 
-func deleteNodePorts(obj runtime.Unstructured, spec *map[string]interface{}) error {
-	if serviceType, _ := collections.GetString(*spec, "type"); serviceType == "ExternalName" {
+func deleteNodePorts(service *corev1api.Service) error {
+	if service.Spec.Type == corev1api.ServiceTypeExternalName {
 		return nil
 	}
 
-	preservedPorts, err := getPreservedPorts(obj)
-	if err != nil {
-		return err
+	// find any NodePorts whose values were explicitly specified according
+	// to the last-applied-config annotation. We'll retain these values, and
+	// clear out any other (presumably auto-assigned) NodePort values.
+	explicitNodePorts := sets.NewString()
+	lastAppliedConfig, ok := service.Annotations[annotationLastAppliedConfig]
+	if ok {
+		appliedService := new(corev1api.Service)
+		if err := json.Unmarshal([]byte(lastAppliedConfig), appliedService); err != nil {
+			return errors.WithStack(err)
+		}
+
+		for _, port := range appliedService.Spec.Ports {
+			if port.NodePort > 0 {
+				explicitNodePorts.Insert(port.Name)
+			}
+		}
 	}
 
-	ports, err := collections.GetSlice(obj.UnstructuredContent(), "spec.ports")
-	if err != nil {
-		return err
+	for i, port := range service.Spec.Ports {
+		if !explicitNodePorts.Has(port.Name) {
+			service.Spec.Ports[i].NodePort = 0
+		}
 	}
 
-	for _, port := range ports {
-		p := port.(map[string]interface{})
-		var name string
-		if nameVal, ok := p["name"]; ok {
-			name = nameVal.(string)
-		}
-		if preservedPorts[name] {
-			continue
-		}
-		delete(p, "nodePort")
-	}
 	return nil
 }

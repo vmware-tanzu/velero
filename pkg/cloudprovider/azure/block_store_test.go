@@ -21,9 +21,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/heptio/velero/pkg/util/collections"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestGetVolumeID(t *testing.T) {
@@ -75,23 +75,23 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "updated")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
-	require.NoError(t, err)
-	assert.Equal(t, "updated", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
-	require.NoError(t, err)
-	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", actual)
+
+	res := new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.AzureDisk)
+	assert.Equal(t, "updated", res.Spec.AzureDisk.DiskName)
+	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/updated", res.Spec.AzureDisk.DataDiskURI)
 
 	// with diskURI
 	azure["diskURI"] = "/foo/bar/updated/blarg"
 	updatedPV, err = b.SetVolumeID(pv, "revised")
 	require.NoError(t, err)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskName")
-	require.NoError(t, err)
-	assert.Equal(t, "revised", actual)
-	actual, err = collections.GetString(updatedPV.UnstructuredContent(), "spec.azureDisk.diskURI")
-	require.NoError(t, err)
-	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", actual)
+
+	res = new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.AzureDisk)
+	assert.Equal(t, "revised", res.Spec.AzureDisk.DiskName)
+	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", res.Spec.AzureDisk.DataDiskURI)
 }
 
 // TODO(1.0) rename to TestParseFullSnapshotName, switch to testing

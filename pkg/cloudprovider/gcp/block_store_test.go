@@ -23,9 +23,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -75,9 +76,11 @@ func TestSetVolumeID(t *testing.T) {
 	}
 	updatedPV, err = b.SetVolumeID(pv, "123abc")
 	require.NoError(t, err)
-	actual, err := collections.GetString(updatedPV.UnstructuredContent(), "spec.gcePersistentDisk.pdName")
-	require.NoError(t, err)
-	assert.Equal(t, "123abc", actual)
+
+	res := new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.GCEPersistentDisk)
+	assert.Equal(t, "123abc", res.Spec.GCEPersistentDisk.PDName)
 }
 
 func TestGetSnapshotTags(t *testing.T) {
