@@ -2,13 +2,9 @@
 
 [![Build Status][1]][2] <a href="https://zenhub.com"><img src="https://raw.githubusercontent.com/ZenHubIO/support/master/zenhub-badge.png"></a>
 
-## Heptio Ark is now Velero!
-
-#### We're working on our first Velero release and instructions for migrating your Ark deployments to Velero. Stay tuned!
-
 ## Overview
 
-Velero gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Velero lets you:
+Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Velero lets you:
 
 * Take backups of your cluster and restore in case of loss.
 * Copy cluster resources to other clusters.
