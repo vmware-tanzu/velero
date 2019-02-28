@@ -1126,7 +1126,6 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 	}
 
 	delete(spec, "claimRef")
-	delete(spec, "storageClassName")
 
 	if boolptr.IsSetToFalse(r.snapshotVolumes) {
 		// The backup had snapshots disabled, so we can return early

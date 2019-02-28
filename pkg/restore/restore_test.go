@@ -1346,18 +1346,25 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:        "ensure spec.claimRef, spec.storageClassName are deleted",
-			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
+			name:        "ensure spec.claimRef is deleted",
+			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "someOtherField").Unstructured,
 			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
 			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
+		},
+		{
+			name:        "ensure spec.storageClassName is retained",
+			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
+			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).Backup,
+			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
 			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
 			backup:      velerotest.NewTestBackup().WithName("backup1").WithPhase(api.BackupPhaseInProgress).WithSnapshotVolumes(false).Backup,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("someOtherField").Unstructured,
+			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:    "restore.spec.restorePVs=false, return early",
