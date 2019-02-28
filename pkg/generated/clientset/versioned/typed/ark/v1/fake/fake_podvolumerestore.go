@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var podvolumerestoresResource = schema.GroupVersionResource{Group: "ark.heptio.c
 var podvolumerestoresKind = schema.GroupVersionKind{Group: "ark.heptio.com", Version: "v1", Kind: "PodVolumeRestore"}
 
 // Get takes name of the podVolumeRestore, and returns the corresponding podVolumeRestore object, and an error if there is any.
-func (c *FakePodVolumeRestores) Get(name string, options v1.GetOptions) (result *ark_v1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Get(name string, options v1.GetOptions) (result *arkv1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(podvolumerestoresResource, c.ns, name), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewGetAction(podvolumerestoresResource, c.ns, name), &arkv1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.PodVolumeRestore), err
+	return obj.(*arkv1.PodVolumeRestore), err
 }
 
 // List takes label and field selectors, and returns the list of PodVolumeRestores that match those selectors.
-func (c *FakePodVolumeRestores) List(opts v1.ListOptions) (result *ark_v1.PodVolumeRestoreList, err error) {
+func (c *FakePodVolumeRestores) List(opts v1.ListOptions) (result *arkv1.PodVolumeRestoreList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(podvolumerestoresResource, podvolumerestoresKind, c.ns, opts), &ark_v1.PodVolumeRestoreList{})
+		Invokes(testing.NewListAction(podvolumerestoresResource, podvolumerestoresKind, c.ns, opts), &arkv1.PodVolumeRestoreList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakePodVolumeRestores) List(opts v1.ListOptions) (result *ark_v1.PodVol
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.PodVolumeRestoreList{ListMeta: obj.(*ark_v1.PodVolumeRestoreList).ListMeta}
-	for _, item := range obj.(*ark_v1.PodVolumeRestoreList).Items {
+	list := &arkv1.PodVolumeRestoreList{ListMeta: obj.(*arkv1.PodVolumeRestoreList).ListMeta}
+	for _, item := range obj.(*arkv1.PodVolumeRestoreList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakePodVolumeRestores) Watch(opts v1.ListOptions) (watch.Interface, err
 }
 
 // Create takes the representation of a podVolumeRestore and creates it.  Returns the server's representation of the podVolumeRestore, and an error, if there is any.
-func (c *FakePodVolumeRestores) Create(podVolumeRestore *ark_v1.PodVolumeRestore) (result *ark_v1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Create(podVolumeRestore *arkv1.PodVolumeRestore) (result *arkv1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewCreateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &arkv1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.PodVolumeRestore), err
+	return obj.(*arkv1.PodVolumeRestore), err
 }
 
 // Update takes the representation of a podVolumeRestore and updates it. Returns the server's representation of the podVolumeRestore, and an error, if there is any.
-func (c *FakePodVolumeRestores) Update(podVolumeRestore *ark_v1.PodVolumeRestore) (result *ark_v1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Update(podVolumeRestore *arkv1.PodVolumeRestore) (result *arkv1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewUpdateAction(podvolumerestoresResource, c.ns, podVolumeRestore), &arkv1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.PodVolumeRestore), err
+	return obj.(*arkv1.PodVolumeRestore), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakePodVolumeRestores) UpdateStatus(podVolumeRestore *ark_v1.PodVolumeRestore) (*ark_v1.PodVolumeRestore, error) {
+func (c *FakePodVolumeRestores) UpdateStatus(podVolumeRestore *arkv1.PodVolumeRestore) (*arkv1.PodVolumeRestore, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(podvolumerestoresResource, "status", c.ns, podVolumeRestore), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewUpdateSubresourceAction(podvolumerestoresResource, "status", c.ns, podVolumeRestore), &arkv1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.PodVolumeRestore), err
+	return obj.(*arkv1.PodVolumeRestore), err
 }
 
 // Delete takes name of the podVolumeRestore and deletes it. Returns an error if one occurs.
 func (c *FakePodVolumeRestores) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(podvolumerestoresResource, c.ns, name), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewDeleteAction(podvolumerestoresResource, c.ns, name), &arkv1.PodVolumeRestore{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakePodVolumeRestores) Delete(name string, options *v1.DeleteOptions) e
 func (c *FakePodVolumeRestores) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(podvolumerestoresResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &ark_v1.PodVolumeRestoreList{})
+	_, err := c.Fake.Invokes(action, &arkv1.PodVolumeRestoreList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched podVolumeRestore.
-func (c *FakePodVolumeRestores) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *ark_v1.PodVolumeRestore, err error) {
+func (c *FakePodVolumeRestores) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *arkv1.PodVolumeRestore, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, name, data, subresources...), &ark_v1.PodVolumeRestore{})
+		Invokes(testing.NewPatchSubresourceAction(podvolumerestoresResource, c.ns, name, data, subresources...), &arkv1.PodVolumeRestore{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.PodVolumeRestore), err
+	return obj.(*arkv1.PodVolumeRestore), err
 }

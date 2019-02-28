@@ -21,11 +21,11 @@ package v1
 import (
 	time "time"
 
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	versioned "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/heptio/velero/pkg/generated/informers/externalversions/internalinterfaces"
 	v1 "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
 	cache "k8s.io/client-go/tools/cache"
@@ -57,20 +57,20 @@ func NewPodVolumeRestoreInformer(client versioned.Interface, namespace string, r
 func NewFilteredPodVolumeRestoreInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options meta_v1.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.VeleroV1().PodVolumeRestores(namespace).List(options)
 			},
-			WatchFunc: func(options meta_v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
 				return client.VeleroV1().PodVolumeRestores(namespace).Watch(options)
 			},
 		},
-		&velero_v1.PodVolumeRestore{},
+		&velerov1.PodVolumeRestore{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *podVolumeRestoreInformer) defaultInformer(client versioned.Interface, r
 }
 
 func (f *podVolumeRestoreInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&velero_v1.PodVolumeRestore{}, f.defaultInformer)
+	return f.factory.InformerFor(&velerov1.PodVolumeRestore{}, f.defaultInformer)
 }
 
 func (f *podVolumeRestoreInformer) Lister() v1.PodVolumeRestoreLister {

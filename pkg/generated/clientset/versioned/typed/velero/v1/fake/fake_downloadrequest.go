@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var downloadrequestsResource = schema.GroupVersionResource{Group: "velero.io", V
 var downloadrequestsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "DownloadRequest"}
 
 // Get takes name of the downloadRequest, and returns the corresponding downloadRequest object, and an error if there is any.
-func (c *FakeDownloadRequests) Get(name string, options v1.GetOptions) (result *velero_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Get(name string, options v1.GetOptions) (result *velerov1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(downloadrequestsResource, c.ns, name), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewGetAction(downloadrequestsResource, c.ns, name), &velerov1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DownloadRequest), err
+	return obj.(*velerov1.DownloadRequest), err
 }
 
 // List takes label and field selectors, and returns the list of DownloadRequests that match those selectors.
-func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *velero_v1.DownloadRequestList, err error) {
+func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *velerov1.DownloadRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(downloadrequestsResource, downloadrequestsKind, c.ns, opts), &velero_v1.DownloadRequestList{})
+		Invokes(testing.NewListAction(downloadrequestsResource, downloadrequestsKind, c.ns, opts), &velerov1.DownloadRequestList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeDownloadRequests) List(opts v1.ListOptions) (result *velero_v1.Down
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velero_v1.DownloadRequestList{ListMeta: obj.(*velero_v1.DownloadRequestList).ListMeta}
-	for _, item := range obj.(*velero_v1.DownloadRequestList).Items {
+	list := &velerov1.DownloadRequestList{ListMeta: obj.(*velerov1.DownloadRequestList).ListMeta}
+	for _, item := range obj.(*velerov1.DownloadRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeDownloadRequests) Watch(opts v1.ListOptions) (watch.Interface, erro
 }
 
 // Create takes the representation of a downloadRequest and creates it.  Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *FakeDownloadRequests) Create(downloadRequest *velero_v1.DownloadRequest) (result *velero_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Create(downloadRequest *velerov1.DownloadRequest) (result *velerov1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(downloadrequestsResource, c.ns, downloadRequest), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewCreateAction(downloadrequestsResource, c.ns, downloadRequest), &velerov1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DownloadRequest), err
+	return obj.(*velerov1.DownloadRequest), err
 }
 
 // Update takes the representation of a downloadRequest and updates it. Returns the server's representation of the downloadRequest, and an error, if there is any.
-func (c *FakeDownloadRequests) Update(downloadRequest *velero_v1.DownloadRequest) (result *velero_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Update(downloadRequest *velerov1.DownloadRequest) (result *velerov1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(downloadrequestsResource, c.ns, downloadRequest), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewUpdateAction(downloadrequestsResource, c.ns, downloadRequest), &velerov1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DownloadRequest), err
+	return obj.(*velerov1.DownloadRequest), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDownloadRequests) UpdateStatus(downloadRequest *velero_v1.DownloadRequest) (*velero_v1.DownloadRequest, error) {
+func (c *FakeDownloadRequests) UpdateStatus(downloadRequest *velerov1.DownloadRequest) (*velerov1.DownloadRequest, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(downloadrequestsResource, "status", c.ns, downloadRequest), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewUpdateSubresourceAction(downloadrequestsResource, "status", c.ns, downloadRequest), &velerov1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DownloadRequest), err
+	return obj.(*velerov1.DownloadRequest), err
 }
 
 // Delete takes name of the downloadRequest and deletes it. Returns an error if one occurs.
 func (c *FakeDownloadRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(downloadrequestsResource, c.ns, name), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewDeleteAction(downloadrequestsResource, c.ns, name), &velerov1.DownloadRequest{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeDownloadRequests) Delete(name string, options *v1.DeleteOptions) er
 func (c *FakeDownloadRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(downloadrequestsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &velero_v1.DownloadRequestList{})
+	_, err := c.Fake.Invokes(action, &velerov1.DownloadRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched downloadRequest.
-func (c *FakeDownloadRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velero_v1.DownloadRequest, err error) {
+func (c *FakeDownloadRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.DownloadRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(downloadrequestsResource, c.ns, name, data, subresources...), &velero_v1.DownloadRequest{})
+		Invokes(testing.NewPatchSubresourceAction(downloadrequestsResource, c.ns, name, data, subresources...), &velerov1.DownloadRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DownloadRequest), err
+	return obj.(*velerov1.DownloadRequest), err
 }

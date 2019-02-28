@@ -21,7 +21,7 @@ package v1
 import (
 	v1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	scheme "github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -38,11 +38,11 @@ type RestoreInterface interface {
 	Create(*v1.Restore) (*v1.Restore, error)
 	Update(*v1.Restore) (*v1.Restore, error)
 	UpdateStatus(*v1.Restore) (*v1.Restore, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.Restore, error)
-	List(opts meta_v1.ListOptions) (*v1.RestoreList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.Restore, error)
+	List(opts metav1.ListOptions) (*v1.RestoreList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Restore, err error)
 	RestoreExpansion
 }
@@ -62,7 +62,7 @@ func newRestores(c *ArkV1Client, namespace string) *restores {
 }
 
 // Get takes name of the restore, and returns the corresponding restore object, and an error if there is any.
-func (c *restores) Get(name string, options meta_v1.GetOptions) (result *v1.Restore, err error) {
+func (c *restores) Get(name string, options metav1.GetOptions) (result *v1.Restore, err error) {
 	result = &v1.Restore{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -75,7 +75,7 @@ func (c *restores) Get(name string, options meta_v1.GetOptions) (result *v1.Rest
 }
 
 // List takes label and field selectors, and returns the list of Restores that match those selectors.
-func (c *restores) List(opts meta_v1.ListOptions) (result *v1.RestoreList, err error) {
+func (c *restores) List(opts metav1.ListOptions) (result *v1.RestoreList, err error) {
 	result = &v1.RestoreList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -87,7 +87,7 @@ func (c *restores) List(opts meta_v1.ListOptions) (result *v1.RestoreList, err e
 }
 
 // Watch returns a watch.Interface that watches the requested restores.
-func (c *restores) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *restores) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -138,7 +138,7 @@ func (c *restores) UpdateStatus(restore *v1.Restore) (result *v1.Restore, err er
 }
 
 // Delete takes name of the restore and deletes it. Returns an error if one occurs.
-func (c *restores) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *restores) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("restores").
@@ -149,7 +149,7 @@ func (c *restores) Delete(name string, options *meta_v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *restores) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *restores) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("restores").

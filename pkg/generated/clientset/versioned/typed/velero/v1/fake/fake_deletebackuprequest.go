@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	velero_v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var deletebackuprequestsResource = schema.GroupVersionResource{Group: "velero.io
 var deletebackuprequestsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "DeleteBackupRequest"}
 
 // Get takes name of the deleteBackupRequest, and returns the corresponding deleteBackupRequest object, and an error if there is any.
-func (c *FakeDeleteBackupRequests) Get(name string, options v1.GetOptions) (result *velero_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Get(name string, options v1.GetOptions) (result *velerov1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(deletebackuprequestsResource, c.ns, name), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewGetAction(deletebackuprequestsResource, c.ns, name), &velerov1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DeleteBackupRequest), err
+	return obj.(*velerov1.DeleteBackupRequest), err
 }
 
 // List takes label and field selectors, and returns the list of DeleteBackupRequests that match those selectors.
-func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *velero_v1.DeleteBackupRequestList, err error) {
+func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *velerov1.DeleteBackupRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deletebackuprequestsResource, deletebackuprequestsKind, c.ns, opts), &velero_v1.DeleteBackupRequestList{})
+		Invokes(testing.NewListAction(deletebackuprequestsResource, deletebackuprequestsKind, c.ns, opts), &velerov1.DeleteBackupRequestList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *velero_v1.
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &velero_v1.DeleteBackupRequestList{ListMeta: obj.(*velero_v1.DeleteBackupRequestList).ListMeta}
-	for _, item := range obj.(*velero_v1.DeleteBackupRequestList).Items {
+	list := &velerov1.DeleteBackupRequestList{ListMeta: obj.(*velerov1.DeleteBackupRequestList).ListMeta}
+	for _, item := range obj.(*velerov1.DeleteBackupRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeDeleteBackupRequests) Watch(opts v1.ListOptions) (watch.Interface, 
 }
 
 // Create takes the representation of a deleteBackupRequest and creates it.  Returns the server's representation of the deleteBackupRequest, and an error, if there is any.
-func (c *FakeDeleteBackupRequests) Create(deleteBackupRequest *velero_v1.DeleteBackupRequest) (result *velero_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Create(deleteBackupRequest *velerov1.DeleteBackupRequest) (result *velerov1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewCreateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &velerov1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DeleteBackupRequest), err
+	return obj.(*velerov1.DeleteBackupRequest), err
 }
 
 // Update takes the representation of a deleteBackupRequest and updates it. Returns the server's representation of the deleteBackupRequest, and an error, if there is any.
-func (c *FakeDeleteBackupRequests) Update(deleteBackupRequest *velero_v1.DeleteBackupRequest) (result *velero_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Update(deleteBackupRequest *velerov1.DeleteBackupRequest) (result *velerov1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewUpdateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &velerov1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DeleteBackupRequest), err
+	return obj.(*velerov1.DeleteBackupRequest), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeleteBackupRequests) UpdateStatus(deleteBackupRequest *velero_v1.DeleteBackupRequest) (*velero_v1.DeleteBackupRequest, error) {
+func (c *FakeDeleteBackupRequests) UpdateStatus(deleteBackupRequest *velerov1.DeleteBackupRequest) (*velerov1.DeleteBackupRequest, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deletebackuprequestsResource, "status", c.ns, deleteBackupRequest), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewUpdateSubresourceAction(deletebackuprequestsResource, "status", c.ns, deleteBackupRequest), &velerov1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DeleteBackupRequest), err
+	return obj.(*velerov1.DeleteBackupRequest), err
 }
 
 // Delete takes name of the deleteBackupRequest and deletes it. Returns an error if one occurs.
 func (c *FakeDeleteBackupRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(deletebackuprequestsResource, c.ns, name), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewDeleteAction(deletebackuprequestsResource, c.ns, name), &velerov1.DeleteBackupRequest{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeDeleteBackupRequests) Delete(name string, options *v1.DeleteOptions
 func (c *FakeDeleteBackupRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(deletebackuprequestsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &velero_v1.DeleteBackupRequestList{})
+	_, err := c.Fake.Invokes(action, &velerov1.DeleteBackupRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched deleteBackupRequest.
-func (c *FakeDeleteBackupRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velero_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deletebackuprequestsResource, c.ns, name, data, subresources...), &velero_v1.DeleteBackupRequest{})
+		Invokes(testing.NewPatchSubresourceAction(deletebackuprequestsResource, c.ns, name, data, subresources...), &velerov1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*velero_v1.DeleteBackupRequest), err
+	return obj.(*velerov1.DeleteBackupRequest), err
 }

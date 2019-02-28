@@ -21,7 +21,7 @@ package v1
 import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	scheme "github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
-	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	rest "k8s.io/client-go/rest"
@@ -38,11 +38,11 @@ type ServerStatusRequestInterface interface {
 	Create(*v1.ServerStatusRequest) (*v1.ServerStatusRequest, error)
 	Update(*v1.ServerStatusRequest) (*v1.ServerStatusRequest, error)
 	UpdateStatus(*v1.ServerStatusRequest) (*v1.ServerStatusRequest, error)
-	Delete(name string, options *meta_v1.DeleteOptions) error
-	DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error
-	Get(name string, options meta_v1.GetOptions) (*v1.ServerStatusRequest, error)
-	List(opts meta_v1.ListOptions) (*v1.ServerStatusRequestList, error)
-	Watch(opts meta_v1.ListOptions) (watch.Interface, error)
+	Delete(name string, options *metav1.DeleteOptions) error
+	DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error
+	Get(name string, options metav1.GetOptions) (*v1.ServerStatusRequest, error)
+	List(opts metav1.ListOptions) (*v1.ServerStatusRequestList, error)
+	Watch(opts metav1.ListOptions) (watch.Interface, error)
 	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.ServerStatusRequest, err error)
 	ServerStatusRequestExpansion
 }
@@ -62,7 +62,7 @@ func newServerStatusRequests(c *VeleroV1Client, namespace string) *serverStatusR
 }
 
 // Get takes name of the serverStatusRequest, and returns the corresponding serverStatusRequest object, and an error if there is any.
-func (c *serverStatusRequests) Get(name string, options meta_v1.GetOptions) (result *v1.ServerStatusRequest, err error) {
+func (c *serverStatusRequests) Get(name string, options metav1.GetOptions) (result *v1.ServerStatusRequest, err error) {
 	result = &v1.ServerStatusRequest{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -75,7 +75,7 @@ func (c *serverStatusRequests) Get(name string, options meta_v1.GetOptions) (res
 }
 
 // List takes label and field selectors, and returns the list of ServerStatusRequests that match those selectors.
-func (c *serverStatusRequests) List(opts meta_v1.ListOptions) (result *v1.ServerStatusRequestList, err error) {
+func (c *serverStatusRequests) List(opts metav1.ListOptions) (result *v1.ServerStatusRequestList, err error) {
 	result = &v1.ServerStatusRequestList{}
 	err = c.client.Get().
 		Namespace(c.ns).
@@ -87,7 +87,7 @@ func (c *serverStatusRequests) List(opts meta_v1.ListOptions) (result *v1.Server
 }
 
 // Watch returns a watch.Interface that watches the requested serverStatusRequests.
-func (c *serverStatusRequests) Watch(opts meta_v1.ListOptions) (watch.Interface, error) {
+func (c *serverStatusRequests) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
@@ -138,7 +138,7 @@ func (c *serverStatusRequests) UpdateStatus(serverStatusRequest *v1.ServerStatus
 }
 
 // Delete takes name of the serverStatusRequest and deletes it. Returns an error if one occurs.
-func (c *serverStatusRequests) Delete(name string, options *meta_v1.DeleteOptions) error {
+func (c *serverStatusRequests) Delete(name string, options *metav1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serverstatusrequests").
@@ -149,7 +149,7 @@ func (c *serverStatusRequests) Delete(name string, options *meta_v1.DeleteOption
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *serverStatusRequests) DeleteCollection(options *meta_v1.DeleteOptions, listOptions meta_v1.ListOptions) error {
+func (c *serverStatusRequests) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serverstatusrequests").

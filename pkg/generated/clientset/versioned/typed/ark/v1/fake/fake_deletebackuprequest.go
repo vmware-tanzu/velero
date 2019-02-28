@@ -19,7 +19,7 @@ limitations under the License.
 package fake
 
 import (
-	ark_v1 "github.com/heptio/velero/pkg/apis/ark/v1"
+	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -39,20 +39,20 @@ var deletebackuprequestsResource = schema.GroupVersionResource{Group: "ark.hepti
 var deletebackuprequestsKind = schema.GroupVersionKind{Group: "ark.heptio.com", Version: "v1", Kind: "DeleteBackupRequest"}
 
 // Get takes name of the deleteBackupRequest, and returns the corresponding deleteBackupRequest object, and an error if there is any.
-func (c *FakeDeleteBackupRequests) Get(name string, options v1.GetOptions) (result *ark_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Get(name string, options v1.GetOptions) (result *arkv1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(deletebackuprequestsResource, c.ns, name), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewGetAction(deletebackuprequestsResource, c.ns, name), &arkv1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DeleteBackupRequest), err
+	return obj.(*arkv1.DeleteBackupRequest), err
 }
 
 // List takes label and field selectors, and returns the list of DeleteBackupRequests that match those selectors.
-func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *ark_v1.DeleteBackupRequestList, err error) {
+func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *arkv1.DeleteBackupRequestList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(deletebackuprequestsResource, deletebackuprequestsKind, c.ns, opts), &ark_v1.DeleteBackupRequestList{})
+		Invokes(testing.NewListAction(deletebackuprequestsResource, deletebackuprequestsKind, c.ns, opts), &arkv1.DeleteBackupRequestList{})
 
 	if obj == nil {
 		return nil, err
@@ -62,8 +62,8 @@ func (c *FakeDeleteBackupRequests) List(opts v1.ListOptions) (result *ark_v1.Del
 	if label == nil {
 		label = labels.Everything()
 	}
-	list := &ark_v1.DeleteBackupRequestList{ListMeta: obj.(*ark_v1.DeleteBackupRequestList).ListMeta}
-	for _, item := range obj.(*ark_v1.DeleteBackupRequestList).Items {
+	list := &arkv1.DeleteBackupRequestList{ListMeta: obj.(*arkv1.DeleteBackupRequestList).ListMeta}
+	for _, item := range obj.(*arkv1.DeleteBackupRequestList).Items {
 		if label.Matches(labels.Set(item.Labels)) {
 			list.Items = append(list.Items, item)
 		}
@@ -79,43 +79,43 @@ func (c *FakeDeleteBackupRequests) Watch(opts v1.ListOptions) (watch.Interface, 
 }
 
 // Create takes the representation of a deleteBackupRequest and creates it.  Returns the server's representation of the deleteBackupRequest, and an error, if there is any.
-func (c *FakeDeleteBackupRequests) Create(deleteBackupRequest *ark_v1.DeleteBackupRequest) (result *ark_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Create(deleteBackupRequest *arkv1.DeleteBackupRequest) (result *arkv1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewCreateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &arkv1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DeleteBackupRequest), err
+	return obj.(*arkv1.DeleteBackupRequest), err
 }
 
 // Update takes the representation of a deleteBackupRequest and updates it. Returns the server's representation of the deleteBackupRequest, and an error, if there is any.
-func (c *FakeDeleteBackupRequests) Update(deleteBackupRequest *ark_v1.DeleteBackupRequest) (result *ark_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Update(deleteBackupRequest *arkv1.DeleteBackupRequest) (result *arkv1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewUpdateAction(deletebackuprequestsResource, c.ns, deleteBackupRequest), &arkv1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DeleteBackupRequest), err
+	return obj.(*arkv1.DeleteBackupRequest), err
 }
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeDeleteBackupRequests) UpdateStatus(deleteBackupRequest *ark_v1.DeleteBackupRequest) (*ark_v1.DeleteBackupRequest, error) {
+func (c *FakeDeleteBackupRequests) UpdateStatus(deleteBackupRequest *arkv1.DeleteBackupRequest) (*arkv1.DeleteBackupRequest, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(deletebackuprequestsResource, "status", c.ns, deleteBackupRequest), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewUpdateSubresourceAction(deletebackuprequestsResource, "status", c.ns, deleteBackupRequest), &arkv1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DeleteBackupRequest), err
+	return obj.(*arkv1.DeleteBackupRequest), err
 }
 
 // Delete takes name of the deleteBackupRequest and deletes it. Returns an error if one occurs.
 func (c *FakeDeleteBackupRequests) Delete(name string, options *v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(deletebackuprequestsResource, c.ns, name), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewDeleteAction(deletebackuprequestsResource, c.ns, name), &arkv1.DeleteBackupRequest{})
 
 	return err
 }
@@ -124,17 +124,17 @@ func (c *FakeDeleteBackupRequests) Delete(name string, options *v1.DeleteOptions
 func (c *FakeDeleteBackupRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
 	action := testing.NewDeleteCollectionAction(deletebackuprequestsResource, c.ns, listOptions)
 
-	_, err := c.Fake.Invokes(action, &ark_v1.DeleteBackupRequestList{})
+	_, err := c.Fake.Invokes(action, &arkv1.DeleteBackupRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched deleteBackupRequest.
-func (c *FakeDeleteBackupRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *ark_v1.DeleteBackupRequest, err error) {
+func (c *FakeDeleteBackupRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *arkv1.DeleteBackupRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(deletebackuprequestsResource, c.ns, name, data, subresources...), &ark_v1.DeleteBackupRequest{})
+		Invokes(testing.NewPatchSubresourceAction(deletebackuprequestsResource, c.ns, name, data, subresources...), &arkv1.DeleteBackupRequest{})
 
 	if obj == nil {
 		return nil, err
 	}
-	return obj.(*ark_v1.DeleteBackupRequest), err
+	return obj.(*arkv1.DeleteBackupRequest), err
 }
