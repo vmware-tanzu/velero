@@ -27,6 +27,22 @@ func DescribeSchedule(schedule *v1.Schedule) string {
 		d.DescribeMetadata(schedule.ObjectMeta)
 
 		d.Println()
+		phase := schedule.Status.Phase
+		if phase == "" {
+			phase = v1.SchedulePhaseNew
+		}
+		d.Printf("Phase:\t%s\n", phase)
+
+		status := schedule.Status
+		if len(status.ValidationErrors) > 0 {
+			d.Println()
+			d.Printf("Validation errors:")
+			for _, ve := range status.ValidationErrors {
+				d.Printf("\t%s\n", ve)
+			}
+		}
+
+		d.Println()
 		DescribeScheduleSpec(d, schedule.Spec)
 
 		d.Println()
@@ -45,21 +61,6 @@ func DescribeScheduleSpec(d *Describer, spec v1.ScheduleSpec) {
 }
 
 func DescribeScheduleStatus(d *Describer, status v1.ScheduleStatus) {
-	phase := status.Phase
-	if phase == "" {
-		phase = v1.SchedulePhaseNew
-	}
-
-	d.Printf("Validation errors:")
-	if len(status.ValidationErrors) == 0 {
-		d.Printf("\t<none>\n")
-	} else {
-		for _, ve := range status.ValidationErrors {
-			d.Printf("\t%s\n", ve)
-		}
-	}
-
-	d.Println()
 	lastBackup := "<never>"
 	if !status.LastBackup.Time.IsZero() {
 		lastBackup = fmt.Sprintf("%v", status.LastBackup.Time)

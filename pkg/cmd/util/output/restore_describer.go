@@ -34,6 +34,19 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		d.DescribeMetadata(restore.ObjectMeta)
 
 		d.Println()
+		d.Printf("Phase:\t%s\n", restore.Status.Phase)
+
+		if len(restore.Status.ValidationErrors) > 0 {
+			d.Println()
+			d.Printf("Validation errors:")
+			for _, ve := range restore.Status.ValidationErrors {
+				d.Printf("\t%s\n", ve)
+			}
+		}
+
+		describeRestoreResults(d, restore, veleroClient)
+
+		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)
 
 		d.Println()
@@ -82,22 +95,6 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		d.Println()
 		d.Printf("Restore PVs:\t%s\n", BoolPointerString(restore.Spec.RestorePVs, "false", "true", "auto"))
 
-		d.Println()
-		d.Printf("Phase:\t%s\n", restore.Status.Phase)
-
-		d.Println()
-		d.Printf("Validation errors:")
-		if len(restore.Status.ValidationErrors) == 0 {
-			d.Printf("\t<none>\n")
-		} else {
-			for _, ve := range restore.Status.ValidationErrors {
-				d.Printf("\t%s\n", ve)
-			}
-		}
-
-		d.Println()
-		describeRestoreResults(d, restore, veleroClient)
-
 		if len(podVolumeRestores) > 0 {
 			d.Println()
 			describePodVolumeRestores(d, podVolumeRestores, details)
@@ -107,7 +104,6 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 
 func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
-		d.Printf("Warnings:\t<none>\nErrors:\t<none>\n")
 		return
 	}
 
@@ -124,9 +120,14 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 		return
 	}
 
-	describeRestoreResult(d, "Warnings", resultMap["warnings"])
-	d.Println()
-	describeRestoreResult(d, "Errors", resultMap["errors"])
+	if restore.Status.Warnings > 0 {
+		d.Println()
+		describeRestoreResult(d, "Warnings", resultMap["warnings"])
+	}
+	if restore.Status.Errors > 0 {
+		d.Println()
+		describeRestoreResult(d, "Errors", resultMap["errors"])
+	}
 }
 
 func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
