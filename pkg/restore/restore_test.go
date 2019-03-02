@@ -1012,9 +1012,6 @@ status:
 				})
 			}
 
-			pvWatch := new(mockWatch)
-			defer pvWatch.AssertExpectations(t)
-
 			unstructuredPVMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvObj)
 			require.NoError(t, err)
 			unstructuredPV := &unstructured.Unstructured{Object: unstructuredPVMap}
@@ -1049,16 +1046,6 @@ status:
 			if test.expectPVCreation {
 				createdPV := unstructuredPV.DeepCopy()
 				pvClient.On("Create", unstructuredPV).Return(createdPV, nil)
-
-				pvClient.On("Watch", metav1.ListOptions{}).Return(pvWatch, nil)
-				pvWatchChan := make(chan watch.Event, 1)
-				readyPV := restoredPV.DeepCopy()
-				require.NoError(t, unstructured.SetNestedField(readyPV.UnstructuredContent(), string(v1.VolumeAvailable), "status", "phase"))
-				pvWatchChan <- watch.Event{
-					Type:   watch.Modified,
-					Object: readyPV,
-				}
-				pvWatch.On("ResultChan").Return(pvWatchChan)
 			}
 
 			// Restore PV
@@ -1099,8 +1086,6 @@ status:
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
 			assert.Equal(t, api.RestoreResult{}, errors)
-
-			ctx.resourceWaitGroup.Wait()
 		})
 	}
 }
@@ -1300,46 +1285,6 @@ func TestIsCompleted(t *testing.T) {
 			if assert.Equal(t, test.expectedErr, err != nil) {
 				assert.Equal(t, test.expected, backup)
 			}
-		})
-	}
-}
-
-func TestIsPVReady(t *testing.T) {
-	tests := []struct {
-		name     string
-		obj      *unstructured.Unstructured
-		expected bool
-	}{
-		{
-			name:     "no status returns not ready",
-			obj:      NewTestUnstructured().Unstructured,
-			expected: false,
-		},
-		{
-			name:     "no status.phase returns not ready",
-			obj:      NewTestUnstructured().WithStatus().Unstructured,
-			expected: false,
-		},
-		{
-			name:     "empty status.phase returns not ready",
-			obj:      NewTestUnstructured().WithStatusField("phase", "").Unstructured,
-			expected: false,
-		},
-		{
-			name:     "non-Available status.phase returns not ready",
-			obj:      NewTestUnstructured().WithStatusField("phase", "foo").Unstructured,
-			expected: false,
-		},
-		{
-			name:     "Available status.phase returns ready",
-			obj:      NewTestUnstructured().WithStatusField("phase", "Available").Unstructured,
-			expected: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, isPVReady(test.obj))
 		})
 	}
 }
