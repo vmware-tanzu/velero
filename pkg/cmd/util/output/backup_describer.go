@@ -49,6 +49,15 @@ func DescribeBackup(
 		}
 		d.Printf("Phase:\t%s\n", phase)
 
+		status := backup.Status
+		if len(status.ValidationErrors) > 0 {
+			d.Println()
+			d.Printf("Validation errors:")
+			for _, ve := range status.ValidationErrors {
+				d.Printf("\t%s\n", ve)
+			}
+		}
+
 		d.Println()
 		DescribeBackupSpec(d, backup.Spec)
 
@@ -201,16 +210,6 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
 	d.Println()
 
-	d.Printf("Validation errors:")
-	if len(status.ValidationErrors) == 0 {
-		d.Printf("\t<none>\n")
-	} else {
-		for _, ve := range status.ValidationErrors {
-			d.Printf("\t%s\n", ve)
-		}
-	}
-
-	d.Println()
 	if len(status.VolumeBackups) > 0 {
 		// pre-v0.10 backup
 		d.Printf("Persistent Volumes:\n")
