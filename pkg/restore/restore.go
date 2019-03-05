@@ -17,8 +17,6 @@ limitations under the License.
 package restore
 
 import (
-	"archive/tar"
-	"compress/gzip"
 	go_context "context"
 	"encoding/json"
 	"fmt"
@@ -264,6 +262,10 @@ func (kr *kubernetesRestorer) Restore(
 		pvRestorer:                 pvRestorer,
 		volumeSnapshots:            volumeSnapshots,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
+		extractor: &backupExtractor{
+			log:        log,
+			fileSystem: kr.fileSystem,
+		},
 	}
 
 	return restoreCtx.execute()
@@ -350,12 +352,13 @@ type context struct {
 	pvRestorer                 PVRestorer
 	volumeSnapshots            []*volume.Snapshot
 	resourceTerminatingTimeout time.Duration
+	extractor                  *backupExtractor
 }
 
 func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
-	dir, err := ctx.unzipAndExtractBackup(ctx.backupReader)
+	dir, err := ctx.extractor.unzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
 		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
@@ -1139,71 +1142,4 @@ func (ctx *context) unmarshal(filePath string) (*unstructured.Unstructured, erro
 	}
 
 	return &obj, nil
-}
-
-// unzipAndExtractBackup extracts a reader on a gzipped tarball to a local temp directory
-func (ctx *context) unzipAndExtractBackup(src io.Reader) (string, error) {
-	gzr, err := gzip.NewReader(src)
-	if err != nil {
-		ctx.log.Infof("error creating gzip reader: %v", err)
-		return "", err
-	}
-	defer gzr.Close()
-
-	return ctx.readBackup(tar.NewReader(gzr))
-}
-
-// readBackup extracts a tar reader to a local directory/file tree within a
-// temp directory.
-func (ctx *context) readBackup(tarRdr *tar.Reader) (string, error) {
-	dir, err := ctx.fileSystem.TempDir("", "")
-	if err != nil {
-		ctx.log.Infof("error creating temp dir: %v", err)
-		return "", err
-	}
-
-	for {
-		header, err := tarRdr.Next()
-
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			ctx.log.Infof("error reading tar: %v", err)
-			return "", err
-		}
-
-		target := filepath.Join(dir, header.Name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			err := ctx.fileSystem.MkdirAll(target, header.FileInfo().Mode())
-			if err != nil {
-				ctx.log.Infof("mkdirall error: %v", err)
-				return "", err
-			}
-
-		case tar.TypeReg:
-			// make sure we have the directory created
-			err := ctx.fileSystem.MkdirAll(filepath.Dir(target), header.FileInfo().Mode())
-			if err != nil {
-				ctx.log.Infof("mkdirall error: %v", err)
-				return "", err
-			}
-
-			// create the file
-			file, err := ctx.fileSystem.Create(target)
-			if err != nil {
-				return "", err
-			}
-			defer file.Close()
-
-			if _, err := io.Copy(file, tarRdr); err != nil {
-				ctx.log.Infof("error copying: %v", err)
-				return "", err
-			}
-		}
-	}
-
-	return dir, nil
 }
