@@ -46,6 +46,19 @@ func (e *backupExtractor) unzipAndExtractBackup(src io.Reader) (string, error) {
 	return e.readBackup(tar.NewReader(gzr))
 }
 
+func (e *backupExtractor) writeFile(target string, tarRdr *tar.Reader) error {
+	file, err := e.fileSystem.Create(target)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, tarRdr); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (e *backupExtractor) readBackup(tarRdr *tar.Reader) (string, error) {
 	dir, err := e.fileSystem.TempDir("", "")
 	if err != nil {
@@ -83,13 +96,7 @@ func (e *backupExtractor) readBackup(tarRdr *tar.Reader) (string, error) {
 			}
 
 			// create the file
-			file, err := e.fileSystem.Create(target)
-			if err != nil {
-				return "", err
-			}
-			defer file.Close()
-
-			if _, err := io.Copy(file, tarRdr); err != nil {
+			if err := e.writeFile(target, tarRdr); err != nil {
 				e.log.Infof("error copying: %v", err)
 				return "", err
 			}
