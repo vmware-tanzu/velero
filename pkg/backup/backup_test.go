@@ -38,6 +38,7 @@ import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -54,19 +55,19 @@ var (
 )
 
 type fakeAction struct {
-	selector        ResourceSelector
+	selector        velero.ResourceSelector
 	ids             []string
 	backups         []v1.Backup
-	additionalItems []ResourceIdentifier
+	additionalItems []velero.ResourceIdentifier
 }
 
-var _ ItemAction = &fakeAction{}
+var _ velero.BackupItemAction = &fakeAction{}
 
 func newFakeAction(resource string) *fakeAction {
 	return (&fakeAction{}).ForResource(resource)
 }
 
-func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
 		return item, a.additionalItems, err
@@ -77,7 +78,7 @@ func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runt
 	return item, a.additionalItems, nil
 }
 
-func (a *fakeAction) AppliesTo() (ResourceSelector, error) {
+func (a *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
@@ -89,34 +90,34 @@ func (a *fakeAction) ForResource(resource string) *fakeAction {
 func TestResolveActions(t *testing.T) {
 	tests := []struct {
 		name                string
-		input               []ItemAction
+		input               []velero.BackupItemAction
 		expected            []resolvedAction
 		resourcesWithErrors []string
 		expectError         bool
 	}{
 		{
 			name:     "empty input",
-			input:    []ItemAction{},
+			input:    []velero.BackupItemAction{},
 			expected: nil,
 		},
 		{
 			name:        "resolve error",
-			input:       []ItemAction{&fakeAction{selector: ResourceSelector{LabelSelector: "=invalid-selector"}}},
+			input:       []velero.BackupItemAction{&fakeAction{selector: velero.ResourceSelector{LabelSelector: "=invalid-selector"}}},
 			expected:    nil,
 			expectError: true,
 		},
 		{
 			name:  "resolved",
-			input: []ItemAction{newFakeAction("foo"), newFakeAction("bar")},
+			input: []velero.BackupItemAction{newFakeAction("foo"), newFakeAction("bar")},
 			expected: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("foo"),
+					BackupItemAction:          newFakeAction("foo"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foodies.somegroup"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
 				},
 				{
-					ItemAction:                newFakeAction("bar"),
+					BackupItemAction:          newFakeAction("bar"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("barnacles.anothergroup"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),

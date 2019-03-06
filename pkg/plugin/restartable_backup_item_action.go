@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // restartableBackupItemAction is a backup item action for a given implementation (such as "pod"). It is associated with
@@ -43,22 +43,22 @@ func newRestartableBackupItemAction(name string, sharedPluginProcess Restartable
 
 // getBackupItemAction returns the backup item action for this restartableBackupItemAction. It does *not* restart the
 // plugin process.
-func (r *restartableBackupItemAction) getBackupItemAction() (backup.ItemAction, error) {
+func (r *restartableBackupItemAction) getBackupItemAction() (velero.BackupItemAction, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	backupItemAction, ok := plugin.(backup.ItemAction)
+	backupItemAction, ok := plugin.(velero.BackupItemAction)
 	if !ok {
-		return nil, errors.Errorf("%T is not a backup.ItemAction!", plugin)
+		return nil, errors.Errorf("%T is not a BackupItemAction!", plugin)
 	}
 
 	return backupItemAction, nil
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the backup item action for this restartableBackupItemAction.
-func (r *restartableBackupItemAction) getDelegate() (backup.ItemAction, error) {
+func (r *restartableBackupItemAction) getDelegate() (velero.BackupItemAction, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -67,17 +67,17 @@ func (r *restartableBackupItemAction) getDelegate() (backup.ItemAction, error) {
 }
 
 // AppliesTo restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) AppliesTo() (backup.ResourceSelector, error) {
+func (r *restartableBackupItemAction) AppliesTo() (velero.ResourceSelector, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
-		return backup.ResourceSelector{}, err
+		return velero.ResourceSelector{}, err
 	}
 
 	return delegate.AppliesTo()
 }
 
 // Execute restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []backup.ResourceIdentifier, error) {
+func (r *restartableBackupItemAction) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, nil, err

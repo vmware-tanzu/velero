@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/backup/mocks"
 	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -93,7 +93,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 		backup              []byte
 		item                []byte
 		implUpdatedItem     runtime.Unstructured
-		implAdditionalItems []backup.ResourceIdentifier
+		implAdditionalItems []velero.ResourceIdentifier
 		implError           error
 		expectError         bool
 		skipMock            bool
@@ -129,7 +129,7 @@ func TestBackupItemActionGRPCServerExecute(t *testing.T) {
 			item:            validItem,
 			backup:          validBackup,
 			implUpdatedItem: &validItemObject,
-			implAdditionalItems: []backup.ResourceIdentifier{
+			implAdditionalItems: []velero.ResourceIdentifier{
 				{
 					GroupResource: schema.GroupResource{Group: "v1", Resource: "pods"},
 					Namespace:     "myns",

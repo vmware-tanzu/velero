@@ -26,17 +26,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
-type resticRestoreAction struct {
+type ResticRestoreAction struct {
 	logger             logrus.FieldLogger
 	initContainerImage string
 }
 
-func NewResticRestoreAction(logger logrus.FieldLogger) ItemAction {
-	return &resticRestoreAction{
+func NewResticRestoreAction(logger logrus.FieldLogger) *ResticRestoreAction {
+	return &ResticRestoreAction{
 		logger:             logger,
 		initContainerImage: initContainerImage(),
 	}
@@ -52,15 +53,15 @@ func initContainerImage() string {
 	return fmt.Sprintf("gcr.io/heptio-images/velero-restic-restore-helper:%s", tag)
 }
 
-func (a *resticRestoreAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *ResticRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}, nil
 }
 
-func (a *resticRestoreAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
-	a.logger.Info("Executing resticRestoreAction")
-	defer a.logger.Info("Done executing resticRestoreAction")
+func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	a.logger.Info("Executing ResticRestoreAction")
+	defer a.logger.Info("Done executing ResticRestoreAction")
 
 	var pod corev1.Pod
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &pod); err != nil {
@@ -72,7 +73,7 @@ func (a *resticRestoreAction) Execute(input *RestoreItemActionExecuteInput) (*Re
 	volumeSnapshots := restic.GetPodSnapshotAnnotations(&pod)
 	if len(volumeSnapshots) == 0 {
 		log.Debug("No restic snapshot ID annotations found")
-		return NewRestoreItemActionExecuteOutput(input.Item), nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log.Info("Restic snapshot ID annotations found")
@@ -120,5 +121,5 @@ func (a *resticRestoreAction) Execute(input *RestoreItemActionExecuteInput) (*Re
 		return nil, errors.Wrap(err, "unable to convert pod to runtime.Unstructured")
 	}
 
-	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

@@ -42,6 +42,7 @@ import (
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
 	"github.com/heptio/velero/pkg/plugin"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -50,7 +51,7 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []pkgbackup.ItemAction, blockStoreGetter pkgbackup.BlockStoreGetter) error {
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, blockStoreGetter pkgbackup.BlockStoreGetter) error {
 	args := b.Called(logger, backup, backupFile, actions, blockStoreGetter)
 	return args.Error(0)
 }
@@ -314,7 +315,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 
-			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []pkgbackup.ItemAction(nil), pluginManager).Return(nil)
+			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
 
 			// Ensure we have a CompletionTimestamp when uploading.
 			// Failures will display the bytes in buf.

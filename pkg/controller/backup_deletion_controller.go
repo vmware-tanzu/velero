@@ -34,12 +34,12 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
 )
@@ -270,7 +270,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 			} else {
-				blockStores := make(map[string]cloudprovider.BlockStore)
+				blockStores := make(map[string]velero.BlockStore)
 
 				for _, snapshot := range snapshots {
 					log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
@@ -365,7 +365,7 @@ func blockStoreForSnapshotLocation(
 	namespace, snapshotLocationName string,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	pluginManager plugin.Manager,
-) (cloudprovider.BlockStore, error) {
+) (velero.BlockStore, error) {
 	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", snapshotLocationName)

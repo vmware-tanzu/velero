@@ -19,7 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // restartableBlockStore is an object store for a given implementation (such as "aws"). It is associated with
@@ -48,31 +48,31 @@ func newRestartableBlockStore(name string, sharedPluginProcess RestartableProces
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
 func (r *restartableBlockStore) reinitialize(dispensed interface{}) error {
-	blockStore, ok := dispensed.(cloudprovider.BlockStore)
+	blockStore, ok := dispensed.(velero.BlockStore)
 	if !ok {
-		return errors.Errorf("%T is not a cloudprovider.BlockStore!", dispensed)
+		return errors.Errorf("%T is not a BlockStore!", dispensed)
 	}
 	return r.init(blockStore, r.config)
 }
 
 // getBlockStore returns the block store for this restartableBlockStore. It does *not* restart the
 // plugin process.
-func (r *restartableBlockStore) getBlockStore() (cloudprovider.BlockStore, error) {
+func (r *restartableBlockStore) getBlockStore() (velero.BlockStore, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	blockStore, ok := plugin.(cloudprovider.BlockStore)
+	blockStore, ok := plugin.(velero.BlockStore)
 	if !ok {
-		return nil, errors.Errorf("%T is not a cloudprovider.BlockStore!", plugin)
+		return nil, errors.Errorf("%T is not a BlockStore!", plugin)
 	}
 
 	return blockStore, nil
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the block store for this restartableBlockStore.
-func (r *restartableBlockStore) getDelegate() (cloudprovider.BlockStore, error) {
+func (r *restartableBlockStore) getDelegate() (velero.BlockStore, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (r *restartableBlockStore) Init(config map[string]string) error {
 
 // init calls Init on blockStore with config. This is split out from Init() so that both Init() and reinitialize() may
 // call it using a specific BlockStore.
-func (r *restartableBlockStore) init(blockStore cloudprovider.BlockStore, config map[string]string) error {
+func (r *restartableBlockStore) init(blockStore velero.BlockStore, config map[string]string) error {
 	return blockStore.Init(config)
 }
 

@@ -79,7 +79,7 @@ func (r *process) dispense(key kindAndName) (interface{}, error) {
 		if key.name == "" {
 			return nil, errors.Errorf("%s plugin requested but name is missing", key.kind.String())
 		}
-		// Get the instance that implements our plugin interface (e.g. cloudprovider.ObjectStore) that is a gRPC-based
+		// Get the instance that implements our plugin interface (e.g. ObjectStore) that is a gRPC-based
 		// client
 		dispensed = clientDispenser.clientFor(key.name)
 	}

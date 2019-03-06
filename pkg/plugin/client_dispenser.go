@@ -37,7 +37,7 @@ type clientDispenser struct {
 	logger logrus.FieldLogger
 	// clienConn is shared among all implementations for this client.
 	clientConn *grpc.ClientConn
-	// initFunc returns a client that implements a plugin interface, such as cloudprovider.ObjectStore.
+	// initFunc returns a client that implements a plugin interface, such as ObjectStore.
 	initFunc clientInitFunc
 	// clients keeps track of all the initialized implementations.
 	clients map[string]interface{}

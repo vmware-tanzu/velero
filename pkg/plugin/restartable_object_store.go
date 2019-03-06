@@ -21,7 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // restartableObjectStore is an object store for a given implementation (such as "aws"). It is associated with
@@ -52,9 +52,9 @@ func newRestartableObjectStore(name string, sharedPluginProcess RestartableProce
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
 func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
-	objectStore, ok := dispensed.(cloudprovider.ObjectStore)
+	objectStore, ok := dispensed.(velero.ObjectStore)
 	if !ok {
-		return errors.Errorf("%T is not a cloudprovider.ObjectStore!", dispensed)
+		return errors.Errorf("%T is not a ObjectStore!", dispensed)
 	}
 
 	return r.init(objectStore, r.config)
@@ -62,22 +62,22 @@ func (r *restartableObjectStore) reinitialize(dispensed interface{}) error {
 
 // getObjectStore returns the object store for this restartableObjectStore. It does *not* restart the
 // plugin process.
-func (r *restartableObjectStore) getObjectStore() (cloudprovider.ObjectStore, error) {
+func (r *restartableObjectStore) getObjectStore() (velero.ObjectStore, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	objectStore, ok := plugin.(cloudprovider.ObjectStore)
+	objectStore, ok := plugin.(velero.ObjectStore)
 	if !ok {
-		return nil, errors.Errorf("%T is not a cloudprovider.ObjectStore!", plugin)
+		return nil, errors.Errorf("%T is not a ObjectStore!", plugin)
 	}
 
 	return objectStore, nil
 }
 
 // getDelegate restarts the plugin process (if needed) and returns the object store for this restartableObjectStore.
-func (r *restartableObjectStore) getDelegate() (cloudprovider.ObjectStore, error) {
+func (r *restartableObjectStore) getDelegate() (velero.ObjectStore, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (r *restartableObjectStore) Init(config map[string]string) error {
 
 // init calls Init on objectStore with config. This is split out from Init() so that both Init() and reinitialize() may
 // call it using a specific ObjectStore.
-func (r *restartableObjectStore) init(objectStore cloudprovider.ObjectStore, config map[string]string) error {
+func (r *restartableObjectStore) init(objectStore velero.ObjectStore, config map[string]string) error {
 	return objectStore.Init(config)
 }
 

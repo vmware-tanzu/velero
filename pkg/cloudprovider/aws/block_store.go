@@ -32,8 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const regionKey = "region"
@@ -43,7 +41,7 @@ const regionKey = "region"
 // from snapshot.
 var iopsVolumeTypes = sets.NewString("io1")
 
-type blockStore struct {
+type BlockStore struct {
 	log logrus.FieldLogger
 	ec2 *ec2.EC2
 }
@@ -61,11 +59,11 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
-	return &blockStore{log: logger}
+func NewBlockStore(logger logrus.FieldLogger) *BlockStore {
+	return &BlockStore{log: logger}
 }
 
-func (b *blockStore) Init(config map[string]string) error {
+func (b *BlockStore) Init(config map[string]string) error {
 	region := config[regionKey]
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)
@@ -83,7 +81,7 @@ func (b *blockStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	// describe the snapshot so we can apply its tags to the volume
 	snapReq := &ec2.DescribeSnapshotsInput{
 		SnapshotIds: []*string{&snapshotID},
@@ -124,7 +122,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return *res.VolumeId, nil
 }
 
-func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
 		return "", nil, err
@@ -146,7 +144,7 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return volumeType, iops, nil
 }
 
-func (b *blockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
+func (b *BlockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -162,7 +160,7 @@ func (b *blockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 	return res.Volumes[0], nil
 }
 
-func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// describe the volume so we can copy its tags to the snapshot
 	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
@@ -234,7 +232,7 @@ func ec2Tag(key, val string) *ec2.Tag {
 	return &ec2.Tag{Key: &key, Value: &val}
 }
 
-func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
 	req := &ec2.DeleteSnapshotInput{
 		SnapshotId: &snapshotID,
 	}
@@ -256,7 +254,7 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
 
-func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return "", errors.WithStack(err)
@@ -273,7 +271,7 @@ func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	return ebsVolumeIDRegex.FindString(pv.Spec.AWSElasticBlockStore.VolumeID), nil
 }
 
-func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *BlockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return nil, errors.WithStack(err)

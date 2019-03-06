@@ -45,6 +45,7 @@ import (
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
 	"github.com/heptio/velero/pkg/plugin"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -922,7 +923,7 @@ func (r *fakeRestorer) Restore(
 	backup *api.Backup,
 	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
-	actions []restore.ItemAction,
+	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	blockStoreGetter restore.BlockStoreGetter,
 ) (api.RestoreResult, api.RestoreResult) {

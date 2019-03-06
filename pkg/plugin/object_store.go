@@ -25,8 +25,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
 	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 const byteChunkSize = 16384
@@ -56,7 +56,7 @@ func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) 
 
 }
 
-// ObjectStoreGRPCClient implements the cloudprovider.ObjectStore interface and uses a
+// ObjectStoreGRPCClient implements the ObjectStore interface and uses a
 // gRPC client to make calls to the plugin server.
 type ObjectStoreGRPCClient struct {
 	*clientBase
@@ -199,13 +199,13 @@ type ObjectStoreGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore, error) {
+func (s *ObjectStoreGRPCServer) getImpl(name string) (velero.ObjectStore, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(cloudprovider.ObjectStore)
+	itemAction, ok := impl.(velero.ObjectStore)
 	if !ok {
 		return nil, errors.Errorf("%T is not an object store", impl)
 	}

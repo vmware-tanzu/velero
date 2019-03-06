@@ -44,10 +44,10 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/filesystem"
@@ -57,7 +57,7 @@ import (
 )
 
 type BlockStoreGetter interface {
-	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+	GetBlockStore(name string) (velero.BlockStore, error)
 }
 
 // Restorer knows how to restore a backup.
@@ -68,7 +68,7 @@ type Restorer interface {
 		backup *api.Backup,
 		volumeSnapshots []*volume.Snapshot,
 		backupReader io.Reader,
-		actions []ItemAction,
+		actions []velero.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		blockStoreGetter BlockStoreGetter,
 	) (api.RestoreResult, api.RestoreResult)
@@ -178,7 +178,7 @@ func (kr *kubernetesRestorer) Restore(
 	backup *api.Backup,
 	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
-	actions []ItemAction,
+	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	blockStoreGetter BlockStoreGetter,
 ) (api.RestoreResult, api.RestoreResult) {
@@ -287,14 +287,14 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 }
 
 type resolvedAction struct {
-	ItemAction
+	velero.RestoreItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
 	selector                  labels.Selector
 }
 
-func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {
@@ -314,7 +314,7 @@ func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAc
 		}
 
 		res := resolvedAction{
-			ItemAction:                action,
+			RestoreItemAction:         action,
 			resourceIncludesExcludes:  resources,
 			namespaceIncludesExcludes: namespaces,
 			selector:                  selector,
@@ -834,7 +834,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 			ctx.log.Infof("Executing item action for %v", &groupResource)
 
-			executeOutput, err := action.Execute(&RestoreItemActionExecuteInput{
+			executeOutput, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 				Item:           obj,
 				ItemFromBackup: itemFromBackup,
 				Restore:        ctx.restore,

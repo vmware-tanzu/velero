@@ -33,8 +33,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-
-	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const (
@@ -42,17 +40,17 @@ const (
 	zoneSeparator = "__"
 )
 
-type blockStore struct {
+type BlockStore struct {
 	gce     *compute.Service
 	project string
 	log     logrus.FieldLogger
 }
 
-func NewBlockStore(logger logrus.FieldLogger) cloudprovider.BlockStore {
-	return &blockStore{log: logger}
+func NewBlockStore(logger logrus.FieldLogger) *BlockStore {
+	return &BlockStore{log: logger}
 }
 
-func (b *blockStore) Init(config map[string]string) error {
+func (b *BlockStore) Init(config map[string]string) error {
 	project, err := extractProjectFromCreds()
 	if err != nil {
 		return err
@@ -127,7 +125,7 @@ func parseRegion(volumeAZ string) (string, error) {
 }
 
 // Retrieve the URLs for zones via the GCP API.
-func (b *blockStore) getZoneURLs(volumeAZ string) ([]string, error) {
+func (b *BlockStore) getZoneURLs(volumeAZ string) ([]string, error) {
 	zones := strings.Split(volumeAZ, zoneSeparator)
 	var zoneURLs []string
 	for _, z := range zones {
@@ -142,7 +140,7 @@ func (b *blockStore) getZoneURLs(volumeAZ string) ([]string, error) {
 	return zoneURLs, nil
 }
 
-func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	// get the snapshot so we can apply its tags to the volume
 	res, err := b.gce.Snapshots.Get(b.project, snapshotID).Do()
 	if err != nil {
@@ -187,7 +185,7 @@ func (b *blockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return disk.Name, nil
 }
 
-func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	var (
 		res *compute.Disk
 		err error
@@ -211,7 +209,7 @@ func (b *blockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return res.Type, nil, nil
 }
 
-func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// snapshot names must adhere to RFC1035 and be 1-63 characters
 	// long
 	var snapshotName string
@@ -234,7 +232,7 @@ func (b *blockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	}
 }
 
-func (b *blockStore) createSnapshot(snapshotName, volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *BlockStore) createSnapshot(snapshotName, volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -253,7 +251,7 @@ func (b *blockStore) createSnapshot(snapshotName, volumeID, volumeAZ string, tag
 	return gceSnap.Name, nil
 }
 
-func (b *blockStore) createRegionSnapshot(snapshotName, volumeID, volumeRegion string, tags map[string]string) (string, error) {
+func (b *BlockStore) createRegionSnapshot(snapshotName, volumeID, volumeRegion string, tags map[string]string) (string, error) {
 	disk, err := b.gce.RegionDisks.Get(b.project, volumeRegion, volumeID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -306,7 +304,7 @@ func getSnapshotTags(veleroTags map[string]string, diskDescription string, log l
 	return string(tagsJSON)
 }
 
-func (b *blockStore) DeleteSnapshot(snapshotID string) error {
+func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
 	_, err := b.gce.Snapshots.Delete(b.project, snapshotID).Do()
 
 	// if it's a 404 (not found) error, we don't need to return an error
@@ -321,7 +319,7 @@ func (b *blockStore) DeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return "", errors.WithStack(err)
@@ -338,7 +336,7 @@ func (b *blockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	return pv.Spec.GCEPersistentDisk.PDName, nil
 }
 
-func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *BlockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return nil, errors.WithStack(err)

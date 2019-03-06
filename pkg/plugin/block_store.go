@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
 	proto "github.com/heptio/velero/pkg/plugin/generated"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // BlockStorePlugin is an implementation of go-plugin's Plugin
@@ -203,13 +203,13 @@ type BlockStoreGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *BlockStoreGRPCServer) getImpl(name string) (cloudprovider.BlockStore, error) {
+func (s *BlockStoreGRPCServer) getImpl(name string) (velero.BlockStore, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	blockStore, ok := impl.(cloudprovider.BlockStore)
+	blockStore, ok := impl.(velero.BlockStore)
 	if !ok {
 		return nil, errors.Errorf("%T is not a block store", impl)
 	}

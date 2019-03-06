@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -33,7 +34,7 @@ func TestPodActionAppliesTo(t *testing.T) {
 	actual, err := a.AppliesTo()
 	require.NoError(t, err)
 
-	expected := ResourceSelector{
+	expected := velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}
 	assert.Equal(t, expected, actual)
@@ -43,7 +44,7 @@ func TestPodActionExecute(t *testing.T) {
 	tests := []struct {
 		name     string
 		pod      runtime.Unstructured
-		expected []ResourceIdentifier
+		expected []velero.ResourceIdentifier
 	}{
 		{
 			name: "no spec.volumes",
@@ -109,7 +110,7 @@ func TestPodActionExecute(t *testing.T) {
 				}
 			}
 			`),
-			expected: []ResourceIdentifier{
+			expected: []velero.ResourceIdentifier{
 				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim1"},
 				{GroupResource: kuberesource.PersistentVolumeClaims, Namespace: "foo", Name: "claim2"},
 			},

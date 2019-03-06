@@ -43,7 +43,7 @@ func TestRestartableGetBlockStore(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a cloudprovider.BlockStore!",
+			expectedError: "int is not a BlockStore!",
 		},
 		{
 			name:   "happy path",
@@ -93,7 +93,7 @@ func TestRestartableBlockStoreReinitialize(t *testing.T) {
 	}
 
 	err := r.reinitialize(3)
-	assert.EqualError(t, err, "int is not a cloudprovider.BlockStore!")
+	assert.EqualError(t, err, "int is not a BlockStore!")
 
 	blockStore := new(mocks.BlockStore)
 	blockStore.Test(t)

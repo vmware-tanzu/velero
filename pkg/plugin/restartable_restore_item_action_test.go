@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore/mocks"
 )
 
@@ -44,7 +44,7 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a restore.ItemAction!",
+			expectedError: "int is not a RestoreItemAction!",
 		},
 		{
 			name:   "happy path",
@@ -104,13 +104,13 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	input := &restore.RestoreItemActionExecuteInput{
+	input := &velero.RestoreItemActionExecuteInput{
 		Item:           pv,
 		ItemFromBackup: pv,
 		Restore:        new(v1.Restore),
 	}
 
-	output := &restore.RestoreItemActionExecuteOutput{
+	output := &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"color": "green",
@@ -134,8 +134,8 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 		restartableDelegateTest{
 			function:                "AppliesTo",
 			inputs:                  []interface{}{},
-			expectedErrorOutputs:    []interface{}{restore.ResourceSelector{}, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{restore.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+			expectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
 		restartableDelegateTest{
 			function:                "Execute",

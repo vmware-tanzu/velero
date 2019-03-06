@@ -39,10 +39,10 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -462,7 +462,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("configmaps"),
+					RestoreItemAction:         newFakeAction("configmaps"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -478,7 +478,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("foo-resource"),
+					RestoreItemAction:         newFakeAction("foo-resource"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -1805,7 +1805,7 @@ type fakeBlockStoreGetter struct {
 	volumeID       string
 }
 
-func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (velero.BlockStore, error) {
 	if r.fakeBlockStore == nil {
 		r.fakeBlockStore = &velerotest.FakeBlockStore{
 			RestorableVolumes: r.volumeMap,
@@ -1819,13 +1819,13 @@ func newFakeAction(resource string) *fakeAction {
 	return &fakeAction{resource}
 }
 
-func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (r *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{r.resource},
 	}, nil
 }
 
-func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+func (r *fakeAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	labels, found, err := unstructured.NestedMap(input.Item.UnstructuredContent(), "metadata", "labels")
 	if err != nil {
 		return nil, err
@@ -1851,7 +1851,7 @@ func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItem
 		return nil, err
 	}
 
-	return NewRestoreItemActionExecuteOutput(res), nil
+	return velero.NewRestoreItemActionExecuteOutput(res), nil
 }
 
 type fakeNamespaceClient struct {

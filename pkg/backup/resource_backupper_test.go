@@ -228,7 +228,7 @@ func TestBackupResource(t *testing.T) {
 			},
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:               newFakeAction("pods"),
+					BackupItemAction:         newFakeAction("pods"),
 					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 				},
 			},
@@ -390,7 +390,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 				ResolvedActions: []resolvedAction{
 					{
-						ItemAction:               newFakeAction("pods"),
+						BackupItemAction:         newFakeAction("pods"),
 						resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 					},
 				},
