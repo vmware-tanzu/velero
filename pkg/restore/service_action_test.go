@@ -274,11 +274,15 @@ func TestServiceActionExecute(t *testing.T) {
 			unstructuredSvc, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, _, err := action.Execute(&unstructured.Unstructured{Object: unstructuredSvc}, nil)
+			res, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           &unstructured.Unstructured{Object: unstructuredSvc},
+				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredSvc},
+				Restore:        nil,
+			})
 
-			if assert.Equal(t, test.expectedErr, err != nil) {
+			if assert.Equal(t, test.expectedErr, err != nil) && !test.expectedErr {
 				var svc corev1api.Service
-				require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UnstructuredContent(), &svc))
+				require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), &svc))
 
 				assert.Equal(t, test.expectedRes, svc)
 			}

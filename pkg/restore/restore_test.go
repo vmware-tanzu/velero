@@ -1880,10 +1880,10 @@ func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
-	labels, found, err := unstructured.NestedMap(obj.UnstructuredContent(), "metadata", "labels")
+func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+	labels, found, err := unstructured.NestedMap(input.Item.UnstructuredContent(), "metadata", "labels")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if !found {
 		labels = make(map[string]interface{})
@@ -1891,22 +1891,22 @@ func (r *fakeAction) Execute(obj runtime.Unstructured, restore *api.Restore) (ru
 
 	labels["fake-restorer"] = "foo"
 
-	if err := unstructured.SetNestedField(obj.UnstructuredContent(), labels, "metadata", "labels"); err != nil {
-		return nil, nil, err
+	if err := unstructured.SetNestedField(input.Item.UnstructuredContent(), labels, "metadata", "labels"); err != nil {
+		return nil, err
 	}
 
-	unstructuredObj, ok := obj.(*unstructured.Unstructured)
+	unstructuredObj, ok := input.Item.(*unstructured.Unstructured)
 	if !ok {
-		return nil, nil, errors.New("Unexpected type")
+		return nil, errors.New("Unexpected type")
 	}
 
 	// want the baseline functionality too
 	res, err := resetMetadataAndStatus(unstructuredObj)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return res, nil, nil
+	return NewRestoreItemActionExecuteOutput(res), nil
 }
 
 type fakeNamespaceClient struct {

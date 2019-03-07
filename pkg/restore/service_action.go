@@ -25,8 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
@@ -45,10 +43,10 @@ func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
 	}, nil
 }
 
-func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) (runtime.Unstructured, error, error) {
+func (a *serviceAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
 	service := new(corev1api.Service)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), service); err != nil {
-		return nil, nil, errors.WithStack(err)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), service); err != nil {
+		return nil, errors.WithStack(err)
 	}
 
 	if service.Spec.ClusterIP != "None" {
@@ -56,15 +54,15 @@ func (a *serviceAction) Execute(obj runtime.Unstructured, restore *api.Restore) 
 	}
 
 	if err := deleteNodePorts(service); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(service)
 	if err != nil {
-		return nil, nil, errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
 
-	return &unstructured.Unstructured{Object: res}, nil, nil
+	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
 func deleteNodePorts(service *corev1api.Service) error {

@@ -34,7 +34,38 @@ type ItemAction interface {
 	// should be returned, along with a warning (which will be logged but will not prevent
 	// the item from being restored) or error (which will be logged and will prevent the item
 	// from being restored) if applicable.
-	Execute(obj runtime.Unstructured, restore *api.Restore) (res runtime.Unstructured, warning error, err error)
+	Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error)
+}
+
+// RestoreItemActionExecuteInput contains the input parameters for the ItemAction's Execute function.
+type RestoreItemActionExecuteInput struct {
+	// Item is the item being restored. It is likely different from the pristine backed up version
+	// (metadata reset, changed by various restore item action plugins, etc.).
+	Item runtime.Unstructured
+	// ItemFromBackup is the item taken from the pristine backed up version of resource.
+	ItemFromBackup runtime.Unstructured
+	// Restore is the representation of the restore resource processed by Ark.
+	Restore *api.Restore
+}
+
+// RestoreItemActionExecuteOutput contains the output variables for the ItemAction's Execution function.
+type RestoreItemActionExecuteOutput struct {
+	// UpdatedItem is the item being restored mutated by ItemAction.
+	UpdatedItem runtime.Unstructured
+	// Warning is an exceptional message returned from ItemAction
+	// which is not preventing the item from being restored.
+	Warning error
+}
+
+func NewRestoreItemActionExecuteOutput(item runtime.Unstructured) *RestoreItemActionExecuteOutput {
+	return &RestoreItemActionExecuteOutput{
+		UpdatedItem: item,
+	}
+}
+
+func (r *RestoreItemActionExecuteOutput) WithWarning(err error) *RestoreItemActionExecuteOutput {
+	r.Warning = err
+	return r
 }
 
 // ResourceSelector is a collection of included/excluded namespaces,

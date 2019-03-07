@@ -733,6 +733,10 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 			continue
 		}
 
+		// make a copy of object retrieved from backup
+		// to make it available unchanged inside restore actions
+		itemFromBackup := obj.DeepCopy()
+
 		if !ctx.selector.Matches(labels.Set(obj.GetLabels())) {
 			continue
 		}
@@ -873,18 +877,22 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (a
 
 			ctx.log.Infof("Executing item action for %v", &groupResource)
 
-			updatedObj, warning, err := action.Execute(obj, ctx.restore)
-			if warning != nil {
-				addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, warning))
+			executeOutput, err := action.Execute(&RestoreItemActionExecuteInput{
+				Item:           obj,
+				ItemFromBackup: itemFromBackup,
+				Restore:        ctx.restore,
+			})
+			if executeOutput.Warning != nil {
+				addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", fullPath, executeOutput.Warning))
 			}
 			if err != nil {
 				addToResult(&errs, namespace, fmt.Errorf("error preparing %s: %v", fullPath, err))
 				continue
 			}
 
-			unstructuredObj, ok := updatedObj.(*unstructured.Unstructured)
+			unstructuredObj, ok := executeOutput.UpdatedItem.(*unstructured.Unstructured)
 			if !ok {
-				addToResult(&errs, namespace, fmt.Errorf("%s: unexpected type %T", fullPath, updatedObj))
+				addToResult(&errs, namespace, fmt.Errorf("%s: unexpected type %T", fullPath, executeOutput.UpdatedItem))
 				continue
 			}
 

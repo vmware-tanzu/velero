@@ -7,6 +7,7 @@ message RestoreExecuteRequest {
     string plugin = 1;
     bytes item = 2;
     bytes restore = 3;
+    bytes itemFromBackup = 4;
 }
 
 message RestoreExecuteResponse {
