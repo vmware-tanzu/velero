@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -282,7 +283,13 @@ func (b *blockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID s
 		return nil, errors.New("spec.awsElasticBlockStore not found")
 	}
 
-	pv.Spec.AWSElasticBlockStore.VolumeID = volumeID
+	pvFailureDomainZone := pv.Labels["failure-domain.beta.kubernetes.io/zone"]
+
+	if len(pvFailureDomainZone) > 0 {
+		pv.Spec.AWSElasticBlockStore.VolumeID = fmt.Sprintf("aws://%s/%s", pvFailureDomainZone, volumeID)
+	} else {
+		pv.Spec.AWSElasticBlockStore.VolumeID = volumeID
+	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
 	if err != nil {
