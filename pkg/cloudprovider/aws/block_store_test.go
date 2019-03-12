@@ -85,7 +85,44 @@ func TestSetVolumeID(t *testing.T) {
 	pv.Object["spec"] = map[string]interface{}{
 		"awsElasticBlockStore": aws,
 	}
+
+	labels := map[string]interface{}{
+		"failure-domain.beta.kubernetes.io/zone": "us-east-1a",
+	}
+
+	pv.Object["metadata"] = map[string]interface{}{
+		"labels": labels,
+	}
+
 	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
+
+	require.NoError(t, err)
+
+	res := new(v1.PersistentVolume)
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(updatedPV.UnstructuredContent(), res))
+	require.NotNil(t, res.Spec.AWSElasticBlockStore)
+	assert.Equal(t, "aws://us-east-1a/vol-updated", res.Spec.AWSElasticBlockStore.VolumeID)
+}
+
+func TestSetVolumeIDNoZone(t *testing.T) {
+	b := &blockStore{}
+
+	pv := &unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
+
+	// missing spec.awsElasticBlockStore -> error
+	updatedPV, err := b.SetVolumeID(pv, "vol-updated")
+	require.Error(t, err)
+
+	// happy path
+	aws := map[string]interface{}{}
+	pv.Object["spec"] = map[string]interface{}{
+		"awsElasticBlockStore": aws,
+	}
+
+	updatedPV, err = b.SetVolumeID(pv, "vol-updated")
+
 	require.NoError(t, err)
 
 	res := new(v1.PersistentVolume)
