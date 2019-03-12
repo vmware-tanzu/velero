@@ -41,6 +41,10 @@ func crd(kind, plural string) *apiextv1beta1.CustomResourceDefinition {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
 		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "CustomResourceDefinition",
+			APIVersion: apiextv1beta1.SchemeGroupVersion.String(),
+		},
 		Spec: apiextv1beta1.CustomResourceDefinitionSpec{
 			Group:   velerov1api.GroupName,
 			Version: velerov1api.SchemeGroupVersion.Version,

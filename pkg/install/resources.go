@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 func labels() map[string]string {
@@ -56,13 +58,22 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 func ServiceAccount(namespace string) *corev1.ServiceAccount {
 	return &corev1.ServiceAccount{
 		ObjectMeta: objectMeta(namespace, "velero"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
 	}
 }
 
 func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
-	return &rbacv1beta1.ClusterRoleBinding{
+	crb := &rbacv1beta1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "velero",
+			Name:   "velero",
+			Labels: labels(),
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ClusterRoleBinding",
+			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
 		},
 		Subjects: []rbacv1beta1.Subject{
 			{
@@ -77,12 +88,53 @@ func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
 			APIGroup: "rbac.authorization.k8s.io",
 		},
 	}
+
+	return crb
 }
 
 func Namespace(namespace string) *corev1.Namespace {
 	return &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
+			Name:   namespace,
+			Labels: labels(),
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+	}
+}
+
+func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string) *v1.BackupStorageLocation {
+	return &v1.BackupStorageLocation{
+		ObjectMeta: objectMeta(namespace, "default"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "BackupStorageLocation",
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		Spec: v1.BackupStorageLocationSpec{
+			Provider: provider,
+			StorageType: v1.StorageType{
+				ObjectStorage: &v1.ObjectStorageLocation{
+					Bucket: bucket,
+					Prefix: prefix,
+				},
+			},
+			Config: config,
+		},
+	}
+}
+
+func VolumeSnapshotLocation(namespace, provider string, config map[string]string) *v1.VolumeSnapshotLocation {
+	return &v1.VolumeSnapshotLocation{
+		ObjectMeta: objectMeta(namespace, "default"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "VolumeSnapshotLocation",
+			APIVersion: v1.SchemeGroupVersion.String(),
+		},
+		Spec: v1.VolumeSnapshotLocationSpec{
+			Provider: provider,
+			Config:   config,
 		},
 	}
 }

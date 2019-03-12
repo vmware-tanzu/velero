@@ -42,6 +42,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 
 	daemonSet := &appsv1.DaemonSet{
 		ObjectMeta: objectMeta(namespace, "restic"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "DaemonSet",
+			APIVersion: appsv1.SchemeGroupVersion.String(),
+		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{

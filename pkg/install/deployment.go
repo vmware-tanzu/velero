@@ -30,6 +30,7 @@ type podTemplateConfig struct {
 	image                    string
 	withoutCredentialsVolume bool
 	envVars                  []corev1.EnvVar
+	restoreOnly              bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -60,7 +61,14 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 	}
 }
 
+func WithRestoreOnly() podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.restoreOnly = true
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deployment {
+	// TODO: Add support for server args
 	c := &podTemplateConfig{
 		image: "gcr.io/heptio-images/velero:latest",
 	}
@@ -78,6 +86,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 
 	deployment := &appsv1beta1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+		},
 		Spec: appsv1beta1.DeploymentSpec{
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -150,6 +162,12 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 				MountPath: "/credentials",
 			},
 		)
+	}
+
+	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, c.envVars...)
+
+	if c.restoreOnly {
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--restore-only")
 	}
 
 	return deployment
