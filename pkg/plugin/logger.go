@@ -22,11 +22,10 @@ import (
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
-// NewLogger returns a logger that is suitable for use within an
+// newLogger returns a logger that is suitable for use within an
 // Velero plugin.
-func NewLogger(level logrus.Level) logrus.FieldLogger {
+func newLogger() *logrus.Logger {
 	logger := logrus.New()
-	logger.Level = level
 	/*
 		!!!DO NOT SET THE OUTPUT TO STDOUT!!!
 

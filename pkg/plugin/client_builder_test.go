@@ -32,7 +32,7 @@ func TestNewClientBuilder(t *testing.T) {
 	logLevel := logrus.InfoLevel
 	cb := newClientBuilder("velero", logger, logLevel)
 	assert.Equal(t, cb.commandName, "velero")
-	assert.Empty(t, cb.commandArgs)
+	assert.Equal(t, []string{"--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
 	cb = newClientBuilder(os.Args[0], logger, logLevel)

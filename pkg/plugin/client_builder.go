@@ -42,8 +42,11 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	}
 	if command == os.Args[0] {
 		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
-		b.commandArgs = []string{"run-plugins", "--log-level", logLevel.String()}
+		b.commandArgs = []string{"run-plugins"}
 	}
+
+	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
+
 	return b
 }
 
