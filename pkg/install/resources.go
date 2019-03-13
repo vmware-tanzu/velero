@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,10 +67,7 @@ func ServiceAccount(namespace string) *corev1.ServiceAccount {
 
 func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
 	crb := &rbacv1beta1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "velero",
-			Labels: labels(),
-		},
+		ObjectMeta: objectMeta("", "velero"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ClusterRoleBinding",
 			APIVersion: rbacv1beta1.SchemeGroupVersion.String(),
@@ -94,10 +91,7 @@ func ClusterRoleBinding(namespace string) *rbacv1beta1.ClusterRoleBinding {
 
 func Namespace(namespace string) *corev1.Namespace {
 	return &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   namespace,
-			Labels: labels(),
-		},
+		ObjectMeta: objectMeta("", namespace),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: corev1.SchemeGroupVersion.String(),
