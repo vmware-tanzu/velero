@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -160,7 +160,13 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (velerobackup.ItemActi
 	return itemAction, nil
 }
 
-func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (*proto.AppliesToResponse, error) {
+func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (response *proto.AppliesToResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -180,7 +186,13 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.A
 	}, nil
 }
 
-func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.ExecuteRequest) (*proto.ExecuteResponse, error) {
+func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.ExecuteRequest) (response *proto.ExecuteResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err

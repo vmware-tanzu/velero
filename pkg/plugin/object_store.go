@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -216,7 +216,13 @@ func (s *ObjectStoreGRPCServer) getImpl(name string) (cloudprovider.ObjectStore,
 // Init prepares the ObjectStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
-func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (*proto.Empty, error) {
+func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (response *proto.Empty, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -231,7 +237,13 @@ func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest
 
 // PutObject creates a new object using the data in body within the specified
 // object storage bucket with the given key.
-func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServer) error {
+func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServer) (err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	// we need to read the first chunk ahead of time to get the bucket and key;
 	// in our receive method, we'll use `first` on the first call
 	firstChunk, err := stream.Recv()
@@ -274,7 +286,13 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
-func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) error {
+func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream proto.ObjectStore_GetObjectServer) (err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return err
@@ -305,7 +323,13 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 // ListCommonPrefixes gets a list of all object key prefixes that start with
 // the specified prefix and stop at the next instance of the provided delimiter
 // (this is often used to simulate a directory hierarchy in object storage).
-func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (*proto.ListCommonPrefixesResponse, error) {
+func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *proto.ListCommonPrefixesRequest) (response *proto.ListCommonPrefixesResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -320,7 +344,13 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 }
 
 // ListObjects gets a list of all objects in bucket that have the same prefix.
-func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.ListObjectsRequest) (*proto.ListObjectsResponse, error) {
+func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.ListObjectsRequest) (response *proto.ListObjectsResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -336,7 +366,13 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 
 // DeleteObject removes object with the specified key from the given
 // bucket.
-func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.DeleteObjectRequest) (*proto.Empty, error) {
+func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.DeleteObjectRequest) (response *proto.Empty, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -350,7 +386,13 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 }
 
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
-func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.CreateSignedURLRequest) (*proto.CreateSignedURLResponse, error) {
+func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.CreateSignedURLRequest) (response *proto.CreateSignedURLResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -220,7 +220,13 @@ func (s *BlockStoreGRPCServer) getImpl(name string) (cloudprovider.BlockStore, e
 // Init prepares the BlockStore for usage using the provided map of
 // configuration key-value pairs. It returns an error if the BlockStore
 // cannot be initialized from the provided config.
-func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (*proto.Empty, error) {
+func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (response *proto.Empty, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -235,7 +241,13 @@ func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest)
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
-func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (*proto.CreateVolumeResponse, error) {
+func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -260,7 +272,13 @@ func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req
 
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
-func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (*proto.GetVolumeInfoResponse, error) {
+func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -284,7 +302,13 @@ func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.Get
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
-func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (*proto.CreateSnapshotResponse, error) {
+func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -299,7 +323,13 @@ func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.Cr
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
-func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (*proto.Empty, error) {
+func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -312,7 +342,13 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 	return &proto.Empty{}, nil
 }
 
-func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (*proto.GetVolumeIDResponse, error) {
+func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
@@ -332,7 +368,13 @@ func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVo
 	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
 }
 
-func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (*proto.SetVolumeIDResponse, error) {
+func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
+	defer func() {
+		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
+			err = recoveredErr
+		}
+	}()
+
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
 		return nil, err
