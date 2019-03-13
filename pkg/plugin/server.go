@@ -93,6 +93,7 @@ func NewServer() Server {
 
 	return &server{
 		log:               log,
+		logLevelFlag:      logging.LogLevelFlag(log.Level),
 		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
 		blockStore:        NewBlockStorePlugin(serverLogger(log)),
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
@@ -101,7 +102,6 @@ func NewServer() Server {
 }
 
 func (s *server) BindFlags(flags *pflag.FlagSet) Server {
-	s.logLevelFlag = logging.LogLevelFlag(s.log.Level)
 	flags.Var(s.logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(s.logLevelFlag.AllowedValues(), ", ")))
 	s.flagSet = flags
 
