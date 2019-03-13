@@ -56,13 +56,13 @@ type registry struct {
 }
 
 // NewRegistry returns a new registry.
-func NewRegistry(dir string, logger logrus.FieldLogger, logLevel logrus.Level) Registry {
+func NewRegistry(dir string, pluginArgs []string, logger logrus.FieldLogger, logLevel logrus.Level) Registry {
 	return &registry{
 		dir:      dir,
 		logger:   logger,
 		logLevel: logLevel,
 
-		processFactory: newProcessFactory(),
+		processFactory: newProcessFactory(pluginArgs),
 		fs:             filesystem.NewFileSystem(),
 		pluginsByID:    make(map[kindAndName]PluginIdentifier),
 		pluginsByKind:  make(map[PluginKind][]PluginIdentifier),

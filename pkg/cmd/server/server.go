@@ -94,6 +94,7 @@ type serverConfig struct {
 	clientQPS                                                               float32
 	clientBurst                                                             int
 	profilerAddress                                                         string
+	resticRestoreHelperImage                                                string
 }
 
 func NewCommand() *cobra.Command {
@@ -112,6 +113,7 @@ func NewCommand() *cobra.Command {
 			clientBurst:                    defaultClientBurst,
 			profilerAddress:                defaultProfilerAddress,
 			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
+			resticRestoreHelperImage:       "",
 		}
 	)
 
@@ -172,6 +174,8 @@ func NewCommand() *cobra.Command {
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
 
+	command.Flags().StringVar(&config.resticRestoreHelperImage, "restic-restore-helper-image", config.resticRestoreHelperImage, "the docker image for the velero restic restore helper")
+
 	return command
 }
 
@@ -205,6 +209,7 @@ type server struct {
 	logLevel              logrus.Level
 	pluginRegistry        plugin.Registry
 	pluginManager         plugin.Manager
+	pluginArgs            []string
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
@@ -235,11 +240,16 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		return nil, errors.WithStack(err)
 	}
 
-	pluginRegistry := plugin.NewRegistry(config.pluginDir, logger, logger.Level)
+	var pluginArgs []string
+	if config.resticRestoreHelperImage != "" {
+		pluginArgs = []string{"--restic-restore-helper-image", config.resticRestoreHelperImage}
+	}
+
+	pluginRegistry := plugin.NewRegistry(config.pluginDir, pluginArgs, logger, logger.Level)
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := plugin.NewManager(logger, logger.Level, pluginRegistry)
+	pluginManager := plugin.NewManager(logger, pluginArgs, logger.Level, pluginRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -266,6 +276,7 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		logLevel:              logger.Level,
 		pluginRegistry:        pluginRegistry,
 		pluginManager:         pluginManager,
+		pluginArgs:            pluginArgs,
 		config:                config,
 	}
 
@@ -519,7 +530,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	s.metrics.InitSchedule("")
 
 	newPluginManager := func(logger logrus.FieldLogger) plugin.Manager {
-		return plugin.NewManager(logger, s.logLevel, s.pluginRegistry)
+		return plugin.NewManager(logger, s.pluginArgs, s.logLevel, s.pluginRegistry)
 	}
 
 	backupSyncController := controller.NewBackupSyncController(

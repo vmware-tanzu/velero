@@ -26,14 +26,15 @@ type ProcessFactory interface {
 }
 
 type processFactory struct {
+	pluginArgs []string
 }
 
-func newProcessFactory() ProcessFactory {
-	return &processFactory{}
+func newProcessFactory(pluginArgs []string) ProcessFactory {
+	return &processFactory{pluginArgs}
 }
 
 func (pf *processFactory) newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error) {
-	return newProcess(command, logger, logLevel)
+	return newProcess(command, pf.pluginArgs, logger, logLevel)
 }
 
 type Process interface {
@@ -47,8 +48,8 @@ type process struct {
 	protocolClient plugin.ClientProtocol
 }
 
-func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error) {
-	builder := newClientBuilder(command, logger.WithField("cmd", command), logLevel)
+func newProcess(command string, pluginArgs []string, logger logrus.FieldLogger, logLevel logrus.Level) (Process, error) {
+	builder := newClientBuilder(command, pluginArgs, logger.WithField("cmd", command), logLevel)
 
 	// This creates a new go-plugin Client that has its own unique exec.Cmd for launching the plugin process.
 	client := builder.client()

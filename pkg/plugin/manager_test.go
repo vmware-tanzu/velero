@@ -59,7 +59,7 @@ func TestNewManager(t *testing.T) {
 	registry := &mockRegistry{}
 	defer registry.AssertExpectations(t)
 
-	m := NewManager(logger, logLevel, registry).(*manager)
+	m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 	assert.Equal(t, logger, m.logger)
 	assert.Equal(t, logLevel, m.logLevel)
 	assert.Equal(t, registry, m.registry)
@@ -114,7 +114,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	registry := &mockRegistry{}
 	defer registry.AssertExpectations(t)
 
-	m := NewManager(logger, logLevel, registry).(*manager)
+	m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 	factory := &mockRestartableProcessFactory{}
 	defer factory.AssertExpectations(t)
 	m.restartableProcessFactory = factory
@@ -160,7 +160,7 @@ func TestCleanupClients(t *testing.T) {
 	registry := &mockRegistry{}
 	defer registry.AssertExpectations(t)
 
-	m := NewManager(logger, logLevel, registry).(*manager)
+	m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 
 	for i := 0; i < 5; i++ {
 		rp := &mockRestartableProcess{}
@@ -254,7 +254,7 @@ func getPluginTest(
 	registry := &mockRegistry{}
 	defer registry.AssertExpectations(t)
 
-	m := NewManager(logger, logLevel, registry).(*manager)
+	m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 	factory := &mockRestartableProcessFactory{}
 	defer factory.AssertExpectations(t)
 	m.restartableProcessFactory = factory
@@ -321,7 +321,7 @@ func TestGetBackupItemActions(t *testing.T) {
 			registry := &mockRegistry{}
 			defer registry.AssertExpectations(t)
 
-			m := NewManager(logger, logLevel, registry).(*manager)
+			m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 			factory := &mockRestartableProcessFactory{}
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
@@ -413,7 +413,7 @@ func TestGetRestoreItemActions(t *testing.T) {
 			registry := &mockRegistry{}
 			defer registry.AssertExpectations(t)
 
-			m := NewManager(logger, logLevel, registry).(*manager)
+			m := NewManager(logger, []string{}, logLevel, registry).(*manager)
 			factory := &mockRestartableProcessFactory{}
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory

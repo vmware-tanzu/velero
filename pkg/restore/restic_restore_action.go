@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+		http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -36,10 +36,14 @@ type ResticRestoreAction struct {
 	initContainerImage string
 }
 
-func NewResticRestoreAction(logger logrus.FieldLogger) *ResticRestoreAction {
+func NewResticRestoreAction(logger logrus.FieldLogger, initContainerImageName string) *ResticRestoreAction {
+	if initContainerImageName == "" {
+		initContainerImageName = initContainerImage()
+	}
+
 	return &ResticRestoreAction{
 		logger:             logger,
-		initContainerImage: initContainerImage(),
+		initContainerImage: initContainerImageName,
 	}
 }
 
@@ -60,7 +64,7 @@ func (a *ResticRestoreAction) AppliesTo() (velero.ResourceSelector, error) {
 }
 
 func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-	a.logger.Info("Executing ResticRestoreAction")
+	a.logger.Infof("Executing ResticRestoreAction using image %q", a.initContainerImage)
 	defer a.logger.Info("Done executing ResticRestoreAction")
 
 	var pod corev1.Pod

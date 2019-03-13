@@ -27,14 +27,15 @@ type RestartableProcessFactory interface {
 }
 
 type restartableProcessFactory struct {
+	pluginArgs []string
 }
 
-func newRestartableProcessFactory() RestartableProcessFactory {
-	return &restartableProcessFactory{}
+func newRestartableProcessFactory(pluginArgs []string) RestartableProcessFactory {
+	return &restartableProcessFactory{pluginArgs}
 }
 
 func (rpf *restartableProcessFactory) newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
-	return newRestartableProcess(command, logger, logLevel)
+	return newRestartableProcess(command, rpf.pluginArgs, logger, logLevel)
 }
 
 type RestartableProcess interface {
@@ -59,6 +60,8 @@ type restartableProcess struct {
 	plugins        map[kindAndName]interface{}
 	reinitializers map[kindAndName]reinitializer
 	resetFailures  int
+
+	pluginArgs []string
 }
 
 // reinitializer is capable of reinitializing a restartable plugin instance using the newly dispensed plugin.
@@ -68,13 +71,15 @@ type reinitializer interface {
 }
 
 // newRestartableProcess creates a new restartableProcess for the given command and options.
-func newRestartableProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
+func newRestartableProcess(command string, pluginArgs []string, logger logrus.FieldLogger, logLevel logrus.Level) (RestartableProcess, error) {
 	p := &restartableProcess{
 		command:        command,
 		logger:         logger,
 		logLevel:       logLevel,
 		plugins:        make(map[kindAndName]interface{}),
 		reinitializers: make(map[kindAndName]reinitializer),
+
+		pluginArgs: pluginArgs,
 	}
 
 	// This launches the process
@@ -108,7 +113,7 @@ func (p *restartableProcess) resetLH() error {
 		return errors.Errorf("unable to restart plugin process: execeeded maximum number of reset failures")
 	}
 
-	process, err := newProcess(p.command, p.logger, p.logLevel)
+	process, err := newProcess(p.command, p.pluginArgs, p.logger, p.logLevel)
 	if err != nil {
 		p.resetFailures++
 		return err

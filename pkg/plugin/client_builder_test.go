@@ -30,21 +30,26 @@ import (
 func TestNewClientBuilder(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
-	cb := newClientBuilder("velero", logger, logLevel)
+	cb := newClientBuilder("velero", []string{}, logger, logLevel)
 	assert.Equal(t, cb.commandName, "velero")
 	assert.Equal(t, []string{"--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
-	cb = newClientBuilder(os.Args[0], logger, logLevel)
+	cb = newClientBuilder(os.Args[0], []string{}, logger, logLevel)
 	assert.Equal(t, cb.commandName, os.Args[0])
 	assert.Equal(t, []string{"run-plugins", "--log-level", "info"}, cb.commandArgs)
+	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
+
+	cb = newClientBuilder(os.Args[0], []string{"additional", "args"}, logger, logLevel)
+	assert.Equal(t, cb.commandName, os.Args[0])
+	assert.Equal(t, []string{"run-plugins", "additional", "args", "--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 }
 
 func TestClientConfig(t *testing.T) {
 	logger := test.NewLogger()
 	logLevel := logrus.InfoLevel
-	cb := newClientBuilder("velero", logger, logLevel)
+	cb := newClientBuilder("velero", []string{}, logger, logLevel)
 
 	expected := &hcplugin.ClientConfig{
 		HandshakeConfig:  Handshake,

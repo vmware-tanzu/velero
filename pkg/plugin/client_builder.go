@@ -34,7 +34,7 @@ type clientBuilder struct {
 
 // newClientBuilder returns a new clientBuilder with commandName to name. If the command matches the currently running
 // process (i.e. velero), this also sets commandArgs to the internal Velero command to run plugins.
-func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus.Level) *clientBuilder {
+func newClientBuilder(command string, pluginArgs []string, logger logrus.FieldLogger, logLevel logrus.Level) *clientBuilder {
 	b := &clientBuilder{
 		commandName:  command,
 		clientLogger: logger,
@@ -43,6 +43,9 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	if command == os.Args[0] {
 		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
 		b.commandArgs = []string{"run-plugins"}
+		if len(pluginArgs) > 0 {
+			b.commandArgs = append(b.commandArgs, pluginArgs...)
+		}
 	}
 
 	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())

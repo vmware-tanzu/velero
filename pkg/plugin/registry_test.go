@@ -32,7 +32,7 @@ func TestNewRegistry(t *testing.T) {
 	logLevel := logrus.InfoLevel
 	dir := "/plugins"
 
-	r := NewRegistry(dir, logger, logLevel).(*registry)
+	r := NewRegistry(dir, []string{}, logger, logLevel).(*registry)
 	assert.Equal(t, dir, r.dir)
 	assert.Equal(t, logger, r.logger)
 	assert.Equal(t, logLevel, r.logLevel)
@@ -107,7 +107,7 @@ func TestReadPluginsDir(t *testing.T) {
 	logLevel := logrus.InfoLevel
 	dir := "/plugins"
 
-	r := NewRegistry(dir, logger, logLevel).(*registry)
+	r := NewRegistry(dir, []string{}, logger, logLevel).(*registry)
 	r.fs = test.NewFakeFileSystem().
 		WithFileAndMode("/plugins/executable1", []byte("plugin1"), 0755).
 		WithFileAndMode("/plugins/nonexecutable2", []byte("plugin2"), 0644).

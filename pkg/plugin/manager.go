@@ -62,13 +62,13 @@ type manager struct {
 }
 
 // NewManager constructs a manager for getting plugins.
-func NewManager(logger logrus.FieldLogger, level logrus.Level, registry Registry) Manager {
+func NewManager(logger logrus.FieldLogger, pluginArgs []string, level logrus.Level, registry Registry) Manager {
 	return &manager{
 		logger:   logger,
 		logLevel: level,
 		registry: registry,
 
-		restartableProcessFactory: newRestartableProcessFactory(),
+		restartableProcessFactory: newRestartableProcessFactory(pluginArgs),
 
 		restartableProcesses: make(map[string]RestartableProcess),
 	}
