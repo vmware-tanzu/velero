@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -274,7 +275,7 @@ func TestServiceActionExecute(t *testing.T) {
 			unstructuredSvc, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, err := action.Execute(&RestoreItemActionExecuteInput{
+			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: unstructuredSvc},
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredSvc},
 				Restore:        nil,

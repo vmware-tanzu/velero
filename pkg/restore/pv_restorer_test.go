@@ -26,10 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
@@ -230,7 +230,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
 				blockStore       = new(cloudprovidermocks.BlockStore)
-				blockStoreGetter = providerToBlockStoreMap(map[string]cloudprovider.BlockStore{
+				blockStoreGetter = providerToBlockStoreMap(map[string]velero.BlockStore{
 					tc.expectedProvider: blockStore,
 				})
 				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
@@ -260,9 +260,9 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	}
 }
 
-type providerToBlockStoreMap map[string]cloudprovider.BlockStore
+type providerToBlockStoreMap map[string]velero.BlockStore
 
-func (g providerToBlockStoreMap) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
+func (g providerToBlockStoreMap) GetBlockStore(provider string) (velero.BlockStore, error) {
 	if bs, ok := g[provider]; !ok {
 		return nil, errors.New("block store not found for provider")
 	} else {

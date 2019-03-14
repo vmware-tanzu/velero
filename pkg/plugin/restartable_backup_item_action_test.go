@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/backup/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 func TestRestartableGetBackupItemAction(t *testing.T) {
@@ -45,7 +45,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a backup.ItemAction!",
+			expectedError: "int is not a BackupItemAction!",
 		},
 		{
 			name:   "happy path",
@@ -113,7 +113,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		},
 	}
 
-	additionalItems := []backup.ResourceIdentifier{
+	additionalItems := []velero.ResourceIdentifier{
 		{
 			GroupResource: schema.GroupResource{Group: "velero.io", Resource: "backups"},
 		},
@@ -134,13 +134,13 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 		restartableDelegateTest{
 			function:                "AppliesTo",
 			inputs:                  []interface{}{},
-			expectedErrorOutputs:    []interface{}{backup.ResourceSelector{}, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{backup.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
+			expectedErrorOutputs:    []interface{}{velero.ResourceSelector{}, errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{velero.ResourceSelector{IncludedNamespaces: []string{"a"}}, errors.Errorf("delegate error")},
 		},
 		restartableDelegateTest{
 			function:                "Execute",
 			inputs:                  []interface{}{pv, b},
-			expectedErrorOutputs:    []interface{}{nil, ([]backup.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			expectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
 			expectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
 		},
 	)

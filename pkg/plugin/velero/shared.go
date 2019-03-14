@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,35 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package backup
-
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-)
-
-// ItemAction is an actor that performs an operation on an individual item being backed up.
-type ItemAction interface {
-	// AppliesTo returns information about which resources this action should be invoked for.
-	// An ItemAction's Execute function will only be invoked on items that match the returned
-	// selector. A zero-valued ResourceSelector matches all resources.
-	AppliesTo() (ResourceSelector, error)
-
-	// Execute allows the ItemAction to perform arbitrary logic with the item being backed up,
-	// including mutating the item itself prior to backup. The item (unmodified or modified)
-	// should be returned, along with an optional slice of ResourceIdentifiers specifying
-	// additional related items that should be backed up.
-	Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []ResourceIdentifier, error)
-}
-
-// ResourceIdentifier describes a single item by its group, resource, namespace, and name.
-type ResourceIdentifier struct {
-	schema.GroupResource
-	Namespace string
-	Name      string
-}
+// Package velero contains the interfaces necessary to implement
+// all of the Velero plugins. Users create their own binary containing
+// implementations of the plugin kinds in this package. Multiple
+// plugins of any type can be implemented.
+package velero
 
 // ResourceSelector is a collection of included/excluded namespaces,
 // included/excluded resources, and a label-selector that can be used

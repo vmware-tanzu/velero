@@ -25,25 +25,27 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 const annotationLastAppliedConfig = "kubectl.kubernetes.io/last-applied-configuration"
 
-type serviceAction struct {
+type ServiceAction struct {
 	log logrus.FieldLogger
 }
 
-func NewServiceAction(logger logrus.FieldLogger) ItemAction {
-	return &serviceAction{log: logger}
+func NewServiceAction(logger logrus.FieldLogger) *ServiceAction {
+	return &ServiceAction{log: logger}
 }
 
-func (a *serviceAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *ServiceAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"services"},
 	}, nil
 }
 
-func (a *serviceAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+func (a *ServiceAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	service := new(corev1api.Service)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), service); err != nil {
 		return nil, errors.WithStack(err)
@@ -62,7 +64,7 @@ func (a *serviceAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreI
 		return nil, errors.WithStack(err)
 	}
 
-	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }
 
 func deleteNodePorts(service *corev1api.Service) error {

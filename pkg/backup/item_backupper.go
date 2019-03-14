@@ -34,9 +34,9 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/volume"
@@ -106,7 +106,7 @@ type defaultItemBackupper struct {
 
 	itemHookHandler             itemHookHandler
 	additionalItemBackupper     ItemBackupper
-	snapshotLocationBlockStores map[string]cloudprovider.BlockStore
+	snapshotLocationBlockStores map[string]velero.BlockStore
 }
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
@@ -345,7 +345,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 // blockStore instantiates and initializes a BlockStore given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotLocation) (cloudprovider.BlockStore, error) {
+func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotLocation) (velero.BlockStore, error) {
 	if bs, ok := ib.snapshotLocationBlockStores[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -360,7 +360,7 @@ func (ib *defaultItemBackupper) blockStore(snapshotLocation *api.VolumeSnapshotL
 	}
 
 	if ib.snapshotLocationBlockStores == nil {
-		ib.snapshotLocationBlockStores = make(map[string]cloudprovider.BlockStore)
+		ib.snapshotLocationBlockStores = make(map[string]velero.BlockStore)
 	}
 	ib.snapshotLocationBlockStores[snapshotLocation.Name] = bs
 
@@ -405,7 +405,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	var (
 		volumeID, location string
-		blockStore         cloudprovider.BlockStore
+		blockStore         velero.BlockStore
 	)
 
 	for _, snapshotLocation := range ib.backupRequest.SnapshotLocations {

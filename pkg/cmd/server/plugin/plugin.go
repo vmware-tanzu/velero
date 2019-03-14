@@ -86,7 +86,7 @@ func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewBackupPVAction(logger), nil
+	return backup.NewPVCAction(logger), nil
 }
 
 func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {

@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -166,7 +166,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 		tarHeaderWriteError                   bool
 		customAction                          bool
 		expectedActionID                      string
-		customActionAdditionalItemIdentifiers []ResourceIdentifier
+		customActionAdditionalItemIdentifiers []velero.ResourceIdentifier
 		customActionAdditionalItems           []runtime.Unstructured
 		groupResource                         string
 		snapshottableVolumes                  map[string]v1.VolumeBackupInfo
@@ -239,7 +239,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
 			customAction:              true,
 			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
 				{
 					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
 					Namespace:     "ns1",
@@ -265,7 +265,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
 			customAction:              true,
 			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
 				{
 					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
 					Namespace:     "ns1",
@@ -397,7 +397,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 				backup.ResolvedActions = []resolvedAction{
 					{
-						ItemAction:                action,
+						BackupItemAction:          action,
 						namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 						resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes(groupResource.String()),
 						selector:                  labels.Everything(),
@@ -548,10 +548,10 @@ func TestBackupItemNoSkips(t *testing.T) {
 }
 
 type blockStoreGetter struct {
-	blockStore cloudprovider.BlockStore
+	blockStore velero.BlockStore
 }
 
-func (b *blockStoreGetter) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
+func (b *blockStoreGetter) GetBlockStore(name string) (velero.BlockStore, error) {
 	if b.blockStore != nil {
 		return b.blockStore, nil
 	}
@@ -560,7 +560,7 @@ func (b *blockStoreGetter) GetBlockStore(name string) (cloudprovider.BlockStore,
 
 type addAnnotationAction struct{}
 
-func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
 	// across a process boundary.
 	copy := item.(*unstructured.Unstructured).DeepCopy()
@@ -580,7 +580,7 @@ func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Back
 	return copy, nil, nil
 }
 
-func (a *addAnnotationAction) AppliesTo() (ResourceSelector, error) {
+func (a *addAnnotationAction) AppliesTo() (velero.ResourceSelector, error) {
 	panic("not implemented")
 }
 
@@ -600,7 +600,7 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:                &addAnnotationAction{},
+					BackupItemAction:          &addAnnotationAction{},
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -656,7 +656,7 @@ func TestResticAnnotationsPersist(t *testing.T) {
 			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:                &addAnnotationAction{},
+					BackupItemAction:          &addAnnotationAction{},
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),

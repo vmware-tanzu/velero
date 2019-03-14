@@ -27,7 +27,7 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	proto "github.com/heptio/velero/pkg/plugin/generated"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // RestoreItemActionPlugin is an implementation of go-plugin's Plugin
@@ -38,7 +38,7 @@ type RestoreItemActionPlugin struct {
 	*pluginBase
 }
 
-var _ restore.ItemAction = &RestoreItemActionGRPCClient{}
+var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
 
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin(options ...pluginOption) *RestoreItemActionPlugin {
@@ -70,13 +70,13 @@ func newRestoreItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientCon
 	}
 }
 
-func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, error) {
+func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
 	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
 	if err != nil {
-		return restore.ResourceSelector{}, err
+		return velero.ResourceSelector{}, err
 	}
 
-	return restore.ResourceSelector{
+	return velero.ResourceSelector{
 		IncludedNamespaces: res.IncludedNamespaces,
 		ExcludedNamespaces: res.ExcludedNamespaces,
 		IncludedResources:  res.IncludedResources,
@@ -85,7 +85,7 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (restore.ResourceSelector, err
 	}, nil
 }
 
-func (c *RestoreItemActionGRPCClient) Execute(input *restore.RestoreItemActionExecuteInput) (*restore.RestoreItemActionExecuteOutput, error) {
+func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *restore.RestoreItemActionEx
 		warning = errors.New(res.Warning)
 	}
 
-	return &restore.RestoreItemActionExecuteOutput{
+	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &updatedItem,
 		Warning:     warning,
 	}, nil
@@ -145,13 +145,13 @@ type RestoreItemActionGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *RestoreItemActionGRPCServer) getImpl(name string) (restore.ItemAction, error) {
+func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAction, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	itemAction, ok := impl.(restore.ItemAction)
+	itemAction, ok := impl.(velero.RestoreItemAction)
 	if !ok {
 		return nil, errors.Errorf("%T is not a restore item action", impl)
 	}
@@ -215,7 +215,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, err
 	}
 
-	executeOutput, err := impl.Execute(&restore.RestoreItemActionExecuteInput{
+	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
 		Item:           &item,
 		ItemFromBackup: &itemFromBackup,
 		Restore:        &restoreObj,

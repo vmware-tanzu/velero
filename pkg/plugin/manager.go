@@ -21,30 +21,28 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/cloudprovider"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
 // Manager manages the lifecycles of plugins.
 type Manager interface {
 	// GetObjectStore returns the ObjectStore plugin for name.
-	GetObjectStore(name string) (cloudprovider.ObjectStore, error)
+	GetObjectStore(name string) (velero.ObjectStore, error)
 
 	// GetBlockStore returns the BlockStore plugin for name.
-	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+	GetBlockStore(name string) (velero.BlockStore, error)
 
 	// GetBackupItemActions returns all backup item action plugins.
-	GetBackupItemActions() ([]backup.ItemAction, error)
+	GetBackupItemActions() ([]velero.BackupItemAction, error)
 
 	// GetBackupItemAction returns the backup item action plugin for name.
-	GetBackupItemAction(name string) (backup.ItemAction, error)
+	GetBackupItemAction(name string) (velero.BackupItemAction, error)
 
 	// GetRestoreItemActions returns all restore item action plugins.
-	GetRestoreItemActions() ([]restore.ItemAction, error)
+	GetRestoreItemActions() ([]velero.RestoreItemAction, error)
 
 	// GetRestoreItemAction returns the restore item action plugin for name.
-	GetRestoreItemAction(name string) (restore.ItemAction, error)
+	GetRestoreItemAction(name string) (velero.RestoreItemAction, error)
 
 	// CleanupClients terminates all of the Manager's running plugin processes.
 	CleanupClients()
@@ -124,7 +122,7 @@ func (m *manager) getRestartableProcess(kind PluginKind, name string) (Restartab
 }
 
 // GetObjectStore returns a restartableObjectStore for name.
-func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error) {
+func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
@@ -136,7 +134,7 @@ func (m *manager) GetObjectStore(name string) (cloudprovider.ObjectStore, error)
 }
 
 // GetBlockStore returns a restartableBlockStore for name.
-func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
+func (m *manager) GetBlockStore(name string) (velero.BlockStore, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindBlockStore, name)
 	if err != nil {
 		return nil, err
@@ -148,10 +146,10 @@ func (m *manager) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
 }
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
-func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
+func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 	list := m.registry.List(PluginKindBackupItemAction)
 
-	actions := make([]backup.ItemAction, 0, len(list))
+	actions := make([]velero.BackupItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -168,7 +166,7 @@ func (m *manager) GetBackupItemActions() ([]backup.ItemAction, error) {
 }
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
-func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
+func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindBackupItemAction, name)
 	if err != nil {
 		return nil, err
@@ -179,10 +177,10 @@ func (m *manager) GetBackupItemAction(name string) (backup.ItemAction, error) {
 }
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
-func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
+func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 	list := m.registry.List(PluginKindRestoreItemAction)
 
-	actions := make([]restore.ItemAction, 0, len(list))
+	actions := make([]velero.RestoreItemAction, 0, len(list))
 
 	for i := range list {
 		id := list[i]
@@ -199,7 +197,7 @@ func (m *manager) GetRestoreItemActions() ([]restore.ItemAction, error) {
 }
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
-func (m *manager) GetRestoreItemAction(name string) (restore.ItemAction, error) {
+func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
 	restartableProcess, err := m.getRestartableProcess(PluginKindRestoreItemAction, name)
 	if err != nil {
 		return nil, err
