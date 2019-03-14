@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,16 +31,13 @@ import (
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
-	logger := veleroplugin.NewLogger()
-
+	pluginServer := veleroplugin.NewServer()
 	c := &cobra.Command{
 		Use:    "run-plugins",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			logger.Debug("Executing run-plugins command")
-
-			veleroplugin.NewServer(logger).
+			pluginServer.
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
@@ -58,6 +55,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 				Serve()
 		},
 	}
+
+	pluginServer.BindFlags(c.Flags())
 
 	return c
 }

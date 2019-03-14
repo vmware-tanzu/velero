@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,12 +32,12 @@ func TestNewClientBuilder(t *testing.T) {
 	logLevel := logrus.InfoLevel
 	cb := newClientBuilder("velero", logger, logLevel)
 	assert.Equal(t, cb.commandName, "velero")
-	assert.Empty(t, cb.commandArgs)
+	assert.Equal(t, []string{"--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 
 	cb = newClientBuilder(os.Args[0], logger, logLevel)
 	assert.Equal(t, cb.commandName, os.Args[0])
-	assert.Equal(t, []string{"run-plugins"}, cb.commandArgs)
+	assert.Equal(t, []string{"run-plugins", "--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
 }
 

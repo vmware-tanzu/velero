@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,6 +44,9 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
 		b.commandArgs = []string{"run-plugins"}
 	}
+
+	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
+
 	return b
 }
 

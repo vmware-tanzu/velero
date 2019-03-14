@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 )
 
 func TestNewLogger(t *testing.T) {
-	l := NewLogger().(*logrus.Logger)
+	l := newLogger()
 
 	expectedFormatter := &logrus.JSONFormatter{
 		FieldMap: logrus.FieldMap{

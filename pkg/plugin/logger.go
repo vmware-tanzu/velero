@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,9 @@ import (
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
-// NewLogger returns a logger that is suitable for use within an
+// newLogger returns a logger that is suitable for use within an
 // Velero plugin.
-func NewLogger() logrus.FieldLogger {
+func newLogger() *logrus.Logger {
 	logger := logrus.New()
 	/*
 		!!!DO NOT SET THE OUTPUT TO STDOUT!!!
