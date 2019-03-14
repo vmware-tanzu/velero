@@ -105,7 +105,7 @@ func TestSetVolumeID(t *testing.T) {
 }
 
 func TestSetVolumeIDNoZone(t *testing.T) {
-	b := &blockStore{}
+	b := &BlockStore{}
 
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{},
