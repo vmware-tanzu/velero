@@ -21,10 +21,14 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/pkg/errors"
-	"k8s.io/apimachinery/pkg/runtime"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/pkg/errors"
+	//k8sapi "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
+
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
 )
 
@@ -42,17 +46,19 @@ func Encode(obj runtime.Object, format string) ([]byte, error) {
 // EncodeTo converts the provided object to the specified format and
 // writes the encoded data to the provided io.Writer.
 func EncodeTo(obj runtime.Object, format string, w io.Writer) error {
-	encoder, err := EncoderFor(format)
+	encoder, err := EncoderFor(format, obj.GetObjectKind().GroupVersionKind().GroupVersion())
 	if err != nil {
 		return err
 	}
-
 	return errors.WithStack(encoder.Encode(obj, w))
 }
 
 // EncoderFor gets the appropriate encoder for the specified format.
-func EncoderFor(format string) (runtime.Encoder, error) {
+func EncoderFor(format string, gv schema.GroupVersion) (runtime.Encoder, error) {
 	var encoder runtime.Encoder
+	// Make sure the kubernetes/CRD types can be found
+	kscheme.AddToScheme(scheme.Scheme)
+	apiextv1beta1.AddToScheme(scheme.Scheme)
 	desiredMediaType := fmt.Sprintf("application/%s", format)
 	serializerInfo, found := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), desiredMediaType)
 	if !found {
@@ -63,6 +69,6 @@ func EncoderFor(format string) (runtime.Encoder, error) {
 	} else {
 		encoder = serializerInfo.Serializer
 	}
-	encoder = scheme.Codecs.EncoderForVersion(encoder, v1.SchemeGroupVersion)
+	encoder = scheme.Codecs.EncoderForVersion(encoder, gv)
 	return encoder, nil
 }
