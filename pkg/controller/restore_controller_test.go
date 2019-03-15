@@ -43,7 +43,7 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore"
@@ -110,7 +110,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
@@ -408,7 +408,7 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
