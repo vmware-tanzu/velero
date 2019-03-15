@@ -27,6 +27,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/backup/mocks"
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -59,7 +60,7 @@ func TestRestartableGetBackupItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: PluginKindBackupItemAction, name: name}
+			key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := newRestartableBackupItemAction(name, p)
@@ -90,7 +91,7 @@ func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
 	expected := new(mocks.ItemAction)
-	key := kindAndName{kind: PluginKindBackupItemAction, name: name}
+	key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
 	p.On("getByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -121,7 +122,7 @@ func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		PluginKindBackupItemAction,
+		framework.PluginKindBackupItemAction,
 		func(key kindAndName, p RestartableProcess) interface{} {
 			return &restartableBackupItemAction{
 				key:                 key,

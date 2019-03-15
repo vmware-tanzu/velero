@@ -21,6 +21,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -38,7 +39,7 @@ type restartableObjectStore struct {
 
 // newRestartableObjectStore returns a new restartableObjectStore.
 func newRestartableObjectStore(name string, sharedPluginProcess RestartableProcess) *restartableObjectStore {
-	key := kindAndName{kind: PluginKindObjectStore, name: name}
+	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,

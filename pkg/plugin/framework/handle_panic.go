@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package framework
 
-import plugin "github.com/hashicorp/go-plugin"
+import (
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
 
-// Interface represents a Velero plugin.
-type Interface interface {
-	plugin.Plugin
+// handlePanic is a panic handler for the server half of velero plugins.
+func handlePanic(p interface{}) error {
+	if p == nil {
+		return nil
+	}
 
-	// names returns a list of all the registered implementations for this plugin (such as "pod" and "pvc" for
-	// BackupItemAction).
-	names() []string
+	return status.Errorf(codes.Aborted, "plugin panicked: %v", p)
 }

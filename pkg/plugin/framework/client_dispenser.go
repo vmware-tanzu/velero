@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package plugin
+
+package framework
 
 import (
 	"github.com/sirupsen/logrus"
@@ -27,7 +28,7 @@ type clientBase struct {
 }
 
 type ClientDispenser interface {
-	clientFor(name string) interface{}
+	ClientFor(name string) interface{}
 }
 
 // clientDispenser supports the initialization and retrieval of multiple implementations for a single plugin kind, such as
@@ -55,9 +56,9 @@ func newClientDispenser(logger logrus.FieldLogger, clientConn *grpc.ClientConn, 
 	}
 }
 
-// clientFor returns a gRPC client stub for the implementation of a plugin named name. If the client stub does not
+// ClientFor returns a gRPC client stub for the implementation of a plugin named name. If the client stub does not
 // currently exist, clientFor creates it.
-func (cd *clientDispenser) clientFor(name string) interface{} {
+func (cd *clientDispenser) ClientFor(name string) interface{} {
 	if client, found := cd.clients[name]; found {
 		return client
 	}

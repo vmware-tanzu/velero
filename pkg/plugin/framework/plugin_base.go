@@ -13,34 +13,36 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package plugin
+
+package framework
 
 import (
-	"testing"
-
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/heptio/velero/pkg/util/logging"
 )
 
-func TestNewLogger(t *testing.T) {
-	l := newLogger()
+type pluginBase struct {
+	clientLogger logrus.FieldLogger
+	*serverMux
+}
 
-	expectedFormatter := &logrus.JSONFormatter{
-		FieldMap: logrus.FieldMap{
-			logrus.FieldKeyMsg: "@message",
-		},
-		DisableTimestamp: true,
+func newPluginBase(options ...PluginOption) *pluginBase {
+	base := new(pluginBase)
+	for _, option := range options {
+		option(base)
 	}
-	assert.Equal(t, expectedFormatter, l.Formatter)
+	return base
+}
 
-	expectedHooks := []logrus.Hook{
-		(&logging.LogLocationHook{}).WithLoggerName("plugin"),
-		&logging.HcLogLevelHook{},
+type PluginOption func(base *pluginBase)
+
+func ClientLogger(logger logrus.FieldLogger) PluginOption {
+	return func(base *pluginBase) {
+		base.clientLogger = logger
 	}
+}
 
-	for _, level := range logrus.AllLevels {
-		assert.Equal(t, expectedHooks, l.Hooks[level])
+func serverLogger(logger logrus.FieldLogger) PluginOption {
+	return func(base *pluginBase) {
+		base.serverMux = newServerMux(logger)
 	}
 }

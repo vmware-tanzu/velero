@@ -18,6 +18,7 @@ package plugin
 import (
 	"github.com/pkg/errors"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -34,7 +35,7 @@ type restartableRestoreItemAction struct {
 // newRestartableRestoreItemAction returns a new restartableRestoreItemAction.
 func newRestartableRestoreItemAction(name string, sharedPluginProcess RestartableProcess) *restartableRestoreItemAction {
 	r := &restartableRestoreItemAction{
-		key:                 kindAndName{kind: PluginKindRestoreItemAction, name: name},
+		key:                 kindAndName{kind: framework.PluginKindRestoreItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r

@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
@@ -31,14 +32,14 @@ type Registry interface {
 	// DiscoverPlugins discovers all available plugins.
 	DiscoverPlugins() error
 	// List returns all PluginIdentifiers for kind.
-	List(kind PluginKind) []PluginIdentifier
+	List(kind framework.PluginKind) []framework.PluginIdentifier
 	// Get returns the PluginIdentifier for kind and name.
-	Get(kind PluginKind, name string) (PluginIdentifier, error)
+	Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error)
 }
 
 // kindAndName is a convenience struct that combines a PluginKind and a name.
 type kindAndName struct {
-	kind PluginKind
+	kind framework.PluginKind
 	name string
 }
 
@@ -51,8 +52,8 @@ type registry struct {
 
 	processFactory ProcessFactory
 	fs             filesystem.Interface
-	pluginsByID    map[kindAndName]PluginIdentifier
-	pluginsByKind  map[PluginKind][]PluginIdentifier
+	pluginsByID    map[kindAndName]framework.PluginIdentifier
+	pluginsByKind  map[framework.PluginKind][]framework.PluginIdentifier
 }
 
 // NewRegistry returns a new registry.
@@ -64,8 +65,8 @@ func NewRegistry(dir string, logger logrus.FieldLogger, logLevel logrus.Level) R
 
 		processFactory: newProcessFactory(),
 		fs:             filesystem.NewFileSystem(),
-		pluginsByID:    make(map[kindAndName]PluginIdentifier),
-		pluginsByKind:  make(map[PluginKind][]PluginIdentifier),
+		pluginsByID:    make(map[kindAndName]framework.PluginIdentifier),
+		pluginsByKind:  make(map[framework.PluginKind][]framework.PluginIdentifier),
 	}
 }
 
@@ -108,16 +109,16 @@ func (r *registry) discoverPlugins(commands []string) error {
 
 // List returns info about all plugin binaries that implement the given
 // PluginKind.
-func (r *registry) List(kind PluginKind) []PluginIdentifier {
+func (r *registry) List(kind framework.PluginKind) []framework.PluginIdentifier {
 	return r.pluginsByKind[kind]
 }
 
 // Get returns info about a plugin with the given name and kind, or an
 // error if one cannot be found.
-func (r *registry) Get(kind PluginKind, name string) (PluginIdentifier, error) {
+func (r *registry) Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error) {
 	p, found := r.pluginsByID[kindAndName{kind: kind, name: name}]
 	if !found {
-		return PluginIdentifier{}, newPluginNotFoundError(kind, name)
+		return framework.PluginIdentifier{}, newPluginNotFoundError(kind, name)
 	}
 	return p, nil
 }
@@ -173,19 +174,19 @@ func executable(info os.FileInfo) bool {
 }
 
 // listPlugins executes command, queries it for registered plugins, and returns the list of PluginIdentifiers.
-func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
+func (r *registry) listPlugins(command string) ([]framework.PluginIdentifier, error) {
 	process, err := r.processFactory.newProcess(command, r.logger, r.logLevel)
 	if err != nil {
 		return nil, err
 	}
 	defer process.kill()
 
-	plugin, err := process.dispense(kindAndName{kind: PluginKindPluginLister})
+	plugin, err := process.dispense(kindAndName{kind: framework.PluginKindPluginLister})
 	if err != nil {
 		return nil, err
 	}
 
-	lister, ok := plugin.(PluginLister)
+	lister, ok := plugin.(framework.PluginLister)
 	if !ok {
 		return nil, errors.Errorf("%T is not a PluginLister", plugin)
 	}
@@ -194,7 +195,7 @@ func (r *registry) listPlugins(command string) ([]PluginIdentifier, error) {
 }
 
 // register registers a PluginIdentifier with the registry.
-func (r *registry) register(id PluginIdentifier) error {
+func (r *registry) register(id framework.PluginIdentifier) error {
 	key := kindAndName{kind: id.Kind, name: id.Name}
 	if existing, found := r.pluginsByID[key]; found {
 		return newDuplicatePluginRegistrationError(existing, id)
@@ -208,12 +209,12 @@ func (r *registry) register(id PluginIdentifier) error {
 
 // pluginNotFoundError indicates a plugin could not be located for kind and name.
 type pluginNotFoundError struct {
-	kind PluginKind
+	kind framework.PluginKind
 	name string
 }
 
 // newPluginNotFoundError returns a new pluginNotFoundError for kind and name.
-func newPluginNotFoundError(kind PluginKind, name string) *pluginNotFoundError {
+func newPluginNotFoundError(kind framework.PluginKind, name string) *pluginNotFoundError {
 	return &pluginNotFoundError{
 		kind: kind,
 		name: name,
@@ -225,11 +226,11 @@ func (e *pluginNotFoundError) Error() string {
 }
 
 type duplicatePluginRegistrationError struct {
-	existing  PluginIdentifier
-	duplicate PluginIdentifier
+	existing  framework.PluginIdentifier
+	duplicate framework.PluginIdentifier
 }
 
-func newDuplicatePluginRegistrationError(existing, duplicate PluginIdentifier) *duplicatePluginRegistrationError {
+func newDuplicatePluginRegistrationError(existing, duplicate framework.PluginIdentifier) *duplicatePluginRegistrationError {
 	return &duplicatePluginRegistrationError{
 		existing:  existing,
 		duplicate: duplicate,

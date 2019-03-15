@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package plugin
+
+package framework
 
 import (
 	plugin "github.com/hashicorp/go-plugin"
@@ -24,7 +25,7 @@ import (
 	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
-// PluginIdenitifer uniquely identifies a plugin by command, kind, and name.
+// PluginIdentifier uniquely identifies a plugin by command, kind, and name.
 type PluginIdentifier struct {
 	Command string
 	Kind    PluginKind

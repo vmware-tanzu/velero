@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/util/test"
 )
 
@@ -47,14 +48,14 @@ func TestClientConfig(t *testing.T) {
 	cb := newClientBuilder("velero", logger, logLevel)
 
 	expected := &hcplugin.ClientConfig{
-		HandshakeConfig:  Handshake,
+		HandshakeConfig:  framework.Handshake,
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(PluginKindBackupItemAction):  NewBackupItemActionPlugin(clientLogger(logger)),
-			string(PluginKindBlockStore):        NewBlockStorePlugin(clientLogger(logger)),
-			string(PluginKindObjectStore):       NewObjectStorePlugin(clientLogger(logger)),
-			string(PluginKindPluginLister):      &PluginListerPlugin{},
-			string(PluginKindRestoreItemAction): NewRestoreItemActionPlugin(clientLogger(logger)),
+			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(logger)),
+			string(framework.PluginKindBlockStore):        framework.NewBlockStorePlugin(framework.ClientLogger(logger)),
+			string(framework.PluginKindObjectStore):       framework.NewObjectStorePlugin(framework.ClientLogger(logger)),
+			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
+			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(logger)),
 		},
 		Logger: cb.pluginLogger,
 		Cmd:    exec.Command(cb.commandName, cb.commandArgs...),

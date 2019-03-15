@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/util/test"
 )
 
@@ -38,16 +39,16 @@ func (r *mockRegistry) DiscoverPlugins() error {
 	return args.Error(0)
 }
 
-func (r *mockRegistry) List(kind PluginKind) []PluginIdentifier {
+func (r *mockRegistry) List(kind framework.PluginKind) []framework.PluginIdentifier {
 	args := r.Called(kind)
-	return args.Get(0).([]PluginIdentifier)
+	return args.Get(0).([]framework.PluginIdentifier)
 }
 
-func (r *mockRegistry) Get(kind PluginKind, name string) (PluginIdentifier, error) {
+func (r *mockRegistry) Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error) {
 	args := r.Called(kind, name)
-	var id PluginIdentifier
+	var id framework.PluginIdentifier
 	if args.Get(0) != nil {
-		id = args.Get(0).(PluginIdentifier)
+		id = args.Get(0).(framework.PluginIdentifier)
 	}
 	return id, args.Error(1)
 }
@@ -120,7 +121,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	m.restartableProcessFactory = factory
 
 	// Test 1: registry error
-	pluginKind := PluginKindBackupItemAction
+	pluginKind := framework.PluginKindBackupItemAction
 	pluginName := "pod"
 	registry.On("Get", pluginKind, pluginName).Return(nil, errors.Errorf("registry")).Once()
 	rp, err := m.getRestartableProcess(pluginKind, pluginName)
@@ -128,7 +129,7 @@ func TestGetRestartableProcess(t *testing.T) {
 	assert.EqualError(t, err, "registry")
 
 	// Test 2: registry ok, factory error
-	podID := PluginIdentifier{
+	podID := framework.PluginIdentifier{
 		Command: "/command",
 		Kind:    pluginKind,
 		Name:    pluginName,
@@ -174,14 +175,14 @@ func TestCleanupClients(t *testing.T) {
 
 func TestGetObjectStore(t *testing.T) {
 	getPluginTest(t,
-		PluginKindObjectStore,
+		framework.PluginKindObjectStore,
 		"aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetObjectStore(name)
 		},
 		func(name string, sharedPluginProcess RestartableProcess) interface{} {
 			return &restartableObjectStore{
-				key:                 kindAndName{kind: PluginKindObjectStore, name: name},
+				key:                 kindAndName{kind: framework.PluginKindObjectStore, name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -191,14 +192,14 @@ func TestGetObjectStore(t *testing.T) {
 
 func TestGetBlockStore(t *testing.T) {
 	getPluginTest(t,
-		PluginKindBlockStore,
+		framework.PluginKindBlockStore,
 		"aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetBlockStore(name)
 		},
 		func(name string, sharedPluginProcess RestartableProcess) interface{} {
 			return &restartableBlockStore{
-				key:                 kindAndName{kind: PluginKindBlockStore, name: name},
+				key:                 kindAndName{kind: framework.PluginKindBlockStore, name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -208,14 +209,14 @@ func TestGetBlockStore(t *testing.T) {
 
 func TestGetBackupItemAction(t *testing.T) {
 	getPluginTest(t,
-		PluginKindBackupItemAction,
+		framework.PluginKindBackupItemAction,
 		"pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetBackupItemAction(name)
 		},
 		func(name string, sharedPluginProcess RestartableProcess) interface{} {
 			return &restartableBackupItemAction{
-				key:                 kindAndName{kind: PluginKindBackupItemAction, name: name},
+				key:                 kindAndName{kind: framework.PluginKindBackupItemAction, name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -225,14 +226,14 @@ func TestGetBackupItemAction(t *testing.T) {
 
 func TestGetRestoreItemAction(t *testing.T) {
 	getPluginTest(t,
-		PluginKindRestoreItemAction,
+		framework.PluginKindRestoreItemAction,
 		"pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetRestoreItemAction(name)
 		},
 		func(name string, sharedPluginProcess RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
-				key:                 kindAndName{kind: PluginKindRestoreItemAction, name: name},
+				key:                 kindAndName{kind: framework.PluginKindRestoreItemAction, name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},
@@ -242,7 +243,7 @@ func TestGetRestoreItemAction(t *testing.T) {
 
 func getPluginTest(
 	t *testing.T,
-	kind PluginKind,
+	kind framework.PluginKind,
 	name string,
 	getPluginFunc func(m Manager, name string) (interface{}, error),
 	expectedResultFunc func(name string, sharedPluginProcess RestartableProcess) interface{},
@@ -261,7 +262,7 @@ func getPluginTest(
 
 	pluginKind := kind
 	pluginName := name
-	pluginID := PluginIdentifier{
+	pluginID := framework.PluginIdentifier{
 		Command: "/command",
 		Kind:    pluginKind,
 		Name:    pluginName,
@@ -326,10 +327,10 @@ func TestGetBackupItemActions(t *testing.T) {
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
 
-			pluginKind := PluginKindBackupItemAction
-			var pluginIDs []PluginIdentifier
+			pluginKind := framework.PluginKindBackupItemAction
+			var pluginIDs []framework.PluginIdentifier
 			for i := range tc.names {
-				pluginID := PluginIdentifier{
+				pluginID := framework.PluginIdentifier{
 					Command: "/command",
 					Kind:    pluginKind,
 					Name:    tc.names[i],
@@ -418,10 +419,10 @@ func TestGetRestoreItemActions(t *testing.T) {
 			defer factory.AssertExpectations(t)
 			m.restartableProcessFactory = factory
 
-			pluginKind := PluginKindRestoreItemAction
-			var pluginIDs []PluginIdentifier
+			pluginKind := framework.PluginKindRestoreItemAction
+			var pluginIDs []framework.PluginIdentifier
 			for i := range tc.names {
-				pluginID := PluginIdentifier{
+				pluginID := framework.PluginIdentifier{
 					Command: "/command",
 					Kind:    pluginKind,
 					Name:    tc.names[i],

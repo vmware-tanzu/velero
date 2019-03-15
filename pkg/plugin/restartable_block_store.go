@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -34,7 +35,7 @@ type restartableBlockStore struct {
 
 // newRestartableBlockStore returns a new restartableBlockStore.
 func newRestartableBlockStore(name string, sharedPluginProcess RestartableProcess) *restartableBlockStore {
-	key := kindAndName{kind: PluginKindBlockStore, name: name}
+	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
 	r := &restartableBlockStore{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,

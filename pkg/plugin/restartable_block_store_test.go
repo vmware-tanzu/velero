@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/heptio/velero/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 func TestRestartableGetBlockStore(t *testing.T) {
@@ -58,7 +59,7 @@ func TestRestartableGetBlockStore(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: PluginKindBlockStore, name: name}
+			key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableBlockStore{
@@ -83,7 +84,7 @@ func TestRestartableBlockStoreReinitialize(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: PluginKindBlockStore, name: name}
+	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
 	r := &restartableBlockStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -116,7 +117,7 @@ func TestRestartableBlockStoreGetDelegate(t *testing.T) {
 	// Reset error
 	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: PluginKindBlockStore, name: name}
+	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
 	r := &restartableBlockStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -144,7 +145,7 @@ func TestRestartableBlockStoreInit(t *testing.T) {
 
 	// getBlockStore error
 	name := "aws"
-	key := kindAndName{kind: PluginKindBlockStore, name: name}
+	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
 	r := &restartableBlockStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -196,7 +197,7 @@ func TestRestartableBlockStoreDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		PluginKindBlockStore,
+		framework.PluginKindBlockStore,
 		func(key kindAndName, p RestartableProcess) interface{} {
 			return &restartableBlockStore{
 				key:                 key,
