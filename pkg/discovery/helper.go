@@ -109,7 +109,11 @@ func (h *helper) Refresh() error {
 
 	preferredResources, err := h.discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return errors.WithStack(err)
+		if discovery.IsGroupDiscoveryFailedError(err) {
+			h.logger.Warnf("Failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
+		} else {
+			return errors.WithStack(err)
+		}
 	}
 
 	h.resources = discovery.FilteredBy(
