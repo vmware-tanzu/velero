@@ -29,11 +29,13 @@ type ServerMetrics struct {
 
 const (
 	metricNamespace              = "velero"
+	backupTotal                  = "backup_total"
 	backupTarballSizeBytesGauge  = "backup_tarball_size_bytes"
 	backupAttemptTotal           = "backup_attempt_total"
 	backupSuccessTotal           = "backup_success_total"
 	backupFailureTotal           = "backup_failure_total"
 	backupDurationSeconds        = "backup_duration_seconds"
+	backupDeletionTotal          = "backup_deletion_total"
 	restoreAttemptTotal          = "restore_attempt_total"
 	restoreValidationFailedTotal = "restore_validation_failed_total"
 	restoreSuccessTotal          = "restore_success_total"
@@ -73,6 +75,14 @@ const (
 func NewServerMetrics() *ServerMetrics {
 	return &ServerMetrics{
 		metrics: map[string]prometheus.Collector{
+			backupTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupTotal,
+					Help:      "Number of existing backups",
+				},
+				[]string{scheduleLabel},
+			),
 			backupTarballSizeBytesGauge: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
 					Namespace: metricNamespace,
@@ -102,6 +112,14 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupFailureTotal,
 					Help:      "Total number of failed backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionTotal,
+					Help:      "Total number of deleted backups",
 				},
 				[]string{scheduleLabel},
 			),
@@ -305,6 +323,9 @@ func (m *ServerMetrics) RegisterAllMetrics() {
 
 // InitSchedule initializes counter metrics of a schedule.
 func (m *ServerMetrics) InitSchedule(scheduleName string) {
+	if c, ok := m.metrics[backupTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
@@ -312,6 +333,9 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[backupDeletionTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
@@ -370,6 +394,13 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	}
 	// TODO: remove code above this comment
 	// -------------------------------------------------------------------
+}
+
+// RegisterBackup records the existing number of backups
+func (m *ServerMetrics) RegisterBackup(backupSchedule string) {
+	if c, ok := m.metrics[backupTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
 }
 
 // SetBackupTarballSizeBytesGauge records the size, in bytes, of a backup tarball.
@@ -440,6 +471,13 @@ func (m *ServerMetrics) RegisterBackupDuration(backupSchedule string, seconds fl
 	}
 	// TODO: remove code above this comment
 	// -------------------------------------------------------------------
+}
+
+// RegisterBackupDeletion records the number of deleted backups
+func (m *ServerMetrics) RegisterBackupDeletion(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
 }
 
 // toSeconds translates a time.Duration value into a float64

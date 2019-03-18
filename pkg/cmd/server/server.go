@@ -612,6 +612,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			newPluginManager,
+			s.metrics,
 		)
 		wg.Add(1)
 		go func() {
