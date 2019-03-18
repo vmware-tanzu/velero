@@ -38,6 +38,7 @@ spec:
             - /velero
           args:
             - server
+            - --restore-resource-priorities=namespaces,storageclasses,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,customresourcedefinitions,imagestreams
             ## uncomment following line and specify values if needed for multiple provider snapshot locations
             # - --default-volume-snapshot-locations=<provider-1:location-1,provider-2:location-2,...>
           volumeMounts:

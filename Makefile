@@ -18,10 +18,10 @@
 BIN ?= velero
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/heptio/velero
+PKG := github.com/fusor/velero
 
 # Where to push the docker image.
-REGISTRY ?= gcr.io/heptio-images
+REGISTRY ?= quay.io/fusor
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
