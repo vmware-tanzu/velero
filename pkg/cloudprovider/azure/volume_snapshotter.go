@@ -162,6 +162,12 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 		Tags: snapshotInfo.Tags,
 	}
 
+	// Restore the disk in the correct zone
+	regionParts := strings.Split(volumeAZ, "-")
+	if len(regionParts) >= 2 {
+		disk.Zones = &[]string{regionParts[len(regionParts)-1]}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), b.apiTimeout)
 	defer cancel()
 
