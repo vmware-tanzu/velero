@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,6 +64,12 @@ var nonRestorableResources = []string{
 	// https://github.com/heptio/velero/issues/622
 	"restores.ark.heptio.com",
 	"restores.velero.io",
+
+	// Restic repositories are automatically managed by Velero and will be automatically
+	// created as needed if they don't exist.
+	// https://github.com/heptio/velero/issues/1113
+	"resticrepositories.ark.heptio.com",
+	"resticrepositories.velero.io",
 }
 
 type restoreController struct {
