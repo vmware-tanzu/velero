@@ -24,8 +24,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
@@ -92,30 +90,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 func (o *InstallOptions) Run(c *cobra.Command) error {
 
 	//TODO: Extract this logic into a function inside of the install package that anyone could use.
-	var resources []runtime.Object
-
-	crds := install.CRDs()
-	for _, crd := range crds {
-		resources = append(resources, crd)
-	}
-
-	ns := install.Namespace(o.Namespace)
-	resources = append(resources, ns)
-
-	crb := install.ClusterRoleBinding(o.Namespace)
-	resources = append(resources, crb)
-
-	sa := install.ServiceAccount(o.Namespace)
-	resources = append(resources, sa)
-
-	// TODO: pass config down.
-	bsl := install.BackupStorageLocation(o.Namespace, o.BackupStorageProviderName, o.BucketName, o.Prefix, nil)
-	resources = append(resources, bsl)
-
-	deploy := install.Deployment(o.Namespace,
-		install.WithImage(o.Image),
-	)
-	resources = append(resources, deploy)
+	resources := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
 
 	// TODO: Wrap the resources in a list instead o just printing with separators
 	for _, r := range resources {

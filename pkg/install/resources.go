@@ -20,6 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/apis/velero/v1"
 )
@@ -131,4 +132,37 @@ func VolumeSnapshotLocation(namespace, provider string, config map[string]string
 			Config:   config,
 		},
 	}
+}
+
+// AllResources returns a slice of all resources necessary to install Velero into a Kubernetes cluster.
+func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) []runtime.Object {
+	var resources []runtime.Object
+
+	crds := CRDs()
+	for _, crd := range crds {
+		resources = append(resources, crd)
+	}
+
+	ns := Namespace(namespace)
+	resources = append(resources, ns)
+
+	crb := ClusterRoleBinding(namespace)
+	resources = append(resources, crb)
+
+	sa := ServiceAccount(namespace)
+	resources = append(resources, sa)
+
+	// TODO: pass config down.
+	bsl := BackupStorageLocation(namespace, backupStorageProviderName, bucketName, prefix, nil)
+	resources = append(resources, bsl)
+
+	vsl := VolumeSnapshotLocation(namespace, backupStorageProviderName, nil)
+	resources = append(resources, vsl)
+
+	deploy := Deployment(namespace,
+		WithImage(image),
+	)
+	resources = append(resources, deploy)
+
+	return resources
 }
