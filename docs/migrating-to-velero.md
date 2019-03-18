@@ -36,14 +36,14 @@ kubectl scale --namespace heptio-ark deployment/ark --replicas 0
  ARCH="amd64"
 
 # Download the velero client/example tarball to and unpack
-curl https://github.com/heptio/velero/releases/download/v0.11.0/velero-v0.11.0-${OS}-${ARCH}.tar.gz --output velero-v0.11.0-${OS}-${ARCH}.tar.gz
+curl -L https://github.com/heptio/velero/releases/download/v0.11.0/velero-v0.11.0-${OS}-${ARCH}.tar.gz --output velero-v0.11.0-${OS}-${ARCH}.tar.gz
 tar xvf velero-v0.11.0-${OS}-${ARCH}.tar.gz
 
 # Create the prerequisite CRDs and namespace
 kubectl apply -f config/common/00-prereqs.yaml
 
 # Download and unpack the crd-migrator tool
-curl https://github.com/vmware/crd-migration-tool/releases/download/v1.0.0/crd-migration-tool-v1.0.0-${OS}-${ARCH}.tar.gz --output crd-migration-tool-v1.0.0-${OS}-${ARCH}.tar.gz
+curl -L https://github.com/vmware/crd-migration-tool/releases/download/v1.0.0/crd-migration-tool-v1.0.0-${OS}-${ARCH}.tar.gz --output crd-migration-tool-v1.0.0-${OS}-${ARCH}.tar.gz
 tar xvf crd-migration-tool-v1.0.0-${OS}-${ARCH}.tar.gz
 
 # Run the tool against your cluster.
