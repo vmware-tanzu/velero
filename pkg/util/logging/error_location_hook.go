@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,6 +45,17 @@ func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
 	)
 
 	if errObj, exists = entry.Data[logrus.ErrorKey]; !exists {
+		return nil
+	}
+
+	if _, ok := entry.Data[errorFileField]; ok {
+		// If there is already an error file field, preserve it instead of overwriting it. This field will already exist if
+		// the log message occurred in the server half of a plugin.
+		return nil
+	}
+	if _, ok := entry.Data[errorFunctionField]; ok {
+		// If there is already an error function field, preserve it instead of overwriting it. This field will already exist if
+		// the log message occurred in the server half of a plugin.
 		return nil
 	}
 
