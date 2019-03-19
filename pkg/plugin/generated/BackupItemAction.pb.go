@@ -45,6 +45,8 @@ It has these top-level messages:
 	InitRequest
 	AppliesToRequest
 	AppliesToResponse
+	Stack
+	StackFrame
 */
 package generated
 

@@ -19,6 +19,7 @@ package framework
 import (
 	"encoding/json"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,9 +53,16 @@ func newBlockStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) inte
 // configuration key-value pairs. It returns an error if the BlockStore
 // cannot be initialized from the provided config.
 func (c *BlockStoreGRPCClient) Init(config map[string]string) error {
-	_, err := c.grpcClient.Init(context.Background(), &proto.InitRequest{Plugin: c.plugin, Config: config})
+	req := &proto.InitRequest{
+		Plugin: c.plugin,
+		Config: config,
+	}
 
-	return err
+	if _, err := c.grpcClient.Init(context.Background(), req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
 }
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
@@ -75,7 +83,7 @@ func (c *BlockStoreGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 
 	res, err := c.grpcClient.CreateVolumeFromSnapshot(context.Background(), req)
 	if err != nil {
-		return "", err
+		return "", fromGRPCError(err)
 	}
 
 	return res.VolumeID, nil
@@ -84,9 +92,15 @@ func (c *BlockStoreGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
 func (c *BlockStoreGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
-	res, err := c.grpcClient.GetVolumeInfo(context.Background(), &proto.GetVolumeInfoRequest{Plugin: c.plugin, VolumeID: volumeID, VolumeAZ: volumeAZ})
+	req := &proto.GetVolumeInfoRequest{
+		Plugin:   c.plugin,
+		VolumeID: volumeID,
+		VolumeAZ: volumeAZ,
+	}
+
+	res, err := c.grpcClient.GetVolumeInfo(context.Background(), req)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fromGRPCError(err)
 	}
 
 	var iops *int64
@@ -109,7 +123,7 @@ func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags ma
 
 	res, err := c.grpcClient.CreateSnapshot(context.Background(), req)
 	if err != nil {
-		return "", err
+		return "", fromGRPCError(err)
 	}
 
 	return res.SnapshotID, nil
@@ -117,15 +131,22 @@ func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags ma
 
 // DeleteSnapshot deletes the specified volume snapshot.
 func (c *BlockStoreGRPCClient) DeleteSnapshot(snapshotID string) error {
-	_, err := c.grpcClient.DeleteSnapshot(context.Background(), &proto.DeleteSnapshotRequest{Plugin: c.plugin, SnapshotID: snapshotID})
+	req := &proto.DeleteSnapshotRequest{
+		Plugin:     c.plugin,
+		SnapshotID: snapshotID,
+	}
 
-	return err
+	if _, err := c.grpcClient.DeleteSnapshot(context.Background(), req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
 }
 
 func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 
 	req := &proto.GetVolumeIDRequest{
@@ -135,7 +156,7 @@ func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, err
 
 	resp, err := c.grpcClient.GetVolumeID(context.Background(), req)
 	if err != nil {
-		return "", err
+		return "", fromGRPCError(err)
 	}
 
 	return resp.VolumeID, nil
@@ -144,7 +165,7 @@ func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, err
 func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	req := &proto.SetVolumeIDRequest{
@@ -155,13 +176,12 @@ func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID str
 
 	resp, err := c.grpcClient.SetVolumeID(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, fromGRPCError(err)
 	}
 
 	var updatedPV unstructured.Unstructured
 	if err := json.Unmarshal(resp.PersistentVolume, &updatedPV); err != nil {
-		return nil, err
-
+		return nil, errors.WithStack(err)
 	}
 
 	return &updatedPV, nil

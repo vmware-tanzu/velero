@@ -19,3 +19,13 @@ message AppliesToResponse {
     repeated string excludedResources = 4;
     string selector = 5;
 }
+
+message Stack {
+    repeated StackFrame frames = 1;
+}
+
+message StackFrame {
+    string file = 1;
+    int32 line = 2;
+    string function = 3;
+}

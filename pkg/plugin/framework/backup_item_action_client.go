@@ -19,6 +19,7 @@ package framework
 import (
 	"encoding/json"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -52,9 +53,13 @@ func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
+	req := &proto.AppliesToRequest{
+		Plugin: c.plugin,
+	}
+
+	res, err := c.grpcClient.AppliesTo(context.Background(), req)
 	if err != nil {
-		return velero.ResourceSelector{}, err
+		return velero.ResourceSelector{}, fromGRPCError(err)
 	}
 
 	return velero.ResourceSelector{
@@ -69,12 +74,12 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error
 func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	itemJSON, err := json.Marshal(item.UnstructuredContent())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
 	backupJSON, err := json.Marshal(backup)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
 	req := &proto.ExecuteRequest{
@@ -85,12 +90,12 @@ func (c *BackupItemActionGRPCClient) Execute(item runtime.Unstructured, backup *
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fromGRPCError(err)
 	}
 
 	var updatedItem unstructured.Unstructured
 	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.WithStack(err)
 	}
 
 	var additionalItems []velero.ResourceIdentifier

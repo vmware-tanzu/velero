@@ -59,11 +59,11 @@ func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest)
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	if err := impl.Init(req.Config); err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -80,7 +80,7 @@ func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	snapshotID := req.SnapshotID
@@ -94,7 +94,7 @@ func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req
 
 	volumeID, err := impl.CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ, iops)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.CreateVolumeResponse{VolumeID: volumeID}, nil
@@ -111,12 +111,12 @@ func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.Get
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	volumeType, iops, err := impl.GetVolumeInfo(req.VolumeID, req.VolumeAZ)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	res := &proto.GetVolumeInfoResponse{
@@ -141,12 +141,12 @@ func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.Cr
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	snapshotID, err := impl.CreateSnapshot(req.VolumeID, req.VolumeAZ, req.Tags)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.CreateSnapshotResponse{SnapshotID: snapshotID}, nil
@@ -162,11 +162,11 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	if err := impl.DeleteSnapshot(req.SnapshotID); err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -181,18 +181,18 @@ func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVo
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	var pv unstructured.Unstructured
 
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	volumeID, err := impl.GetVolumeID(&pv)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
@@ -207,23 +207,22 @@ func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVo
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	var pv unstructured.Unstructured
-
 	if err := json.Unmarshal(req.PersistentVolume, &pv); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	updatedPV, err := impl.SetVolumeID(&pv, req.VolumeID)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	updatedPVBytes, err := json.Marshal(updatedPV.UnstructuredContent())
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.SetVolumeIDResponse{PersistentVolume: updatedPVBytes}, nil

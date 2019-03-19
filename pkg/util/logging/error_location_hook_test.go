@@ -55,7 +55,7 @@ func TestFire(t *testing.T) {
 			expectedEntryFields: map[string]interface{}{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
 				errorFileField:     "",
-				errorFunctionField: "TestFire",
+				errorFunctionField: "github.com/heptio/velero/pkg/util/logging.TestFire",
 			},
 		},
 	}

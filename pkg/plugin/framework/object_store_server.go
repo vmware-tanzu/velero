@@ -59,11 +59,11 @@ func (s *ObjectStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	if err := impl.Init(req.Config); err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -82,12 +82,12 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 	// in our receive method, we'll use `first` on the first call
 	firstChunk, err := stream.Recv()
 	if err != nil {
-		return err
+		return newGRPCError(errors.WithStack(err))
 	}
 
 	impl, err := s.getImpl(firstChunk.Plugin)
 	if err != nil {
-		return err
+		return newGRPCError(err)
 	}
 
 	bucket := firstChunk.Bucket
@@ -102,7 +102,7 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 
 		data, err := stream.Recv()
 		if err != nil {
-			return nil, err
+			return nil, errors.WithStack(err)
 		}
 		return data.Body, nil
 	}
@@ -112,10 +112,14 @@ func (s *ObjectStoreGRPCServer) PutObject(stream proto.ObjectStore_PutObjectServ
 	}
 
 	if err := impl.PutObject(bucket, key, &StreamReadCloser{receive: receive, close: close}); err != nil {
-		return err
+		return newGRPCError(err)
 	}
 
-	return stream.SendAndClose(&proto.Empty{})
+	if err := stream.SendAndClose(&proto.Empty{}); err != nil {
+		return newGRPCError(errors.WithStack(err))
+	}
+
+	return nil
 }
 
 // GetObject retrieves the object with the given key from the specified
@@ -129,12 +133,12 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return err
+		return newGRPCError(err)
 	}
 
 	rdr, err := impl.GetObject(req.Bucket, req.Key)
 	if err != nil {
-		return err
+		return newGRPCError(err)
 	}
 	defer rdr.Close()
 
@@ -142,14 +146,14 @@ func (s *ObjectStoreGRPCServer) GetObject(req *proto.GetObjectRequest, stream pr
 	for {
 		n, err := rdr.Read(chunk)
 		if err != nil && err != io.EOF {
-			return err
+			return newGRPCError(errors.WithStack(err))
 		}
 		if n == 0 {
 			return nil
 		}
 
 		if err := stream.Send(&proto.Bytes{Data: chunk[0:n]}); err != nil {
-			return err
+			return newGRPCError(errors.WithStack(err))
 		}
 	}
 }
@@ -166,12 +170,12 @@ func (s *ObjectStoreGRPCServer) ListCommonPrefixes(ctx context.Context, req *pro
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	prefixes, err := impl.ListCommonPrefixes(req.Bucket, req.Prefix, req.Delimiter)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.ListCommonPrefixesResponse{Prefixes: prefixes}, nil
@@ -187,12 +191,12 @@ func (s *ObjectStoreGRPCServer) ListObjects(ctx context.Context, req *proto.List
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	keys, err := impl.ListObjects(req.Bucket, req.Prefix)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.ListObjectsResponse{Keys: keys}, nil
@@ -209,11 +213,11 @@ func (s *ObjectStoreGRPCServer) DeleteObject(ctx context.Context, req *proto.Del
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	if err := impl.DeleteObject(req.Bucket, req.Key); err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.Empty{}, nil
@@ -229,12 +233,12 @@ func (s *ObjectStoreGRPCServer) CreateSignedURL(ctx context.Context, req *proto.
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	url, err := impl.CreateSignedURL(req.Bucket, req.Key, time.Duration(req.Ttl))
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.CreateSignedURLResponse{Url: url}, nil

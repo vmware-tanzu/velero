@@ -57,12 +57,12 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.A
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.AppliesToResponse{
@@ -83,22 +83,22 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	var item unstructured.Unstructured
 	var backup api.Backup
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 	if err := json.Unmarshal(req.Backup, &backup); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	updatedItem, additionalItems, err := impl.Execute(&item, &backup)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	// If the plugin implementation returned a nil updatedItem (meaning no modifications), reset updatedItem to the
@@ -109,7 +109,7 @@ func (s *BackupItemActionGRPCServer) Execute(ctx context.Context, req *proto.Exe
 	} else {
 		updatedItemJSON, err = json.Marshal(updatedItem.UnstructuredContent())
 		if err != nil {
-			return nil, err
+			return nil, newGRPCError(errors.WithStack(err))
 		}
 	}
 
