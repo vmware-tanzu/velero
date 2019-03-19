@@ -489,6 +489,8 @@ func (s *server) initRestic() error {
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
 		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.kubeClient.CoreV1(),
+		s.kubeClient.CoreV1(),
 		s.logger,
 	)
 	if err != nil {

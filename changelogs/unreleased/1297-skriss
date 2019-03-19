@@ -1,0 +1,1 @@
+check for and exclude hostPath-based persistent volumes from restic backup
