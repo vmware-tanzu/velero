@@ -39,7 +39,8 @@ func CRDs() []*apiextv1beta1.CustomResourceDefinition {
 func crd(kind, plural string) *apiextv1beta1.CustomResourceDefinition {
 	return &apiextv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
+			Name:   fmt.Sprintf("%s.%s", plural, velerov1api.GroupName),
+			Labels: labels(),
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "CustomResourceDefinition",
