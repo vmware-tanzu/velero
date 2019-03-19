@@ -38,7 +38,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -146,7 +146,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Velero().V1().PodVolumeBackups(),
 			sharedInformers.Velero().V1().BackupStorageLocations(),
 			sharedInformers.Velero().V1().VolumeSnapshotLocations(),
-			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 		).(*backupDeletionController),
 
 		req: req,
@@ -389,7 +389,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
 		pluginManager.On("CleanupClients")
-		td.controller.newPluginManager = func(logrus.FieldLogger) plugin.Manager { return pluginManager }
+		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)
 		td.backupStore.On("DeleteRestore", "restore-1").Return(nil)
@@ -528,7 +528,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		pluginManager := &pluginmocks.Manager{}
 		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
 		pluginManager.On("CleanupClients")
-		td.controller.newPluginManager = func(logrus.FieldLogger) plugin.Manager { return pluginManager }
+		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
 		td.backupStore.On("GetBackupVolumeSnapshots", td.req.Spec.BackupName).Return(snapshots, nil)
 		td.backupStore.On("DeleteBackup", td.req.Spec.BackupName).Return(nil)

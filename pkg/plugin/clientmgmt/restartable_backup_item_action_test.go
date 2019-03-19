@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package plugin
+package clientmgmt
 
 import (
 	"testing"
@@ -23,14 +23,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup/mocks"
 	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/restore/mocks"
 )
 
-func TestRestartableGetRestoreItemAction(t *testing.T) {
+func TestRestartableGetBackupItemAction(t *testing.T) {
 	tests := []struct {
 		name          string
 		plugin        interface{}
@@ -45,7 +46,7 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a RestoreItemAction!",
+			expectedError: "int is not a BackupItemAction!",
 		},
 		{
 			name:   "happy path",
@@ -59,11 +60,11 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
+			key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := newRestartableRestoreItemAction(name, p)
-			a, err := r.getRestoreItemAction()
+			r := newRestartableBackupItemAction(name, p)
+			a, err := r.getBackupItemAction()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
 				return
@@ -75,14 +76,14 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 	}
 }
 
-func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
+func TestRestartableBackupItemActionGetDelegate(t *testing.T) {
 	p := new(mockRestartableProcess)
 	defer p.AssertExpectations(t)
 
 	// Reset error
 	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "pod"
-	r := newRestartableRestoreItemAction(name, p)
+	r := newRestartableBackupItemAction(name, p)
 	a, err := r.getDelegate()
 	assert.Nil(t, a)
 	assert.EqualError(t, err, "reset error")
@@ -90,7 +91,7 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
 	expected := new(mocks.ItemAction)
-	key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
+	key := kindAndName{kind: framework.PluginKindBackupItemAction, name: name}
 	p.On("getByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -98,33 +99,32 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	assert.Equal(t, expected, a)
 }
 
-func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
+func TestRestartableBackupItemActionDelegatedFunctions(t *testing.T) {
+	b := new(v1.Backup)
+
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"color": "blue",
 		},
 	}
 
-	input := &velero.RestoreItemActionExecuteInput{
-		Item:           pv,
-		ItemFromBackup: pv,
-		Restore:        new(v1.Restore),
+	pvToReturn := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"color": "green",
+		},
 	}
 
-	output := &velero.RestoreItemActionExecuteOutput{
-		UpdatedItem: &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"color": "green",
-			},
+	additionalItems := []velero.ResourceIdentifier{
+		{
+			GroupResource: schema.GroupResource{Group: "velero.io", Resource: "backups"},
 		},
-		Warning: errors.Errorf("delegate warning"),
 	}
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindRestoreItemAction,
+		framework.PluginKindBackupItemAction,
 		func(key kindAndName, p RestartableProcess) interface{} {
-			return &restartableRestoreItemAction{
+			return &restartableBackupItemAction{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
@@ -140,9 +140,9 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 		},
 		restartableDelegateTest{
 			function:                "Execute",
-			inputs:                  []interface{}{input},
-			expectedErrorOutputs:    []interface{}{nil, errors.Errorf("reset error")},
-			expectedDelegateOutputs: []interface{}{output, errors.Errorf("delegate error")},
+			inputs:                  []interface{}{pv, b},
+			expectedErrorOutputs:    []interface{}{nil, ([]velero.ResourceIdentifier)(nil), errors.Errorf("reset error")},
+			expectedDelegateOutputs: []interface{}{pvToReturn, additionalItems, errors.Errorf("delegate error")},
 		},
 	)
 }
