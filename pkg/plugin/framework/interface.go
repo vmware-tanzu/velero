@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,28 +13,16 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package plugin
 
-import (
-	"testing"
+package framework
 
-	"github.com/stretchr/testify/assert"
+import plugin "github.com/hashicorp/go-plugin"
 
-	"github.com/heptio/velero/pkg/util/test"
-)
+// Interface represents a Velero plugin.
+type Interface interface {
+	plugin.Plugin
 
-func TestClientLogger(t *testing.T) {
-	base := &pluginBase{}
-	logger := test.NewLogger()
-	f := clientLogger(logger)
-	f(base)
-	assert.Equal(t, logger, base.clientLogger)
-}
-
-func TestServerLogger(t *testing.T) {
-	base := &pluginBase{}
-	logger := test.NewLogger()
-	f := serverLogger(logger)
-	f(base)
-	assert.Equal(t, newServerMux(logger), base.serverMux)
+	// names returns a list of all the registered implementations for this plugin (such as "pod" and "pvc" for
+	// BackupItemAction).
+	names() []string
 }

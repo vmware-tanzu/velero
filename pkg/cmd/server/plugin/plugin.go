@@ -26,7 +26,7 @@ import (
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	"github.com/heptio/velero/pkg/cloudprovider/gcp"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	veleroplugin "github.com/heptio/velero/pkg/plugin"
+	veleroplugin "github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/restore"
 )
 

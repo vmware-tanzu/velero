@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 func TestRestartableGetObjectStore(t *testing.T) {
@@ -59,7 +60,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: PluginKindObjectStore, name: name}
+			key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := &restartableObjectStore{
@@ -84,7 +85,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: PluginKindObjectStore, name: name}
+	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -117,7 +118,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 	// Reset error
 	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: PluginKindObjectStore, name: name}
+	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -145,7 +146,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 
 	// getObjectStore error
 	name := "aws"
-	key := kindAndName{kind: PluginKindObjectStore, name: name}
+	key := kindAndName{kind: framework.PluginKindObjectStore, name: name}
 	r := &restartableObjectStore{
 		key:                 key,
 		sharedPluginProcess: p,
@@ -185,7 +186,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 	runRestartableDelegateTests(
 		t,
-		PluginKindObjectStore,
+		framework.PluginKindObjectStore,
 		func(key kindAndName, p RestartableProcess) interface{} {
 			return &restartableObjectStore{
 				key:                 key,

@@ -22,6 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 type mockClientProtocol struct {
@@ -47,7 +49,7 @@ type mockClientDispenser struct {
 	mock.Mock
 }
 
-func (cd *mockClientDispenser) clientFor(name string) interface{} {
+func (cd *mockClientDispenser) ClientFor(name string) interface{} {
 	args := cd.Called(name)
 	return args.Get(0)
 }
@@ -94,17 +96,17 @@ func TestDispense(t *testing.T) {
 
 			key := kindAndName{}
 			if tc.clientDispenser {
-				key.kind = PluginKindObjectStore
+				key.kind = framework.PluginKindObjectStore
 				protocolClient.On("Dispense", key.kind.String()).Return(clientDispenser, tc.dispenseError)
 
 				if !tc.missingKeyName {
 					key.name = "aws"
-					client = &BackupItemActionGRPCClient{}
-					clientDispenser.On("clientFor", key.name).Return(client)
+					client = &framework.BackupItemActionGRPCClient{}
+					clientDispenser.On("ClientFor", key.name).Return(client)
 				}
 			} else {
-				key.kind = PluginKindPluginLister
-				client = &PluginListerGRPCClient{}
+				key.kind = framework.PluginKindPluginLister
+				client = &framework.PluginListerGRPCClient{}
 				protocolClient.On("Dispense", key.kind.String()).Return(client, tc.dispenseError)
 			}
 

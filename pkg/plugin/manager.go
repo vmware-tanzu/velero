@@ -21,6 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -86,12 +87,12 @@ func (m *manager) CleanupClients() {
 
 // getRestartableProcess returns a restartableProcess for a plugin identified by kind and name, creating a
 // restartableProcess if it is the first time it has been requested.
-func (m *manager) getRestartableProcess(kind PluginKind, name string) (RestartableProcess, error) {
+func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) (RestartableProcess, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	logger := m.logger.WithFields(logrus.Fields{
-		"kind": PluginKindObjectStore.String(),
+		"kind": framework.PluginKindObjectStore.String(),
 		"name": name,
 	})
 	logger.Debug("looking for plugin in registry")
@@ -123,7 +124,7 @@ func (m *manager) getRestartableProcess(kind PluginKind, name string) (Restartab
 
 // GetObjectStore returns a restartableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
-	restartableProcess, err := m.getRestartableProcess(PluginKindObjectStore, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +136,7 @@ func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 
 // GetBlockStore returns a restartableBlockStore for name.
 func (m *manager) GetBlockStore(name string) (velero.BlockStore, error) {
-	restartableProcess, err := m.getRestartableProcess(PluginKindBlockStore, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBlockStore, name)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ func (m *manager) GetBlockStore(name string) (velero.BlockStore, error) {
 
 // GetBackupItemActions returns all backup item actions as restartableBackupItemActions.
 func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
-	list := m.registry.List(PluginKindBackupItemAction)
+	list := m.registry.List(framework.PluginKindBackupItemAction)
 
 	actions := make([]velero.BackupItemAction, 0, len(list))
 
@@ -167,7 +168,7 @@ func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
 func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
-	restartableProcess, err := m.getRestartableProcess(PluginKindBackupItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +179,7 @@ func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, err
 
 // GetRestoreItemActions returns all restore item actions as restartableRestoreItemActions.
 func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
-	list := m.registry.List(PluginKindRestoreItemAction)
+	list := m.registry.List(framework.PluginKindRestoreItemAction)
 
 	actions := make([]velero.RestoreItemAction, 0, len(list))
 
@@ -198,7 +199,7 @@ func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
 func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
-	restartableProcess, err := m.getRestartableProcess(PluginKindRestoreItemAction, name)
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemAction, name)
 	if err != nil {
 		return nil, err
 	}

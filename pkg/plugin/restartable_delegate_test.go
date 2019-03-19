@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 type restartableDelegateTest struct {
@@ -40,7 +42,7 @@ type mockable interface {
 
 func runRestartableDelegateTests(
 	t *testing.T,
-	kind PluginKind,
+	kind framework.PluginKind,
 	newRestartable func(key kindAndName, p RestartableProcess) interface{},
 	newMock func() mockable,
 	tests ...restartableDelegateTest,

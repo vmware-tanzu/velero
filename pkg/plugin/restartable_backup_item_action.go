@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
@@ -35,7 +36,7 @@ type restartableBackupItemAction struct {
 // newRestartableBackupItemAction returns a new restartableBackupItemAction.
 func newRestartableBackupItemAction(name string, sharedPluginProcess RestartableProcess) *restartableBackupItemAction {
 	r := &restartableBackupItemAction{
-		key:                 kindAndName{kind: PluginKindBackupItemAction, name: name},
+		key:                 kindAndName{kind: framework.PluginKindBackupItemAction, name: name},
 		sharedPluginProcess: sharedPluginProcess,
 	}
 	return r

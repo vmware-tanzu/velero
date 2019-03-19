@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package plugin
+package framework
 
 import (
 	"testing"
@@ -61,7 +61,7 @@ func TestClientFor(t *testing.T) {
 
 	cd := newClientDispenser(logger, clientConn, initFunc)
 
-	actual := cd.clientFor("pod")
+	actual := cd.ClientFor("pod")
 	require.IsType(t, &fakeClient{}, actual)
 	typed := actual.(*fakeClient)
 	assert.Equal(t, 1, count)
@@ -74,7 +74,7 @@ func TestClientFor(t *testing.T) {
 	assert.Equal(t, clientConn, typed.clientConn)
 
 	// Make sure we reuse a previous client
-	actual = cd.clientFor("pod")
+	actual = cd.ClientFor("pod")
 	require.IsType(t, &fakeClient{}, actual)
 	typed = actual.(*fakeClient)
 	assert.Equal(t, 1, count)

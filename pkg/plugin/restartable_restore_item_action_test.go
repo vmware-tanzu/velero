@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore/mocks"
 )
@@ -58,7 +59,7 @@ func TestRestartableGetRestoreItemAction(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "pod"
-			key := kindAndName{kind: PluginKindRestoreItemAction, name: name}
+			key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
 			r := newRestartableRestoreItemAction(name, p)
@@ -89,7 +90,7 @@ func TestRestartableRestoreItemActionGetDelegate(t *testing.T) {
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
 	expected := new(mocks.ItemAction)
-	key := kindAndName{kind: PluginKindRestoreItemAction, name: name}
+	key := kindAndName{kind: framework.PluginKindRestoreItemAction, name: name}
 	p.On("getByKindAndName", key).Return(expected, nil)
 
 	a, err = r.getDelegate()
@@ -121,7 +122,7 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		PluginKindRestoreItemAction,
+		framework.PluginKindRestoreItemAction,
 		func(key kindAndName, p RestartableProcess) interface{} {
 			return &restartableRestoreItemAction{
 				key:                 key,

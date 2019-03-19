@@ -22,6 +22,8 @@ import (
 	"github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
+
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 // clientBuilder builds go-plugin Clients.
@@ -56,14 +58,14 @@ func newLogrusAdapter(pluginLogger logrus.FieldLogger, logLevel logrus.Level) *l
 
 func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 	return &hcplugin.ClientConfig{
-		HandshakeConfig:  Handshake,
+		HandshakeConfig:  framework.Handshake,
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
-			string(PluginKindBackupItemAction):  NewBackupItemActionPlugin(clientLogger(b.clientLogger)),
-			string(PluginKindBlockStore):        NewBlockStorePlugin(clientLogger(b.clientLogger)),
-			string(PluginKindObjectStore):       NewObjectStorePlugin(clientLogger(b.clientLogger)),
-			string(PluginKindPluginLister):      &PluginListerPlugin{},
-			string(PluginKindRestoreItemAction): NewRestoreItemActionPlugin(clientLogger(b.clientLogger)),
+			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindBlockStore):        framework.NewBlockStorePlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindObjectStore):       framework.NewObjectStorePlugin(framework.ClientLogger(b.clientLogger)),
+			string(framework.PluginKindPluginLister):      &framework.PluginListerPlugin{},
+			string(framework.PluginKindRestoreItemAction): framework.NewRestoreItemActionPlugin(framework.ClientLogger(b.clientLogger)),
 		},
 		Logger: b.pluginLogger,
 		Cmd:    exec.Command(b.commandName, b.commandArgs...),
