@@ -20,7 +20,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/velero/pkg/apis/velero/v1"
 )
@@ -134,35 +136,53 @@ func VolumeSnapshotLocation(namespace, provider string, config map[string]string
 	}
 }
 
-// AllResources returns a slice of all resources necessary to install Velero into a Kubernetes cluster.
-func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) []runtime.Object {
-	var resources []runtime.Object
+func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
+	if err != nil {
+		return err
+	}
+	list.Items = append(list.Items, unstructured.Unstructured{Object: u})
+	return nil
+}
 
-	crds := CRDs()
-	for _, crd := range crds {
-		resources = append(resources, crd)
+// AllResources returns a slice of all resources necessary to install Velero into a Kubernetes cluster.
+func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) (*unstructured.UnstructuredList, error) {
+	resources := new(unstructured.UnstructuredList)
+	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
+
+	for _, crd := range CRDs() {
+		unstructuredCRD, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&crd)
+		// Remove the status field, as it's added with null values by the code, but is rejected by server-side validation
+		delete(unstructuredCRD, "status")
+		if err != nil {
+			// TODO: Wrap the error
+			return nil, err
+		}
+		resources.Items = append(resources.Items, unstructured.Unstructured{Object: unstructuredCRD})
 	}
 
 	ns := Namespace(namespace)
-	resources = append(resources, ns)
+	appendUnstructured(resources, ns)
 
 	crb := ClusterRoleBinding(namespace)
-	resources = append(resources, crb)
+	appendUnstructured(resources, crb)
 
 	sa := ServiceAccount(namespace)
-	resources = append(resources, sa)
+	appendUnstructured(resources, sa)
 
 	// TODO: pass config down.
 	bsl := BackupStorageLocation(namespace, backupStorageProviderName, bucketName, prefix, nil)
-	resources = append(resources, bsl)
+	appendUnstructured(resources, bsl)
 
 	vsl := VolumeSnapshotLocation(namespace, backupStorageProviderName, nil)
-	resources = append(resources, vsl)
+	appendUnstructured(resources, vsl)
 
 	deploy := Deployment(namespace,
 		WithImage(image),
 	)
-	resources = append(resources, deploy)
+	appendUnstructured(resources, deploy)
 
-	return resources
+	//TODO: Restic daemonset
+
+	return resources, nil
 }

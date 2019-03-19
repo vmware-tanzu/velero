@@ -17,7 +17,6 @@ limitations under the License.
 package install
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -89,15 +88,14 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 func (o *InstallOptions) Run(c *cobra.Command) error {
 
-	//TODO: Extract this logic into a function inside of the install package that anyone could use.
-	resources := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
+	resources, err := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
+	if err != nil {
+		return err
+	}
 
 	// TODO: Wrap the resources in a list instead o just printing with separators
-	for _, r := range resources {
-		fmt.Println("---")
-		if _, err := output.PrintWithFormat(c, r); err != nil {
-			return err
-		}
+	if _, err := output.PrintWithFormat(c, resources); err != nil {
+		return err
 	}
 
 	return nil
