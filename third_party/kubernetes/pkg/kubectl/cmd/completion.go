@@ -2,7 +2,7 @@
 The original code is from https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/completion.go -
 
 Copyright 2016 The Kubernetes Authors.
-Modifications Copyright 2018 the Heptio Ark contributors.
+Modifications Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
