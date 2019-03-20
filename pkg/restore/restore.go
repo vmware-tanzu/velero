@@ -372,12 +372,12 @@ func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
 	// need to set this for additionalItems to be restored
 	ctx.restoreDir = dir
 
-	return ctx.restoreFromDir(dir)
+	return ctx.restoreFromDir()
 }
 
 // restoreFromDir executes a restore based on backup data contained within a local
-// directory.
-func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreResult) {
+// directory, ctx.restoreDir.
+func (ctx *context) restoreFromDir() (api.RestoreResult, api.RestoreResult) {
 	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
 
 	namespaceFilter := collections.NewIncludesExcludes().
@@ -385,7 +385,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 		Excludes(ctx.restore.Spec.ExcludedNamespaces...)
 
 	// Make sure the top level "resources" dir exists:
-	resourcesDir := filepath.Join(dir, api.ResourcesDir)
+	resourcesDir := filepath.Join(ctx.restoreDir, api.ResourcesDir)
 	rde, err := ctx.fileSystem.DirExists(resourcesDir)
 	if err != nil {
 		addVeleroError(&errs, err)
@@ -477,7 +477,7 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 			// create a blank one.
 			if !existingNamespaces.Has(mappedNsName) {
 				logger := ctx.log.WithField("namespace", nsName)
-				ns := getNamespace(logger, filepath.Join(dir, api.ResourcesDir, "namespaces", api.ClusterScopedDir, nsName+".json"), mappedNsName)
+				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", nsName), mappedNsName)
 				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 					addVeleroError(&errs, err)
 					continue
@@ -507,6 +507,15 @@ func (ctx *context) restoreFromDir(dir string) (api.RestoreResult, api.RestoreRe
 	}
 
 	return warnings, errs
+}
+
+func getItemFilePath(rootDir, groupResource, namespace, name string) string {
+	switch namespace {
+	case "":
+		return filepath.Join(rootDir, api.ResourcesDir, groupResource, api.ClusterScopedDir, name+".json")
+	default:
+		return filepath.Join(rootDir, api.ResourcesDir, groupResource, api.NamespaceScopedDir, namespace, name+".json")
+	}
 }
 
 // getNamespace returns a namespace API object that we should attempt to
@@ -922,12 +931,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		obj = unstructuredObj
 
 		for _, additionalItem := range executeOutput.AdditionalItems {
-			var itemPath string
-			if additionalItem.Namespace == "" {
-				itemPath = filepath.Join(ctx.restoreDir, api.ResourcesDir, additionalItem.GroupResource.String(), api.ClusterScopedDir, additionalItem.Name+".json")
-			} else {
-				itemPath = filepath.Join(ctx.restoreDir, api.ResourcesDir, additionalItem.GroupResource.String(), api.NamespaceScopedDir, additionalItem.Namespace, additionalItem.Name+".json")
-			}
+			itemPath := getItemFilePath(ctx.restoreDir, additionalItem.GroupResource.String(), additionalItem.Namespace, additionalItem.Name)
 
 			if _, err := ctx.fileSystem.Stat(itemPath); err != nil {
 				ctx.log.WithError(err).WithFields(logrus.Fields{
