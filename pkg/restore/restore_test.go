@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	pkgclient "github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
@@ -342,6 +343,9 @@ func TestNamespaceRemapping(t *testing.T) {
 		restore:              restore,
 		backup:               &api.Backup{},
 		log:                  velerotest.NewLogger(),
+		applicableActions:    make(map[schema.GroupResource][]resolvedAction),
+		resourceClients:      make(map[resourceClientKey]pkgclient.Dynamic),
+		restoredItems:        make(map[velero.ResourceIdentifier]struct{}),
 	}
 
 	nsClient.On("Get", "ns-2", metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "ns-2"))
@@ -653,6 +657,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 					snapshotLocationLister: snapshotLocationLister,
 					backup:                 &api.Backup{},
 				},
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
@@ -736,8 +743,11 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 						BackupName:              "my-backup",
 					},
 				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
+				backup:            &api.Backup{},
+				log:               velerotest.NewLogger(),
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
 
@@ -994,11 +1004,14 @@ status:
 						Name:      "my-restore",
 					},
 				},
-				backup:          backup,
-				log:             velerotest.NewLogger(),
-				pvsToProvision:  sets.NewString(),
-				pvRestorer:      pvRestorer,
-				namespaceClient: nsClient,
+				backup:            backup,
+				log:               velerotest.NewLogger(),
+				pvsToProvision:    sets.NewString(),
+				pvRestorer:        pvRestorer,
+				namespaceClient:   nsClient,
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 
 			if test.haveSnapshot && !test.legacyBackup {

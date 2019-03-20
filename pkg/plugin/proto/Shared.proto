@@ -29,3 +29,10 @@ message StackFrame {
     int32 line = 2;
     string function = 3;
 }
+
+message ResourceIdentifier {
+    string group = 1;
+    string resource = 2;
+    string namespace = 3;
+    string name = 4;
+}

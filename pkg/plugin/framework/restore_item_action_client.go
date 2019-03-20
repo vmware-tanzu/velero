@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	proto "github.com/heptio/velero/pkg/plugin/generated"
 	"github.com/heptio/velero/pkg/plugin/velero"
@@ -82,7 +83,7 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		return nil, errors.WithStack(err)
 	}
 
-	req := &proto.RestoreExecuteRequest{
+	req := &proto.RestoreItemActionExecuteRequest{
 		Plugin:         c.plugin,
 		Item:           itemJSON,
 		ItemFromBackup: itemFromBackupJSON,
@@ -104,8 +105,23 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		warning = errors.New(res.Warning)
 	}
 
+	var additionalItems []velero.ResourceIdentifier
+	for _, itm := range res.AdditionalItems {
+		newItem := velero.ResourceIdentifier{
+			GroupResource: schema.GroupResource{
+				Group:    itm.Group,
+				Resource: itm.Resource,
+			},
+			Namespace: itm.Namespace,
+			Name:      itm.Name,
+		}
+
+		additionalItems = append(additionalItems, newItem)
+	}
+
 	return &velero.RestoreItemActionExecuteOutput{
-		UpdatedItem: &updatedItem,
-		Warning:     warning,
+		UpdatedItem:     &updatedItem,
+		Warning:         warning,
+		AdditionalItems: additionalItems,
 	}, nil
 }
