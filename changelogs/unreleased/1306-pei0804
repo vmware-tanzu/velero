@@ -1,0 +1,1 @@
+compile only once to lower the initialization cost for regexp.MustCompile.
