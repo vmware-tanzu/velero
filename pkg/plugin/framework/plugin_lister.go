@@ -58,8 +58,6 @@ type PluginListerPlugin struct {
 	impl PluginLister
 }
 
-var _ plugin.GRPCPlugin = &PluginListerPlugin{}
-
 // NewPluginListerPlugin creates a new PluginListerPlugin with impl as the server-side implementation.
 func NewPluginListerPlugin(impl PluginLister) *PluginListerPlugin {
 	return &PluginListerPlugin{impl: impl}

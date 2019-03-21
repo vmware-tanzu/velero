@@ -32,8 +32,6 @@ type ObjectStorePlugin struct {
 	*pluginBase
 }
 
-var _ plugin.GRPCPlugin = &ObjectStorePlugin{}
-
 // GRPCClient returns an ObjectStore gRPC client.
 func (p *ObjectStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newObjectStoreGRPCClient), nil

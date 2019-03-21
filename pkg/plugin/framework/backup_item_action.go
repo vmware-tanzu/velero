@@ -32,8 +32,6 @@ type BackupItemActionPlugin struct {
 	*pluginBase
 }
 
-var _ plugin.GRPCPlugin = &BackupItemActionPlugin{}
-
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
 func (p *BackupItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newBackupItemActionGRPCClient), nil

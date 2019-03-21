@@ -32,8 +32,6 @@ type BlockStorePlugin struct {
 	*pluginBase
 }
 
-var _ plugin.GRPCPlugin = &BlockStorePlugin{}
-
 // GRPCClient returns a BlockStore gRPC client.
 func (p *BlockStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newBlockStoreGRPCClient), nil
