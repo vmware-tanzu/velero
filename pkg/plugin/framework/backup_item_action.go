@@ -18,6 +18,7 @@ package framework
 
 import (
 	"github.com/hashicorp/go-plugin"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	proto "github.com/heptio/velero/pkg/plugin/generated"
@@ -31,13 +32,15 @@ type BackupItemActionPlugin struct {
 	*pluginBase
 }
 
+var _ plugin.GRPCPlugin = &BackupItemActionPlugin{}
+
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
-func (p *BackupItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, c, newBackupItemActionGRPCClient), nil
+func (p *BackupItemActionPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return newClientDispenser(p.clientLogger, clientConn, newBackupItemActionGRPCClient), nil
 }
 
 // GRPCServer registers a BackupItemAction gRPC server.
-func (p *BackupItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBackupItemActionServer(s, &BackupItemActionGRPCServer{mux: p.serverMux})
+func (p *BackupItemActionPlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterBackupItemActionServer(server, &BackupItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }

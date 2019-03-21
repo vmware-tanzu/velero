@@ -58,6 +58,8 @@ type PluginListerPlugin struct {
 	impl PluginLister
 }
 
+var _ plugin.GRPCPlugin = &PluginListerPlugin{}
+
 // NewPluginListerPlugin creates a new PluginListerPlugin with impl as the server-side implementation.
 func NewPluginListerPlugin(impl PluginLister) *PluginListerPlugin {
 	return &PluginListerPlugin{impl: impl}
@@ -68,8 +70,8 @@ func NewPluginListerPlugin(impl PluginLister) *PluginListerPlugin {
 //////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns a PluginLister gRPC client.
-func (p *PluginListerPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return &PluginListerGRPCClient{grpcClient: proto.NewPluginListerClient(c)}, nil
+func (p *PluginListerPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return &PluginListerGRPCClient{grpcClient: proto.NewPluginListerClient(clientConn)}, nil
 }
 
 // PluginListerGRPCClient implements PluginLister and uses a gRPC client to make calls to the plugin server.
@@ -106,8 +108,8 @@ func (c *PluginListerGRPCClient) ListPlugins() ([]PluginIdentifier, error) {
 //////////////////////////////////////////////////////////////////////////////
 
 // GRPCServer registers a PluginLister gRPC server.
-func (p *PluginListerPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterPluginListerServer(s, &PluginListerGRPCServer{impl: p.impl})
+func (p *PluginListerPlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterPluginListerServer(server, &PluginListerGRPCServer{impl: p.impl})
 	return nil
 }
 

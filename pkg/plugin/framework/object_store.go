@@ -18,6 +18,7 @@ package framework
 
 import (
 	"github.com/hashicorp/go-plugin"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	proto "github.com/heptio/velero/pkg/plugin/generated"
@@ -31,14 +32,16 @@ type ObjectStorePlugin struct {
 	*pluginBase
 }
 
+var _ plugin.GRPCPlugin = &ObjectStorePlugin{}
+
 // GRPCClient returns an ObjectStore gRPC client.
-func (p *ObjectStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, c, newObjectStoreGRPCClient), nil
+func (p *ObjectStorePlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return newClientDispenser(p.clientLogger, clientConn, newObjectStoreGRPCClient), nil
 
 }
 
 // GRPCServer registers an ObjectStore gRPC server.
-func (p *ObjectStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterObjectStoreServer(s, &ObjectStoreGRPCServer{mux: p.serverMux})
+func (p *ObjectStorePlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterObjectStoreServer(server, &ObjectStoreGRPCServer{mux: p.serverMux})
 	return nil
 }
