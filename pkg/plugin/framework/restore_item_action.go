@@ -18,6 +18,7 @@ package framework
 
 import (
 	"github.com/hashicorp/go-plugin"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	proto "github.com/heptio/velero/pkg/plugin/generated"
@@ -32,12 +33,12 @@ type RestoreItemActionPlugin struct {
 }
 
 // GRPCClient returns a RestoreItemAction gRPC client.
-func (p *RestoreItemActionPlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, c, newRestoreItemActionGRPCClient), nil
+func (p *RestoreItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return newClientDispenser(p.clientLogger, clientConn, newRestoreItemActionGRPCClient), nil
 }
 
 // GRPCServer registers a RestoreItemAction gRPC server.
-func (p *RestoreItemActionPlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterRestoreItemActionServer(s, &RestoreItemActionGRPCServer{mux: p.serverMux})
+func (p *RestoreItemActionPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterRestoreItemActionServer(server, &RestoreItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }

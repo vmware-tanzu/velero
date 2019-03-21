@@ -18,6 +18,7 @@ package framework
 
 import (
 	"github.com/hashicorp/go-plugin"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	proto "github.com/heptio/velero/pkg/plugin/generated"
@@ -32,12 +33,12 @@ type BlockStorePlugin struct {
 }
 
 // GRPCClient returns a BlockStore gRPC client.
-func (p *BlockStorePlugin) GRPCClient(c *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, c, newBlockStoreGRPCClient), nil
+func (p *BlockStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return newClientDispenser(p.clientLogger, clientConn, newBlockStoreGRPCClient), nil
 }
 
 // GRPCServer registers a BlockStore gRPC server.
-func (p *BlockStorePlugin) GRPCServer(s *grpc.Server) error {
-	proto.RegisterBlockStoreServer(s, &BlockStoreGRPCServer{mux: p.serverMux})
+func (p *BlockStorePlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterBlockStoreServer(server, &BlockStoreGRPCServer{mux: p.serverMux})
 	return nil
 }
