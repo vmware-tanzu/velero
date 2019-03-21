@@ -70,7 +70,7 @@ func NewPluginListerPlugin(impl PluginLister) *PluginListerPlugin {
 //////////////////////////////////////////////////////////////////////////////
 
 // GRPCClient returns a PluginLister gRPC client.
-func (p *PluginListerPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *PluginListerPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return &PluginListerGRPCClient{grpcClient: proto.NewPluginListerClient(clientConn)}, nil
 }
 
@@ -108,7 +108,7 @@ func (c *PluginListerGRPCClient) ListPlugins() ([]PluginIdentifier, error) {
 //////////////////////////////////////////////////////////////////////////////
 
 // GRPCServer registers a PluginLister gRPC server.
-func (p *PluginListerPlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+func (p *PluginListerPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
 	proto.RegisterPluginListerServer(server, &PluginListerGRPCServer{impl: p.impl})
 	return nil
 }

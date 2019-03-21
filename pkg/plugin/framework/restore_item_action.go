@@ -35,12 +35,12 @@ type RestoreItemActionPlugin struct {
 var _ plugin.GRPCPlugin = &RestoreItemActionPlugin{}
 
 // GRPCClient returns a RestoreItemAction gRPC client.
-func (p *RestoreItemActionPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *RestoreItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newRestoreItemActionGRPCClient), nil
 }
 
 // GRPCServer registers a RestoreItemAction gRPC server.
-func (p *RestoreItemActionPlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+func (p *RestoreItemActionPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
 	proto.RegisterRestoreItemActionServer(server, &RestoreItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }

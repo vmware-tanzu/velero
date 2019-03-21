@@ -35,12 +35,12 @@ type BlockStorePlugin struct {
 var _ plugin.GRPCPlugin = &BlockStorePlugin{}
 
 // GRPCClient returns a BlockStore gRPC client.
-func (p *BlockStorePlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *BlockStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newBlockStoreGRPCClient), nil
 }
 
 // GRPCServer registers a BlockStore gRPC server.
-func (p *BlockStorePlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+func (p *BlockStorePlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
 	proto.RegisterBlockStoreServer(server, &BlockStoreGRPCServer{mux: p.serverMux})
 	return nil
 }

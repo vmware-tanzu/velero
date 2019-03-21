@@ -35,12 +35,12 @@ type BackupItemActionPlugin struct {
 var _ plugin.GRPCPlugin = &BackupItemActionPlugin{}
 
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.
-func (p *BackupItemActionPlugin) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+func (p *BackupItemActionPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
 	return newClientDispenser(p.clientLogger, clientConn, newBackupItemActionGRPCClient), nil
 }
 
 // GRPCServer registers a BackupItemAction gRPC server.
-func (p *BackupItemActionPlugin) GRPCServer(broker *plugin.GRPCBroker, server *grpc.Server) error {
+func (p *BackupItemActionPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
 	proto.RegisterBackupItemActionServer(server, &BackupItemActionGRPCServer{mux: p.serverMux})
 	return nil
 }
