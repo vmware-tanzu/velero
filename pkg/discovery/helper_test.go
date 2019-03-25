@@ -19,11 +19,12 @@ package discovery
 import (
 	"testing"
 
-	"github.com/heptio/velero/pkg/util/logging"
-	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestSortResources(t *testing.T) {
