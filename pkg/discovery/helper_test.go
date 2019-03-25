@@ -19,6 +19,9 @@ package discovery
 import (
 	"testing"
 
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -139,4 +142,12 @@ func TestFilteringByVerbs(t *testing.T) {
 			assert.Equal(t, test.expected, out)
 		})
 	}
+}
+
+func TestRefreshServerPreferredResources(t *testing.T) {
+	t.Run("One failed group", func(t *testing.T) {
+		resources, err := refreshServerPreferredResources(velerotest.NewFakeServerResourcesInterface(), logging.DefaultLogger(logrus.DebugLevel))
+		assert.NotNil(t, err)
+		assert.NotNil(t, resources)
+	})
 }

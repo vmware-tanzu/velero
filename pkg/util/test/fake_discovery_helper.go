@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 )
 
 type FakeDiscoveryHelper struct {
@@ -122,4 +123,31 @@ func (dh *FakeDiscoveryHelper) ResourceFor(input schema.GroupVersionResource) (s
 
 func (dh *FakeDiscoveryHelper) APIGroups() []metav1.APIGroup {
 	return dh.APIGroupsList
+}
+
+type FakeServerResourcesInterface struct {
+}
+
+func (di *FakeServerResourcesInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+
+	resourceList := []*metav1.APIResourceList{
+		{GroupVersion: "groupB/v1"},
+		{GroupVersion: "apps/v1beta1"},
+		{GroupVersion: "extensions/v1beta1"},
+	}
+
+	failedGroups := make(map[schema.GroupVersion]error)
+	groupVersion := schema.GroupVersion{
+		Group:   "groupA",
+		Version: "v1",
+	}
+
+	failedGroups[groupVersion] = errors.New("Fake error")
+
+	return resourceList, &discovery.ErrGroupDiscoveryFailed{Groups: failedGroups}
+}
+
+func NewFakeServerResourcesInterface() *FakeServerResourcesInterface {
+	helper := &FakeServerResourcesInterface{}
+	return helper
 }

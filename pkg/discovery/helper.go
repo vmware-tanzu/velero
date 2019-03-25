@@ -51,6 +51,12 @@ type Helper interface {
 	APIGroups() []metav1.APIGroup
 }
 
+// DiscoveryInterface exposes functions for Kubernetes discovery
+// API.
+type ServerResourcesInterface interface {
+	ServerPreferredResources() ([]*metav1.APIResourceList, error)
+}
+
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
 	logger          logrus.FieldLogger
@@ -107,13 +113,9 @@ func (h *helper) Refresh() error {
 	}
 	h.mapper = shortcutExpander
 
-	preferredResources, err := h.discoveryClient.ServerPreferredResources()
+	preferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
 	if err != nil {
-		if discovery.IsGroupDiscoveryFailedError(err) {
-			h.logger.Warnf("Failed to discover some groups: %v", err.(*discovery.ErrGroupDiscoveryFailed).Groups)
-		} else {
-			return errors.WithStack(err)
-		}
+		return errors.WithStack(err)
 	}
 
 	h.resources = discovery.FilteredBy(
@@ -143,6 +145,19 @@ func (h *helper) Refresh() error {
 	h.apiGroups = apiGroupList.Groups
 
 	return nil
+}
+
+func refreshServerPreferredResources(discoveryClient ServerResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIResourceList, error) {
+	preferredResources, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+			for groupVersion, err := range discoveryErr.Groups {
+				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
+			}
+			return preferredResources, nil
+		}
+	}
+	return preferredResources, err
 }
 
 func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {
