@@ -102,6 +102,7 @@ func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 		SnapshotId:       &snapshotID,
 		AvailabilityZone: &volumeAZ,
 		VolumeType:       &volumeType,
+		Encrypted:        snapRes.Snapshots[0].Encrypted,
 		TagSpecifications: []*ec2.TagSpecification{
 			{
 				ResourceType: aws.String(ec2.ResourceTypeVolume),
