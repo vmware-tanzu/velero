@@ -153,6 +153,7 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 // Items are unstructured, since there are different data types returned.
 func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) (*unstructured.UnstructuredList, error) {
 	resources := new(unstructured.UnstructuredList)
+	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	for _, crd := range CRDs() {
