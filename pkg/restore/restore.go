@@ -873,29 +873,6 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		}
 	}
 
-	if groupResource == kuberesource.PersistentVolumeClaims {
-		pvc := new(v1.PersistentVolumeClaim)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
-			addToResult(&errs, namespace, err)
-			return warnings, errs
-		}
-
-		if pvc.Spec.VolumeName != "" && ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
-			ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, pvc.Spec.VolumeName)
-
-			pvc.Spec.VolumeName = ""
-			delete(pvc.Annotations, "pv.kubernetes.io/bind-completed")
-			delete(pvc.Annotations, "pv.kubernetes.io/bound-by-controller")
-
-			res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pvc)
-			if err != nil {
-				addToResult(&errs, namespace, err)
-				return warnings, errs
-			}
-			obj.Object = res
-		}
-	}
-
 	// clear out non-core metadata fields & status
 	if obj, err = resetMetadataAndStatus(obj); err != nil {
 		addToResult(&errs, namespace, err)
@@ -959,6 +936,35 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			w, e := ctx.restoreItem(additionalObj, additionalItem.GroupResource, additionalItemNamespace)
 			merge(&warnings, &w)
 			merge(&errs, &e)
+		}
+	}
+
+	// This comes after running item actions because we have built-in actions that restore
+	// a PVC's associated PV (if applicable). As part of the PV being restored, the 'pvsToProvision'
+	// set may be inserted into, and this needs to happen *before* running the following block of logic.
+	//
+	// The side effect of this is that it's impossible for a user to write a restore item action that
+	// adjusts this behavior (i.e. of resetting the PVC for dynamic provisioning if it claims a PV with
+	// a reclaim policy of Delete and no snapshot). If/when that becomes an issue for users, we can
+	// revisit. This would be easier with a multi-pass restore process.
+	if groupResource == kuberesource.PersistentVolumeClaims {
+		pvc := new(v1.PersistentVolumeClaim)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
+			addToResult(&errs, namespace, err)
+			return warnings, errs
+		}
+
+		if pvc.Spec.VolumeName != "" && ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
+			ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, pvc.Spec.VolumeName)
+
+			// use the unstructured helpers here since we're only deleting and
+			// the unstructured converter will add back (empty) fields for metadata
+			// and status that we removed earlier.
+			unstructured.RemoveNestedField(obj.Object, "spec", "volumeName")
+			annotations := obj.GetAnnotations()
+			delete(annotations, "pv.kubernetes.io/bind-completed")
+			delete(annotations, "pv.kubernetes.io/bound-by-controller")
+			obj.SetAnnotations(annotations)
 		}
 	}
 
