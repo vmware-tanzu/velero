@@ -149,7 +149,8 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 	return nil
 }
 
-// AllResources returns a slice of all resources necessary to install Velero into a Kubernetes cluster.
+// AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
+// Items are unstructured, since there are different data types returned.
 func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) (*unstructured.UnstructuredList, error) {
 	resources := new(unstructured.UnstructuredList)
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
@@ -178,6 +179,7 @@ func AllResources(namespace, image, backupStorageProviderName, bucketName, prefi
 	bsl := BackupStorageLocation(namespace, backupStorageProviderName, bucketName, prefix, nil)
 	appendUnstructured(resources, bsl)
 
+	// TODO: pass config down
 	vsl := VolumeSnapshotLocation(namespace, backupStorageProviderName, nil)
 	appendUnstructured(resources, vsl)
 
@@ -186,7 +188,10 @@ func AllResources(namespace, image, backupStorageProviderName, bucketName, prefi
 	)
 	appendUnstructured(resources, deploy)
 
-	//TODO: Restic daemonset
+	ds := DaemonSet(namespace,
+		WithImage(image),
+	)
+	appendUnstructured(resources, ds)
 
 	return resources, nil
 }
