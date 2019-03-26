@@ -30,8 +30,6 @@ import (
 	"github.com/heptio/velero/pkg/install"
 )
 
-const defaultImage = "gcr.io/heptio/velero:latest"
-
 type InstallOptions struct {
 	Namespace                 string
 	DeploymentName            string
@@ -43,6 +41,7 @@ type InstallOptions struct {
 	LogLevel                  string
 	ResticTimeout             time.Duration
 	SecretName                string
+	DryRun                    bool
 }
 
 // Args:
@@ -54,16 +53,21 @@ type InstallOptions struct {
 
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	// TODO Send this string down into the deployment
-	flags.StringVar(&o.DeploymentName, "deploy-name", "", "name to apply to the Velero deployment")
-	flags.StringVar(&o.BucketName, "bucket-name", "", "bucket name in which to store backups")
-	flags.StringVar(&o.Prefix, "prefix", "", "prefix under the bucket in which to store backups")
-	flags.StringVar(&o.BackupStorageProviderName, "backup-provider", "", "provider name for backup storage")
-	flags.StringVar(&o.Image, "image", "", "image to use for the Velero server deployment")
-	flags.BoolVar(&o.RestoreOnly, "restore-only", false, "run the server in restore-only mode")
+	flags.StringVar(&o.DeploymentName, "deploy-name", o.DeploymentName, "name to apply to the Velero deployment")
+	flags.StringVar(&o.BucketName, "bucket-name", o.BucketName, "bucket name in which to store backups")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under the bucket in which to store backups")
+	flags.StringVar(&o.BackupStorageProviderName, "backup-provider", o.BackupStorageProviderName, "provider name for backup storage")
+	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero server deployment")
+	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode")
+	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "don't create resources on the Kubernetes cluster")
 }
 
 func NewInstallOptions() *InstallOptions {
-	return &InstallOptions{}
+	return &InstallOptions{
+		Namespace:      api.DefaultNamespace,
+		DeploymentName: api.DefaultNamespace,
+		Image:          install.DefaultImage,
+	}
 }
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -71,7 +75,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "install",
 		Short: "Install Velero",
-		Long:  "Install Velero",
+		Long:  "Install Velero into the Kubernetes cluster using provided information",
 		Run: func(c *cobra.Command, args []string) {
 			o.Namespace = c.Flag("namespace").Value.String()
 			cmd.CheckError(o.Complete(args, f))
@@ -87,29 +91,23 @@ func NewCommand(f client.Factory) *cobra.Command {
 }
 
 func (o *InstallOptions) Run(c *cobra.Command) error {
-
+	//TODO pass backup and volume config down
 	resources, err := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
 	if err != nil {
 		return err
 	}
 
-	// TODO: Wrap the resources in a list instead o just printing with separators
 	if _, err := output.PrintWithFormat(c, resources); err != nil {
 		return err
+	}
+
+	if o.DryRun {
+		return nil
 	}
 
 	return nil
 }
 
 func (o *InstallOptions) Complete(args []string, f client.Factory) error {
-	if o.Namespace == "" {
-		o.Namespace = api.DefaultNamespace
-	}
-	if o.DeploymentName == "" {
-		o.DeploymentName = api.DefaultNamespace
-	}
-	if o.Image == "" {
-		o.Image = defaultImage
-	}
 	return nil
 }

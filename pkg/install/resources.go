@@ -17,6 +17,7 @@ limitations under the License.
 package install
 
 import (
+	"github.com/heptio/velero/pkg/buildinfo"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +27,9 @@ import (
 
 	"github.com/heptio/velero/pkg/apis/velero/v1"
 )
+
+// DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
+var DefaultImage = "gcr.io/heptio-images/velero:" + buildinfo.Version
 
 func labels() map[string]string {
 	return map[string]string{
