@@ -55,7 +55,7 @@ func (a *AddPVCFromPodAction) Execute(input *velero.RestoreItemActionExecuteInpu
 			continue
 		}
 
-		a.logger.Infof("Found a PVC we need to back up: %s/%s", pod.Namespace, volume.PersistentVolumeClaim.ClaimName)
+		a.logger.Infof("Adding PVC %s/%s as an additional item to restore", pod.Namespace, volume.PersistentVolumeClaim.ClaimName)
 		additionalItems = append(additionalItems, velero.ResourceIdentifier{
 			GroupResource: kuberesource.PersistentVolumeClaims,
 			Namespace:     pod.Namespace,
