@@ -17,17 +17,27 @@ limitations under the License.
 package install
 
 import (
+	"fmt"
+	"log"
+	"os"
 	"time"
 
-	"github.com/spf13/pflag"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/output"
+	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/install"
+	"github.com/heptio/velero/pkg/util/logging"
 )
 
 type InstallOptions struct {
@@ -78,6 +88,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Long:  "Install Velero into the Kubernetes cluster using provided information",
 		Run: func(c *cobra.Command, args []string) {
 			o.Namespace = c.Flag("namespace").Value.String()
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Run(c))
 		},
@@ -105,9 +116,50 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 		return nil
 	}
 
+	clientConfig, err := client.Config("", "", fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+	if err != nil {
+		return err
+	}
+	client, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return err
+	}
+	log.SetOutput(os.Stdout)
+	// TODO: parse out log level
+	logger := logging.DefaultLogger(logrus.DebugLevel)
+	helper, err := velerodiscovery.NewHelper(kubeClient.Discovery(), logger)
+	if err != nil {
+		return err
+	}
+
+	err = install.Install(client, helper, resources, logger)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (o *InstallOptions) Complete(args []string, f client.Factory) error {
+	return nil
+}
+
+func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	if err := output.ValidateFlags(c); err != nil {
+		return err
+	}
+
+	if o.BucketName == "" {
+		return errors.Errorf("Bucket name must be provided")
+	}
+
+	if o.BackupStorageProviderName == "" {
+		return errors.Errorf("Backup storage proivder name must be provided")
+	}
+
 	return nil
 }
