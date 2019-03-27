@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -117,24 +116,16 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	client, err := dynamic.NewForConfig(clientConfig)
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return err
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
-	if err != nil {
-		return err
-	}
 	log.SetOutput(os.Stdout)
 	// TODO: parse out log level
 	logger := logging.DefaultLogger(logrus.DebugLevel)
-	helper, err := velerodiscovery.NewHelper(kubeClient.Discovery(), logger)
-	if err != nil {
-		return err
-	}
 
-	err = install.Install(client, helper, resources, logger)
+	err = install.Install(client.NewDynamicFactory(dynamicClient), resources, logger)
 	if err != nil {
 		return err
 	}

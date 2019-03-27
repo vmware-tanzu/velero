@@ -20,26 +20,55 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-
-	"github.com/heptio/velero/pkg/discovery"
 	"github.com/sirupsen/logrus"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
+
+	"github.com/heptio/velero/pkg/client"
 )
 
-// Install creates resources on the Kubernetes cluster.
-// Need to get a client.DynamicFactory in, then produce a client per resource type.
-func Install(client dynamic.Interface, helper discovery.Helper, resources *unstructured.UnstructuredList, logger *logrus.Logger) error {
-	for _, r := range resources.Items {
-		logger.WithField("resource", fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())).Info("Creating resource")
+// kindToResource translates a Kind (mixed case, singular) to a Resource (lowercase, plural) string.
+// This is to accomodate the dynamic client's need for an APIResource, as the Unstructured objects do not have easy helpers for this information.
+var kindToResource = map[string]string{
+	"CustomResourceDefinition": "customresourcedefinitions",
+	"Namespace":                "namespaces",
+	"ClusterRoleBinding":       "clusterrolebindings",
+	"ServiceAccount":           "serviceaccounts",
+	"Deployment":               "deployments",
+	"DaemonSet":                "daemonsets",
+	"BackupStorageLocation":    "backupstoragelocations",
+	"VolumeSnapshotLocation":   "volumesnapshotlocations",
+}
 
-		gvr := schema.ParseGroupResource(r.GetResourceVersion()).WithVersion("")
-		_, err := client.Resource(gvr).Create(&r, metav1.CreateOptions{})
+// Install creates resources on the Kubernetes cluster.
+func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, logger *logrus.Logger) error {
+	for _, r := range resources.Items {
+		// TODO: do we want to use the logger, or just a print?
+		//logger.WithField("resource", fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())).Info("Creating resource")
+		fmt.Printf("Attempting to create resource %s/%s\n", r.GetKind(), r.GetName())
+
+		gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
+
+		apiResource := metav1.APIResource{
+			Name:       kindToResource[r.GetKind()],
+			Namespaced: (r.GetNamespace() != ""),
+		}
+
+		c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
 		if err != nil {
+			return errors.Wrapf(err, "Error creating client for resource %s/%s", r.GetKind(), r.GetName())
+		}
+
+		_, err = c.Create(&r)
+		if apierrors.IsAlreadyExists(err) {
+			fmt.Printf("Resource %s/%s already exists, proceeding\n", r.GetKind(), r.GetName())
+		} else if err != nil {
 			return errors.Wrapf(err, "Error creating resource %s/%s", r.GetKind(), r.GetName())
 		}
+		fmt.Printf("Created %s/%s\n", r.GetKind(), r.GetName())
 	}
 	return nil
 }
