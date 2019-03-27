@@ -459,14 +459,12 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	// At this point, no further logs should be written to restoreLog since it's been uploaded
 	// to object storage.
 
-	//TODO(1.0): Remove warnings.Ark
-	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster) + len(restoreWarnings.Ark)
+	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
 		restore.Status.Warnings += len(w)
 	}
 
-	//TODO (1.0): Remove errors.Ark
-	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster) + len(restoreErrors.Ark)
+	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster)
 	for _, e := range restoreErrors.Namespaces {
 		restore.Status.Errors += len(e)
 	}
