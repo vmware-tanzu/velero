@@ -35,11 +35,11 @@ import (
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/output"
-	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/install"
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
+// InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
 	Namespace                 string
 	DeploymentName            string
@@ -54,13 +54,7 @@ type InstallOptions struct {
 	DryRun                    bool
 }
 
-// Args:
-//   secret
-//   plugin-dir
-//   basically all the server args?
-// Flags
-//   dry-run (yaml dump)
-
+// BindFlags adds command line values to the options struct.
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	// TODO Send this string down into the deployment
 	flags.StringVar(&o.DeploymentName, "deploy-name", o.DeploymentName, "name to apply to the Velero deployment")
@@ -72,6 +66,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "don't create resources on the Kubernetes cluster")
 }
 
+// NewInstallOptions instantiates a new, default InstallOptions stuct.
 func NewInstallOptions() *InstallOptions {
 	return &InstallOptions{
 		Namespace:      api.DefaultNamespace,
@@ -80,6 +75,7 @@ func NewInstallOptions() *InstallOptions {
 	}
 }
 
+// NewCommand creates a cobra command.
 func NewCommand(f client.Factory) *cobra.Command {
 	o := NewInstallOptions()
 	c := &cobra.Command{
@@ -101,6 +97,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	return c
 }
 
+// Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command) error {
 	//TODO pass backup and volume config down
 	resources, err := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
@@ -144,10 +141,12 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	return nil
 }
 
+//Complete completes options for a command.
 func (o *InstallOptions) Complete(args []string, f client.Factory) error {
 	return nil
 }
 
+// Validate validates options provided to a command.
 func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
