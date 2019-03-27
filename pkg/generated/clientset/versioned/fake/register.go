@@ -19,7 +19,6 @@ limitations under the License.
 package fake
 
 import (
-	arkv1 "github.com/heptio/velero/pkg/apis/ark/v1"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -32,7 +31,6 @@ var scheme = runtime.NewScheme()
 var codecs = serializer.NewCodecFactory(scheme)
 var parameterCodec = runtime.NewParameterCodec(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
-	arkv1.AddToScheme,
 	velerov1.AddToScheme,
 }
 

@@ -19,7 +19,6 @@ limitations under the License.
 package versioned
 
 import (
-	arkv1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/ark/v1"
 	velerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -28,9 +27,6 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	ArkV1() arkv1.ArkV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Ark() arkv1.ArkV1Interface
 	VeleroV1() velerov1.VeleroV1Interface
 	// Deprecated: please explicitly pick a version if possible.
 	Velero() velerov1.VeleroV1Interface
@@ -40,19 +36,7 @@ type Interface interface {
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	arkV1    *arkv1.ArkV1Client
 	veleroV1 *velerov1.VeleroV1Client
-}
-
-// ArkV1 retrieves the ArkV1Client
-func (c *Clientset) ArkV1() arkv1.ArkV1Interface {
-	return c.arkV1
-}
-
-// Deprecated: Ark retrieves the default version of ArkClient.
-// Please explicitly pick a version.
-func (c *Clientset) Ark() arkv1.ArkV1Interface {
-	return c.arkV1
 }
 
 // VeleroV1 retrieves the VeleroV1Client
@@ -82,10 +66,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.arkV1, err = arkv1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.veleroV1, err = velerov1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -102,7 +82,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.arkV1 = arkv1.NewForConfigOrDie(c)
 	cs.veleroV1 = velerov1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
@@ -112,7 +91,6 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.arkV1 = arkv1.New(c)
 	cs.veleroV1 = velerov1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
