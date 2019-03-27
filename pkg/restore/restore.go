@@ -1115,11 +1115,6 @@ func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 	labels[api.BackupNameLabel] = backupName
 	labels[api.RestoreNameLabel] = restoreName
 
-	// TODO(1.0): remove the below line, and remove the `RestoreLabelKey`
-	// constant from the API pkg, since it's been replaced with the
-	// namespaced label above.
-	labels[api.RestoreLabelKey] = restoreName
-
 	obj.SetLabels(labels)
 }
 

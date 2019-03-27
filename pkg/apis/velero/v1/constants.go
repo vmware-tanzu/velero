@@ -29,14 +29,6 @@ const (
 	// files that store metadata about the backup, such as the backup version.
 	MetadataDir = "metadata"
 
-	// RestoreLabelKey is the label key that's applied to all resources that
-	// are created during a restore. This is applied for ease of identification
-	// of restored resources. The value will be the restore's name.
-	//
-	// This label is DEPRECATED as of v0.10 and will be removed entirely as of
-	// v1.0 and replaced with RestoreNameLabel ("velero.io/restore-name").
-	RestoreLabelKey = "velero-restore"
-
 	// ClusterScopedDir is the name of the directory containing cluster-scoped
 	// resources within a Velero backup.
 	ClusterScopedDir = "cluster"
