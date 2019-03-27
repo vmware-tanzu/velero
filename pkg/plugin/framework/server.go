@@ -178,7 +178,7 @@ func (s *server) Serve() {
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
 	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: Handshake,
+		HandshakeConfig: Handshake(),
 		Plugins: map[string]plugin.Plugin{
 			string(PluginKindBackupItemAction):  s.backupItemAction,
 			string(PluginKindBlockStore):        s.blockStore,

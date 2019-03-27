@@ -60,7 +60,7 @@ func newLogrusAdapter(pluginLogger logrus.FieldLogger, logLevel logrus.Level) *l
 
 func (b *clientBuilder) clientConfig() *hcplugin.ClientConfig {
 	return &hcplugin.ClientConfig{
-		HandshakeConfig:  framework.Handshake,
+		HandshakeConfig:  framework.Handshake(),
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
 			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(b.clientLogger)),
