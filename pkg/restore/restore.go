@@ -916,6 +916,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					"additionalResourceNamespace": additionalItem.Namespace,
 					"additionalResourceName":      additionalItem.Name,
 				}).Warn("unable to restore additional item")
+				addToResult(&warnings, additionalItem.Namespace, err)
 
 				continue
 			}
@@ -1043,7 +1044,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 	// Error was something other than an AlreadyExists
 	if restoreErr != nil {
-		ctx.log.Infof("error restoring %s: %v", name, err)
+		ctx.log.Infof("error restoring %s: %v", name, restoreErr)
 		addToResult(&errs, namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
 		return warnings, errs
 	}
