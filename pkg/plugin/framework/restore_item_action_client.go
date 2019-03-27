@@ -54,7 +54,7 @@ func newRestoreItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientCon
 func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
 	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
 	if err != nil {
-		return velero.ResourceSelector{}, err
+		return velero.ResourceSelector{}, fromGRPCError(err)
 	}
 
 	return velero.ResourceSelector{
@@ -69,17 +69,17 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	itemFromBackupJSON, err := json.Marshal(input.ItemFromBackup.UnstructuredContent())
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	restoreJSON, err := json.Marshal(input.Restore)
 	if err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	req := &proto.RestoreExecuteRequest{
@@ -91,12 +91,12 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 
 	res, err := c.grpcClient.Execute(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, fromGRPCError(err)
 	}
 
 	var updatedItem unstructured.Unstructured
 	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
-		return nil, err
+		return nil, errors.WithStack(err)
 	}
 
 	var warning error

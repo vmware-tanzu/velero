@@ -18,6 +18,8 @@ package logging
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,21 +32,18 @@ const (
 
 // ErrorLocationHook is a logrus hook that attaches error location information
 // to log entries if an error is being logged and it has stack-trace information
-// (i.e. if it originates from or is wrapped by github.com/pkg/errors).
-type ErrorLocationHook struct {
-}
+// (i.e. if it originates from or is wrapped by github.com/pkg/errors, or if it
+// implements the errorLocationer interface, like errors returned from plugins
+// typically do).
+type ErrorLocationHook struct{}
 
 func (h *ErrorLocationHook) Levels() []logrus.Level {
 	return logrus.AllLevels
 }
 
 func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
-	var (
-		errObj interface{}
-		exists bool
-	)
-
-	if errObj, exists = entry.Data[logrus.ErrorKey]; !exists {
+	errObj, ok := entry.Data[logrus.ErrorKey]
+	if !ok {
 		return nil
 	}
 
@@ -53,18 +52,58 @@ func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
 		return errors.New("object logged as error does not satisfy error interface")
 	}
 
-	stackErr := getInnermostTrace(err)
+	if errorLocationer, ok := err.(errorLocationer); ok {
+		entry.Data[errorFileField] = fmt.Sprintf("%s:%d", errorLocationer.File(), errorLocationer.Line())
+		entry.Data[errorFunctionField] = errorLocationer.Function()
+		return nil
+	}
 
-	if stackErr != nil {
-		stackTrace := stackErr.StackTrace()
-		functionName := fmt.Sprintf("%n", stackTrace[0])
-		fileAndLine := fmt.Sprintf("%s:%d", stackTrace[0], stackTrace[0])
+	if stackErr := getInnermostTrace(err); stackErr != nil {
+		location := GetFrameLocationInfo(stackErr.StackTrace()[0])
 
-		entry.Data[errorFileField] = fileAndLine
-		entry.Data[errorFunctionField] = functionName
+		entry.Data[errorFileField] = fmt.Sprintf("%s:%d", location.File, location.Line)
+		entry.Data[errorFunctionField] = location.Function
 	}
 
 	return nil
+}
+
+// LocationInfo specifies the location of a line
+// of code.
+type LocationInfo struct {
+	File     string
+	Function string
+	Line     int
+}
+
+// GetFrameLocationInfo returns the location of a frame.
+func GetFrameLocationInfo(frame errors.Frame) LocationInfo {
+	// see https://godoc.org/github.com/pkg/errors#Frame.Format for
+	// details on formatting verbs
+	functionNameAndFileAndLine := fmt.Sprintf("%+v", frame)
+
+	newLineIndex := strings.Index(functionNameAndFileAndLine, "\n")
+	functionName := functionNameAndFileAndLine[0:newLineIndex]
+
+	tabIndex := strings.LastIndex(functionNameAndFileAndLine, "\t")
+	fileAndLine := strings.Split(functionNameAndFileAndLine[tabIndex+1:], ":")
+
+	line, err := strconv.Atoi(fileAndLine[1])
+	if err != nil {
+		line = -1
+	}
+
+	return LocationInfo{
+		File:     fileAndLine[0],
+		Function: functionName,
+		Line:     line,
+	}
+}
+
+type errorLocationer interface {
+	File() string
+	Line() int32
+	Function() string
 }
 
 type stackTracer interface {

@@ -57,12 +57,12 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	appliesTo, err := impl.AppliesTo()
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.AppliesToResponse{
@@ -83,7 +83,7 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 
 	impl, err := s.getImpl(req.Plugin)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	var (
@@ -93,15 +93,15 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 	)
 
 	if err := json.Unmarshal(req.Item, &item); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	if err := json.Unmarshal(req.ItemFromBackup, &itemFromBackup); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	if err := json.Unmarshal(req.Restore, &restoreObj); err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	executeOutput, err := impl.Execute(&velero.RestoreItemActionExecuteInput{
@@ -110,12 +110,12 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		Restore:        &restoreObj,
 	})
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	updatedItem, err := json.Marshal(executeOutput.UpdatedItem)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(errors.WithStack(err))
 	}
 
 	var warnMessage string

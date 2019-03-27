@@ -20,6 +20,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
@@ -53,9 +54,16 @@ func newObjectStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) int
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
 func (c *ObjectStoreGRPCClient) Init(config map[string]string) error {
-	_, err := c.grpcClient.Init(context.Background(), &proto.InitRequest{Plugin: c.plugin, Config: config})
+	req := &proto.InitRequest{
+		Plugin: c.plugin,
+		Config: config,
+	}
 
-	return err
+	if _, err := c.grpcClient.Init(context.Background(), req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
 }
 
 // PutObject creates a new object using the data in body within the specified
@@ -63,7 +71,7 @@ func (c *ObjectStoreGRPCClient) Init(config map[string]string) error {
 func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) error {
 	stream, err := c.grpcClient.PutObject(context.Background())
 	if err != nil {
-		return err
+		return fromGRPCError(err)
 	}
 
 	// read from the provider io.Reader into chunks, and send each one over
@@ -72,16 +80,18 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 	for {
 		n, err := body.Read(chunk)
 		if err == io.EOF {
-			_, resErr := stream.CloseAndRecv()
-			return resErr
+			if _, resErr := stream.CloseAndRecv(); resErr != nil {
+				return fromGRPCError(resErr)
+			}
+			return nil
 		}
 		if err != nil {
 			stream.CloseSend()
-			return err
+			return errors.WithStack(err)
 		}
 
 		if err := stream.Send(&proto.PutObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key, Body: chunk[0:n]}); err != nil {
-			return err
+			return fromGRPCError(err)
 		}
 	}
 }
@@ -89,22 +99,31 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
 func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, error) {
-	stream, err := c.grpcClient.GetObject(context.Background(), &proto.GetObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key})
+	req := &proto.GetObjectRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
+
+	stream, err := c.grpcClient.GetObject(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, fromGRPCError(err)
 	}
 
 	receive := func() ([]byte, error) {
 		data, err := stream.Recv()
 		if err != nil {
-			return nil, err
+			return nil, fromGRPCError(err)
 		}
 
 		return data.Data, nil
 	}
 
 	close := func() error {
-		return stream.CloseSend()
+		if err := stream.CloseSend(); err != nil {
+			return fromGRPCError(err)
+		}
+		return nil
 	}
 
 	return &StreamReadCloser{receive: receive, close: close}, nil
@@ -123,7 +142,7 @@ func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, prefix, delimiter str
 
 	res, err := c.grpcClient.ListCommonPrefixes(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, fromGRPCError(err)
 	}
 
 	return res.Prefixes, nil
@@ -131,9 +150,15 @@ func (c *ObjectStoreGRPCClient) ListCommonPrefixes(bucket, prefix, delimiter str
 
 // ListObjects gets a list of all objects in bucket that have the same prefix.
 func (c *ObjectStoreGRPCClient) ListObjects(bucket, prefix string) ([]string, error) {
-	res, err := c.grpcClient.ListObjects(context.Background(), &proto.ListObjectsRequest{Plugin: c.plugin, Bucket: bucket, Prefix: prefix})
+	req := &proto.ListObjectsRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Prefix: prefix,
+	}
+
+	res, err := c.grpcClient.ListObjects(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, fromGRPCError(err)
 	}
 
 	return res.Keys, nil
@@ -142,21 +167,31 @@ func (c *ObjectStoreGRPCClient) ListObjects(bucket, prefix string) ([]string, er
 // DeleteObject removes object with the specified key from the given
 // bucket.
 func (c *ObjectStoreGRPCClient) DeleteObject(bucket, key string) error {
-	_, err := c.grpcClient.DeleteObject(context.Background(), &proto.DeleteObjectRequest{Plugin: c.plugin, Bucket: bucket, Key: key})
+	req := &proto.DeleteObjectRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
 
-	return err
+	if _, err := c.grpcClient.DeleteObject(context.Background(), req); err != nil {
+		return fromGRPCError(err)
+	}
+
+	return nil
 }
 
 // CreateSignedURL creates a pre-signed URL for the given bucket and key that expires after ttl.
 func (c *ObjectStoreGRPCClient) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
-	res, err := c.grpcClient.CreateSignedURL(context.Background(), &proto.CreateSignedURLRequest{
+	req := &proto.CreateSignedURLRequest{
 		Plugin: c.plugin,
 		Bucket: bucket,
 		Key:    key,
 		Ttl:    int64(ttl),
-	})
+	}
+
+	res, err := c.grpcClient.CreateSignedURL(context.Background(), req)
 	if err != nil {
-		return "", nil
+		return "", fromGRPCError(err)
 	}
 
 	return res.Url, nil

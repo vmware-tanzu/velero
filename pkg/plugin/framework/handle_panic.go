@@ -17,8 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // handlePanic is a panic handler for the server half of velero plugins.
@@ -27,5 +27,20 @@ func handlePanic(p interface{}) error {
 		return nil
 	}
 
-	return status.Errorf(codes.Aborted, "plugin panicked: %v", p)
+	// If p is an error with a stack trace, we want to retain
+	// it to preserve the stack trace. Otherwise, create a new
+	// error here.
+	var err error
+
+	if panicErr, ok := p.(error); !ok {
+		err = errors.Errorf("plugin panicked: %v", p)
+	} else {
+		if _, ok := panicErr.(stackTracer); ok {
+			err = panicErr
+		} else {
+			err = errors.Wrap(panicErr, "plugin panicked")
+		}
+	}
+
+	return newGRPCErrorWithCode(err, codes.Aborted)
 }
