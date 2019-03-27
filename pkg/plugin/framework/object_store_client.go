@@ -112,6 +112,12 @@ func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, er
 
 	receive := func() ([]byte, error) {
 		data, err := stream.Recv()
+		if err == io.EOF {
+			// we need to return io.EOF errors unwrapped so that
+			// calling code sees them as io.EOF and knows to stop
+			// reading.
+			return nil, err
+		}
 		if err != nil {
 			return nil, fromGRPCError(err)
 		}
