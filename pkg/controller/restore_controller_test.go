@@ -925,7 +925,7 @@ func (r *fakeRestorer) Restore(
 	backupReader io.Reader,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	blockStoreGetter restore.BlockStoreGetter,
+	volumeSnapshotterGetter restore.VolumeSnapshotterGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 	res := r.Called(log, restore, backup, backupReader, actions)
 

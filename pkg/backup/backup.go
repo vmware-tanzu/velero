@@ -49,7 +49,7 @@ const BackupVersion = 1
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, blockStoreGetter BlockStoreGetter) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -209,13 +209,13 @@ func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discov
 	return h, nil
 }
 
-type BlockStoreGetter interface {
-	GetBlockStore(name string) (velero.BlockStore, error)
+type VolumeSnapshotterGetter interface {
+	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, blockStoreGetter BlockStoreGetter) error {
+func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -280,7 +280,7 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 		tw,
 		resticBackupper,
 		newPVCSnapshotTracker(),
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 
 	var errs []error

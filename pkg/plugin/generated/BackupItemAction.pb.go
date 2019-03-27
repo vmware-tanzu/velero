@@ -6,27 +6,16 @@ Package generated is a generated protocol buffer package.
 
 It is generated from these files:
 	BackupItemAction.proto
-	BlockStore.proto
 	ObjectStore.proto
 	PluginLister.proto
 	RestoreItemAction.proto
 	Shared.proto
+	VolumeSnapshotter.proto
 
 It has these top-level messages:
 	ExecuteRequest
 	ExecuteResponse
 	ResourceIdentifier
-	CreateVolumeRequest
-	CreateVolumeResponse
-	GetVolumeInfoRequest
-	GetVolumeInfoResponse
-	CreateSnapshotRequest
-	CreateSnapshotResponse
-	DeleteSnapshotRequest
-	GetVolumeIDRequest
-	GetVolumeIDResponse
-	SetVolumeIDRequest
-	SetVolumeIDResponse
 	PutObjectRequest
 	GetObjectRequest
 	Bytes
@@ -47,6 +36,17 @@ It has these top-level messages:
 	AppliesToResponse
 	Stack
 	StackFrame
+	CreateVolumeRequest
+	CreateVolumeResponse
+	GetVolumeInfoRequest
+	GetVolumeInfoResponse
+	CreateSnapshotRequest
+	CreateSnapshotResponse
+	DeleteSnapshotRequest
+	GetVolumeIDRequest
+	GetVolumeIDResponse
+	SetVolumeIDRequest
+	SetVolumeIDResponse
 */
 package generated
 

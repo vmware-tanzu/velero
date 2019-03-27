@@ -25,7 +25,7 @@ import (
 
 func TestPluginImplementationsAreGRPCPlugins(t *testing.T) {
 	pluginImpls := []interface{}{
-		new(BlockStorePlugin),
+		new(VolumeSnapshotterPlugin),
 		new(BackupItemActionPlugin),
 		new(ObjectStorePlugin),
 		new(PluginListerPlugin),

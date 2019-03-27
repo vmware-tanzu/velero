@@ -29,7 +29,7 @@ import (
 	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
-func TestRestartableGetBlockStore(t *testing.T) {
+func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 	tests := []struct {
 		name          string
 		plugin        interface{}
@@ -44,11 +44,11 @@ func TestRestartableGetBlockStore(t *testing.T) {
 		{
 			name:          "wrong type",
 			plugin:        3,
-			expectedError: "int is not a BlockStore!",
+			expectedError: "int is not a VolumeSnapshotter!",
 		},
 		{
 			name:   "happy path",
-			plugin: new(mocks.BlockStore),
+			plugin: new(mocks.VolumeSnapshotter),
 		},
 	}
 
@@ -59,14 +59,14 @@ func TestRestartableGetBlockStore(t *testing.T) {
 			defer p.AssertExpectations(t)
 
 			name := "aws"
-			key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
+			key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
 			p.On("getByKindAndName", key).Return(tc.plugin, tc.getError)
 
-			r := &restartableBlockStore{
+			r := &restartableVolumeSnapshotter{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
-			a, err := r.getBlockStore()
+			a, err := r.getVolumeSnapshotter()
 			if tc.expectedError != "" {
 				assert.EqualError(t, err, tc.expectedError)
 				return
@@ -78,14 +78,14 @@ func TestRestartableGetBlockStore(t *testing.T) {
 	}
 }
 
-func TestRestartableBlockStoreReinitialize(t *testing.T) {
+func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	p := new(mockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
-	r := &restartableBlockStore{
+	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
 		config: map[string]string{
@@ -94,22 +94,22 @@ func TestRestartableBlockStoreReinitialize(t *testing.T) {
 	}
 
 	err := r.reinitialize(3)
-	assert.EqualError(t, err, "int is not a BlockStore!")
+	assert.EqualError(t, err, "int is not a VolumeSnapshotter!")
 
-	blockStore := new(mocks.BlockStore)
-	blockStore.Test(t)
-	defer blockStore.AssertExpectations(t)
+	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter.Test(t)
+	defer volumeSnapshotter.AssertExpectations(t)
 
-	blockStore.On("Init", r.config).Return(errors.Errorf("init error")).Once()
-	err = r.reinitialize(blockStore)
+	volumeSnapshotter.On("Init", r.config).Return(errors.Errorf("init error")).Once()
+	err = r.reinitialize(volumeSnapshotter)
 	assert.EqualError(t, err, "init error")
 
-	blockStore.On("Init", r.config).Return(nil)
-	err = r.reinitialize(blockStore)
+	volumeSnapshotter.On("Init", r.config).Return(nil)
+	err = r.reinitialize(volumeSnapshotter)
 	assert.NoError(t, err)
 }
 
-func TestRestartableBlockStoreGetDelegate(t *testing.T) {
+func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 	p := new(mockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
@@ -117,8 +117,8 @@ func TestRestartableBlockStoreGetDelegate(t *testing.T) {
 	// Reset error
 	p.On("resetIfNeeded").Return(errors.Errorf("reset error")).Once()
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
-	r := &restartableBlockStore{
+	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
 	}
@@ -128,25 +128,25 @@ func TestRestartableBlockStoreGetDelegate(t *testing.T) {
 
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
-	blockStore := new(mocks.BlockStore)
-	blockStore.Test(t)
-	defer blockStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(blockStore, nil)
+	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter.Test(t)
+	defer volumeSnapshotter.AssertExpectations(t)
+	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
 
 	a, err = r.getDelegate()
 	assert.NoError(t, err)
-	assert.Equal(t, blockStore, a)
+	assert.Equal(t, volumeSnapshotter, a)
 }
 
-func TestRestartableBlockStoreInit(t *testing.T) {
+func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 	p := new(mockRestartableProcess)
 	p.Test(t)
 	defer p.AssertExpectations(t)
 
-	// getBlockStore error
+	// getVolumeSnapshottererror
 	name := "aws"
-	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
-	r := &restartableBlockStore{
+	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: p,
 	}
@@ -159,11 +159,11 @@ func TestRestartableBlockStoreInit(t *testing.T) {
 	assert.EqualError(t, err, "getByKindAndName error")
 
 	// Delegate returns error
-	blockStore := new(mocks.BlockStore)
-	blockStore.Test(t)
-	defer blockStore.AssertExpectations(t)
-	p.On("getByKindAndName", key).Return(blockStore, nil)
-	blockStore.On("Init", config).Return(errors.Errorf("Init error")).Once()
+	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter.Test(t)
+	defer volumeSnapshotter.AssertExpectations(t)
+	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
+	volumeSnapshotter.On("Init", config).Return(errors.Errorf("Init error")).Once()
 
 	err = r.Init(config)
 	assert.EqualError(t, err, "Init error")
@@ -172,7 +172,7 @@ func TestRestartableBlockStoreInit(t *testing.T) {
 	r.config = nil
 
 	// Happy path
-	blockStore.On("Init", config).Return(nil)
+	volumeSnapshotter.On("Init", config).Return(nil)
 	err = r.Init(config)
 	assert.NoError(t, err)
 	assert.Equal(t, config, r.config)
@@ -182,7 +182,7 @@ func TestRestartableBlockStoreInit(t *testing.T) {
 	assert.EqualError(t, err, "already initialized")
 }
 
-func TestRestartableBlockStoreDelegatedFunctions(t *testing.T) {
+func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 	pv := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"color": "blue",
@@ -197,15 +197,15 @@ func TestRestartableBlockStoreDelegatedFunctions(t *testing.T) {
 
 	runRestartableDelegateTests(
 		t,
-		framework.PluginKindBlockStore,
+		framework.PluginKindVolumeSnapshotter,
 		func(key kindAndName, p RestartableProcess) interface{} {
-			return &restartableBlockStore{
+			return &restartableVolumeSnapshotter{
 				key:                 key,
 				sharedPluginProcess: p,
 			}
 		},
 		func() mockable {
-			return new(mocks.BlockStore)
+			return new(mocks.VolumeSnapshotter)
 		},
 		restartableDelegateTest{
 			function:                "CreateVolumeFromSnapshot",

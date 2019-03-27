@@ -229,9 +229,9 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				blockStore       = new(cloudprovidermocks.BlockStore)
-				blockStoreGetter = providerToBlockStoreMap(map[string]velero.BlockStore{
-					tc.expectedProvider: blockStore,
+				volumeSnapshotter       = new(cloudprovidermocks.VolumeSnapshotter)
+				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]velero.VolumeSnapshotter{
+					tc.expectedProvider: volumeSnapshotter,
 				})
 				locationsInformer = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0).Velero().V1().VolumeSnapshotLocations()
 			)
@@ -241,30 +241,30 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			}
 
 			r := &pvRestorer{
-				logger:                 velerotest.NewLogger(),
-				backup:                 tc.backup,
-				volumeSnapshots:        tc.volumeSnapshots,
-				snapshotLocationLister: locationsInformer.Lister(),
-				blockStoreGetter:       blockStoreGetter,
+				logger:                  velerotest.NewLogger(),
+				backup:                  tc.backup,
+				volumeSnapshots:         tc.volumeSnapshots,
+				snapshotLocationLister:  locationsInformer.Lister(),
+				volumeSnapshotterGetter: volumeSnapshotterGetter,
 			}
 
-			blockStore.On("Init", mock.Anything).Return(nil)
-			blockStore.On("CreateVolumeFromSnapshot", tc.expectedSnapshotID, tc.expectedVolumeType, tc.expectedVolumeAZ, tc.expectedVolumeIOPS).Return("volume-1", nil)
-			blockStore.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
+			volumeSnapshotter.On("Init", mock.Anything).Return(nil)
+			volumeSnapshotter.On("CreateVolumeFromSnapshot", tc.expectedSnapshotID, tc.expectedVolumeType, tc.expectedVolumeAZ, tc.expectedVolumeIOPS).Return("volume-1", nil)
+			volumeSnapshotter.On("SetVolumeID", tc.obj, "volume-1").Return(tc.obj, nil)
 
 			_, err := r.executePVAction(tc.obj)
 			assert.NoError(t, err)
 
-			blockStore.AssertExpectations(t)
+			volumeSnapshotter.AssertExpectations(t)
 		})
 	}
 }
 
-type providerToBlockStoreMap map[string]velero.BlockStore
+type providerToVolumeSnapshotterMap map[string]velero.VolumeSnapshotter
 
-func (g providerToBlockStoreMap) GetBlockStore(provider string) (velero.BlockStore, error) {
+func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (velero.VolumeSnapshotter, error) {
 	if bs, ok := g[provider]; !ok {
-		return nil, errors.New("block store not found for provider")
+		return nil, errors.New("volume snapshotter not found for provider")
 	} else {
 		return bs, nil
 	}

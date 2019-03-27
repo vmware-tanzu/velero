@@ -27,30 +27,30 @@ import (
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-// BlockStoreGRPCServer implements the proto-generated BlockStoreServer interface, and accepts
+// VolumeSnapshotterGRPCServer implements the proto-generated VolumeSnapshotterServer interface, and accepts
 // gRPC calls and forwards them to an implementation of the pluggable interface.
-type BlockStoreGRPCServer struct {
+type VolumeSnapshotterGRPCServer struct {
 	mux *serverMux
 }
 
-func (s *BlockStoreGRPCServer) getImpl(name string) (velero.BlockStore, error) {
+func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (velero.VolumeSnapshotter, error) {
 	impl, err := s.mux.getHandler(name)
 	if err != nil {
 		return nil, err
 	}
 
-	blockStore, ok := impl.(velero.BlockStore)
+	volumeSnapshotter, ok := impl.(velero.VolumeSnapshotter)
 	if !ok {
-		return nil, errors.Errorf("%T is not a block store", impl)
+		return nil, errors.Errorf("%T is not a volume snapshotter", impl)
 	}
 
-	return blockStore, nil
+	return volumeSnapshotter, nil
 }
 
-// Init prepares the BlockStore for usage using the provided map of
-// configuration key-value pairs. It returns an error if the BlockStore
+// Init prepares the VolumeSnapshotter for usage using the provided map of
+// configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
-func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (response *proto.Empty, err error) {
+func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -71,7 +71,7 @@ func (s *BlockStoreGRPCServer) Init(ctx context.Context, req *proto.InitRequest)
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
-func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req *proto.CreateVolumeRequest) (response *proto.CreateVolumeResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -102,7 +102,7 @@ func (s *BlockStoreGRPCServer) CreateVolumeFromSnapshot(ctx context.Context, req
 
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
-func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.GetVolumeInfoRequest) (response *proto.GetVolumeInfoResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -132,7 +132,7 @@ func (s *BlockStoreGRPCServer) GetVolumeInfo(ctx context.Context, req *proto.Get
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
-func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) CreateSnapshot(ctx context.Context, req *proto.CreateSnapshotRequest) (response *proto.CreateSnapshotResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -153,7 +153,7 @@ func (s *BlockStoreGRPCServer) CreateSnapshot(ctx context.Context, req *proto.Cr
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
-func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
+func (s *VolumeSnapshotterGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.DeleteSnapshotRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -172,7 +172,7 @@ func (s *BlockStoreGRPCServer) DeleteSnapshot(ctx context.Context, req *proto.De
 	return &proto.Empty{}, nil
 }
 
-func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVolumeIDRequest) (response *proto.GetVolumeIDResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -198,7 +198,7 @@ func (s *BlockStoreGRPCServer) GetVolumeID(ctx context.Context, req *proto.GetVo
 	return &proto.GetVolumeIDResponse{VolumeID: volumeID}, nil
 }
 
-func (s *BlockStoreGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
+func (s *VolumeSnapshotterGRPCServer) SetVolumeID(ctx context.Context, req *proto.SetVolumeIDRequest) (response *proto.SetVolumeIDResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

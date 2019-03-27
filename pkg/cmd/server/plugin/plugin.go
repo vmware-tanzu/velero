@@ -41,9 +41,9 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
-				RegisterBlockStore("aws", newAwsBlockStore).
-				RegisterBlockStore("azure", newAzureBlockStore).
-				RegisterBlockStore("gcp", newGcpBlockStore).
+				RegisterVolumeSnapshotter("aws", newAwsVolumeSnapshotter).
+				RegisterVolumeSnapshotter("azure", newAzureVolumeSnapshotter).
+				RegisterVolumeSnapshotter("gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("pv", newPVBackupItemAction).
 				RegisterBackupItemAction("pod", newPodBackupItemAction).
 				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
@@ -73,16 +73,16 @@ func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewObjectStore(logger), nil
 }
 
-func newAwsBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewBlockStore(logger), nil
+func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return aws.NewVolumeSnapshotter(logger), nil
 }
 
-func newAzureBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewBlockStore(logger), nil
+func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return azure.NewVolumeSnapshotter(logger), nil
 }
 
-func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewBlockStore(logger), nil
+func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return gcp.NewVolumeSnapshotter(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {

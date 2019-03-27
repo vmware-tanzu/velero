@@ -45,7 +45,7 @@ const (
 	disksResource     = "disks"
 )
 
-type BlockStore struct {
+type VolumeSnapshotter struct {
 	log                logrus.FieldLogger
 	disks              *disk.DisksClient
 	snaps              *disk.SnapshotsClient
@@ -65,11 +65,11 @@ func (si *snapshotIdentifier) String() string {
 	return getComputeResourceName(si.subscription, si.resourceGroup, snapshotsResource, si.name)
 }
 
-func NewBlockStore(logger logrus.FieldLogger) *BlockStore {
-	return &BlockStore{log: logger}
+func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
+	return &VolumeSnapshotter{log: logger}
 }
 
-func (b *BlockStore) Init(config map[string]string) error {
+func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
 	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
@@ -122,7 +122,7 @@ func (b *BlockStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	snapshotIdentifier, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return "", err
@@ -168,7 +168,7 @@ func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return diskName, nil
 }
 
-func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	res, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
 	if err != nil {
 		return "", nil, errors.WithStack(err)
@@ -181,7 +181,7 @@ func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return string(res.Sku.Name), nil, nil
 }
 
-func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// Lookup disk info for its Location
 	diskInfo, err := b.disks.Get(context.TODO(), b.disksResourceGroup, volumeID)
 	if err != nil {
@@ -259,7 +259,7 @@ func stringPtr(s string) *string {
 	return &s
 }
 
-func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
+func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	snapshotInfo, err := b.parseSnapshotName(snapshotID)
 	if err != nil {
 		return err
@@ -303,11 +303,11 @@ var snapshotURIRegexp = regexp.MustCompile(
 // parseSnapshotName takes a snapshot name, either fully-qualified or not, and returns
 // a snapshot identifier or an error if the name is not in a valid format. If the name
 // is not fully-qualified, the subscription and resource group are assumed to be the
-// ones that the block store is configured with.
+// ones that the volume snapshotter is configured with.
 //
 // TODO(1.0) remove this function and replace usage with `parseFullSnapshotName` since
 // we won't support the legacy snapshot name format for 1.0.
-func (b *BlockStore) parseSnapshotName(name string) (*snapshotIdentifier, error) {
+func (b *VolumeSnapshotter) parseSnapshotName(name string) (*snapshotIdentifier, error) {
 	switch {
 	// legacy format - name only (not fully-qualified)
 	case !strings.Contains(name, "/"):
@@ -357,7 +357,7 @@ func parseFullSnapshotName(name string) (*snapshotIdentifier, error) {
 	return snapshotID, nil
 }
 
-func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+func (b *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return "", errors.WithStack(err)
@@ -374,7 +374,7 @@ func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	return pv.Spec.AzureDisk.DiskName, nil
 }
 
-func (b *BlockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return nil, errors.WithStack(err)

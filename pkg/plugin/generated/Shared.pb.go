@@ -18,7 +18,7 @@ type Empty struct {
 func (m *Empty) Reset()                    { *m = Empty{} }
 func (m *Empty) String() string            { return proto.CompactTextString(m) }
 func (*Empty) ProtoMessage()               {}
-func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{0} }
+func (*Empty) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
 
 type InitRequest struct {
 	Plugin string            `protobuf:"bytes,1,opt,name=plugin" json:"plugin,omitempty"`
@@ -28,7 +28,7 @@ type InitRequest struct {
 func (m *InitRequest) Reset()                    { *m = InitRequest{} }
 func (m *InitRequest) String() string            { return proto.CompactTextString(m) }
 func (*InitRequest) ProtoMessage()               {}
-func (*InitRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{1} }
+func (*InitRequest) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
 
 func (m *InitRequest) GetPlugin() string {
 	if m != nil {
@@ -51,7 +51,7 @@ type AppliesToRequest struct {
 func (m *AppliesToRequest) Reset()                    { *m = AppliesToRequest{} }
 func (m *AppliesToRequest) String() string            { return proto.CompactTextString(m) }
 func (*AppliesToRequest) ProtoMessage()               {}
-func (*AppliesToRequest) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{2} }
+func (*AppliesToRequest) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{2} }
 
 func (m *AppliesToRequest) GetPlugin() string {
 	if m != nil {
@@ -71,7 +71,7 @@ type AppliesToResponse struct {
 func (m *AppliesToResponse) Reset()                    { *m = AppliesToResponse{} }
 func (m *AppliesToResponse) String() string            { return proto.CompactTextString(m) }
 func (*AppliesToResponse) ProtoMessage()               {}
-func (*AppliesToResponse) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{3} }
+func (*AppliesToResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{3} }
 
 func (m *AppliesToResponse) GetIncludedNamespaces() []string {
 	if m != nil {
@@ -115,7 +115,7 @@ type Stack struct {
 func (m *Stack) Reset()                    { *m = Stack{} }
 func (m *Stack) String() string            { return proto.CompactTextString(m) }
 func (*Stack) ProtoMessage()               {}
-func (*Stack) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{4} }
+func (*Stack) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{4} }
 
 func (m *Stack) GetFrames() []*StackFrame {
 	if m != nil {
@@ -133,7 +133,7 @@ type StackFrame struct {
 func (m *StackFrame) Reset()                    { *m = StackFrame{} }
 func (m *StackFrame) String() string            { return proto.CompactTextString(m) }
 func (*StackFrame) ProtoMessage()               {}
-func (*StackFrame) Descriptor() ([]byte, []int) { return fileDescriptor5, []int{5} }
+func (*StackFrame) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{5} }
 
 func (m *StackFrame) GetFile() string {
 	if m != nil {
@@ -165,9 +165,9 @@ func init() {
 	proto.RegisterType((*StackFrame)(nil), "generated.StackFrame")
 }
 
-func init() { proto.RegisterFile("Shared.proto", fileDescriptor5) }
+func init() { proto.RegisterFile("Shared.proto", fileDescriptor4) }
 
-var fileDescriptor5 = []byte{
+var fileDescriptor4 = []byte{
 	// 345 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0xc1, 0x4a, 0xeb, 0x40,
 	0x14, 0x86, 0x49, 0xd2, 0xe4, 0xde, 0x9e, 0xdc, 0x45, 0x3b, 0x5c, 0x25, 0x74, 0x55, 0xb2, 0x2a,

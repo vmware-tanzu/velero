@@ -51,8 +51,8 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, blockStoreGetter pkgbackup.BlockStoreGetter) error {
-	args := b.Called(logger, backup, backupFile, actions, blockStoreGetter)
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 

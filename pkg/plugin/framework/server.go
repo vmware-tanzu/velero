@@ -54,11 +54,11 @@ type Server interface {
 	// RegisterBackupItemActions registers multiple backup item actions.
 	RegisterBackupItemActions(map[string]HandlerInitializer) Server
 
-	// RegisterBlockStore registers a block store.
-	RegisterBlockStore(name string, initializer HandlerInitializer) Server
+	// RegisterVolumeSnapshotter registers a volume snapshotter.
+	RegisterVolumeSnapshotter(name string, initializer HandlerInitializer) Server
 
-	// RegisterBlockStores registers multiple block stores.
-	RegisterBlockStores(map[string]HandlerInitializer) Server
+	// RegisterVolumeSnapshotters registers multiple volume snapshotters.
+	RegisterVolumeSnapshotters(map[string]HandlerInitializer) Server
 
 	// RegisterObjectStore registers an object store.
 	RegisterObjectStore(name string, initializer HandlerInitializer) Server
@@ -82,7 +82,7 @@ type server struct {
 	logLevelFlag      *logging.LevelFlag
 	flagSet           *pflag.FlagSet
 	backupItemAction  *BackupItemActionPlugin
-	blockStore        *BlockStorePlugin
+	volumeSnapshotter *VolumeSnapshotterPlugin
 	objectStore       *ObjectStorePlugin
 	restoreItemAction *RestoreItemActionPlugin
 }
@@ -95,7 +95,7 @@ func NewServer() Server {
 		log:               log,
 		logLevelFlag:      logging.LogLevelFlag(log.Level),
 		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
-		blockStore:        NewBlockStorePlugin(serverLogger(log)),
+		volumeSnapshotter: NewVolumeSnapshotterPlugin(serverLogger(log)),
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
 		restoreItemAction: NewRestoreItemActionPlugin(serverLogger(log)),
 	}
@@ -120,14 +120,14 @@ func (s *server) RegisterBackupItemActions(m map[string]HandlerInitializer) Serv
 	return s
 }
 
-func (s *server) RegisterBlockStore(name string, initializer HandlerInitializer) Server {
-	s.blockStore.register(name, initializer)
+func (s *server) RegisterVolumeSnapshotter(name string, initializer HandlerInitializer) Server {
+	s.volumeSnapshotter.register(name, initializer)
 	return s
 }
 
-func (s *server) RegisterBlockStores(m map[string]HandlerInitializer) Server {
+func (s *server) RegisterVolumeSnapshotters(m map[string]HandlerInitializer) Server {
 	for name := range m {
-		s.RegisterBlockStore(name, m[name])
+		s.RegisterVolumeSnapshotter(name, m[name])
 	}
 	return s
 }
@@ -181,7 +181,7 @@ func (s *server) Serve() {
 
 	var pluginIdentifiers []PluginIdentifier
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindBackupItemAction, s.backupItemAction)...)
-	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindBlockStore, s.blockStore)...)
+	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindVolumeSnapshotter, s.volumeSnapshotter)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindObjectStore, s.objectStore)...)
 	pluginIdentifiers = append(pluginIdentifiers, getNames(command, PluginKindRestoreItemAction, s.restoreItemAction)...)
 
@@ -191,7 +191,7 @@ func (s *server) Serve() {
 		HandshakeConfig: Handshake,
 		Plugins: map[string]plugin.Plugin{
 			string(PluginKindBackupItemAction):  s.backupItemAction,
-			string(PluginKindBlockStore):        s.blockStore,
+			string(PluginKindVolumeSnapshotter): s.volumeSnapshotter,
 			string(PluginKindObjectStore):       s.objectStore,
 			string(PluginKindPluginLister):      NewPluginListerPlugin(pluginLister),
 			string(PluginKindRestoreItemAction): s.restoreItemAction,

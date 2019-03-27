@@ -78,16 +78,16 @@ func (_m *Manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 	return r0, r1
 }
 
-// GetBlockStore provides a mock function with given fields: name
-func (_m *Manager) GetBlockStore(name string) (velero.BlockStore, error) {
+// GetVolumeSnapshotter provides a mock function with given fields: name
+func (_m *Manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
 	ret := _m.Called(name)
 
-	var r0 velero.BlockStore
-	if rf, ok := ret.Get(0).(func(string) velero.BlockStore); ok {
+	var r0 velero.VolumeSnapshotter
+	if rf, ok := ret.Get(0).(func(string) velero.VolumeSnapshotter); ok {
 		r0 = rf(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(velero.BlockStore)
+			r0 = ret.Get(0).(velero.VolumeSnapshotter)
 		}
 	}
 

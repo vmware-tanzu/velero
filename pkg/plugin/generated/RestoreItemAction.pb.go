@@ -27,7 +27,7 @@ type RestoreExecuteRequest struct {
 func (m *RestoreExecuteRequest) Reset()                    { *m = RestoreExecuteRequest{} }
 func (m *RestoreExecuteRequest) String() string            { return proto.CompactTextString(m) }
 func (*RestoreExecuteRequest) ProtoMessage()               {}
-func (*RestoreExecuteRequest) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{0} }
+func (*RestoreExecuteRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
 
 func (m *RestoreExecuteRequest) GetPlugin() string {
 	if m != nil {
@@ -65,7 +65,7 @@ type RestoreExecuteResponse struct {
 func (m *RestoreExecuteResponse) Reset()                    { *m = RestoreExecuteResponse{} }
 func (m *RestoreExecuteResponse) String() string            { return proto.CompactTextString(m) }
 func (*RestoreExecuteResponse) ProtoMessage()               {}
-func (*RestoreExecuteResponse) Descriptor() ([]byte, []int) { return fileDescriptor4, []int{1} }
+func (*RestoreExecuteResponse) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{1} }
 
 func (m *RestoreExecuteResponse) GetItem() []byte {
 	if m != nil {
@@ -191,9 +191,9 @@ var _RestoreItemAction_serviceDesc = grpc.ServiceDesc{
 	Metadata: "RestoreItemAction.proto",
 }
 
-func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor4) }
+func init() { proto.RegisterFile("RestoreItemAction.proto", fileDescriptor3) }
 
-var fileDescriptor4 = []byte{
+var fileDescriptor3 = []byte{
 	// 252 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x7c, 0x51, 0x4b, 0x4e, 0xc3, 0x30,
 	0x14, 0x94, 0xa1, 0x6a, 0x95, 0xa7, 0x0a, 0x89, 0x27, 0x51, 0xac, 0xc0, 0x22, 0x74, 0x81, 0xba,

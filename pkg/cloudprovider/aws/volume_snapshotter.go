@@ -41,7 +41,7 @@ const regionKey = "region"
 // from snapshot.
 var iopsVolumeTypes = sets.NewString("io1")
 
-type BlockStore struct {
+type VolumeSnapshotter struct {
 	log logrus.FieldLogger
 	ec2 *ec2.EC2
 }
@@ -59,11 +59,11 @@ func getSession(config *aws.Config) (*session.Session, error) {
 	return sess, nil
 }
 
-func NewBlockStore(logger logrus.FieldLogger) *BlockStore {
-	return &BlockStore{log: logger}
+func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
+	return &VolumeSnapshotter{log: logger}
 }
 
-func (b *BlockStore) Init(config map[string]string) error {
+func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	region := config[regionKey]
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)
@@ -81,7 +81,7 @@ func (b *BlockStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	// describe the snapshot so we can apply its tags to the volume
 	snapReq := &ec2.DescribeSnapshotsInput{
 		SnapshotIds: []*string{&snapshotID},
@@ -123,7 +123,7 @@ func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return *res.VolumeId, nil
 }
 
-func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
 		return "", nil, err
@@ -145,7 +145,7 @@ func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return volumeType, iops, nil
 }
 
-func (b *BlockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
+func (b *VolumeSnapshotter) describeVolume(volumeID string) (*ec2.Volume, error) {
 	req := &ec2.DescribeVolumesInput{
 		VolumeIds: []*string{&volumeID},
 	}
@@ -161,7 +161,7 @@ func (b *BlockStore) describeVolume(volumeID string) (*ec2.Volume, error) {
 	return res.Volumes[0], nil
 }
 
-func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	// describe the volume so we can copy its tags to the snapshot
 	volumeInfo, err := b.describeVolume(volumeID)
 	if err != nil {
@@ -233,7 +233,7 @@ func ec2Tag(key, val string) *ec2.Tag {
 	return &ec2.Tag{Key: &key, Value: &val}
 }
 
-func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
+func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	req := &ec2.DeleteSnapshotInput{
 		SnapshotId: &snapshotID,
 	}
@@ -255,7 +255,7 @@ func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
 
 var ebsVolumeIDRegex = regexp.MustCompile("vol-.*")
 
-func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
+func (b *VolumeSnapshotter) GetVolumeID(unstructuredPV runtime.Unstructured) (string, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return "", errors.WithStack(err)
@@ -272,7 +272,7 @@ func (b *BlockStore) GetVolumeID(unstructuredPV runtime.Unstructured) (string, e
 	return ebsVolumeIDRegex.FindString(pv.Spec.AWSElasticBlockStore.VolumeID), nil
 }
 
-func (b *BlockStore) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	pv := new(v1.PersistentVolume)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.UnstructuredContent(), pv); err != nil {
 		return nil, errors.WithStack(err)

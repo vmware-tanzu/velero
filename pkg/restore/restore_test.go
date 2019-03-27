@@ -646,7 +646,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				log:    velerotest.NewLogger(),
 				pvRestorer: &pvRestorer{
 					logger: logging.DefaultLogger(logrus.DebugLevel),
-					blockStoreGetter: &fakeBlockStoreGetter{
+					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
 						volumeMap: map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
 						volumeID:  "volume-1",
 					},
@@ -1799,20 +1799,20 @@ type fakeAction struct {
 	resource string
 }
 
-type fakeBlockStoreGetter struct {
-	fakeBlockStore *velerotest.FakeBlockStore
-	volumeMap      map[api.VolumeBackupInfo]string
-	volumeID       string
+type fakeVolumeSnapshotterGetter struct {
+	fakeVolumeSnapshotter *velerotest.FakeVolumeSnapshotter
+	volumeMap             map[api.VolumeBackupInfo]string
+	volumeID              string
 }
 
-func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (velero.BlockStore, error) {
-	if r.fakeBlockStore == nil {
-		r.fakeBlockStore = &velerotest.FakeBlockStore{
+func (r *fakeVolumeSnapshotterGetter) GetVolumeSnapshotter(provider string) (velero.VolumeSnapshotter, error) {
+	if r.fakeVolumeSnapshotter == nil {
+		r.fakeVolumeSnapshotter = &velerotest.FakeVolumeSnapshotter{
 			RestorableVolumes: r.volumeMap,
 			VolumeID:          r.volumeID,
 		}
 	}
-	return r.fakeBlockStore, nil
+	return r.fakeVolumeSnapshotter, nil
 }
 
 func newFakeAction(resource string) *fakeAction {

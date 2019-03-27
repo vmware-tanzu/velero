@@ -24,20 +24,20 @@ import (
 	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-// restartableBlockStore is an object store for a given implementation (such as "aws"). It is associated with
+// restartableVolumeSnapshotter is a volume snapshotter for a given implementation (such as "aws"). It is associated with
 // a restartableProcess, which may be shared and used to run multiple plugins. At the beginning of each method
-// call, the restartableBlockStore asks its restartableProcess to restart itself if needed (e.g. if the
+// call, the restartableVolumeSnapshotter asks its restartableProcess to restart itself if needed (e.g. if the
 // process terminated for any reason), then it proceeds with the actual call.
-type restartableBlockStore struct {
+type restartableVolumeSnapshotter struct {
 	key                 kindAndName
 	sharedPluginProcess RestartableProcess
 	config              map[string]string
 }
 
-// newRestartableBlockStore returns a new restartableBlockStore.
-func newRestartableBlockStore(name string, sharedPluginProcess RestartableProcess) *restartableBlockStore {
-	key := kindAndName{kind: framework.PluginKindBlockStore, name: name}
-	r := &restartableBlockStore{
+// newRestartableVolumeSnapshotter returns a new restartableVolumeSnapshotter.
+func newRestartableVolumeSnapshotter(name string, sharedPluginProcess RestartableProcess) *restartableVolumeSnapshotter {
+	key := kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name}
+	r := &restartableVolumeSnapshotter{
 		key:                 key,
 		sharedPluginProcess: sharedPluginProcess,
 	}
@@ -49,48 +49,48 @@ func newRestartableBlockStore(name string, sharedPluginProcess RestartableProces
 }
 
 // reinitialize reinitializes a re-dispensed plugin using the initial data passed to Init().
-func (r *restartableBlockStore) reinitialize(dispensed interface{}) error {
-	blockStore, ok := dispensed.(velero.BlockStore)
+func (r *restartableVolumeSnapshotter) reinitialize(dispensed interface{}) error {
+	volumeSnapshotter, ok := dispensed.(velero.VolumeSnapshotter)
 	if !ok {
-		return errors.Errorf("%T is not a BlockStore!", dispensed)
+		return errors.Errorf("%T is not a VolumeSnapshotter!", dispensed)
 	}
-	return r.init(blockStore, r.config)
+	return r.init(volumeSnapshotter, r.config)
 }
 
-// getBlockStore returns the block store for this restartableBlockStore. It does *not* restart the
+// getVolumeSnapshotter returns the volume snapshotter for this restartableVolumeSnapshotter. It does *not* restart the
 // plugin process.
-func (r *restartableBlockStore) getBlockStore() (velero.BlockStore, error) {
+func (r *restartableVolumeSnapshotter) getVolumeSnapshotter() (velero.VolumeSnapshotter, error) {
 	plugin, err := r.sharedPluginProcess.getByKindAndName(r.key)
 	if err != nil {
 		return nil, err
 	}
 
-	blockStore, ok := plugin.(velero.BlockStore)
+	volumeSnapshotter, ok := plugin.(velero.VolumeSnapshotter)
 	if !ok {
-		return nil, errors.Errorf("%T is not a BlockStore!", plugin)
+		return nil, errors.Errorf("%T is not a VolumeSnapshotter!", plugin)
 	}
 
-	return blockStore, nil
+	return volumeSnapshotter, nil
 }
 
-// getDelegate restarts the plugin process (if needed) and returns the block store for this restartableBlockStore.
-func (r *restartableBlockStore) getDelegate() (velero.BlockStore, error) {
+// getDelegate restarts the plugin process (if needed) and returns the volume snapshotter for this restartableVolumeSnapshotter.
+func (r *restartableVolumeSnapshotter) getDelegate() (velero.VolumeSnapshotter, error) {
 	if err := r.sharedPluginProcess.resetIfNeeded(); err != nil {
 		return nil, err
 	}
 
-	return r.getBlockStore()
+	return r.getVolumeSnapshotter()
 }
 
-// Init initializes the block store instance using config. If this is the first invocation, r stores config for future
+// Init initializes the volume snapshotter instance using config. If this is the first invocation, r stores config for future
 // reinitialization needs. Init does NOT restart the shared plugin process. Init may only be called once.
-func (r *restartableBlockStore) Init(config map[string]string) error {
+func (r *restartableVolumeSnapshotter) Init(config map[string]string) error {
 	if r.config != nil {
 		return errors.Errorf("already initialized")
 	}
 
 	// Not using getDelegate() to avoid possible infinite recursion
-	delegate, err := r.getBlockStore()
+	delegate, err := r.getVolumeSnapshotter()
 	if err != nil {
 		return err
 	}
@@ -100,14 +100,14 @@ func (r *restartableBlockStore) Init(config map[string]string) error {
 	return r.init(delegate, config)
 }
 
-// init calls Init on blockStore with config. This is split out from Init() so that both Init() and reinitialize() may
-// call it using a specific BlockStore.
-func (r *restartableBlockStore) init(blockStore velero.BlockStore, config map[string]string) error {
-	return blockStore.Init(config)
+// init calls Init on volumeSnapshotter with config. This is split out from Init() so that both Init() and reinitialize() may
+// call it using a specific VolumeSnapshotter.
+func (r *restartableVolumeSnapshotter) init(volumeSnapshotter velero.VolumeSnapshotter, config map[string]string) error {
+	return volumeSnapshotter.Init(config)
 }
 
 // CreateVolumeFromSnapshot restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) CreateVolumeFromSnapshot(snapshotID string, volumeType string, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (r *restartableVolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID string, volumeType string, volumeAZ string, iops *int64) (volumeID string, err error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return "", err
@@ -116,7 +116,7 @@ func (r *restartableBlockStore) CreateVolumeFromSnapshot(snapshotID string, volu
 }
 
 // GetVolumeID restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (r *restartableVolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return "", err
@@ -125,7 +125,7 @@ func (r *restartableBlockStore) GetVolumeID(pv runtime.Unstructured) (string, er
 }
 
 // SetVolumeID restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (r *restartableVolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ func (r *restartableBlockStore) SetVolumeID(pv runtime.Unstructured, volumeID st
 }
 
 // GetVolumeInfo restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) GetVolumeInfo(volumeID string, volumeAZ string) (string, *int64, error) {
+func (r *restartableVolumeSnapshotter) GetVolumeInfo(volumeID string, volumeAZ string) (string, *int64, error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return "", nil, err
@@ -143,7 +143,7 @@ func (r *restartableBlockStore) GetVolumeInfo(volumeID string, volumeAZ string) 
 }
 
 // CreateSnapshot restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) CreateSnapshot(volumeID string, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+func (r *restartableVolumeSnapshotter) CreateSnapshot(volumeID string, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return "", err
@@ -152,7 +152,7 @@ func (r *restartableBlockStore) CreateSnapshot(volumeID string, volumeAZ string,
 }
 
 // DeleteSnapshot restarts the plugin's process if needed, then delegates the call.
-func (r *restartableBlockStore) DeleteSnapshot(snapshotID string) error {
+func (r *restartableVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	delegate, err := r.getDelegate()
 	if err != nil {
 		return err

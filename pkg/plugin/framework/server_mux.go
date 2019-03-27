@@ -23,7 +23,7 @@ import (
 )
 
 // HandlerInitializer is a function that initializes and returns a new instance of one of Velero's plugin interfaces
-// (ObjectStore, BlockStore, BackupItemAction, RestoreItemAction).
+// (ObjectStore, VolumeSnapshotter, BackupItemAction, RestoreItemAction).
 type HandlerInitializer func(logger logrus.FieldLogger) (interface{}, error)
 
 // serverMux manages multiple implementations of a single plugin kind, such as pod and pvc BackupItemActions.
