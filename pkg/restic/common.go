@@ -40,10 +40,6 @@ const (
 
 	podAnnotationPrefix       = "snapshot.velero.io/"
 	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
-
-	// TODO(1.0) remove both legacy annotations
-	podAnnotationLegacyPrefix       = "snapshot.ark.heptio.com/"
-	volumesToBackupLegacyAnnotation = "backup.ark.heptio.com/backup-volumes"
 )
 
 // PodHasSnapshotAnnotation returns true if the object has an annotation
@@ -52,11 +48,6 @@ const (
 func PodHasSnapshotAnnotation(obj metav1.Object) bool {
 	for key := range obj.GetAnnotations() {
 		if strings.HasPrefix(key, podAnnotationPrefix) {
-			return true
-		}
-
-		// TODO(1.0): remove if statement & contents
-		if strings.HasPrefix(key, podAnnotationLegacyPrefix) {
 			return true
 		}
 	}
@@ -79,16 +70,6 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	for k, v := range obj.GetAnnotations() {
 		if strings.HasPrefix(k, podAnnotationPrefix) {
 			insertSafe(k[len(podAnnotationPrefix):], v)
-		}
-
-		if strings.HasPrefix(k, podAnnotationLegacyPrefix) {
-			volume := k[len(podAnnotationLegacyPrefix):]
-
-			// if it has the legacy prefix, only use it if there's not
-			// already a value in res for the volume
-			if _, ok := res[volume]; !ok {
-				insertSafe(volume, v)
-			}
 		}
 	}
 
@@ -117,12 +98,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue, ok := annotations[volumesToBackupAnnotation]
-	// TODO(1.0) remove the following if statement & contents
-	if !ok {
-		backupsValue = annotations[volumesToBackupLegacyAnnotation]
-	}
-
+	backupsValue := annotations[volumesToBackupAnnotation]
 	if backupsValue == "" {
 		return nil
 	}

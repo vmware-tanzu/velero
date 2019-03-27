@@ -69,16 +69,6 @@ func TestPodHasSnapshotAnnotation(t *testing.T) {
 			annotations: map[string]string{"foo": "bar", podAnnotationPrefix + "foo": "bar"},
 			expected:    true,
 		},
-		{
-			name:        "has legacy snapshot annotation only, with suffix",
-			annotations: map[string]string{podAnnotationLegacyPrefix + "foo": "bar"},
-			expected:    true,
-		},
-		{
-			name:        "has legacy and current snapshot annotations, with suffixes",
-			annotations: map[string]string{podAnnotationPrefix + "curr": "baz", podAnnotationLegacyPrefix + "foo": "bar"},
-			expected:    true,
-		},
 	}
 
 	for _, test := range tests {
@@ -125,20 +115,6 @@ func TestGetPodSnapshotAnnotations(t *testing.T) {
 			name:        "has snapshot annotation, with suffix",
 			annotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
 			expected:    map[string]string{"foo": "bar", "abc": "123"},
-		},
-		{
-			name:        "has legacy snapshot annotation only",
-			annotations: map[string]string{podAnnotationLegacyPrefix + "foo": "bar"},
-			expected:    map[string]string{"foo": "bar"},
-		},
-		{
-			name: "when current and legacy snapshot annotations exist, current wins",
-			annotations: map[string]string{
-				podAnnotationPrefix + "foo":       "current",
-				podAnnotationLegacyPrefix + "foo": "legacy",
-				podAnnotationLegacyPrefix + "bar": "baz",
-			},
-			expected: map[string]string{"foo": "current", "bar": "baz"},
 		},
 	}
 
@@ -218,16 +194,6 @@ func TestGetVolumesToBackup(t *testing.T) {
 			name:        "multiple volumes to backup",
 			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
 			expected:    []string{"volume-1", "volume-2", "volume-3"},
-		},
-		{
-			name:        "legacy annotation",
-			annotations: map[string]string{"foo": "bar", volumesToBackupLegacyAnnotation: "volume-1"},
-			expected:    []string{"volume-1"},
-		},
-		{
-			name:        "when legacy and current annotations are both specified, current wins",
-			annotations: map[string]string{volumesToBackupAnnotation: "current", volumesToBackupLegacyAnnotation: "legacy"},
-			expected:    []string{"current"},
 		},
 	}
 
