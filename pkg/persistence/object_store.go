@@ -27,8 +27,6 @@ import (
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -208,48 +206,7 @@ func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volu
 }
 
 func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup, error) {
-	// We need to determine whether the backup metadata file is the legacy ark.heptio.com
-	// one (named ark-backup.json) or the current velero.io one (named velero-backup.json).
-	// Listing all objects in the backup directory and searching for them is easiest, because
-	// GetObject() calls don't immediately return an error if the object is not found due to
-	// a bug related to the plugin infrastructure, and even if they did, it's difficult to
-	// distinguish between a 404 and a different error.
-	//
-	// TODO once the plugin/error-related bugs are fixed, simplify this code by just calling
-	// GetObject() to check existence of the metadata files.
-	keys, err := s.objectStore.ListObjects(s.bucket, s.layout.getBackupDir(name))
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	var (
-		metadataKey       = s.layout.getBackupMetadataKey(name)
-		legacyMetadataKey = s.layout.getLegacyBackupMetadataKey(name)
-		legacyMetadata    bool
-	)
-
-	var found bool
-	for _, key := range keys {
-		switch key {
-		case metadataKey:
-			found = true
-		case legacyMetadataKey:
-			found = true
-			legacyMetadata = true
-		}
-
-		if found {
-			break
-		}
-	}
-
-	if legacyMetadata {
-		s.logger.WithField("backup", name).Debug("Legacy metadata file found, converting")
-		return s.getAndConvertLegacyBackupMetadata(legacyMetadataKey)
-	}
-
-	// TODO(1.0): remove everything in this method from here up, except the metadataKey
-	// declaration.
+	metadataKey := s.layout.getBackupMetadataKey(name)
 
 	res, err := s.objectStore.GetObject(s.bucket, metadataKey)
 	if err != nil {
@@ -274,48 +231,6 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	}
 
 	return backupObj, nil
-}
-
-// TODO(1.0): remove
-func (s *objectBackupStore) getAndConvertLegacyBackupMetadata(key string) (*velerov1api.Backup, error) {
-	obj, err := s.objectStore.GetObject(s.bucket, key)
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(obj)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	res := new(unstructured.Unstructured)
-	if err := json.Unmarshal(data, &res); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	res.SetAPIVersion(velerov1api.SchemeGroupVersion.String())
-	res.SetLabels(convertMapKeys(res.GetLabels(), "ark.heptio.com", "velero.io"))
-	res.SetLabels(convertMapKeys(res.GetLabels(), "ark-schedule", velerov1api.ScheduleNameLabel))
-	res.SetAnnotations(convertMapKeys(res.GetAnnotations(), "ark.heptio.com", "velero.io"))
-
-	backup := new(velerov1api.Backup)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(res.Object, backup); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return backup, nil
-}
-
-// TODO(1.0): remove
-func convertMapKeys(m map[string]string, find, replace string) map[string]string {
-	for k, v := range m {
-		if updatedKey := strings.Replace(k, find, replace, -1); updatedKey != k {
-			m[updatedKey] = v
-			delete(m, k)
-		}
-	}
-
-	return m
 }
 
 func keyExists(objectStore velero.ObjectStore, bucket, prefix, key string) (bool, error) {

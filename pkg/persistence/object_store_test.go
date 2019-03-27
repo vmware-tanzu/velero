@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	arkv1api "github.com/heptio/velero/pkg/apis/ark/v1"
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cloudprovider"
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
@@ -316,22 +315,7 @@ func TestGetBackupMetadata(t *testing.T) {
 		wantErr    error
 	}{
 		{
-			name:       "legacy metadata file returns correctly",
-			backupName: "foo",
-			key:        "backups/foo/ark-backup.json",
-			obj: &arkv1api.Backup{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Backup",
-					APIVersion: arkv1api.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: arkv1api.DefaultNamespace,
-					Name:      "foo",
-				},
-			},
-		},
-		{
-			name:       "current metadata file returns correctly",
+			name:       "metadata file returns correctly",
 			backupName: "foo",
 			key:        "backups/foo/velero-backup.json",
 			obj: &velerov1api.Backup{
@@ -371,85 +355,6 @@ func TestGetBackupMetadata(t *testing.T) {
 
 				assert.Equal(t, tc.obj.GetNamespace(), res.Namespace)
 				assert.Equal(t, tc.obj.GetName(), res.Name)
-			}
-		})
-	}
-}
-
-func TestGetAndConvertLegacyBackupMetadata(t *testing.T) {
-	tests := []struct {
-		name    string
-		key     string
-		obj     metav1.Object
-		want    *velerov1api.Backup
-		wantErr error
-	}{
-		{
-			name: "velerov1api group, labels and annotations all get converted",
-			key:  "backups/foo/ark-backup.json",
-			obj: &arkv1api.Backup{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Backup",
-					APIVersion: arkv1api.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: arkv1api.DefaultNamespace,
-					Name:      "foo",
-					Labels: map[string]string{
-						"ark.heptio.com/foo":        "bar",
-						"ark.heptio.com/tango":      "foxtrot",
-						"prefix.ark.heptio.com/zaz": "zoo",
-						"non-matching":              "no-change",
-					},
-					Annotations: map[string]string{
-						"ark.heptio.com/foo":        "bar",
-						"ark.heptio.com/tango":      "foxtrot",
-						"prefix.ark.heptio.com/zaz": "zoo",
-						"non-matching":              "no-change",
-					},
-				},
-			},
-			want: &velerov1api.Backup{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Backup",
-					APIVersion: velerov1api.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: arkv1api.DefaultNamespace,
-					Name:      "foo",
-					Labels: map[string]string{
-						"velero.io/foo":        "bar",
-						"velero.io/tango":      "foxtrot",
-						"prefix.velero.io/zaz": "zoo",
-						"non-matching":         "no-change",
-					},
-					Annotations: map[string]string{
-						"velero.io/foo":        "bar",
-						"velero.io/tango":      "foxtrot",
-						"prefix.velero.io/zaz": "zoo",
-						"non-matching":         "no-change",
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			harness := newObjectBackupStoreTestHarness("test-bucket", "")
-
-			jsonBytes, err := json.Marshal(tc.obj)
-			require.NoError(t, err)
-
-			require.NoError(t, harness.objectStore.PutObject(harness.bucket, tc.key, bytes.NewReader(jsonBytes)))
-
-			res, err := harness.getAndConvertLegacyBackupMetadata(tc.key)
-			if tc.wantErr != nil {
-				assert.Equal(t, tc.wantErr, err)
-			} else {
-				require.NoError(t, err)
-
-				assert.Equal(t, tc.want, res)
 			}
 		})
 	}

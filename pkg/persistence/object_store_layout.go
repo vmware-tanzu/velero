@@ -75,11 +75,6 @@ func (l *ObjectStoreLayout) getBackupMetadataKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, "velero-backup.json")
 }
 
-// TODO(1.0): remove
-func (l *ObjectStoreLayout) getLegacyBackupMetadataKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, "ark-backup.json")
-}
-
 func (l *ObjectStoreLayout) getBackupContentsKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s.tar.gz", backup))
 }
