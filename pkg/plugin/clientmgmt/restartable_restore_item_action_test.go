@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -117,7 +117,6 @@ func TestRestartableRestoreItemActionDelegatedFunctions(t *testing.T) {
 				"color": "green",
 			},
 		},
-		Warning: errors.Errorf("delegate warning"),
 	}
 
 	runRestartableDelegateTests(

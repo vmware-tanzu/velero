@@ -891,9 +891,6 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			ItemFromBackup: itemFromBackup,
 			Restore:        ctx.restore,
 		})
-		if executeOutput.Warning != nil {
-			addToResult(&warnings, namespace, fmt.Errorf("warning preparing %s: %v", resourceID, executeOutput.Warning))
-		}
 		if err != nil {
 			addToResult(&errs, namespace, fmt.Errorf("error preparing %s: %v", resourceID, err))
 			return warnings, errs

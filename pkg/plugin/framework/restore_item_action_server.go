@@ -125,14 +125,8 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		}
 	}
 
-	var warnMessage string
-	if executeOutput.Warning != nil {
-		warnMessage = executeOutput.Warning.Error()
-	}
-
 	res := &proto.RestoreItemActionExecuteResponse{
-		Item:    updatedItemJSON,
-		Warning: warnMessage,
+		Item: updatedItemJSON,
 	}
 
 	for _, item := range executeOutput.AdditionalItems {

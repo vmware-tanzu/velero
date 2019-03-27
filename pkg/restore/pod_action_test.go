@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -203,7 +203,6 @@ func TestPodActionExecute(t *testing.T) {
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredPod},
 				Restore:        nil,
 			})
-			assert.Nil(t, res.Warning)
 
 			if test.expectedErr {
 				assert.NotNil(t, err, "expected an error")
