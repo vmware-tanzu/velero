@@ -6,6 +6,8 @@ This directory contains sample YAML config files for running Velero on each core
 
 * `minio/`: Used in the [Quickstart][1] to set up [Minio][0], a local S3-compatible object storage service. It provides a convenient way to test Velero without tying you to a specific cloud provider.
 
+* `noobaa/`: Contains manifests to make use of NooBaa's S3 storage.
+
 * `aws/`, `azure/`, `gcp/`, `ibm/`: Contains manifests specific to the given cloud provider's setup.
 
 [0]: https://github.com/minio/minio
