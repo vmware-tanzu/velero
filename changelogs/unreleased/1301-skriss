@@ -1,0 +1,1 @@
+log error locations from plugin logger, and don't overwrite them in the client logger if they exist already
