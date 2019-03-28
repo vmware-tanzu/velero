@@ -160,12 +160,12 @@ func getNames(command string, kind PluginKind, plugin Interface) []PluginIdentif
 
 func (s *server) Serve() {
 	if s.flagSet != nil && !s.flagSet.Parsed() {
-		s.log.Infof("Parsing flags")
+		s.log.Debugf("Parsing flags")
 		s.flagSet.Parse(os.Args[1:])
 	}
 
 	s.log.Level = s.logLevelFlag.Parse()
-	s.log.Infof("Setting log level to %s", strings.ToUpper(s.log.Level.String()))
+	s.log.Debugf("Setting log level to %s", strings.ToUpper(s.log.Level.String()))
 
 	command := os.Args[0]
 
