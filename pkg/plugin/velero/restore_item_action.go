@@ -31,7 +31,8 @@ type RestoreItemAction interface {
 
 	// Execute allows the ItemAction to perform arbitrary logic with the item being restored,
 	// including mutating the item itself prior to restore. The item (unmodified or modified)
-	// should be returned, along with a warning (which will be logged but will not prevent
+	// should be returned, along with an optional slice of ResourceIdentifiers specifying additional
+	// related items that should be restored, a warning (which will be logged but will not prevent
 	// the item from being restored) or error (which will be logged and will prevent the item
 	// from being restored) if applicable.
 	Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error)
@@ -55,6 +56,9 @@ type RestoreItemActionExecuteOutput struct {
 	// Warning is an exceptional message returned from ItemAction
 	// which is not preventing the item from being restored.
 	Warning error
+	// AdditionalItems is a list of additional related items that should
+	// be restored.
+	AdditionalItems []ResourceIdentifier
 }
 
 // NewRestoreItemActionExecuteOutput creates a new RestoreItemActionExecuteOutput

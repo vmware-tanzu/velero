@@ -74,7 +74,7 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 	}, nil
 }
 
-func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreExecuteRequest) (response *proto.RestoreExecuteResponse, err error) {
+func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.RestoreItemActionExecuteRequest) (response *proto.RestoreItemActionExecuteResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -113,9 +113,16 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		return nil, newGRPCError(err)
 	}
 
-	updatedItem, err := json.Marshal(executeOutput.UpdatedItem)
-	if err != nil {
-		return nil, newGRPCError(errors.WithStack(err))
+	// If the plugin implementation returned a nil updateItem (meaning no modifications), reset updatedItem to the
+	// original item.
+	var updatedItemJSON []byte
+	if executeOutput.UpdatedItem == nil {
+		updatedItemJSON = req.Item
+	} else {
+		updatedItemJSON, err = json.Marshal(executeOutput.UpdatedItem.UnstructuredContent())
+		if err != nil {
+			return nil, newGRPCError(errors.WithStack(err))
+		}
 	}
 
 	var warnMessage string
@@ -123,8 +130,23 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 		warnMessage = executeOutput.Warning.Error()
 	}
 
-	return &proto.RestoreExecuteResponse{
-		Item:    updatedItem,
+	res := &proto.RestoreItemActionExecuteResponse{
+		Item:    updatedItemJSON,
 		Warning: warnMessage,
-	}, nil
+	}
+
+	for _, item := range executeOutput.AdditionalItems {
+		res.AdditionalItems = append(res.AdditionalItems, restoreResourceIdentifierToProto(item))
+	}
+
+	return res, nil
+}
+
+func restoreResourceIdentifierToProto(id velero.ResourceIdentifier) *proto.ResourceIdentifier {
+	return &proto.ResourceIdentifier{
+		Group:     id.Group,
+		Resource:  id.Resource,
+		Namespace: id.Namespace,
+		Name:      id.Name,
+	}
 }
