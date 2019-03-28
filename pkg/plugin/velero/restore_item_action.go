@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,9 +53,7 @@ type RestoreItemActionExecuteInput struct {
 type RestoreItemActionExecuteOutput struct {
 	// UpdatedItem is the item being restored mutated by ItemAction.
 	UpdatedItem runtime.Unstructured
-	// Warning is an exceptional message returned from ItemAction
-	// which is not preventing the item from being restored.
-	Warning error
+
 	// AdditionalItems is a list of additional related items that should
 	// be restored.
 	AdditionalItems []ResourceIdentifier
@@ -66,10 +64,4 @@ func NewRestoreItemActionExecuteOutput(item runtime.Unstructured) *RestoreItemAc
 	return &RestoreItemActionExecuteOutput{
 		UpdatedItem: item,
 	}
-}
-
-// WithWarning returns a warning for RestoreItemActionExecuteOutput
-func (r *RestoreItemActionExecuteOutput) WithWarning(err error) *RestoreItemActionExecuteOutput {
-	r.Warning = err
-	return r
 }

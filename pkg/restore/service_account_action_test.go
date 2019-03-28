@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,7 +95,6 @@ func TestServiceAccountActionExecute(t *testing.T) {
 				ItemFromBackup: &unstructured.Unstructured{Object: saUnstructured},
 				Restore:        nil,
 			})
-			require.NoError(t, res.Warning)
 			require.NoError(t, err)
 
 			var resSA *corev1.ServiceAccount

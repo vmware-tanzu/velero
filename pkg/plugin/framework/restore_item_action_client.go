@@ -100,11 +100,6 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 		return nil, errors.WithStack(err)
 	}
 
-	var warning error
-	if res.Warning != "" {
-		warning = errors.New(res.Warning)
-	}
-
 	var additionalItems []velero.ResourceIdentifier
 	for _, itm := range res.AdditionalItems {
 		newItem := velero.ResourceIdentifier{
@@ -121,7 +116,6 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &updatedItem,
-		Warning:         warning,
 		AdditionalItems: additionalItems,
 	}, nil
 }
