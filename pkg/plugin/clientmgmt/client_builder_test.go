@@ -49,7 +49,7 @@ func TestClientConfig(t *testing.T) {
 	cb := newClientBuilder("velero", logger, logLevel)
 
 	expected := &hcplugin.ClientConfig{
-		HandshakeConfig:  framework.Handshake,
+		HandshakeConfig:  framework.Handshake(),
 		AllowedProtocols: []hcplugin.Protocol{hcplugin.ProtocolGRPC},
 		Plugins: map[string]hcplugin.Plugin{
 			string(framework.PluginKindBackupItemAction):  framework.NewBackupItemActionPlugin(framework.ClientLogger(logger)),

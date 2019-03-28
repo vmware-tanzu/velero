@@ -28,16 +28,6 @@ import (
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
-// Handshake is configuration information that allows go-plugin clients and servers to perform a handshake.
-//
-// TODO(ncdc): this should probably be a function so it can't be mutated, and we should probably move it to
-// handshake.go.
-var Handshake = plugin.HandshakeConfig{
-	ProtocolVersion:  1,
-	MagicCookieKey:   "ARK_PLUGIN",
-	MagicCookieValue: "hello",
-}
-
 // Server serves registered plugin implementations.
 type Server interface {
 	// BindFlags defines the plugin server's command-line flags
@@ -188,7 +178,7 @@ func (s *server) Serve() {
 	pluginLister := NewPluginLister(pluginIdentifiers...)
 
 	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: Handshake,
+		HandshakeConfig: Handshake(),
 		Plugins: map[string]plugin.Plugin{
 			string(PluginKindBackupItemAction):  s.backupItemAction,
 			string(PluginKindVolumeSnapshotter): s.volumeSnapshotter,
