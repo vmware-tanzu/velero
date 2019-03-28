@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -68,7 +68,7 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) string {
 			url = fmt.Sprintf("s3-%s.amazonaws.com", region)
 		}
 
-		return fmt.Sprintf("s3:%s/%s", url, bucketAndPrefix)
+		return fmt.Sprintf("s3:%s/%s", strings.TrimSuffix(url, "/"), bucketAndPrefix)
 	case AzureBackend:
 		provider = "azure"
 	case GCPBackend:
