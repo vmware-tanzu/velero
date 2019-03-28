@@ -41,11 +41,11 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -204,6 +204,40 @@ func (c *restoreController) processRestore(key string) error {
 	// don't modify items in the cache
 	restore = restore.DeepCopy()
 
+	// begin log setup from runRestore
+	var restoreWarnings, restoreErrors api.RestoreResult
+	var restoreFailure error
+	logFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		c.logger.
+			WithFields(
+				logrus.Fields{
+					"restore": kubeutil.NamespaceAndName(restore),
+					"backup":  restore.Spec.BackupName,
+				},
+			).
+			WithError(errors.WithStack(err)).
+			Error("Error creating log temp file")
+		restoreFailure = err
+		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
+	}
+	gzippedLogFile := gzip.NewWriter(logFile)
+	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
+	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
+	defer gzippedLogFile.Close()
+	defer closeAndRemoveFile(logFile, c.logger)
+
+	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
+	// backup log failed for whatever reason.
+	logger := logging.DefaultLogger(c.restoreLogLevel)
+	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
+	log = logger.WithFields(
+		logrus.Fields{
+			"restore": kubeutil.NamespaceAndName(restore),
+			"backup":  restore.Spec.BackupName,
+		})
+	// end log setup from runRestore
+
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
@@ -241,22 +275,97 @@ func (c *restoreController) processRestore(key string) error {
 	log.Debug("Running restore")
 
 	// execution & upload of restore
-	restoreRes, restoreFailure := c.runRestore(
-		restore,
-		actions,
-		info,
-		pluginManager,
-	)
+	// begin runRestore
+	var backupFile, resultsFile *os.File
+	var volumeSnapshots []*volume.Snapshot
+	var gzippedResultsFile *gzip.Writer
+	if restoreFailure == nil {
+		backupFile, err = downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
+		if err != nil {
+			log.WithError(err).Error("Error downloading backup")
+			restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
+			restoreFailure = err
+		}
+	}
+	if restoreFailure == nil {
+		defer closeAndRemoveFile(backupFile, c.logger)
 
+		resultsFile, err = ioutil.TempFile("", "")
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
+			restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
+			restoreFailure = err
+		}
+	}
+	if restoreFailure == nil {
+		defer closeAndRemoveFile(resultsFile, c.logger)
+
+		volumeSnapshots, err = info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
+			restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
+			restoreFailure = err
+		}
+	}
+	// Any restoreFailure above this line means a total restore failure
+	// Some failures after this line *may* be a total restore failure
+	if restoreFailure == nil {
+		var stopWithoutFailure = false
+		log.Info("starting restore")
+		restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
+		log.Info("restore completed")
+
+		// Try to upload the log file. This is best-effort. If we fail, we'll add to the velero errors.
+		if err := gzippedLogFile.Close(); err != nil {
+			c.logger.WithError(err).Error("error closing gzippedLogFile")
+		}
+		// Reset the offset to 0 for reading
+		if _, err = logFile.Seek(0, 0); err != nil {
+			restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error resetting log file offset to 0: %v", err))
+			stopWithoutFailure = true
+		}
+
+		if !stopWithoutFailure {
+			if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
+				restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to backup storage: %v", err))
+			}
+
+			m := map[string]api.RestoreResult{
+				"warnings": restoreWarnings,
+				"errors":   restoreErrors,
+			}
+
+			gzippedResultsFile = gzip.NewWriter(resultsFile)
+
+			if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
+				stopWithoutFailure = true
+			}
+		}
+		if !stopWithoutFailure {
+			gzippedResultsFile.Close()
+
+			if _, err = resultsFile.Seek(0, 0); err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
+				stopWithoutFailure = true
+			}
+		}
+		if !stopWithoutFailure {
+			if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
+			}
+		}
+	}
+	// end runRestore
 	//TODO(1.0): Remove warnings.Ark
-	restore.Status.Warnings = len(restoreRes.warnings.Velero) + len(restoreRes.warnings.Cluster) + len(restoreRes.warnings.Ark)
-	for _, w := range restoreRes.warnings.Namespaces {
+	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster) + len(restoreWarnings.Ark)
+	for _, w := range restoreWarnings.Namespaces {
 		restore.Status.Warnings += len(w)
 	}
 
 	//TODO (1.0): Remove errors.Ark
-	restore.Status.Errors = len(restoreRes.errors.Velero) + len(restoreRes.errors.Cluster) + len(restoreRes.errors.Ark)
-	for _, e := range restoreRes.errors.Namespaces {
+	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster) + len(restoreErrors.Ark)
+	for _, e := range restoreErrors.Namespaces {
 		restore.Status.Errors += len(e)
 	}
 
@@ -429,114 +538,6 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		backup:      backup,
 		backupStore: backupStore,
 	}, nil
-}
-
-func (c *restoreController) runRestore(
-	restore *api.Restore,
-	actions []velero.RestoreItemAction,
-	info backupInfo,
-	pluginManager clientmgmt.Manager,
-) (restoreResult, error) {
-	var restoreWarnings, restoreErrors api.RestoreResult
-	var restoreFailure error
-	logFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		c.logger.
-			WithFields(
-				logrus.Fields{
-					"restore": kubeutil.NamespaceAndName(restore),
-					"backup":  restore.Spec.BackupName,
-				},
-			).
-			WithError(errors.WithStack(err)).
-			Error("Error creating log temp file")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	gzippedLogFile := gzip.NewWriter(logFile)
-	// Assuming we successfully uploaded the log file, this will have already been closed below. It is safe to call
-	// close multiple times. If we get an error closing this, there's not really anything we can do about it.
-	defer gzippedLogFile.Close()
-	defer closeAndRemoveFile(logFile, c.logger)
-
-	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
-	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.restoreLogLevel)
-	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
-	log := logger.WithFields(
-		logrus.Fields{
-			"restore": kubeutil.NamespaceAndName(restore),
-			"backup":  restore.Spec.BackupName,
-		})
-
-	backupFile, err := downloadToTempFile(restore.Spec.BackupName, info.backupStore, c.logger)
-	if err != nil {
-		log.WithError(err).Error("Error downloading backup")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	defer closeAndRemoveFile(backupFile, c.logger)
-
-	resultsFile, err := ioutil.TempFile("", "")
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error creating results temp file")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	defer closeAndRemoveFile(resultsFile, c.logger)
-
-	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error fetching volume snapshots")
-		restoreErrors.Velero = append(restoreErrors.Velero, err.Error())
-		restoreFailure = err
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-
-	// Any return statement above this line means a total restore failure
-	// Some failures after this line *may* be a total restore failure
-	log.Info("starting restore")
-	restoreWarnings, restoreErrors = c.restorer.Restore(log, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
-	log.Info("restore completed")
-
-	// Try to upload the log file. This is best-effort. If we fail, we'll add to the velero errors.
-	if err := gzippedLogFile.Close(); err != nil {
-		c.logger.WithError(err).Error("error closing gzippedLogFile")
-	}
-	// Reset the offset to 0 for reading
-	if _, err = logFile.Seek(0, 0); err != nil {
-		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error resetting log file offset to 0: %v", err))
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-
-	if err := info.backupStore.PutRestoreLog(restore.Spec.BackupName, restore.Name, logFile); err != nil {
-		restoreErrors.Ark = append(restoreErrors.Ark, fmt.Sprintf("error uploading log file to backup storage: %v", err))
-	}
-
-	m := map[string]api.RestoreResult{
-		"warnings": restoreWarnings,
-		"errors":   restoreErrors,
-	}
-
-	gzippedResultsFile := gzip.NewWriter(resultsFile)
-
-	if err := json.NewEncoder(gzippedResultsFile).Encode(m); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error encoding restore results")
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	gzippedResultsFile.Close()
-
-	if _, err = resultsFile.Seek(0, 0); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error resetting results file offset to 0")
-		return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
-	}
-	if err := info.backupStore.PutRestoreResults(restore.Spec.BackupName, restore.Name, resultsFile); err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error uploading results file to backup storage")
-	}
-
-	return restoreResult{warnings: restoreWarnings, errors: restoreErrors}, restoreFailure
 }
 
 func downloadToTempFile(
