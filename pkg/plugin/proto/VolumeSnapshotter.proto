@@ -61,7 +61,7 @@ message SetVolumeIDResponse {
   bytes persistentVolume = 1;
 }
 
-service BlockStore {
+service VolumeSnapshotter {
     rpc Init(InitRequest) returns (Empty);
     rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
     rpc GetVolumeInfo(GetVolumeInfoRequest) returns (GetVolumeInfoResponse);

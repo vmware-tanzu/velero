@@ -56,8 +56,8 @@ import (
 	"github.com/heptio/velero/pkg/volume"
 )
 
-type BlockStoreGetter interface {
-	GetBlockStore(name string) (velero.BlockStore, error)
+type VolumeSnapshotterGetter interface {
+	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
 // Restorer knows how to restore a backup.
@@ -70,7 +70,7 @@ type Restorer interface {
 		backupReader io.Reader,
 		actions []velero.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
-		blockStoreGetter BlockStoreGetter,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) (api.RestoreResult, api.RestoreResult)
 }
 
@@ -180,7 +180,7 @@ func (kr *kubernetesRestorer) Restore(
 	backupReader io.Reader,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
@@ -230,13 +230,13 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	pvRestorer := &pvRestorer{
-		logger:                 log,
-		backup:                 backup,
-		snapshotVolumes:        backup.Spec.SnapshotVolumes,
-		restorePVs:             restore.Spec.RestorePVs,
-		volumeSnapshots:        volumeSnapshots,
-		blockStoreGetter:       blockStoreGetter,
-		snapshotLocationLister: snapshotLocationLister,
+		logger:                  log,
+		backup:                  backup,
+		snapshotVolumes:         backup.Spec.SnapshotVolumes,
+		restorePVs:              restore.Spec.RestorePVs,
+		volumeSnapshots:         volumeSnapshots,
+		volumeSnapshotterGetter: volumeSnapshotterGetter,
+		snapshotLocationLister:  snapshotLocationLister,
 	}
 
 	restoreCtx := &context{
@@ -250,7 +250,7 @@ func (kr *kubernetesRestorer) Restore(
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
 		actions:                    resolvedActions,
-		blockStoreGetter:           blockStoreGetter,
+		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
 		pvsToProvision:             sets.NewString(),
 		pvRestorer:                 pvRestorer,
@@ -337,7 +337,7 @@ type context struct {
 	fileSystem                 filesystem.Interface
 	namespaceClient            corev1.NamespaceInterface
 	actions                    []resolvedAction
-	blockStoreGetter           BlockStoreGetter
+	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
 	globalWaitGroup            velerosync.ErrorGroup
 	pvsToProvision             sets.String

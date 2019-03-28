@@ -284,7 +284,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			additionalItemError: errors.New("foo"),
 		},
 		{
-			name:                      "takePVSnapshot is not invoked for PVs when blockStore == nil",
+			name:                      "takePVSnapshot is not invoked for PVs when volumeSnapshotter == nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               false,
@@ -293,7 +293,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			groupResource:             "persistentvolumes",
 		},
 		{
-			name:                      "takePVSnapshot is invoked for PVs when blockStore != nil",
+			name:                      "takePVSnapshot is invoked for PVs when volumeSnapshotter != nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               false,
@@ -312,7 +312,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			// empty snapshottableVolumes causes a blockStore to be created, but no
+			// empty snapshottableVolumes causes a volumeSnapshotter to be created, but no
 			// snapshots are expected to be taken.
 			snapshottableVolumes: map[string]v1.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
@@ -413,7 +413,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			discoveryHelper := velerotest.NewFakeDiscoveryHelper(true, nil)
 
-			blockStoreGetter := &blockStoreGetter{}
+			volumeSnapshotterGetter := &volumeSnapshotterGetter{}
 
 			b := (&defaultItemBackupperFactory{}).newItemBackupper(
 				backup,
@@ -424,18 +424,18 @@ func TestBackupItemNoSkips(t *testing.T) {
 				discoveryHelper,
 				nil, // restic backupper
 				newPVCSnapshotTracker(),
-				blockStoreGetter,
+				volumeSnapshotterGetter,
 			).(*defaultItemBackupper)
 
-			var blockStore *velerotest.FakeBlockStore
+			var volumeSnapshotter *velerotest.FakeVolumeSnapshotter
 			if test.snapshottableVolumes != nil {
-				blockStore = &velerotest.FakeBlockStore{
+				volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{
 					SnapshottableVolumes: test.snapshottableVolumes,
 					VolumeID:             "vol-abc123",
 					Error:                test.snapshotError,
 				}
 
-				blockStoreGetter.blockStore = blockStore
+				volumeSnapshotterGetter.volumeSnapshotter = volumeSnapshotter
 			}
 
 			if test.trackedPVCs != nil {
@@ -523,7 +523,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 
 			if test.snapshottableVolumes != nil {
-				require.Equal(t, len(test.snapshottableVolumes), len(blockStore.SnapshotsTaken))
+				require.Equal(t, len(test.snapshottableVolumes), len(volumeSnapshotter.SnapshotsTaken))
 			}
 
 			if len(test.snapshottableVolumes) > 0 {
@@ -547,13 +547,13 @@ func TestBackupItemNoSkips(t *testing.T) {
 	}
 }
 
-type blockStoreGetter struct {
-	blockStore velero.BlockStore
+type volumeSnapshotterGetter struct {
+	volumeSnapshotter velero.VolumeSnapshotter
 }
 
-func (b *blockStoreGetter) GetBlockStore(name string) (velero.BlockStore, error) {
-	if b.blockStore != nil {
-		return b.blockStore, nil
+func (b *volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	if b.volumeSnapshotter != nil {
+		return b.volumeSnapshotter, nil
 	}
 	return nil, errors.New("plugin not found")
 }
@@ -787,7 +787,7 @@ func TestTakePVSnapshot(t *testing.T) {
 				},
 			}
 
-			blockStore := &velerotest.FakeBlockStore{
+			volumeSnapshotter := &velerotest.FakeVolumeSnapshotter{
 				SnapshottableVolumes: test.volumeInfo,
 				VolumeID:             test.expectedVolumeID,
 			}
@@ -797,7 +797,7 @@ func TestTakePVSnapshot(t *testing.T) {
 					Backup:            backup,
 					SnapshotLocations: []*v1.VolumeSnapshotLocation{new(v1.VolumeSnapshotLocation)},
 				},
-				blockStoreGetter: &blockStoreGetter{blockStore: blockStore},
+				volumeSnapshotterGetter: &volumeSnapshotterGetter{volumeSnapshotter: volumeSnapshotter},
 			}
 
 			pv, err := velerotest.GetAsMap(test.pv)
@@ -823,13 +823,13 @@ func TestTakePVSnapshot(t *testing.T) {
 			}
 
 			// we should have exactly one snapshot taken
-			require.Equal(t, test.expectedSnapshotsTaken, blockStore.SnapshotsTaken.Len())
+			require.Equal(t, test.expectedSnapshotsTaken, volumeSnapshotter.SnapshotsTaken.Len())
 
 			if test.expectedSnapshotsTaken > 0 {
 				require.Len(t, ib.backupRequest.VolumeSnapshots, 1)
 				snapshot := ib.backupRequest.VolumeSnapshots[0]
 
-				snapshotID, _ := blockStore.SnapshotsTaken.PopAny()
+				snapshotID, _ := volumeSnapshotter.SnapshotsTaken.PopAny()
 				assert.Equal(t, snapshotID, snapshot.Status.ProviderSnapshotID)
 				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Type, snapshot.Spec.VolumeType)
 				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Iops, snapshot.Spec.VolumeIOPS)

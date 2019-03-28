@@ -27,7 +27,7 @@ type PutObjectRequest struct {
 func (m *PutObjectRequest) Reset()                    { *m = PutObjectRequest{} }
 func (m *PutObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*PutObjectRequest) ProtoMessage()               {}
-func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{0} }
+func (*PutObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{0} }
 
 func (m *PutObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -66,7 +66,7 @@ type GetObjectRequest struct {
 func (m *GetObjectRequest) Reset()                    { *m = GetObjectRequest{} }
 func (m *GetObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*GetObjectRequest) ProtoMessage()               {}
-func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{1} }
+func (*GetObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{1} }
 
 func (m *GetObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -96,7 +96,7 @@ type Bytes struct {
 func (m *Bytes) Reset()                    { *m = Bytes{} }
 func (m *Bytes) String() string            { return proto.CompactTextString(m) }
 func (*Bytes) ProtoMessage()               {}
-func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{2} }
+func (*Bytes) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{2} }
 
 func (m *Bytes) GetData() []byte {
 	if m != nil {
@@ -115,7 +115,7 @@ type ListCommonPrefixesRequest struct {
 func (m *ListCommonPrefixesRequest) Reset()                    { *m = ListCommonPrefixesRequest{} }
 func (m *ListCommonPrefixesRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesRequest) ProtoMessage()               {}
-func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{3} }
+func (*ListCommonPrefixesRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{3} }
 
 func (m *ListCommonPrefixesRequest) GetPlugin() string {
 	if m != nil {
@@ -152,7 +152,7 @@ type ListCommonPrefixesResponse struct {
 func (m *ListCommonPrefixesResponse) Reset()                    { *m = ListCommonPrefixesResponse{} }
 func (m *ListCommonPrefixesResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListCommonPrefixesResponse) ProtoMessage()               {}
-func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{4} }
+func (*ListCommonPrefixesResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{4} }
 
 func (m *ListCommonPrefixesResponse) GetPrefixes() []string {
 	if m != nil {
@@ -170,7 +170,7 @@ type ListObjectsRequest struct {
 func (m *ListObjectsRequest) Reset()                    { *m = ListObjectsRequest{} }
 func (m *ListObjectsRequest) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsRequest) ProtoMessage()               {}
-func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{5} }
+func (*ListObjectsRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{5} }
 
 func (m *ListObjectsRequest) GetPlugin() string {
 	if m != nil {
@@ -200,7 +200,7 @@ type ListObjectsResponse struct {
 func (m *ListObjectsResponse) Reset()                    { *m = ListObjectsResponse{} }
 func (m *ListObjectsResponse) String() string            { return proto.CompactTextString(m) }
 func (*ListObjectsResponse) ProtoMessage()               {}
-func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{6} }
+func (*ListObjectsResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{6} }
 
 func (m *ListObjectsResponse) GetKeys() []string {
 	if m != nil {
@@ -218,7 +218,7 @@ type DeleteObjectRequest struct {
 func (m *DeleteObjectRequest) Reset()                    { *m = DeleteObjectRequest{} }
 func (m *DeleteObjectRequest) String() string            { return proto.CompactTextString(m) }
 func (*DeleteObjectRequest) ProtoMessage()               {}
-func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{7} }
+func (*DeleteObjectRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{7} }
 
 func (m *DeleteObjectRequest) GetPlugin() string {
 	if m != nil {
@@ -251,7 +251,7 @@ type CreateSignedURLRequest struct {
 func (m *CreateSignedURLRequest) Reset()                    { *m = CreateSignedURLRequest{} }
 func (m *CreateSignedURLRequest) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLRequest) ProtoMessage()               {}
-func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{8} }
+func (*CreateSignedURLRequest) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{8} }
 
 func (m *CreateSignedURLRequest) GetPlugin() string {
 	if m != nil {
@@ -288,7 +288,7 @@ type CreateSignedURLResponse struct {
 func (m *CreateSignedURLResponse) Reset()                    { *m = CreateSignedURLResponse{} }
 func (m *CreateSignedURLResponse) String() string            { return proto.CompactTextString(m) }
 func (*CreateSignedURLResponse) ProtoMessage()               {}
-func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor2, []int{9} }
+func (*CreateSignedURLResponse) Descriptor() ([]byte, []int) { return fileDescriptor1, []int{9} }
 
 func (m *CreateSignedURLResponse) GetUrl() string {
 	if m != nil {
@@ -642,9 +642,9 @@ var _ObjectStore_serviceDesc = grpc.ServiceDesc{
 	Metadata: "ObjectStore.proto",
 }
 
-func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor2) }
+func init() { proto.RegisterFile("ObjectStore.proto", fileDescriptor1) }
 
-var fileDescriptor2 = []byte{
+var fileDescriptor1 = []byte{
 	// 468 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x54, 0x51, 0x8b, 0xd3, 0x40,
 	0x10, 0x26, 0x26, 0x1e, 0x66, 0xae, 0x60, 0x9c, 0x83, 0x1a, 0x73, 0x2a, 0x75, 0x51, 0xa8, 0x08,

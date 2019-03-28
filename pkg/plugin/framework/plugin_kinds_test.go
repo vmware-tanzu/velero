@@ -25,7 +25,7 @@ import (
 func TestAllPluginKinds(t *testing.T) {
 	expected := sets.NewString(
 		PluginKindObjectStore.String(),
-		PluginKindBlockStore.String(),
+		PluginKindVolumeSnapshotter.String(),
 		PluginKindBackupItemAction.String(),
 		PluginKindRestoreItemAction.String(),
 	)

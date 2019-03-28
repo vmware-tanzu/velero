@@ -97,7 +97,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
@@ -110,7 +110,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 		tarWriter,
 		resticBackupper,
 		resticSnapshotTracker,
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 	return args.Get(0).(resourceBackupper)
 }

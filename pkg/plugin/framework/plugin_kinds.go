@@ -33,8 +33,8 @@ const (
 	// PluginKindObjectStore represents an object store plugin.
 	PluginKindObjectStore PluginKind = "ObjectStore"
 
-	// PluginKindBlockStore represents a block store plugin.
-	PluginKindBlockStore PluginKind = "BlockStore"
+	// PluginKindVolumeSnapshotter represents a volume snapshotter plugin.
+	PluginKindVolumeSnapshotter PluginKind = "VolumeSnapshotter"
 
 	// PluginKindBackupItemAction represents a backup item action plugin.
 	PluginKindBackupItemAction PluginKind = "BackupItemAction"
@@ -50,7 +50,7 @@ const (
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
 var allPluginKinds = sets.NewString(
 	PluginKindObjectStore.String(),
-	PluginKindBlockStore.String(),
+	PluginKindVolumeSnapshotter.String(),
 	PluginKindBackupItemAction.String(),
 	PluginKindRestoreItemAction.String(),
 )

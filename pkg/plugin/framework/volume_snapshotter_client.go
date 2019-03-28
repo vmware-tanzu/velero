@@ -28,31 +28,31 @@ import (
 	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
-// NewBlockStorePlugin constructs a BlockStorePlugin.
-func NewBlockStorePlugin(options ...PluginOption) *BlockStorePlugin {
-	return &BlockStorePlugin{
+// NewVolumeSnapshotterPlugin constructs a VolumeSnapshotterPlugin.
+func NewVolumeSnapshotterPlugin(options ...PluginOption) *VolumeSnapshotterPlugin {
+	return &VolumeSnapshotterPlugin{
 		pluginBase: newPluginBase(options...),
 	}
 }
 
-// BlockStoreGRPCClient implements the cloudprovider.BlockStore interface and uses a
+// VolumeSnapshotterGRPCClient implements the cloudprovider.VolumeSnapshotter interface and uses a
 // gRPC client to make calls to the plugin server.
-type BlockStoreGRPCClient struct {
+type VolumeSnapshotterGRPCClient struct {
 	*clientBase
-	grpcClient proto.BlockStoreClient
+	grpcClient proto.VolumeSnapshotterClient
 }
 
-func newBlockStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
-	return &BlockStoreGRPCClient{
+func newVolumeSnapshotterGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &VolumeSnapshotterGRPCClient{
 		clientBase: base,
-		grpcClient: proto.NewBlockStoreClient(clientConn),
+		grpcClient: proto.NewVolumeSnapshotterClient(clientConn),
 	}
 }
 
-// Init prepares the BlockStore for usage using the provided map of
-// configuration key-value pairs. It returns an error if the BlockStore
+// Init prepares the VolumeSnapshotter for usage using the provided map of
+// configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
-func (c *BlockStoreGRPCClient) Init(config map[string]string) error {
+func (c *VolumeSnapshotterGRPCClient) Init(config map[string]string) error {
 	req := &proto.InitRequest{
 		Plugin: c.plugin,
 		Config: config,
@@ -67,7 +67,7 @@ func (c *BlockStoreGRPCClient) Init(config map[string]string) error {
 
 // CreateVolumeFromSnapshot creates a new block volume, initialized from the provided snapshot,
 // and with the specified type and IOPS (if using provisioned IOPS).
-func (c *BlockStoreGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (c *VolumeSnapshotterGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	req := &proto.CreateVolumeRequest{
 		Plugin:     c.plugin,
 		SnapshotID: snapshotID,
@@ -91,7 +91,7 @@ func (c *BlockStoreGRPCClient) CreateVolumeFromSnapshot(snapshotID, volumeType, 
 
 // GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for a specified block
 // volume.
-func (c *BlockStoreGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (c *VolumeSnapshotterGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	req := &proto.GetVolumeInfoRequest{
 		Plugin:   c.plugin,
 		VolumeID: volumeID,
@@ -113,7 +113,7 @@ func (c *BlockStoreGRPCClient) GetVolumeInfo(volumeID, volumeAZ string) (string,
 
 // CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
 // set of tags to the snapshot.
-func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (c *VolumeSnapshotterGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	req := &proto.CreateSnapshotRequest{
 		Plugin:   c.plugin,
 		VolumeID: volumeID,
@@ -130,7 +130,7 @@ func (c *BlockStoreGRPCClient) CreateSnapshot(volumeID, volumeAZ string, tags ma
 }
 
 // DeleteSnapshot deletes the specified volume snapshot.
-func (c *BlockStoreGRPCClient) DeleteSnapshot(snapshotID string) error {
+func (c *VolumeSnapshotterGRPCClient) DeleteSnapshot(snapshotID string) error {
 	req := &proto.DeleteSnapshotRequest{
 		Plugin:     c.plugin,
 		SnapshotID: snapshotID,
@@ -143,7 +143,7 @@ func (c *BlockStoreGRPCClient) DeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (c *VolumeSnapshotterGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -162,7 +162,7 @@ func (c *BlockStoreGRPCClient) GetVolumeID(pv runtime.Unstructured) (string, err
 	return resp.VolumeID, nil
 }
 
-func (c *BlockStoreGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (c *VolumeSnapshotterGRPCClient) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	encodedPV, err := json.Marshal(pv.UnstructuredContent())
 	if err != nil {
 		return nil, errors.WithStack(err)

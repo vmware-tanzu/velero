@@ -33,13 +33,13 @@ type PVRestorer interface {
 }
 
 type pvRestorer struct {
-	logger                 logrus.FieldLogger
-	backup                 *api.Backup
-	snapshotVolumes        *bool
-	restorePVs             *bool
-	volumeSnapshots        []*volume.Snapshot
-	blockStoreGetter       BlockStoreGetter
-	snapshotLocationLister listers.VolumeSnapshotLocationLister
+	logger                  logrus.FieldLogger
+	backup                  *api.Backup
+	snapshotVolumes         *bool
+	restorePVs              *bool
+	volumeSnapshots         []*volume.Snapshot
+	volumeSnapshotterGetter VolumeSnapshotterGetter
+	snapshotLocationLister  listers.VolumeSnapshotLocationLister
 }
 
 func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
@@ -83,23 +83,23 @@ func (r *pvRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructu
 		return obj, nil
 	}
 
-	blockStore, err := r.blockStoreGetter.GetBlockStore(snapshotInfo.location.Spec.Provider)
+	volumeSnapshotter, err := r.volumeSnapshotterGetter.GetVolumeSnapshotter(snapshotInfo.location.Spec.Provider)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	if err := blockStore.Init(snapshotInfo.location.Spec.Config); err != nil {
+	if err := volumeSnapshotter.Init(snapshotInfo.location.Spec.Config); err != nil {
 		return nil, errors.WithStack(err)
 	}
 
-	volumeID, err := blockStore.CreateVolumeFromSnapshot(snapshotInfo.providerSnapshotID, snapshotInfo.volumeType, snapshotInfo.volumeAZ, snapshotInfo.volumeIOPS)
+	volumeID, err := volumeSnapshotter.CreateVolumeFromSnapshot(snapshotInfo.providerSnapshotID, snapshotInfo.volumeType, snapshotInfo.volumeAZ, snapshotInfo.volumeIOPS)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 
 	log.WithField("providerSnapshotID", snapshotInfo.providerSnapshotID).Info("successfully restored persistent volume from snapshot")
 
-	updated1, err := blockStore.SetVolumeID(obj, volumeID)
+	updated1, err := volumeSnapshotter.SetVolumeID(obj, volumeID)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

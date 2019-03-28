@@ -111,29 +111,29 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 }
 
 type backupDeletionControllerTestData struct {
-	client          *fake.Clientset
-	sharedInformers informers.SharedInformerFactory
-	blockStore      *velerotest.FakeBlockStore
-	backupStore     *persistencemocks.BackupStore
-	controller      *backupDeletionController
-	req             *v1.DeleteBackupRequest
+	client            *fake.Clientset
+	sharedInformers   informers.SharedInformerFactory
+	volumeSnapshotter *velerotest.FakeVolumeSnapshotter
+	backupStore       *persistencemocks.BackupStore
+	controller        *backupDeletionController
+	req               *v1.DeleteBackupRequest
 }
 
 func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
 	var (
-		client          = fake.NewSimpleClientset(objects...)
-		sharedInformers = informers.NewSharedInformerFactory(client, 0)
-		blockStore      = &velerotest.FakeBlockStore{SnapshotsTaken: sets.NewString()}
-		pluginManager   = &pluginmocks.Manager{}
-		backupStore     = &persistencemocks.BackupStore{}
-		req             = pkgbackup.NewDeleteBackupRequest("foo", "uid")
+		client            = fake.NewSimpleClientset(objects...)
+		sharedInformers   = informers.NewSharedInformerFactory(client, 0)
+		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}
+		pluginManager     = &pluginmocks.Manager{}
+		backupStore       = &persistencemocks.BackupStore{}
+		req               = pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	)
 
 	data := &backupDeletionControllerTestData{
-		client:          client,
-		sharedInformers: sharedInformers,
-		blockStore:      blockStore,
-		backupStore:     backupStore,
+		client:            client,
+		sharedInformers:   sharedInformers,
+		volumeSnapshotter: volumeSnapshotter,
+		backupStore:       backupStore,
 		controller: NewBackupDeletionController(
 			velerotest.NewLogger(),
 			sharedInformers.Velero().V1().DeleteBackupRequests(),
@@ -376,7 +376,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, backup, nil
 		})
-		td.blockStore.SnapshotsTaken.Insert("snap-1")
+		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -387,7 +387,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		})
 
 		pluginManager := &pluginmocks.Manager{}
-		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
+		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
@@ -453,7 +453,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		velerotest.CompareActions(t, expectedActions, td.client.Actions())
 
 		// Make sure snapshot was deleted
-		assert.Equal(t, 0, td.blockStore.SnapshotsTaken.Len())
+		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
 	})
 
 	t.Run("full delete, no errors", func(t *testing.T) {
@@ -504,7 +504,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, backup, nil
 		})
-		td.blockStore.SnapshotsTaken.Insert("snap-1")
+		td.volumeSnapshotter.SnapshotsTaken.Insert("snap-1")
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -526,7 +526,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		}
 
 		pluginManager := &pluginmocks.Manager{}
-		pluginManager.On("GetBlockStore", "provider-1").Return(td.blockStore, nil)
+		pluginManager.On("GetVolumeSnapshotter", "provider-1").Return(td.volumeSnapshotter, nil)
 		pluginManager.On("CleanupClients")
 		td.controller.newPluginManager = func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager }
 
@@ -593,7 +593,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		velerotest.CompareActions(t, expectedActions, td.client.Actions())
 
 		// Make sure snapshot was deleted
-		assert.Equal(t, 0, td.blockStore.SnapshotsTaken.Len())
+		assert.Equal(t, 0, td.volumeSnapshotter.SnapshotsTaken.Len())
 	})
 }
 

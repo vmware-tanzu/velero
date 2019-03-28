@@ -24,21 +24,21 @@ import (
 	proto "github.com/heptio/velero/pkg/plugin/generated"
 )
 
-// BlockStorePlugin is an implementation of go-plugin's Plugin
-// interface with support for gRPC for the cloudprovider/BlockStore
+// VolumeSnapshotterPlugin is an implementation of go-plugin's Plugin
+// interface with support for gRPC for the cloudprovider/VolumeSnapshotter
 // interface.
-type BlockStorePlugin struct {
+type VolumeSnapshotterPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
 	*pluginBase
 }
 
-// GRPCClient returns a BlockStore gRPC client.
-func (p *BlockStorePlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
-	return newClientDispenser(p.clientLogger, clientConn, newBlockStoreGRPCClient), nil
+// GRPCClient returns a VolumeSnapshotter gRPC client.
+func (p *VolumeSnapshotterPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, clientConn *grpc.ClientConn) (interface{}, error) {
+	return newClientDispenser(p.clientLogger, clientConn, newVolumeSnapshotterGRPCClient), nil
 }
 
-// GRPCServer registers a BlockStore gRPC server.
-func (p *BlockStorePlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
-	proto.RegisterBlockStoreServer(server, &BlockStoreGRPCServer{mux: p.serverMux})
+// GRPCServer registers a VolumeSnapshotter gRPC server.
+func (p *VolumeSnapshotterPlugin) GRPCServer(_ *plugin.GRPCBroker, server *grpc.Server) error {
+	proto.RegisterVolumeSnapshotterServer(server, &VolumeSnapshotterGRPCServer{mux: p.serverMux})
 	return nil
 }

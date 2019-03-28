@@ -648,7 +648,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
@@ -659,7 +659,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		discoveryHelper,
 		resticBackupper,
 		resticSnapshotTracker,
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 	return args.Get(0).(ItemBackupper)
 }

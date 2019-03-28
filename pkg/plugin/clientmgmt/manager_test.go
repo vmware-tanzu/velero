@@ -190,16 +190,16 @@ func TestGetObjectStore(t *testing.T) {
 	)
 }
 
-func TestGetBlockStore(t *testing.T) {
+func TestGetVolumeSnapshotter(t *testing.T) {
 	getPluginTest(t,
-		framework.PluginKindBlockStore,
+		framework.PluginKindVolumeSnapshotter,
 		"aws",
 		func(m Manager, name string) (interface{}, error) {
-			return m.GetBlockStore(name)
+			return m.GetVolumeSnapshotter(name)
 		},
 		func(name string, sharedPluginProcess RestartableProcess) interface{} {
-			return &restartableBlockStore{
-				key:                 kindAndName{kind: framework.PluginKindBlockStore, name: name},
+			return &restartableVolumeSnapshotter{
+				key:                 kindAndName{kind: framework.PluginKindVolumeSnapshotter, name: name},
 				sharedPluginProcess: sharedPluginProcess,
 			}
 		},

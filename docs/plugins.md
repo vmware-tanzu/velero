@@ -15,7 +15,7 @@ A fully-functional [sample plugin repository][1] is provided to serve as a conve
 Velero currently supports the following kinds of plugins:
 
 - **Object Store** - persists and retrieves backups, backup logs and restore logs
-- **Block Store** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
+- **Volume Snapshotter** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
 - **Backup Item Action** - executes arbitrary logic for individual items prior to storing them in a backup file
 - **Restore Item Action** - executes arbitrary logic for individual items prior to restoring them into a cluster
 

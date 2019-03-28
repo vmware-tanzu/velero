@@ -21,30 +21,30 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-func ExampleNewServer_blockStore() {
+func ExampleNewServer_volumeSnapshotter() {
 	NewServer(). // call the server
-			RegisterBlockStore("example-blockstore", newBlockStore). // register the plugin
-			Serve()                                                  // serve the plugin
+			RegisterVolumeSnapshotter("example-volumesnapshotter", newVolumeSnapshotter). // register the plugin
+			Serve()                                                                       // serve the plugin
 }
 
-func newBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return &BlockStore{FieldLogger: logger}, nil
+func newVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return &VolumeSnapshotter{FieldLogger: logger}, nil
 }
 
-type BlockStore struct {
+type VolumeSnapshotter struct {
 	FieldLogger logrus.FieldLogger
 }
 
-// Implement all methods for the BlockStore interface...
-func (b *BlockStore) Init(config map[string]string) error {
-	b.FieldLogger.Infof("BlockStore.Init called")
+// Implement all methods for the VolumeSnapshotter interface...
+func (b *VolumeSnapshotter) Init(config map[string]string) error {
+	b.FieldLogger.Infof("VolumeSnapshotter.Init called")
 
 	// ...
 
 	return nil
 }
 
-func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	b.FieldLogger.Infof("CreateVolumeFromSnapshot called")
 
 	// ...
@@ -52,7 +52,7 @@ func (b *BlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ s
 	return "volumeID", nil
 }
 
-func (b *BlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (b *VolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	b.FieldLogger.Infof("GetVolumeID called")
 
 	// ...
@@ -60,7 +60,7 @@ func (b *BlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	return "volumeID", nil
 }
 
-func (b *BlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (b *VolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	b.FieldLogger.Infof("SetVolumeID called")
 
 	// ...
@@ -68,7 +68,7 @@ func (b *BlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runt
 	return nil, nil
 }
 
-func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	b.FieldLogger.Infof("GetVolumeInfo called")
 
 	// ...
@@ -76,7 +76,7 @@ func (b *BlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, e
 	return "volumeFilesystemType", nil, nil
 }
 
-func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
 	b.FieldLogger.Infof("CreateSnapshot called")
 
 	// ...
@@ -84,7 +84,7 @@ func (b *BlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]s
 	return "snapshotID", nil
 }
 
-func (b *BlockStore) DeleteSnapshot(snapshotID string) error {
+func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	b.FieldLogger.Infof("DeleteSnapshot called")
 
 	// ...

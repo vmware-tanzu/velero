@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,15 +20,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
-// BlockStore exposes basic block-storage operations required
-// by Velero.
-type BlockStore interface {
-	// Init prepares the BlockStore for usage using the provided map of
-	// configuration key-value pairs. It returns an error if the BlockStore
+// VolumeSnapshotter defines the operations needed by Velero to
+// take snapshots of persistent volumes during backup, and to restore
+// persistent volumes from snapshots during restore.
+type VolumeSnapshotter interface {
+	// Init prepares the VolumeSnapshotter for usage using the provided map of
+	// configuration key-value pairs. It returns an error if the VolumeSnapshotter
 	// cannot be initialized from the provided config.
 	Init(config map[string]string) error
 
-	// CreateVolumeFromSnapshot creates a new block volume in the specified
+	// CreateVolumeFromSnapshot creates a new volume in the specified
 	// availability zone, initialized from the provided snapshot,
 	// and with the specified type and IOPS (if using provisioned IOPS).
 	CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error)
@@ -40,10 +41,10 @@ type BlockStore interface {
 	SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error)
 
 	// GetVolumeInfo returns the type and IOPS (if using provisioned IOPS) for
-	// the specified block volume in the given availability zone.
+	// the specified volume in the given availability zone.
 	GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error)
 
-	// CreateSnapshot creates a snapshot of the specified block volume, and applies the provided
+	// CreateSnapshot creates a snapshot of the specified volume, and applies the provided
 	// set of tags to the snapshot.
 	CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error)
 

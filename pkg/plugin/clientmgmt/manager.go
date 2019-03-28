@@ -30,8 +30,8 @@ type Manager interface {
 	// GetObjectStore returns the ObjectStore plugin for name.
 	GetObjectStore(name string) (velero.ObjectStore, error)
 
-	// GetBlockStore returns the BlockStore plugin for name.
-	GetBlockStore(name string) (velero.BlockStore, error)
+	// GetVolumeSnapshotter returns the VolumeSnapshotter plugin for name.
+	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 
 	// GetBackupItemActions returns all backup item action plugins.
 	GetBackupItemActions() ([]velero.BackupItemAction, error)
@@ -134,14 +134,14 @@ func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 	return r, nil
 }
 
-// GetBlockStore returns a restartableBlockStore for name.
-func (m *manager) GetBlockStore(name string) (velero.BlockStore, error) {
-	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBlockStore, name)
+// GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
+func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotter, name)
 	if err != nil {
 		return nil, err
 	}
 
-	r := newRestartableBlockStore(name, restartableProcess)
+	r := newRestartableVolumeSnapshotter(name, restartableProcess)
 
 	return r, nil
 }

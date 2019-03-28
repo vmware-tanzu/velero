@@ -508,7 +508,7 @@ func TestBackup(t *testing.T) {
 				mock.Anything, // tarWriter
 				mock.Anything, // restic backupper
 				mock.Anything, // pvc snapshot tracker
-				mock.Anything, // block store getter
+				mock.Anything, // volume snapshotter getter
 			).Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
@@ -613,7 +613,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) groupBackupper {
 	args := f.Called(
 		log,
@@ -626,7 +626,7 @@ func (f *mockGroupBackupperFactory) newGroupBackupper(
 		tarWriter,
 		resticBackupper,
 		resticSnapshotTracker,
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 	return args.Get(0).(groupBackupper)
 }

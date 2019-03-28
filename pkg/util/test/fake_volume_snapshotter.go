@@ -25,7 +25,7 @@ import (
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
-type FakeBlockStore struct {
+type FakeVolumeSnapshotter struct {
 	// SnapshotID->VolumeID
 	SnapshotsTaken sets.String
 
@@ -41,11 +41,11 @@ type FakeBlockStore struct {
 	Error error
 }
 
-func (bs *FakeBlockStore) Init(config map[string]string) error {
+func (bs *FakeVolumeSnapshotter) Init(config map[string]string) error {
 	return nil
 }
 
-func (bs *FakeBlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
+func (bs *FakeVolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (string, error) {
 	if bs.Error != nil {
 		return "", bs.Error
 	}
@@ -62,7 +62,7 @@ func (bs *FakeBlockStore) CreateSnapshot(volumeID, volumeAZ string, tags map[str
 	return bs.SnapshottableVolumes[volumeID].SnapshotID, nil
 }
 
-func (bs *FakeBlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
+func (bs *FakeVolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (string, error) {
 	if bs.Error != nil {
 		return "", bs.Error
 	}
@@ -77,7 +77,7 @@ func (bs *FakeBlockStore) CreateVolumeFromSnapshot(snapshotID, volumeType, volum
 	return bs.RestorableVolumes[key], nil
 }
 
-func (bs *FakeBlockStore) DeleteSnapshot(snapshotID string) error {
+func (bs *FakeVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	if bs.Error != nil {
 		return bs.Error
 	}
@@ -91,7 +91,7 @@ func (bs *FakeBlockStore) DeleteSnapshot(snapshotID string) error {
 	return nil
 }
 
-func (bs *FakeBlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+func (bs *FakeVolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
 	if bs.Error != nil {
 		return "", nil, bs.Error
 	}
@@ -103,11 +103,11 @@ func (bs *FakeBlockStore) GetVolumeInfo(volumeID, volumeAZ string) (string, *int
 	}
 }
 
-func (bs *FakeBlockStore) GetVolumeID(pv runtime.Unstructured) (string, error) {
+func (bs *FakeVolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
 	return bs.VolumeID, nil
 }
 
-func (bs *FakeBlockStore) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (bs *FakeVolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	bs.VolumeIDSet = volumeID
 	return pv, bs.Error
 }
