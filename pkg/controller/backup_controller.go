@@ -175,6 +175,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
+		request.Status.StartTimestamp.Time = c.clock.Now()
 	}
 
 	// update status
@@ -390,7 +391,6 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	log := c.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
-	backup.Status.StartTimestamp.Time = c.clock.Now()
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {
