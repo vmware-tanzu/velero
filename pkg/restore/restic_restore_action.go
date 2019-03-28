@@ -149,7 +149,7 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 	switch {
 	case len(parts) == 1:
 		// tag-less image name: add tag
-		log.Debugf("Plugin config contains image name without tag")
+		log.Debugf("Plugin config contains image name without tag. Adding tag.")
 		return initContainerImage(image)
 	case len(parts) == 2:
 		// tagged image name
