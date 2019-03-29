@@ -156,6 +156,9 @@ func Secret(namespace string, data []byte) *corev1.Secret {
 
 func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
+	// Remove the status field so we're not sending blank data to the server.
+	// On CRDs, having an empty status is actually a validation error.
+	delete(u, "status")
 	if err != nil {
 		return err
 	}
@@ -163,57 +166,65 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 	return nil
 }
 
+type VeleroOptions struct {
+	Namespace    string
+	Image        string
+	ProviderName string
+	Bucket       string
+	Prefix       string
+	SecretData   []byte
+	RestoreOnly  bool
+	UseRestic    bool
+	BSLConfig    map[string]string
+	VSLConfig    map[string]string
+}
+
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string, bslConfig, vslConfig map[string]string, secretData []byte, restoreOnly bool) (*unstructured.UnstructuredList, error) {
+func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	for _, crd := range CRDs() {
-		unstructuredCRD, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&crd)
-		// Remove the status field, as it's added with null values by the code, but is rejected by server-side validation
-		delete(unstructuredCRD, "status")
-		if err != nil {
-			// TODO: Wrap the error
-			return nil, err
-		}
-		resources.Items = append(resources.Items, unstructured.Unstructured{Object: unstructuredCRD})
+		appendUnstructured(resources, crd)
 	}
 
-	ns := Namespace(namespace)
+	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)
 
-	crb := ClusterRoleBinding(namespace)
+	crb := ClusterRoleBinding(o.Namespace)
 	appendUnstructured(resources, crb)
 
-	sa := ServiceAccount(namespace)
+	sa := ServiceAccount(o.Namespace)
 	appendUnstructured(resources, sa)
 
-	sec := Secret(namespace, secretData)
+	sec := Secret(o.Namespace, o.SecretData)
 	appendUnstructured(resources, sec)
 
-	bsl := BackupStorageLocation(namespace, backupStorageProviderName, bucketName, prefix, bslConfig)
+	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
 	appendUnstructured(resources, bsl)
 
-	vsl := VolumeSnapshotLocation(namespace, backupStorageProviderName, vslConfig)
+	vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
 	appendUnstructured(resources, vsl)
 
-	deploy := Deployment(namespace,
-		WithImage(image),
+	deploy := Deployment(o.Namespace,
+		WithImage(o.Image),
 	)
-	if restoreOnly {
-		deploy = Deployment(namespace,
-			WithImage(image),
+	if o.RestoreOnly {
+		deploy = Deployment(o.Namespace,
+			WithImage(o.Image),
 			WithRestoreOnly(),
 		)
 	}
 	appendUnstructured(resources, deploy)
 
-	ds := DaemonSet(namespace,
-		WithImage(image),
-	)
-	appendUnstructured(resources, ds)
+	if o.UseRestic {
+		ds := DaemonSet(o.Namespace,
+			WithImage(o.Image),
+		)
+		appendUnstructured(resources, ds)
+	}
 
 	return resources, nil
 }

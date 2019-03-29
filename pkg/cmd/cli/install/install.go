@@ -74,6 +74,29 @@ func NewInstallOptions() *InstallOptions {
 	}
 }
 
+// AsVeleroOptions translates the values provided at the command line into values used to instantiate Kubernetes resources
+func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
+	realPath, err := filepath.Abs(o.Secret)
+	if err != nil {
+		return nil, err
+	}
+	secretData, err := ioutil.ReadFile(realPath)
+	if err != nil {
+		return nil, err
+	}
+	return &install.VeleroOptions{
+		Namespace:    o.Namespace,
+		Image:        o.Image,
+		ProviderName: o.ProviderName,
+		Bucket:       o.BucketName,
+		Prefix:       o.Prefix,
+		SecretData:   secretData,
+		RestoreOnly:  o.RestoreOnly,
+		BSLConfig:    o.BackupStorageConfig.Data(),
+		VSLConfig:    o.VolumeSnapshotConfig.Data(),
+	}, nil
+}
+
 // NewCommand creates a cobra command.
 func NewCommand(f client.Factory) *cobra.Command {
 	o := NewInstallOptions()
@@ -97,7 +120,6 @@ Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources a
 This is useful as a starting point for more customized installations.
 		`,
 		Run: func(c *cobra.Command, args []string) {
-			o.Namespace = c.Flag("namespace").Value.String()
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Run(c))
@@ -113,25 +135,12 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command) error {
-	realPath, err := filepath.Abs(o.Secret)
+	vo, err := o.AsVeleroOptions()
 	if err != nil {
 		return err
 	}
-	secretData, err := ioutil.ReadFile(realPath)
-	if err != nil {
-		return err
-	}
-	resources, err := install.AllResources(
-		o.Namespace,
-		o.Image,
-		o.ProviderName,
-		o.BucketName,
-		o.Prefix,
-		o.BackupStorageConfig.Data(),
-		o.VolumeSnapshotConfig.Data(),
-		secretData,
-		o.RestoreOnly,
-	)
+
+	resources, err := install.AllResources(vo)
 	if err != nil {
 		return err
 	}
