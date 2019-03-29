@@ -169,6 +169,7 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+	fmt.Println("Velero is installed and ready! ⛵")
 	return nil
 }
 
