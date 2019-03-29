@@ -140,6 +140,20 @@ func VolumeSnapshotLocation(namespace, provider string, config map[string]string
 	}
 }
 
+func Secret(namespace string, data []byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: objectMeta(namespace, "cloud-credentials"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		Data: map[string][]byte{
+			"cloud": data,
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+}
+
 func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
 	if err != nil {
@@ -151,7 +165,7 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string) (*unstructured.UnstructuredList, error) {
+func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string, secretData []byte) (*unstructured.UnstructuredList, error) {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
@@ -175,6 +189,9 @@ func AllResources(namespace, image, backupStorageProviderName, bucketName, prefi
 
 	sa := ServiceAccount(namespace)
 	appendUnstructured(resources, sa)
+
+	sec := Secret(namespace, secretData)
+	appendUnstructured(resources, sec)
 
 	// TODO: pass config down.
 	bsl := BackupStorageLocation(namespace, backupStorageProviderName, bucketName, prefix, nil)

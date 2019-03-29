@@ -40,6 +40,7 @@ var kindToResource = map[string]string{
 	"ServiceAccount":           "serviceaccounts",
 	"Deployment":               "deployments",
 	"DaemonSet":                "daemonsets",
+	"Secret":                   "secrets",
 	"BackupStorageLocation":    "backupstoragelocations",
 	"VolumeSnapshotLocation":   "volumesnapshotlocations",
 }

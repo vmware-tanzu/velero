@@ -18,12 +18,11 @@ package install
 
 import (
 	"fmt"
-	"log"
+	"io/ioutil"
 	"os"
-	"time"
+	"path/filepath"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"k8s.io/client-go/dynamic"
 
@@ -35,42 +34,36 @@ import (
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/output"
 	"github.com/heptio/velero/pkg/install"
-	"github.com/heptio/velero/pkg/util/logging"
 )
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace                 string
-	DeploymentName            string
-	Image                     string
-	BucketName                string
-	Prefix                    string
-	BackupStorageProviderName string
-	RestoreOnly               bool
-	LogLevel                  string
-	ResticTimeout             time.Duration
-	SecretName                string
-	DryRun                    bool
+	Namespace    string
+	Image        string
+	BucketName   string
+	Prefix       string
+	ProviderName string
+	RestoreOnly  bool
+	Secret       string
+	DryRun       bool
 }
 
 // BindFlags adds command line values to the options struct.
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
-	// TODO Send this string down into the deployment
-	flags.StringVar(&o.DeploymentName, "deploy-name", o.DeploymentName, "name to apply to the Velero deployment")
 	flags.StringVar(&o.BucketName, "bucket-name", o.BucketName, "bucket name in which to store backups")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under the bucket in which to store backups")
-	flags.StringVar(&o.BackupStorageProviderName, "backup-provider", o.BackupStorageProviderName, "provider name for backup storage")
+	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup storage")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero server deployment")
+	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials to backup and volume provider")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode")
-	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "don't create resources on the Kubernetes cluster")
+	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "only print resources that would be installed, without sending them to the cluster")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions stuct.
 func NewInstallOptions() *InstallOptions {
 	return &InstallOptions{
-		Namespace:      api.DefaultNamespace,
-		DeploymentName: api.DefaultNamespace,
-		Image:          install.DefaultImage,
+		Namespace: api.DefaultNamespace,
+		Image:     install.DefaultImage,
 	}
 }
 
@@ -98,8 +91,16 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command) error {
+	realPath, err := filepath.Abs(o.Secret)
+	if err != nil {
+		return err
+	}
+	secretData, err := ioutil.ReadFile(realPath)
+	if err != nil {
+		return err
+	}
 	//TODO pass backup and volume config down
-	resources, err := install.AllResources(o.Namespace, o.Image, o.BackupStorageProviderName, o.BucketName, o.Prefix)
+	resources, err := install.AllResources(o.Namespace, o.Image, o.ProviderName, o.BucketName, o.Prefix, secretData)
 	if err != nil {
 		return err
 	}
@@ -121,11 +122,7 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 		return err
 	}
 
-	log.SetOutput(os.Stdout)
-	// TODO: parse out log level
-	logger := logging.DefaultLogger(logrus.DebugLevel)
-
-	err = install.Install(client.NewDynamicFactory(dynamicClient), resources, logger)
+	err = install.Install(client.NewDynamicFactory(dynamicClient), resources, os.Stdout)
 	if err != nil {
 		return err
 	}
@@ -147,8 +144,12 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		return errors.Errorf("Bucket name must be provided")
 	}
 
-	if o.BackupStorageProviderName == "" {
+	if o.ProviderName == "" {
 		return errors.Errorf("Backup storage proivder name must be provided")
+	}
+
+	if o.Secret == "" {
+		return errors.Errorf("No secret file provided")
 	}
 
 	return nil
