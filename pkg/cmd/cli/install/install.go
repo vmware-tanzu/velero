@@ -32,29 +32,34 @@ import (
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/util/flag"
 	"github.com/heptio/velero/pkg/cmd/util/output"
 	"github.com/heptio/velero/pkg/install"
 )
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace    string
-	Image        string
-	BucketName   string
-	Prefix       string
-	ProviderName string
-	RestoreOnly  bool
-	Secret       string
-	DryRun       bool
+	Namespace            string
+	Image                string
+	BucketName           string
+	Prefix               string
+	ProviderName         string
+	RestoreOnly          bool
+	Secret               string
+	DryRun               bool
+	BackupStorageConfig  flag.Map
+	VolumeSnapshotConfig flag.Map
 }
 
 // BindFlags adds command line values to the options struct.
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.BucketName, "bucket-name", o.BucketName, "bucket name in which to store backups")
-	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under the bucket in which to store backups")
-	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup storage")
-	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero server deployment")
+	flags.StringVar(&o.BucketName, "bucket-name", o.BucketName, "name of the object storage bucket where backups should be stored")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
+	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server deployment")
 	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials to backup and volume provider")
+	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location")
+	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "only print resources that would be installed, without sending them to the cluster")
 }
@@ -62,8 +67,10 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 // NewInstallOptions instantiates a new, default InstallOptions stuct.
 func NewInstallOptions() *InstallOptions {
 	return &InstallOptions{
-		Namespace: api.DefaultNamespace,
-		Image:     install.DefaultImage,
+		Namespace:            api.DefaultNamespace,
+		Image:                install.DefaultImage,
+		BackupStorageConfig:  flag.NewMap(),
+		VolumeSnapshotConfig: flag.NewMap(),
 	}
 }
 
@@ -99,8 +106,16 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	//TODO pass backup and volume config down
-	resources, err := install.AllResources(o.Namespace, o.Image, o.ProviderName, o.BucketName, o.Prefix, secretData)
+	resources, err := install.AllResources(
+		o.Namespace,
+		o.Image,
+		o.ProviderName,
+		o.BucketName,
+		o.Prefix,
+		o.BackupStorageConfig.Data(),
+		o.VolumeSnapshotConfig.Data(),
+		secretData,
+	)
 	if err != nil {
 		return err
 	}
