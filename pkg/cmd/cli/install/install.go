@@ -53,15 +53,15 @@ type InstallOptions struct {
 
 // BindFlags adds command line values to the options struct.
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.BucketName, "bucket-name", o.BucketName, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
-	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server deployment")
+	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials for backup and volume provider")
+	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
+	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode")
-	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "only print resources that would be installed, without sending them to the cluster")
+	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions stuct.
@@ -80,7 +80,22 @@ func NewCommand(f client.Factory) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "install",
 		Short: "Install Velero",
-		Long:  "Install Velero into the Kubernetes cluster using provided information",
+		Long: `
+Install Velero onto a Kubernetes cluster using the supplied provider information, such as
+the provider's name, a bucket name, and a file containing the credentials to access that bucket.
+A prefix within the bucket and configuration for the backup store location may also be supplied.
+Additionally, volume snapshot information for the same provider may be supplied.
+
+All required CustomResourceDefinitions will be installed to the server, as well as the
+Velero Deployment and associated Restic DaemonSet.
+
+The provided secret data will be created in a Secret named 'cloud-credentials'.
+
+All namespaced resources will be placed in the 'velero' namespace.
+
+Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
+This is useful as a starting point for more customized installations.
+		`,
 		Run: func(c *cobra.Command, args []string) {
 			o.Namespace = c.Flag("namespace").Value.String()
 			cmd.CheckError(o.Validate(c, args, f))
