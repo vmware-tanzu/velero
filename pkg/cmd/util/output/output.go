@@ -37,7 +37,7 @@ const downloadRequestTimeout = 30 * time.Second
 // BindFlags defines a set of output-specific flags within the provided
 // FlagSet.
 func BindFlags(flags *pflag.FlagSet) {
-	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.")
+	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 	labelColumns := flag.NewStringArray()
 	flags.Var(&labelColumns, "label-columns", "a comma-separated list of labels to be displayed as columns")
 	flags.Bool("show-labels", false, "show labels in the last column")
@@ -161,6 +161,9 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 // NewPrinter returns a printer for doing human-readable table printing of
 // Velero objects.
 func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
+	if cmd.Name() == "install" {
+		return nil, errors.New("table format not supported for install command")
+	}
 	options := printers.PrintOptions{
 		NoHeaders:    flag.GetOptionalBoolFlag(cmd, "no-headers"),
 		ShowLabels:   GetShowLabelsValue(cmd),
