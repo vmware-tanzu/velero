@@ -76,7 +76,7 @@ func crdIsReady(crd apiextv1beta1.CustomResourceDefinition) bool {
 func crdsAreReady(factory client.DynamicFactory) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(apiextv1beta1.SchemeGroupVersion.String(), "CustomResourceDefinition")
 	apiResource := metav1.APIResource{
-		Name:       "customresourcedefinitons",
+		Name:       kindToResource["CustomResourceDefinition"],
 		Namespaced: false,
 	}
 	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, "")
@@ -109,7 +109,9 @@ func crdsAreReady(factory client.DynamicFactory) (bool, error) {
 			return false, errors.Wrap(err, "error converting volumesnapshotlocation from unstructured")
 		}
 
-		isReady = (crdIsReady(*bsl) && crdIsReady(*vsl))
+		if !(crdIsReady(*bsl) && crdIsReady(*vsl)) {
+			return false, nil
+		}
 
 		return true, nil
 	})
@@ -159,32 +161,13 @@ func GroupResources(resources *unstructured.UnstructuredList) []*ResourceGroup {
 	otherObjs := new(ResourceGroup)
 	otherObjs.Ready = deploymentIsReady
 
-	for _, r := range resources.Items {
-		fmt.Printf("Sorting %s/%s\n", r.GetKind(), r.GetName())
+	for i, r := range resources.Items {
 		if r.GetKind() == "CustomResourceDefinition" {
-			crdObjs.Resources = append(crdObjs.Resources, &r)
-			fmt.Printf("Put %s/%s in crdObjs\n", r.GetKind(), r.GetName())
-			fmt.Printf("crdObjs looks like:\n")
-			for _, c := range crdObjs.Resources {
-				fmt.Printf("%+v\n", c)
-				fmt.Printf("> %s/%s\n", c.GetKind(), c.GetName())
-			}
+			crdObjs.Resources = append(crdObjs.Resources, &resources.Items[i])
 			continue
 		}
-		otherObjs.Resources = append(otherObjs.Resources, &r)
-		fmt.Printf("Put %s/%s in otherObjs\n", r.GetKind(), r.GetName())
-		fmt.Printf("otherObjs looks like:\n")
-		for _, c := range otherObjs.Resources {
-			fmt.Printf("%+v\n", c)
-			fmt.Printf("> %s/%s\n", c.GetKind(), c.GetName())
-		}
+		otherObjs.Resources = append(otherObjs.Resources, &resources.Items[i])
 	}
-	fmt.Printf("%d Otherobjects after sorting\n", len(otherObjs.Resources))
-	fmt.Printf("%d CRDobjects after sorting\n", len(crdObjs.Resources))
-	// for _, c := range crdObjs.Resources {
-	// 	fmt.Printf("%+v\n", c)
-	// 	fmt.Printf("> %s/%s\n", c.GetKind(), c.GetName())
-	// }
 
 	return []*ResourceGroup{crdObjs, otherObjs}
 }
@@ -195,9 +178,6 @@ func GroupResources(resources *unstructured.UnstructuredList) []*ResourceGroup {
 func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer) error {
 	// Loop over our items on a per-group basis.
 	for _, group := range GroupResources(resources) {
-		for _, r := range group.Resources {
-			fmt.Printf("%s/%s\n", r.GetKind(), r.GetName())
-		}
 		for _, r := range group.Resources {
 			id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
@@ -230,12 +210,14 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 
 			log("created")
 		}
-		fmt.Fprint(w, "Waiting for resources to be ready in cluster...")
+		fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
 		_, err := group.Ready(factory)
 		// Covers the err.WaitForTimeout case
 		if err != nil {
 			return err
 		}
+
+		fmt.Fprint(w, "Finished waiting, proceeding\n")
 	}
 	return nil
 }
