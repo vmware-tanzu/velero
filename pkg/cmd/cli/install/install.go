@@ -130,6 +130,7 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 		o.BackupStorageConfig.Data(),
 		o.VolumeSnapshotConfig.Data(),
 		secretData,
+		o.RestoreOnly,
 	)
 	if err != nil {
 		return err

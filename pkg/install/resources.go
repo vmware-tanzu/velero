@@ -165,7 +165,7 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string, bslConfig, vslConfig map[string]string, secretData []byte) (*unstructured.UnstructuredList, error) {
+func AllResources(namespace, image, backupStorageProviderName, bucketName, prefix string, bslConfig, vslConfig map[string]string, secretData []byte, restoreOnly bool) (*unstructured.UnstructuredList, error) {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
@@ -202,6 +202,12 @@ func AllResources(namespace, image, backupStorageProviderName, bucketName, prefi
 	deploy := Deployment(namespace,
 		WithImage(image),
 	)
+	if restoreOnly {
+		deploy = Deployment(namespace,
+			WithImage(image),
+			WithRestoreOnly(),
+		)
+	}
 	appendUnstructured(resources, deploy)
 
 	ds := DaemonSet(namespace,
