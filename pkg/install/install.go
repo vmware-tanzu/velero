@@ -18,9 +18,10 @@ package install
 
 import (
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,11 +45,23 @@ var kindToResource = map[string]string{
 }
 
 // Install creates resources on the Kubernetes cluster.
-func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, logger *logrus.Logger) error {
+// An unstructured list of resources is sent, one at a time, to the server. These are assumed to be in the preferred order already.
+// An io.Writer can be used to output to a log or the console.
+func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer) error {
+
 	for _, r := range resources.Items {
-		// TODO: do we want to use the logger, or just a print?
-		//logger.WithField("resource", fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())).Info("Creating resource")
-		fmt.Printf("Attempting to create resource %s/%s\n", r.GetKind(), r.GetName())
+		id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
+
+		// Helper to reduce boilerplate message about the same object
+		log := func(f string, a ...interface{}) {
+			format := strings.Join([]string{id, ": ", f, "\n"}, "")
+			if len(a) > 0 {
+				fmt.Fprintf(w, format, a)
+			} else {
+				fmt.Fprintf(w, format)
+			}
+		}
+		log("attempting to create resource")
 
 		gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
 
@@ -59,16 +72,18 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 
 		c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
 		if err != nil {
-			return errors.Wrapf(err, "Error creating client for resource %s/%s", r.GetKind(), r.GetName())
+			return errors.Wrapf(err, "Error creating client for resource %s", id)
 		}
 
 		_, err = c.Create(&r)
 		if apierrors.IsAlreadyExists(err) {
-			fmt.Printf("Resource %s/%s already exists, proceeding\n", r.GetKind(), r.GetName())
+			log("already exists, proceeding")
+			continue
 		} else if err != nil {
-			return errors.Wrapf(err, "Error creating resource %s/%s", r.GetKind(), r.GetName())
+			return errors.Wrapf(err, "Error creating resource %s", id)
 		}
-		fmt.Printf("Created %s/%s\n", r.GetKind(), r.GetName())
+
+		log("created", id)
 	}
 	return nil
 }
