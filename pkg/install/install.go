@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -49,18 +50,13 @@ var kindToResource = map[string]string{
 // An unstructured list of resources is sent, one at a time, to the server. These are assumed to be in the preferred order already.
 // An io.Writer can be used to output to a log or the console.
 func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer) error {
-
 	for _, r := range resources.Items {
 		id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
 
 		// Helper to reduce boilerplate message about the same object
 		log := func(f string, a ...interface{}) {
 			format := strings.Join([]string{id, ": ", f, "\n"}, "")
-			if len(a) > 0 {
-				fmt.Fprintf(w, format, a)
-			} else {
-				fmt.Fprintf(w, format)
-			}
+			fmt.Fprintf(w, format, a...)
 		}
 		log("attempting to create resource")
 
@@ -84,7 +80,8 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 			return errors.Wrapf(err, "Error creating resource %s", id)
 		}
 
-		log("created", id)
+		log("created")
+		time.Sleep(1 * time.Second)
 	}
 	return nil
 }
