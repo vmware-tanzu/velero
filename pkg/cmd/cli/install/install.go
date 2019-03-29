@@ -49,6 +49,7 @@ type InstallOptions struct {
 	DryRun               bool
 	BackupStorageConfig  flag.Map
 	VolumeSnapshotConfig flag.Map
+	UseRestic            bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -62,6 +63,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o. Optional.")
+	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions stuct.
@@ -92,6 +94,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		Prefix:       o.Prefix,
 		SecretData:   secretData,
 		RestoreOnly:  o.RestoreOnly,
+		UseRestic:    o.UseRestic,
 		BSLConfig:    o.BackupStorageConfig.Data(),
 		VSLConfig:    o.VolumeSnapshotConfig.Data(),
 	}, nil
