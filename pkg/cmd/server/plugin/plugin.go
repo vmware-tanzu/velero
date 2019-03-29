@@ -49,7 +49,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
 				RegisterRestoreItemAction("job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
-				RegisterRestoreItemAction("restic", newResticRestoreItemAction).
+				RegisterRestoreItemAction("restic", newResticRestoreItemAction(f)).
 				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
 				RegisterRestoreItemAction("serviceaccount", newServiceAccountRestoreItemAction).
 				RegisterRestoreItemAction("addPVCFromPod", newAddPVCFromPodRestoreItemAction).
@@ -128,8 +128,15 @@ func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewPodAction(logger), nil
 }
 
-func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewResticRestoreAction(logger), nil
+func newResticRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewResticRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+	}
 }
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {

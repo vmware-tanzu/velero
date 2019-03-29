@@ -126,7 +126,39 @@ You're now ready to use Velero with restic.
 common encryption key for all restic repositories created by Velero. **This means that anyone who has access to your
 bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
 appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in 
-a future release.   
+a future release.
+
+## Customize Restore Helper Image
+
+Velero uses a helper init container when performing a restic restore. By default, the image for this container is `gcr.io/heptio-images/velero-restic-restore-helper:<VERSION>`,
+where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
+the alternate image. The ConfigMap must look like the following:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # any name can be used; Velero uses the labels (below)
+  # to identify it rather than the name
+  name: restic-restore-action-config
+  # must be in the velero namespace
+  namespace: velero
+  # the below labels should be used verbatim in your
+  # ConfigMap.
+  labels:
+    # this value-less label identifies the ConfigMap as
+    # config for a plugin (i.e. the built-in restic restore
+    # item action plugin)
+    velero.io/plugin-config: ""
+    # this label identifies the name and kind of plugin
+    # that this ConfigMap is for.
+    velero.io/restic: RestoreItemAction
+data:
+  # "image" is the only configurable key. The value can either
+  # include a tag or not; if the tag is *not* included, the
+  # tag from the main Velero image will automatically be used.
+  image: myregistry.io/my-custom-helper-image[:OPTIONAL_TAG]
+```
 
 ## Troubleshooting
 
