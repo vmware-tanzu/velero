@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -89,6 +89,22 @@ func TestGetRepoIdentifier(t *testing.T) {
 		},
 	}
 	assert.Equal(t, "s3:alternate-url/bucket/prefix/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
+
+	backupLocation = &velerov1api.BackupStorageLocation{
+		Spec: velerov1api.BackupStorageLocationSpec{
+			Provider: "aws",
+			Config: map[string]string{
+				"s3Url": "alternate-url-with-trailing-slash/",
+			},
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
+					Bucket: "bucket",
+					Prefix: "prefix",
+				},
+			},
+		},
+	}
+	assert.Equal(t, "s3:alternate-url-with-trailing-slash/bucket/prefix/restic/repo-1", GetRepoIdentifier(backupLocation, "repo-1"))
 
 	backupLocation = &velerov1api.BackupStorageLocation{
 		Spec: velerov1api.BackupStorageLocationSpec{

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ func newAWSConfig(url, region string, forcePathStyle bool) (*aws.Config, error) 
 
 	if url != "" {
 		if !IsValidS3URLScheme(url) {
-			return nil, errors.Errorf("Invalid s3 url: %s", url)
+			return nil, errors.Errorf("Invalid s3 url %s, URL must be valid according to https://golang.org/pkg/net/url/#Parse and start with http:// or https://", url)
 		}
 
 		awsConfig = awsConfig.WithEndpointResolver(
