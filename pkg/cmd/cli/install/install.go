@@ -23,11 +23,9 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
-
-	"k8s.io/client-go/dynamic"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/dynamic"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"

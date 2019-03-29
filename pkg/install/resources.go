@@ -17,7 +17,6 @@ limitations under the License.
 package install
 
 import (
-	"github.com/heptio/velero/pkg/buildinfo"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
 )
 
 // DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.

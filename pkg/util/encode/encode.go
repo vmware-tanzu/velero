@@ -19,17 +19,13 @@ package encode
 import (
 	"bytes"
 	"fmt"
-	"io"
-
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	"github.com/pkg/errors"
-	//k8sapi "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	kscheme "k8s.io/client-go/kubernetes/scheme"
-
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/pkg/errors" //k8sapi "k8s.io/api/core/v1"
+	"io"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	kscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // Encode converts the provided object to the specified format
