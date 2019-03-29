@@ -57,9 +57,9 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server deployment")
-	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials to backup and volume provider")
-	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location")
-	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location")
+	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials for backup and volume provider")
+	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
+	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "only print resources that would be installed, without sending them to the cluster")
 }
@@ -156,15 +156,15 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	if o.BucketName == "" {
-		return errors.Errorf("Bucket name must be provided")
+		return errors.New("--bucket is required")
 	}
 
 	if o.ProviderName == "" {
-		return errors.Errorf("Backup storage proivder name must be provided")
+		return errors.New("--provider is required")
 	}
 
 	if o.Secret == "" {
-		return errors.Errorf("No secret file provided")
+		return errors.New("--secret is required")
 	}
 
 	return nil
