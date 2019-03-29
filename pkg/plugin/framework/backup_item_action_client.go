@@ -34,7 +34,7 @@ import (
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.
 func NewBackupItemActionPlugin(options ...PluginOption) *BackupItemActionPlugin {
 	return &BackupItemActionPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: NewPluginBase(options...),
 	}
 }
 

@@ -29,7 +29,7 @@ import (
 // interface.
 type ObjectStorePlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*PluginBase
 }
 
 // GRPCClient returns an ObjectStore gRPC client.

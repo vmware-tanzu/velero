@@ -32,7 +32,7 @@ const byteChunkSize = 16384
 // NewObjectStorePlugin construct an ObjectStorePlugin.
 func NewObjectStorePlugin(options ...PluginOption) *ObjectStorePlugin {
 	return &ObjectStorePlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: NewPluginBase(options...),
 	}
 }
 

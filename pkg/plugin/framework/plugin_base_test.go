@@ -24,7 +24,7 @@ import (
 )
 
 func TestClientLogger(t *testing.T) {
-	base := &pluginBase{}
+	base := &PluginBase{}
 	logger := test.NewLogger()
 	f := ClientLogger(logger)
 	f(base)
@@ -32,7 +32,7 @@ func TestClientLogger(t *testing.T) {
 }
 
 func TestServerLogger(t *testing.T) {
-	base := &pluginBase{}
+	base := &PluginBase{}
 	logger := test.NewLogger()
 	f := serverLogger(logger)
 	f(base)

@@ -31,7 +31,7 @@ import (
 // NewVolumeSnapshotterPlugin constructs a VolumeSnapshotterPlugin.
 func NewVolumeSnapshotterPlugin(options ...PluginOption) *VolumeSnapshotterPlugin {
 	return &VolumeSnapshotterPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: NewPluginBase(options...),
 	}
 }
 

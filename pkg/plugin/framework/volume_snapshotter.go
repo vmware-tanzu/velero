@@ -29,7 +29,7 @@ import (
 // interface.
 type VolumeSnapshotterPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*PluginBase
 }
 
 // GRPCClient returns a VolumeSnapshotter gRPC client.

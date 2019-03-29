@@ -34,7 +34,7 @@ var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
 // NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
 func NewRestoreItemActionPlugin(options ...PluginOption) *RestoreItemActionPlugin {
 	return &RestoreItemActionPlugin{
-		pluginBase: newPluginBase(options...),
+		PluginBase: NewPluginBase(options...),
 	}
 }
 

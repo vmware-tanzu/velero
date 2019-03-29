@@ -20,29 +20,29 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type pluginBase struct {
+type PluginBase struct {
 	clientLogger logrus.FieldLogger
 	*serverMux
 }
 
-func newPluginBase(options ...PluginOption) *pluginBase {
-	base := new(pluginBase)
+func NewPluginBase(options ...PluginOption) *PluginBase {
+	base := new(PluginBase)
 	for _, option := range options {
 		option(base)
 	}
 	return base
 }
 
-type PluginOption func(base *pluginBase)
+type PluginOption func(base *PluginBase)
 
 func ClientLogger(logger logrus.FieldLogger) PluginOption {
-	return func(base *pluginBase) {
+	return func(base *PluginBase) {
 		base.clientLogger = logger
 	}
 }
 
 func serverLogger(logger logrus.FieldLogger) PluginOption {
-	return func(base *pluginBase) {
+	return func(base *PluginBase) {
 		base.serverMux = newServerMux(logger)
 	}
 }

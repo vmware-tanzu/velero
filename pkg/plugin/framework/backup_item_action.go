@@ -29,7 +29,7 @@ import (
 // interface.
 type BackupItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*PluginBase
 }
 
 // GRPCClient returns a clientDispenser for BackupItemAction gRPC clients.

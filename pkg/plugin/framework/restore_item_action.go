@@ -29,7 +29,7 @@ import (
 // interface.
 type RestoreItemActionPlugin struct {
 	plugin.NetRPCUnsupportedPlugin
-	*pluginBase
+	*PluginBase
 }
 
 // GRPCClient returns a RestoreItemAction gRPC client.
