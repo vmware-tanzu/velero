@@ -13,6 +13,7 @@ message RestoreItemActionExecuteRequest {
 message RestoreItemActionExecuteResponse {
     bytes item = 1;
     repeated ResourceIdentifier additionalItems = 2;
+    bool skipRestore = 3;
 }
 
 service RestoreItemAction {

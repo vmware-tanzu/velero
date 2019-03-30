@@ -896,6 +896,10 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			return warnings, errs
 		}
 
+		if executeOutput.SkipRestore {
+			ctx.log.Infof("Skipping restore of %s: %v because a registered plugin discarded it", obj.GroupVersionKind().Kind, name)
+			return warnings, errs
+		}
 		unstructuredObj, ok := executeOutput.UpdatedItem.(*unstructured.Unstructured)
 		if !ok {
 			addToResult(&errs, namespace, fmt.Errorf("%s: unexpected type %T", resourceID, executeOutput.UpdatedItem))

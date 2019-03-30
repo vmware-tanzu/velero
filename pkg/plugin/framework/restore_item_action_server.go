@@ -126,7 +126,8 @@ func (s *RestoreItemActionGRPCServer) Execute(ctx context.Context, req *proto.Re
 	}
 
 	res := &proto.RestoreItemActionExecuteResponse{
-		Item: updatedItemJSON,
+		Item:        updatedItemJSON,
+		SkipRestore: executeOutput.SkipRestore,
 	}
 
 	for _, item := range executeOutput.AdditionalItems {
