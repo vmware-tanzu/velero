@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -36,10 +38,24 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 		Short: "Get backup logs",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
+			backupName := args[0]
+
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), args[0], v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
+			backup, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(backupName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				cmd.Exit("Backup %q does not exist.", backupName)
+			} else if err != nil {
+				cmd.Exit("Error checking for backup %q: %v", backupName, err)
+			}
+
+			if backup.Status.Phase != v1.BackupPhaseCompleted && backup.Status.Phase != v1.BackupPhaseFailed {
+				cmd.Exit("Logs for backup %q are not available until it's finished processing. Please wait "+
+					"until the backup has a phase of Completed or Failed and try again.", backupName)
+			}
+
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
 			cmd.CheckError(err)
 		},
 	}
