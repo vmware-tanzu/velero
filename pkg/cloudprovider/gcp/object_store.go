@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
@@ -60,6 +62,10 @@ func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config); err != nil {
+		return err
+	}
+
 	credentialsFile := os.Getenv(credentialsEnvVar)
 	if credentialsFile == "" {
 		return errors.Errorf("%s is undefined", credentialsEnvVar)

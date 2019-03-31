@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const (
@@ -62,6 +64,17 @@ func isValidSignatureVersion(signatureVersion string) bool {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config,
+		regionKey,
+		s3URLKey,
+		publicURLKey,
+		kmsKeyIDKey,
+		s3ForcePathStyleKey,
+		signatureVersionKey,
+	); err != nil {
+		return err
+	}
+
 	var (
 		region              = config[regionKey]
 		s3URL               = config[s3URLKey]
