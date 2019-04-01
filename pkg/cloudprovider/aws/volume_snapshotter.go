@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const regionKey = "region"
@@ -64,6 +66,10 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config, regionKey); err != nil {
+		return err
+	}
+
 	region := config[regionKey]
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)

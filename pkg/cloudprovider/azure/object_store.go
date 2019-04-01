@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
 const (
@@ -99,6 +101,10 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return err
+	}
+
 	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
 		return err
