@@ -54,7 +54,7 @@ type InstallOptions struct {
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.Secret, "secret", o.Secret, "file containing credentials for backup and volume provider")
+	flags.StringVar(&o.Secret, "secret-file", o.Secret, "file containing credentials for backup and volume provider")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
@@ -119,6 +119,12 @@ All namespaced resources will be placed in the 'velero' namespace.
 
 Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
 This is useful as a starting point for more customized installations.
+		`,
+		Example: `	# velero install --bucket mybucket --provider gcp --secret-file ./gcp-service-account.json
+
+	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east2 --snapshot-location-config region=us-east2
+
+	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east2 --snapshot-location-config region=us-east2 --use-restic
 		`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args, f))
