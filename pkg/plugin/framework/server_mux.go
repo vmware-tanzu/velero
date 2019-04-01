@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 // HandlerInitializer is a function that initializes and returns a new instance of one of Velero's plugin interfaces
@@ -81,12 +82,40 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 	return m.handlers[name], nil
 }
 
+const hostnameRegexStringRFC952 = `^[a-zA-Z][a-zA-Z0-9\-\.]+[a-z-Az0-9]$` // https://tools.ietf.org/html/rfc952
+
 func validPluginName(name string, existingNames []string) bool {
-	name = strings.ToLower(name)
-	tokens := strings.Split(name, "/")
-	if len(tokens) <= 1 || tokens[0] == "" || tokens[1] == "" {
+	errors := validation.IsQualifiedName(name)
+	if len(errors) != 0 {
 		return false
 	}
+	// if name == "" {
+	// 	return false
+	// }
+
+	// tokens := strings.Split(name, "/")
+	// fmt.Println("tokens are: ", tokens)
+
+	// // hostnameRegexRFC952 := regexp.MustCompile(hostnameRegexStringRFC952)
+
+	// fmt.Println("name before: ", name)
+	// if name[len(name)-1] == '.' {
+	// 	name = name[0 : len(name)-1]
+	// }
+	// fmt.Println("name after: ", name)
+
+	// // return strings.ContainsAny(name, ".") &&
+	// // 	hostnameRegexRFC952.MatchString(name)
+
+	// name = strings.ToLower(name)
+
+	// if len(tokens) <= 1 || tokens[0] == "" || tokens[1] == "" {
+	// 	return false
+	// }
+
+	// if valid := prefixValidation(tokens[0]); !valid {
+	// 	return false
+	// }
 
 	for _, existingName := range existingNames {
 		if strings.Compare(name, existingName) == 0 {
@@ -94,4 +123,28 @@ func validPluginName(name string, existingNames []string) bool {
 		}
 	}
 	return true
+}
+
+// valid characters of a-z, 0-9, ., -,
+// max total length 253,
+// max length between .'s 63
+
+func prefixValidation(s string) bool {
+	// s2 := strings.TrimSuffix(s, ".")
+	// if s == s2 {
+	// 	return false
+	// }
+
+	// i := strings.LastIndexFunc(s2, func(r rune) bool {
+	// 	return r != '\\'
+	// })
+
+	// // Test whether we have an even number of escape sequences before
+	// // the dot or none.
+	// return (len(s2)-i)%2 != 0
+	l := len(s)
+	if l == 0 {
+		return false
+	}
+	return s[l-1] == '.'
 }
