@@ -48,17 +48,9 @@ func newServerMux(logger logrus.FieldLogger) *serverMux {
 // register registers the initializer for the given name. Proper format
 // for the name is <namespace>/<name> and there can be no duplicates.
 func (m *serverMux) register(name string, f HandlerInitializer) {
-	name = strings.ToLower(name)
-	if !strings.Contains(name, "/") {
+	if !validPluginName(name, m.names()) {
 		return
 	}
-
-	for _, existingName := range m.names() {
-		if strings.Compare(name, existingName) == 0 {
-			return // found a duplicate
-		}
-	}
-
 	m.initializers[name] = f
 }
 
@@ -76,7 +68,7 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 
 	initializer, found := m.initializers[name]
 	if !found {
-		return nil, errors.Errorf("%v plugin: %s not found or had invalid format. Valid format: <namespace>/<name>", m.kind, name)
+		return nil, errors.Errorf("%v plugin: %s was not found or is an invalid format. Valid format: <namespace>/<name>", m.kind, name)
 	}
 
 	instance, err := initializer(m.serverLog)
@@ -87,4 +79,19 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 	m.handlers[name] = instance
 
 	return m.handlers[name], nil
+}
+
+func validPluginName(name string, existingNames []string) bool {
+	name = strings.ToLower(name)
+	tokens := strings.Split(name, "/")
+	if len(tokens) <= 1 || tokens[0] == "" || tokens[1] == "" {
+		return false
+	}
+
+	for _, existingName := range existingNames {
+		if strings.Compare(name, existingName) == 0 {
+			return false // found a duplicate
+		}
+	}
+	return true
 }
