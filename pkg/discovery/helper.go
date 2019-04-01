@@ -51,9 +51,7 @@ type Helper interface {
 	APIGroups() []metav1.APIGroup
 }
 
-// DiscoveryInterface exposes functions for Kubernetes discovery
-// API.
-type ServerResourcesInterface interface {
+type serverResourcesInterface interface {
 	ServerPreferredResources() ([]*metav1.APIResourceList, error)
 }
 
@@ -147,7 +145,7 @@ func (h *helper) Refresh() error {
 	return nil
 }
 
-func refreshServerPreferredResources(discoveryClient ServerResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIResourceList, error) {
+func refreshServerPreferredResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIResourceList, error) {
 	preferredResources, err := discoveryClient.ServerPreferredResources()
 	if err != nil {
 		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
