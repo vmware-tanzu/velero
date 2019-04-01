@@ -84,7 +84,11 @@ func ValidateFlags(cmd *cobra.Command) error {
 func validateOutputFlag(cmd *cobra.Command) error {
 	output := GetOutputFlagValue(cmd)
 	switch output {
-	case "", "table", "json", "yaml":
+	case "", "json", "yaml":
+	case "table":
+		if cmd.Name() == "install" {
+			return errors.New("'table' format is not supported with 'install' command")
+		}
 	default:
 		return errors.Errorf("invalid output format %q - valid values are 'table', 'json', and 'yaml'", output)
 	}
@@ -161,9 +165,6 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 // NewPrinter returns a printer for doing human-readable table printing of
 // Velero objects.
 func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
-	if cmd.Name() == "install" {
-		return nil, errors.New("table format not supported for install command")
-	}
 	options := printers.PrintOptions{
 		NoHeaders:    flag.GetOptionalBoolFlag(cmd, "no-headers"),
 		ShowLabels:   GetShowLabelsValue(cmd),
