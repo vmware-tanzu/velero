@@ -20,15 +20,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
-	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
@@ -39,12 +38,24 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 		Short: "Get restore logs",
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
-			l := NewLogsOptions()
-			cmd.CheckError(l.Complete(args))
-			cmd.CheckError(l.Validate(f))
+			restoreName := args[0]
+
 			veleroClient, err := f.Client()
 			cmd.CheckError(err)
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), args[0], v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
+
+			restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(restoreName, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				cmd.Exit("Restore %q does not exist.", restoreName)
+			} else if err != nil {
+				cmd.Exit("Error checking for restore %q: %v", restoreName, err)
+			}
+
+			if restore.Status.Phase != v1.RestorePhaseCompleted && restore.Status.Phase != v1.RestorePhaseFailed {
+				cmd.Exit("Logs for restore %q are not available until it's finished processing. Please wait "+
+					"until the restore has a phase of Completed or Failed and try again.", restoreName)
+			}
+
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), restoreName, v1.DownloadTargetKindRestoreLog, os.Stdout, timeout)
 			cmd.CheckError(err)
 		},
 	}
@@ -52,42 +63,4 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
 
 	return c
-}
-
-// LogsOptions contains the fields required to retrieve logs of a restore
-type LogsOptions struct {
-	RestoreName string
-
-	client veleroclient.Interface
-}
-
-// NewLogsOptions returns a new instance of LogsOptions
-func NewLogsOptions() *LogsOptions {
-	return &LogsOptions{}
-}
-
-// Complete fills in LogsOptions with the given parameters, like populating the
-// restore name from the input args
-func (l *LogsOptions) Complete(args []string) error {
-	l.RestoreName = args[0]
-	return nil
-}
-
-// Validate validates the LogsOptions against the cluster, like validating if
-// the given restore exists in the cluster or not
-func (l *LogsOptions) Validate(f client.Factory) error {
-	c, err := f.Client()
-	if err != nil {
-		return err
-	}
-	l.client = c
-
-	r, err := l.client.VeleroV1().Restores(f.Namespace()).Get(l.RestoreName, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-	if r.Status.Phase != v1.RestorePhaseCompleted {
-		return errors.Errorf("unable to retrieve logs because restore is not complete")
-	}
-	return nil
 }
