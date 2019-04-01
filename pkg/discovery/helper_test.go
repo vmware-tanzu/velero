@@ -17,10 +17,16 @@ limitations under the License.
 package discovery
 
 import (
+	"errors"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	"github.com/heptio/velero/pkg/util/logging"
+	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestSortResources(t *testing.T) {
@@ -139,4 +145,54 @@ func TestFilteringByVerbs(t *testing.T) {
 			assert.Equal(t, test.expected, out)
 		})
 	}
+}
+
+func TestRefreshServerPreferredResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		resourceList []*metav1.APIResourceList
+		failedGroups map[schema.GroupVersion]error
+		returnError  error
+	}{
+		{
+			name: "all groups discovered, no error is returned",
+			resourceList: []*metav1.APIResourceList{
+				{GroupVersion: "groupB/v1"},
+				{GroupVersion: "apps/v1beta1"},
+				{GroupVersion: "extensions/v1beta1"},
+			},
+		},
+		{
+			name: "failed to discover some groups, no error is returned",
+			resourceList: []*metav1.APIResourceList{
+				{GroupVersion: "groupB/v1"},
+				{GroupVersion: "apps/v1beta1"},
+				{GroupVersion: "extensions/v1beta1"},
+			},
+			failedGroups: map[schema.GroupVersion]error{
+				{Group: "groupA", Version: "v1"}: errors.New("Fake error"),
+				{Group: "groupC", Version: "v2"}: errors.New("Fake error"),
+			},
+		},
+		{
+			name:        "non ErrGroupDiscoveryFailed error, returns error",
+			returnError: errors.New("Generic error"),
+		},
+	}
+
+	for _, test := range tests {
+		fakeServer := velerotest.NewFakeServerResourcesInterface(test.resourceList, test.failedGroups, test.returnError)
+		t.Run(test.name, func(t *testing.T) {
+			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel))
+			if test.returnError != nil {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, test.returnError, err)
+			}
+
+			assert.Equal(t, test.resourceList, resources)
+		})
+	}
+
 }

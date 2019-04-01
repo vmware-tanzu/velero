@@ -51,6 +51,10 @@ type Helper interface {
 	APIGroups() []metav1.APIGroup
 }
 
+type serverResourcesInterface interface {
+	ServerPreferredResources() ([]*metav1.APIResourceList, error)
+}
+
 type helper struct {
 	discoveryClient discovery.DiscoveryInterface
 	logger          logrus.FieldLogger
@@ -107,7 +111,7 @@ func (h *helper) Refresh() error {
 	}
 	h.mapper = shortcutExpander
 
-	preferredResources, err := h.discoveryClient.ServerPreferredResources()
+	preferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -139,6 +143,19 @@ func (h *helper) Refresh() error {
 	h.apiGroups = apiGroupList.Groups
 
 	return nil
+}
+
+func refreshServerPreferredResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIResourceList, error) {
+	preferredResources, err := discoveryClient.ServerPreferredResources()
+	if err != nil {
+		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+			for groupVersion, err := range discoveryErr.Groups {
+				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
+			}
+			return preferredResources, nil
+		}
+	}
+	return preferredResources, err
 }
 
 func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {
