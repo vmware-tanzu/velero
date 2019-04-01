@@ -17,6 +17,8 @@ limitations under the License.
 package framework
 
 import (
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,9 +45,20 @@ func newServerMux(logger logrus.FieldLogger) *serverMux {
 	}
 }
 
-// register registers the initializer for name.
+// register registers the initializer for the given name. Proper format
+// for the name is <namespace>/<name> and there can be no duplicates.
 func (m *serverMux) register(name string, f HandlerInitializer) {
-	// TODO(ncdc): return an error on duplicate registrations for the same name.
+	name = strings.ToLower(name)
+	if !strings.Contains(name, "/") {
+		return
+	}
+
+	for _, existingName := range m.names() {
+		if strings.Compare(name, existingName) == 0 {
+			return // found a duplicate
+		}
+	}
+
 	m.initializers[name] = f
 }
 
@@ -63,7 +76,7 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 
 	initializer, found := m.initializers[name]
 	if !found {
-		return nil, errors.Errorf("unknown %v plugin: %s", m.kind, name)
+		return nil, errors.Errorf("%v plugin: %s not found or had invalid format. Valid format: <namespace>/<name>", m.kind, name)
 	}
 
 	instance, err := initializer(m.serverLog)
