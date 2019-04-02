@@ -198,8 +198,7 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 				return errors.Wrapf(err, "Error creating client for resource %s", id)
 			}
 
-			_, err = c.Create(r)
-			if apierrors.IsAlreadyExists(err) {
+			if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
 				log("already exists, proceeding")
 				continue
 			} else if err != nil {
