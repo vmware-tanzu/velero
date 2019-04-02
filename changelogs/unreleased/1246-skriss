@@ -1,0 +1,1 @@
+don't remove storageclass from a persistent volume when restoring it
