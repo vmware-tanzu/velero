@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -39,7 +40,7 @@ func TestBackupPVAction(t *testing.T) {
 
 	backup := &v1.Backup{}
 
-	a := NewBackupPVAction(velerotest.NewLogger())
+	a := NewPVCAction(velerotest.NewLogger())
 
 	// no spec.volumeName should result in no error
 	// and no additional items
@@ -81,7 +82,7 @@ func TestBackupPVAction(t *testing.T) {
 	_, additional, err = a.Execute(pvc, backup)
 	require.NoError(t, err)
 	require.Len(t, additional, 1)
-	assert.Equal(t, ResourceIdentifier{GroupResource: kuberesource.PersistentVolumes, Name: "myVolume"}, additional[0])
+	assert.Equal(t, velero.ResourceIdentifier{GroupResource: kuberesource.PersistentVolumes, Name: "myVolume"}, additional[0])
 
 	// empty spec.volumeName when status.phase is 'Bound' should
 	// result in no error and no additional items

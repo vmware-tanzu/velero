@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,32 +19,140 @@ package restic
 import (
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestVolumeExists(t *testing.T) {
-	podVolumes := map[string]corev1api.Volume{
-		"foo": {},
-		"bar": {},
-	}
-
-	assert.True(t, volumeExists(podVolumes, "foo"))
-	assert.True(t, volumeExists(podVolumes, "bar"))
-	assert.False(t, volumeExists(podVolumes, "non-existent volume"))
-}
-
 func TestIsHostPathVolume(t *testing.T) {
-	podVolumes := map[string]corev1api.Volume{
-		"foo": {
-			VolumeSource: corev1api.VolumeSource{
-				HostPath: &corev1api.HostPathVolumeSource{},
+	// hostPath pod volume
+	vol := &corev1api.Volume{
+		VolumeSource: corev1api.VolumeSource{
+			HostPath: &corev1api.HostPathVolumeSource{},
+		},
+	}
+	isHostPath, err := isHostPathVolume(vol, nil, nil)
+	assert.Nil(t, err)
+	assert.True(t, isHostPath)
+
+	// non-hostPath pod volume
+	vol = &corev1api.Volume{
+		VolumeSource: corev1api.VolumeSource{
+			EmptyDir: &corev1api.EmptyDirVolumeSource{},
+		},
+	}
+	isHostPath, err = isHostPathVolume(vol, nil, nil)
+	assert.Nil(t, err)
+	assert.False(t, isHostPath)
+
+	// PVC that doesn't have a PV
+	vol = &corev1api.Volume{
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+				ClaimName: "pvc-1",
 			},
 		},
-		"bar": {},
+	}
+	pvcGetter := &fakePVCGetter{
+		pvc: &corev1api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns-1",
+				Name:      "pvc-1",
+			},
+		},
+	}
+	isHostPath, err = isHostPathVolume(vol, pvcGetter, nil)
+	assert.Nil(t, err)
+	assert.False(t, isHostPath)
+
+	// PVC that claims a non-hostPath PV
+	vol = &corev1api.Volume{
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+				ClaimName: "pvc-1",
+			},
+		},
+	}
+	pvcGetter = &fakePVCGetter{
+		pvc: &corev1api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns-1",
+				Name:      "pvc-1",
+			},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName: "pv-1",
+			},
+		},
+	}
+	pvGetter := &fakePVGetter{
+		pv: &corev1api.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pv-1",
+			},
+			Spec: corev1api.PersistentVolumeSpec{},
+		},
+	}
+	isHostPath, err = isHostPathVolume(vol, pvcGetter, pvGetter)
+	assert.Nil(t, err)
+	assert.False(t, isHostPath)
+
+	// PVC that claims a hostPath PV
+	vol = &corev1api.Volume{
+		VolumeSource: corev1api.VolumeSource{
+			PersistentVolumeClaim: &corev1api.PersistentVolumeClaimVolumeSource{
+				ClaimName: "pvc-1",
+			},
+		},
+	}
+	pvcGetter = &fakePVCGetter{
+		pvc: &corev1api.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "ns-1",
+				Name:      "pvc-1",
+			},
+			Spec: corev1api.PersistentVolumeClaimSpec{
+				VolumeName: "pv-1",
+			},
+		},
+	}
+	pvGetter = &fakePVGetter{
+		pv: &corev1api.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pv-1",
+			},
+			Spec: corev1api.PersistentVolumeSpec{
+				PersistentVolumeSource: corev1api.PersistentVolumeSource{
+					HostPath: &corev1api.HostPathVolumeSource{},
+				},
+			},
+		},
+	}
+	isHostPath, err = isHostPathVolume(vol, pvcGetter, pvGetter)
+	assert.Nil(t, err)
+	assert.True(t, isHostPath)
+}
+
+type fakePVCGetter struct {
+	pvc *corev1api.PersistentVolumeClaim
+}
+
+func (g *fakePVCGetter) Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error) {
+	if g.pvc != nil {
+		return g.pvc, nil
 	}
 
-	assert.True(t, isHostPathVolume(podVolumes, "foo"))
-	assert.False(t, isHostPathVolume(podVolumes, "bar"))
-	assert.False(t, isHostPathVolume(podVolumes, "non-existent volume"))
+	return nil, errors.New("item not found")
+}
+
+type fakePVGetter struct {
+	pv *corev1api.PersistentVolume
+}
+
+func (g *fakePVGetter) Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error) {
+	if g.pv != nil {
+		return g.pv, nil
+	}
+
+	return nil, errors.New("item not found")
 }

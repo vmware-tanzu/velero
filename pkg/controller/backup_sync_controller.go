@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
@@ -47,7 +47,7 @@ type backupSyncController struct {
 	backupStorageLocationLister listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
-	newPluginManager            func(logrus.FieldLogger) plugin.Manager
+	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
@@ -59,7 +59,7 @@ func NewBackupSyncController(
 	syncPeriod time.Duration,
 	namespace string,
 	defaultBackupLocation string,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
 	if syncPeriod < time.Minute {

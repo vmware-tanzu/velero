@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,8 +40,9 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -50,8 +51,8 @@ type fakeBackupper struct {
 	mock.Mock
 }
 
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []pkgbackup.ItemAction, blockStoreGetter pkgbackup.BlockStoreGetter) error {
-	args := b.Called(logger, backup, backupFile, actions, blockStoreGetter)
+func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
+	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
 	return args.Error(0)
 }
 
@@ -304,7 +305,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupTracker:          NewBackupTracker(),
 				metrics:                metrics.NewServerMetrics(),
 				clock:                  clock.NewFakeClock(now),
-				newPluginManager:       func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				newPluginManager:       func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				newBackupStore: func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStore, nil
 				},
@@ -314,7 +315,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 
-			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []pkgbackup.ItemAction(nil), pluginManager).Return(nil)
+			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
 
 			// Ensure we have a CompletionTimestamp when uploading.
 			// Failures will display the bytes in buf.

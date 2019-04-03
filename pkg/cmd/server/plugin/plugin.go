@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,38 +26,39 @@ import (
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	"github.com/heptio/velero/pkg/cloudprovider/gcp"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	veleroplugin "github.com/heptio/velero/pkg/plugin"
+	veleroplugin "github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/restore"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
-	logger := veleroplugin.NewLogger()
-
+	pluginServer := veleroplugin.NewServer()
 	c := &cobra.Command{
 		Use:    "run-plugins",
 		Hidden: true,
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
-			logger.Debug("Executing run-plugins command")
-
-			veleroplugin.NewServer(logger).
+			pluginServer.
 				RegisterObjectStore("aws", newAwsObjectStore).
 				RegisterObjectStore("azure", newAzureObjectStore).
 				RegisterObjectStore("gcp", newGcpObjectStore).
-				RegisterBlockStore("aws", newAwsBlockStore).
-				RegisterBlockStore("azure", newAzureBlockStore).
-				RegisterBlockStore("gcp", newGcpBlockStore).
+				RegisterVolumeSnapshotter("aws", newAwsVolumeSnapshotter).
+				RegisterVolumeSnapshotter("azure", newAzureVolumeSnapshotter).
+				RegisterVolumeSnapshotter("gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("pv", newPVBackupItemAction).
 				RegisterBackupItemAction("pod", newPodBackupItemAction).
 				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
 				RegisterRestoreItemAction("job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
-				RegisterRestoreItemAction("restic", newResticRestoreItemAction).
+				RegisterRestoreItemAction("restic", newResticRestoreItemAction(f)).
 				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
 				RegisterRestoreItemAction("serviceaccount", newServiceAccountRestoreItemAction).
+				RegisterRestoreItemAction("addPVCFromPod", newAddPVCFromPodRestoreItemAction).
+				RegisterRestoreItemAction("addPVFromPVC", newAddPVFromPVCRestoreItemAction).
 				Serve()
 		},
 	}
+
+	pluginServer.BindFlags(c.Flags())
 
 	return c
 }
@@ -74,20 +75,20 @@ func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewObjectStore(logger), nil
 }
 
-func newAwsBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewBlockStore(logger), nil
+func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return aws.NewVolumeSnapshotter(logger), nil
 }
 
-func newAzureBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewBlockStore(logger), nil
+func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return azure.NewVolumeSnapshotter(logger), nil
 }
 
-func newGcpBlockStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewBlockStore(logger), nil
+func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return gcp.NewVolumeSnapshotter(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewBackupPVAction(logger), nil
+	return backup.NewPVCAction(logger), nil
 }
 
 func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -127,8 +128,15 @@ func newPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewPodAction(logger), nil
 }
 
-func newResticRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return restore.NewResticRestoreAction(logger), nil
+func newResticRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewResticRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+	}
 }
 
 func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -137,4 +145,12 @@ func newServiceRestoreItemAction(logger logrus.FieldLogger) (interface{}, error)
 
 func newServiceAccountRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewServiceAccountAction(logger), nil
+}
+
+func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewAddPVCFromPodAction(logger), nil
+}
+
+func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewAddPVFromPVCAction(logger), nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,16 +28,17 @@ import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-// serviceAccountAction implements ItemAction.
-type serviceAccountAction struct {
+// ServiceAccountAction implements ItemAction.
+type ServiceAccountAction struct {
 	log                 logrus.FieldLogger
 	clusterRoleBindings []ClusterRoleBinding
 }
 
 // NewServiceAccountAction creates a new ItemAction for service accounts.
-func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (ItemAction, error) {
+func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingListers map[string]ClusterRoleBindingLister, discoveryHelper velerodiscovery.Helper) (*ServiceAccountAction, error) {
 	// Look up the supported RBAC version
 	var supportedAPI metav1.GroupVersionForDiscovery
 	for _, ag := range discoveryHelper.APIGroups() {
@@ -56,15 +57,15 @@ func NewServiceAccountAction(logger logrus.FieldLogger, clusterRoleBindingLister
 		return nil, err
 	}
 
-	return &serviceAccountAction{
+	return &ServiceAccountAction{
 		log:                 logger,
 		clusterRoleBindings: crbs,
 	}, nil
 }
 
 // AppliesTo returns a ResourceSelector that applies only to service accounts.
-func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
 }
@@ -72,9 +73,9 @@ func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
 // Execute checks for any ClusterRoleBindings that have this service account as a subject, and
 // adds the ClusterRoleBinding and associated ClusterRole to the list of additional items to
 // be backed up.
-func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
-	a.log.Info("Running serviceAccountAction")
-	defer a.log.Info("Done running serviceAccountAction")
+func (a *ServiceAccountAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	a.log.Info("Running ServiceAccountAction")
+	defer a.log.Info("Done running ServiceAccountAction")
 
 	objectMeta, err := meta.Accessor(item)
 	if err != nil {
@@ -101,16 +102,16 @@ func (a *serviceAccountAction) Execute(item runtime.Unstructured, backup *v1.Bac
 		}
 	}
 
-	var additionalItems []ResourceIdentifier
+	var additionalItems []velero.ResourceIdentifier
 	for binding := range bindings {
-		additionalItems = append(additionalItems, ResourceIdentifier{
+		additionalItems = append(additionalItems, velero.ResourceIdentifier{
 			GroupResource: kuberesource.ClusterRoleBindings,
 			Name:          binding,
 		})
 	}
 
 	for role := range roles {
-		additionalItems = append(additionalItems, ResourceIdentifier{
+		additionalItems = append(additionalItems, velero.ResourceIdentifier{
 			GroupResource: kuberesource.ClusterRoles,
 			Name:          role,
 		})

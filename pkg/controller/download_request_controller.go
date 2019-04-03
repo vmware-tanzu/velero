@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
@@ -48,7 +48,7 @@ type downloadRequestController struct {
 	clock                 clock.Clock
 	backupLocationLister  listers.BackupStorageLocationLister
 	backupLister          listers.BackupLister
-	newPluginManager      func(logrus.FieldLogger) plugin.Manager
+	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
@@ -59,7 +59,7 @@ func NewDownloadRequestController(
 	restoreInformer informers.RestoreInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	backupInformer informers.BackupInformer,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
 	c := &downloadRequestController{

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ type resourceBackupperFactory interface {
 		tarWriter tarWriter,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) resourceBackupper
 }
 
@@ -63,20 +63,20 @@ func (f *defaultResourceBackupperFactory) newResourceBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) resourceBackupper {
 	return &defaultResourceBackupper{
-		log:                   log,
-		backupRequest:         backupRequest,
-		dynamicFactory:        dynamicFactory,
-		discoveryHelper:       discoveryHelper,
-		backedUpItems:         backedUpItems,
-		cohabitatingResources: cohabitatingResources,
-		podCommandExecutor:    podCommandExecutor,
-		tarWriter:             tarWriter,
-		resticBackupper:       resticBackupper,
-		resticSnapshotTracker: resticSnapshotTracker,
-		blockStoreGetter:      blockStoreGetter,
+		log:                     log,
+		backupRequest:           backupRequest,
+		dynamicFactory:          dynamicFactory,
+		discoveryHelper:         discoveryHelper,
+		backedUpItems:           backedUpItems,
+		cohabitatingResources:   cohabitatingResources,
+		podCommandExecutor:      podCommandExecutor,
+		tarWriter:               tarWriter,
+		resticBackupper:         resticBackupper,
+		resticSnapshotTracker:   resticSnapshotTracker,
+		volumeSnapshotterGetter: volumeSnapshotterGetter,
 
 		itemBackupperFactory: &defaultItemBackupperFactory{},
 	}
@@ -87,18 +87,18 @@ type resourceBackupper interface {
 }
 
 type defaultResourceBackupper struct {
-	log                   logrus.FieldLogger
-	backupRequest         *Request
-	dynamicFactory        client.DynamicFactory
-	discoveryHelper       discovery.Helper
-	backedUpItems         map[itemKey]struct{}
-	cohabitatingResources map[string]*cohabitatingResource
-	podCommandExecutor    podexec.PodCommandExecutor
-	tarWriter             tarWriter
-	resticBackupper       restic.Backupper
-	resticSnapshotTracker *pvcSnapshotTracker
-	itemBackupperFactory  itemBackupperFactory
-	blockStoreGetter      BlockStoreGetter
+	log                     logrus.FieldLogger
+	backupRequest           *Request
+	dynamicFactory          client.DynamicFactory
+	discoveryHelper         discovery.Helper
+	backedUpItems           map[itemKey]struct{}
+	cohabitatingResources   map[string]*cohabitatingResource
+	podCommandExecutor      podexec.PodCommandExecutor
+	tarWriter               tarWriter
+	resticBackupper         restic.Backupper
+	resticSnapshotTracker   *pvcSnapshotTracker
+	itemBackupperFactory    itemBackupperFactory
+	volumeSnapshotterGetter VolumeSnapshotterGetter
 }
 
 // backupResource backs up all the objects for a given group-version-resource.
@@ -169,7 +169,7 @@ func (rb *defaultResourceBackupper) backupResource(
 		rb.discoveryHelper,
 		rb.resticBackupper,
 		rb.resticSnapshotTracker,
-		rb.blockStoreGetter,
+		rb.volumeSnapshotterGetter,
 	)
 
 	namespacesToList := getNamespacesToList(rb.backupRequest.NamespaceIncludesExcludes)

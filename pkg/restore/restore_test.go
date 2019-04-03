@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,10 +39,11 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
+	pkgclient "github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -195,11 +196,12 @@ func TestRestoreNamespaceFiltering(t *testing.T) {
 				fileSystem:           test.fileSystem,
 				log:                  log,
 				prioritizedResources: test.prioritizedResources,
+				restoreDir:           test.baseDir,
 			}
 
 			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
 
-			warnings, errors := ctx.restoreFromDir(test.baseDir)
+			warnings, errors := ctx.restoreFromDir()
 
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
@@ -291,11 +293,12 @@ func TestRestorePriority(t *testing.T) {
 				fileSystem:           test.fileSystem,
 				prioritizedResources: test.prioritizedResources,
 				log:                  log,
+				restoreDir:           test.baseDir,
 			}
 
 			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
 
-			warnings, errors := ctx.restoreFromDir(test.baseDir)
+			warnings, errors := ctx.restoreFromDir()
 
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
@@ -342,13 +345,17 @@ func TestNamespaceRemapping(t *testing.T) {
 		restore:              restore,
 		backup:               &api.Backup{},
 		log:                  velerotest.NewLogger(),
+		applicableActions:    make(map[schema.GroupResource][]resolvedAction),
+		resourceClients:      make(map[resourceClientKey]pkgclient.Dynamic),
+		restoredItems:        make(map[velero.ResourceIdentifier]struct{}),
+		restoreDir:           baseDir,
 	}
 
 	nsClient.On("Get", "ns-2", metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "ns-2"))
 	ns := newTestNamespace("ns-2").Namespace
 	nsClient.On("Create", ns).Return(ns, nil)
 
-	warnings, errors := ctx.restoreFromDir(baseDir)
+	warnings, errors := ctx.restoreFromDir()
 
 	assert.Empty(t, warnings.Velero)
 	assert.Empty(t, warnings.Cluster)
@@ -462,7 +469,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("configmaps"),
+					RestoreItemAction:         newFakeAction("configmaps"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -478,7 +485,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
 			actions: []resolvedAction{
 				{
-					ItemAction:                newFakeAction("foo-resource"),
+					RestoreItemAction:         newFakeAction("foo-resource"),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -646,13 +653,16 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				log:    velerotest.NewLogger(),
 				pvRestorer: &pvRestorer{
 					logger: logging.DefaultLogger(logrus.DebugLevel),
-					blockStoreGetter: &fakeBlockStoreGetter{
+					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
 						volumeMap: map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
 						volumeID:  "volume-1",
 					},
 					snapshotLocationLister: snapshotLocationLister,
 					backup:                 &api.Backup{},
 				},
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 
 			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
@@ -736,8 +746,11 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 						BackupName:              "my-backup",
 					},
 				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
+				backup:            &api.Backup{},
+				log:               velerotest.NewLogger(),
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
 
@@ -994,11 +1007,14 @@ status:
 						Name:      "my-restore",
 					},
 				},
-				backup:          backup,
-				log:             velerotest.NewLogger(),
-				pvsToProvision:  sets.NewString(),
-				pvRestorer:      pvRestorer,
-				namespaceClient: nsClient,
+				backup:            backup,
+				log:               velerotest.NewLogger(),
+				pvsToProvision:    sets.NewString(),
+				pvRestorer:        pvRestorer,
+				namespaceClient:   nsClient,
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 
 			if test.haveSnapshot && !test.legacyBackup {
@@ -1521,8 +1537,15 @@ status:
 
 			assert.Equal(t, test.expectedResult, result)
 		})
-
 	}
+}
+
+func TestGetItemFilePath(t *testing.T) {
+	res := getItemFilePath("root", "resource", "", "item")
+	assert.Equal(t, "root/resources/resource/cluster/item.json", res)
+
+	res = getItemFilePath("root", "resource", "namespace", "item")
+	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
 }
 
 type testUnstructured struct {
@@ -1799,33 +1822,33 @@ type fakeAction struct {
 	resource string
 }
 
-type fakeBlockStoreGetter struct {
-	fakeBlockStore *velerotest.FakeBlockStore
-	volumeMap      map[api.VolumeBackupInfo]string
-	volumeID       string
+type fakeVolumeSnapshotterGetter struct {
+	fakeVolumeSnapshotter *velerotest.FakeVolumeSnapshotter
+	volumeMap             map[api.VolumeBackupInfo]string
+	volumeID              string
 }
 
-func (r *fakeBlockStoreGetter) GetBlockStore(provider string) (cloudprovider.BlockStore, error) {
-	if r.fakeBlockStore == nil {
-		r.fakeBlockStore = &velerotest.FakeBlockStore{
+func (r *fakeVolumeSnapshotterGetter) GetVolumeSnapshotter(provider string) (velero.VolumeSnapshotter, error) {
+	if r.fakeVolumeSnapshotter == nil {
+		r.fakeVolumeSnapshotter = &velerotest.FakeVolumeSnapshotter{
 			RestorableVolumes: r.volumeMap,
 			VolumeID:          r.volumeID,
 		}
 	}
-	return r.fakeBlockStore, nil
+	return r.fakeVolumeSnapshotter, nil
 }
 
 func newFakeAction(resource string) *fakeAction {
 	return &fakeAction{resource}
 }
 
-func (r *fakeAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (r *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{r.resource},
 	}, nil
 }
 
-func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+func (r *fakeAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	labels, found, err := unstructured.NestedMap(input.Item.UnstructuredContent(), "metadata", "labels")
 	if err != nil {
 		return nil, err
@@ -1851,7 +1874,7 @@ func (r *fakeAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItem
 		return nil, err
 	}
 
-	return NewRestoreItemActionExecuteOutput(res), nil
+	return velero.NewRestoreItemActionExecuteOutput(res), nil
 }
 
 type fakeNamespaceClient struct {

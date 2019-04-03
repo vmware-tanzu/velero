@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 )
 
 type FakeDiscoveryHelper struct {
@@ -122,4 +123,29 @@ func (dh *FakeDiscoveryHelper) ResourceFor(input schema.GroupVersionResource) (s
 
 func (dh *FakeDiscoveryHelper) APIGroups() []metav1.APIGroup {
 	return dh.APIGroupsList
+}
+
+type FakeServerResourcesInterface struct {
+	ResourceList []*metav1.APIResourceList
+	FailedGroups map[schema.GroupVersion]error
+	ReturnError  error
+}
+
+func (di *FakeServerResourcesInterface) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	if di.ReturnError != nil {
+		return di.ResourceList, di.ReturnError
+	}
+	if di.FailedGroups == nil || len(di.FailedGroups) == 0 {
+		return di.ResourceList, nil
+	}
+	return di.ResourceList, &discovery.ErrGroupDiscoveryFailed{Groups: di.FailedGroups}
+}
+
+func NewFakeServerResourcesInterface(resourceList []*metav1.APIResourceList, failedGroups map[schema.GroupVersion]error, returnError error) *FakeServerResourcesInterface {
+	helper := &FakeServerResourcesInterface{
+		ResourceList: resourceList,
+		FailedGroups: failedGroups,
+		ReturnError:  returnError,
+	}
+	return helper
 }

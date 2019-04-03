@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,8 +32,8 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/volume"
 )
 
@@ -62,16 +62,16 @@ type BackupStore interface {
 const DownloadURLTTL = 10 * time.Minute
 
 type objectBackupStore struct {
-	objectStore cloudprovider.ObjectStore
+	objectStore velero.ObjectStore
 	bucket      string
 	layout      *ObjectStoreLayout
 	logger      logrus.FieldLogger
 }
 
-// ObjectStoreGetter is a type that can get a cloudprovider.ObjectStore
+// ObjectStoreGetter is a type that can get a velero.ObjectStore
 // from a provider name.
 type ObjectStoreGetter interface {
-	GetObjectStore(provider string) (cloudprovider.ObjectStore, error)
+	GetObjectStore(provider string) (velero.ObjectStore, error)
 }
 
 func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
@@ -152,7 +152,7 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 	output := make([]string, 0, len(prefixes))
 
 	for _, prefix := range prefixes {
-		// values returned from a call to cloudprovider.ObjectStore's
+		// values returned from a call to ObjectStore's
 		// ListCommonPrefixes method return the *full* prefix, inclusive
 		// of s.backupsPrefix, and include the delimiter ("/") as a suffix. Trim
 		// each of those off to get the backup name.
@@ -318,7 +318,7 @@ func convertMapKeys(m map[string]string, find, replace string) map[string]string
 	return m
 }
 
-func keyExists(objectStore cloudprovider.ObjectStore, bucket, prefix, key string) (bool, error) {
+func keyExists(objectStore velero.ObjectStore, bucket, prefix, key string) (bool, error) {
 	keys, err := objectStore.ListObjects(bucket, prefix)
 	if err != nil {
 		return false, err
@@ -478,7 +478,7 @@ func seekToBeginning(r io.Reader) error {
 	return err
 }
 
-func seekAndPutObject(objectStore cloudprovider.ObjectStore, bucket, key string, file io.Reader) error {
+func seekAndPutObject(objectStore velero.ObjectStore, bucket, key string, file io.Reader) error {
 	if file == nil {
 		return nil
 	}

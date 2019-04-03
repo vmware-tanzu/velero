@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -228,7 +228,7 @@ func TestBackupResource(t *testing.T) {
 			},
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:               newFakeAction("pods"),
+					BackupItemAction:         newFakeAction("pods"),
 					resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 				},
 			},
@@ -390,7 +390,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 				ResourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("*"),
 				ResolvedActions: []resolvedAction{
 					{
-						ItemAction:               newFakeAction("pods"),
+						BackupItemAction:         newFakeAction("pods"),
 						resourceIncludesExcludes: collections.NewIncludesExcludes().Includes("pods"),
 					},
 				},
@@ -648,7 +648,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 	discoveryHelper discovery.Helper,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) ItemBackupper {
 	args := ibf.Called(
 		backup,
@@ -659,7 +659,7 @@ func (ibf *mockItemBackupperFactory) newItemBackupper(
 		discoveryHelper,
 		resticBackupper,
 		resticSnapshotTracker,
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 	return args.Get(0).(ItemBackupper)
 }

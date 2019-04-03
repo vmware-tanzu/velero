@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,23 +24,25 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-type podAction struct {
+type PodAction struct {
 	logger logrus.FieldLogger
 }
 
-func NewPodAction(logger logrus.FieldLogger) ItemAction {
-	return &podAction{logger: logger}
+func NewPodAction(logger logrus.FieldLogger) *PodAction {
+	return &PodAction{logger: logger}
 }
 
-func (a *podAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *PodAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"pods"},
 	}, nil
 }
 
-func (a *podAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
+func (a *PodAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	pod := new(v1.Pod)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), pod); err != nil {
 		return nil, errors.WithStack(err)
@@ -84,5 +86,5 @@ func (a *podAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemA
 		return nil, errors.WithStack(err)
 	}
 
-	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

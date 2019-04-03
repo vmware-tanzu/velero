@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,28 +24,29 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 )
 
-// backupPVAction inspects a PersistentVolumeClaim for the PersistentVolume
+// PVCAction inspects a PersistentVolumeClaim for the PersistentVolume
 // that it references and backs it up
-type backupPVAction struct {
+type PVCAction struct {
 	log logrus.FieldLogger
 }
 
-func NewBackupPVAction(logger logrus.FieldLogger) ItemAction {
-	return &backupPVAction{log: logger}
+func NewPVCAction(logger logrus.FieldLogger) *PVCAction {
+	return &PVCAction{log: logger}
 }
 
-func (a *backupPVAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *PVCAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims"},
 	}, nil
 }
 
 // Execute finds the PersistentVolume bound by the provided
 // PersistentVolumeClaim, if any, and backs it up
-func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
-	a.log.Info("Executing backupPVAction")
+func (a *PVCAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	a.log.Info("Executing PVCAction")
 
 	var pvc corev1api.PersistentVolumeClaim
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &pvc); err != nil {
@@ -56,9 +57,9 @@ func (a *backupPVAction) Execute(item runtime.Unstructured, backup *v1.Backup) (
 		return item, nil, nil
 	}
 
-	pv := ResourceIdentifier{
+	pv := velero.ResourceIdentifier{
 		GroupResource: kuberesource.PersistentVolumes,
 		Name:          pvc.Spec.VolumeName,
 	}
-	return item, []ResourceIdentifier{pv}, nil
+	return item, []velero.ResourceIdentifier{pv}, nil
 }

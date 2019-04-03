@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,7 +55,20 @@ func TestFire(t *testing.T) {
 			expectedEntryFields: map[string]interface{}{
 				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
 				errorFileField:     "",
-				errorFunctionField: "TestFire",
+				errorFunctionField: "github.com/heptio/velero/pkg/util/logging.TestFire",
+			},
+		},
+		{
+			name: "already have error file and function fields",
+			preEntryFields: map[string]interface{}{
+				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
+				errorFileField:     "some_file.go:123",
+				errorFunctionField: "SomeFunction",
+			},
+			expectedEntryFields: map[string]interface{}{
+				logrus.ErrorKey:    pkgerrs.New("a pkg/errors error"),
+				errorFileField:     "some_file.go:123",
+				errorFunctionField: "SomeFunction",
 			},
 		},
 	}

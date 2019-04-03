@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -197,12 +198,11 @@ func TestPodActionExecute(t *testing.T) {
 			unstructuredPod, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&test.obj)
 			require.NoError(t, err)
 
-			res, err := action.Execute(&RestoreItemActionExecuteInput{
+			res, err := action.Execute(&velero.RestoreItemActionExecuteInput{
 				Item:           &unstructured.Unstructured{Object: unstructuredPod},
 				ItemFromBackup: &unstructured.Unstructured{Object: unstructuredPod},
 				Restore:        nil,
 			})
-			assert.Nil(t, res.Warning)
 
 			if test.expectedErr {
 				assert.NotNil(t, err, "expected an error")

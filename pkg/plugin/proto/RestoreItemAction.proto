@@ -3,19 +3,19 @@ package generated;
 
 import "Shared.proto";
 
-message RestoreExecuteRequest {
+message RestoreItemActionExecuteRequest {
     string plugin = 1;
     bytes item = 2;
     bytes restore = 3;
     bytes itemFromBackup = 4;
 }
 
-message RestoreExecuteResponse {
+message RestoreItemActionExecuteResponse {
     bytes item = 1;
-    string warning = 2;
+    repeated ResourceIdentifier additionalItems = 2;
 }
 
 service RestoreItemAction {
     rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
-    rpc Execute(RestoreExecuteRequest) returns (RestoreExecuteResponse);
+    rpc Execute(RestoreItemActionExecuteRequest) returns (RestoreItemActionExecuteResponse);
 }

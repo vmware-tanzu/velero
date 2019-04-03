@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -166,7 +166,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 		tarHeaderWriteError                   bool
 		customAction                          bool
 		expectedActionID                      string
-		customActionAdditionalItemIdentifiers []ResourceIdentifier
+		customActionAdditionalItemIdentifiers []velero.ResourceIdentifier
 		customActionAdditionalItems           []runtime.Unstructured
 		groupResource                         string
 		snapshottableVolumes                  map[string]v1.VolumeBackupInfo
@@ -239,7 +239,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
 			customAction:              true,
 			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
 				{
 					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
 					Namespace:     "ns1",
@@ -265,7 +265,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
 			customAction:              true,
 			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []ResourceIdentifier{
+			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
 				{
 					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
 					Namespace:     "ns1",
@@ -284,7 +284,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			additionalItemError: errors.New("foo"),
 		},
 		{
-			name:                      "takePVSnapshot is not invoked for PVs when blockStore == nil",
+			name:                      "takePVSnapshot is not invoked for PVs when volumeSnapshotter == nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               false,
@@ -293,7 +293,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			groupResource:             "persistentvolumes",
 		},
 		{
-			name:                      "takePVSnapshot is invoked for PVs when blockStore != nil",
+			name:                      "takePVSnapshot is invoked for PVs when volumeSnapshotter != nil",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               false,
@@ -312,7 +312,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			// empty snapshottableVolumes causes a blockStore to be created, but no
+			// empty snapshottableVolumes causes a volumeSnapshotter to be created, but no
 			// snapshots are expected to be taken.
 			snapshottableVolumes: map[string]v1.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
@@ -397,7 +397,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 				}
 				backup.ResolvedActions = []resolvedAction{
 					{
-						ItemAction:                action,
+						BackupItemAction:          action,
 						namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 						resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes(groupResource.String()),
 						selector:                  labels.Everything(),
@@ -413,7 +413,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			discoveryHelper := velerotest.NewFakeDiscoveryHelper(true, nil)
 
-			blockStoreGetter := &blockStoreGetter{}
+			volumeSnapshotterGetter := &volumeSnapshotterGetter{}
 
 			b := (&defaultItemBackupperFactory{}).newItemBackupper(
 				backup,
@@ -424,18 +424,18 @@ func TestBackupItemNoSkips(t *testing.T) {
 				discoveryHelper,
 				nil, // restic backupper
 				newPVCSnapshotTracker(),
-				blockStoreGetter,
+				volumeSnapshotterGetter,
 			).(*defaultItemBackupper)
 
-			var blockStore *velerotest.FakeBlockStore
+			var volumeSnapshotter *velerotest.FakeVolumeSnapshotter
 			if test.snapshottableVolumes != nil {
-				blockStore = &velerotest.FakeBlockStore{
+				volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{
 					SnapshottableVolumes: test.snapshottableVolumes,
 					VolumeID:             "vol-abc123",
 					Error:                test.snapshotError,
 				}
 
-				blockStoreGetter.blockStore = blockStore
+				volumeSnapshotterGetter.volumeSnapshotter = volumeSnapshotter
 			}
 
 			if test.trackedPVCs != nil {
@@ -523,7 +523,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 
 			if test.snapshottableVolumes != nil {
-				require.Equal(t, len(test.snapshottableVolumes), len(blockStore.SnapshotsTaken))
+				require.Equal(t, len(test.snapshottableVolumes), len(volumeSnapshotter.SnapshotsTaken))
 			}
 
 			if len(test.snapshottableVolumes) > 0 {
@@ -547,20 +547,20 @@ func TestBackupItemNoSkips(t *testing.T) {
 	}
 }
 
-type blockStoreGetter struct {
-	blockStore cloudprovider.BlockStore
+type volumeSnapshotterGetter struct {
+	volumeSnapshotter velero.VolumeSnapshotter
 }
 
-func (b *blockStoreGetter) GetBlockStore(name string) (cloudprovider.BlockStore, error) {
-	if b.blockStore != nil {
-		return b.blockStore, nil
+func (b *volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	if b.volumeSnapshotter != nil {
+		return b.volumeSnapshotter, nil
 	}
 	return nil, errors.New("plugin not found")
 }
 
 type addAnnotationAction struct{}
 
-func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []ResourceIdentifier, error) {
+func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
 	// across a process boundary.
 	copy := item.(*unstructured.Unstructured).DeepCopy()
@@ -580,7 +580,7 @@ func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Back
 	return copy, nil, nil
 }
 
-func (a *addAnnotationAction) AppliesTo() (ResourceSelector, error) {
+func (a *addAnnotationAction) AppliesTo() (velero.ResourceSelector, error) {
 	panic("not implemented")
 }
 
@@ -600,7 +600,7 @@ func TestItemActionModificationsToItemPersist(t *testing.T) {
 			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:                &addAnnotationAction{},
+					BackupItemAction:          &addAnnotationAction{},
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -656,7 +656,7 @@ func TestResticAnnotationsPersist(t *testing.T) {
 			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
 			ResolvedActions: []resolvedAction{
 				{
-					ItemAction:                &addAnnotationAction{},
+					BackupItemAction:          &addAnnotationAction{},
 					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
 					selector:                  labels.Everything(),
@@ -787,7 +787,7 @@ func TestTakePVSnapshot(t *testing.T) {
 				},
 			}
 
-			blockStore := &velerotest.FakeBlockStore{
+			volumeSnapshotter := &velerotest.FakeVolumeSnapshotter{
 				SnapshottableVolumes: test.volumeInfo,
 				VolumeID:             test.expectedVolumeID,
 			}
@@ -797,7 +797,7 @@ func TestTakePVSnapshot(t *testing.T) {
 					Backup:            backup,
 					SnapshotLocations: []*v1.VolumeSnapshotLocation{new(v1.VolumeSnapshotLocation)},
 				},
-				blockStoreGetter: &blockStoreGetter{blockStore: blockStore},
+				volumeSnapshotterGetter: &volumeSnapshotterGetter{volumeSnapshotter: volumeSnapshotter},
 			}
 
 			pv, err := velerotest.GetAsMap(test.pv)
@@ -823,13 +823,13 @@ func TestTakePVSnapshot(t *testing.T) {
 			}
 
 			// we should have exactly one snapshot taken
-			require.Equal(t, test.expectedSnapshotsTaken, blockStore.SnapshotsTaken.Len())
+			require.Equal(t, test.expectedSnapshotsTaken, volumeSnapshotter.SnapshotsTaken.Len())
 
 			if test.expectedSnapshotsTaken > 0 {
 				require.Len(t, ib.backupRequest.VolumeSnapshots, 1)
 				snapshot := ib.backupRequest.VolumeSnapshots[0]
 
-				snapshotID, _ := blockStore.SnapshotsTaken.PopAny()
+				snapshotID, _ := volumeSnapshotter.SnapshotsTaken.PopAny()
 				assert.Equal(t, snapshotID, snapshot.Status.ProviderSnapshotID)
 				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Type, snapshot.Spec.VolumeType)
 				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Iops, snapshot.Spec.VolumeIOPS)

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,8 +43,9 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -109,7 +110,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
@@ -407,7 +408,7 @@ func TestProcessRestore(t *testing.T) {
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				logger,
 				logrus.InfoLevel,
-				func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
 			).(*restoreController)
@@ -922,9 +923,9 @@ func (r *fakeRestorer) Restore(
 	backup *api.Backup,
 	volumeSnapshots []*volume.Snapshot,
 	backupReader io.Reader,
-	actions []restore.ItemAction,
+	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	blockStoreGetter restore.BlockStoreGetter,
+	volumeSnapshotterGetter restore.VolumeSnapshotterGetter,
 ) (api.RestoreResult, api.RestoreResult) {
 	res := r.Called(log, restore, backup, backupReader, actions)
 

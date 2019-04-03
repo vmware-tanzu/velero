@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -60,7 +60,7 @@ type backupController struct {
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
-	newPluginManager         func(logrus.FieldLogger) plugin.Manager
+	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker            BackupTracker
 	backupLocationLister     listers.BackupStorageLocationLister
 	defaultBackupLocation    string
@@ -76,7 +76,7 @@ func NewBackupController(
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
@@ -175,6 +175,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
+		request.Status.StartTimestamp.Time = c.clock.Now()
 	}
 
 	// update status
@@ -392,7 +393,6 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	log := c.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
-	backup.Status.StartTimestamp.Time = c.clock.Now()
 
 	logFile, err := ioutil.TempFile("", "")
 	if err != nil {

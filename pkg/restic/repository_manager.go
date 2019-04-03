@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
@@ -90,6 +91,8 @@ type repositoryManager struct {
 	repoEnsurer                  *repositoryEnsurer
 	fileSystem                   filesystem.Interface
 	ctx                          context.Context
+	pvcClient                    corev1client.PersistentVolumeClaimsGetter
+	pvClient                     corev1client.PersistentVolumesGetter
 }
 
 // NewRepositoryManager constructs a RepositoryManager.
@@ -101,6 +104,8 @@ func NewRepositoryManager(
 	repoInformer velerov1informers.ResticRepositoryInformer,
 	repoClient velerov1client.ResticRepositoriesGetter,
 	backupLocationInformer velerov1informers.BackupStorageLocationInformer,
+	pvcClient corev1client.PersistentVolumeClaimsGetter,
+	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
 ) (RepositoryManager, error) {
 	rm := &repositoryManager{
@@ -111,6 +116,8 @@ func NewRepositoryManager(
 		repoInformerSynced:           repoInformer.Informer().HasSynced,
 		backupLocationLister:         backupLocationInformer.Lister(),
 		backupLocationInformerSynced: backupLocationInformer.Informer().HasSynced,
+		pvcClient:                    pvcClient,
+		pvClient:                     pvClient,
 		log:                          log,
 		ctx:                          ctx,
 
@@ -137,7 +144,7 @@ func (rm *repositoryManager) NewBackupper(ctx context.Context, backup *velerov1a
 		},
 	)
 
-	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.log)
+	b := newBackupper(ctx, rm, rm.repoEnsurer, informer, rm.pvcClient, rm.pvClient, rm.log)
 
 	go informer.Run(ctx.Done())
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced, rm.repoInformerSynced) {

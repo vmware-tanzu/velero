@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -41,6 +42,8 @@ type backupper struct {
 	ctx         context.Context
 	repoManager *repositoryManager
 	repoEnsurer *repositoryEnsurer
+	pvcClient   corev1client.PersistentVolumeClaimsGetter
+	pvClient    corev1client.PersistentVolumesGetter
 
 	results     map[string]chan *velerov1api.PodVolumeBackup
 	resultsLock sync.Mutex
@@ -51,12 +54,16 @@ func newBackupper(
 	repoManager *repositoryManager,
 	repoEnsurer *repositoryEnsurer,
 	podVolumeBackupInformer cache.SharedIndexInformer,
+	pvcClient corev1client.PersistentVolumeClaimsGetter,
+	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
 ) *backupper {
 	b := &backupper{
 		ctx:         ctx,
 		repoManager: repoManager,
 		repoEnsurer: repoEnsurer,
+		pvcClient:   pvcClient,
+		pvClient:    pvClient,
 
 		results: make(map[string]chan *velerov1api.PodVolumeBackup),
 	}
@@ -123,14 +130,20 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	}
 
 	for _, volumeName := range volumesToBackup {
-		if !volumeExists(podVolumes, volumeName) {
+		volume, ok := podVolumes[volumeName]
+		if !ok {
 			log.Warnf("No volume named %s found in pod %s/%s, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
 
 		// hostPath volumes are not supported because they're not mounted into /var/lib/kubelet/pods, so our
 		// daemonset pod has no way to access their data.
-		if isHostPathVolume(podVolumes, volumeName) {
+		isHostPath, err := isHostPathVolume(&volume, b.pvcClient.PersistentVolumeClaims(pod.Namespace), b.pvClient.PersistentVolumes())
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "error checking if volume is a hostPath volume"))
+			continue
+		}
+		if isHostPath {
 			log.Warnf("Volume %s in pod %s/%s is a hostPath volume which is not supported for restic backup, skipping", volumeName, pod.Namespace, pod.Name)
 			continue
 		}
@@ -169,18 +182,40 @@ ForEachVolume:
 	return volumeSnapshots, errs
 }
 
-func volumeExists(podVolumes map[string]corev1api.Volume, volumeName string) bool {
-	_, found := podVolumes[volumeName]
-	return found
+type pvcGetter interface {
+	Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error)
 }
 
-func isHostPathVolume(podVolumes map[string]corev1api.Volume, volumeName string) bool {
-	volume, found := podVolumes[volumeName]
-	if !found {
-		return false
+type pvGetter interface {
+	Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error)
+}
+
+// isHostPathVolume returns true if the volume is either a hostPath pod volume or a persistent
+// volume claim on a hostPath persistent volume, or false otherwise.
+func isHostPathVolume(volume *corev1api.Volume, pvcGetter pvcGetter, pvGetter pvGetter) (bool, error) {
+	if volume.HostPath != nil {
+		return true, nil
 	}
 
-	return volume.HostPath != nil
+	if volume.PersistentVolumeClaim == nil {
+		return false, nil
+	}
+
+	pvc, err := pvcGetter.Get(volume.PersistentVolumeClaim.ClaimName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	if pvc.Spec.VolumeName == "" {
+		return false, nil
+	}
+
+	pv, err := pvGetter.Get(pvc.Spec.VolumeName, metav1.GetOptions{})
+	if err != nil {
+		return false, errors.WithStack(err)
+	}
+
+	return pv.Spec.HostPath != nil, nil
 }
 
 func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *velerov1api.PodVolumeBackup {

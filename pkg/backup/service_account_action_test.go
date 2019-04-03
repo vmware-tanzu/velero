@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -77,12 +78,12 @@ func (f FakeV1beta1ClusterRoleBindingLister) List() ([]ClusterRoleBinding, error
 func TestServiceAccountActionAppliesTo(t *testing.T) {
 	// Instantiating the struct directly since using
 	// NewServiceAccountAction requires a full kubernetes clientset
-	a := &serviceAccountAction{}
+	a := &ServiceAccountAction{}
 
 	actual, err := a.AppliesTo()
 	require.NoError(t, err)
 
-	expected := ResourceSelector{
+	expected := velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}
 	assert.Equal(t, expected, actual)
@@ -189,9 +190,7 @@ func TestNewServiceAccountAction(t *testing.T) {
 			}
 			action, err := NewServiceAccountAction(logger, clusterRoleBindingListers, &discoveryHelper)
 			require.NoError(t, err)
-			saAction, ok := action.(*serviceAccountAction)
-			require.True(t, ok)
-			assert.Equal(t, test.expectedCRBs, saAction.clusterRoleBindings)
+			assert.Equal(t, test.expectedCRBs, action.clusterRoleBindings)
 		})
 	}
 }
@@ -201,7 +200,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 		name                    string
 		serviceAccount          runtime.Unstructured
 		crbs                    []rbac.ClusterRoleBinding
-		expectedAdditionalItems []ResourceIdentifier
+		expectedAdditionalItems []velero.ResourceIdentifier
 	}{
 		{
 			name: "no crbs",
@@ -345,7 +344,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 					},
 				},
 			},
-			expectedAdditionalItems: []ResourceIdentifier{
+			expectedAdditionalItems: []velero.ResourceIdentifier{
 				{
 					GroupResource: kuberesource.ClusterRoleBindings,
 					Name:          "crb-2",
@@ -377,7 +376,7 @@ func TestServiceAccountActionExecute(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create the action struct directly so we don't need to mock a clientset
-			action := &serviceAccountAction{
+			action := &ServiceAccountAction{
 				log:                 velerotest.NewLogger(),
 				clusterRoleBindings: newV1ClusterRoleBindingList(test.crbs),
 			}
@@ -409,7 +408,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 		name                    string
 		serviceAccount          runtime.Unstructured
 		crbs                    []rbacbeta.ClusterRoleBinding
-		expectedAdditionalItems []ResourceIdentifier
+		expectedAdditionalItems []velero.ResourceIdentifier
 	}{
 		{
 			name: "no crbs",
@@ -553,7 +552,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 					},
 				},
 			},
-			expectedAdditionalItems: []ResourceIdentifier{
+			expectedAdditionalItems: []velero.ResourceIdentifier{
 				{
 					GroupResource: kuberesource.ClusterRoleBindings,
 					Name:          "crb-2",
@@ -585,7 +584,7 @@ func TestServiceAccountActionExecuteOnBeta1(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create the action struct directly so we don't need to mock a clientset
-			action := &serviceAccountAction{
+			action := &ServiceAccountAction{
 				log:                 velerotest.NewLogger(),
 				clusterRoleBindings: newV1beta1ClusterRoleBindingList(test.crbs),
 			}

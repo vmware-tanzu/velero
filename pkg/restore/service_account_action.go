@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,26 +25,27 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
-type serviceAccountAction struct {
+type ServiceAccountAction struct {
 	logger logrus.FieldLogger
 }
 
-func NewServiceAccountAction(logger logrus.FieldLogger) ItemAction {
-	return &serviceAccountAction{logger: logger}
+func NewServiceAccountAction(logger logrus.FieldLogger) *ServiceAccountAction {
+	return &ServiceAccountAction{logger: logger}
 }
 
-func (a *serviceAccountAction) AppliesTo() (ResourceSelector, error) {
-	return ResourceSelector{
+func (a *ServiceAccountAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{
 		IncludedResources: []string{"serviceaccounts"},
 	}, nil
 }
 
-func (a *serviceAccountAction) Execute(input *RestoreItemActionExecuteInput) (*RestoreItemActionExecuteOutput, error) {
-	a.logger.Info("Executing serviceAccountAction")
-	defer a.logger.Info("Done executing serviceAccountAction")
+func (a *ServiceAccountAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	a.logger.Info("Executing ServiceAccountAction")
+	defer a.logger.Info("Done executing ServiceAccountAction")
 
 	var serviceAccount corev1.ServiceAccount
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &serviceAccount); err != nil {
@@ -74,5 +75,5 @@ func (a *serviceAccountAction) Execute(input *RestoreItemActionExecuteInput) (*R
 		return nil, errors.Wrap(err, "unable to convert serviceaccount to runtime.Unstructured")
 	}
 
-	return NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
+	return velero.NewRestoreItemActionExecuteOutput(&unstructured.Unstructured{Object: res}), nil
 }

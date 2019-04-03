@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) resourceBackupper {
 	args := rbf.Called(
 		log,
@@ -110,7 +110,7 @@ func (rbf *mockResourceBackupperFactory) newResourceBackupper(
 		tarWriter,
 		resticBackupper,
 		resticSnapshotTracker,
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 	return args.Get(0).(resourceBackupper)
 }

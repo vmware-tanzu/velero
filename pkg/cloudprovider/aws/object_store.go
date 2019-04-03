@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/signer/v4"
+	v4 "github.com/aws/aws-sdk-go/aws/signer/v4"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
@@ -42,7 +42,7 @@ const (
 	signatureVersionKey = "signatureVersion"
 )
 
-type objectStore struct {
+type ObjectStore struct {
 	log              logrus.FieldLogger
 	s3               *s3.S3
 	preSignS3        *s3.S3
@@ -51,8 +51,8 @@ type objectStore struct {
 	signatureVersion string
 }
 
-func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
-	return &objectStore{log: logger}
+func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
+	return &ObjectStore{log: logger}
 }
 
 func isValidSignatureVersion(signatureVersion string) bool {
@@ -63,7 +63,18 @@ func isValidSignatureVersion(signatureVersion string) bool {
 	return false
 }
 
-func (o *objectStore) Init(config map[string]string) error {
+func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config,
+		regionKey,
+		s3URLKey,
+		publicURLKey,
+		kmsKeyIDKey,
+		s3ForcePathStyleKey,
+		signatureVersionKey,
+	); err != nil {
+		return err
+	}
+
 	var (
 		region              = config[regionKey]
 		s3URL               = config[s3URLKey]
@@ -143,7 +154,7 @@ func newAWSConfig(url, region string, forcePathStyle bool) (*aws.Config, error) 
 
 	if url != "" {
 		if !IsValidS3URLScheme(url) {
-			return nil, errors.Errorf("Invalid s3 url: %s", url)
+			return nil, errors.Errorf("Invalid s3 url %s, URL must be valid according to https://golang.org/pkg/net/url/#Parse and start with http:// or https://", url)
 		}
 
 		awsConfig = awsConfig.WithEndpointResolver(
@@ -162,7 +173,7 @@ func newAWSConfig(url, region string, forcePathStyle bool) (*aws.Config, error) 
 	return awsConfig, nil
 }
 
-func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
+func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	req := &s3manager.UploadInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -180,7 +191,7 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	return errors.Wrapf(err, "error putting object %s", key)
 }
 
-func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
+func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	req := &s3.GetObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -194,7 +205,7 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	return res.Body, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket:    &bucket,
 		Prefix:    &prefix,
@@ -215,7 +226,7 @@ func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 	return ret, nil
 }
 
-func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	req := &s3.ListObjectsV2Input{
 		Bucket: &bucket,
 		Prefix: &prefix,
@@ -241,7 +252,7 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (o *objectStore) DeleteObject(bucket, key string) error {
+func (o *ObjectStore) DeleteObject(bucket, key string) error {
 	req := &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
@@ -252,7 +263,7 @@ func (o *objectStore) DeleteObject(bucket, key string) error {
 	return errors.Wrapf(err, "error deleting object %s", key)
 }
 
-func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	req, _ := o.preSignS3.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),

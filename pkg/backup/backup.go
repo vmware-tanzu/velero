@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,8 +34,8 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -49,7 +49,7 @@ const BackupVersion = 1
 type Backupper interface {
 	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
 	// to the given writers.
-	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error
+	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
 
 // kubernetesBackupper implements Backupper.
@@ -69,7 +69,7 @@ type itemKey struct {
 }
 
 type resolvedAction struct {
-	ItemAction
+	velero.BackupItemAction
 
 	resourceIncludesExcludes  *collections.IncludesExcludes
 	namespaceIncludesExcludes *collections.IncludesExcludes
@@ -108,7 +108,7 @@ func NewKubernetesBackupper(
 	}, nil
 }
 
-func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAction, error) {
+func resolveActions(actions []velero.BackupItemAction, helper discovery.Helper) ([]resolvedAction, error) {
 	var resolved []resolvedAction
 
 	for _, action := range actions {
@@ -128,7 +128,7 @@ func resolveActions(actions []ItemAction, helper discovery.Helper) ([]resolvedAc
 		}
 
 		res := resolvedAction{
-			ItemAction:                action,
+			BackupItemAction:          action,
 			resourceIncludesExcludes:  resources,
 			namespaceIncludesExcludes: namespaces,
 			selector:                  selector,
@@ -209,13 +209,13 @@ func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discov
 	return h, nil
 }
 
-type BlockStoreGetter interface {
-	GetBlockStore(name string) (cloudprovider.BlockStore, error)
+type VolumeSnapshotterGetter interface {
+	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
 // written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []ItemAction, blockStoreGetter BlockStoreGetter) error {
+func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
@@ -280,7 +280,7 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 		tw,
 		resticBackupper,
 		newPVCSnapshotTracker(),
-		blockStoreGetter,
+		volumeSnapshotterGetter,
 	)
 
 	var errs []error

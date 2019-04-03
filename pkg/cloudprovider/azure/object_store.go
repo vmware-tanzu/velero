@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,13 +37,13 @@ const (
 	storageAccountConfigKey = "storageAccount"
 )
 
-type objectStore struct {
+type ObjectStore struct {
 	blobClient *storage.BlobStorageClient
 	log        logrus.FieldLogger
 }
 
-func NewObjectStore(logger logrus.FieldLogger) cloudprovider.ObjectStore {
-	return &objectStore{log: logger}
+func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
+	return &ObjectStore{log: logger}
 }
 
 func getStorageAccountKey(config map[string]string) (string, error) {
@@ -100,7 +100,11 @@ func mapLookup(data map[string]string) func(string) string {
 	}
 }
 
-func (o *objectStore) Init(config map[string]string) error {
+func (o *ObjectStore) Init(config map[string]string) error {
+	if err := cloudprovider.ValidateConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+		return err
+	}
+
 	storageAccountKey, err := getStorageAccountKey(config)
 	if err != nil {
 		return err
@@ -118,7 +122,7 @@ func (o *objectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
+func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return err
@@ -132,7 +136,7 @@ func (o *objectStore) PutObject(bucket, key string, body io.Reader) error {
 	return errors.WithStack(blob.CreateBlockBlobFromReader(body, nil))
 }
 
-func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
+func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -151,7 +155,7 @@ func (o *objectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	return res, nil
 }
 
-func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -170,7 +174,7 @@ func (o *objectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 	return res.BlobPrefixes, nil
 }
 
-func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
+func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return nil, err
@@ -193,7 +197,7 @@ func (o *objectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	return ret, nil
 }
 
-func (o *objectStore) DeleteObject(bucket string, key string) error {
+func (o *ObjectStore) DeleteObject(bucket string, key string) error {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return err
@@ -207,7 +211,7 @@ func (o *objectStore) DeleteObject(bucket string, key string) error {
 	return errors.WithStack(blob.Delete(nil))
 }
 
-func (o *objectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	container, err := getContainerReference(o.blobClient, bucket)
 	if err != nil {
 		return "", err

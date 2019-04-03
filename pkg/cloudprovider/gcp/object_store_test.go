@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ func TestPutObject(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			wc := newMockWriteCloser(test.writeErr, test.closeErr)
-			o := NewObjectStore(velerotest.NewLogger()).(*objectStore)
+			o := NewObjectStore(velerotest.NewLogger())
 			o.bucketWriter = newFakeWriter(wc)
 
 			err := o.PutObject("bucket", "key", strings.NewReader("contents"))

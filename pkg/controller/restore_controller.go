@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,8 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -63,6 +64,12 @@ var nonRestorableResources = []string{
 	// https://github.com/heptio/velero/issues/622
 	"restores.ark.heptio.com",
 	"restores.velero.io",
+
+	// Restic repositories are automatically managed by Velero and will be automatically
+	// created as needed if they don't exist.
+	// https://github.com/heptio/velero/issues/1113
+	"resticrepositories.ark.heptio.com",
+	"resticrepositories.velero.io",
 }
 
 type restoreController struct {
@@ -80,7 +87,7 @@ type restoreController struct {
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
 
-	newPluginManager func(logger logrus.FieldLogger) plugin.Manager
+	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
@@ -99,7 +106,7 @@ func NewRestoreController(
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
 ) Interface {
@@ -278,7 +285,7 @@ type backupInfo struct {
 	backupStore persistence.BackupStore
 }
 
-func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager plugin.Manager) backupInfo {
+func (c *restoreController) validateAndComplete(restore *api.Restore, pluginManager clientmgmt.Manager) backupInfo {
 	// add non-restorable resources to restore's excluded resources
 	excludedResources := sets.NewString(restore.Spec.ExcludedResources...)
 	for _, nonrestorable := range nonRestorableResources {
@@ -402,7 +409,7 @@ func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 
 // fetchBackupInfo checks the backup lister for a backup that matches the given name. If it doesn't
 // find it, it returns an error.
-func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plugin.Manager) (backupInfo, error) {
+func (c *restoreController) fetchBackupInfo(backupName string, pluginManager clientmgmt.Manager) (backupInfo, error) {
 	backup, err := c.backupLister.Backups(c.namespace).Get(backupName)
 	if err != nil {
 		return backupInfo{}, err
@@ -426,9 +433,9 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager plu
 
 func (c *restoreController) runRestore(
 	restore *api.Restore,
-	actions []restore.ItemAction,
+	actions []velero.RestoreItemAction,
 	info backupInfo,
-	pluginManager plugin.Manager,
+	pluginManager clientmgmt.Manager,
 ) (restoreResult, error) {
 	var restoreWarnings, restoreErrors api.RestoreResult
 	var restoreFailure error

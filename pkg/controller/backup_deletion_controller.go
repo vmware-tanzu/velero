@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Heptio Ark contributors.
+Copyright 2018 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -34,13 +34,13 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/cloudprovider"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/kube"
 )
@@ -62,7 +62,7 @@ type backupDeletionController struct {
 	snapshotLocationLister    listers.VolumeSnapshotLocationLister
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
-	newPluginManager          func(logrus.FieldLogger) plugin.Manager
+	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
 }
@@ -80,7 +80,7 @@ func NewBackupDeletionController(
 	podvolumeBackupInformer informers.PodVolumeBackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
-	newPluginManager func(logrus.FieldLogger) plugin.Manager,
+	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupDeletionController{
@@ -257,12 +257,12 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			} else if len(locations) != 1 {
 				errs = append(errs, errors.Errorf("unable to delete pre-v0.10 volume snapshots because exactly one volume snapshot location must exist, got %d", len(locations)).Error())
 			} else {
-				blockStore, err := blockStoreForSnapshotLocation(backup.Namespace, locations[0].Name, c.snapshotLocationLister, pluginManager)
+				volumeSnapshotter, err := volumeSnapshotterForSnapshotLocation(backup.Namespace, locations[0].Name, c.snapshotLocationLister, pluginManager)
 				if err != nil {
 					errs = append(errs, err.Error())
 				} else {
 					for _, snapshot := range backup.Status.VolumeBackups {
-						if err := blockStore.DeleteSnapshot(snapshot.SnapshotID); err != nil {
+						if err := volumeSnapshotter.DeleteSnapshot(snapshot.SnapshotID); err != nil {
 							errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.SnapshotID).Error())
 						}
 					}
@@ -273,21 +273,21 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
 				errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 			} else {
-				blockStores := make(map[string]cloudprovider.BlockStore)
+				volumeSnapshotters := make(map[string]velero.VolumeSnapshotter)
 
 				for _, snapshot := range snapshots {
 					log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
 
-					blockStore, ok := blockStores[snapshot.Spec.Location]
+					volumeSnapshotter, ok := volumeSnapshotters[snapshot.Spec.Location]
 					if !ok {
-						if blockStore, err = blockStoreForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
+						if volumeSnapshotter, err = volumeSnapshotterForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
 							errs = append(errs, err.Error())
 							continue
 						}
-						blockStores[snapshot.Spec.Location] = blockStore
+						volumeSnapshotters[snapshot.Spec.Location] = volumeSnapshotter
 					}
 
-					if err := blockStore.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
+					if err := volumeSnapshotter.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
 						errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
 					}
 				}
@@ -367,29 +367,29 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	return nil
 }
 
-func blockStoreForSnapshotLocation(
+func volumeSnapshotterForSnapshotLocation(
 	namespace, snapshotLocationName string,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
-	pluginManager plugin.Manager,
-) (cloudprovider.BlockStore, error) {
+	pluginManager clientmgmt.Manager,
+) (velero.VolumeSnapshotter, error) {
 	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "error getting volume snapshot location %s", snapshotLocationName)
 	}
 
-	blockStore, err := pluginManager.GetBlockStore(snapshotLocation.Spec.Provider)
+	volumeSnapshotter, err := pluginManager.GetVolumeSnapshotter(snapshotLocation.Spec.Provider)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error getting block store for provider %s", snapshotLocation.Spec.Provider)
+		return nil, errors.Wrapf(err, "error getting volume snapshotter for provider %s", snapshotLocation.Spec.Provider)
 	}
 
-	if err = blockStore.Init(snapshotLocation.Spec.Config); err != nil {
-		return nil, errors.Wrapf(err, "error initializing block store for volume snapshot location %s", snapshotLocationName)
+	if err = volumeSnapshotter.Init(snapshotLocation.Spec.Config); err != nil {
+		return nil, errors.Wrapf(err, "error initializing volume snapshotter for volume snapshot location %s", snapshotLocationName)
 	}
 
-	return blockStore, nil
+	return volumeSnapshotter, nil
 }
 
-func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager plugin.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
+func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager clientmgmt.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
 	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
 	if err != nil {
 		return nil, errors.WithStack(err)

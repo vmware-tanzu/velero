@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -59,7 +59,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 			informerFactory.Velero().V1().Restores(),
 			informerFactory.Velero().V1().BackupStorageLocations(),
 			informerFactory.Velero().V1().Backups(),
-			func(logrus.FieldLogger) plugin.Manager { return pluginManager },
+			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			velerotest.NewLogger(),
 		).(*downloadRequestController)
 	)

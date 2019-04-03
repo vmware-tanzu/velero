@@ -1,0 +1,1 @@
+Send stack traces from plugin errors to Velero via gRPC so error location info can be logged

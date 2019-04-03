@@ -15,15 +15,16 @@ A fully-functional [sample plugin repository][1] is provided to serve as a conve
 Velero currently supports the following kinds of plugins:
 
 - **Object Store** - persists and retrieves backups, backup logs and restore logs
-- **Block Store** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
+- **Volume Snapshotter** - creates volume snapshots (during backup) and restores volumes from snapshots (during restore)
 - **Backup Item Action** - executes arbitrary logic for individual items prior to storing them in a backup file
 - **Restore Item Action** - executes arbitrary logic for individual items prior to restoring them into a cluster
 
 ## Plugin Logging
 
 Velero provides a [logger][2] that can be used by plugins to log structured information to the main Velero server log or 
-per-backup/restore logs. See the [sample repository][1] for an example of how to instantiate and use the logger 
-within your plugin.
+per-backup/restore logs. It also passes a `--log-level` flag to each plugin binary, whose value is the value of the same 
+flag from the main Velero process. This means that if you turn on debug logging for the Velero server via `--log-level=debug`, 
+plugins will also emit debug-level logs. See the [sample repository][1] for an example of how to use the logger within your plugin.
 
 
 

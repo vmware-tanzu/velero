@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Heptio Ark contributors.
+Copyright 2017 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ type groupBackupperFactory interface {
 		tarWriter tarWriter,
 		resticBackupper restic.Backupper,
 		resticSnapshotTracker *pvcSnapshotTracker,
-		blockStoreGetter BlockStoreGetter,
+		volumeSnapshotterGetter VolumeSnapshotterGetter,
 	) groupBackupper
 }
 
@@ -61,20 +61,20 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	tarWriter tarWriter,
 	resticBackupper restic.Backupper,
 	resticSnapshotTracker *pvcSnapshotTracker,
-	blockStoreGetter BlockStoreGetter,
+	volumeSnapshotterGetter VolumeSnapshotterGetter,
 ) groupBackupper {
 	return &defaultGroupBackupper{
-		log:                   log,
-		backupRequest:         backupRequest,
-		dynamicFactory:        dynamicFactory,
-		discoveryHelper:       discoveryHelper,
-		backedUpItems:         backedUpItems,
-		cohabitatingResources: cohabitatingResources,
-		podCommandExecutor:    podCommandExecutor,
-		tarWriter:             tarWriter,
-		resticBackupper:       resticBackupper,
-		resticSnapshotTracker: resticSnapshotTracker,
-		blockStoreGetter:      blockStoreGetter,
+		log:                     log,
+		backupRequest:           backupRequest,
+		dynamicFactory:          dynamicFactory,
+		discoveryHelper:         discoveryHelper,
+		backedUpItems:           backedUpItems,
+		cohabitatingResources:   cohabitatingResources,
+		podCommandExecutor:      podCommandExecutor,
+		tarWriter:               tarWriter,
+		resticBackupper:         resticBackupper,
+		resticSnapshotTracker:   resticSnapshotTracker,
+		volumeSnapshotterGetter: volumeSnapshotterGetter,
 
 		resourceBackupperFactory: &defaultResourceBackupperFactory{},
 	}
@@ -96,7 +96,7 @@ type defaultGroupBackupper struct {
 	resticBackupper          restic.Backupper
 	resticSnapshotTracker    *pvcSnapshotTracker
 	resourceBackupperFactory resourceBackupperFactory
-	blockStoreGetter         BlockStoreGetter
+	volumeSnapshotterGetter  VolumeSnapshotterGetter
 }
 
 // backupGroup backs up a single API group.
@@ -115,7 +115,7 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 			gb.tarWriter,
 			gb.resticBackupper,
 			gb.resticSnapshotTracker,
-			gb.blockStoreGetter,
+			gb.volumeSnapshotterGetter,
 		)
 	)
 
