@@ -29,13 +29,14 @@ type ServerMetrics struct {
 
 const (
 	metricNamespace              = "velero"
-	backupTotal                  = "backup_total"
 	backupTarballSizeBytesGauge  = "backup_tarball_size_bytes"
 	backupAttemptTotal           = "backup_attempt_total"
 	backupSuccessTotal           = "backup_success_total"
 	backupFailureTotal           = "backup_failure_total"
 	backupDurationSeconds        = "backup_duration_seconds"
-	backupDeletionTotal          = "backup_deletion_total"
+	backupDeletionAttemptTotal   = "backup_deletion_attempt_total"
+	backupDeletionSuccessTotal   = "backup_deletion_success_total"
+	backupDeletionFailureTotal   = "backup_deletion_failure_total"
 	restoreAttemptTotal          = "restore_attempt_total"
 	restoreValidationFailedTotal = "restore_validation_failed_total"
 	restoreSuccessTotal          = "restore_success_total"
@@ -75,14 +76,6 @@ const (
 func NewServerMetrics() *ServerMetrics {
 	return &ServerMetrics{
 		metrics: map[string]prometheus.Collector{
-			backupTotal: prometheus.NewCounterVec(
-				prometheus.CounterOpts{
-					Namespace: metricNamespace,
-					Name:      backupTotal,
-					Help:      "Number of existing backups",
-				},
-				[]string{scheduleLabel},
-			),
 			backupTarballSizeBytesGauge: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
 					Namespace: metricNamespace,
@@ -115,11 +108,27 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
-			backupDeletionTotal: prometheus.NewCounterVec(
+			backupDeletionAttemptTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
 					Namespace: metricNamespace,
-					Name:      backupDeletionTotal,
-					Help:      "Total number of deleted backups",
+					Name:      backupDeletionAttemptTotal,
+					Help:      "Total number of attempted backup deletions",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionSuccessTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionSuccessTotal,
+					Help:      "Total number of successful backup deletions",
+				},
+				[]string{scheduleLabel},
+			),
+			backupDeletionFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupDeletionFailureTotal,
+					Help:      "Total number of failed backup deletions",
 				},
 				[]string{scheduleLabel},
 			),
@@ -323,9 +332,6 @@ func (m *ServerMetrics) RegisterAllMetrics() {
 
 // InitSchedule initializes counter metrics of a schedule.
 func (m *ServerMetrics) InitSchedule(scheduleName string) {
-	if c, ok := m.metrics[backupTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
-	}
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
@@ -335,7 +341,13 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
-	if c, ok := m.metrics[backupDeletionTotal].(*prometheus.CounterVec); ok {
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
@@ -394,13 +406,6 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	}
 	// TODO: remove code above this comment
 	// -------------------------------------------------------------------
-}
-
-// RegisterBackup records the existing number of backups
-func (m *ServerMetrics) RegisterBackup(backupSchedule string) {
-	if c, ok := m.metrics[backupTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(backupSchedule).Inc()
-	}
 }
 
 // SetBackupTarballSizeBytesGauge records the size, in bytes, of a backup tarball.
@@ -473,9 +478,23 @@ func (m *ServerMetrics) RegisterBackupDuration(backupSchedule string, seconds fl
 	// -------------------------------------------------------------------
 }
 
-// RegisterBackupDeletion records the number of deleted backups
-func (m *ServerMetrics) RegisterBackupDeletion(backupSchedule string) {
-	if c, ok := m.metrics[backupDeletionTotal].(*prometheus.CounterVec); ok {
+// RegisterBackupDeletionAttempt records the number of attempted backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionAttempt(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupDeletionFailed records the number of failed backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionFailed(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupDeletionSuccess records the number of successful backup deletions
+func (m *ServerMetrics) RegisterBackupDeletionSuccess(backupSchedule string) {
+	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
 }

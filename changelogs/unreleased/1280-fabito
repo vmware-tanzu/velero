@@ -1,1 +1,1 @@
-Add 3 new prometheus metrics: backup_total, restore_total and backup_deleted_total
+Collect 3 new metrics: backup_deletion_{attempt|failure|success}_total

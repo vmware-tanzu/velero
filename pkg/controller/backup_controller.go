@@ -212,8 +212,6 @@ func (c *backupController) processBackup(key string) error {
 		log.WithError(err).Error("error updating backup's final status")
 	}
 
-	c.metrics.RegisterBackup(backupScheduleName)
-
 	return nil
 }
 

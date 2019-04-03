@@ -237,6 +237,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return err
 	}
 
+	backupScheduleName := backup.GetLabels()[v1.ScheduleNameLabel]
+	c.metrics.RegisterBackupDeletionAttempt(backupScheduleName)
+
 	var errs []string
 
 	pluginManager := c.newPluginManager(log)
@@ -359,10 +362,10 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			// If this errors, all we can do is log it.
 			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
 		}
+		c.metrics.RegisterBackupDeletionSuccess(backupScheduleName)
+	} else {
+		c.metrics.RegisterBackupDeletionFailed(backupScheduleName)
 	}
-
-	backupScheduleName := backup.GetLabels()[v1.ScheduleNameLabel]
-	c.metrics.RegisterBackupDeletion(backupScheduleName)
 
 	return nil
 }
