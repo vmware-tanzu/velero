@@ -24,6 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	corev1 "k8s.io/api/core/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,6 +117,7 @@ func crdsAreReady(factory client.DynamicFactory) (bool, error) {
 	return isReady, err
 }
 
+// TODO this should be refined - it doesn't account for CrashLoopBackoffs caused by application errors as the Deployment could be ready, then the app crashes
 func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1beta1.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
@@ -142,7 +144,7 @@ func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 		}
 
 		for _, cond := range deploy.Status.Conditions {
-			if cond.Type == appsv1beta1.DeploymentAvailable {
+			if cond.Type == appsv1beta1.DeploymentAvailable && cond.Status == corev1.ConditionTrue {
 				isReady = true
 			}
 		}
