@@ -345,6 +345,12 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
+	if len(errs) == 0 {
+		c.metrics.RegisterBackupDeletionSuccess(backupScheduleName)
+	} else {
+		c.metrics.RegisterBackupDeletionFailed(backupScheduleName)
+	}
+
 	// Update status to processed and record errors
 	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 		r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
@@ -362,9 +368,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 			// If this errors, all we can do is log it.
 			c.logger.WithField("backup", kube.NamespaceAndName(backup)).Error("error deleting all associated DeleteBackupRequests after successfully deleting the backup")
 		}
-		c.metrics.RegisterBackupDeletionSuccess(backupScheduleName)
-	} else {
-		c.metrics.RegisterBackupDeletionFailed(backupScheduleName)
 	}
 
 	return nil
