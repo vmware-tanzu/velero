@@ -170,6 +170,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
+				clock:                  &clock.RealClock{},
 			}
 
 			require.NotNil(t, test.backup)
@@ -194,6 +195,61 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			// test hasn't set up the necessary controller dependencies for running backups. So the lack
 			// of segfaults during test execution here imply that backups are not being processed, which
 			// is what we expect.
+		})
+	}
+}
+
+func TestDefaultBackupTTL(t *testing.T) {
+
+	var (
+		defaultBackupTTL = metav1.Duration{Duration: 24 * 30 * time.Hour}
+	)
+
+	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
+	require.NoError(t, err)
+	now = now.Local()
+
+	tests := []struct {
+		name               string
+		backup             *v1.Backup
+		backupLocation     *v1.BackupStorageLocation
+		expectedTTL        metav1.Duration
+		expectedExpiration metav1.Time
+	}{
+		{
+			name:               "backup with no TTL specified",
+			backup:             velerotest.NewTestBackup().WithName("backup-1").Backup,
+			expectedTTL:        defaultBackupTTL,
+			expectedExpiration: metav1.NewTime(now.Add(defaultBackupTTL.Duration)),
+		},
+		{
+			name:               "backup with TTL specified",
+			backup:             velerotest.NewTestBackup().WithName("backup-1").WithTTL(1 * time.Hour).Backup,
+			expectedTTL:        metav1.Duration{Duration: 1 * time.Hour},
+			expectedExpiration: metav1.NewTime(now.Add(1 * time.Hour)),
+		},
+	}
+
+	for _, test := range tests {
+		var (
+			clientset       = fake.NewSimpleClientset(test.backup)
+			logger          = logging.DefaultLogger(logrus.DebugLevel)
+			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
+		)
+
+		t.Run(test.name, func(t *testing.T) {
+			c := &backupController{
+				genericController:      newGenericController("backup-test", logger),
+				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+				defaultBackupTTL:       defaultBackupTTL.Duration,
+				clock:                  clock.NewFakeClock(now),
+			}
+
+			res := c.prepareBackupRequest(test.backup)
+			assert.NotNil(t, res)
+			assert.Equal(t, test.expectedTTL, res.Spec.TTL)
+			assert.Equal(t, test.expectedExpiration, res.Status.Expiration)
 		})
 	}
 }
@@ -231,6 +287,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Version:             1,
 					StartTimestamp:      metav1.NewTime(now),
 					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
 				},
 			},
 		},
@@ -254,6 +311,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Version:             1,
 					StartTimestamp:      metav1.NewTime(now),
 					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
 				},
 			},
 		},

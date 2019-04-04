@@ -83,11 +83,15 @@ const (
 	defaultClientBurst int     = 30
 
 	defaultProfilerAddress = "localhost:6060"
+
+	// the default TTL for a backup
+	defaultBackupTTL = 30 * 24 * time.Hour
 )
 
 type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
+	defaultBackupTTL                                                        time.Duration
 	restoreResourcePriorities                                               []string
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -106,6 +110,7 @@ func NewCommand() *cobra.Command {
 			defaultBackupLocation:          "default",
 			defaultVolumeSnapshotLocations: make(map[string]string),
 			backupSyncPeriod:               defaultBackupSyncPeriod,
+			defaultBackupTTL:               defaultBackupTTL,
 			podVolumeOperationTimeout:      defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:      defaultRestorePriorities,
 			clientQPS:                      defaultClientQPS,
@@ -171,6 +176,7 @@ func NewCommand() *cobra.Command {
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
+	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "how long to wait by default before backups can be garbage collected")
 
 	return command
 }
@@ -565,6 +571,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.config.defaultBackupLocation,
+			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
