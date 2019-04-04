@@ -40,6 +40,21 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 1. Run one of the following for your platform to create the daemonset:
 
+   Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
+   thereby requires modifying the restic-daemonset.yaml before applying.
+
+   ```
+   hostPath:
+   path: /var/lib/kubelet/pods
+   ```
+
+   to 
+
+   ```
+   hostPath:
+   path: /opt/rke/var/lib/kubelet/pods
+   ```
+
     - AWS: `kubectl apply -f config/aws/20-restic-daemonset.yaml`
     - Azure: `kubectl apply -f config/azure/20-restic-daemonset.yaml`
     - GCP: `kubectl apply -f config/gcp/20-restic-daemonset.yaml`
