@@ -64,7 +64,7 @@ func isValidSignatureVersion(signatureVersion string) bool {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateConfigKeys(config,
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
 		regionKey,
 		s3URLKey,
 		publicURLKey,

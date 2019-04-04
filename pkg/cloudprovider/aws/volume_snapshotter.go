@@ -66,7 +66,7 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateConfigKeys(config, regionKey); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, regionKey); err != nil {
 		return err
 	}
 
