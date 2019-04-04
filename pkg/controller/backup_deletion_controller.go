@@ -37,6 +37,7 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/plugin/velero"
@@ -63,6 +64,7 @@ type backupDeletionController struct {
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	metrics                   *metrics.ServerMetrics
 }
 
 // NewBackupDeletionController creates a new backup deletion controller.
@@ -79,6 +81,7 @@ func NewBackupDeletionController(
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
+	metrics *metrics.ServerMetrics,
 ) Interface {
 	c := &backupDeletionController{
 		genericController:         newGenericController("backup-deletion", logger),
@@ -92,7 +95,7 @@ func NewBackupDeletionController(
 		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
 		backupLocationLister:      backupLocationInformer.Lister(),
 		snapshotLocationLister:    snapshotLocationInformer.Lister(),
-
+		metrics:                   metrics,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
 		newPluginManager: newPluginManager,
@@ -234,6 +237,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return err
 	}
 
+	backupScheduleName := backup.GetLabels()[v1.ScheduleNameLabel]
+	c.metrics.RegisterBackupDeletionAttempt(backupScheduleName)
+
 	var errs []string
 
 	pluginManager := c.newPluginManager(log)
@@ -337,6 +343,12 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		if err != nil {
 			errs = append(errs, errors.Wrapf(err, "error deleting backup %s", kube.NamespaceAndName(backup)).Error())
 		}
+	}
+
+	if len(errs) == 0 {
+		c.metrics.RegisterBackupDeletionSuccess(backupScheduleName)
+	} else {
+		c.metrics.RegisterBackupDeletionFailed(backupScheduleName)
 	}
 
 	// Update status to processed and record errors

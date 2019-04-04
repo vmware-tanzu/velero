@@ -1,0 +1,1 @@
+Collect 3 new metrics: backup_deletion_{attempt|failure|success}_total

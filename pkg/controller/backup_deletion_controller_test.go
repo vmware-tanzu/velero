@@ -36,6 +36,7 @@ import (
 	pkgbackup "github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
@@ -61,6 +62,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Velero().V1().BackupStorageLocations(),
 		sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 		nil, // new plugin manager func
+		metrics.NewServerMetrics(),
 	).(*backupDeletionController)
 
 	// Error splitting key
@@ -147,6 +149,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Velero().V1().BackupStorageLocations(),
 			sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+			metrics.NewServerMetrics(),
 		).(*backupDeletionController),
 
 		req: req,
@@ -723,6 +726,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Velero().V1().BackupStorageLocations(),
 				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
 				nil, // new plugin manager func
+				metrics.NewServerMetrics(),
 			).(*backupDeletionController)
 
 			fakeClock := &clock.FakeClock{}
