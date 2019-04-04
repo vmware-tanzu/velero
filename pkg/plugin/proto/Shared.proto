@@ -3,23 +3,6 @@ package generated;
 
 message Empty {}
 
-message InitRequest {
-    string plugin = 1;
-    map<string, string> config = 2;
-}
-
-message AppliesToRequest {
-    string plugin = 1;
-}
-
-message AppliesToResponse {
-    repeated string includedNamespaces = 1;
-    repeated string excludedNamespaces = 2;
-    repeated string includedResources = 3;
-    repeated string excludedResources = 4;
-    string selector = 5;
-}
-
 message Stack {
     repeated StackFrame frames = 1;
 }
@@ -35,4 +18,12 @@ message ResourceIdentifier {
     string resource = 2;
     string namespace = 3;
     string name = 4;
+}
+
+message ResourceSelector {
+    repeated string includedNamespaces = 1;
+    repeated string excludedNamespaces = 2;
+    repeated string includedResources = 3;
+    repeated string excludedResources = 4;
+    string selector = 5;
 }
