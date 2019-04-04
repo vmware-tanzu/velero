@@ -117,5 +117,6 @@ func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExe
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem:     &updatedItem,
 		AdditionalItems: additionalItems,
+		SkipRestore:     res.SkipRestore,
 	}, nil
 }
