@@ -54,7 +54,7 @@ func newObjectStoreGRPCClient(base *clientBase, clientConn *grpc.ClientConn) int
 // configuration key-value pairs. It returns an error if the ObjectStore
 // cannot be initialized from the provided config.
 func (c *ObjectStoreGRPCClient) Init(config map[string]string) error {
-	req := &proto.InitRequest{
+	req := &proto.ObjectStoreInitRequest{
 		Plugin: c.plugin,
 		Config: config,
 	}

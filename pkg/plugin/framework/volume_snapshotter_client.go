@@ -53,7 +53,7 @@ func newVolumeSnapshotterGRPCClient(base *clientBase, clientConn *grpc.ClientCon
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
 func (c *VolumeSnapshotterGRPCClient) Init(config map[string]string) error {
-	req := &proto.InitRequest{
+	req := &proto.VolumeSnapshotterInitRequest{
 		Plugin: c.plugin,
 		Config: config,
 	}

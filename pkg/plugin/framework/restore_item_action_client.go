@@ -53,17 +53,17 @@ func newRestoreItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientCon
 }
 
 func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.AppliesToRequest{Plugin: c.plugin})
+	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.RestoreItemActionAppliesToRequest{Plugin: c.plugin})
 	if err != nil {
 		return velero.ResourceSelector{}, fromGRPCError(err)
 	}
 
 	return velero.ResourceSelector{
-		IncludedNamespaces: res.IncludedNamespaces,
-		ExcludedNamespaces: res.ExcludedNamespaces,
-		IncludedResources:  res.IncludedResources,
-		ExcludedResources:  res.ExcludedResources,
-		LabelSelector:      res.Selector,
+		IncludedNamespaces: res.ResourceSelector.IncludedNamespaces,
+		ExcludedNamespaces: res.ResourceSelector.ExcludedNamespaces,
+		IncludedResources:  res.ResourceSelector.IncludedResources,
+		ExcludedResources:  res.ResourceSelector.ExcludedResources,
+		LabelSelector:      res.ResourceSelector.Selector,
 	}, nil
 }
 

@@ -50,7 +50,7 @@ func (s *VolumeSnapshotterGRPCServer) getImpl(name string) (velero.VolumeSnapsho
 // Init prepares the VolumeSnapshotter for usage using the provided map of
 // configuration key-value pairs. It returns an error if the VolumeSnapshotter
 // cannot be initialized from the provided config.
-func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.InitRequest) (response *proto.Empty, err error) {
+func (s *VolumeSnapshotterGRPCServer) Init(ctx context.Context, req *proto.VolumeSnapshotterInitRequest) (response *proto.Empty, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr

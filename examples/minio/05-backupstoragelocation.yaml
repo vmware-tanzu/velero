@@ -25,9 +25,9 @@ spec:
   config:
     region: minio
     s3ForcePathStyle: "true"
-    s3Url: http://localhost:9000
+    s3Url: http://minio.velero.svc:9000
     # Uncomment the following line and provide the value of an externally
     # available URL for downloading logs, running Velero describe, and more.
-    publicUrl: http://localhost:9000
+    # publicUrl: https://minio.mycluster.com
     
 
