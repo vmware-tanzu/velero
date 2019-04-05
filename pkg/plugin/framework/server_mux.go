@@ -46,10 +46,11 @@ func newServerMux(logger logrus.FieldLogger) *serverMux {
 	}
 }
 
-// register registers the initializer for the given name. Proper format
-// for the name is <namespace>/<name> and there can be no duplicates.
+// register validates the plugin name and registers the
+// initializer for the given name.
 func (m *serverMux) register(name string, f HandlerInitializer) {
-	if !validPluginName(name, m.names()) {
+	if errs := ValidatePluginName(name, m.names()); len(errs) != 0 {
+		m.serverLog.Errorf("invalid plugin name %q: %s", name, strings.Join(errs, "; "))
 		return
 	}
 	m.initializers[name] = f
@@ -69,7 +70,7 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 
 	initializer, found := m.initializers[name]
 	if !found {
-		return nil, errors.Errorf("%v plugin: %s was not found or is an invalid format. Valid format: <namespace>/<name>", m.kind, name)
+		return nil, errors.Errorf("%v plugin: %s was not found or has an invalid format", m.kind, name)
 	}
 
 	instance, err := initializer(m.serverLog)
@@ -82,69 +83,33 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 	return m.handlers[name], nil
 }
 
-const hostnameRegexStringRFC952 = `^[a-zA-Z][a-zA-Z0-9\-\.]+[a-z-Az0-9]$` // https://tools.ietf.org/html/rfc952
-
-func validPluginName(name string, existingNames []string) bool {
-	errors := validation.IsQualifiedName(name)
-	if len(errors) != 0 {
-		return false
+// ValidatePluginName checks if the given name:
+// - is not empty
+// - is a "qualified name",
+// - contains a '/'
+// - a plugin with the same name does not already exist (if list of existing names is passed in)
+// If the name is not valid, a list of error strings is returned.
+// Otherwise an empty list (or nil) is returned.
+func ValidatePluginName(name string, existingNames []string) []string {
+	if name == "" {
+		return []string{"plugin name cannot be empty"}
 	}
-	// if name == "" {
-	// 	return false
-	// }
 
-	// tokens := strings.Split(name, "/")
-	// fmt.Println("tokens are: ", tokens)
+	var errs []string
+	errs = validation.IsQualifiedName(name)
 
-	// // hostnameRegexRFC952 := regexp.MustCompile(hostnameRegexStringRFC952)
-
-	// fmt.Println("name before: ", name)
-	// if name[len(name)-1] == '.' {
-	// 	name = name[0 : len(name)-1]
-	// }
-	// fmt.Println("name after: ", name)
-
-	// // return strings.ContainsAny(name, ".") &&
-	// // 	hostnameRegexRFC952.MatchString(name)
-
-	// name = strings.ToLower(name)
-
-	// if len(tokens) <= 1 || tokens[0] == "" || tokens[1] == "" {
-	// 	return false
-	// }
-
-	// if valid := prefixValidation(tokens[0]); !valid {
-	// 	return false
-	// }
+	// validate there is one "/"
+	parts := strings.Split(name, "/")
+	if len(parts) <= 1 {
+		errs = append(errs, "a DNS subdomain prefix followed by '/' is expected (e.g. 'example.com/name'")
+	}
 
 	for _, existingName := range existingNames {
 		if strings.Compare(name, existingName) == 0 {
-			return false // found a duplicate
+			errs = append(errs, "plugin name "+existingName+" already exists")
+			break
 		}
 	}
-	return true
-}
 
-// valid characters of a-z, 0-9, ., -,
-// max total length 253,
-// max length between .'s 63
-
-func prefixValidation(s string) bool {
-	// s2 := strings.TrimSuffix(s, ".")
-	// if s == s2 {
-	// 	return false
-	// }
-
-	// i := strings.LastIndexFunc(s2, func(r rune) bool {
-	// 	return r != '\\'
-	// })
-
-	// // Test whether we have an even number of escape sequences before
-	// // the dot or none.
-	// return (len(s2)-i)%2 != 0
-	l := len(s)
-	if l == 0 {
-		return false
-	}
-	return s[l-1] == '.'
+	return errs
 }

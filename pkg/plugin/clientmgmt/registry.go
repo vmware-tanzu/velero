@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -200,6 +201,11 @@ func (r *registry) register(id framework.PluginIdentifier) error {
 	key := kindAndName{kind: id.Kind, name: id.Name}
 	if existing, found := r.pluginsByID[key]; found {
 		return newDuplicatePluginRegistrationError(existing, id)
+	}
+
+	// no need to pass list of existing plugins since the check if this exists was done above
+	if errs := framework.ValidatePluginName(id.Name, nil); len(errs) != 0 {
+		return errors.Errorf("invalid plugin name %q: %s", id.Name, strings.Join(errs, "; "))
 	}
 
 	r.pluginsByID[key] = id
