@@ -25,6 +25,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
@@ -133,6 +134,8 @@ func NewRestoreController(
 		backupLocationInformer.Informer().HasSynced,
 		snapshotLocationInformer.Informer().HasSynced,
 	)
+	c.resyncFunc = c.resync
+	c.resyncPeriod = time.Minute
 
 	restoreInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -161,6 +164,15 @@ func NewRestoreController(
 	)
 
 	return c
+}
+
+func (c *restoreController) resync() {
+	restores, err := c.restoreLister.List(labels.Everything())
+	if err != nil {
+		c.logger.Error(err, "Error computing restore_total metric")
+	} else {
+		c.metrics.SetRestoreTotal(int64(len(restores)))
+	}
 }
 
 func (c *restoreController) processQueueItem(key string) error {
