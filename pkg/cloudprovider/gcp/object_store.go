@@ -62,7 +62,7 @@ func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateConfigKeys(config); err != nil {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config); err != nil {
 		return err
 	}
 

@@ -101,7 +101,7 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return err
 	}
 

@@ -21,7 +21,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-func ValidateConfigKeys(config map[string]string, validKeys ...string) error {
+// ValidateObjectStoreConfigKeys ensures that an object store's config
+// is valid by making sure each `config` key is in the `validKeys` list.
+// The special key "bucket" is always considered valid.
+func ValidateObjectStoreConfigKeys(config map[string]string, validKeys ...string) error {
+	// `bucket` is automatically added to all object store config by
+	// velero, so add it as a valid key.
+	return validateConfigKeys(config, append(validKeys, "bucket")...)
+}
+
+// ValidateVolumeSnapshotterConfigKeys ensures that a volume snapshotter's
+// config is valid by making sure each `config` key is in the `validKeys` list.
+func ValidateVolumeSnapshotterConfigKeys(config map[string]string, validKeys ...string) error {
+	return validateConfigKeys(config, validKeys...)
+}
+
+func validateConfigKeys(config map[string]string, validKeys ...string) error {
 	validKeysSet := sets.NewString(validKeys...)
 
 	var invalidKeys []string
