@@ -71,6 +71,7 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.B
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
 			ExcludedResources:  resourceSelector.ExcludedResources,
+			Selector:           resourceSelector.LabelSelector,
 		},
 	}, nil
 }

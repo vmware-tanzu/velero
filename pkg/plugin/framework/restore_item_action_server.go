@@ -71,6 +71,7 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
 			IncludedResources:  resourceSelector.IncludedResources,
 			ExcludedResources:  resourceSelector.ExcludedResources,
+			Selector:           resourceSelector.LabelSelector,
 		},
 	}, nil
 }
