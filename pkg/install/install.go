@@ -52,8 +52,9 @@ var kindToResource = map[string]string{
 
 // ResourceGroup represents a collection of kubernetes objects with a common ready conditon
 type ResourceGroup struct {
-	Resources []*unstructured.Unstructured
-	Ready     func(client.DynamicFactory) (bool, error)
+	Resources      []*unstructured.Unstructured
+	Ready          func(client.DynamicFactory) (bool, error)
+	UnreadyMessage string
 }
 
 // crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
@@ -117,7 +118,18 @@ func crdsAreReady(factory client.DynamicFactory) (bool, error) {
 	return isReady, err
 }
 
-// TODO this should be refined - it doesn't account for CrashLoopBackoffs caused by application errors as the Deployment could be ready, then the app crashes
+func isAvailable(c appsv1beta1.DeploymentCondition) bool {
+	// Make sure that the deployment has been available for at least 10 seconds.
+	// This is because the deployment can show as Ready momentarily before the pods fall into a CrashLoopBackOff.
+	// See podutils.IsPodAvailable upstream for similar logic with pods
+	if c.Type == appsv1beta1.DeploymentAvailable && c.Status == corev1.ConditionTrue {
+		if !c.LastTransitionTime.IsZero() && c.LastTransitionTime.Add(10*time.Second).Before(time.Now()) {
+			return true
+		}
+	}
+	return false
+}
+
 func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1beta1.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
@@ -130,6 +142,7 @@ func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 	}
 	// declare this variable out of scope so we can return it
 	var isReady bool
+	var readyObservations int32
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 		unstructuredDeployment, err := c.Get("velero", metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
@@ -144,9 +157,15 @@ func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 		}
 
 		for _, cond := range deploy.Status.Conditions {
-			if cond.Type == appsv1beta1.DeploymentAvailable && cond.Status == corev1.ConditionTrue {
-				isReady = true
+			if isAvailable(cond) {
+				readyObservations++
 			}
+		}
+		// Make sure we query the deployment enough times to see the state change, provided there is one.
+		if readyObservations > 4 {
+			isReady = true
+		} else {
+			return false, nil
 		}
 		return true, nil
 	})
@@ -158,8 +177,11 @@ func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 func GroupResources(resources *unstructured.UnstructuredList) []*ResourceGroup {
 	crdObjs := new(ResourceGroup)
 	crdObjs.Ready = crdsAreReady
+	crdObjs.UnreadyMessage = "CRDs were not fully ready to create objects"
+
 	otherObjs := new(ResourceGroup)
 	otherObjs.Ready = deploymentIsReady
+	otherObjs.UnreadyMessage = "Deployment was not ready"
 
 	for i, r := range resources.Items {
 		if r.GetKind() == "CustomResourceDefinition" {
@@ -212,7 +234,9 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 		fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
 		_, err := group.Ready(factory)
 		// Covers the err.WaitForTimeout case
-		if err != nil {
+		if err == wait.ErrWaitTimeout {
+			return errors.Errorf("timeout reached. %s", group.UnreadyMessage)
+		} else if err != nil {
 			return err
 		}
 

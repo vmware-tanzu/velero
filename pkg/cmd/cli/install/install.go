@@ -171,7 +171,7 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 
 	err = install.Install(client.NewDynamicFactory(dynamicClient), resources, os.Stdout)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs")
 	}
 	fmt.Println("Velero is installed and ready! ⛵")
 	return nil
