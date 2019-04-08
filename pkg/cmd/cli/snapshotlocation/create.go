@@ -95,6 +95,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Name:      o.Name,
 			Labels:    o.Labels.Data(),
 		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: api.SchemeGroupVersion.String(),
+			Kind:       "VolumeSnapshotLocation",
+		},
 		Spec: api.VolumeSnapshotLocationSpec{
 			Provider: o.Provider,
 			Config:   o.Config.Data(),
