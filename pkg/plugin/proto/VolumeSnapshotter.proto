@@ -61,8 +61,13 @@ message SetVolumeIDResponse {
   bytes persistentVolume = 1;
 }
 
+message VolumeSnapshotterInitRequest {
+  string plugin = 1;
+  map<string, string> config = 2;
+}
+
 service VolumeSnapshotter {
-    rpc Init(InitRequest) returns (Empty);
+    rpc Init(VolumeSnapshotterInitRequest) returns (Empty);
     rpc CreateVolumeFromSnapshot(CreateVolumeRequest) returns (CreateVolumeResponse);
     rpc GetVolumeInfo(GetVolumeInfoRequest) returns (GetVolumeInfoResponse);
     rpc CreateSnapshot(CreateSnapshotRequest) returns (CreateSnapshotResponse);

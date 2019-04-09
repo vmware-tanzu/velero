@@ -53,7 +53,7 @@ func newBackupItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn
 }
 
 func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
-	req := &proto.AppliesToRequest{
+	req := &proto.BackupItemActionAppliesToRequest{
 		Plugin: c.plugin,
 	}
 
@@ -63,11 +63,11 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error
 	}
 
 	return velero.ResourceSelector{
-		IncludedNamespaces: res.IncludedNamespaces,
-		ExcludedNamespaces: res.ExcludedNamespaces,
-		IncludedResources:  res.IncludedResources,
-		ExcludedResources:  res.ExcludedResources,
-		LabelSelector:      res.Selector,
+		IncludedNamespaces: res.ResourceSelector.IncludedNamespaces,
+		ExcludedNamespaces: res.ResourceSelector.ExcludedNamespaces,
+		IncludedResources:  res.ResourceSelector.IncludedResources,
+		ExcludedResources:  res.ResourceSelector.ExcludedResources,
+		LabelSelector:      res.ResourceSelector.Selector,
 	}, nil
 }
 

@@ -48,7 +48,7 @@ func (s *BackupItemActionGRPCServer) getImpl(name string) (velero.BackupItemActi
 	return itemAction, nil
 }
 
-func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (response *proto.AppliesToResponse, err error) {
+func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.BackupItemActionAppliesToRequest) (response *proto.BackupItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -65,12 +65,14 @@ func (s *BackupItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.A
 		return nil, newGRPCError(err)
 	}
 
-	return &proto.AppliesToResponse{
-		IncludedNamespaces: resourceSelector.IncludedNamespaces,
-		ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
-		IncludedResources:  resourceSelector.IncludedResources,
-		ExcludedResources:  resourceSelector.ExcludedResources,
-		Selector:           resourceSelector.LabelSelector,
+	return &proto.BackupItemActionAppliesToResponse{
+		&proto.ResourceSelector{
+			IncludedNamespaces: resourceSelector.IncludedNamespaces,
+			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
+			IncludedResources:  resourceSelector.IncludedResources,
+			ExcludedResources:  resourceSelector.ExcludedResources,
+			Selector:           resourceSelector.LabelSelector,
+		},
 	}, nil
 }
 

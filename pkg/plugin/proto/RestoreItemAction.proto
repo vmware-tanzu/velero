@@ -17,6 +17,14 @@ message RestoreItemActionExecuteResponse {
 }
 
 service RestoreItemAction {
-    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
+    rpc AppliesTo(RestoreItemActionAppliesToRequest) returns (RestoreItemActionAppliesToResponse);
     rpc Execute(RestoreItemActionExecuteRequest) returns (RestoreItemActionExecuteResponse);
+}
+
+message RestoreItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message RestoreItemActionAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
 }

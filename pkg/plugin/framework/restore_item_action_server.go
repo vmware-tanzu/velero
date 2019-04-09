@@ -48,7 +48,7 @@ func (s *RestoreItemActionGRPCServer) getImpl(name string) (velero.RestoreItemAc
 	return itemAction, nil
 }
 
-func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.AppliesToRequest) (response *proto.AppliesToResponse, err error) {
+func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.RestoreItemActionAppliesToRequest) (response *proto.RestoreItemActionAppliesToResponse, err error) {
 	defer func() {
 		if recoveredErr := handlePanic(recover()); recoveredErr != nil {
 			err = recoveredErr
@@ -60,17 +60,19 @@ func (s *RestoreItemActionGRPCServer) AppliesTo(ctx context.Context, req *proto.
 		return nil, newGRPCError(err)
 	}
 
-	appliesTo, err := impl.AppliesTo()
+	resourceSelector, err := impl.AppliesTo()
 	if err != nil {
 		return nil, newGRPCError(err)
 	}
 
-	return &proto.AppliesToResponse{
-		IncludedNamespaces: appliesTo.IncludedNamespaces,
-		ExcludedNamespaces: appliesTo.ExcludedNamespaces,
-		IncludedResources:  appliesTo.IncludedResources,
-		ExcludedResources:  appliesTo.ExcludedResources,
-		Selector:           appliesTo.LabelSelector,
+	return &proto.RestoreItemActionAppliesToResponse{
+		&proto.ResourceSelector{
+			IncludedNamespaces: resourceSelector.IncludedNamespaces,
+			ExcludedNamespaces: resourceSelector.ExcludedNamespaces,
+			IncludedResources:  resourceSelector.IncludedResources,
+			ExcludedResources:  resourceSelector.ExcludedResources,
+			Selector:           resourceSelector.LabelSelector,
+		},
 	}, nil
 }
 

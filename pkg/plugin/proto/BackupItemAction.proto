@@ -15,6 +15,14 @@ message ExecuteResponse {
 }
 
 service BackupItemAction {
-    rpc AppliesTo(AppliesToRequest) returns (AppliesToResponse);
+    rpc AppliesTo(BackupItemActionAppliesToRequest) returns (BackupItemActionAppliesToResponse);
     rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}
+
+message BackupItemActionAppliesToRequest {
+    string plugin = 1;
+}
+
+message BackupItemActionAppliesToResponse {
+    ResourceSelector ResourceSelector = 1;
 }
