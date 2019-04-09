@@ -64,6 +64,7 @@ type backupController struct {
 	backupTracker            BackupTracker
 	backupLocationLister     listers.BackupStorageLocationLister
 	defaultBackupLocation    string
+	defaultBackupTTL         time.Duration
 	snapshotLocationLister   listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
@@ -80,6 +81,7 @@ func NewBackupController(
 	backupTracker BackupTracker,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	defaultBackupLocation string,
+	defaultBackupTTL time.Duration,
 	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
@@ -95,6 +97,7 @@ func NewBackupController(
 		backupTracker:            backupTracker,
 		backupLocationLister:     backupLocationInformer.Lister(),
 		defaultBackupLocation:    defaultBackupLocation,
+		defaultBackupTTL:         defaultBackupTTL,
 		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
@@ -247,10 +250,13 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// set backup version
 	request.Status.Version = pkgbackup.BackupVersion
 
-	// calculate expiration
-	if request.Spec.TTL.Duration > 0 {
-		request.Status.Expiration = metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
+	if request.Spec.TTL.Duration == 0 {
+		// set default backup TTL
+		request.Spec.TTL.Duration = c.defaultBackupTTL
 	}
+
+	// calculate expiration
+	request.Status.Expiration = metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
 
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
