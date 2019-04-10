@@ -37,13 +37,14 @@ import (
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace            string
-	Image                string
-	BucketName           string
-	Prefix               string
-	ProviderName         string
-	RestoreOnly          bool
-	Secret               string
+	Namespace    string
+	Image        string
+	BucketName   string
+	Prefix       string
+	ProviderName string
+	RestoreOnly  bool
+	SecretFile   string
+
 	DryRun               bool
 	BackupStorageConfig  flag.Map
 	VolumeSnapshotConfig flag.Map
@@ -54,7 +55,7 @@ type InstallOptions struct {
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.Secret, "secret-file", o.Secret, "file containing credentials for backup and volume provider")
+	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
@@ -76,7 +77,7 @@ func NewInstallOptions() *InstallOptions {
 
 // AsVeleroOptions translates the values provided at the command line into values used to instantiate Kubernetes resources
 func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
-	realPath, err := filepath.Abs(o.Secret)
+	realPath, err := filepath.Abs(o.SecretFile)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +123,10 @@ This is useful as a starting point for more customized installations.
 		`,
 		Example: `	# velero install --bucket mybucket --provider gcp --secret-file ./gcp-service-account.json
 
-	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east2 --snapshot-location-config region=us-east2
+	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
 
-	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east2 --snapshot-location-config region=us-east2 --use-restic
+	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-restic
+
 		`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args, f))
@@ -196,8 +198,8 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		return errors.New("--provider is required")
 	}
 
-	if o.Secret == "" {
-		return errors.New("--secret is required")
+	if o.SecretFile == "" {
+		return errors.New("--secret-file is required")
 	}
 
 	return nil
