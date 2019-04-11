@@ -31,6 +31,7 @@ import (
 	"github.com/heptio/velero/pkg/cmd/cli/delete"
 	"github.com/heptio/velero/pkg/cmd/cli/describe"
 	"github.com/heptio/velero/pkg/cmd/cli/get"
+	"github.com/heptio/velero/pkg/cmd/cli/migratebackups"
 	"github.com/heptio/velero/pkg/cmd/cli/plugin"
 	"github.com/heptio/velero/pkg/cmd/cli/restic"
 	"github.com/heptio/velero/pkg/cmd/cli/restore"
@@ -75,6 +76,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		bug.NewCommand(),
 		backuplocation.NewCommand(f),
 		snapshotlocation.NewCommand(f),
+		migratebackups.NewCommand(f),
 	)
 
 	// add the glog flags
