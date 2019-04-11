@@ -49,8 +49,8 @@ func newServerMux(logger logrus.FieldLogger) *serverMux {
 // register validates the plugin name and registers the
 // initializer for the given name.
 func (m *serverMux) register(name string, f HandlerInitializer) {
-	if errs := ValidatePluginName(name, m.names()); len(errs) != 0 {
-		m.serverLog.Errorf("invalid plugin name %q: %s", name, strings.Join(errs, "; "))
+	if err := ValidatePluginName(name, m.names()); err != nil {
+		m.serverLog.Errorf("invalid plugin name %q: %s", name, err)
 		return
 	}
 	m.initializers[name] = f
@@ -84,32 +84,32 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 }
 
 // ValidatePluginName checks if the given name:
-// - is not empty
-// - is a "qualified name",
-// - contains a '/'
+// - the plugin name has two parts separated by '/'
+// - non of the above parts is empty
+// - the prefix is a valid DNS subdomain name,
 // - a plugin with the same name does not already exist (if list of existing names is passed in)
-// If the name is not valid, a list of error strings is returned.
-// Otherwise an empty list (or nil) is returned.
-func ValidatePluginName(name string, existingNames []string) []string {
-	if name == "" {
-		return []string{"plugin name cannot be empty"}
+func ValidatePluginName(name string, existingNames []string) error {
+	// validate there is one "/" and two parts
+	parts := strings.Split(name, "/")
+	if len(parts) != 2 {
+		return errors.Errorf("%s is not a DNS subdomain prefix followed by '/' and a non-empty name (e.g. 'example.com/name'", name)
 	}
 
-	var errs []string
-	errs = validation.IsQualifiedName(name)
+	// validate both prefix and name are non-empty
+	if parts[0] == "" || parts[1] == "" {
+		return errors.New("plugin name cannot be empty")
+	}
 
-	// validate there is one "/"
-	parts := strings.Split(name, "/")
-	if len(parts) <= 1 {
-		errs = append(errs, "a DNS subdomain prefix followed by '/' is expected (e.g. 'example.com/name'")
+	// validate that the prefix is a DNS subdomain
+	if errs := validation.IsDNS1123Subdomain(parts[0]); len(errs) != 0 {
+		return errors.Errorf("invalid plugin name %q: %s", parts[0], strings.Join(errs, "; "))
 	}
 
 	for _, existingName := range existingNames {
 		if strings.Compare(name, existingName) == 0 {
-			errs = append(errs, "plugin name "+existingName+" already exists")
-			break
+			return errors.New("plugin name " + existingName + " already exists")
 		}
 	}
 
-	return errs
+	return nil
 }

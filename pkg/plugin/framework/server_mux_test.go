@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func Test_validPluginName(t *testing.T) {
+func TestValidPluginName(t *testing.T) {
 	successCases := []struct {
 		pluginName    string
 		existingNames []string
@@ -34,11 +34,12 @@ func Test_validPluginName(t *testing.T) {
 		{"example.io/azure", []string{"velero.io/aws"}},
 		{"example.io/azure", []string{""}},
 		{"example.io/azure", nil},
+		{strings.Repeat("a", 253) + "/name", []string{"velero.io/aws"}},
 	}
 	for i, tt := range successCases {
 		t.Run(tt.pluginName, func(t *testing.T) {
-			if errs := ValidatePluginName(tt.pluginName, tt.existingNames); len(errs) != 0 {
-				t.Errorf("case[%d]: %q: expected success: %v", i, successCases[i], errs)
+			if err := ValidatePluginName(tt.pluginName, tt.existingNames); err != nil {
+				t.Errorf("case[%d]: %q: expected success: %v", i, successCases[i], err)
 			}
 		})
 	}
@@ -55,14 +56,14 @@ func Test_validPluginName(t *testing.T) {
 		{"a/", []string{"velero.io/aws"}},
 		{"/a", []string{"velero.io/aws"}},
 		{"velero.io/aws", []string{"velero.io/aws"}},
-		{"Uppercase_NOT_OK_123/name", []string{"velero.io/aws"}},
-		{strings.Repeat("a", 64) + "/" + strings.Repeat("b", 64), []string{"velero.io/aws"}},
+		{"Uppercase_Is_OK_123/name", []string{"velero.io/aws"}},
+		{strings.Repeat("a", 254) + "/name", []string{"velero.io/aws"}},
 		{"ospecialchars%^=@", []string{"velero.io/aws"}},
 	}
 
 	for i, tt := range errorCases {
 		t.Run(tt.pluginName, func(t *testing.T) {
-			if errs := ValidatePluginName(tt.pluginName, tt.existingNames); len(errs) == 0 {
+			if err := ValidatePluginName(tt.pluginName, tt.existingNames); err == nil {
 				t.Errorf("case[%d]: %q: expected failure.", i, errorCases[i])
 			}
 		})
