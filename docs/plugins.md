@@ -1,14 +1,14 @@
 # Plugins
 
-Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores 
-without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary 
-containing implementations of Velero's plugin kinds (described below), plus a small amount of boilerplate code to 
-expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for 
-the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access. 
+Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary containing implementations of Velero's plugin kinds (described below), plus a small amount of boilerplate code to expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access.
 
 Multiple plugins, of any type,  can be implemented in this binary.
 
-A fully-functional [sample plugin repository][1] is provided to serve as a convenient starting point for plugin authors.
+A fully-functional [sample plugin repository][1] is provided to serve as a convenient starting point for plugin authors. Note that when naming your plugin, the name needs to conform to these rules:
+- have two parts separated by '/'
+- non of the above parts can be empty
+- the prefix is a valid DNS subdomain name
+- a plugin with the same name cannot not already exist
 
 ## Plugin Kinds
 

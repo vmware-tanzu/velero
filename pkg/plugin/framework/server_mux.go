@@ -86,7 +86,7 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 // ValidatePluginName checks if the given name:
 // - the plugin name has two parts separated by '/'
 // - non of the above parts is empty
-// - the prefix is a valid DNS subdomain name,
+// - the prefix is a valid DNS subdomain name
 // - a plugin with the same name does not already exist (if list of existing names is passed in)
 func ValidatePluginName(name string, existingNames []string) error {
 	// validate there is one "/" and two parts
