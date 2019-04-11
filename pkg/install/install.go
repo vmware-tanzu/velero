@@ -52,9 +52,8 @@ var kindToResource = map[string]string{
 
 // ResourceGroup represents a collection of kubernetes objects with a common ready conditon
 type ResourceGroup struct {
-	Resources      []*unstructured.Unstructured
-	Ready          func(client.DynamicFactory) (bool, error)
-	UnreadyMessage string
+	CRDResources   []*unstructured.Unstructured
+	OtherResources []*unstructured.Unstructured
 }
 
 // crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
@@ -130,7 +129,8 @@ func isAvailable(c appsv1beta1.DeploymentCondition) bool {
 	return false
 }
 
-func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
+// DeploymentIsReady will poll the kubernetes API server to see if the velero deployment is ready to service user requests.
+func DeploymentIsReady(factory client.DynamicFactory) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1beta1.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
 		Name:       "deployments",
@@ -172,75 +172,87 @@ func deploymentIsReady(factory client.DynamicFactory) (bool, error) {
 	return isReady, err
 }
 
-// GroupResources groups resources into ResourcesGroups based on whether the resources are CustomResourceDefinitions or other types of kubernetes objects
+// GroupResources groups resources based on whether the resources are CustomResourceDefinitions or other types of kubernetes objects
 // This is useful to wait for readiness before creating CRD objects
-func GroupResources(resources *unstructured.UnstructuredList) []*ResourceGroup {
-	crdObjs := new(ResourceGroup)
-	crdObjs.Ready = crdsAreReady
-	crdObjs.UnreadyMessage = "CRDs were not fully ready to create objects"
-
-	otherObjs := new(ResourceGroup)
-	otherObjs.Ready = deploymentIsReady
-	otherObjs.UnreadyMessage = "Deployment was not ready"
+func GroupResources(resources *unstructured.UnstructuredList) *ResourceGroup {
+	rg := new(ResourceGroup)
 
 	for i, r := range resources.Items {
 		if r.GetKind() == "CustomResourceDefinition" {
-			crdObjs.Resources = append(crdObjs.Resources, &resources.Items[i])
+			rg.CRDResources = append(rg.CRDResources, &resources.Items[i])
 			continue
 		}
-		otherObjs.Resources = append(otherObjs.Resources, &resources.Items[i])
+		rg.OtherResources = append(rg.OtherResources, &resources.Items[i])
 	}
 
-	return []*ResourceGroup{crdObjs, otherObjs}
+	return rg
+}
+
+// createResource attempts to create a resource in the cluster.
+// If the resource already exists in the cluster, it's merely logged.
+func createResource(r *unstructured.Unstructured, factory client.DynamicFactory, w io.Writer) error {
+	id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
+
+	// Helper to reduce boilerplate message about the same object
+	log := func(f string, a ...interface{}) {
+		format := strings.Join([]string{id, ": ", f, "\n"}, "")
+		fmt.Fprintf(w, format, a...)
+	}
+	log("attempting to create resource")
+
+	gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
+
+	apiResource := metav1.APIResource{
+		Name:       kindToResource[r.GetKind()],
+		Namespaced: (r.GetNamespace() != ""),
+	}
+
+	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
+	if err != nil {
+		return errors.Wrapf(err, "Error creating client for resource %s", id)
+	}
+
+	if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
+		log("already exists, proceeding")
+	} else if err != nil {
+		return errors.Wrapf(err, "Error creating resource %s", id)
+	}
+
+	log("created")
+	return nil
 }
 
 // Install creates resources on the Kubernetes cluster.
 // An unstructured list of resources is sent, one at a time, to the server. These are assumed to be in the preferred order already.
+// Resources will be sorted into CustomResourceDefinitions and any other resource type, and the function will wait up to 1 minute
+// for CRDs to be ready before proceeding.
 // An io.Writer can be used to output to a log or the console.
 func Install(factory client.DynamicFactory, resources *unstructured.UnstructuredList, w io.Writer) error {
-	// Loop over our items on a per-group basis.
-	for _, group := range GroupResources(resources) {
-		for _, r := range group.Resources {
-			id := fmt.Sprintf("%s/%s", r.GetKind(), r.GetName())
+	rg := GroupResources(resources)
 
-			// Helper to reduce boilerplate message about the same object
-			log := func(f string, a ...interface{}) {
-				format := strings.Join([]string{id, ": ", f, "\n"}, "")
-				fmt.Fprintf(w, format, a...)
-			}
-			log("attempting to create resource")
+	//Install CRDs first
+	for _, r := range rg.CRDResources {
 
-			gvk := schema.FromAPIVersionAndKind(r.GetAPIVersion(), r.GetKind())
-
-			apiResource := metav1.APIResource{
-				Name:       kindToResource[r.GetKind()],
-				Namespaced: (r.GetNamespace() != ""),
-			}
-
-			c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, r.GetNamespace())
-			if err != nil {
-				return errors.Wrapf(err, "Error creating client for resource %s", id)
-			}
-
-			if _, err := c.Create(r); apierrors.IsAlreadyExists(err) {
-				log("already exists, proceeding")
-				continue
-			} else if err != nil {
-				return errors.Wrapf(err, "Error creating resource %s", id)
-			}
-
-			log("created")
-		}
-		fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
-		_, err := group.Ready(factory)
-		// Covers the err.WaitForTimeout case
-		if err == wait.ErrWaitTimeout {
-			return errors.Errorf("timeout reached. %s", group.UnreadyMessage)
-		} else if err != nil {
+		if err := createResource(r, factory, w); err != nil {
 			return err
 		}
-
-		fmt.Fprint(w, "Finished waiting, proceeding\n")
 	}
+
+	// Wait for CRDs to be ready before proceeding
+	fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
+	_, err := crdsAreReady(factory)
+	if err == wait.ErrWaitTimeout {
+		return errors.Errorf("timeout reached, CRDs not ready")
+	} else if err != nil {
+		return err
+	}
+
+	// Install all other resources
+	for _, r := range rg.OtherResources {
+		if err = createResource(r, factory, w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

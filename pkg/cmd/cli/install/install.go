@@ -37,18 +37,18 @@ import (
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
 type InstallOptions struct {
-	Namespace    string
-	Image        string
-	BucketName   string
-	Prefix       string
-	ProviderName string
-	RestoreOnly  bool
-	SecretFile   string
-
+	Namespace            string
+	Image                string
+	BucketName           string
+	Prefix               string
+	ProviderName         string
+	RestoreOnly          bool
+	SecretFile           string
 	DryRun               bool
 	BackupStorageConfig  flag.Map
 	VolumeSnapshotConfig flag.Map
 	UseRestic            bool
+	Wait                 bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -63,6 +63,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o. Optional.")
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
+	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions stuct.
@@ -118,6 +119,8 @@ The provided secret data will be created in a Secret named 'cloud-credentials'.
 
 All namespaced resources will be placed in the 'velero' namespace.
 
+Use '--wait' to wait for the Velero Deployment to be ready before proceeding.
+
 Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
 This is useful as a starting point for more customized installations.
 		`,
@@ -126,6 +129,8 @@ This is useful as a starting point for more customized installations.
 	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
 
 	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-restic
+
+	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --wait
 
 		`,
 		Run: func(c *cobra.Command, args []string) {
@@ -170,12 +175,21 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	if err != nil {
 		return err
 	}
+	factory := client.NewDynamicFactory(dynamicClient)
 
-	err = install.Install(client.NewDynamicFactory(dynamicClient), resources, os.Stdout)
+	err = install.Install(factory, resources, os.Stdout)
 	if err != nil {
 		return errors.Wrap(err, "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs")
 	}
-	fmt.Println("Velero is installed and ready! ⛵")
+
+	if o.Wait {
+		fmt.Println("Waiting for Velero to be ready.")
+		_, err = install.DeploymentIsReady(factory)
+		if err != nil {
+			return err
+		}
+	}
+	fmt.Println("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n velero' to view the status.")
 	return nil
 }
 
