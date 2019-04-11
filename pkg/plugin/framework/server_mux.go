@@ -70,7 +70,7 @@ func (m *serverMux) getHandler(name string) (interface{}, error) {
 
 	initializer, found := m.initializers[name]
 	if !found {
-		return nil, errors.Errorf("%v plugin: %s was not found or has an invalid format", m.kind, name)
+		return nil, errors.Errorf("%v plugin: %s was not found or has an invalid name format", m.kind, name)
 	}
 
 	instance, err := initializer(m.serverLog)
@@ -92,17 +92,17 @@ func ValidatePluginName(name string, existingNames []string) error {
 	// validate there is one "/" and two parts
 	parts := strings.Split(name, "/")
 	if len(parts) != 2 {
-		return errors.Errorf("%s is not a DNS subdomain prefix followed by '/' and a non-empty name (e.g. 'example.com/name'", name)
+		return errors.Errorf("plugin name must have exactly two parts separated by a `/`. Accepted format: <DNS subdomain>/<non-empty name>. %s is invalid", name)
 	}
 
 	// validate both prefix and name are non-empty
 	if parts[0] == "" || parts[1] == "" {
-		return errors.New("plugin name cannot be empty")
+		return errors.Errorf("both parts of the plugin name must be non-empty. Accepted format: <DNS subdomain>/<non-empty name>. %s is invalid", name)
 	}
 
 	// validate that the prefix is a DNS subdomain
 	if errs := validation.IsDNS1123Subdomain(parts[0]); len(errs) != 0 {
-		return errors.Errorf("invalid plugin name %q: %s", parts[0], strings.Join(errs, "; "))
+		return errors.Errorf("first part of the plugin name must be a valid DNS subdomain. Accepted format: <DNS subdomain>/<non-empty name>. first part %q is invalid: %s", parts[0], strings.Join(errs, "; "))
 	}
 
 	for _, existingName := range existingNames {
