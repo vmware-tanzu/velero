@@ -20,7 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
@@ -119,31 +118,6 @@ type snapshotInfo struct {
 }
 
 func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister) (*snapshotInfo, error) {
-	// pre-v0.10 backup
-	if backup.Status.VolumeBackups != nil {
-		volumeBackup := backup.Status.VolumeBackups[pvName]
-		if volumeBackup == nil {
-			return nil, nil
-		}
-
-		locations, err := snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).List(labels.Everything())
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-		if len(locations) != 1 {
-			return nil, errors.Errorf("unable to restore pre-v0.10 volume snapshot because exactly one volume snapshot location must exist, got %d", len(locations))
-		}
-
-		return &snapshotInfo{
-			providerSnapshotID: volumeBackup.SnapshotID,
-			volumeType:         volumeBackup.Type,
-			volumeAZ:           volumeBackup.AvailabilityZone,
-			volumeIOPS:         volumeBackup.Iops,
-			location:           locations[0],
-		}, nil
-	}
-
-	// v0.10+ backup
 	var pvSnapshot *volume.Snapshot
 	for _, snapshot := range volumeSnapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {

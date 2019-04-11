@@ -831,16 +831,10 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		var hasSnapshot bool
 
-		if len(ctx.backup.Status.VolumeBackups) > 0 {
-			// pre-v0.10 backup
-			_, hasSnapshot = ctx.backup.Status.VolumeBackups[name]
-		} else {
-			// v0.10+ backup
-			for _, snapshot := range ctx.volumeSnapshots {
-				if snapshot.Spec.PersistentVolumeName == name {
-					hasSnapshot = true
-					break
-				}
+		for _, snapshot := range ctx.volumeSnapshots {
+			if snapshot.Spec.PersistentVolumeName == name {
+				hasSnapshot = true
+				break
 			}
 		}
 

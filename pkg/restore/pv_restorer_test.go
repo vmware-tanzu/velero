@@ -93,24 +93,6 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
-			name:        "backup.status.volumeBackups non-nil and no entry for PV: return early",
-			obj:         NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:      velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("non-matching-pv", "snap").Backup,
-			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-		},
-		{
-			name:    "backup.status.volumeBackups has entry for PV, >1 VSLs configured: return error",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup:  velerotest.NewTestBackup().WithName("backup-1").WithSnapshot("pv-1", "snap").Backup,
-			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
-			},
-			expectedErr: true,
-		},
-		{
 			name:    "volumeSnapshots is empty: return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
@@ -189,24 +171,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		expectedSnapshot   *volume.Snapshot
 	}{
 		{
-			name:    "pre-v0.10 backup with .status.volumeBackups with entry for PV and single VSL executes restore",
-			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
-			backup: velerotest.NewTestBackup().WithName("backup-1").
-				WithVolumeBackupInfo("pv-1", "snap-1", "type-1", "az-1", int64Ptr(1)).
-				WithVolumeBackupInfo("pv-2", "snap-2", "type-2", "az-2", int64Ptr(2)).
-				Backup,
-			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
-			},
-			expectedProvider:   "provider-1",
-			expectedSnapshotID: "snap-1",
-			expectedVolumeType: "type-1",
-			expectedVolumeAZ:   "az-1",
-			expectedVolumeIOPS: int64Ptr(1),
-		},
-		{
-			name:    "v0.10+ backup with a matching volume.Snapshot for PV executes restore",
+			name:    "backup with a matching volume.Snapshot for PV executes restore",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
 			backup:  velerotest.NewTestBackup().WithName("backup-1").Backup,

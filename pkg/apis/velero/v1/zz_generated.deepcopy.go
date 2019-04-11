@@ -254,21 +254,6 @@ func (in *BackupSpec) DeepCopy() *BackupSpec {
 func (in *BackupStatus) DeepCopyInto(out *BackupStatus) {
 	*out = *in
 	in.Expiration.DeepCopyInto(&out.Expiration)
-	if in.VolumeBackups != nil {
-		in, out := &in.VolumeBackups, &out.VolumeBackups
-		*out = make(map[string]*VolumeBackupInfo, len(*in))
-		for key, val := range *in {
-			var outVal *VolumeBackupInfo
-			if val == nil {
-				(*out)[key] = nil
-			} else {
-				in, out := &val, &outVal
-				*out = new(VolumeBackupInfo)
-				(*in).DeepCopyInto(*out)
-			}
-			(*out)[key] = outVal
-		}
-	}
 	if in.ValidationErrors != nil {
 		in, out := &in.ValidationErrors, &out.ValidationErrors
 		*out = make([]string, len(*in))
