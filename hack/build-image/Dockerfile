@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.11-alpine3.8
+FROM golang:1.12-stretch
 
-RUN apk add --update --no-cache git bash && \
-    mkdir -p /go/src/k8s.io && \
+RUN mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
     git config --global advice.detachedHead false && \
     git clone -b kubernetes-1.12.0 https://github.com/kubernetes/code-generator && \
