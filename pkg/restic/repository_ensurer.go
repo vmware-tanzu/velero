@@ -68,20 +68,28 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 				oldObj := old.(*velerov1api.ResticRepository)
 				newObj := upd.(*velerov1api.ResticRepository)
 
-				if oldObj.Status.Phase != velerov1api.ResticRepositoryPhaseReady && newObj.Status.Phase == velerov1api.ResticRepositoryPhaseReady {
-					r.readyChansLock.Lock()
-					defer r.readyChansLock.Unlock()
-
-					key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
-					readyChan, ok := r.readyChans[key]
-					if !ok {
-						log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
-						return
-					}
-
-					readyChan <- newObj
-					delete(r.readyChans, key)
+				// we're only interested in phase-changing updates
+				if oldObj.Status.Phase == newObj.Status.Phase {
+					return
 				}
+
+				// we're only interested in updates where the updated object is either Ready or NotReady
+				if newObj.Status.Phase != velerov1api.ResticRepositoryPhaseReady && newObj.Status.Phase != velerov1api.ResticRepositoryPhaseNotReady {
+					return
+				}
+
+				r.readyChansLock.Lock()
+				defer r.readyChansLock.Unlock()
+
+				key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
+				readyChan, ok := r.readyChans[key]
+				if !ok {
+					log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
+					return
+				}
+
+				readyChan <- newObj
+				delete(r.readyChans, key)
 			},
 		},
 	)
@@ -132,7 +140,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 	if len(repos) == 1 {
 		if repos[0].Status.Phase != velerov1api.ResticRepositoryPhaseReady {
-			return nil, errors.New("restic repository is not ready")
+			return nil, errors.Errorf("restic repository is not ready: %s", repos[0].Status.Message)
 		}
 
 		log.Debug("Ready repository found")
@@ -163,9 +171,15 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 
 	select {
+	// TODO it doesn't really make sense to wait for the full pod volume operation timeout
+	// here - repos should become ready quickly if they don't already exist.
 	case <-ctx.Done():
 		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case res := <-readyChan:
+		if res.Status.Phase == velerov1api.ResticRepositoryPhaseNotReady {
+			return nil, errors.Errorf("restic repository is not ready: %s", res.Status.Message)
+		}
+
 		return res, nil
 	}
 }
