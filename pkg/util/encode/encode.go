@@ -76,8 +76,11 @@ func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 	}
 
 	// If the object doesn't have a GVK set, see if it's registered in this scheme.
-	if gvks, _, _ := scheme.ObjectKinds(obj); len(gvks) > 0 {
+	// If there's more than 1 used, return the encoder found in serializerInfo.
+	if gvks, _, err := scheme.ObjectKinds(obj); len(gvks) == 1 {
 		return codecs.EncoderForVersion(encoder, gvks[0].GroupVersion()), nil
+	} else if err != nil {
+		return nil, errors.Wrapf(err, "unable to determine GroupVersion for object")
 	}
 
 	return encoder, nil

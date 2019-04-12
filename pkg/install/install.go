@@ -167,10 +167,10 @@ func DeploymentIsReady(factory client.DynamicFactory) (bool, error) {
 		// Make sure we query the deployment enough times to see the state change, provided there is one.
 		if readyObservations > 4 {
 			isReady = true
+			return true, nil
 		} else {
 			return false, nil
 		}
-		return true, nil
 	})
 	return isReady, err
 }
