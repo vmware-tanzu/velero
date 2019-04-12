@@ -76,6 +76,11 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
+	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
+	if err := loadEnv(); err != nil {
+		return err
+	}
+
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
 	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
