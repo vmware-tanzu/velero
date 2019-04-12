@@ -14,6 +14,15 @@ When naming your plugin, keep in mind that the name needs to conform to these ru
 - the prefix is a valid DNS subdomain name
 - a plugin with the same name cannot not already exist
 
+### Some examples:
+```
+- example.io/azure
+- 1.2.3.4/5678
+- example-with-dash.io/azure
+```
+
+You will need to give your plugin(s) a name when registering them by calling the appropriate `RegisterX` function: <https://github.com/heptio/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
+
 ## Plugin Kinds
 
 Velero currently supports the following kinds of plugins:
