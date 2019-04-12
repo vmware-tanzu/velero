@@ -49,6 +49,9 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
  
   # create a restore from the latest successful backup triggered by schedule "schedule-1"
   velero restore create --from-schedule schedule-1
+
+  # create a restore for only persistentvolumeclaims and persistentvolumes within a backup
+  velero restore create --from-backup backup-2 --include-resources persistentvolumeclaims,persistentvolumes
   `,
 		Args: cobra.MaximumNArgs(1),
 		Run: func(c *cobra.Command, args []string) {
