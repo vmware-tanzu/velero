@@ -57,7 +57,7 @@ type ResourceGroup struct {
 }
 
 // crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
-func crdIsReady(crd apiextv1beta1.CustomResourceDefinition) bool {
+func crdIsReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	var isEstablished, namesAccepted bool
 	for _, cond := range crd.Status.Conditions {
 		if cond.Type == apiextv1beta1.Established {
@@ -72,7 +72,7 @@ func crdIsReady(crd apiextv1beta1.CustomResourceDefinition) bool {
 }
 
 // crdsAreReady polls the API server to see if the BackupStorageLocation and VolumeSnapshotLocation CRDs are ready to create objects.
-func crdsAreReady(factory client.DynamicFactory) (bool, error) {
+func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(apiextv1beta1.SchemeGroupVersion.String(), "CustomResourceDefinition")
 	apiResource := metav1.APIResource{
 		Name:       kindToResource["CustomResourceDefinition"],
@@ -82,39 +82,42 @@ func crdsAreReady(factory client.DynamicFactory) (bool, error) {
 	if err != nil {
 		return false, errors.Wrapf(err, "Error creating client for CustomResourceDefinition polling")
 	}
-	var isReady bool
+	// Track all the CRDs that have been found and successfully marshalled.
+	// len should be equal to len(crdKinds) in the happy path.
+	foundCRDs := make([]*apiextv1beta1.CustomResourceDefinition, 0)
+	var areReady bool
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-		unstructuredBSL, err := c.Get("backupstoragelocations.velero.io", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		} else if err != nil {
-			return false, errors.Wrap(err, "error waiting for backupstoragelocations to be ready")
+		for _, k := range crdKinds {
+			unstruct, err := c.Get(k, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			} else if err != nil {
+				return false, errors.Wrapf(err, "error waiting for %s to be ready", k)
+			}
+
+			crd := new(apiextv1beta1.CustomResourceDefinition)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, crd); err != nil {
+				return false, errors.Wrapf(err, "error converting %s from unstructured", k)
+			}
+
+			foundCRDs = append(foundCRDs, crd)
 		}
 
-		bsl := new(apiextv1beta1.CustomResourceDefinition)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredBSL.Object, bsl); err != nil {
-			return false, errors.Wrap(err, "error converting backupstoragelocation from unstructured")
-		}
-
-		unstructuredVSL, err := c.Get("volumesnapshotlocations.velero.io", metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		} else if err != nil {
-			return false, errors.Wrap(err, "error waiting for volumesnapshotlocations to be ready")
-		}
-
-		vsl := new(apiextv1beta1.CustomResourceDefinition)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredVSL.Object, vsl); err != nil {
-			return false, errors.Wrap(err, "error converting volumesnapshotlocation from unstructured")
-		}
-
-		if !(crdIsReady(*bsl) && crdIsReady(*vsl)) {
+		if len(foundCRDs) != len(crdKinds) {
 			return false, nil
 		}
+
+		for _, crd := range foundCRDs {
+			if !crdIsReady(crd) {
+				return false, nil
+			}
+
+		}
+		areReady = true
 
 		return true, nil
 	})
-	return isReady, err
+	return areReady, nil
 }
 
 func isAvailable(c appsv1beta1.DeploymentCondition) bool {
@@ -232,7 +235,6 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 
 	//Install CRDs first
 	for _, r := range rg.CRDResources {
-
 		if err := createResource(r, factory, w); err != nil {
 			return err
 		}
@@ -240,7 +242,7 @@ func Install(factory client.DynamicFactory, resources *unstructured.Unstructured
 
 	// Wait for CRDs to be ready before proceeding
 	fmt.Fprint(w, "Waiting for resources to be ready in cluster...\n")
-	_, err := crdsAreReady(factory)
+	_, err := crdsAreReady(factory, []string{"backupstoragelocations.velero.io", "volumesnapshotlocations.velero.io"})
 	if err == wait.ErrWaitTimeout {
 		return errors.Errorf("timeout reached, CRDs not ready")
 	} else if err != nil {
