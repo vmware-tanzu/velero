@@ -23,8 +23,8 @@ import (
 
 func ExampleNewServer_volumeSnapshotter() {
 	NewServer(). // call the server
-			RegisterVolumeSnapshotter("example-volumesnapshotter", newVolumeSnapshotter). // register the plugin
-			Serve()                                                                       // serve the plugin
+			RegisterVolumeSnapshotter("example.io/volumesnapshotter", newVolumeSnapshotter). // register the plugin with a valid name
+			Serve()                                                                          // serve the plugin
 }
 
 func newVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {

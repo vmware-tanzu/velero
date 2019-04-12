@@ -202,6 +202,11 @@ func (r *registry) register(id framework.PluginIdentifier) error {
 		return newDuplicatePluginRegistrationError(existing, id)
 	}
 
+	// no need to pass list of existing plugins since the check if this exists was done above
+	if err := framework.ValidatePluginName(id.Name, nil); err != nil {
+		return errors.Errorf("invalid plugin name %q: %s", id.Name, err)
+	}
+
 	r.pluginsByID[key] = id
 	r.pluginsByKind[id.Kind] = append(r.pluginsByKind[id.Kind], id)
 

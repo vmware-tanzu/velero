@@ -38,22 +38,22 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
-				RegisterObjectStore("aws", newAwsObjectStore).
-				RegisterObjectStore("azure", newAzureObjectStore).
-				RegisterObjectStore("gcp", newGcpObjectStore).
-				RegisterVolumeSnapshotter("aws", newAwsVolumeSnapshotter).
-				RegisterVolumeSnapshotter("azure", newAzureVolumeSnapshotter).
-				RegisterVolumeSnapshotter("gcp", newGcpVolumeSnapshotter).
-				RegisterBackupItemAction("pv", newPVBackupItemAction).
-				RegisterBackupItemAction("pod", newPodBackupItemAction).
-				RegisterBackupItemAction("serviceaccount", newServiceAccountBackupItemAction(f)).
-				RegisterRestoreItemAction("job", newJobRestoreItemAction).
-				RegisterRestoreItemAction("pod", newPodRestoreItemAction).
-				RegisterRestoreItemAction("restic", newResticRestoreItemAction(f)).
-				RegisterRestoreItemAction("service", newServiceRestoreItemAction).
-				RegisterRestoreItemAction("serviceaccount", newServiceAccountRestoreItemAction).
-				RegisterRestoreItemAction("addPVCFromPod", newAddPVCFromPodRestoreItemAction).
-				RegisterRestoreItemAction("addPVFromPVC", newAddPVFromPVCRestoreItemAction).
+				RegisterObjectStore("velero.io/aws", newAwsObjectStore).
+				RegisterObjectStore("velero.io/azure", newAzureObjectStore).
+				RegisterObjectStore("velero.io/gcp", newGcpObjectStore).
+				RegisterVolumeSnapshotter("velero.io/aws", newAwsVolumeSnapshotter).
+				RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
+				RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
+				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
+				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
+				RegisterBackupItemAction("velero.io/serviceaccount", newServiceAccountBackupItemAction(f)).
+				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
+				RegisterRestoreItemAction("velero.io/service", newServiceRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/serviceaccount", newServiceAccountRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/addPVCFromPod", newAddPVCFromPodRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/addPVFromPVC", newAddPVFromPVCRestoreItemAction).
 				Serve()
 		},
 	}

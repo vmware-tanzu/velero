@@ -1,14 +1,27 @@
 # Plugins
 
-Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores 
-without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary 
-containing implementations of Velero's plugin kinds (described below), plus a small amount of boilerplate code to 
-expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for 
-the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access. 
+Velero has a plugin architecture that allows users to add their own custom functionality to Velero backups & restores without having to modify/recompile the core Velero binary. To add custom functionality, users simply create their own binary containing implementations of Velero's plugin kinds (described below), plus a small amount of boilerplate code to expose the plugin implementations to Velero. This binary is added to a container image that serves as an init container for the Velero server pod and copies the binary into a shared emptyDir volume for the Velero server to access.
 
 Multiple plugins, of any type,  can be implemented in this binary.
 
 A fully-functional [sample plugin repository][1] is provided to serve as a convenient starting point for plugin authors.
+
+## Plugin Naming
+
+When naming your plugin, keep in mind that the name needs to conform to these rules:
+- have two parts separated by '/'
+- none of the above parts can be empty
+- the prefix is a valid DNS subdomain name
+- a plugin with the same name cannot not already exist
+
+### Some examples:
+```
+- example.io/azure
+- 1.2.3.4/5678
+- example-with-dash.io/azure
+```
+
+You will need to give your plugin(s) a name when registering them by calling the appropriate `RegisterX` function: <https://github.com/heptio/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
 
 ## Plugin Kinds
 
