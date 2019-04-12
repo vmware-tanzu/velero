@@ -182,10 +182,6 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			Name:      o.RestoreName,
 			Labels:    o.Labels.Data(),
 		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: api.SchemeGroupVersion.String(),
-			Kind:       "Restore",
-		},
 		Spec: api.RestoreSpec{
 			BackupName:              o.BackupName,
 			ScheduleName:            o.ScheduleName,
