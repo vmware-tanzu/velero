@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -171,8 +172,10 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 
 	select {
-	// TODO it doesn't really make sense to wait for the full pod volume operation timeout
-	// here - repos should become ready quickly if they don't already exist.
+	// repositories should become either ready or not ready quickly if they're
+	// newly created.
+	case <-time.After(time.Minute):
+		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case <-ctx.Done():
 		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case res := <-readyChan:
