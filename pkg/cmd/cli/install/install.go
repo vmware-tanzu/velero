@@ -184,9 +184,8 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 
 	if o.Wait {
 		fmt.Println("Waiting for Velero to be ready.")
-		_, err = install.DeploymentIsReady(factory)
-		if err != nil {
-			return err
+		if _, err = install.DeploymentIsReady(factory); err != nil {
+			return errors.Wrap(err, "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs")
 		}
 	}
 	fmt.Println("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n velero' to view the status.")
