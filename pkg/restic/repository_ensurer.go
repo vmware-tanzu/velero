@@ -40,8 +40,8 @@ type repositoryEnsurer struct {
 	repoLister velerov1listers.ResticRepositoryLister
 	repoClient velerov1client.ResticRepositoriesGetter
 
-	readyChansLock sync.Mutex
-	readyChans     map[string]chan *velerov1api.ResticRepository
+	repoChansLock sync.Mutex
+	repoChans     map[string]chan *velerov1api.ResticRepository
 
 	// repoLocksMu synchronizes reads/writes to the repoLocks map itself
 	// since maps are not threadsafe.
@@ -59,7 +59,7 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 		log:        log,
 		repoLister: repoInformer.Lister(),
 		repoClient: repoClient,
-		readyChans: make(map[string]chan *velerov1api.ResticRepository),
+		repoChans:  make(map[string]chan *velerov1api.ResticRepository),
 		repoLocks:  make(map[repoKey]*sync.Mutex),
 	}
 
@@ -79,18 +79,18 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 					return
 				}
 
-				r.readyChansLock.Lock()
-				defer r.readyChansLock.Unlock()
+				r.repoChansLock.Lock()
+				defer r.repoChansLock.Unlock()
 
 				key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
-				readyChan, ok := r.readyChans[key]
+				repoChan, ok := r.repoChans[key]
 				if !ok {
 					log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
 					return
 				}
 
-				readyChan <- newObj
-				delete(r.readyChans, key)
+				repoChan <- newObj
+				delete(r.repoChans, key)
 			},
 		},
 	)
@@ -164,8 +164,8 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		},
 	}
 
-	readyChan := r.getReadyChan(selector.String())
-	defer close(readyChan)
+	repoChan := r.getrepoChan(selector.String())
+	defer close(repoChan)
 
 	if _, err := r.repoClient.ResticRepositories(namespace).Create(repo); err != nil {
 		return nil, errors.Wrapf(err, "unable to create restic repository resource")
@@ -178,7 +178,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		return nil, errors.New("timed out waiting for restic repository to become ready")
 	case <-ctx.Done():
 		return nil, errors.New("timed out waiting for restic repository to become ready")
-	case res := <-readyChan:
+	case res := <-repoChan:
 		if res.Status.Phase == velerov1api.ResticRepositoryPhaseNotReady {
 			return nil, errors.Errorf("restic repository is not ready: %s", res.Status.Message)
 		}
@@ -187,12 +187,12 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 }
 
-func (r *repositoryEnsurer) getReadyChan(name string) chan *velerov1api.ResticRepository {
-	r.readyChansLock.Lock()
-	defer r.readyChansLock.Unlock()
+func (r *repositoryEnsurer) getrepoChan(name string) chan *velerov1api.ResticRepository {
+	r.repoChansLock.Lock()
+	defer r.repoChansLock.Unlock()
 
-	r.readyChans[name] = make(chan *velerov1api.ResticRepository)
-	return r.readyChans[name]
+	r.repoChans[name] = make(chan *velerov1api.ResticRepository)
+	return r.repoChans[name]
 }
 
 func (r *repositoryEnsurer) repoLock(volumeNamespace, backupLocation string) *sync.Mutex {
