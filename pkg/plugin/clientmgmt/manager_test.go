@@ -176,7 +176,7 @@ func TestCleanupClients(t *testing.T) {
 func TestGetObjectStore(t *testing.T) {
 	getPluginTest(t,
 		framework.PluginKindObjectStore,
-		"aws",
+		"velero.io/aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetObjectStore(name)
 		},
@@ -193,7 +193,7 @@ func TestGetObjectStore(t *testing.T) {
 func TestGetVolumeSnapshotter(t *testing.T) {
 	getPluginTest(t,
 		framework.PluginKindVolumeSnapshotter,
-		"aws",
+		"velero.io/aws",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetVolumeSnapshotter(name)
 		},
@@ -210,7 +210,7 @@ func TestGetVolumeSnapshotter(t *testing.T) {
 func TestGetBackupItemAction(t *testing.T) {
 	getPluginTest(t,
 		framework.PluginKindBackupItemAction,
-		"pod",
+		"velero.io/pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetBackupItemAction(name)
 		},
@@ -227,7 +227,7 @@ func TestGetBackupItemAction(t *testing.T) {
 func TestGetRestoreItemAction(t *testing.T) {
 	getPluginTest(t,
 		framework.PluginKindRestoreItemAction,
-		"pod",
+		"velero.io/pod",
 		func(m Manager, name string) (interface{}, error) {
 			return m.GetRestoreItemAction(name)
 		},
@@ -305,13 +305,13 @@ func TestGetBackupItemActions(t *testing.T) {
 		},
 		{
 			name:                       "Error getting restartable process",
-			names:                      []string{"a", "b", "c"},
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
 			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
 			expectedError:              "newRestartableProcess",
 		},
 		{
 			name:  "Happy path",
-			names: []string{"a", "b", "c"},
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
 		},
 	}
 	for _, tc := range tests {
@@ -397,13 +397,13 @@ func TestGetRestoreItemActions(t *testing.T) {
 		},
 		{
 			name:                       "Error getting restartable process",
-			names:                      []string{"a", "b", "c"},
+			names:                      []string{"velero.io/a", "velero.io/b", "velero.io/c"},
 			newRestartableProcessError: errors.Errorf("newRestartableProcess"),
 			expectedError:              "newRestartableProcess",
 		},
 		{
 			name:  "Happy path",
-			names: []string{"a", "b", "c"},
+			names: []string{"velero.io/a", "velero.io/b", "velero.io/c"},
 		},
 	}
 	for _, tc := range tests {

@@ -17,6 +17,7 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -124,6 +125,10 @@ func (m *manager) getRestartableProcess(kind framework.PluginKind, name string) 
 
 // GetObjectStore returns a restartableObjectStore for name.
 func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
+	// Backwards compatibility with non-namespaced, built-in plugins.
+	if !strings.Contains(name, "/") {
+		name = "velero.io/" + name
+	}
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindObjectStore, name)
 	if err != nil {
 		return nil, err
@@ -136,6 +141,10 @@ func (m *manager) GetObjectStore(name string) (velero.ObjectStore, error) {
 
 // GetVolumeSnapshotter returns a restartableVolumeSnapshotter for name.
 func (m *manager) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	// Backwards compatibility with non-namespaced, built-in plugins.
+	if !strings.Contains(name, "/") {
+		name = "velero.io/" + name
+	}
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindVolumeSnapshotter, name)
 	if err != nil {
 		return nil, err
@@ -168,6 +177,10 @@ func (m *manager) GetBackupItemActions() ([]velero.BackupItemAction, error) {
 
 // GetBackupItemAction returns a restartableBackupItemAction for name.
 func (m *manager) GetBackupItemAction(name string) (velero.BackupItemAction, error) {
+	// Backwards compatibility with non-namespaced, built-in plugins.
+	if !strings.Contains(name, "/") {
+		name = "velero.io/" + name
+	}
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindBackupItemAction, name)
 	if err != nil {
 		return nil, err
@@ -199,6 +212,10 @@ func (m *manager) GetRestoreItemActions() ([]velero.RestoreItemAction, error) {
 
 // GetRestoreItemAction returns a restartableRestoreItemAction for name.
 func (m *manager) GetRestoreItemAction(name string) (velero.RestoreItemAction, error) {
+	// Backwards compatibility with non-namespaced, built-in plugins.
+	if !strings.Contains(name, "/") {
+		name = "velero.io/" + name
+	}
 	restartableProcess, err := m.getRestartableProcess(framework.PluginKindRestoreItemAction, name)
 	if err != nil {
 		return nil, err
