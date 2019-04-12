@@ -150,7 +150,7 @@ func TestFetchBackupInfo(t *testing.T) {
 	}
 }
 
-func TestProcessRestoreSkips(t *testing.T) {
+func TestProcessQueueItemSkips(t *testing.T) {
 	tests := []struct {
 		name        string
 		restoreKey  string
@@ -212,14 +212,14 @@ func TestProcessRestoreSkips(t *testing.T) {
 				sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(test.restore)
 			}
 
-			err := c.processRestore(test.restoreKey)
+			err := c.processQueueItem(test.restoreKey)
 
 			assert.Equal(t, test.expectError, err != nil)
 		})
 	}
 }
 
-func TestProcessRestore(t *testing.T) {
+func TestProcessQueueItem(t *testing.T) {
 	tests := []struct {
 		name                            string
 		restoreKey                      string
@@ -524,7 +524,7 @@ func TestProcessRestore(t *testing.T) {
 				pluginManager.On("CleanupClients")
 			}
 
-			err = c.processRestore(key)
+			err = c.processQueueItem(key)
 
 			assert.Equal(t, test.expectedErr, err != nil, "got error %v", err)
 			actions := client.Actions()
@@ -716,7 +716,6 @@ func TestValidateAndComplete(t *testing.T) {
 			assert.Equal(t, tc.expectedErrs, tc.restore.Status.ValidationErrors)
 		})
 	}
-
 }
 
 func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
