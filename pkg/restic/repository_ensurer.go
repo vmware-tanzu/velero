@@ -90,7 +90,6 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 				}
 
 				repoChan <- newObj
-				delete(r.repoChans, key)
 			},
 		},
 	)
@@ -164,8 +163,11 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 		},
 	}
 
-	repoChan := r.getrepoChan(selector.String())
-	defer close(repoChan)
+	repoChan := r.getRepoChan(selector.String())
+	defer func() {
+		delete(r.repoChans, selector.String())
+		close(repoChan)
+	}()
 
 	if _, err := r.repoClient.ResticRepositories(namespace).Create(repo); err != nil {
 		return nil, errors.Wrapf(err, "unable to create restic repository resource")
@@ -187,7 +189,7 @@ func (r *repositoryEnsurer) EnsureRepo(ctx context.Context, namespace, volumeNam
 	}
 }
 
-func (r *repositoryEnsurer) getrepoChan(name string) chan *velerov1api.ResticRepository {
+func (r *repositoryEnsurer) getRepoChan(name string) chan *velerov1api.ResticRepository {
 	r.repoChansLock.Lock()
 	defer r.repoChansLock.Unlock()
 
