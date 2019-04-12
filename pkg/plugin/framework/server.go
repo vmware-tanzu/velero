@@ -38,26 +38,30 @@ type Server interface {
 	// This method must be called prior to calling .Serve().
 	BindFlags(flags *pflag.FlagSet) Server
 
-	// RegisterBackupItemAction registers a backup item action.
-	RegisterBackupItemAction(name string, initializer HandlerInitializer) Server
+	// RegisterBackupItemAction registers a backup item action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterBackupItemAction(pluginName string, initializer HandlerInitializer) Server
 
 	// RegisterBackupItemActions registers multiple backup item actions.
 	RegisterBackupItemActions(map[string]HandlerInitializer) Server
 
-	// RegisterVolumeSnapshotter registers a volume snapshotter.
-	RegisterVolumeSnapshotter(name string, initializer HandlerInitializer) Server
+	// RegisterVolumeSnapshotter registers a volume snapshotter. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterVolumeSnapshotter(pluginName string, initializer HandlerInitializer) Server
 
 	// RegisterVolumeSnapshotters registers multiple volume snapshotters.
 	RegisterVolumeSnapshotters(map[string]HandlerInitializer) Server
 
-	// RegisterObjectStore registers an object store.
-	RegisterObjectStore(name string, initializer HandlerInitializer) Server
+	// RegisterObjectStore registers an object store. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterObjectStore(pluginName string, initializer HandlerInitializer) Server
 
 	// RegisterObjectStores registers multiple object stores.
 	RegisterObjectStores(map[string]HandlerInitializer) Server
 
-	// RegisterRestoreItemAction registers a restore item action.
-	RegisterRestoreItemAction(name string, initializer HandlerInitializer) Server
+	// RegisterRestoreItemAction registers a restore item action. Accepted format
+	// for the plugin name is <DNS subdomain>/<non-empty name>.
+	RegisterRestoreItemAction(pluginName string, initializer HandlerInitializer) Server
 
 	// RegisterRestoreItemActions registers multiple restore item actions.
 	RegisterRestoreItemActions(map[string]HandlerInitializer) Server

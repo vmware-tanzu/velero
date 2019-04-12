@@ -4,9 +4,13 @@ Velero has a plugin architecture that allows users to add their own custom funct
 
 Multiple plugins, of any type,  can be implemented in this binary.
 
-A fully-functional [sample plugin repository][1] is provided to serve as a convenient starting point for plugin authors. Note that when naming your plugin, the name needs to conform to these rules:
+A fully-functional [sample plugin repository][1] is provided to serve as a convenient starting point for plugin authors.
+
+## Plugin Naming
+
+When naming your plugin, keep in mind that the name needs to conform to these rules:
 - have two parts separated by '/'
-- non of the above parts can be empty
+- none of the above parts can be empty
 - the prefix is a valid DNS subdomain name
 - a plugin with the same name cannot not already exist
 
