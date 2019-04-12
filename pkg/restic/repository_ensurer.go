@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 					key := repoLabels(newObj.Spec.VolumeNamespace, newObj.Spec.BackupStorageLocation).String()
 					readyChan, ok := r.readyChans[key]
 					if !ok {
-						log.Errorf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
+						log.Debugf("No ready channel found for repository %s/%s", newObj.Namespace, newObj.Name)
 						return
 					}
 
