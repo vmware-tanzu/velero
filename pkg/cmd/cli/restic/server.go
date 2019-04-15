@@ -54,7 +54,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger := logging.DefaultLogger(logLevel)
-			logger.Infof("Starting Velero restic server %s", buildinfo.FormattedGitSHA())
+			logger.Infof("Starting Velero restic server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
 			cmd.CheckError(err)
