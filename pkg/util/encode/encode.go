@@ -23,10 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
-	kscheme "k8s.io/client-go/kubernetes/scheme"
 
-	vscheme "github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
 )
 
 // Encode converts the provided object to the specified format
@@ -47,20 +46,16 @@ func EncodeTo(obj runtime.Object, format string, w io.Writer) error {
 	if err != nil {
 		return err
 	}
+
 	return errors.WithStack(encoder.Encode(obj, w))
 }
 
 // EncoderFor gets the appropriate encoder for the specified format.
+// Only objects registered in the velero scheme, or objects with their TypeMeta set will have valid encoders.
 func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
-	scheme := runtime.NewScheme()
-	vscheme.AddToScheme(scheme)
-	kscheme.AddToScheme(scheme)
-
-	codecs := serializer.NewCodecFactory(scheme)
-
 	var encoder runtime.Encoder
 	desiredMediaType := fmt.Sprintf("application/%s", format)
-	serializerInfo, found := runtime.SerializerInfoForMediaType(codecs.SupportedMediaTypes(), desiredMediaType)
+	serializerInfo, found := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), desiredMediaType)
 	if !found {
 		return nil, errors.Errorf("unable to locate an encoder for %q", desiredMediaType)
 	}
@@ -69,17 +64,9 @@ func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 	} else {
 		encoder = serializerInfo.Serializer
 	}
-
-	// Use the object's GVK if it's defined
-	if gvk := obj.GetObjectKind().GroupVersionKind(); !gvk.Empty() {
-		return codecs.EncoderForVersion(encoder, gvk.GroupVersion()), nil
+	if !obj.GetObjectKind().GroupVersionKind().Empty() {
+		return encoder, nil
 	}
-
-	// If the object doesn't have a GVK set, see if it's registered in this scheme.
-	// If there's not a GVK, use the default encoder.
-	if gvks, _, _ := scheme.ObjectKinds(obj); len(gvks) > 0 {
-		return codecs.EncoderForVersion(encoder, gvks[0].GroupVersion()), nil
-	}
-
+	encoder = scheme.Codecs.EncoderForVersion(encoder, v1.SchemeGroupVersion)
 	return encoder, nil
 }
