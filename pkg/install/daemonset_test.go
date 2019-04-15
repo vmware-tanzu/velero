@@ -30,7 +30,7 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
 
 	ds = DaemonSet("velero", WithoutCredentialsVolume())
-	assert.Equal(t, 1, len(ds.Spec.Template.Spec.Volumes))
+	assert.Equal(t, 2, len(ds.Spec.Template.Spec.Volumes))
 
 	ds = DaemonSet("velero", WithImage("gcr.io/heptio-images/velero:v0.11"))
 	assert.Equal(t, "gcr.io/heptio-images/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
