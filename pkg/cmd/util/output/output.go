@@ -37,7 +37,7 @@ const downloadRequestTimeout = 30 * time.Second
 // BindFlags defines a set of output-specific flags within the provided
 // FlagSet.
 func BindFlags(flags *pflag.FlagSet) {
-	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'.")
+	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 	labelColumns := flag.NewStringArray()
 	flags.Var(&labelColumns, "label-columns", "a comma-separated list of labels to be displayed as columns")
 	flags.Bool("show-labels", false, "show labels in the last column")
@@ -84,7 +84,11 @@ func ValidateFlags(cmd *cobra.Command) error {
 func validateOutputFlag(cmd *cobra.Command) error {
 	output := GetOutputFlagValue(cmd)
 	switch output {
-	case "", "table", "json", "yaml":
+	case "", "json", "yaml":
+	case "table":
+		if cmd.Name() == "install" {
+			return errors.New("'table' format is not supported with 'install' command")
+		}
 	default:
 		return errors.Errorf("invalid output format %q - valid values are 'table', 'json', and 'yaml'", output)
 	}

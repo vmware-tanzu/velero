@@ -20,9 +20,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/buildinfo"
 )
+
+// DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
+var DefaultImage = "gcr.io/heptio-images/velero:" + buildinfo.Version
 
 func labels() map[string]string {
 	return map[string]string{
@@ -131,4 +138,93 @@ func VolumeSnapshotLocation(namespace, provider string, config map[string]string
 			Config:   config,
 		},
 	}
+}
+
+func Secret(namespace string, data []byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: objectMeta(namespace, "cloud-credentials"),
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		Data: map[string][]byte{
+			"cloud": data,
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+}
+
+func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
+	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
+	// Remove the status field so we're not sending blank data to the server.
+	// On CRDs, having an empty status is actually a validation error.
+	delete(u, "status")
+	if err != nil {
+		return err
+	}
+	list.Items = append(list.Items, unstructured.Unstructured{Object: u})
+	return nil
+}
+
+type VeleroOptions struct {
+	Namespace    string
+	Image        string
+	ProviderName string
+	Bucket       string
+	Prefix       string
+	SecretData   []byte
+	RestoreOnly  bool
+	UseRestic    bool
+	BSLConfig    map[string]string
+	VSLConfig    map[string]string
+}
+
+// AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
+// Items are unstructured, since there are different data types returned.
+func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
+	resources := new(unstructured.UnstructuredList)
+	// Set the GVK so that the serialization framework outputs the list properly
+	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
+
+	for _, crd := range CRDs() {
+		appendUnstructured(resources, crd)
+	}
+
+	ns := Namespace(o.Namespace)
+	appendUnstructured(resources, ns)
+
+	crb := ClusterRoleBinding(o.Namespace)
+	appendUnstructured(resources, crb)
+
+	sa := ServiceAccount(o.Namespace)
+	appendUnstructured(resources, sa)
+
+	sec := Secret(o.Namespace, o.SecretData)
+	appendUnstructured(resources, sec)
+
+	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
+	appendUnstructured(resources, bsl)
+
+	vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
+	appendUnstructured(resources, vsl)
+
+	deploy := Deployment(o.Namespace,
+		WithImage(o.Image),
+	)
+	if o.RestoreOnly {
+		deploy = Deployment(o.Namespace,
+			WithImage(o.Image),
+			WithRestoreOnly(),
+		)
+	}
+	appendUnstructured(resources, deploy)
+
+	if o.UseRestic {
+		ds := DaemonSet(o.Namespace,
+			WithImage(o.Image),
+		)
+		appendUnstructured(resources, ds)
+	}
+
+	return resources, nil
 }

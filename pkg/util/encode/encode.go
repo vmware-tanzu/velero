@@ -42,7 +42,7 @@ func Encode(obj runtime.Object, format string) ([]byte, error) {
 // EncodeTo converts the provided object to the specified format and
 // writes the encoded data to the provided io.Writer.
 func EncodeTo(obj runtime.Object, format string, w io.Writer) error {
-	encoder, err := EncoderFor(format)
+	encoder, err := EncoderFor(format, obj)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,8 @@ func EncodeTo(obj runtime.Object, format string, w io.Writer) error {
 }
 
 // EncoderFor gets the appropriate encoder for the specified format.
-func EncoderFor(format string) (runtime.Encoder, error) {
+// Only objects registered in the velero scheme, or objects with their TypeMeta set will have valid encoders.
+func EncoderFor(format string, obj runtime.Object) (runtime.Encoder, error) {
 	var encoder runtime.Encoder
 	desiredMediaType := fmt.Sprintf("application/%s", format)
 	serializerInfo, found := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), desiredMediaType)
@@ -62,6 +63,9 @@ func EncoderFor(format string) (runtime.Encoder, error) {
 		encoder = serializerInfo.PrettySerializer
 	} else {
 		encoder = serializerInfo.Serializer
+	}
+	if !obj.GetObjectKind().GroupVersionKind().Empty() {
+		return encoder, nil
 	}
 	encoder = scheme.Codecs.EncoderForVersion(encoder, v1.SchemeGroupVersion)
 	return encoder, nil

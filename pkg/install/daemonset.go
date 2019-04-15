@@ -58,7 +58,8 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-						"name": "restic",
+						"name":      "restic",
+						"component": "velero",
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -87,6 +88,14 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 							Name:            "restic",
 							Image:           c.image,
 							ImagePullPolicy: pullPolicy,
+							Command: []string{
+								"/velero",
+							},
+							Args: []string{
+								"restic",
+								"server",
+							},
+
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:             "host-pods",

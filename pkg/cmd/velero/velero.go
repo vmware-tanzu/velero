@@ -31,6 +31,7 @@ import (
 	"github.com/heptio/velero/pkg/cmd/cli/delete"
 	"github.com/heptio/velero/pkg/cmd/cli/describe"
 	"github.com/heptio/velero/pkg/cmd/cli/get"
+	"github.com/heptio/velero/pkg/cmd/cli/install"
 	"github.com/heptio/velero/pkg/cmd/cli/plugin"
 	"github.com/heptio/velero/pkg/cmd/cli/restic"
 	"github.com/heptio/velero/pkg/cmd/cli/restore"
@@ -64,6 +65,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		server.NewCommand(),
 		version.NewCommand(f),
 		get.NewCommand(f),
+		install.NewCommand(f),
 		describe.NewCommand(f),
 		create.NewCommand(f),
 		runplugin.NewCommand(f),
