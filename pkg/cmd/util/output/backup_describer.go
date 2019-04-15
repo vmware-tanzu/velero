@@ -210,17 +210,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
 	d.Println()
 
-	if len(status.VolumeBackups) > 0 {
-		// pre-v0.10 backup
-		d.Printf("Persistent Volumes:\n")
-		for pvName, info := range status.VolumeBackups {
-			printSnapshot(d, pvName, info.SnapshotID, info.Type, info.AvailabilityZone, info.Iops)
-		}
-		return
-	}
-
 	if status.VolumeSnapshotsAttempted > 0 {
-		// v0.10+ backup
 		if !details {
 			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
 			return

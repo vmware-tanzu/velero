@@ -34,6 +34,6 @@ cd ${GOPATH}/src/k8s.io/code-generator
   all \
   github.com/heptio/velero/pkg/generated \
   github.com/heptio/velero/pkg/apis \
-  "ark:v1 velero:v1" \
+  "velero:v1" \
   --go-header-file ${GOPATH}/src/github.com/heptio/velero/hack/boilerplate.go.txt \
   $@

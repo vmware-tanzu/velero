@@ -94,38 +94,20 @@ func TestSetVolumeID(t *testing.T) {
 	assert.Equal(t, "/subscriptions/sub/resourceGroups/rg/providers/Microsoft.Compute/disks/revised", res.Spec.AzureDisk.DataDiskURI)
 }
 
-// TODO(1.0) rename to TestParseFullSnapshotName, switch to testing
-// the `parseFullSnapshotName` function, and remove case for legacy
-// format
-func TestParseSnapshotName(t *testing.T) {
-	b := &VolumeSnapshotter{
-		subscription:       "default-sub",
-		disksResourceGroup: "default-rg-legacy",
-	}
-
+func TestParseFullSnapshotName(t *testing.T) {
 	// invalid name
 	fullName := "foo/bar"
-	_, err := b.parseSnapshotName(fullName)
+	_, err := parseFullSnapshotName(fullName)
 	assert.Error(t, err)
 
 	// valid name (current format)
 	fullName = "/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.Compute/snapshots/snap-1"
-	snap, err := b.parseSnapshotName(fullName)
+	snap, err := parseFullSnapshotName(fullName)
 	require.NoError(t, err)
 
 	assert.Equal(t, "sub-1", snap.subscription)
 	assert.Equal(t, "rg-1", snap.resourceGroup)
 	assert.Equal(t, "snap-1", snap.name)
-
-	// valid name (legacy format)
-	// TODO(1.0) remove this test case
-	fullName = "foobar"
-	snap, err = b.parseSnapshotName(fullName)
-	require.NoError(t, err)
-	assert.Equal(t, b.subscription, snap.subscription)
-	assert.Equal(t, b.disksResourceGroup, snap.resourceGroup)
-	assert.Equal(t, fullName, snap.name)
-
 }
 
 func TestGetComputeResourceName(t *testing.T) {

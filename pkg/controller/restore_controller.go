@@ -329,26 +329,6 @@ func (c *restoreController) validateAndComplete(restore *api.Restore, pluginMana
 		return backupInfo{}
 	}
 
-	// Ensure that we have either .status.volumeBackups (for pre-v0.10 backups) OR a
-	// volumesnapshots.json.gz file in obj storage (for v0.10+ backups), but not both.
-	// If we have .status.volumeBackups, ensure that there's only one volume snapshot
-	// location configured.
-	if info.backup.Status.VolumeBackups != nil {
-		snapshots, err := info.backupStore.GetBackupVolumeSnapshots(info.backup.Name)
-		if err != nil {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrap(err, "Error checking for volumesnapshots file").Error())
-		} else if len(snapshots) > 0 {
-			restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Backup must not have both .status.volumeBackups and a volumesnapshots.json.gz file in object storage")
-		} else {
-			locations, err := c.snapshotLocationLister.VolumeSnapshotLocations(restore.Namespace).List(labels.Everything())
-			if err != nil {
-				restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, errors.Wrap(err, "Error listing volume snapshot locations").Error())
-			} else if len(locations) > 1 {
-				restore.Status.ValidationErrors = append(restore.Status.ValidationErrors, "Cannot restore backup with .status.volumeBackups when more than one volume snapshot location exists")
-			}
-		}
-	}
-
 	// Fill in the ScheduleName so it's easier to consume for metrics.
 	if restore.Spec.ScheduleName == "" {
 		restore.Spec.ScheduleName = info.backup.GetLabels()[velerov1api.ScheduleNameLabel]
@@ -459,14 +439,12 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	// At this point, no further logs should be written to restoreLog since it's been uploaded
 	// to object storage.
 
-	//TODO(1.0): Remove warnings.Ark
-	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster) + len(restoreWarnings.Ark)
+	restore.Status.Warnings = len(restoreWarnings.Velero) + len(restoreWarnings.Cluster)
 	for _, w := range restoreWarnings.Namespaces {
 		restore.Status.Warnings += len(w)
 	}
 
-	//TODO (1.0): Remove errors.Ark
-	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster) + len(restoreErrors.Ark)
+	restore.Status.Errors = len(restoreErrors.Velero) + len(restoreErrors.Cluster)
 	for _, e := range restoreErrors.Namespaces {
 		restore.Status.Errors += len(e)
 	}

@@ -132,8 +132,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 
 func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
 	d.Printf("%s:\n", name)
-	// TODO(1.0): only describe result.Velero
-	d.DescribeSlice(1, "Velero", append(result.Ark, result.Velero...))
+	d.DescribeSlice(1, "Velero", result.Velero)
 	d.DescribeSlice(1, "Cluster", result.Cluster)
 	if len(result.Namespaces) == 0 {
 		d.Printf("\tNamespaces: <none>\n")

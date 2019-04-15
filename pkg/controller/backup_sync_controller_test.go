@@ -37,7 +37,6 @@ import (
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
-	"github.com/heptio/velero/pkg/util/stringslice"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -96,16 +95,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				},
 				"bucket-2": {
 					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
-				},
-			},
-		},
-		{
-			name:      "gcFinalizer (only) gets removed on sync",
-			namespace: "ns-1",
-			locations: defaultLocationsList("ns-1"),
-			cloudBackups: map[string][]*velerov1api.Backup{
-				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithFinalizers("a-finalizer", gcFinalizer, "some-other-finalizer").Backup,
 				},
 			},
 		},
@@ -268,9 +257,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 
 						assert.Equal(t, expected, obj)
 					} else {
-						// verify that the GC finalizer is removed
-						assert.Equal(t, stringslice.Except(cloudBackup.Finalizers, gcFinalizer), obj.Finalizers)
-
 						// verify that the storage location field and label are set properly
 						assert.Equal(t, location.Name, obj.Spec.StorageLocation)
 						assert.Equal(t, location.Name, obj.Labels[velerov1api.StorageLocationLabel])

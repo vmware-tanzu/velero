@@ -252,47 +252,26 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	if backupStore != nil {
 		log.Info("Removing PV snapshots")
-		if len(backup.Status.VolumeBackups) > 0 {
-			// pre-v0.10 backup
-			locations, err := c.snapshotLocationLister.VolumeSnapshotLocations(backup.Namespace).List(labels.Everything())
-			if err != nil {
-				errs = append(errs, errors.Wrap(err, "error listing volume snapshot locations").Error())
-			} else if len(locations) != 1 {
-				errs = append(errs, errors.Errorf("unable to delete pre-v0.10 volume snapshots because exactly one volume snapshot location must exist, got %d", len(locations)).Error())
-			} else {
-				volumeSnapshotter, err := volumeSnapshotterForSnapshotLocation(backup.Namespace, locations[0].Name, c.snapshotLocationLister, pluginManager)
-				if err != nil {
-					errs = append(errs, err.Error())
-				} else {
-					for _, snapshot := range backup.Status.VolumeBackups {
-						if err := volumeSnapshotter.DeleteSnapshot(snapshot.SnapshotID); err != nil {
-							errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.SnapshotID).Error())
-						}
-					}
-				}
-			}
+
+		if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
+			errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
 		} else {
-			// v0.10+ backup
-			if snapshots, err := backupStore.GetBackupVolumeSnapshots(backup.Name); err != nil {
-				errs = append(errs, errors.Wrap(err, "error getting backup's volume snapshots").Error())
-			} else {
-				volumeSnapshotters := make(map[string]velero.VolumeSnapshotter)
+			volumeSnapshotters := make(map[string]velero.VolumeSnapshotter)
 
-				for _, snapshot := range snapshots {
-					log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
+			for _, snapshot := range snapshots {
+				log.WithField("providerSnapshotID", snapshot.Status.ProviderSnapshotID).Info("Removing snapshot associated with backup")
 
-					volumeSnapshotter, ok := volumeSnapshotters[snapshot.Spec.Location]
-					if !ok {
-						if volumeSnapshotter, err = volumeSnapshotterForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
-							errs = append(errs, err.Error())
-							continue
-						}
-						volumeSnapshotters[snapshot.Spec.Location] = volumeSnapshotter
+				volumeSnapshotter, ok := volumeSnapshotters[snapshot.Spec.Location]
+				if !ok {
+					if volumeSnapshotter, err = volumeSnapshotterForSnapshotLocation(backup.Namespace, snapshot.Spec.Location, c.snapshotLocationLister, pluginManager); err != nil {
+						errs = append(errs, err.Error())
+						continue
 					}
+					volumeSnapshotters[snapshot.Spec.Location] = volumeSnapshotter
+				}
 
-					if err := volumeSnapshotter.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
-						errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
-					}
+				if err := volumeSnapshotter.DeleteSnapshot(snapshot.Status.ProviderSnapshotID); err != nil {
+					errs = append(errs, errors.Wrapf(err, "error deleting snapshot %s", snapshot.Status.ProviderSnapshotID).Error())
 				}
 			}
 		}

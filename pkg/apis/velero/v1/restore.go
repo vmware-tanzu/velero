@@ -116,12 +116,6 @@ type RestoreStatus struct {
 // during execution of a restore. This will typically store either
 // warning or error messages.
 type RestoreResult struct {
-	// Ark is a slice of messages related to the operation of Ark
-	// itself (for example, messages related to connecting to the
-	// cloud, reading a backup file, etc.)
-	// TODO(1.0) Remove this field. Currently maintained for backwards compatibility.
-	Ark []string `json:"ark,omitempty"`
-
 	// Velero is a slice of messages related to the operation of Velero
 	// itself (for example, messages related to connecting to the
 	// cloud, reading a backup file, etc.)

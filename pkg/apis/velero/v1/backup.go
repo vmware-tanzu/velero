@@ -170,16 +170,6 @@ type BackupStatus struct {
 	// Phase is the current state of the Backup.
 	Phase BackupPhase `json:"phase"`
 
-	// VolumeBackups is a map of PersistentVolume names to
-	// information about the backed-up volume in the cloud
-	// provider API.
-	//
-	// Deprecated: this field is considered read-only as of v0.10
-	// and will be removed in a subsequent release. The information
-	// previously contained here is now stored in a file in backup
-	// storage.
-	VolumeBackups map[string]*VolumeBackupInfo `json:"volumeBackups,omitempty"`
-
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable).
 	ValidationErrors []string `json:"validationErrors"`

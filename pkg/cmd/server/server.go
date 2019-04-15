@@ -18,7 +18,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -36,8 +35,6 @@ import (
 	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -65,9 +62,7 @@ import (
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/restore"
-	"github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
-	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
 const (
@@ -793,10 +788,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
 	go s.sharedInformerFactory.Start(ctx.Done())
 
-	// TODO(1.0): remove
-	cache.WaitForCacheSync(ctx.Done(), s.sharedInformerFactory.Velero().V1().Backups().Informer().HasSynced)
-	s.removeDeprecatedGCFinalizer()
-
 	s.logger.Info("Server started successfully")
 
 	<-ctx.Done()
@@ -817,45 +808,5 @@ func (s *server) runProfiler() {
 
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
-	}
-}
-
-// TODO(1.0): remove
-func (s *server) removeDeprecatedGCFinalizer() {
-	const gcFinalizer = "gc.ark.heptio.com"
-
-	backups, err := s.sharedInformerFactory.Velero().V1().Backups().Lister().List(labels.Everything())
-	if err != nil {
-		s.logger.WithError(errors.WithStack(err)).Error("error listing backups from cache - unable to remove old finalizers")
-		return
-	}
-
-	for _, backup := range backups {
-		log := s.logger.WithField("backup", kube.NamespaceAndName(backup))
-
-		if !stringslice.Has(backup.Finalizers, gcFinalizer) {
-			log.Debug("backup doesn't have deprecated finalizer - skipping")
-			continue
-		}
-
-		log.Info("removing deprecated finalizer from backup")
-
-		patch := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"finalizers":      stringslice.Except(backup.Finalizers, gcFinalizer),
-				"resourceVersion": backup.ResourceVersion,
-			},
-		}
-
-		patchBytes, err := json.Marshal(patch)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
-			continue
-		}
-
-		_, err = s.veleroClient.VeleroV1().Backups(backup.Namespace).Patch(backup.Name, types.MergePatchType, patchBytes)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("error marshaling finalizers patch")
-		}
 	}
 }

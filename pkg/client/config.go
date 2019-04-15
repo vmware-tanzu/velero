@@ -35,42 +35,6 @@ func LoadConfig() (map[string]string, error) {
 
 	_, err := os.Stat(fileName)
 	if os.IsNotExist(err) {
-		// if the file isn't there, try loading from the legacy
-		// location
-		// TODO(1.0): remove this line and uncomment the code
-		// just below.
-		return LoadLegacyConfig()
-
-		// If the file isn't there, just return an empty map
-		// return map[string]string{}, nil
-	}
-	if err != nil {
-		// For any other Stat() error, return it
-		return nil, errors.WithStack(err)
-	}
-
-	configFile, err := os.Open(fileName)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	defer configFile.Close()
-
-	var config map[string]string
-	if err := json.NewDecoder(configFile).Decode(&config); err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	return config, nil
-}
-
-// LoadLegacyConfig loads the Ark client configuration file and returns it as a map[string]string. If the
-// file does not exist, an empty map is returned.
-// TODO(1.0): remove this function
-func LoadLegacyConfig() (map[string]string, error) {
-	fileName := legacyConfigFileName()
-
-	_, err := os.Stat(fileName)
-	if os.IsNotExist(err) {
 		// If the file isn't there, just return an empty map
 		return map[string]string{}, nil
 	}
@@ -114,9 +78,4 @@ func SaveConfig(config map[string]string) error {
 
 func configFileName() string {
 	return filepath.Join(os.Getenv("HOME"), ".config", "velero", "config.json")
-}
-
-// TODO(1.0): remove this function
-func legacyConfigFileName() string {
-	return filepath.Join(os.Getenv("HOME"), ".config", "ark", "config.json")
 }

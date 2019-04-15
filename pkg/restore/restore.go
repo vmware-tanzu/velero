@@ -193,19 +193,19 @@ func (kr *kubernetesRestorer) Restore(
 
 	selector, err := metav1.LabelSelectorAsSelector(ls)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
 	}
 
 	// get resource includes-excludes
 	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
 	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, log)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
 	}
 
 	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
 	}
 
 	podVolumeTimeout := kr.resticTimeout
@@ -225,7 +225,7 @@ func (kr *kubernetesRestorer) Restore(
 	if kr.resticRestorerFactory != nil {
 		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, restore)
 		if err != nil {
-			return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+			return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
 		}
 	}
 
@@ -365,7 +365,7 @@ func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
 	dir, err := ctx.extractor.unzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
-		return api.RestoreResult{}, api.RestoreResult{Ark: []string{err.Error()}}
+		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
 	}
 	defer ctx.fileSystem.RemoveAll(dir)
 
@@ -831,16 +831,10 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		var hasSnapshot bool
 
-		if len(ctx.backup.Status.VolumeBackups) > 0 {
-			// pre-v0.10 backup
-			_, hasSnapshot = ctx.backup.Status.VolumeBackups[name]
-		} else {
-			// v0.10+ backup
-			for _, snapshot := range ctx.volumeSnapshots {
-				if snapshot.Spec.PersistentVolumeName == name {
-					hasSnapshot = true
-					break
-				}
+		for _, snapshot := range ctx.volumeSnapshots {
+			if snapshot.Spec.PersistentVolumeName == name {
+				hasSnapshot = true
+				break
 			}
 		}
 
@@ -1114,11 +1108,6 @@ func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 
 	labels[api.BackupNameLabel] = backupName
 	labels[api.RestoreNameLabel] = restoreName
-
-	// TODO(1.0): remove the below line, and remove the `RestoreLabelKey`
-	// constant from the API pkg, since it's been replaced with the
-	// namespaced label above.
-	labels[api.RestoreLabelKey] = restoreName
 
 	obj.SetLabels(labels)
 }

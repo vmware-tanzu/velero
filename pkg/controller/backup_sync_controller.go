@@ -35,7 +35,6 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	"github.com/heptio/velero/pkg/util/stringslice"
 )
 
 type backupSyncController struct {
@@ -91,9 +90,6 @@ func NewBackupSyncController(
 
 	return c
 }
-
-// TODO(1.0): remove this
-const gcFinalizer = "gc.ark.heptio.com"
 
 func shouldSync(location *velerov1api.BackupStorageLocation, now time.Time, backupStore persistence.BackupStore, log logrus.FieldLogger) (bool, string) {
 	log = log.WithFields(map[string]interface{}{
@@ -212,9 +208,6 @@ func (c *backupSyncController) run() {
 				continue
 			}
 
-			// remove the pre-v0.8.0 gcFinalizer if it exists
-			// TODO(1.0): remove this
-			backup.Finalizers = stringslice.Except(backup.Finalizers, gcFinalizer)
 			backup.Namespace = c.namespace
 			backup.ResourceVersion = ""
 

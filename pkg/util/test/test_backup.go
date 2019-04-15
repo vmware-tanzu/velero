@@ -97,29 +97,6 @@ func (b *TestBackup) WithVersion(version int) *TestBackup {
 	return b
 }
 
-func (b *TestBackup) WithSnapshot(pv string, snapshot string) *TestBackup {
-	if b.Status.VolumeBackups == nil {
-		b.Status.VolumeBackups = make(map[string]*v1.VolumeBackupInfo)
-	}
-	b.Status.VolumeBackups[pv] = &v1.VolumeBackupInfo{SnapshotID: snapshot}
-	return b
-}
-
-func (b *TestBackup) WithVolumeBackupInfo(pv, snapshotID, volumeType, az string, iops *int64) *TestBackup {
-	if b.Status.VolumeBackups == nil {
-		b.Status.VolumeBackups = make(map[string]*v1.VolumeBackupInfo)
-	}
-
-	b.Status.VolumeBackups[pv] = &v1.VolumeBackupInfo{
-		SnapshotID:       snapshotID,
-		Type:             volumeType,
-		AvailabilityZone: az,
-		Iops:             iops,
-	}
-
-	return b
-}
-
 func (b *TestBackup) WithSnapshotVolumes(value bool) *TestBackup {
 	b.Spec.SnapshotVolumes = &value
 	return b

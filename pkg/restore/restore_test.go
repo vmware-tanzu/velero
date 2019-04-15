@@ -840,7 +840,6 @@ status:
 	tests := []struct {
 		name                          string
 		haveSnapshot                  bool
-		legacyBackup                  bool
 		reclaimPolicy                 string
 		expectPVCVolumeName           bool
 		expectedPVCAnnotationsMissing sets.String
@@ -848,68 +847,38 @@ status:
 		expectPVFound                 bool
 	}{
 		{
-			name:                "legacy backup, have snapshot, reclaim policy delete, no existing PV found",
+			name:                "backup has snapshot, reclaim policy delete, no existing PV found",
 			haveSnapshot:        true,
-			legacyBackup:        true,
 			reclaimPolicy:       "Delete",
 			expectPVCVolumeName: true,
 			expectPVCreation:    true,
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy delete, no existing PV found",
+			name:                "backup has snapshot, reclaim policy delete, existing PV found",
 			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Delete",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
-		},
-		{
-			name:                "non-legacy backup, have snapshot, reclaim policy delete, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
 			reclaimPolicy:       "Delete",
 			expectPVCVolumeName: true,
 			expectPVCreation:    false,
 			expectPVFound:       true,
 		},
 		{
-			name:                "legacy backup, have snapshot, reclaim policy retain, no existing PV found",
+			name:                "backup has snapshot, reclaim policy retain, no existing PV found",
 			haveSnapshot:        true,
-			legacyBackup:        true,
 			reclaimPolicy:       "Retain",
 			expectPVCVolumeName: true,
 			expectPVCreation:    true,
 		},
 		{
-			name:                "legacy backup, have snapshot, reclaim policy retain, existing PV found",
+			name:                "backup has snapshot, reclaim policy retain, existing PV found",
 			haveSnapshot:        true,
-			legacyBackup:        true,
 			reclaimPolicy:       "Retain",
 			expectPVCVolumeName: true,
 			expectPVCreation:    false,
 			expectPVFound:       true,
 		},
 		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, no existing PV found",
+			name:                "backup has snapshot, reclaim policy retain, existing PV found",
 			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    true,
-		},
-		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
-			reclaimPolicy:       "Retain",
-			expectPVCVolumeName: true,
-			expectPVCreation:    false,
-			expectPVFound:       true,
-		},
-		{
-			name:                "non-legacy backup, have snapshot, reclaim policy retain, existing PV found",
-			haveSnapshot:        true,
-			legacyBackup:        false,
 			reclaimPolicy:       "Retain",
 			expectPVCVolumeName: true,
 			expectPVCreation:    false,
@@ -979,13 +948,6 @@ status:
 			nsClient.On("Get", pvcObj.Namespace, mock.Anything).Return(ns, nil)
 
 			backup := &api.Backup{}
-			if test.haveSnapshot && test.legacyBackup {
-				backup.Status.VolumeBackups = map[string]*api.VolumeBackupInfo{
-					"pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce": {
-						SnapshotID: "snap",
-					},
-				}
-			}
 
 			pvRestorer := new(mockPVRestorer)
 			defer pvRestorer.AssertExpectations(t)
@@ -1017,7 +979,7 @@ status:
 				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
 			}
 
-			if test.haveSnapshot && !test.legacyBackup {
+			if test.haveSnapshot {
 				ctx.volumeSnapshots = append(ctx.volumeSnapshots, &volume.Snapshot{
 					Spec: volume.SnapshotSpec{
 						PersistentVolumeName: "pvc-6a74b5af-78a5-11e8-a0d8-e2ad1e9734ce",
