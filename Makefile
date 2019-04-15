@@ -47,7 +47,7 @@ GOARCH = $(word 2, $(platform_temp))
 # TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
-		DOCKERFILE ?= Dockerfile-$(BIN).alpine
+		DOCKERFILE ?= Dockerfile-$(BIN)
 endif
 #ifeq ($(GOARCH),arm)
 #		DOCKERFILE ?= Dockerfile.arm #armel/busybox

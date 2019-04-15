@@ -1,4 +1,4 @@
-# Copyright 2018 the Velero contributors.
+# Copyright 2018, 2019 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM alpine:3.8
+FROM debian:stretch-slim
 
-MAINTAINER Wayne Witzel III <wayne@heptio.com>
+LABEL maintainer="Steve Kriss <krisss@vmware.com>"
 
-RUN apk add --no-cache ca-certificates
-RUN apk add --update --no-cache busybox util-linux
-
-ENTRYPOINT ["/bin/sh", "-c", "while true; do sleep 10000; done"]
+ENTRYPOINT ["/bin/bash", "-c", "while true; do sleep 10000; done"]
