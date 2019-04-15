@@ -134,6 +134,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 									Name:  "AWS_SHARED_CREDENTIALS_FILE",
 									Value: "/credentials/cloud",
 								},
+								{
+									Name:  "AZURE_CREDENTIALS_FILE",
+									Value: "/credentials/cloud",
+								},
 							},
 						},
 					},

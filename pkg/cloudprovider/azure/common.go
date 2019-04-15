@@ -17,10 +17,12 @@ limitations under the License.
 package azure
 
 import (
+	"os"
 	"strings"
 
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 )
 
@@ -46,6 +48,19 @@ func GetResticEnvVars(config map[string]string) (map[string]string, error) {
 		"AZURE_ACCOUNT_NAME": config[storageAccountConfigKey],
 		"AZURE_ACCOUNT_KEY":  storageAccountKey,
 	}, nil
+}
+
+func loadEnv() error {
+	envFile := os.Getenv("AZURE_CREDENTIALS_FILE")
+	if envFile == "" {
+		return nil
+	}
+
+	if err := godotenv.Overload(envFile); err != nil {
+		return errors.Wrapf(err, "error loading environment from AZURE_CREDENTIALS_FILE (%s)", envFile)
+	}
+
+	return nil
 }
 
 func newServicePrincipalToken(tenantID, clientID, clientSecret, scope string) (*adal.ServicePrincipalToken, error) {
