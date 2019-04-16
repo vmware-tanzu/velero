@@ -71,7 +71,7 @@ type Restorer interface {
 		actions []velero.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) (api.RestoreResult, api.RestoreResult)
+	) (Result, Result)
 }
 
 // kubernetesRestorer implements Restorer for restoring into a Kubernetes cluster.
@@ -181,7 +181,7 @@ func (kr *kubernetesRestorer) Restore(
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) (api.RestoreResult, api.RestoreResult) {
+) (Result, Result) {
 	// metav1.LabelSelectorAsSelector converts a nil LabelSelector to a
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
@@ -193,19 +193,19 @@ func (kr *kubernetesRestorer) Restore(
 
 	selector, err := metav1.LabelSelectorAsSelector(ls)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
+		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
 	// get resource includes-excludes
 	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
 	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, log)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
+		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
 	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
 	if err != nil {
-		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
+		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
 	podVolumeTimeout := kr.resticTimeout
@@ -225,7 +225,7 @@ func (kr *kubernetesRestorer) Restore(
 	if kr.resticRestorerFactory != nil {
 		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, restore)
 		if err != nil {
-			return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
+			return Result{}, Result{Velero: []string{err.Error()}}
 		}
 	}
 
@@ -359,13 +359,13 @@ type resourceClientKey struct {
 	namespace string
 }
 
-func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
+func (ctx *context) execute() (Result, Result) {
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
 	dir, err := ctx.extractor.unzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
-		return api.RestoreResult{}, api.RestoreResult{Velero: []string{err.Error()}}
+		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 	defer ctx.fileSystem.RemoveAll(dir)
 
@@ -377,8 +377,8 @@ func (ctx *context) execute() (api.RestoreResult, api.RestoreResult) {
 
 // restoreFromDir executes a restore based on backup data contained within a local
 // directory, ctx.restoreDir.
-func (ctx *context) restoreFromDir() (api.RestoreResult, api.RestoreResult) {
-	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
+func (ctx *context) restoreFromDir() (Result, Result) {
+	warnings, errs := Result{}, Result{}
 
 	namespaceFilter := collections.NewIncludesExcludes().
 		Includes(ctx.restore.Spec.IncludedNamespaces...).
@@ -556,7 +556,7 @@ func getNamespace(logger logrus.FieldLogger, path, remappedName string) *v1.Name
 
 // merge combines two RestoreResult objects into one
 // by appending the corresponding lists to one another.
-func merge(a, b *api.RestoreResult) {
+func merge(a, b *Result) {
 	a.Cluster = append(a.Cluster, b.Cluster...)
 	a.Velero = append(a.Velero, b.Velero...)
 	for k, v := range b.Namespaces {
@@ -568,14 +568,14 @@ func merge(a, b *api.RestoreResult) {
 }
 
 // addVeleroError appends an error to the provided RestoreResult's Velero list.
-func addVeleroError(r *api.RestoreResult, err error) {
+func addVeleroError(r *Result, err error) {
 	r.Velero = append(r.Velero, err.Error())
 }
 
 // addToResult appends an error to the provided RestoreResult, either within
 // the cluster-scoped list (if ns == "") or within the provided namespace's
 // entry.
-func addToResult(r *api.RestoreResult, ns string, e error) {
+func addToResult(r *Result, ns string, e error) {
 	if ns == "" {
 		r.Cluster = append(r.Cluster, e.Error())
 	} else {
@@ -703,8 +703,8 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
 // empty we are restoring a cluster level resource, otherwise into the specified namespace.
-func (ctx *context) restoreResource(resource, namespace, resourcePath string) (api.RestoreResult, api.RestoreResult) {
-	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
+func (ctx *context) restoreResource(resource, namespace, resourcePath string) (Result, Result) {
+	warnings, errs := Result{}, Result{}
 
 	if ctx.restore.Spec.IncludeClusterResources != nil && !*ctx.restore.Spec.IncludeClusterResources && namespace == "" {
 		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
@@ -784,8 +784,8 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 	return fmt.Sprintf("%s/%s/%s", groupResource.String(), namespace, name)
 }
 
-func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (api.RestoreResult, api.RestoreResult) {
-	warnings, errs := api.RestoreResult{}, api.RestoreResult{}
+func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result) {
+	warnings, errs := Result{}, Result{}
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
 
 	// make a copy of object retrieved from backup

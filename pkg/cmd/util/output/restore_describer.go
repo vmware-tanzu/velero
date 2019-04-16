@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	pkgrestore "github.com/heptio/velero/pkg/restore"
 )
 
 func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface) string {
@@ -108,7 +109,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 	}
 
 	var buf bytes.Buffer
-	var resultMap map[string]v1.RestoreResult
+	var resultMap map[string]pkgrestore.Result
 
 	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
@@ -130,7 +131,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 	}
 }
 
-func describeRestoreResult(d *Describer, name string, result v1.RestoreResult) {
+func describeRestoreResult(d *Describer, name string, result pkgrestore.Result) {
 	d.Printf("%s:\n", name)
 	d.DescribeSlice(1, "Velero", result.Velero)
 	d.DescribeSlice(1, "Cluster", result.Cluster)
