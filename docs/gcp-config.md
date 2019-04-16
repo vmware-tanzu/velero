@@ -9,7 +9,11 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
 
 ## Download Velero
 
-1. Download the [latest release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+1. Download the [latest official release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+
+    _We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
     ```bash
@@ -18,10 +22,6 @@ If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the 
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
-
-_We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
-`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
-branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## Create GCS bucket
 
@@ -110,49 +110,30 @@ To integrate Velero with GCP, create an Velero-specific [Service Account][15]:
 If you run Google Kubernetes Engine (GKE), make sure that your current IAM user is a cluster-admin. This role is required to create RBAC objects.
 See [the GKE documentation][22] for more information.
 
-In the Velero directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
+
+## Install and start Velero
+
+Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
 ```bash
-kubectl apply -f config/common/00-prereqs.yaml
+velero install \
+    --provider gcp \
+    --bucket $BUCKET \
+    --secret-file ./credentials-velero
 ```
 
-Create a Secret. In the directory of the credentials file you just created, run:
+Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-```bash
-kubectl create secret generic cloud-credentials \
-    --namespace velero \
-    --from-file cloud=credentials-velero
-```
+(Optional) Specify `--snapshot-location-config snapshotLocation=<YOUR_LOCATION>` to keep snapshots in a specific availability zone.  See the [VolumeSnapshotLocation definition][8] for details.
 
-**Note: If you use a custom namespace, replace `velero` with the name of the custom namespace**
+For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
-Specify the following values in the example files:
+## Installing the nginx example (optional)
 
-* In file `config/gcp/05-backupstoragelocation.yaml`:
-
-  * Replace `<YOUR_BUCKET>`. See the [BackupStorageLocation definition][7] for details.
-
-* (Optional) If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
+If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
 
-* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/gcp/10-deployment.yaml`:
-
-  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
-
-* (Optional) In file `config/gcp/06-volumesnapshotlocation.yaml`:
-
-  * Add `snapshotLocation: <YOUR_LOCATION>` to the config. See the [VolumeSnapshotLocation definition][8] for details.
-
-## Start the server
-
-In the root of your Velero directory, run:
-
-  ```bash
-  kubectl apply -f config/gcp/05-backupstoragelocation.yaml
-  kubectl apply -f config/gcp/06-volumesnapshotlocation.yaml
-  kubectl apply -f config/gcp/10-deployment.yaml
-  ```
 
   [0]: namespace.md
   [7]: api-types/backupstoragelocation.md#gcp
@@ -160,5 +141,5 @@ In the root of your Velero directory, run:
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
   [20]: faq.md
-  [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#prerequisites_for_using_role-based_access_control
+  [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#iam-rolebinding-bootstrap
 
