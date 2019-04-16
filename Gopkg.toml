@@ -76,7 +76,7 @@
 
 [[constraint]]
   name = "google.golang.org/api"
-  branch = "master"
+  version = "~v0.3.2"
 
 [[constraint]]
   name = "golang.org/x/oauth2"
