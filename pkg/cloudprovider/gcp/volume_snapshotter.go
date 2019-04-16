@@ -38,14 +38,16 @@ import (
 )
 
 const (
-	projectKey    = "project"
-	zoneSeparator = "__"
+	projectKey          = "project"
+	zoneSeparator       = "__"
+	snapshotLocationKey = "snapshotLocation"
 )
 
 type VolumeSnapshotter struct {
-	gce     *compute.Service
-	project string
-	log     logrus.FieldLogger
+	gce              *compute.Service
+	project          string
+	log              logrus.FieldLogger
+	snapshotLocation string
 }
 
 func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
@@ -53,9 +55,11 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, snapshotLocationKey); err != nil {
 		return err
 	}
+
+	b.snapshotLocation = config[snapshotLocationKey]
 
 	project, err := extractProjectFromCreds()
 	if err != nil {
@@ -249,6 +253,10 @@ func (b *VolumeSnapshotter) createSnapshot(snapshotName, volumeID, volumeAZ stri
 		Description: getSnapshotTags(tags, disk.Description, b.log),
 	}
 
+	if b.snapshotLocation != "" {
+		gceSnap.StorageLocations = []string{b.snapshotLocation}
+	}
+
 	_, err = b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -266,6 +274,10 @@ func (b *VolumeSnapshotter) createRegionSnapshot(snapshotName, volumeID, volumeR
 	gceSnap := compute.Snapshot{
 		Name:        snapshotName,
 		Description: getSnapshotTags(tags, disk.Description, b.log),
+	}
+
+	if b.snapshotLocation != "" {
+		gceSnap.StorageLocations = []string{b.snapshotLocation}
 	}
 
 	_, err = b.gce.RegionDisks.CreateSnapshot(b.project, volumeRegion, volumeID, &gceSnap).Do()

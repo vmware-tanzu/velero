@@ -140,6 +140,10 @@ Specify the following values in the example files:
 
   * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
 
+* (Optional) In file `config/gcp/06-volumesnapshotlocation.yaml`:
+
+  * Add `snapshotLocation: <YOUR_LOCATION>` to the config. See the [VolumeSnapshotLocation definition][8] for details.
+
 ## Start the server
 
 In the root of your Velero directory, run:
@@ -152,6 +156,7 @@ In the root of your Velero directory, run:
 
   [0]: namespace.md
   [7]: api-types/backupstoragelocation.md#gcp
+  [8]: api-types/volumesnapshotlocation.md#gcp
   [15]: https://cloud.google.com/compute/docs/access/service-accounts
   [16]: https://cloud.google.com/sdk/docs/
   [20]: faq.md

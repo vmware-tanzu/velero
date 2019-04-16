@@ -20,3 +20,4 @@ metadata:
   namespace: velero
 spec:
   provider: gcp
+  config: {}
