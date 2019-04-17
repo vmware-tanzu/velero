@@ -133,13 +133,13 @@ func isAvailable(c appsv1beta1.DeploymentCondition) bool {
 }
 
 // DeploymentIsReady will poll the kubernetes API server to see if the velero deployment is ready to service user requests.
-func DeploymentIsReady(factory client.DynamicFactory) (bool, error) {
+func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
 	gvk := schema.FromAPIVersionAndKind(appsv1beta1.SchemeGroupVersion.String(), "Deployment")
 	apiResource := metav1.APIResource{
 		Name:       "deployments",
 		Namespaced: true,
 	}
-	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, "velero")
+	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, namespace)
 	if err != nil {
 		return false, errors.Wrapf(err, "Error creating client for deployment polling")
 	}
