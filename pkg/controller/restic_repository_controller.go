@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -74,7 +74,7 @@ func NewResticRepositoryController(
 		},
 	)
 
-	c.resyncPeriod = 30 * time.Minute
+	c.resyncPeriod = 5 * time.Minute
 	c.resyncFunc = c.enqueueAllRepositories
 
 	return c

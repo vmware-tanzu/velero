@@ -1,0 +1,1 @@
+restic repo ensurer: return error if new repository does not become ready within a minute, and fix channel closing/deletion
