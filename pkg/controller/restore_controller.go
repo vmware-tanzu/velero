@@ -42,7 +42,7 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	"github.com/heptio/velero/pkg/restore"
+	pkgrestore "github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
@@ -78,7 +78,7 @@ type restoreController struct {
 	namespace              string
 	restoreClient          velerov1client.RestoresGetter
 	backupClient           velerov1client.BackupsGetter
-	restorer               restore.Restorer
+	restorer               pkgrestore.Restorer
 	backupLister           listers.BackupLister
 	restoreLister          listers.RestoreLister
 	backupLocationLister   listers.BackupStorageLocationLister
@@ -96,7 +96,7 @@ func NewRestoreController(
 	restoreInformer informers.RestoreInformer,
 	restoreClient velerov1client.RestoresGetter,
 	backupClient velerov1client.BackupsGetter,
-	restorer restore.Restorer,
+	restorer pkgrestore.Restorer,
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
@@ -449,7 +449,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		restore.Status.Errors += len(e)
 	}
 
-	m := map[string]api.RestoreResult{
+	m := map[string]pkgrestore.Result{
 		"warnings": restoreWarnings,
 		"errors":   restoreErrors,
 	}
@@ -461,7 +461,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	return nil
 }
 
-func putResults(restore *api.Restore, results map[string]api.RestoreResult, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
+func putResults(restore *api.Restore, results map[string]pkgrestore.Result, backupStore persistence.BackupStore, log logrus.FieldLogger) error {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 	defer gzw.Close()

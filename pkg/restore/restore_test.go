@@ -221,7 +221,7 @@ func TestRestorePriority(t *testing.T) {
 		restore              *api.Restore
 		baseDir              string
 		prioritizedResources []schema.GroupResource
-		expectedErrors       api.RestoreResult
+		expectedErrors       Result
 		expectedReadDirs     []string
 	}{
 		{
@@ -272,7 +272,7 @@ func TestRestorePriority(t *testing.T) {
 				{Resource: "b"},
 				{Resource: "c"},
 			},
-			expectedErrors: api.RestoreResult{
+			expectedErrors: Result{
 				Namespaces: map[string][]string{
 					"ns-1": {"error decoding \"bak/resources/a/namespaces/ns-1/invalid-json.json\": invalid character 'i' looking for beginning of value"},
 				},
@@ -390,7 +390,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		includeClusterResources *bool
 		fileSystem              *velerotest.FakeFileSystem
 		actions                 []resolvedAction
-		expectedErrors          api.RestoreResult
+		expectedErrors          Result
 		expectedObjs            []unstructured.Unstructured
 	}{
 		{
@@ -411,7 +411,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			namespace:    "ns-1",
 			resourcePath: "configmaps",
 			fileSystem:   velerotest.NewFakeFileSystem(),
-			expectedErrors: api.RestoreResult{
+			expectedErrors: Result{
 				Namespaces: map[string][]string{
 					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
 				},
@@ -431,7 +431,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
 				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedErrors: api.RestoreResult{
+			expectedErrors: Result{
 				Namespaces: map[string][]string{
 					"ns-1": {"error decoding \"configmaps/cm-1-invalid.json\": invalid character 'h' in literal true (expecting 'r')"},
 				},
@@ -757,7 +757,7 @@ func TestRestoringExistingServiceAccount(t *testing.T) {
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
+			assert.Equal(t, Result{}, errors)
 		})
 	}
 }
@@ -1031,7 +1031,7 @@ status:
 
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
+			assert.Equal(t, Result{}, errors)
 			assert.Empty(t, warnings.Cluster)
 
 			// Prep PVC restore
@@ -1063,7 +1063,7 @@ status:
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, api.RestoreResult{}, errors)
+			assert.Equal(t, Result{}, errors)
 		})
 	}
 }
