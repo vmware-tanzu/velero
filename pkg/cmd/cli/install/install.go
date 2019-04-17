@@ -58,6 +58,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "namespace to install Velero and associated data into. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
@@ -177,18 +178,20 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	}
 	factory := client.NewDynamicFactory(dynamicClient)
 
+	errorMsg := fmt.Sprintf("\n\nError installing Velero. Use `kubectl logs deploy/velero -n %s` to check the deploy logs", o.Namespace)
+
 	err = install.Install(factory, resources, os.Stdout)
 	if err != nil {
-		return errors.Wrap(err, "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs")
+		return errors.Wrap(err, errorMsg)
 	}
 
 	if o.Wait {
 		fmt.Println("Waiting for Velero to be ready.")
-		if _, err = install.DeploymentIsReady(factory); err != nil {
-			return errors.Wrap(err, "\n\nError installing Velero. Use `kubectl logs deploy/velero -n velero` to check the deploy logs")
+		if _, err = install.DeploymentIsReady(factory, o.Namespace); err != nil {
+			return errors.Wrap(err, errorMsg)
 		}
 	}
-	fmt.Println("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n velero' to view the status.")
+	fmt.Printf("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n %s' to view the status.\n", o.Namespace)
 	return nil
 }
 
