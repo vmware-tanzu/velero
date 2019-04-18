@@ -133,7 +133,7 @@ func TestObjectExists(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			o := NewObjectStore().(*objectStore)
+			o := NewObjectStore(velerotest.NewLogger())
 			w := newFakeWriter(nil)
 			o.bucketWriter = w
 			w.attrsErr = tc.errorResponse

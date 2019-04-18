@@ -23,11 +23,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/heptio/ark/pkg/util/test"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/heptio/velero/pkg/util/test"
 )
 
 func TestIsValidSignatureVersion(t *testing.T) {
@@ -95,9 +96,9 @@ func TestObjectExists(t *testing.T) {
 			s := new(mockS3)
 			defer s.AssertExpectations(t)
 
-			o := &objectStore{
-				logger: test.NewLogger(),
-				s3:     s,
+			o := &ObjectStore{
+				log: test.NewLogger(),
+				s3:  s,
 			}
 
 			bucket := "b"

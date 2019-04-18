@@ -158,8 +158,7 @@ func (c *backupController) processBackup(key string) error {
 	log.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		logContext.WithError(err).Errorf("error splitting key")
-		return nil
+		return errors.Wrap(err, "error splitting queue key")
 	}
 
 	log.Debug("Getting backup")

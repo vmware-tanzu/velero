@@ -101,8 +101,6 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel)
 			)
-			defer backupper.AssertExpectations(t)
-			defer cloudBackups.AssertExpectations(t)
 
 			c := &backupController{
 				genericController: newGenericController("backup-test", logger),
