@@ -89,8 +89,6 @@ type BackupResourceHookSpec struct {
 	ExcludedResources []string `json:"excludedResources"`
 	// LabelSelector, if specified, filters the resources to which this hook spec applies.
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
-	// Hooks is a list of BackupResourceHooks to execute. DEPRECATED. Replaced by PreHooks.
-	Hooks []BackupResourceHook `json:"hooks"`
 	// PreHooks is a list of BackupResourceHooks to execute prior to storing the item in the backup.
 	// These are executed before any "additional items" from item actions are processed.
 	PreHooks []BackupResourceHook `json:"pre,omitempty"`

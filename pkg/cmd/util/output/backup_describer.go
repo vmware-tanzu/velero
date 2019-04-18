@@ -172,10 +172,21 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 			}
 			d.Printf("\t\t\tLabel selector:\t%s\n", s)
 
-			for _, hook := range backupResourceHookSpec.Hooks {
+			for _, hook := range backupResourceHookSpec.PreHooks {
 				if hook.Exec != nil {
 					d.Println()
-					d.Printf("\t\t\tExec Hook:\n")
+					d.Printf("\t\t\tPre Exec Hook:\n")
+					d.Printf("\t\t\t\tContainer:\t%s\n", hook.Exec.Container)
+					d.Printf("\t\t\t\tCommand:\t%s\n", strings.Join(hook.Exec.Command, " "))
+					d.Printf("\t\t\t\tOn Error:\t%s\n", hook.Exec.OnError)
+					d.Printf("\t\t\t\tTimeout:\t%s\n", hook.Exec.Timeout.Duration)
+				}
+			}
+
+			for _, hook := range backupResourceHookSpec.PostHooks {
+				if hook.Exec != nil {
+					d.Println()
+					d.Printf("\t\t\tPost Exec Hook:\n")
 					d.Printf("\t\t\t\tContainer:\t%s\n", hook.Exec.Container)
 					d.Printf("\t\t\t\tCommand:\t%s\n", strings.Join(hook.Exec.Command, " "))
 					d.Printf("\t\t\t\tOn Error:\t%s\n", hook.Exec.OnError)
