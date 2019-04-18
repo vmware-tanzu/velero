@@ -24,7 +24,6 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
@@ -101,23 +100,7 @@ type defaultGroupBackupper struct {
 
 // backupGroup backs up a single API group.
 func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) error {
-	var (
-		errs []error
-		log  = gb.log.WithField("group", group.GroupVersion)
-		rb   = gb.resourceBackupperFactory.newResourceBackupper(
-			log,
-			gb.backupRequest,
-			gb.dynamicFactory,
-			gb.discoveryHelper,
-			gb.backedUpItems,
-			gb.cohabitatingResources,
-			gb.podCommandExecutor,
-			gb.tarWriter,
-			gb.resticBackupper,
-			gb.resticSnapshotTracker,
-			gb.volumeSnapshotterGetter,
-		)
-	)
+	log := gb.log.WithField("group", group.GroupVersion)
 
 	log.Infof("Backing up group")
 
@@ -132,13 +115,27 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 		sortCoreGroup(group)
 	}
 
+	rb := gb.resourceBackupperFactory.newResourceBackupper(
+		log,
+		gb.backupRequest,
+		gb.dynamicFactory,
+		gb.discoveryHelper,
+		gb.backedUpItems,
+		gb.cohabitatingResources,
+		gb.podCommandExecutor,
+		gb.tarWriter,
+		gb.resticBackupper,
+		gb.resticSnapshotTracker,
+		gb.volumeSnapshotterGetter,
+	)
+
 	for _, resource := range group.APIResources {
 		if err := rb.backupResource(group, resource); err != nil {
-			errs = append(errs, err)
+			log.WithError(err).WithField("resource", resource.String()).Error("Error backing up API resource")
 		}
 	}
 
-	return kuberrs.NewAggregate(errs)
+	return nil
 }
 
 // sortCoreGroup sorts group as a coreGroup.

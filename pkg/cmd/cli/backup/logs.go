@@ -50,7 +50,10 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 				cmd.Exit("Error checking for backup %q: %v", backupName, err)
 			}
 
-			if backup.Status.Phase != v1.BackupPhaseCompleted && backup.Status.Phase != v1.BackupPhaseFailed {
+			switch backup.Status.Phase {
+			case v1.BackupPhaseCompleted, v1.BackupPhasePartiallyFailed, v1.BackupPhaseFailed:
+				// terminal phases, do nothing.
+			default:
 				cmd.Exit("Logs for backup %q are not available until it's finished processing. Please wait "+
 					"until the backup has a phase of Completed or Failed and try again.", backupName)
 			}

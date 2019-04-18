@@ -149,6 +149,10 @@ const (
 	// errors.
 	BackupPhaseCompleted BackupPhase = "Completed"
 
+	// BackupPhasePartiallyFailed means the backup has run to completion
+	// but encountered 1+ errors backing up individual items.
+	BackupPhasePartiallyFailed BackupPhase = "PartiallyFailed"
+
 	// BackupPhaseFailed means the backup ran but encountered an error that
 	// prevented it from completing successfully.
 	BackupPhaseFailed BackupPhase = "Failed"
@@ -191,6 +195,16 @@ type BackupStatus struct {
 	// VolumeSnapshotsCompleted is the total number of successfully
 	// completed volume snapshots for this backup.
 	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted"`
+
+	// Warnings is a count of all warning messages that were generated during
+	// execution of the backup. The actual warnings are in the backup's log
+	// file in object storage.
+	Warnings int `json:"warnings"`
+
+	// Errors is a count of all error messages that were generated during
+	// execution of the backup.  The actual errors are in the backup's log
+	// file in object storage.
+	Errors int `json:"errors"`
 }
 
 // +genclient

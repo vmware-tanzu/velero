@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,7 +47,13 @@ func DescribeBackup(
 		if phase == "" {
 			phase = velerov1api.BackupPhaseNew
 		}
-		d.Printf("Phase:\t%s\n", phase)
+
+		logsNote := ""
+		if backup.Status.Phase == velerov1api.BackupPhaseFailed || backup.Status.Phase == velerov1api.BackupPhasePartiallyFailed {
+			logsNote = fmt.Sprintf(" (run `velero backup logs %s` for more information)", backup.Name)
+		}
+
+		d.Printf("Phase:\t%s%s\n", phase, logsNote)
 
 		status := backup.Status
 		if len(status.ValidationErrors) > 0 {
@@ -56,6 +62,12 @@ func DescribeBackup(
 			for _, ve := range status.ValidationErrors {
 				d.Printf("\t%s\n", ve)
 			}
+		}
+
+		if status.Phase == velerov1api.BackupPhasePartiallyFailed {
+			d.Println()
+			d.Printf("Errors:\t%d\n", status.Errors)
+			d.Printf("Warnings:\t%d\n", status.Warnings)
 		}
 
 		d.Println()

@@ -30,7 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -39,7 +38,6 @@ import (
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 // BackupVersion is the current backup version for Velero.
@@ -207,17 +205,18 @@ type VolumeSnapshotterGetter interface {
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
-// written to backupFile. The finalized api.Backup is written to metadata.
-func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
+// written to backupFile. The finalized api.Backup is written to metadata. Any error that represents
+// a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
+// back up individual resources that don't prevent the backup from continuing to be processed) are logged
+// to the backup log.
+func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error {
 	gzippedData := gzip.NewWriter(backupFile)
 	defer gzippedData.Close()
 
 	tw := tar.NewWriter(gzippedData)
 	defer tw.Close()
 
-	log := logger.WithField("backup", kubeutil.NamespaceAndName(backupRequest))
-	log.Info("Starting backup")
-
+	log.Info("Writing backup version file")
 	if err := kb.writeBackupVersion(tw); err != nil {
 		return errors.WithStack(err)
 	}
@@ -276,21 +275,13 @@ func (kb *kubernetesBackupper) Backup(logger logrus.FieldLogger, backupRequest *
 		volumeSnapshotterGetter,
 	)
 
-	var errs []error
 	for _, group := range kb.discoveryHelper.Resources() {
 		if err := gb.backupGroup(group); err != nil {
-			errs = append(errs, err)
+			log.WithError(err).WithField("apiGroup", group.String()).Error("Error backing up API group")
 		}
 	}
 
-	err = kuberrs.Flatten(kuberrs.NewAggregate(errs))
-	if err == nil {
-		log.Infof("Backup completed successfully")
-	} else {
-		log.Infof("Backup completed with errors: %v", err)
-	}
-
-	return err
+	return nil
 }
 
 func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
