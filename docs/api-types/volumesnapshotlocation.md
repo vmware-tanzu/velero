@@ -52,9 +52,15 @@ The configurable parameters are as follows:
 
 #### GCP
 
-No parameters required.
+##### config
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `snapshotLocation` | string | Empty | *Example*: "us-central1"<br><br>See [GCP documentation][4] for the full list.<br><br>If not specified the snapshots are stored in the [default location][5]. |
 
 [0]: #aws
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[4]: https://cloud.google.com/storage/docs/locations#available_locations
+[5]: https://cloud.google.com/compute/docs/disks/create-snapshots#default_location

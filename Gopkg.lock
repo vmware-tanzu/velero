@@ -600,8 +600,7 @@
   revision = "26559e0f760e39c24d730d3224364aef164ee23f"
 
 [[projects]]
-  branch = "master"
-  digest = "1:a602f48d6caf1bcb3a082346459de0e0dbc6ea9aeabc3cb88255794980644001"
+  digest = "1:cb42335b4b5606082a8e93f437a8962702e7875d157ccb03fba8cdd1ca70e8c3"
   name = "google.golang.org/api"
   packages = [
     "compute/v1",
@@ -617,7 +616,8 @@
     "transport/http/internal/propagation",
   ]
   pruneopts = "NUT"
-  revision = "3f6e8463aa1d824abe11b439d178c02220079da5"
+  revision = "0cbcb99a9ea0c8023c794b2693cbe1def82ed4d7"
+  version = "v0.3.2"
 
 [[projects]]
   digest = "1:7206d98ec77c90c72ec2c405181a1dcf86965803b6dbc4f98ceab7a5047c37a9"
@@ -1073,6 +1073,7 @@
     "k8s.io/apimachinery/pkg/util/errors",
     "k8s.io/apimachinery/pkg/util/runtime",
     "k8s.io/apimachinery/pkg/util/sets",
+    "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",
     "k8s.io/client-go/discovery",
