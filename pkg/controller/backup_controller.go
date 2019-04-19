@@ -111,6 +111,8 @@ func NewBackupController(
 		backupLocationInformer.Informer().HasSynced,
 		volumeSnapshotLocationInformer.Informer().HasSynced,
 	)
+	c.resyncFunc = c.resync
+	c.resyncPeriod = time.Minute
 
 	backupInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -139,6 +141,15 @@ func NewBackupController(
 	)
 
 	return c
+}
+
+func (c *backupController) resync() {
+	backups, err := c.lister.List(labels.Everything())
+	if err != nil {
+		c.logger.Error(err, "Error computing backup_total metric")
+	} else {
+		c.metrics.SetBackupTotal(int64(len(backups)))
+	}
 }
 
 func (c *backupController) processBackup(key string) error {

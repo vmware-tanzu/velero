@@ -30,6 +30,7 @@ type ServerMetrics struct {
 const (
 	metricNamespace              = "velero"
 	backupTarballSizeBytesGauge  = "backup_tarball_size_bytes"
+	backupTotal                  = "backup_total"
 	backupAttemptTotal           = "backup_attempt_total"
 	backupSuccessTotal           = "backup_success_total"
 	backupFailureTotal           = "backup_failure_total"
@@ -37,6 +38,7 @@ const (
 	backupDeletionAttemptTotal   = "backup_deletion_attempt_total"
 	backupDeletionSuccessTotal   = "backup_deletion_success_total"
 	backupDeletionFailureTotal   = "backup_deletion_failure_total"
+	restoreTotal                 = "restore_total"
 	restoreAttemptTotal          = "restore_attempt_total"
 	restoreValidationFailedTotal = "restore_validation_failed_total"
 	restoreSuccessTotal          = "restore_success_total"
@@ -62,6 +64,13 @@ func NewServerMetrics() *ServerMetrics {
 					Help:      "Size, in bytes, of a backup",
 				},
 				[]string{scheduleLabel},
+			),
+			backupTotal: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupTotal,
+					Help:      "Current number of existent backups",
+				},
 			),
 			backupAttemptTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
@@ -129,6 +138,13 @@ func NewServerMetrics() *ServerMetrics {
 					},
 				},
 				[]string{scheduleLabel},
+			),
+			restoreTotal: prometheus.NewGauge(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      restoreTotal,
+					Help:      "Current number of existent restores",
+				},
 			),
 			restoreAttemptTotal: prometheus.NewCounterVec(
 				prometheus.CounterOpts{
@@ -247,6 +263,13 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 	}
 }
 
+// SetBackupTotal records the current number of existent backups.
+func (m *ServerMetrics) SetBackupTotal(numberOfBackups int64) {
+	if g, ok := m.metrics[backupTotal].(prometheus.Gauge); ok {
+		g.Set(float64(numberOfBackups))
+	}
+}
+
 // RegisterBackupAttempt records an backup attempt.
 func (m *ServerMetrics) RegisterBackupAttempt(backupSchedule string) {
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
@@ -300,6 +323,13 @@ func (m *ServerMetrics) RegisterBackupDeletionSuccess(backupSchedule string) {
 // representing the number of seconds in that duration.
 func toSeconds(d time.Duration) float64 {
 	return float64(d / time.Second)
+}
+
+// SetRestoreTotal records the current number of existent restores.
+func (m *ServerMetrics) SetRestoreTotal(numberOfRestores int64) {
+	if g, ok := m.metrics[restoreTotal].(prometheus.Gauge); ok {
+		g.Set(float64(numberOfRestores))
+	}
 }
 
 // RegisterRestoreAttempt records an attempt to restore a backup.
