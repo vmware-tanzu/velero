@@ -97,10 +97,6 @@ spec:
             app: velero
             component: server
         # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
-        # DEPRECATED. Use pre instead.
-        hooks:
-          # Same content as pre below.
-        # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
         pre:
           - 
             # The type of hook. This must be "exec".

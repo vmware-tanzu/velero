@@ -183,18 +183,11 @@ func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper di
 }
 
 func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
-	// Use newer PreHooks if it's set
-	preHooks := hookSpec.PreHooks
-	if len(preHooks) == 0 {
-		// Fall back to Hooks otherwise (DEPRECATED)
-		preHooks = hookSpec.Hooks
-	}
-
 	h := resourceHook{
 		name:       hookSpec.Name,
 		namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
 		resources:  getResourceIncludesExcludes(discoveryHelper, hookSpec.IncludedResources, hookSpec.ExcludedResources),
-		pre:        preHooks,
+		pre:        hookSpec.PreHooks,
 		post:       hookSpec.PostHooks,
 	}
 

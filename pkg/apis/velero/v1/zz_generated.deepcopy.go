@@ -158,13 +158,6 @@ func (in *BackupResourceHookSpec) DeepCopyInto(out *BackupResourceHookSpec) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Hooks != nil {
-		in, out := &in.Hooks, &out.Hooks
-		*out = make([]BackupResourceHook, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
 	if in.PreHooks != nil {
 		in, out := &in.PreHooks, &out.PreHooks
 		*out = make([]BackupResourceHook, len(*in))

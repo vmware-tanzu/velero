@@ -428,7 +428,7 @@ func TestBackup(t *testing.T) {
 								LabelSelector: &metav1.LabelSelector{
 									MatchLabels: map[string]string{"1": "2"},
 								},
-								Hooks: []v1.BackupResourceHook{
+								PreHooks: []v1.BackupResourceHook{
 									{
 										Exec: &v1.ExecHook{
 											Command: []string{"ls", "/tmp"},
@@ -652,68 +652,6 @@ func TestGetResourceHook(t *testing.T) {
 		hookSpec v1.BackupResourceHookSpec
 		expected resourceHook
 	}{
-		{
-			name: "PreHooks take priority over Hooks",
-			hookSpec: v1.BackupResourceHookSpec{
-				Name: "spec1",
-				PreHooks: []v1.BackupResourceHook{
-					{
-						Exec: &v1.ExecHook{
-							Container: "a",
-							Command:   []string{"b"},
-						},
-					},
-				},
-				Hooks: []v1.BackupResourceHook{
-					{
-						Exec: &v1.ExecHook{
-							Container: "c",
-							Command:   []string{"d"},
-						},
-					},
-				},
-			},
-			expected: resourceHook{
-				name:       "spec1",
-				namespaces: collections.NewIncludesExcludes(),
-				resources:  collections.NewIncludesExcludes(),
-				pre: []v1.BackupResourceHook{
-					{
-						Exec: &v1.ExecHook{
-							Container: "a",
-							Command:   []string{"b"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "Use Hooks if PreHooks isn't set",
-			hookSpec: v1.BackupResourceHookSpec{
-				Name: "spec1",
-				Hooks: []v1.BackupResourceHook{
-					{
-						Exec: &v1.ExecHook{
-							Container: "a",
-							Command:   []string{"b"},
-						},
-					},
-				},
-			},
-			expected: resourceHook{
-				name:       "spec1",
-				namespaces: collections.NewIncludesExcludes(),
-				resources:  collections.NewIncludesExcludes(),
-				pre: []v1.BackupResourceHook{
-					{
-						Exec: &v1.ExecHook{
-							Container: "a",
-							Command:   []string{"b"},
-						},
-					},
-				},
-			},
-		},
 		{
 			name: "Full test",
 			hookSpec: v1.BackupResourceHookSpec{

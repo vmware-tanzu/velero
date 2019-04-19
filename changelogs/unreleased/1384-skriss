@@ -1,0 +1,1 @@
+remove deprecated "hooks" for backups (they've been replaced by "pre hooks")
