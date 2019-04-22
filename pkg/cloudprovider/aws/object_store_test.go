@@ -82,6 +82,7 @@ func TestObjectExists(t *testing.T) {
 			name:           "doesn't exist",
 			errorResponse:  awserr.New(s3.ErrCodeNoSuchKey, "no such key", nil),
 			expectedExists: false,
+			expectedError:  "NoSuchKey: no such key",
 		},
 		{
 			name:           "error checking for existence",

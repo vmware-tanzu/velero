@@ -54,8 +54,8 @@ type s3Interface interface {
 
 type ObjectStore struct {
 	log              logrus.FieldLogger
-	s3               *s3.S3
-	preSignS3        *s3.S3
+	s3               s3Interface
+	preSignS3        s3Interface
 	s3Uploader       *s3manager.Uploader
 	kmsKeyID         string
 	signatureVersion string
@@ -203,6 +203,7 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 
 const notFoundCode = "NotFound"
 
+// ObjectExists checks if there is an object with the given key in the object storage bucket.
 func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	log := o.log.WithFields(
 		logrus.Fields{
