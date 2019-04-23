@@ -50,7 +50,10 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 				cmd.Exit("Error checking for restore %q: %v", restoreName, err)
 			}
 
-			if restore.Status.Phase != v1.RestorePhaseCompleted && restore.Status.Phase != v1.RestorePhaseFailed {
+			switch restore.Status.Phase {
+			case v1.RestorePhaseCompleted, v1.RestorePhaseFailed, v1.RestorePhasePartiallyFailed:
+				// terminal phases, don't exit.
+			default:
 				cmd.Exit("Logs for restore %q are not available until it's finished processing. Please wait "+
 					"until the restore has a phase of Completed or Failed and try again.", restoreName)
 			}
