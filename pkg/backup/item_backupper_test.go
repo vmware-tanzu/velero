@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -169,7 +169,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 		customActionAdditionalItemIdentifiers []velero.ResourceIdentifier
 		customActionAdditionalItems           []runtime.Unstructured
 		groupResource                         string
-		snapshottableVolumes                  map[string]v1.VolumeBackupInfo
+		snapshottableVolumes                  map[string]velerotest.VolumeBackupInfo
 		snapshotError                         error
 		additionalItemError                   error
 		trackedPVCs                           sets.String
@@ -300,7 +300,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
+			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
@@ -314,7 +314,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			groupResource:             "persistentvolumes",
 			// empty snapshottableVolumes causes a volumeSnapshotter to be created, but no
 			// snapshots are expected to be taken.
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{},
+			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
 		},
 		{
@@ -325,7 +325,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
+			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 			trackedPVCs: sets.NewString(key("another-pvc-ns", "another-pvc")),
@@ -336,7 +336,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
 			expectError:               true,
 			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]v1.VolumeBackupInfo{
+			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
 			},
 			snapshotError: fmt.Errorf("failure"),
@@ -716,7 +716,7 @@ func TestTakePVSnapshot(t *testing.T) {
 		expectError            bool
 		expectedVolumeID       string
 		expectedSnapshotsTaken int
-		volumeInfo             map[string]v1.VolumeBackupInfo
+		volumeInfo             map[string]velerotest.VolumeBackupInfo
 	}{
 		{
 			name:            "snapshot disabled",
@@ -737,7 +737,7 @@ func TestTakePVSnapshot(t *testing.T) {
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
+			volumeInfo: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
@@ -749,7 +749,7 @@ func TestTakePVSnapshot(t *testing.T) {
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
+			volumeInfo: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
 			},
 		},
@@ -768,7 +768,7 @@ func TestTakePVSnapshot(t *testing.T) {
 			expectedSnapshotsTaken: 1,
 			expectedVolumeID:       "vol-abc123",
 			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]v1.VolumeBackupInfo{
+			volumeInfo: map[string]velerotest.VolumeBackupInfo{
 				"vol-abc123": {Type: "gp", SnapshotID: "snap-1"},
 			},
 		},

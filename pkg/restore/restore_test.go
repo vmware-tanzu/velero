@@ -654,7 +654,7 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				pvRestorer: &pvRestorer{
 					logger: logging.DefaultLogger(logrus.DebugLevel),
 					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
-						volumeMap: map[api.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+						volumeMap: map[velerotest.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
 						volumeID:  "volume-1",
 					},
 					snapshotLocationLister: snapshotLocationLister,
@@ -1786,7 +1786,7 @@ type fakeAction struct {
 
 type fakeVolumeSnapshotterGetter struct {
 	fakeVolumeSnapshotter *velerotest.FakeVolumeSnapshotter
-	volumeMap             map[api.VolumeBackupInfo]string
+	volumeMap             map[velerotest.VolumeBackupInfo]string
 	volumeID              string
 }
 
