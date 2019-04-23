@@ -17,67 +17,15 @@ limitations under the License.
 package azure
 
 import (
+	"io"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
-
-// type mockBlobGetter struct {
-// 	mock.Mock
-// }
-
-// func (m *mockBlobGetter) getBlob(bucket string, key string) (blob, error) {
-// 	args := m.Called(bucket, key)
-// 	return args.Get(0).(blob), args.Error(1)
-// }
-
-// type mockBlob struct {
-// 	mock.Mock
-// }
-
-// func (m *mockBlob) CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error {
-// 	args := m.Called(blob, options)
-// 	return args.Error(0)
-// }
-
-// func (m *mockBlob) Exists() (bool, error) {
-// 	args := m.Called()
-// 	return args.Bool(0), args.Error(1)
-// }
-
-// func (m *mockBlob) Get(options *storage.GetBlobOptions) (io.ReadCloser, error) {
-// 	args := m.Called(options)
-// 	return args.Get(0).(io.ReadCloser), args.Error(1)
-// }
-
-// func (m *mockBlob) Delete(options *storage.DeleteBlobOptions) error {
-// 	args := m.Called(options)
-// 	return args.Error(0)
-// }
-
-// func (m *mockBlob) GetSASURI(expiry time.Time, permissions string) (string, error) {
-// 	args := m.Called(expiry, permissions)
-// 	return args.String(0), args.Error(1)
-// }
-
-// type mockContainerGetter struct {
-// 	mock.Mock
-// }
-
-// func (m *mockContainerGetter) getContainer(bucket string) (container, error) {
-// 	args := m.Called(bucket)
-// 	return args.Get(0).(container), args.Error(1)
-// }
-
-// type mockContainer struct {
-// 	mock.Mock
-// }
-
-// func (m *mockContainer) ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error) {
-// 	args := m.Called(params)
-// 	return args.Get(0).(storage.BlobListResponse), args.Error(1)
-// }
 
 func TestObjectExists(t *testing.T) {
 	tests := []struct {
@@ -116,69 +64,89 @@ func TestObjectExists(t *testing.T) {
 		},
 	}
 
-	// for _, tc := range tests {
-	// 	t.Run(tc.name, func(t *testing.T) {
-	// 		blobGetter := new(mockBlobGetter)
-	// 		defer blobGetter.AssertExpectations(t)
-
-	// 		o := &objectStore{
-	// 			blobGetter: blobGetter,
-	// 		}
-
-	// 		bucket := "b"
-	// 		key := "k"
-
-	// 		blob := new(mockBlob)
-	// 		defer blob.AssertExpectations(t)
-	// 		blobGetter.On("getBlob", bucket, key).Return(blob, tc.getBlobError)
-
-	// 		blob.On("Exists").Return(tc.exists, tc.errorResponse)
-
-	// 		exists, err := o.ObjectExists(bucket, key)
-
-	// 		if tc.expectedError != "" {
-	// 			assert.EqualError(t, err, tc.expectedError)
-	// 			return
-	// 		}
-	// 		require.NoError(t, err)
-
-	// 		assert.Equal(t, tc.expectedExists, exists)
-	// 	})
-	// }
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// o := NewObjectStore(velerotest.NewLogger())
+			blobGetter := new(mockBlobGetter)
+			defer blobGetter.AssertExpectations(t)
 
-			// bucket := "b"
-			// key := "k"
+			o := &ObjectStore{
+				blobGetter: blobGetter,
+			}
 
-			// // container := new(mockContainer)
-			// // container.On("getContainerReference", nil, bucket)
+			bucket := "b"
+			key := "k"
 
-			// blob := new(mockBlob)
-			// defer blob.AssertExpectations(t)
-			// // blob.On("getBlobReference", container, key).Return(blob, tc.getBlobError)
-			// blob.On("Exists").Return(tc.exists, tc.errorResponse)
+			blob := new(mockBlob)
+			defer blob.AssertExpectations(t)
+			blobGetter.On("getBlob", bucket, key).Return(blob, tc.getBlobError)
 
-			// exists, err := o.ObjectExists(bucket, key)
+			blob.On("Exists").Return(tc.exists, tc.errorResponse)
 
-			// if tc.expectedError != "" {
-			// 	assert.EqualError(t, err, tc.expectedError)
-			// 	return
-			// }
-			// require.NoError(t, err)
+			exists, err := o.ObjectExists(bucket, key)
 
-			// assert.Equal(t, tc.expectedExists, exists)
+			if tc.expectedError != "" {
+				assert.EqualError(t, err, tc.expectedError)
+				return
+			}
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expectedExists, exists)
 		})
 	}
+}
+
+type mockBlobGetter struct {
+	mock.Mock
+}
+
+func (m *mockBlobGetter) getBlob(bucket string, key string) (blob, error) {
+	args := m.Called(bucket, key)
+	return args.Get(0).(blob), args.Error(1)
 }
 
 type mockBlob struct {
 	mock.Mock
 }
 
+func (m *mockBlob) CreateBlockBlobFromReader(blob io.Reader, options *storage.PutBlobOptions) error {
+	args := m.Called(blob, options)
+	return args.Error(0)
+}
+
 func (m *mockBlob) Exists() (bool, error) {
 	args := m.Called()
 	return args.Bool(0), args.Error(1)
+}
+
+func (m *mockBlob) Get(options *storage.GetBlobOptions) (io.ReadCloser, error) {
+	args := m.Called(options)
+	return args.Get(0).(io.ReadCloser), args.Error(1)
+}
+
+func (m *mockBlob) Delete(options *storage.DeleteBlobOptions) error {
+	args := m.Called(options)
+	return args.Error(0)
+}
+
+func (m *mockBlob) GetSASURI(options *storage.BlobSASOptions) (string, error) {
+	args := m.Called(options)
+	return args.String(0), args.Error(1)
+}
+
+type mockContainerGetter struct {
+	mock.Mock
+}
+
+func (m *mockContainerGetter) getContainer(bucket string) (container, error) {
+	args := m.Called(bucket)
+	return args.Get(0).(container), args.Error(1)
+}
+
+type mockContainer struct {
+	mock.Mock
+}
+
+func (m *mockContainer) ListBlobs(params storage.ListBlobsParameters) (storage.BlobListResponse, error) {
+	args := m.Called(params)
+	return args.Get(0).(storage.BlobListResponse), args.Error(1)
 }

@@ -158,18 +158,21 @@ func (c *backupController) processBackup(key string) error {
 	log.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		log.WithError(err).Errorf("error splitting key")
+		return nil
 	}
 
 	log.Debug("Getting backup")
 	original, err := c.lister.Backups(ns).Get(name)
 	if apierrors.IsNotFound(err) {
-		log.Debug("backup not found")
+		log.Debugf("backup %s not found", name)
 		return nil
 	}
 	if err != nil {
 		return errors.Wrap(err, "error getting backup")
 	}
+
+	fmt.Println("original name is.....---- ", original.Name)
 
 	// Double-check we have the correct phase. In the unlikely event that multiple controller
 	// instances are running, it's possible for controller A to succeed in changing the phase to
@@ -195,6 +198,9 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
 		request.Status.StartTimestamp.Time = c.clock.Now()
 	}
+
+	fmt.Println("request.Backup.Name name is.....---- ", request.Backup.Name)
+	fmt.Println("original name is.....---- ", original.Name)
 
 	// update status
 	updatedBackup, err := patchBackup(original, request.Backup, c.client)
@@ -284,11 +290,12 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = request.Spec.StorageLocation
 
-	// validate the included/excluded resources and namespaces
+	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
+	// validate the included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
@@ -410,6 +417,8 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 }
 
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
+	fmt.Println("runbackup name is.....---- ", backup.Name)
+
 	log := c.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
@@ -451,6 +460,12 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	}
 
 	var errs []error
+	errs = append(errs, validateUniqueness(backupStore, backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)...)
+	if len(errs) > 0 {
+		backup.Status.Phase = velerov1api.BackupPhaseFailed
+		backup.Status.CompletionTimestamp.Time = c.clock.Now()
+		return kerrors.NewAggregate(errs)
+	}
 
 	// Do the actual backup
 	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
@@ -481,6 +496,18 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
+}
+
+func validateUniqueness(backupStore persistence.BackupStore, bucket, name string) []error {
+	var errs []error
+	exists, err := backupStore.BackupExists(bucket, name)
+	if err != nil {
+		errs = append(errs, errors.Errorf("Error checking if backup already exists in object storage: %v", err))
+	}
+	if exists {
+		errs = append(errs, errors.Errorf("Backup already exists in object storage"))
+	}
+	return errs
 }
 
 func recordBackupMetrics(backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {
