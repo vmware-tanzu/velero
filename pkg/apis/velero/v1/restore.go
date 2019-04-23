@@ -82,9 +82,13 @@ const (
 	// RestorePhaseInProgress means the restore is currently executing.
 	RestorePhaseInProgress RestorePhase = "InProgress"
 
-	// RestorePhaseCompleted means the restore has finished executing.
-	// Any relevant warnings or errors will be captured in the Status.
+	// RestorePhaseCompleted means the restore has run successfully
+	// without errors.
 	RestorePhaseCompleted RestorePhase = "Completed"
+
+	// RestorePhasePartiallyFailed means the restore has run to completion
+	// but encountered 1+ errors restoring individual items.
+	RestorePhasePartiallyFailed RestorePhase = "PartiallyFailed"
 
 	// RestorePhaseFailed means the restore was unable to execute.
 	// The failing error is recorded in status.FailureReason.

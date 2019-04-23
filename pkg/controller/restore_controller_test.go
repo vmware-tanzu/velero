@@ -300,6 +300,7 @@ func TestProcessQueueItem(t *testing.T) {
 			restorerError:         errors.New("blarg"),
 			expectedErr:           false,
 			expectedPhase:         string(api.RestorePhaseInProgress),
+			expectedFinalPhase:    string(api.RestorePhasePartiallyFailed),
 			expectedRestoreErrors: 1,
 			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
 		},
@@ -595,7 +596,7 @@ func TestProcessQueueItem(t *testing.T) {
 			if test.expectedFinalPhase != "" {
 				expected = Patch{
 					Status: StatusPatch{
-						Phase:  api.RestorePhaseCompleted,
+						Phase:  api.RestorePhase(test.expectedFinalPhase),
 						Errors: test.expectedRestoreErrors,
 					},
 				}
