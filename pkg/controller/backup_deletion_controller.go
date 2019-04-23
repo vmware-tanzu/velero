@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
+	"github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,11 +32,12 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
@@ -196,7 +197,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
 
 		if req.Labels[v1.BackupNameLabel] == "" {
-			req.Labels[v1.BackupNameLabel] = req.Spec.BackupName
+			req.Labels[v1.BackupNameLabel] = label.GetValidName(req.Spec.BackupName)
 		}
 	})
 	if err != nil {
@@ -390,7 +391,7 @@ func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, plugi
 func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
-		v1.BackupNameLabel: req.Spec.BackupName,
+		v1.BackupNameLabel: label.GetValidName(req.Spec.BackupName),
 	}))
 	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(req.Namespace).List(selector)
 	if err != nil {

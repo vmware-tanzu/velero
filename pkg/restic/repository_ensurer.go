@@ -32,6 +32,7 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 )
 
 // repositoryEnsurer ensures that Velero restic repositories are created and ready.
@@ -99,8 +100,8 @@ func newRepositoryEnsurer(repoInformer velerov1informers.ResticRepositoryInforme
 
 func repoLabels(volumeNamespace, backupLocation string) labels.Set {
 	return map[string]string{
-		velerov1api.ResticVolumeNamespaceLabel: volumeNamespace,
-		velerov1api.StorageLocationLabel:       backupLocation,
+		velerov1api.ResticVolumeNamespaceLabel: label.GetValidName(volumeNamespace),
+		velerov1api.StorageLocationLabel:       label.GetValidName(backupLocation),
 	}
 }
 

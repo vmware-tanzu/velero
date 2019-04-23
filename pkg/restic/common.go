@@ -30,6 +30,7 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
@@ -125,7 +126,7 @@ type SnapshotIdentifier struct {
 // a given Velero backup.
 func GetSnapshotsInBackup(backup *velerov1api.Backup, podVolumeBackupLister velerov1listers.PodVolumeBackupLister) ([]SnapshotIdentifier, error) {
 	selector := labels.Set(map[string]string{
-		velerov1api.BackupNameLabel: backup.Name,
+		velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 	}).AsSelector()
 
 	podVolumeBackups, err := podVolumeBackupLister.List(selector)
@@ -189,7 +190,7 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespac
 // find PodVolumeBackups for the backup identified by name.
 func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, name),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name)),
 	}
 }
 
@@ -197,7 +198,7 @@ func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
 // find PodVolumeRestores for the restore identified by name.
 func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, name),
+		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.RestoreNameLabel, label.GetValidName(name)),
 	}
 }
 

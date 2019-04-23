@@ -215,9 +215,10 @@ func TestGetVolumesToBackup(t *testing.T) {
 
 func TestGetSnapshotsInBackup(t *testing.T) {
 	tests := []struct {
-		name             string
-		podVolumeBackups []velerov1api.PodVolumeBackup
-		expected         []SnapshotIdentifier
+		name                  string
+		podVolumeBackups      []velerov1api.PodVolumeBackup
+		expected              []SnapshotIdentifier
+		longBackupNameEnabled bool
 	}{
 		{
 			name:             "no pod volume backups",
@@ -294,6 +295,53 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                  "some pod volume backups with matching label and backup name greater than 63 chars",
+			longBackupNameEnabled: true,
+			podVolumeBackups: []velerov1api.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "foo", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-1"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "bar", Labels: map[string]string{velerov1api.BackupNameLabel: "non-matching-backup-2"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-2", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-2"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "the-really-long-backup-name-that-is-much-more-than-63-cha6ca4bc"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-3"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "completed-pvb-2", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-1"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: "snap-4"},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "incomplete-or-failed-pvb", Labels: map[string]string{velerov1api.BackupNameLabel: "backup-1"}},
+					Spec: velerov1api.PodVolumeBackupSpec{
+						Pod: corev1api.ObjectReference{Name: "pod-1", Namespace: "ns-2"},
+					},
+					Status: velerov1api.PodVolumeBackupStatus{SnapshotID: ""},
+				},
+			},
+			expected: []SnapshotIdentifier{
+				{
+					VolumeNamespace: "ns-1",
+					SnapshotID:      "snap-3",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -306,6 +354,10 @@ func TestGetSnapshotsInBackup(t *testing.T) {
 			)
 
 			veleroBackup.Name = "backup-1"
+
+			if test.longBackupNameEnabled {
+				veleroBackup.Name = "the-really-long-backup-name-that-is-much-more-than-63-characters"
+			}
 
 			for _, pvb := range test.podVolumeBackups {
 				require.NoError(t, pvbInformer.Informer().GetStore().Add(pvb.DeepCopy()))

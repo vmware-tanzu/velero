@@ -42,6 +42,7 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
@@ -296,7 +297,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	if request.Labels == nil {
 		request.Labels = make(map[string]string)
 	}
-	request.Labels[velerov1api.StorageLocationLabel] = request.Spec.StorageLocation
+	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {

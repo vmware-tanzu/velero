@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
@@ -187,6 +188,53 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			// test hasn't set up the necessary controller dependencies for running backups. So the lack
 			// of segfaults during test execution here imply that backups are not being processed, which
 			// is what we expect.
+		})
+	}
+}
+
+func TestBackupLocationLabel(t *testing.T) {
+	tests := []struct {
+		name                   string
+		backup                 *v1.Backup
+		backupLocation         *v1.BackupStorageLocation
+		expectedBackupLocation string
+	}{
+		{
+			name:                   "valid backup location name should be used as a label",
+			backup:                 velerotest.NewTestBackup().WithName("backup-1").Backup,
+			backupLocation:         velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			expectedBackupLocation: "loc-1",
+		},
+		{
+			name:   "invalid storage location name should be handled while creating label",
+			backup: velerotest.NewTestBackup().WithName("backup-1").Backup,
+			backupLocation: velerotest.NewTestBackupStorageLocation().
+				WithName("defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefault").BackupStorageLocation,
+			expectedBackupLocation: "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultd58343f",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var (
+				clientset       = fake.NewSimpleClientset(test.backup)
+				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
+				logger          = logging.DefaultLogger(logrus.DebugLevel)
+			)
+
+			c := &backupController{
+				genericController:      newGenericController("backup-test", logger),
+				client:                 clientset.VeleroV1(),
+				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
+				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+				defaultBackupLocation:  test.backupLocation.Name,
+				clock:                  &clock.RealClock{},
+			}
+
+			res := c.prepareBackupRequest(test.backup)
+			assert.NotNil(t, res)
+			assert.Equal(t, test.expectedBackupLocation, res.Labels[velerov1api.StorageLocationLabel])
 		})
 	}
 }

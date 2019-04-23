@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/util/boolptr"
 )
 
@@ -233,7 +234,7 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volumeNa
 				},
 			},
 			Labels: map[string]string{
-				velerov1api.BackupNameLabel: backup.Name,
+				velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 				velerov1api.BackupUIDLabel:  string(backup.UID),
 			},
 		},
