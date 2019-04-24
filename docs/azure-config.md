@@ -5,8 +5,7 @@ To configure Velero on Azure, you:
 * Download an official release of Velero
 * Create your Azure storage account and blob container
 * Create Azure service principal for Velero
-* Configure the server
-* Create a Secret for your credentials
+* Install the server
 
 If you do not have the `az` Azure CLI 2.0 installed locally, follow the [install guide][18] to set it up. 
 
@@ -23,7 +22,11 @@ consider using Premium Managed Disks, which are SSD backed.
 
 ## Download Velero
 
-1. Download the [latest release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+1. Download the [latest official release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+
+    _We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
     ```bash
@@ -32,10 +35,6 @@ consider using Premium Managed Disks, which are SSD backed.
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
-
-_We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
-`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
-branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## Create Azure storage account and blob container
 
@@ -71,7 +70,8 @@ az storage account create \
 Create the blob container named `velero`. Feel free to use a different name, preferably unique to a single Kubernetes cluster. See the [FAQ][20] for more details.
 
 ```bash
-az storage container create -n velero --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
+BLOB_CONTAINER=velero
+az storage container create -n $BLOB_CONTAINER --public-access off --account-name $AZURE_STORAGE_ACCOUNT_ID
 ```
 
 ## Get resource group for persistent volume snapshots
@@ -120,47 +120,40 @@ To integrate Velero with Azure, you must create an Velero-specific [service prin
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
-## Credentials and configuration
-
-In the Velero directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML file to specify the namespace. See [Run in custom namespace][0].
+Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
 ```bash
-kubectl apply -f config/common/00-prereqs.yaml
+cat << EOF  > ./credentials-velero
+AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+AZURE_TENANT_ID=${AZURE_TENANT_ID}
+AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+EOF
 ```
 
-Now you need to create a Secret that contains all the environment variables you just set. The command looks like the following:
+## Install and start Velero
+
+Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
 ```bash
-kubectl create secret generic cloud-credentials \
-    --namespace <VELERO_NAMESPACE> \
-    --from-literal AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID} \
-    --from-literal AZURE_TENANT_ID=${AZURE_TENANT_ID} \
-    --from-literal AZURE_CLIENT_ID=${AZURE_CLIENT_ID} \
-    --from-literal AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET} \
-    --from-literal AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+velero install \
+    --provider azure \
+    --bucket $BLOB_CONTAINER \
+    --secret-file ./credentials-velero \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>
 ```
 
-Now that you have your Azure credentials stored in a Secret, you need to replace some placeholder values in the template files. Specifically, you need to change the following:
+Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-* In file `config/azure/05-backupstoragelocation.yaml`:
+For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
-  * Replace `<YOUR_BLOB_CONTAINER>`, `<YOUR_STORAGE_RESOURCE_GROUP>`, and `<YOUR_STORAGE_ACCOUNT>`. See the [BackupStorageLocation definition][21] for details.
+## Installing the nginx example (optional)
 
-* In file `config/azure/06-volumesnapshotlocation.yaml`:
+If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
-  * Replace `<YOUR_TIMEOUT>`. See the [VolumeSnapshotLocation definition][8] for details.
-
-* (Optional, use only if you need to specify multiple volume snapshot locations) In `config/azure/00-deployment.yaml`:
-
-  * Uncomment the `--default-volume-snapshot-locations` and replace provider locations with the values for your environment.
-
-## Start the server
-
-In the root of your Velero directory, run:
-
-  ```bash
-  kubectl apply -f config/azure/
-  ```
+    * Replace `<YOUR_STORAGE_CLASS_NAME>` with `default`. This is Azure's default `StorageClass` name.
 
 [0]: namespace.md
 [8]: api-types/volumesnapshotlocation.md#azure

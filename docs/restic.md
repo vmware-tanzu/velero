@@ -23,42 +23,28 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 ### Prerequisites
 
-- A working install of Velero version 0.10.0 or later. See [Set up Velero][2]
-- A local clone of [the latest release tag of the Velero repository][3]
 - Velero's restic integration requires the Kubernetes [MountPropagation feature][6], which is enabled by default in Kubernetes v1.10.0 and later.
-
 
 ### Instructions
 
-1. Ensure you've [downloaded & extracted the latest release][3].
+Ensure you've [downloaded latest release][3].
 
-1. In the Velero directory (i.e. where you extracted the release tarball), run the following to create new custom resource definitions:
-
-    ```bash
-    kubectl apply -f config/common/00-prereqs.yaml
-    ```
-
-1. Run one of the following for your platform to create the daemonset:
+To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
    Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
-   thereby requires modifying the restic-daemonset.yaml before applying.
+   thereby requires modifying the restic daemonset after installing.
 
-   ```
-   hostPath:
-   path: /var/lib/kubelet/pods
-   ```
+  ```yaml
+  hostPath:
+    path: /var/lib/kubelet/pods
+  ```
 
-   to 
+  to
 
-   ```
-   hostPath:
-   path: /opt/rke/var/lib/kubelet/pods
-   ```
-
-    - AWS: `kubectl apply -f config/aws/20-restic-daemonset.yaml`
-    - Azure: `kubectl apply -f config/azure/20-restic-daemonset.yaml`
-    - GCP: `kubectl apply -f config/gcp/20-restic-daemonset.yaml`
-    - Minio: `kubectl apply -f config/minio/30-restic-daemonset.yaml`
+  ```yaml
+  hostPath:
+    path: /opt/rke/var/lib/kubelet/pods
+  ```
 
 You're now ready to use Velero with restic.
 
@@ -70,11 +56,11 @@ You're now ready to use Velero with restic.
     kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
 
-    where the volume names are the names of the volumes in the pod spec. 
-    
+    where the volume names are the names of the volumes in the pod spec.
+
     For example, for the following pod:
 
-    ```bash
+    ```yaml
     apiVersion: v1
     kind: Pod
     metadata:
@@ -98,6 +84,7 @@ You're now ready to use Velero with restic.
     ```
 
     You'd run:
+
     ```bash
     kubectl -n foo annotate pod/sample backup.velero.io/backup-volumes=pvc-volume,emptydir-volume
     ```
@@ -127,7 +114,7 @@ You're now ready to use Velero with restic.
     ```
 
 1. When the restore completes, view information about your pod volume restores:
-    
+
     ```bash
     velero restore describe YOUR_RESTORE_NAME
 
