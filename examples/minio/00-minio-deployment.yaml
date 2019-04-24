@@ -13,6 +13,12 @@
 # limitations under the License.
 
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: velero
+
+---
 apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
@@ -73,20 +79,6 @@ spec:
       protocol: TCP
   selector:
     component: minio
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  namespace: velero
-  name: cloud-credentials
-  labels:
-    component: minio
-stringData:
-  cloud: |
-    [default]
-    aws_access_key_id = minio
-    aws_secret_access_key = minio123
 
 ---
 apiVersion: batch/v1
