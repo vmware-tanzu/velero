@@ -50,6 +50,15 @@ the supported options. For example, if you use [Portworx][102] for persistent st
 of your Velero backups. If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][20], which provides a
 platform-agnostic backup solution for volume data.
 
+## Removing Velero
+
+If you would like to completely uninstall Velero from your cluster, the following commands will remove all resources created by `velero install`:
+
+```bash
+kubectl delete namespace/velero clusterrolebinding/velero
+kubectl delete crds -l component=velero
+```
+
 ## Examples
 
 After you set up the Velero server, try these examples:
