@@ -220,30 +220,29 @@ func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	log.Debug("Checking if object exists")
 	_, err := o.s3.HeadObject(req)
 
-	if err == nil {
-		log.Debug("Object exists")
-		return true, nil
-	}
+	if err != nil {
+		log.Debug("Checking for AWS specific error information")
+		if aerr, ok := err.(awserr.Error); ok {
+			log.WithFields(
+				logrus.Fields{
+					"code":    aerr.Code(),
+					"message": aerr.Message(),
+				},
+			).Debugf("awserr.Error contents (origErr=%v)", aerr.OrigErr())
 
-	log.Debug("Checking for AWS specific error information")
-	if aerr, ok := err.(awserr.Error); ok {
-		log.WithFields(
-			logrus.Fields{
-				"code":    aerr.Code(),
-				"message": aerr.Message(),
-			},
-		).Debugf("awserr.Error contents (origErr=%v)", aerr.OrigErr())
-
-		// The code will be NotFound if the key doesn't exist.
-		// See https://github.com/aws/aws-sdk-go/issues/1208 and https://github.com/aws/aws-sdk-go/pull/1213.
-		log.Debugf("Checking for code=%s", notFoundCode)
-		if aerr.Code() == notFoundCode {
-			log.Debug("Object doesn't exist - got not found")
-			return false, nil
+			// The code will be NotFound if the key doesn't exist.
+			// See https://github.com/aws/aws-sdk-go/issues/1208 and https://github.com/aws/aws-sdk-go/pull/1213.
+			log.Debugf("Checking for code=%s", notFoundCode)
+			if aerr.Code() == notFoundCode {
+				log.Debug("Object doesn't exist - got not found")
+				return false, nil
+			}
 		}
+		return false, errors.WithStack(err)
 	}
 
-	return false, errors.WithStack(err)
+	log.Debug("Object exists")
+	return true, nil
 }
 
 func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {

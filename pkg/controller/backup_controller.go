@@ -172,8 +172,6 @@ func (c *backupController) processBackup(key string) error {
 		return errors.Wrap(err, "error getting backup")
 	}
 
-	fmt.Println("original name is.....---- ", original.Name)
-
 	// Double-check we have the correct phase. In the unlikely event that multiple controller
 	// instances are running, it's possible for controller A to succeed in changing the phase to
 	// InProgress, while controller B's attempt to patch the phase fails. When controller B
@@ -198,9 +196,6 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
 		request.Status.StartTimestamp.Time = c.clock.Now()
 	}
-
-	fmt.Println("request.Backup.Name name is.....---- ", request.Backup.Name)
-	fmt.Println("original name is.....---- ", original.Name)
 
 	// update status
 	updatedBackup, err := patchBackup(original, request.Backup, c.client)
@@ -417,8 +412,6 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 }
 
 func (c *backupController) runBackup(backup *pkgbackup.Request) error {
-	fmt.Println("runbackup name is.....---- ", backup.Name)
-
 	log := c.logger.WithField("backup", kubeutil.NamespaceAndName(backup))
 	log.Info("Starting backup")
 
@@ -459,15 +452,18 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	var errs []error
-	errs = append(errs, validateUniqueness(backupStore, backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)...)
-	if len(errs) > 0 {
+	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
+	if exists || err != nil {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
 		backup.Status.CompletionTimestamp.Time = c.clock.Now()
-		return kerrors.NewAggregate(errs)
+		if err != nil {
+			return errors.Errorf("Error checking if backup already exists in object storage: %v", err)
+		}
+		return errors.Errorf("Backup already exists in object storage")
 	}
 
 	// Do the actual backup
+	var errs []error
 	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
 		errs = append(errs, err)
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
@@ -496,18 +492,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	log.Info("Backup completed")
 
 	return kerrors.NewAggregate(errs)
-}
-
-func validateUniqueness(backupStore persistence.BackupStore, bucket, name string) []error {
-	var errs []error
-	exists, err := backupStore.BackupExists(bucket, name)
-	if err != nil {
-		errs = append(errs, errors.Errorf("Error checking if backup already exists in object storage: %v", err))
-	}
-	if exists {
-		errs = append(errs, errors.Errorf("Backup already exists in object storage"))
-	}
-	return errs
 }
 
 func recordBackupMetrics(backup *velerov1api.Backup, backupFile *os.File, serverMetrics *metrics.ServerMetrics) error {

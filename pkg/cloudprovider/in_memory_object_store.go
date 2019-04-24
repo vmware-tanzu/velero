@@ -76,8 +76,7 @@ func (o *InMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
 		return false, errors.New("bucket not found")
 	}
 
-	_, ok = bucketData[key]
-	if !ok {
+	if _, ok = bucketData[key]; !ok {
 		return false, errors.New("key not found")
 	}
 

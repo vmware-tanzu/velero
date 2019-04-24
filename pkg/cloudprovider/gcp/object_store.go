@@ -125,14 +125,14 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	_, err := o.bucketWriter.getAttrs(bucket, key)
 
-	switch err {
-	case nil:
-		return true, nil
-	case storage.ErrObjectNotExist:
-		return false, nil
+	if err != nil {
+		if err == storage.ErrObjectNotExist {
+			return false, nil
+		}
+		return false, errors.WithStack(err)
 	}
 
-	return false, errors.WithStack(err)
+	return true, nil
 }
 
 func (o *ObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {

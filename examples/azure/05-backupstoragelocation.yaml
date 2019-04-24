@@ -21,7 +21,7 @@ metadata:
 spec:
   provider: azure
   objectStorage:
-    bucket: <YOUR_BLOB_CONTAINER> 
+    bucket: velero 
   config:
-    resourceGroup: <YOUR_STORAGE_RESOURCE_GROUP>
-    storageAccount: <YOUR_STORAGE_ACCOUNT>
+    resourceGroup: VeleroDev
+    storageAccount: velero89312100bd0c

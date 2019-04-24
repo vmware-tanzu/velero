@@ -56,14 +56,12 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 	return args.Error(0)
 }
 
-func TestProcessBackupProcessing(t *testing.T) {
+func TestProcessBackupNonProcessedItems(t *testing.T) {
 	tests := []struct {
-		name        string
-		key         string
-		backup      *v1.Backup
-		expectedErr string
+		name   string
+		key    string
+		backup *v1.Backup
 	}{
-		// processed successfully
 		{
 			name: "bad key does not return error",
 			key:  "bad/key/here",
@@ -72,8 +70,6 @@ func TestProcessBackupProcessing(t *testing.T) {
 			name: "backup not found in lister does not return error",
 			key:  "nonexistent/backup",
 		},
-
-		// skipped
 		{
 			name:   "FailedValidation backup is not processed",
 			key:    "velero/backup-1",
@@ -113,12 +109,7 @@ func TestProcessBackupProcessing(t *testing.T) {
 			}
 
 			err := c.processBackup(test.key)
-			if test.expectedErr != "" {
-				require.Error(t, err)
-				assert.Equal(t, test.expectedErr, err.Error())
-			} else {
-				assert.Nil(t, err)
-			}
+			assert.Nil(t, err)
 
 			// Any backup that would actually proceed to validation will cause a segfault because this
 			// test hasn't set up the necessary controller dependencies for validation/etc. So the lack
@@ -345,7 +336,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			},
 		},
 		{
-			name:           "backup with existing backup will fail",
+			name:           "backup without an existing backup will succeed",
 			backupExists:   false,
 			backup:         velerotest.NewTestBackup().WithName("backup-1").Backup,
 			backupLocation: defaultBackupLocation,
@@ -487,8 +478,6 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			res, err := clientset.VeleroV1().Backups(test.backup.Namespace).Get(test.backup.Name, metav1.GetOptions{})
 			require.NoError(t, err)
-
-			// failed tests for failed backup should have a phase of failed
 
 			assert.Equal(t, test.expectedResult, res)
 		})

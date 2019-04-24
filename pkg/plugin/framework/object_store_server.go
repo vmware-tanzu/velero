@@ -143,7 +143,7 @@ func (s *ObjectStoreGRPCServer) ObjectExists(ctx context.Context, req *proto.Obj
 
 	exists, err := impl.ObjectExists(req.Bucket, req.Key)
 	if err != nil {
-		return nil, err
+		return nil, newGRPCError(err)
 	}
 
 	return &proto.ObjectExistsResponse{Exists: exists}, nil
