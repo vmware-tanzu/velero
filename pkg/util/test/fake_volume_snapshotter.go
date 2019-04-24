@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,19 +21,24 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
+
+type VolumeBackupInfo struct {
+	SnapshotID       string
+	Type             string
+	Iops             *int64
+	AvailabilityZone string
+}
 
 type FakeVolumeSnapshotter struct {
 	// SnapshotID->VolumeID
 	SnapshotsTaken sets.String
 
 	// VolumeID -> (SnapshotID, Type, Iops)
-	SnapshottableVolumes map[string]api.VolumeBackupInfo
+	SnapshottableVolumes map[string]VolumeBackupInfo
 
 	// VolumeBackupInfo -> VolumeID
-	RestorableVolumes map[api.VolumeBackupInfo]string
+	RestorableVolumes map[VolumeBackupInfo]string
 
 	VolumeID    string
 	VolumeIDSet string
@@ -67,7 +72,7 @@ func (bs *FakeVolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType
 		return "", bs.Error
 	}
 
-	key := api.VolumeBackupInfo{
+	key := VolumeBackupInfo{
 		SnapshotID:       snapshotID,
 		Type:             volumeType,
 		Iops:             iops,

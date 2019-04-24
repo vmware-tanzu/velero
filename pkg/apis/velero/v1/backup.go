@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -191,27 +191,6 @@ type BackupStatus struct {
 	// VolumeSnapshotsCompleted is the total number of successfully
 	// completed volume snapshots for this backup.
 	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted"`
-}
-
-// VolumeBackupInfo captures the required information about
-// a PersistentVolume at backup time to be able to restore
-// it later.
-type VolumeBackupInfo struct {
-	// SnapshotID is the ID of the snapshot taken in the cloud
-	// provider API of this volume.
-	SnapshotID string `json:"snapshotID"`
-
-	// Type is the type of the disk/volume in the cloud provider
-	// API.
-	Type string `json:"type"`
-
-	// AvailabilityZone is the where the volume is provisioned
-	// in the cloud provider.
-	AvailabilityZone string `json:"availabilityZone,omitempty"`
-
-	// Iops is the optional value of provisioned IOPS for the
-	// disk/volume in the cloud provider API.
-	Iops *int64 `json:"iops,omitempty"`
 }
 
 // +genclient
