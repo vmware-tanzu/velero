@@ -11,7 +11,11 @@ To set up IBM Cloud Object Storage (COS) as Velero's destination, you:
 
 ## Download Velero
 
-1. Download the [latest release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+1. Download the [latest official release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+
+    _We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
     ```bash
@@ -20,10 +24,6 @@ To set up IBM Cloud Object Storage (COS) as Velero's destination, you:
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
-
-_We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
-`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
-branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## Create COS instance
 If you don’t have a COS instance, you can create a new one, according to the detailed instructions in [Creating a new resource instance][1].
@@ -51,40 +51,34 @@ Several comments:
 
     where the access key id and secret are the values that we got above.
 
-## Credentials and configuration
+## Install and start Velero
 
-In the Velero directory (i.e. where you extracted the release tarball), run the following to first set up namespaces, RBAC, and other scaffolding. To run in a custom namespace, make sure that you have edited the YAML files to specify the namespace. See [Run in custom namespace][0].
-
-```bash
-kubectl apply -f config/common/00-prereqs.yaml
-```
-
-Create a Secret. In the directory of the credentials file you just created, run:
+Install Velero, including all prerequisites, into the cluster and start the deployment. This will create a namespace called `velero`, and place a deployment named `velero` in it.
 
 ```bash
-kubectl create secret generic cloud-credentials \
-    --namespace <VELERO_NAMESPACE> \
-    --from-file cloud=credentials-velero
+velero install \
+    --provider aws \
+    --bucket <YOUR_BUCKET> \
+    --secret-file ./credentials-velero
+    --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>
 ```
 
-Specify the following values in the example files:
+Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-* In `config/ibm/05-backupstoragelocation.yaml`:
+Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
 
-  * Replace `<YOUR_BUCKET>`, `<YOUR_REGION>` and `<YOUR_URL_ACCESS_POINT>`. See the [BackupStorageLocation definition][6] for details.
+```bash
+kubectl -n velero delete volumesnapshotlocation.velero.io default
+```
 
-* (Optional) If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
+For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
+
+## Installing the nginx example (optional)
+
+If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.
 
-## Start the Velero server
-
-In the root of your Velero directory, run:
-
-  ```bash
-  kubectl apply -f config/ibm/05-backupstoragelocation.yaml
-  kubectl apply -f config/ibm/10-deployment.yaml
-  ```
 
   [0]: namespace.md
   [1]: https://console.bluemix.net/docs/services/cloud-object-storage/basics/order-storage.html#creating-a-new-resource-instance
