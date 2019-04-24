@@ -72,6 +72,7 @@ var _ Helper = &helper{}
 func NewHelper(discoveryClient discovery.DiscoveryInterface, logger logrus.FieldLogger) (Helper, error) {
 	h := &helper{
 		discoveryClient: discoveryClient,
+		logger:          logger,
 	}
 	if err := h.Refresh(); err != nil {
 		return nil, err
