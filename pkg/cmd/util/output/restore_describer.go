@@ -43,7 +43,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 
 		resultsNote := ""
 		if phase == v1.RestorePhaseFailed || phase == v1.RestorePhasePartiallyFailed {
-			resultsNote = fmt.Sprintf(" (run velero restore describe %s or velero restore logs %s for more information)", restore.Name, restore.Name)
+			resultsNote = fmt.Sprintf(" (run 'velero restore logs %s' for more information)", restore.Name)
 		}
 
 		d.Printf("Phase:\t%s%s\n", restore.Status.Phase, resultsNote)
