@@ -218,9 +218,7 @@ func (o *ObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	}
 
 	log.Debug("Checking if object exists")
-	_, err := o.s3.HeadObject(req)
-
-	if err != nil {
+	if _, err := o.s3.HeadObject(req); err != nil {
 		log.Debug("Checking for AWS specific error information")
 		if aerr, ok := err.(awserr.Error); ok {
 			log.WithFields(
