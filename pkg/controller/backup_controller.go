@@ -457,9 +457,9 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
 		backup.Status.CompletionTimestamp.Time = c.clock.Now()
 		if err != nil {
-			return errors.Errorf("Error checking if backup already exists in object storage: %v", err)
+			return errors.Wrapf(err, "error checking if backup already exists in object storage")
 		}
-		return errors.Errorf("Backup already exists in object storage")
+		return errors.Errorf("backup already exists in object storage")
 	}
 
 	// Do the actual backup

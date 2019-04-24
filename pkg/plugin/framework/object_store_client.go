@@ -99,6 +99,7 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 // ObjectExists checks if there is an object with the given key in the object storage bucket.
 func (c *ObjectStoreGRPCClient) ObjectExists(bucket, key string) (bool, error) {
 	req := &proto.ObjectExistsRequest{
+		Plugin: c.plugin,
 		Bucket: bucket,
 		Key:    key,
 	}
