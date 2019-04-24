@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/util/diff"
 	core "k8s.io/client-go/testing"
 )
 
@@ -101,9 +102,8 @@ func AssertDeepEqual(t *testing.T, expected, actual interface{}) bool {
 	}
 
 	if !equality.Semantic.DeepEqual(expected, actual) {
-		fmt.Printf("expected = %+v\n", expected)
-		fmt.Printf("actual = %+v\n", actual)
-		return assert.Fail(t, fmt.Sprintf("Objects not equal"))
+		s := diff.ObjectDiff(expected, actual)
+		return assert.Fail(t, fmt.Sprintf("Objects not equal:\n\n%s", s))
 	}
 
 	return true

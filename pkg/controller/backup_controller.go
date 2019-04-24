@@ -158,11 +158,16 @@ func (c *backupController) processBackup(key string) error {
 	log.Debug("Running processBackup")
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		return errors.Wrap(err, "error splitting queue key")
+		log.WithError(err).Errorf("error splitting key")
+		return nil
 	}
 
 	log.Debug("Getting backup")
 	original, err := c.lister.Backups(ns).Get(name)
+	if apierrors.IsNotFound(err) {
+		log.Debugf("backup %s not found", name)
+		return nil
+	}
 	if err != nil {
 		return errors.Wrap(err, "error getting backup")
 	}
@@ -280,11 +285,12 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = request.Spec.StorageLocation
 
-	// validate the included/excluded resources and namespaces
+	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded resource lists: %v", err))
 	}
 
+	// validate the included/excluded namespaces
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedNamespaces, request.Spec.ExcludedNamespaces) {
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
@@ -446,9 +452,18 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	var errs []error
+	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
+	if exists || err != nil {
+		backup.Status.Phase = velerov1api.BackupPhaseFailed
+		backup.Status.CompletionTimestamp.Time = c.clock.Now()
+		if err != nil {
+			return errors.Wrapf(err, "error checking if backup already exists in object storage")
+		}
+		return errors.Errorf("backup already exists in object storage")
+	}
 
 	// Do the actual backup
+	var errs []error
 	if err := c.backupper.Backup(log, backup, backupFile, actions, pluginManager); err != nil {
 		errs = append(errs, err)
 		backup.Status.Phase = velerov1api.BackupPhaseFailed

@@ -47,6 +47,10 @@ type BackupStore interface {
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
+
+	// BackupExists checks if the backup metadata file exists in object storage.
+	BackupExists(bucket, backupName string) (bool, error)
+
 	DeleteBackup(name string) error
 
 	PutRestoreLog(backup, restore string, log io.Reader) error
@@ -286,6 +290,10 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
 	return s.objectStore.GetObject(s.bucket, s.layout.getBackupContentsKey(name))
+}
+
+func (s *objectBackupStore) BackupExists(bucket, backupName string) (bool, error) {
+	return s.objectStore.ObjectExists(bucket, s.layout.getBackupMetadataKey(backupName))
 }
 
 func (s *objectBackupStore) DeleteBackup(name string) error {

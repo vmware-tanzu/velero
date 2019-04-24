@@ -144,6 +144,27 @@ func (_m *ObjectStore) ListObjects(bucket string, prefix string) ([]string, erro
 	return r0, r1
 }
 
+// ObjectExists provides a mock function with given fields: bucket, key
+func (_m *ObjectStore) ObjectExists(bucket string, key string) (bool, error) {
+	ret := _m.Called(bucket, key)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(string, string) bool); ok {
+		r0 = rf(bucket, key)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(bucket, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // PutObject provides a mock function with given fields: bucket, key, body
 func (_m *ObjectStore) PutObject(bucket string, key string, body io.Reader) error {
 	ret := _m.Called(bucket, key, body)

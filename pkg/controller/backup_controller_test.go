@@ -58,20 +58,17 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
 	tests := []struct {
-		name        string
-		key         string
-		backup      *v1.Backup
-		expectedErr string
+		name   string
+		key    string
+		backup *v1.Backup
 	}{
 		{
-			name:        "bad key returns error",
-			key:         "bad/key/here",
-			expectedErr: "error splitting queue key: unexpected key format: \"bad/key/here\"",
+			name: "bad key does not return error",
+			key:  "bad/key/here",
 		},
 		{
-			name:        "backup not found in lister returns error",
-			key:         "nonexistent/backup",
-			expectedErr: "error getting backup: backup.velero.io \"backup\" not found",
+			name: "backup not found in lister does not return error",
+			key:  "nonexistent/backup",
 		},
 		{
 			name:   "FailedValidation backup is not processed",
@@ -112,12 +109,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 			}
 
 			err := c.processBackup(test.key)
-			if test.expectedErr != "" {
-				require.Error(t, err)
-				assert.Equal(t, test.expectedErr, err.Error())
-			} else {
-				assert.Nil(t, err)
-			}
+			assert.Nil(t, err)
 
 			// Any backup that would actually proceed to validation will cause a segfault because this
 			// test hasn't set up the necessary controller dependencies for validation/etc. So the lack
@@ -255,18 +247,21 @@ func TestDefaultBackupTTL(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
+	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").WithObjectStorage("store-1").BackupStorageLocation
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
 	now = now.Local()
 
 	tests := []struct {
-		name           string
-		backup         *v1.Backup
-		backupLocation *v1.BackupStorageLocation
-		expectedResult *v1.Backup
+		name                string
+		backup              *v1.Backup
+		backupLocation      *v1.BackupStorageLocation
+		expectedResult      *v1.Backup
+		backupExists        bool
+		existenceCheckError error
 	}{
+		// Completed
 		{
 			name:           "backup with no backup location gets the default",
 			backup:         velerotest.NewTestBackup().WithName("backup-1").Backup,
@@ -294,7 +289,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:           "backup with a specific backup location keeps it",
 			backup:         velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("alt-loc").Backup,
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("alt-loc").BackupStorageLocation,
+			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("alt-loc").WithObjectStorage("store-1").BackupStorageLocation,
 			expectedResult: &v1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: v1.DefaultNamespace,
@@ -340,6 +335,83 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "backup without an existing backup will succeed",
+			backupExists:   false,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").Backup,
+			backupLocation: defaultBackupLocation,
+			expectedResult: &v1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: v1.DefaultNamespace,
+					Name:      "backup-1",
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: v1.BackupSpec{
+					StorageLocation: defaultBackupLocation.Name,
+				},
+				Status: v1.BackupStatus{
+					Phase:               v1.BackupPhaseCompleted,
+					Version:             1,
+					StartTimestamp:      metav1.NewTime(now),
+					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
+				},
+			},
+		},
+
+		// Failed
+		{
+			name:           "backup with existing backup will fail",
+			backupExists:   true,
+			backup:         velerotest.NewTestBackup().WithName("backup-1").Backup,
+			backupLocation: defaultBackupLocation,
+			expectedResult: &v1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: v1.DefaultNamespace,
+					Name:      "backup-1",
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: v1.BackupSpec{
+					StorageLocation: defaultBackupLocation.Name,
+				},
+				Status: v1.BackupStatus{
+					Phase:               v1.BackupPhaseFailed,
+					Version:             1,
+					StartTimestamp:      metav1.NewTime(now),
+					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
+				},
+			},
+		},
+		{
+			name:                "error when checking if backup exists will cause backup to fail",
+			backup:              velerotest.NewTestBackup().WithName("backup-1").Backup,
+			existenceCheckError: errors.New("Backup already exists in object storage"),
+			backupLocation:      defaultBackupLocation,
+			expectedResult: &v1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: v1.DefaultNamespace,
+					Name:      "backup-1",
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: v1.BackupSpec{
+					StorageLocation: defaultBackupLocation.Name,
+				},
+				Status: v1.BackupStatus{
+					Phase:               v1.BackupPhaseFailed,
+					Version:             1,
+					StartTimestamp:      metav1.NewTime(now),
+					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -380,6 +452,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			completionTimestampIsPresent := func(buf *bytes.Buffer) bool {
 				return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 			}
+			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			// add the test's backup to the informer/lister store

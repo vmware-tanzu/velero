@@ -96,6 +96,22 @@ func (c *ObjectStoreGRPCClient) PutObject(bucket, key string, body io.Reader) er
 	}
 }
 
+// ObjectExists checks if there is an object with the given key in the object storage bucket.
+func (c *ObjectStoreGRPCClient) ObjectExists(bucket, key string) (bool, error) {
+	req := &proto.ObjectExistsRequest{
+		Plugin: c.plugin,
+		Bucket: bucket,
+		Key:    key,
+	}
+
+	res, err := c.grpcClient.ObjectExists(context.Background(), req)
+	if err != nil {
+		return false, err
+	}
+
+	return res.Exists, nil
+}
+
 // GetObject retrieves the object with the given key from the specified
 // bucket in object storage.
 func (c *ObjectStoreGRPCClient) GetObject(bucket, key string) (io.ReadCloser, error) {

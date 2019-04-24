@@ -70,6 +70,19 @@ func (o *InMemoryObjectStore) PutObject(bucket, key string, body io.Reader) erro
 	return nil
 }
 
+func (o *InMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
+	bucketData, ok := o.Data[bucket]
+	if !ok {
+		return false, errors.New("bucket not found")
+	}
+
+	if _, ok = bucketData[key]; !ok {
+		return false, errors.New("key not found")
+	}
+
+	return true, nil
+}
+
 func (o *InMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
