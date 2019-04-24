@@ -1,3 +1,29 @@
+## v1.0.0-alpha.2
+#### 2019-04-24
+
+### Download
+- https://github.com/heptio/velero/releases/tag/v1.0.0-alpha.2
+
+### Container Image
+`gcr.io/heptio-images/velero:v1.0.0-alpha.2`
+
+### Highlights
+Our second v1.0 alpha is ready for testing! Please try it out in your non-critial environments. This alpha contains a bunch of bug fixes and smaller enhancements. See the **All Changes** section below for details.
+
+We expect that our next release will be `v1.0.0-beta.1`, meaning that all key features for v1.0.0 will be included. Following that release, we'll continue to fix
+bugs and make minor improvements, and we expect to ship at least one more beta and/or release candidate prior to the general availability of v1.0.0.
+
+### All Changes
+* restic repo ensurer: return error if new repository does not become ready within a minute, and fix channel closing/deletion (#1367, @skriss)
+* remove deprecated "hooks" for backups (they've been replaced by "pre hooks") (#1384, @skriss)
+* fix setting up restic identifiers when fully-qualified plugin names are used (#1377, @jmontleon)
+* add `--namespace` flag to `velero install` (@1380, @nrb)
+* GCP: allow `storageLocation` to be specified as a config parameter for VolumeSnapshotLocations (#1375, @ctrox)
+* add new prometheus gauge metrics `backup_total` and `restore_total` (#1353, @fabito)
+* update install docs to use `velero install` (#1376 #1393 #1394, @nrb and @skriss)
+* fix panic in API discovery when 1+ API groups cannot be reached (#1399, @skriss)
+* fail backup if it already exists in object storage (#1390, @carlisia and @ncdc)
+
 ## v1.0.0-alpha.1
 #### 2019-04-15
 
