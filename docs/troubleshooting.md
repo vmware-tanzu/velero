@@ -49,8 +49,7 @@ Alternatively, you might be able to use the Service's `spec.loadBalancerIP` fiel
 
 ### Velero reports `custom resource not found` errors when starting up.
 
-Velero's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `config/common/00-prereqs.yaml` file to create these definitions, then restart Velero.
+Velero's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Run `velero install` again to install any missing custom resource definitions.
 
 ### `velero backup logs` returns a `SignatureDoesNotMatch` error
 

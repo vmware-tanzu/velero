@@ -55,7 +55,7 @@ These instructions start the Velero server and a Minio instance that is accessib
 1. Start the server and the local storage service. In the Velero directory, run:
 
     ```bash
-    kubectl apply -f config/minio/00-minio-deployment.yaml
+    kubectl apply -f examples/minio/00-minio-deployment.yaml
 
     velero install \
         --provider aws \
@@ -75,7 +75,7 @@ These instructions start the Velero server and a Minio instance that is accessib
 1. Deploy the example nginx application:
 
     ```bash
-    kubectl apply -f config/nginx-app/base.yaml
+    kubectl apply -f examples/nginx-app/base.yaml
     ```
 
 1. Check to see that both the Velero and nginx deployments are successfully created:
@@ -183,14 +183,12 @@ Once fully removed, the backup is no longer visible when you run:
 velero backup get BACKUP_NAME
 ```
 
-If you want to uninstall Velero but preserve the backup data in object storage and persistent volume
-snapshots, it is safe to remove the `velero` namespace and everything else created for this
-example:
+To completely uninstall Velero, minio, and the nginx example app from your Kubernetes cluster:
 
 ```
-kubectl delete -f config/common/
-kubectl delete -f config/minio/
-kubectl delete -f config/nginx-app/base.yaml
+kubectl delete namespace/velero clusterrolebinding/velero
+kubectl delete crds -l component=velero
+kubectl delete -f examples/nginx-app/base.yaml
 ```
 
 [31]: expose-minio.md

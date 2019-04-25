@@ -13,9 +13,6 @@
 # limitations under the License.
 
 dist: _output
-before:
-  hooks:
-    - ./hack/set-example-tags.sh
 builds:
   - main: ./cmd/velero/main.go
     env:
@@ -45,7 +42,7 @@ archive:
   wrap_in_directory: true
   files:
     - LICENSE
-    - config/**/*
+    - examples/**/*
 checksum:
   name_template: 'CHECKSUM'
 release:

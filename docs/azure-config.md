@@ -151,7 +151,7 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 
 ## Installing the nginx example (optional)
 
-If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
+If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `default`. This is Azure's default `StorageClass` name.
 

@@ -7,7 +7,6 @@
 _obj
 _test
 _output
-config
 
 # Architecture specific extensions/prefixes
 *.[568vq]
