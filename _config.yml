@@ -3,6 +3,7 @@ baseurl: /velero
 google_analytics: FILL_OUT
 latest: v0.11.0
 versions:
+- v1.0.0-alpha.2
 - v0.11.0
 - v0.10.0
 - v0.9.0
@@ -31,6 +32,11 @@ defaults:
   values:
     version: master
     gh: https://github.com/heptio/velero/tree/master
+- scope:
+    path: v1.0.0-alpha.2
+  values:
+    version: v1.0.0-alpha.2
+    gh: https:/github.com/heptio/velero/tree/v1.0.0-alpha.2
 - scope:
     path: v0.11.0
   values:

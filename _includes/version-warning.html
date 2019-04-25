@@ -8,11 +8,11 @@
     <a href="{{latest_url}}">latest version</a>.
     </p>
   </div>
-{% elsif page.version contains 'beta' %}
+{% elsif page.version contains 'beta' or page.version contains 'alpha' %}
   <div class="version-warning">
     <p>
     <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
-    This is the documentation for the latest beta version of Ark. Both code and docs may be
+    This is the documentation for the latest pre-production version of Velero. Both code and docs may be
     unstable, and these docs only a best-guess effort at being up to date or correct. See the
     <a href="{{latest_url}}">latest version</a>.
     </p>
