@@ -38,8 +38,8 @@ import (
 )
 
 const (
-	projectKey          = "project"
 	zoneSeparator       = "__"
+	projectKey          = "project"
 	snapshotLocationKey = "snapshotLocation"
 )
 
@@ -55,15 +55,22 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, snapshotLocationKey); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, snapshotLocationKey, projectKey); err != nil {
 		return err
 	}
 
 	b.snapshotLocation = config[snapshotLocationKey]
 
-	project, err := extractProjectFromCreds()
-	if err != nil {
-		return err
+	// take 'project' from config if specified, otherwise get it
+	// from the credentials file
+	if val := config[projectKey]; val != "" {
+		b.project = val
+	} else {
+		project, err := extractProjectFromCreds()
+		if err != nil {
+			return err
+		}
+		b.project = project
 	}
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
@@ -77,7 +84,6 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	b.gce = gce
-	b.project = project
 
 	return nil
 }
