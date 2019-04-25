@@ -1,4 +1,5 @@
 name: velero
+title: "Velero: Backup and migrate Kubernetes applications and their persistent volumes"
 baseurl: /velero
 google_analytics: FILL_OUT
 latest: v0.11.0
