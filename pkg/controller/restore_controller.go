@@ -259,6 +259,10 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 		restore.Status.Phase = api.RestorePhaseFailed
 		restore.Status.FailureReason = err.Error()
 		c.metrics.RegisterRestoreFailed(backupScheduleName)
+	} else if restore.Status.Errors > 0 {
+		c.logger.Debug("Restore partially failed")
+		restore.Status.Phase = api.RestorePhasePartiallyFailed
+		c.metrics.RegisterRestorePartialFailure(backupScheduleName)
 	} else {
 		c.logger.Debug("Restore completed")
 		restore.Status.Phase = api.RestorePhaseCompleted

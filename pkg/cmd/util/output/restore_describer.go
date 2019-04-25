@@ -19,6 +19,7 @@ package output
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -35,7 +36,17 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		d.DescribeMetadata(restore.ObjectMeta)
 
 		d.Println()
-		d.Printf("Phase:\t%s\n", restore.Status.Phase)
+		phase := restore.Status.Phase
+		if phase == "" {
+			phase = v1.RestorePhaseNew
+		}
+
+		resultsNote := ""
+		if phase == v1.RestorePhaseFailed || phase == v1.RestorePhasePartiallyFailed {
+			resultsNote = fmt.Sprintf(" (run 'velero restore logs %s' for more information)", restore.Name)
+		}
+
+		d.Printf("Phase:\t%s%s\n", restore.Status.Phase, resultsNote)
 
 		if len(restore.Status.ValidationErrors) > 0 {
 			d.Println()
