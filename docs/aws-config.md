@@ -298,7 +298,7 @@ It can be set up for Velero by creating a role that will have required permissio
 
 ## Installing the nginx example (optional)
 
-If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
+If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
 
