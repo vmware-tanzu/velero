@@ -75,7 +75,7 @@ See [the list of releases][6] to find out about feature changes.
 
 
 [29]: https://heptio.github.io/velero/
-[30]: troubleshooting.md
+[30]: /troubleshooting.md
 
-[99]: support-matrix.md
-[100]: img/velero.png
+[99]: /support-matrix.md
+[100]: /img/velero.png
