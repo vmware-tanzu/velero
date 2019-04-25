@@ -14,12 +14,28 @@ For details, see the documentation topics for individual cloud providers.
 
 ## Cloud provider
 
-The Velero repository includes a set of example YAML files that specify the settings for each supported cloud provider. For provider-specific instructions, see:
+The Velero client includes an `install` command to specify the settings for each supported cloud provider. You can install Velero for the included cloud providers using the following command:
+
+```bash
+    velero install \
+        --provider <YOUR_PROVIDER> \
+        --bucket <YOUR_BUCKET> \
+        --secret-file <PATH_TO_FILE> \
+        [--backup-location-config]
+        [--snapshot-location-config]
+        [--namespace]
+```
+        
+For provider-specific instructions, see:
 
 * [Run Velero on AWS][0]
 * [Run Velero on GCP][1]
 * [Run Velero on Azure][2]
 * [Use IBM Cloud Object Store as Velero's storage destination][4]
+
+To see the YAML applied by the `velero install` command, use the `--dry-run -o yaml` arguments.
+
+For more complex installation needs, use either the generated YAML, or the Helm chart.
 
 ## On-premises
 
@@ -33,6 +49,15 @@ Second, if you need to back up persistent volume data, you must select a volume 
 the supported options. For example, if you use [Portworx][102] for persistent storage, you can install their Velero plugin to get native Portworx snapshots as part
 of your Velero backups. If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][20], which provides a
 platform-agnostic backup solution for volume data.
+
+## Removing Velero
+
+If you would like to completely uninstall Velero from your cluster, the following commands will remove all resources created by `velero install`:
+
+```bash
+kubectl delete namespace/velero clusterrolebinding/velero
+kubectl delete crds -l component=velero
+```
 
 ## Examples
 

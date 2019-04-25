@@ -66,7 +66,9 @@ spec:
   volumeSnapshotLocations:
     - aws-primary
     - gcp-primary
-  # The amount of time before this backup is eligible for garbage collection.
+  # The amount of time before this backup is eligible for garbage collection. If not specified, 
+  # a default value of 30 days will be used. The default can be configured on the velero server
+  # by passing the flag --default-backup-ttl. 
   ttl: 24h0m0s
   # Actions to perform at different times during a backup. The only hook currently supported is
   # executing a command in a container in a pod using the pod exec API. Optional.
@@ -94,10 +96,6 @@ spec:
           matchLabels:
             app: velero
             component: server
-        # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
-        # DEPRECATED. Use pre instead.
-        hooks:
-          # Same content as pre below.
         # An array of hooks to run before executing custom actions. Currently only "exec" hooks are supported.
         pre:
           - 

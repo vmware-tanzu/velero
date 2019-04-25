@@ -19,7 +19,11 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 
 ## Download Velero
 
-1. Download the [latest release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+1. Download the [latest official release's](https://github.com/heptio/velero/releases) tarball for your client platform.
+
+    _We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
     ```bash
@@ -28,10 +32,6 @@ If you encounter issues with installing or configuring, see [Debugging Installat
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
-
-_We strongly recommend that you use an [official release](https://github.com/heptio/velero/releases) of Velero. The tarballs for each release contain the
-`velero` command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. The code and sample YAML files in the master 
-branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 #### MacOS Installation
 
@@ -44,11 +44,32 @@ brew install velero
 
 These instructions start the Velero server and a Minio instance that is accessible from within the cluster only. See [Expose Minio outside your cluster][31] for information about configuring your cluster for outside access to Minio. Outside access is required to access logs and run `velero describe` commands.
 
-1.  Start the server and the local storage service. In the Velero directory, run:
+1. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
+
+    ```
+    [default]
+    aws_access_key_id = minio
+    aws_secret_access_key = minio123
+    ```
+
+1. Start the server and the local storage service. In the Velero directory, run:
 
     ```bash
-    kubectl apply -f config/common/00-prereqs.yaml
-    kubectl apply -f config/minio/
+    kubectl apply -f config/minio/00-minio-deployment.yaml
+
+    velero install \
+        --provider aws \
+        --bucket velero \
+        --secret-file ./credentials-velero \
+        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 \
+    ```
+
+    Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
+
+1. Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's not relevant for this scenario:
+
+    ```bash
+    kubectl -n velero delete volumesnapshotlocation.velero.io default
     ```
 
 1. Deploy the example nginx application:

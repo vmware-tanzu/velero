@@ -21,6 +21,7 @@ _Note that these providers are not regularly tested by the Velero team._
  * Ceph RADOS v12.2.7
  * [DigitalOcean][7]
  * Quobyte
+ * [NooBaa][16]
 
 _Some storage providers, like Quobyte, may need a different [signature algorithm version][15]._
 
@@ -56,3 +57,4 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [13]: https://portworx.slack.com/messages/px-k8s
 [14]: https://github.com/portworx/ark-plugin/issues
 [15]: api-types/backupstoragelocation.md#aws
+[16]: http://www.noobaa.com/
