@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -208,6 +209,13 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 
 	if o.BucketName == "" {
 		return errors.New("--bucket is required")
+	}
+
+	// Our main 3 providers don't support bucket names starting with a dash, and a bucket name starting with one
+	// can indicate that an environment variable was left blank.
+	// This case will help catch that error
+	if strings.HasPrefix(o.BucketName, "-") {
+		return errors.Errorf("Bucket names cannot begin with a dash. Bucket name was: %s", o.BucketName)
 	}
 
 	if o.ProviderName == "" {
