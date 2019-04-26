@@ -33,6 +33,7 @@ const (
 	backupTotal                  = "backup_total"
 	backupAttemptTotal           = "backup_attempt_total"
 	backupSuccessTotal           = "backup_success_total"
+	backupPartialFailureTotal    = "backup_partial_failure_total"
 	backupFailureTotal           = "backup_failure_total"
 	backupDurationSeconds        = "backup_duration_seconds"
 	backupDeletionAttemptTotal   = "backup_deletion_attempt_total"
@@ -86,6 +87,14 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupSuccessTotal,
 					Help:      "Total number of successful backups",
+				},
+				[]string{scheduleLabel},
+			),
+			backupPartialFailureTotal: prometheus.NewCounterVec(
+				prometheus.CounterOpts{
+					Namespace: metricNamespace,
+					Name:      backupPartialFailureTotal,
+					Help:      "Total number of partially failed backups",
 				},
 				[]string{scheduleLabel},
 			),
@@ -230,6 +239,9 @@ func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(scheduleName).Set(0)
+	}
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(scheduleName).Set(0)
 	}
@@ -292,6 +304,13 @@ func (m *ServerMetrics) RegisterBackupAttempt(backupSchedule string) {
 // RegisterBackupSuccess records a successful completion of a backup.
 func (m *ServerMetrics) RegisterBackupSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
+		c.WithLabelValues(backupSchedule).Inc()
+	}
+}
+
+// RegisterBackupPartialFailure records a partially failed backup.
+func (m *ServerMetrics) RegisterBackupPartialFailure(backupSchedule string) {
+	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
 }

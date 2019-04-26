@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kuberrs "k8s.io/apimachinery/pkg/util/errors"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
@@ -102,22 +102,16 @@ type defaultResourceBackupper struct {
 }
 
 // backupResource backs up all the objects for a given group-version-resource.
-func (rb *defaultResourceBackupper) backupResource(
-	group *metav1.APIResourceList,
-	resource metav1.APIResource,
-) error {
-	var errs []error
+func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList, resource metav1.APIResource) error {
+	log := rb.log.WithField("resource", resource.Name)
+
+	log.Info("Backing up resource")
 
 	gv, err := schema.ParseGroupVersion(group.GroupVersion)
 	if err != nil {
 		return errors.Wrapf(err, "error parsing GroupVersion %s", group.GroupVersion)
 	}
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
-	grString := gr.String()
-
-	log := rb.log.WithField("groupResource", grString)
-
-	log.Info("Evaluating resource")
 
 	clusterScoped := !resource.Namespaced
 
@@ -142,8 +136,8 @@ func (rb *defaultResourceBackupper) backupResource(
 		}
 	}
 
-	if !rb.backupRequest.ResourceIncludesExcludes.ShouldInclude(grString) {
-		log.Infof("Resource is excluded")
+	if !rb.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
+		log.Infof("Skipping resource because it's excluded")
 		return nil
 	}
 
@@ -178,38 +172,39 @@ func (rb *defaultResourceBackupper) backupResource(
 	if gr == kuberesource.Namespaces && namespacesToList[0] != "" {
 		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
 		if err != nil {
-			return err
+			log.WithError(err).Error("Error getting dynamic client")
+		} else {
+			var labelSelector labels.Selector
+			if rb.backupRequest.Spec.LabelSelector != nil {
+				labelSelector, err = metav1.LabelSelectorAsSelector(rb.backupRequest.Spec.LabelSelector)
+				if err != nil {
+					// This should never happen...
+					return errors.Wrap(err, "invalid label selector")
+				}
+			}
+
+			for _, ns := range namespacesToList {
+				log = log.WithField("namespace", ns)
+				log.Info("Getting namespace")
+				unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
+				if err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error getting namespace")
+					continue
+				}
+
+				labels := labels.Set(unstructured.GetLabels())
+				if labelSelector != nil && !labelSelector.Matches(labels) {
+					log.Info("Skipping namespace because it does not match the backup's label selector")
+					continue
+				}
+
+				if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
+					log.WithError(errors.WithStack(err)).Error("Error backing up namespace")
+				}
+			}
+
+			return nil
 		}
-
-		var labelSelector labels.Selector
-		if rb.backupRequest.Spec.LabelSelector != nil {
-			labelSelector, err = metav1.LabelSelectorAsSelector(rb.backupRequest.Spec.LabelSelector)
-			if err != nil {
-				// This should never happen...
-				return errors.Wrap(err, "invalid label selector")
-			}
-		}
-
-		for _, ns := range namespacesToList {
-			log.WithField("namespace", ns).Info("Getting namespace")
-			unstructured, err := resourceClient.Get(ns, metav1.GetOptions{})
-			if err != nil {
-				errs = append(errs, errors.Wrap(err, "error getting namespace"))
-				continue
-			}
-
-			labels := labels.Set(unstructured.GetLabels())
-			if labelSelector != nil && !labelSelector.Matches(labels) {
-				log.WithField("name", unstructured.GetName()).Info("skipping item because it does not match the backup's label selector")
-				continue
-			}
-
-			if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
-				errs = append(errs, err)
-			}
-		}
-
-		return kuberrs.NewAggregate(errs)
 	}
 
 	// If we get here, we're backing up something other than namespaces
@@ -218,9 +213,12 @@ func (rb *defaultResourceBackupper) backupResource(
 	}
 
 	for _, namespace := range namespacesToList {
+		log = log.WithField("namespace", namespace)
+
 		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, namespace)
 		if err != nil {
-			return err
+			log.WithError(err).Error("Error getting dynamic client")
+			continue
 		}
 
 		var labelSelector string
@@ -228,44 +226,59 @@ func (rb *defaultResourceBackupper) backupResource(
 			labelSelector = metav1.FormatLabelSelector(selector)
 		}
 
-		log.WithField("namespace", namespace).Info("Listing items")
+		log.Info("Listing items")
 		unstructuredList, err := resourceClient.List(metav1.ListOptions{LabelSelector: labelSelector})
 		if err != nil {
-			return errors.WithStack(err)
+			log.WithError(errors.WithStack(err)).Error("Error listing items")
+			continue
 		}
 
 		// do the backup
 		items, err := meta.ExtractList(unstructuredList)
 		if err != nil {
-			return errors.WithStack(err)
+			log.WithError(errors.WithStack(err)).Error("Error extracting list")
+			continue
 		}
 
-		log.WithField("namespace", namespace).Infof("Retrieved %d items", len(items))
+		log.Infof("Retrieved %d items", len(items))
+
 		for _, item := range items {
 			unstructured, ok := item.(runtime.Unstructured)
 			if !ok {
-				errs = append(errs, errors.Errorf("unexpected type %T", item))
+				log.Errorf("Unexpected type %T", item)
 				continue
 			}
 
 			metadata, err := meta.Accessor(unstructured)
 			if err != nil {
-				errs = append(errs, errors.Wrapf(err, "unable to get a metadata accessor"))
+				log.WithError(errors.WithStack(err)).Error("Error getting a metadata accessor")
 				continue
 			}
 
 			if gr == kuberesource.Namespaces && !rb.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
-				log.WithField("name", metadata.GetName()).Info("skipping namespace because it is excluded")
+				log.WithField("name", metadata.GetName()).Info("Skipping namespace because it's excluded")
 				continue
 			}
 
-			if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
-				errs = append(errs, err)
+			err = itemBackupper.backupItem(log, unstructured, gr)
+			if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+				log.WithField("name", metadata.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
+				// log each error separately so we get error location info in the log, and an
+				// accurate count of errors
+				for _, err = range aggregate.Errors() {
+					log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+				}
+
+				continue
+			}
+			if err != nil {
+				log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+				continue
 			}
 		}
 	}
 
-	return kuberrs.NewAggregate(errs)
+	return nil
 }
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of

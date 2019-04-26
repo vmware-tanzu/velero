@@ -373,12 +373,64 @@ func TestBackup(t *testing.T) {
 	tests := []struct {
 		name               string
 		backup             *v1.Backup
+		actions            []velero.BackupItemAction
 		expectedNamespaces *collections.IncludesExcludes
 		expectedResources  *collections.IncludesExcludes
 		expectedHooks      []resourceHook
 		backupGroupErrors  map[*metav1.APIResourceList]error
 		expectedError      error
 	}{
+		{
+			name: "error resolving actions returns an error",
+			backup: &v1.Backup{
+				Spec: v1.BackupSpec{
+					// cm - shortcut in legacy api group
+					// csr - shortcut in certificates.k8s.io api group
+					// roles - fully qualified in rbac.authorization.k8s.io api group
+					IncludedResources:  []string{"cm", "csr", "roles"},
+					IncludedNamespaces: []string{"a", "b"},
+					ExcludedNamespaces: []string{"c", "d"},
+				},
+			},
+			actions:            []velero.BackupItemAction{new(appliesToErrorAction)},
+			expectedNamespaces: collections.NewIncludesExcludes().Includes("a", "b").Excludes("c", "d"),
+			expectedResources:  collections.NewIncludesExcludes().Includes("configmaps", "certificatesigningrequests.certificates.k8s.io", "roles.rbac.authorization.k8s.io"),
+			expectedHooks:      []resourceHook{},
+			expectedError:      errors.New("error calling AppliesTo"),
+		},
+		{
+			name: "error resolving hooks returns an error",
+			backup: &v1.Backup{
+				Spec: v1.BackupSpec{
+					// cm - shortcut in legacy api group
+					// csr - shortcut in certificates.k8s.io api group
+					// roles - fully qualified in rbac.authorization.k8s.io api group
+					IncludedResources:  []string{"cm", "csr", "roles"},
+					IncludedNamespaces: []string{"a", "b"},
+					ExcludedNamespaces: []string{"c", "d"},
+					Hooks: v1.BackupHooks{
+						Resources: []v1.BackupResourceHookSpec{
+							{
+								Name: "hook-with-invalid-label-selector",
+								LabelSelector: &metav1.LabelSelector{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "foo",
+											Operator: metav1.LabelSelectorOperator("nonexistent-operator"),
+											Values:   []string{"bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedNamespaces: collections.NewIncludesExcludes().Includes("a", "b").Excludes("c", "d"),
+			expectedResources:  collections.NewIncludesExcludes().Includes("configmaps", "certificatesigningrequests.certificates.k8s.io", "roles.rbac.authorization.k8s.io"),
+			expectedHooks:      []resourceHook{},
+			expectedError:      errors.New("\"nonexistent-operator\" is not a valid pod selector operator"),
+		},
 		{
 			name: "happy path, no actions, no hooks, no errors",
 			backup: &v1.Backup{
@@ -411,7 +463,7 @@ func TestBackup(t *testing.T) {
 				certificatesGroup: nil,
 				rbacGroup:         errors.New("rbac error"),
 			},
-			expectedError: errors.New("[v1 error, rbac error]"),
+			expectedError: nil,
 		},
 		{
 			name: "hooks",
@@ -509,7 +561,7 @@ func TestBackup(t *testing.T) {
 				mock.Anything, // restic backupper
 				mock.Anything, // pvc snapshot tracker
 				mock.Anything, // volume snapshotter getter
-			).Return(groupBackupper)
+			).Maybe().Return(groupBackupper)
 
 			for group, err := range test.backupGroupErrors {
 				groupBackupper.On("backupGroup", group).Return(err)
@@ -522,7 +574,7 @@ func TestBackup(t *testing.T) {
 				groupBackupperFactory: groupBackupperFactory,
 			}
 
-			err := kb.Backup(logging.DefaultLogger(logrus.DebugLevel), req, new(bytes.Buffer), nil, nil)
+			err := kb.Backup(logging.DefaultLogger(logrus.DebugLevel), req, new(bytes.Buffer), test.actions, nil)
 
 			assert.Equal(t, test.expectedNamespaces, req.NamespaceIncludesExcludes)
 			assert.Equal(t, test.expectedResources, req.ResourceIncludesExcludes)
@@ -536,6 +588,18 @@ func TestBackup(t *testing.T) {
 
 		})
 	}
+}
+
+// appliesToErrorAction is a backup item action that always returns
+// an error when AppliesTo() is called.
+type appliesToErrorAction struct{}
+
+func (a *appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{}, errors.New("error calling AppliesTo")
+}
+
+func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	panic("not implemented")
 }
 
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
