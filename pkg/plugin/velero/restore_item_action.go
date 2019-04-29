@@ -45,7 +45,7 @@ type RestoreItemActionExecuteInput struct {
 	Item runtime.Unstructured
 	// ItemFromBackup is the item taken from the pristine backed up version of resource.
 	ItemFromBackup runtime.Unstructured
-	// Restore is the representation of the restore resource processed by Ark.
+	// Restore is the representation of the restore resource processed by Velero.
 	Restore *api.Restore
 }
 

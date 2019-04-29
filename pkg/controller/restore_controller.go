@@ -58,18 +58,15 @@ var nonRestorableResources = []string{
 
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
 	// https://github.com/heptio/velero/issues/622
-	"backups.ark.heptio.com",
 	"backups.velero.io",
 
 	// Restores are cluster-specific, and don't have value moving across clusters.
 	// https://github.com/heptio/velero/issues/622
-	"restores.ark.heptio.com",
 	"restores.velero.io",
 
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
 	// https://github.com/heptio/velero/issues/1113
-	"resticrepositories.ark.heptio.com",
 	"resticrepositories.velero.io",
 }
 
