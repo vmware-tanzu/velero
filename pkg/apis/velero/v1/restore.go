@@ -18,14 +18,14 @@ package v1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-// RestoreSpec defines the specification for an Ark restore.
+// RestoreSpec defines the specification for a Velero restore.
 type RestoreSpec struct {
-	// BackupName is the unique name of the Ark backup to restore
+	// BackupName is the unique name of the Velero backup to restore
 	// from.
 	BackupName string `json:"backupName"`
 
-	// ScheduleName is the unique name of the Ark schedule to restore
-	// from. If specified, and BackupName is empty, Ark will restore
+	// ScheduleName is the unique name of the Velero schedule to restore
+	// from. If specified, and BackupName is empty, Velero will restore
 	// from the most recent successful backup created from this schedule.
 	ScheduleName string `json:"scheduleName,omitempty"`
 
@@ -67,7 +67,7 @@ type RestoreSpec struct {
 }
 
 // RestorePhase is a string representation of the lifecycle phase
-// of an Ark restore
+// of a Velero restore
 type RestorePhase string
 
 const (
@@ -95,7 +95,7 @@ const (
 	RestorePhaseFailed RestorePhase = "Failed"
 )
 
-// RestoreStatus captures the current status of an Ark restore
+// RestoreStatus captures the current status of a Velero restore
 type RestoreStatus struct {
 	// Phase is the current state of the Restore
 	Phase RestorePhase `json:"phase"`
@@ -119,8 +119,8 @@ type RestoreStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Restore is an Ark resource that represents the application of
-// resources from an Ark backup to a target Kubernetes cluster.
+// Restore is a Velero resource that represents the application of
+// resources from a Velero backup to a target Kubernetes cluster.
 type Restore struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
