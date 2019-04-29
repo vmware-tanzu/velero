@@ -43,7 +43,7 @@ type RepositoryManager interface {
 	// InitRepo initializes a repo with the specified name and identifier.
 	InitRepo(repo *velerov1api.ResticRepository) error
 
-	// ConnectToRepo runs the 'restic stats' command against the
+	// ConnectToRepo runs the 'restic snapshots' command against the
 	// specified repo, and returns an error if it fails. This is
 	// intended to be used to ensure that the repo exists/can be
 	// authenticated to.
@@ -184,11 +184,17 @@ func (rm *repositoryManager) InitRepo(repo *velerov1api.ResticRepository) error 
 }
 
 func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) error {
-	// restic stats requires a non-exclusive lock
+	// restic snapshots requires a non-exclusive lock
 	rm.repoLocker.Lock(repo.Name)
 	defer rm.repoLocker.Unlock(repo.Name)
 
-	return rm.exec(StatsCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+	snapshotsCmd := SnapshotsCommand(repo.Spec.ResticIdentifier)
+	// use the '--last' flag to minimize the amount of data fetched since
+	// we're just validating that the repo exists and can be authenticated
+	// to.
+	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--last")
+
+	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) CheckRepo(repo *velerov1api.ResticRepository) error {
