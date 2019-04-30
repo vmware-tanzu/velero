@@ -96,10 +96,10 @@ func TestInitCommand(t *testing.T) {
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
-func TestStatsCommand(t *testing.T) {
-	c := StatsCommand("repo-id")
+func TestSnapshotsCommand(t *testing.T) {
+	c := SnapshotsCommand("repo-id")
 
-	assert.Equal(t, "stats", c.Command)
+	assert.Equal(t, "snapshots", c.Command)
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
