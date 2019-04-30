@@ -147,7 +147,6 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 velero install \
     --provider aws \
     --bucket $BUCKET \
-    --secret-file ./credentials-velero
     --backup-location-config region=$REGION \
     --snapshot-location-config region=$REGION \
     --secret-file ./credentials-velero
