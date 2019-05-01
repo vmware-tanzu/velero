@@ -33,6 +33,7 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 )
@@ -218,7 +219,7 @@ func (c *backupSyncController) run() {
 			if backup.Labels == nil {
 				backup.Labels = make(map[string]string)
 			}
-			backup.Labels[velerov1api.StorageLocationLabel] = backup.Spec.StorageLocation
+			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 			_, err = c.backupClient.Backups(backup.Namespace).Create(backup)
 			switch {
@@ -283,7 +284,7 @@ func patchStorageLocation(backup *velerov1api.Backup, client velerov1client.Back
 // and a phase of Completed, but no corresponding backup in object storage.
 func (c *backupSyncController) deleteOrphanedBackups(locationName string, cloudBackupNames sets.String, log logrus.FieldLogger) {
 	locationSelector := labels.Set(map[string]string{
-		velerov1api.StorageLocationLabel: locationName,
+		velerov1api.StorageLocationLabel: label.GetValidName(locationName),
 	}).AsSelector()
 
 	backups, err := c.backupLister.Backups(c.namespace).List(locationSelector)

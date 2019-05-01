@@ -47,6 +47,7 @@ import (
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -1106,8 +1107,8 @@ func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 		labels = make(map[string]string)
 	}
 
-	labels[api.BackupNameLabel] = backupName
-	labels[api.RestoreNameLabel] = restoreName
+	labels[api.BackupNameLabel] = label.GetValidName(backupName)
+	labels[api.RestoreNameLabel] = label.GetValidName(restoreName)
 
 	obj.SetLabels(labels)
 }

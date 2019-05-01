@@ -21,7 +21,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/label"
 )
 
 // NewDeleteBackupRequest creates a DeleteBackupRequest for the backup identified by name and uid.
@@ -30,7 +31,7 @@ func NewDeleteBackupRequest(name string, uid string) *v1.DeleteBackupRequest {
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: name + "-",
 			Labels: map[string]string{
-				v1.BackupNameLabel: name,
+				v1.BackupNameLabel: label.GetValidName(name),
 				v1.BackupUIDLabel:  uid,
 			},
 		},
@@ -44,6 +45,6 @@ func NewDeleteBackupRequest(name string, uid string) *v1.DeleteBackupRequest {
 // find DeleteBackupRequests for the backup identified by name and uid.
 func NewDeleteBackupRequestListOptions(name, uid string) metav1.ListOptions {
 	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", v1.BackupNameLabel, name, v1.BackupUIDLabel, uid),
+		LabelSelector: fmt.Sprintf("%s=%s,%s=%s", v1.BackupNameLabel, label.GetValidName(name), v1.BackupUIDLabel, uid),
 	}
 }

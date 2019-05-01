@@ -675,6 +675,130 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 	}
 }
 
+func TestRestoreLabels(t *testing.T) {
+	tests := []struct {
+		name                    string
+		namespace               string
+		resourcePath            string
+		backupName              string
+		restoreName             string
+		labelSelector           labels.Selector
+		includeClusterResources *bool
+		fileSystem              *velerotest.FakeFileSystem
+		actions                 []resolvedAction
+		expectedErrors          Result
+		expectedObjs            []unstructured.Unstructured
+	}{
+		{
+			name:          "backup name and restore name less than 63 characters",
+			namespace:     "ns-1",
+			resourcePath:  "configmaps",
+			backupName:    "less-than-63-characters",
+			restoreName:   "less-than-63-characters-12345",
+			labelSelector: labels.NewSelector(),
+			fileSystem: velerotest.NewFakeFileSystem().
+				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
+			expectedObjs: toUnstructured(
+				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
+					api.BackupNameLabel:  "less-than-63-characters",
+					api.RestoreNameLabel: "less-than-63-characters-12345",
+				}).ConfigMap,
+			),
+		},
+		{
+			name:          "backup name equal to 63 characters",
+			namespace:     "ns-1",
+			resourcePath:  "configmaps",
+			backupName:    "the-really-long-kube-service-name-that-is-exactly-63-characters",
+			restoreName:   "the-really-long-kube-service-name-that-is-exactly-63-characters-12345",
+			labelSelector: labels.NewSelector(),
+			fileSystem: velerotest.NewFakeFileSystem().
+				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
+			expectedObjs: toUnstructured(
+				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
+					api.BackupNameLabel:  "the-really-long-kube-service-name-that-is-exactly-63-characters",
+					api.RestoreNameLabel: "the-really-long-kube-service-name-that-is-exactly-63-char0871f3",
+				}).ConfigMap,
+			),
+		},
+		{
+			name:          "backup name greter than 63 characters",
+			namespace:     "ns-1",
+			resourcePath:  "configmaps",
+			backupName:    "the-really-long-kube-service-name-that-is-much-greater-than-63-characters",
+			restoreName:   "the-really-long-kube-service-name-that-is-much-greater-than-63-characters-12345",
+			labelSelector: labels.NewSelector(),
+			fileSystem: velerotest.NewFakeFileSystem().
+				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
+			expectedObjs: toUnstructured(
+				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
+					api.BackupNameLabel:  "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
+					api.RestoreNameLabel: "the-really-long-kube-service-name-that-is-much-greater-th1bf26f",
+				}).ConfigMap,
+			),
+		},
+	}
+
+	var (
+		client                 = fake.NewSimpleClientset()
+		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
+		snapshotLocationLister = sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister()
+	)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resourceClient := &velerotest.FakeDynamicClient{}
+			for i := range test.expectedObjs {
+				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
+			}
+
+			dynamicFactory := &velerotest.FakeDynamicFactory{}
+			gv := schema.GroupVersion{Group: "", Version: "v1"}
+
+			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
+			dynamicFactory.On("ClientForGroupVersionResource", gv, configMapResource, test.namespace).Return(resourceClient, nil)
+
+			ctx := &context{
+				dynamicFactory: dynamicFactory,
+				actions:        test.actions,
+				fileSystem:     test.fileSystem,
+				selector:       test.labelSelector,
+				restore: &api.Restore{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: api.DefaultNamespace,
+						Name:      test.restoreName,
+					},
+					Spec: api.RestoreSpec{
+						IncludeClusterResources: test.includeClusterResources,
+						BackupName:              test.backupName,
+					},
+				},
+				backup: &api.Backup{},
+				log:    velerotest.NewLogger(),
+				pvRestorer: &pvRestorer{
+					logger: logging.DefaultLogger(logrus.DebugLevel),
+					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
+						volumeMap: map[velerotest.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
+						volumeID:  "volume-1",
+					},
+					snapshotLocationLister: snapshotLocationLister,
+					backup:                 &api.Backup{},
+				},
+				applicableActions: make(map[schema.GroupResource][]resolvedAction),
+				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
+			}
+
+			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
+
+			assert.Empty(t, warnings.Velero)
+			assert.Empty(t, warnings.Cluster)
+			assert.Empty(t, warnings.Namespaces)
+			assert.Equal(t, test.expectedErrors, errors)
+		})
+	}
+}
+
 func TestRestoringExistingServiceAccount(t *testing.T) {
 	fromCluster := newTestServiceAccount()
 	fromClusterUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fromCluster.ServiceAccount)
