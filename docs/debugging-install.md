@@ -37,9 +37,9 @@ into the Velero server pod. Ensure the following:
 * The `cloud-credentials` secret is being mounted into the Velero server pod at `/credentials`
 
 #### Using kube2iam
-This means that Ark can't read the content of the S3 bucket. Ensure the following:
-* There is a Trust Policy document allowing the role used by kube2iam to assume Ark's role, as stated in the AWS config documentation.
-* The new Ark role has all the permissions listed in the documentation regarding S3.
+This means that Velero can't read the content of the S3 bucket. Ensure the following:
+* There is a Trust Policy document allowing the role used by kube2iam to assume Velero's role, as stated in the AWS config documentation.
+* The new Velero role has all the permissions listed in the documentation regarding S3.
 
 
 ## Azure

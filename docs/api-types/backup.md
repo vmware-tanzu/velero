@@ -22,7 +22,7 @@ kind: Backup
 metadata:
   # Backup name. May be any valid Kubernetes object name. Required.
   name: a
-  # Backup namespace. Required. In version 0.7.0 and later, can be any string. Must be the namespace of the Velero server.
+  # Backup namespace. Must be the namespace of the Velero server. Required.
   namespace: velero
 # Parameters about the backup. Required.
 spec:

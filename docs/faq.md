@@ -26,12 +26,15 @@ in [pod_action.go](https://github.com/heptio/velero/blob/master/pkg/restore/pod_
 
 ## I'm using Velero in multiple clusters. Should I use the same bucket to store all of my backups?
 
-We **strongly** recommend that you use a separate bucket per cluster to store backups. Sharing a bucket
-across multiple Velero instances can lead to numerous problems - failed backups, overwritten backups,
-inadvertently deleted backups, etc., all of which can be avoided by using a separate bucket per Velero
-instance.
+We **strongly** recommend that each Velero instance use a distinct bucket/prefix combination to store backups.
+It's fine to have multiple Velero instances back up to the same bucket if each instance uses its own
+prefix within the bucket. This can be configured in your `BackupStorageLocation`, by setting the 
+`spec.objectStorage.prefix` field. However, sharing a bucket/prefix combination across multiple Velero instances 
+can lead to numerous problems - failed backups, overwritten backups, inadvertently deleted backups, etc., 
+all of which can be avoided by using a separate bucket + prefix per Velero instance. It's also fine to
+use a distinct bucket for each Velero instance, and not to use prefixes at all.
 
 Related to this, if you need to restore a backup from cluster A into cluster B, please use restore-only
 mode in cluster B's Velero instance (via the `--restore-only` flag on the `velero server` command specified
-in your Velero deployment) while it's configured to use cluster A's bucket. This will ensure no 
+in your Velero deployment) while it's configured to use cluster A's bucket/prefix. This will ensure no 
 new backups are created, and no existing backups are deleted or overwritten.

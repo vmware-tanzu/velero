@@ -2,9 +2,9 @@
 
 You can run Velero with a cloud provider or on-premises. For detailed information about the platforms that Velero supports, see [Compatible Storage Providers][99].
 
-In version 0.7.0 and later, you can run Velero in any namespace, which requires additional customization. See [Run in custom namespace][3].
+You can run Velero in any namespace, which requires additional customization. See [Run in custom namespace][3].
 
-In version 0.9.0 and later, you can use Velero's integration with restic, which requires additional setup. See [restic instructions][20].
+You can also use Velero's integration with restic, which requires additional setup. See [restic instructions][20].
 
 ## Customize configuration
 
