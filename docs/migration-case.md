@@ -21,7 +21,7 @@ Velero can help you port your resources from one cluster to another, as long as 
     velero backup describe <BACKUP-NAME>
     ```
 
-    **Note:** As of version 0.10, the default sync interval is 1 minute, so make sure to wait before checking. You can configure this interval with the `--backup-sync-period` flag to the Velero server.
+    **Note:** The default sync interval is 1 minute, so make sure to wait before checking. You can configure this interval with the `--backup-sync-period` flag to the Velero server.
 
 1.  *(Cluster 2)* Once you have confirmed that the right Backup (`<BACKUP-NAME>`) is now present, you can restore everything with:
 
