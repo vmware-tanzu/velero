@@ -278,6 +278,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 		}
 	}
 
+	itemBackupper.uploadItem(log)
 	return nil
 }
 

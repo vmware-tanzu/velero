@@ -159,3 +159,12 @@ func (r *restartableVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 	}
 	return delegate.DeleteSnapshot(snapshotID)
 }
+
+// UploadSnapshot restarts the plugin's process if needed, then delegates the call.
+func (r *restartableVolumeSnapshotter) UploadSnapshot(volumeID string, volumeAZ string, tags map[string]string) error {
+	delegate, err := r.getDelegate()
+	if err != nil {
+		return err
+	}
+	return delegate.UploadSnapshot(volumeID, volumeAZ, tags)
+}

@@ -50,4 +50,7 @@ type VolumeSnapshotter interface {
 
 	// DeleteSnapshot deletes the specified volume snapshot.
 	DeleteSnapshot(snapshotID string) error
+
+	// UploadSnapshot uploads all the snapshots at the end
+	UploadSnapshot(volumeID, volumeAZ string, tags map[string]string) error
 }

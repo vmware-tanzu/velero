@@ -92,6 +92,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 
 type ItemBackupper interface {
 	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error
+	uploadItem(logger logrus.FieldLogger)
 }
 
 type defaultItemBackupper struct {
@@ -104,6 +105,8 @@ type defaultItemBackupper struct {
 	resticSnapshotTracker   *pvcSnapshotTracker
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
+	tagMapper                          map[*volume.Snapshot]map[string]string //to store the tags of the PVs, required while uploading
+	blockStoreVolumeSnapshotter        velero.VolumeSnapshotter
 	itemHookHandler                    itemHookHandler
 	additionalItemBackupper            ItemBackupper
 	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
@@ -457,11 +460,23 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
 	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
+	ib.tagMapper[snapshot] = tags
+	ib.blockStoreVolumeSnapshotter = volumeSnapshotter
 
 	// nil errors are automatically removed
 	return kubeerrs.NewAggregate(errs)
 }
+func (ib *defaultItemBackupper) uploadItem(log logrus.FieldLogger) {
+	volumeSnapshotter := ib.blockStoreVolumeSnapshotter
+	if volumeSnapshotter == nil {
+		log.Info("No volumeSnapshotter provided skipping")
+		return
+	}
 
+	for _, snapshot := range ib.backupRequest.VolumeSnapshots {
+		volumeSnapshotter.UploadSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, ib.tagMapper[snapshot])
+	}
+}
 func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
 	return &volume.Snapshot{
 		Spec: volume.SnapshotSpec{
