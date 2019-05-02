@@ -5,7 +5,7 @@ When you run commands to get logs or describe a backup, the Velero server genera
 - Change the Minio Service type from `ClusterIP` to `NodePort`.
 - Set up Ingress for your cluster, keeping Minio Service type `ClusterIP`.
 
-In Velero 0.10, you can also specify the value of a new `publicUrl` field for the pre-signed URL in your backup storage config.
+You can also specify a `publicUrl` config field for the pre-signed URL in your backup storage location config.
 
 For basic instructions on how to install the Velero server and client, see [the getting started example][1].
 
@@ -13,7 +13,7 @@ For basic instructions on how to install the Velero server and client, see [the 
 
 The Minio deployment by default specifies a Service of type `ClusterIP`. You can change this to `NodePort` to easily expose a cluster service externally if you can reach the node from your Velero client.
 
-You must also get the Minio URL, which you can then specify as the value of the new `publicUrl` field in your backup storage config.
+You must also get the Minio URL, which you can then specify as the value of the `publicUrl` field in your backup storage location config.
 
 1.  In `examples/minio/00-minio-deployment.yaml`, change the value of Service `spec.type` from `ClusterIP` to `NodePort`.
 
@@ -35,7 +35,7 @@ You must also get the Minio URL, which you can then specify as the value of the 
           kubectl -n velero get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
           ```
 
-1.  In `examples/minio/05-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide this Minio URL as the value of the `publicUrl` field. You must include the `http://` or `https://` prefix.
+1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_FROM_PREVIOUS_STEP>` as a field under `spec.config`. You must include the `http://` or `https://` prefix.
 
 ## Work with Ingress
 
@@ -45,6 +45,6 @@ In this case:
 
 1.  Keep the Service type as `ClusterIP`.
 
-1.  In `examples/minio/05-backupstoragelocation.yaml`, uncomment the `publicUrl` line and provide the URL and port of your Ingress as the value of the `publicUrl` field.
+1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_AND_PORT_OF_INGRESS>` as a field under `spec.config`.
 
 [1]: get-started.md
