@@ -19,9 +19,31 @@ package collections
 import (
 	"strings"
 
+	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type globStringSet struct {
+	sets.String
+}
+
+func newGlobStringSet() globStringSet {
+	return globStringSet{sets.NewString()}
+}
+
+func (gss globStringSet) match(match string) bool {
+	for _, item := range gss.List() {
+		g, err := glob.Compile(item)
+		if err != nil {
+			return false
+		}
+		if g.Match(match) {
+			return true
+		}
+	}
+	return false
+}
 
 // IncludesExcludes is a type that manages lists of included
 // and excluded items. The logic implemented is that everything
@@ -29,14 +51,14 @@ import (
 // should be included. '*' in the includes list means "include
 // everything", but it is not valid in the exclude list.
 type IncludesExcludes struct {
-	includes sets.String
-	excludes sets.String
+	includes globStringSet
+	excludes globStringSet
 }
 
 func NewIncludesExcludes() *IncludesExcludes {
 	return &IncludesExcludes{
-		includes: sets.NewString(),
-		excludes: sets.NewString(),
+		includes: newGlobStringSet(),
+		excludes: newGlobStringSet(),
 	}
 }
 
@@ -67,12 +89,12 @@ func (ie *IncludesExcludes) GetExcludes() []string {
 // included or not. Everything in the includes list except those
 // items in the excludes list should be included.
 func (ie *IncludesExcludes) ShouldInclude(s string) bool {
-	if ie.excludes.Has(s) {
+	if ie.excludes.match(s) {
 		return false
 	}
 
 	// len=0 means include everything
-	return ie.includes.Len() == 0 || ie.includes.Has("*") || ie.includes.Has(s)
+	return ie.includes.Len() == 0 || ie.includes.Has("*") || ie.includes.match(s)
 }
 
 // IncludesString returns a string containing all of the includes, separated by commas, or * if the
