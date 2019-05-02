@@ -444,10 +444,7 @@ func (s *server) validateBackupStorageLocations() error {
 		}
 
 		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err,
-				"backup store for location %q is invalid (if upgrading from a pre-v0.10 version of Velero, please refer to https://heptio.github.io/velero/v0.10.0/storage-layout-reorg-v0.10 for instructions)",
-				location.Name,
-			).Error())
+			invalid = append(invalid, errors.Wrapf(err, "backup store for location %q is invalid", location.Name).Error())
 		}
 	}
 
