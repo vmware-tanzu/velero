@@ -7,37 +7,37 @@ toc:
     subfolderitems:
       - page: About Velero
         url: /index.html
-      - page: Getting started
-        url: /get-started
-      - page: Get the right Velero version
-        url: /versions
       - page: How Velero works
         url: /about
-      - page: Supported platforms
-        url: /support-matrix
-  - title: Upgrade
-    subfolderitems:
-      - page: Upgrade from Ark to Velero 
-        url: /migrating-to-velero
       - page: About locations
         url: /locations
+      - page: Supported platforms
+        url: /support-matrix
+      - page: Get the right Velero version
+        url: /versions
   - title: Install
     subfolderitems:
-      - page: Set up Velero
+      - page: Overview
         url: /install-overview
-      - page: Expose Minio
-        url: /expose-minio
+      - page: Upgrade to 1.0
+        url: /upgrade-to-1.0
+      - page: Quick Start with In-Cluster Minio
+        url: /get-started
       - page: Run on AWS
         url: /aws-config
-      - page: Run on GCP
-        url: /gcp-config
       - page: Run on Azure
         url: /azure-config
-      - page: IBM Cloud Object Store
-        url: /ibm-config
+      - page: Run on GCP
+        url: /gcp-config
       - page: Restic Setup
-        url: /restic
-  - title: Troubleshooting
+        url: /restic    
+  - title: Use
+    subfolderitems:
+      - page: Disaster Recovery
+        url: /disaster-case
+      - page: Cluster migration
+        url: /migration-case
+  - title: Troubleshoot
     subfolderitems:
       - page: Troubleshooting
         url: /troubleshooting
@@ -65,9 +65,4 @@ toc:
         url: /output-file-format
       - page: FAQ
         url: /faq
-  - title: Tutorials
-    subfolderitems:
-      - page: Disaster Recovery
-        url: /disaster-case
-      - page: Cluster migration
-        url: /migration-case
+
