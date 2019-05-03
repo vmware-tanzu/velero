@@ -147,7 +147,6 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 velero install \
     --provider aws \
     --bucket $BUCKET \
-    --secret-file ./credentials-velero
     --backup-location-config region=$REGION \
     --snapshot-location-config region=$REGION \
     --secret-file ./credentials-velero
@@ -298,7 +297,7 @@ It can be set up for Velero by creating a role that will have required permissio
 
 ## Installing the nginx example (optional)
 
-If you run the nginx example, in file `config/nginx-app/with-pv.yaml`:
+If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
     * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
 

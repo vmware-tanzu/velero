@@ -9,7 +9,7 @@ See also:
 
 ## General troubleshooting information
 
-In `velero` version >= `0.10.0`, you can use the `velero bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `velero` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
+You can use the `velero bug` command to open a [Github issue][4] by launching a browser window with some prepopulated values. Values included are OS, CPU architecture, `kubectl` client and server versions (if available) and the `velero` client version. This information isn't submitted to Github until you click the `Submit new issue` button in the Github UI, so feel free to add, remove or update whatever information you like.
 
 Some general commands for troubleshooting that may be helpful:
 
@@ -49,8 +49,7 @@ Alternatively, you might be able to use the Service's `spec.loadBalancerIP` fiel
 
 ### Velero reports `custom resource not found` errors when starting up.
 
-Velero's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Apply
-the `config/common/00-prereqs.yaml` file to create these definitions, then restart Velero.
+Velero's server will not start if the required Custom Resource Definitions are not found in Kubernetes. Run `velero install` again to install any missing custom resource definitions.
 
 ### `velero backup logs` returns a `SignatureDoesNotMatch` error
 
