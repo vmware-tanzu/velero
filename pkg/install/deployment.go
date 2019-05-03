@@ -70,7 +70,7 @@ func WithRestoreOnly() podTemplateOption {
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/velero:latest",
+		image: DefaultImage,
 	}
 
 	for _, opt := range opts {

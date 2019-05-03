@@ -28,8 +28,16 @@ import (
 	"github.com/heptio/velero/pkg/buildinfo"
 )
 
+// Use "latest" if the build process didn't supply a version
+func imageVersion() string {
+	if buildinfo.Version == "" {
+		return "latest"
+	}
+	return buildinfo.Version
+}
+
 // DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
-var DefaultImage = "gcr.io/heptio-images/velero:" + buildinfo.Version
+var DefaultImage = "gcr.io/heptio-images/velero:" + imageVersion()
 
 func labels() map[string]string {
 	return map[string]string{
