@@ -57,6 +57,7 @@ The configurable parameters are as follows:
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `snapshotLocation` | string | Empty | *Example*: "us-central1"<br><br>See [GCP documentation][4] for the full list.<br><br>If not specified the snapshots are stored in the [default location][5]. |
+| `project` | string | Empty | The project ID where snapshots should be stored, if different than the project that your IAM account is in. Optional. |
 
 [0]: #aws
 [1]: #gcp

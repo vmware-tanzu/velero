@@ -1,6 +1,6 @@
 # Run in custom namespace
 
-In Velero version 0.7.0 and later, you can run Velero in any namespace.
+You can run Velero in any namespace.
 
 First, ensure you've [downloaded & extracted the latest release][0].
 
