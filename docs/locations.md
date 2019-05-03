@@ -18,6 +18,8 @@ This configuration design enables a number of different use cases, including:
 
 ## Limitations / Caveats
 
+- Velero only supports a single set of credentials *per provider*. It's not yet possible to use different credentials for different locations, if they're for the same provider.
+
 - Volume snapshots are still limited by where your provider allows you to create snapshots. For example, AWS and Azure do not allow you to create a volume snapshot in a different region than where the volume is. If you try to take an Velero backup using a volume snapshot location with a different region than where your cluster's volumes are, the backup will fail.
 
 - Each Velero backup has one `BackupStorageLocation`, and one `VolumeSnapshotLocation` per volume provider. It is not possible (yet) to send a single Velero backup to multiple backup storage locations simultaneously, or a single volume snapshot to multiple locations simultaneously. However, you can always set up multiple scheduled backups that differ only in the storage locations used if redundancy of backups across locations is important.
