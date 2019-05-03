@@ -38,16 +38,17 @@ import (
 )
 
 const (
-	projectKey          = "project"
 	zoneSeparator       = "__"
+	projectKey          = "project"
 	snapshotLocationKey = "snapshotLocation"
 )
 
 type VolumeSnapshotter struct {
-	gce              *compute.Service
-	project          string
 	log              logrus.FieldLogger
+	gce              *compute.Service
 	snapshotLocation string
+	volumeProject    string
+	snapshotProject  string
 }
 
 func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
@@ -55,7 +56,7 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, snapshotLocationKey); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, snapshotLocationKey, projectKey); err != nil {
 		return err
 	}
 
@@ -64,6 +65,14 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	project, err := extractProjectFromCreds()
 	if err != nil {
 		return err
+	}
+	b.volumeProject = project
+
+	// get snapshot project from 'project' config key if specified,
+	// otherwise from the credentials file
+	b.snapshotProject = config[projectKey]
+	if b.snapshotProject == "" {
+		b.snapshotProject = b.volumeProject
 	}
 
 	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
@@ -77,7 +86,6 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	}
 
 	b.gce = gce
-	b.project = project
 
 	return nil
 }
@@ -139,7 +147,7 @@ func (b *VolumeSnapshotter) getZoneURLs(volumeAZ string) ([]string, error) {
 	zones := strings.Split(volumeAZ, zoneSeparator)
 	var zoneURLs []string
 	for _, z := range zones {
-		zone, err := b.gce.Zones.Get(b.project, z).Do()
+		zone, err := b.gce.Zones.Get(b.volumeProject, z).Do()
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
@@ -152,7 +160,7 @@ func (b *VolumeSnapshotter) getZoneURLs(volumeAZ string) ([]string, error) {
 
 func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
 	// get the snapshot so we can apply its tags to the volume
-	res, err := b.gce.Snapshots.Get(b.project, snapshotID).Do()
+	res, err := b.gce.Snapshots.Get(b.snapshotProject, snapshotID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -183,11 +191,11 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 
 		disk.ReplicaZones = zoneURLs
 
-		if _, err = b.gce.RegionDisks.Insert(b.project, volumeRegion, disk).Do(); err != nil {
+		if _, err = b.gce.RegionDisks.Insert(b.volumeProject, volumeRegion, disk).Do(); err != nil {
 			return "", errors.WithStack(err)
 		}
 	} else {
-		if _, err = b.gce.Disks.Insert(b.project, volumeAZ, disk).Do(); err != nil {
+		if _, err = b.gce.Disks.Insert(b.volumeProject, volumeAZ, disk).Do(); err != nil {
 			return "", errors.WithStack(err)
 		}
 	}
@@ -206,12 +214,12 @@ func (b *VolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *i
 		if err != nil {
 			return "", nil, errors.WithStack(err)
 		}
-		res, err = b.gce.RegionDisks.Get(b.project, volumeRegion, volumeID).Do()
+		res, err = b.gce.RegionDisks.Get(b.volumeProject, volumeRegion, volumeID).Do()
 		if err != nil {
 			return "", nil, errors.WithStack(err)
 		}
 	} else {
-		res, err = b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
+		res, err = b.gce.Disks.Get(b.volumeProject, volumeAZ, volumeID).Do()
 		if err != nil {
 			return "", nil, errors.WithStack(err)
 		}
@@ -243,7 +251,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 }
 
 func (b *VolumeSnapshotter) createSnapshot(snapshotName, volumeID, volumeAZ string, tags map[string]string) (string, error) {
-	disk, err := b.gce.Disks.Get(b.project, volumeAZ, volumeID).Do()
+	disk, err := b.gce.Disks.Get(b.volumeProject, volumeAZ, volumeID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -257,7 +265,7 @@ func (b *VolumeSnapshotter) createSnapshot(snapshotName, volumeID, volumeAZ stri
 		gceSnap.StorageLocations = []string{b.snapshotLocation}
 	}
 
-	_, err = b.gce.Disks.CreateSnapshot(b.project, volumeAZ, volumeID, &gceSnap).Do()
+	_, err = b.gce.Disks.CreateSnapshot(b.snapshotProject, volumeAZ, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -266,7 +274,7 @@ func (b *VolumeSnapshotter) createSnapshot(snapshotName, volumeID, volumeAZ stri
 }
 
 func (b *VolumeSnapshotter) createRegionSnapshot(snapshotName, volumeID, volumeRegion string, tags map[string]string) (string, error) {
-	disk, err := b.gce.RegionDisks.Get(b.project, volumeRegion, volumeID).Do()
+	disk, err := b.gce.RegionDisks.Get(b.volumeProject, volumeRegion, volumeID).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -280,7 +288,7 @@ func (b *VolumeSnapshotter) createRegionSnapshot(snapshotName, volumeID, volumeR
 		gceSnap.StorageLocations = []string{b.snapshotLocation}
 	}
 
-	_, err = b.gce.RegionDisks.CreateSnapshot(b.project, volumeRegion, volumeID, &gceSnap).Do()
+	_, err = b.gce.RegionDisks.CreateSnapshot(b.snapshotProject, volumeRegion, volumeID, &gceSnap).Do()
 	if err != nil {
 		return "", errors.WithStack(err)
 	}
@@ -323,7 +331,7 @@ func getSnapshotTags(veleroTags map[string]string, diskDescription string, log l
 }
 
 func (b *VolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
-	_, err := b.gce.Snapshots.Delete(b.project, snapshotID).Do()
+	_, err := b.gce.Snapshots.Delete(b.snapshotProject, snapshotID).Do()
 
 	// if it's a 404 (not found) error, we don't need to return an error
 	// since the snapshot is not there.

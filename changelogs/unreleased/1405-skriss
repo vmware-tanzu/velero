@@ -1,0 +1,1 @@
+GCP: add optional 'project' config to volume snapshot location for if snapshots are in a different project than the IAM account
