@@ -13,8 +13,6 @@ toc:
         url: /locations
       - page: Supported platforms
         url: /support-matrix
-      - page: Get the right Velero version
-        url: /versions
   - title: Install
     subfolderitems:
       - page: Overview
