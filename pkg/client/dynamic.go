@@ -114,5 +114,5 @@ func (d *dynamicResourceClient) Get(name string, opts metav1.GetOptions) (*unstr
 }
 
 func (d *dynamicResourceClient) Patch(name string, data []byte) (*unstructured.Unstructured, error) {
-	return d.resourceClient.Patch(name, types.MergePatchType, data, metav1.UpdateOptions{})
+	return d.resourceClient.Patch(name, types.MergePatchType, data, metav1.PatchOptions{})
 }

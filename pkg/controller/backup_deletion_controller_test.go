@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
@@ -122,13 +123,16 @@ type backupDeletionControllerTestData struct {
 }
 
 func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
+	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
+	req.Namespace = "velero"
+	req.Name = "foo-abcde"
+
 	var (
-		client            = fake.NewSimpleClientset(objects...)
+		client            = fake.NewSimpleClientset(append(objects, req)...)
 		sharedInformers   = informers.NewSharedInformerFactory(client, 0)
 		volumeSnapshotter = &velerotest.FakeVolumeSnapshotter{SnapshotsTaken: sets.NewString()}
 		pluginManager     = &pluginmocks.Manager{}
 		backupStore       = &persistencemocks.BackupStore{}
-		req               = pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	)
 
 	data := &backupDeletionControllerTestData{
@@ -161,9 +165,6 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 
 	pluginManager.On("CleanupClients").Return(nil)
 
-	req.Namespace = "velero"
-	req.Name = "foo-abcde"
-
 	return data
 }
 
@@ -181,6 +182,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"errors":["spec.backupName is required"],"phase":"Processed"}}`),
 			),
 		}
@@ -256,6 +258,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"errors":["backup is still in progress"],"phase":"Processed"}}`),
 			),
 		}
@@ -308,6 +311,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"phase":"InProgress"}}`),
 			),
 			core.NewGetAction(
@@ -319,6 +323,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"errors":["backup not found"],"phase":"Processed"}}`),
 			),
 		}
@@ -413,6 +418,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"metadata":{"labels":{"velero.io/backup-name":"foo"}},"status":{"phase":"InProgress"}}`),
 			),
 			core.NewGetAction(
@@ -424,12 +430,14 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"metadata":{"labels":{"velero.io/backup-uid":"uid"}}}`),
 			),
 			core.NewPatchAction(
 				v1.SchemeGroupVersion.WithResource("backups"),
 				td.req.Namespace,
 				td.req.Spec.BackupName,
+				types.MergePatchType,
 				[]byte(`{"status":{"phase":"Deleting"}}`),
 			),
 			core.NewDeleteAction(
@@ -451,6 +459,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"phase":"Processed"}}`),
 			),
 			core.NewDeleteCollectionAction(
@@ -558,6 +567,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"metadata":{"labels":{"velero.io/backup-name":"the-really-long-backup-name-that-is-much-more-than-63-cha6ca4bc"}},"status":{"phase":"InProgress"}}`),
 			),
 			core.NewGetAction(
@@ -569,12 +579,14 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"metadata":{"labels":{"velero.io/backup-uid":"uid"}}}`),
 			),
 			core.NewPatchAction(
 				v1.SchemeGroupVersion.WithResource("backups"),
 				td.req.Namespace,
 				td.req.Spec.BackupName,
+				types.MergePatchType,
 				[]byte(`{"status":{"phase":"Deleting"}}`),
 			),
 			core.NewDeleteAction(
@@ -596,6 +608,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
 				td.req.Name,
+				types.MergePatchType,
 				[]byte(`{"status":{"phase":"Processed"}}`),
 			),
 			core.NewDeleteCollectionAction(
