@@ -13,7 +13,7 @@ If you encounter issues with installing or configuring, see [Debugging Installat
 
 ### Prerequisites
 
-* Access to a Kubernetes cluster, version 1.7 or later.
+* Access to a Kubernetes cluster, version 1.7 or later.  **Note:** restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. Restic support is not required for this example, but may be of interest later. See [Restic Integration][17].
 * A DNS server on the cluster
 * `kubectl` installed
 
@@ -243,6 +243,7 @@ In this case:
 
 [1]: get-started.md
 [3]: install-overview.md
+[17]: restic.md
 [18]: debugging-restores.md
 [26]: https://github.com/heptio/velero/releases
 [30]: https://godoc.org/github.com/robfig/cron
