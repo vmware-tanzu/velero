@@ -1,3 +1,32 @@
+## v1.0.0-beta.1
+#### 2019-05-03
+
+We're excited to release our first beta for v1.0! This beta includes all key features for v1.0 plus a number of bug fixes and documentation updates. See the **All Changes** section below for details. Please test it out in your non-critical environments!
+
+We'll continue to fix bugs and make minor changes, and we expect to ship at least one more beta or release candidate prior to the general availability of v1.0.0.
+
+### Download
+- https://github.com/heptio/velero/releases/tag/v1.0.0-beta.1
+
+### Container Image
+`gcr.io/heptio-images/velero:v1.0.0-beta.1`
+
+### Documentation
+https://heptio.github.io/velero/v1.0.0-beta.1/
+
+### All Changes
+* Add PartiallyFailed phase for restores (#1389, @skriss)
+* Add PartiallyFailed phase for backups, log + continue on errors during backup process (#1386, @skriss)
+* Switch from `restic stats` to `restic snapshots` for checking restic repository existence (#1416, @skriss)
+* Disallow bucket names starting with '-' (#1407, @nrb)
+* Shorten label values when they're longer than 63 characters (#1392, @anshulc)
+* Fail backup if it already exists in object storage. (#1390, @ncdc,carlisia)
+* Install command: Use `latest` image tag if no version information is provided at build time (#1439, @nrb)
+* GCP: add optional 'project' config to volume snapshot location for if snapshots are in a different project than the IAM account (#1405, @skriss)
+* Azure: restore disks with zone information if it exists (#1298, @sylr)
+* Replace config/ with examples/ in release tarball (#1406, @skriss)
+
+
 ## v1.0.0-alpha.2
 #### 2019-04-24
 
