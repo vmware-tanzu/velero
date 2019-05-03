@@ -1,6 +1,11 @@
+# Supported Kubernetes Versions
+
+- In general, Velero works on Kubernetes version 1.7 or later (when Custom Resource Definitions were introduced).
+- Restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. See [Restic Integration][17].
+
 # Compatible Storage Providers
 
-Velero supports a variety of storage providers for different backup and snapshot operations. As of version 0.6.0, a plugin system allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
+Velero supports a variety of storage providers for different backup and snapshot operations. Velero has a plugin system which allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
 
 ## Backup Storage Providers
 
@@ -58,3 +63,4 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [14]: https://github.com/portworx/ark-plugin/issues
 [15]: api-types/backupstoragelocation.md#aws
 [16]: http://www.noobaa.com/
+[17]: restic.md
