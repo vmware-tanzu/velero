@@ -28,8 +28,6 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	VeleroV1() velerov1.VeleroV1Interface
-	// Deprecated: please explicitly pick a version if possible.
-	Velero() velerov1.VeleroV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -41,12 +39,6 @@ type Clientset struct {
 
 // VeleroV1 retrieves the VeleroV1Client
 func (c *Clientset) VeleroV1() velerov1.VeleroV1Interface {
-	return c.veleroV1
-}
-
-// Deprecated: Velero retrieves the default version of VeleroClient.
-// Please explicitly pick a version.
-func (c *Clientset) Velero() velerov1.VeleroV1Interface {
 	return c.veleroV1
 }
 

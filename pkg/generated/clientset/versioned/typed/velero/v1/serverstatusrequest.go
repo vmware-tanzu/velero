@@ -19,6 +19,8 @@ limitations under the License.
 package v1
 
 import (
+	"time"
+
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	scheme "github.com/heptio/velero/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,11 +78,16 @@ func (c *serverStatusRequests) Get(name string, options metav1.GetOptions) (resu
 
 // List takes label and field selectors, and returns the list of ServerStatusRequests that match those selectors.
 func (c *serverStatusRequests) List(opts metav1.ListOptions) (result *v1.ServerStatusRequestList, err error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	result = &v1.ServerStatusRequestList{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("serverstatusrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Do().
 		Into(result)
 	return
@@ -88,11 +95,16 @@ func (c *serverStatusRequests) List(opts metav1.ListOptions) (result *v1.ServerS
 
 // Watch returns a watch.Interface that watches the requested serverStatusRequests.
 func (c *serverStatusRequests) Watch(opts metav1.ListOptions) (watch.Interface, error) {
+	var timeout time.Duration
+	if opts.TimeoutSeconds != nil {
+		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
+	}
 	opts.Watch = true
 	return c.client.Get().
 		Namespace(c.ns).
 		Resource("serverstatusrequests").
 		VersionedParams(&opts, scheme.ParameterCodec).
+		Timeout(timeout).
 		Watch()
 }
 
@@ -150,10 +162,15 @@ func (c *serverStatusRequests) Delete(name string, options *metav1.DeleteOptions
 
 // DeleteCollection deletes a collection of objects.
 func (c *serverStatusRequests) DeleteCollection(options *metav1.DeleteOptions, listOptions metav1.ListOptions) error {
+	var timeout time.Duration
+	if listOptions.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("serverstatusrequests").
 		VersionedParams(&listOptions, scheme.ParameterCodec).
+		Timeout(timeout).
 		Body(options).
 		Do().
 		Error()

@@ -131,7 +131,7 @@ func (c *FakeVolumeSnapshotLocations) DeleteCollection(options *v1.DeleteOptions
 // Patch applies the patch and returns the patched volumeSnapshotLocation.
 func (c *FakeVolumeSnapshotLocations) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.VolumeSnapshotLocation, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, data, subresources...), &velerov1.VolumeSnapshotLocation{})
+		Invokes(testing.NewPatchSubresourceAction(volumesnapshotlocationsResource, c.ns, name, pt, data, subresources...), &velerov1.VolumeSnapshotLocation{})
 
 	if obj == nil {
 		return nil, err
