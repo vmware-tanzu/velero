@@ -298,7 +298,7 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 
 // SetBackupLastSuccessfull records the last time a backup ran successfully, Unix timestamp in seconds
 func (m *ServerMetrics) SetBackupLastSuccessfull(backupSchedule string) {
-	if g, ok := m.metrics[backupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
+	if g, ok := m.metrics[backupLastSuccessfullSeconds].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(backupSchedule).Set(float64(time.Now().Unix()))
 	}
 }
