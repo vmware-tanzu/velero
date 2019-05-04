@@ -39,6 +39,7 @@ const (
 	backupDeletionAttemptTotal   = "backup_deletion_attempt_total"
 	backupDeletionSuccessTotal   = "backup_deletion_success_total"
 	backupDeletionFailureTotal   = "backup_deletion_failure_total"
+	backupLastSuccessfullSeconds = "backup_last_successful_seconds"
 	restoreTotal                 = "restore_total"
 	restoreAttemptTotal          = "restore_attempt_total"
 	restoreValidationFailedTotal = "restore_validation_failed_total"
@@ -64,6 +65,14 @@ func NewServerMetrics() *ServerMetrics {
 					Namespace: metricNamespace,
 					Name:      backupTarballSizeBytesGauge,
 					Help:      "Size, in bytes, of a backup",
+				},
+				[]string{scheduleLabel},
+			),
+			backupLastSuccessfullSeconds: prometheus.NewGaugeVec(
+				prometheus.GaugeOpts{
+					Namespace: metricNamespace,
+					Name:      backupLastSuccessfullSeconds,
+					Help:      "Last time a backup ran successfully, Unix timestamp in seconds",
 				},
 				[]string{scheduleLabel},
 			),
@@ -287,6 +296,13 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 	}
 }
 
+// SetBackupLastSuccessfull records the last time a backup ran successfully, Unix timestamp in seconds
+func (m *ServerMetrics) SetBackupLastSuccessfull(backupSchedule string) {
+	if g, ok := m.metrics[backupTarballSizeBytesGauge].(*prometheus.GaugeVec); ok {
+		g.WithLabelValues(backupSchedule).Set(float64(time.Now().Unix()))
+	}
+}
+
 // SetBackupTotal records the current number of existent backups.
 func (m *ServerMetrics) SetBackupTotal(numberOfBackups int64) {
 	if g, ok := m.metrics[backupTotal].(prometheus.Gauge); ok {
@@ -306,6 +322,7 @@ func (m *ServerMetrics) RegisterBackupSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
+	m.SetBackupLastSuccessfull(backupSchedule)
 }
 
 // RegisterBackupPartialFailure records a partially failed backup.
