@@ -1,6 +1,6 @@
 # Restic Integration
 
-Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1].
+Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality.
 
 Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of 
 the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks). 
