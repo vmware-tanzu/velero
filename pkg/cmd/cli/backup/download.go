@@ -25,6 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -40,7 +41,7 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args))
-			cmd.CheckError(o.Validate(c, args))
+			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Run(c, f))
 		},
 	}
@@ -70,7 +71,14 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
 }
 
-func (o *DownloadOptions) Validate(c *cobra.Command, args []string) error {
+func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	veleroClient, err := f.Client()
+	cmd.CheckError(err)
+
+	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
 	return nil
 }
 
