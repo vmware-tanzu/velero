@@ -72,15 +72,11 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
-
 	veleroClient, err := f.Client()
 	cmd.CheckError(err)
 
-	switch {
-	case o.Name != "":
-		if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
-			return err
-		}
+	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
+		return err
 	}
 
 	return nil
