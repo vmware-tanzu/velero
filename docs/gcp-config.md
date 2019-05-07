@@ -126,6 +126,10 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify `--snapshot-location-config snapshotLocation=<YOUR_LOCATION>` to keep snapshots in a specific availability zone.  See the [VolumeSnapshotLocation definition][8] for details.
 
+(Optional) Specify [additional configurable parameters][7] for the `--backup-location-config` flag.
+
+(Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
+
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 ## Installing the nginx example (optional)
