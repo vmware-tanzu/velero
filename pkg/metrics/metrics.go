@@ -28,27 +28,27 @@ type ServerMetrics struct {
 }
 
 const (
-	metricNamespace              = "velero"
-	backupTarballSizeBytesGauge  = "backup_tarball_size_bytes"
-	backupTotal                  = "backup_total"
-	backupAttemptTotal           = "backup_attempt_total"
-	backupSuccessTotal           = "backup_success_total"
-	backupPartialFailureTotal    = "backup_partial_failure_total"
-	backupFailureTotal           = "backup_failure_total"
-	backupDurationSeconds        = "backup_duration_seconds"
-	backupDeletionAttemptTotal   = "backup_deletion_attempt_total"
-	backupDeletionSuccessTotal   = "backup_deletion_success_total"
-	backupDeletionFailureTotal   = "backup_deletion_failure_total"
-	backupLastSuccessfullSeconds = "backup_last_successful_seconds"
-	restoreTotal                 = "restore_total"
-	restoreAttemptTotal          = "restore_attempt_total"
-	restoreValidationFailedTotal = "restore_validation_failed_total"
-	restoreSuccessTotal          = "restore_success_total"
-	restorePartialFailureTotal   = "restore_partial_failure_total"
-	restoreFailedTotal           = "restore_failed_total"
-	volumeSnapshotAttemptTotal   = "volume_snapshot_attempt_total"
-	volumeSnapshotSuccessTotal   = "volume_snapshot_success_total"
-	volumeSnapshotFailureTotal   = "volume_snapshot_failure_total"
+	metricNamespace                = "velero"
+	backupTarballSizeBytesGauge    = "backup_tarball_size_bytes"
+	backupTotal                    = "backup_total"
+	backupAttemptTotal             = "backup_attempt_total"
+	backupSuccessTotal             = "backup_success_total"
+	backupPartialFailureTotal      = "backup_partial_failure_total"
+	backupFailureTotal             = "backup_failure_total"
+	backupDurationSeconds          = "backup_duration_seconds"
+	backupDeletionAttemptTotal     = "backup_deletion_attempt_total"
+	backupDeletionSuccessTotal     = "backup_deletion_success_total"
+	backupDeletionFailureTotal     = "backup_deletion_failure_total"
+	backupLastSuccessfullTimestamp = "backup_last_successful_timestamp"
+	restoreTotal                   = "restore_total"
+	restoreAttemptTotal            = "restore_attempt_total"
+	restoreValidationFailedTotal   = "restore_validation_failed_total"
+	restoreSuccessTotal            = "restore_success_total"
+	restorePartialFailureTotal     = "restore_partial_failure_total"
+	restoreFailedTotal             = "restore_failed_total"
+	volumeSnapshotAttemptTotal     = "volume_snapshot_attempt_total"
+	volumeSnapshotSuccessTotal     = "volume_snapshot_success_total"
+	volumeSnapshotFailureTotal     = "volume_snapshot_failure_total"
 
 	scheduleLabel   = "schedule"
 	backupNameLabel = "backupName"
@@ -68,10 +68,10 @@ func NewServerMetrics() *ServerMetrics {
 				},
 				[]string{scheduleLabel},
 			),
-			backupLastSuccessfullSeconds: prometheus.NewGaugeVec(
+			backupLastSuccessfullTimestamp: prometheus.NewGaugeVec(
 				prometheus.GaugeOpts{
 					Namespace: metricNamespace,
-					Name:      backupLastSuccessfullSeconds,
+					Name:      backupLastSuccessfullTimestamp,
 					Help:      "Last time a backup ran successfully, Unix timestamp in seconds",
 				},
 				[]string{scheduleLabel},
@@ -298,7 +298,7 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 
 // SetBackupLastSuccessfull records the last time a backup ran successfully, Unix timestamp in seconds
 func (m *ServerMetrics) SetBackupLastSuccessfull(backupSchedule string) {
-	if g, ok := m.metrics[backupLastSuccessfullSeconds].(*prometheus.GaugeVec); ok {
+	if g, ok := m.metrics[backupLastSuccessfullTimestamp].(*prometheus.GaugeVec); ok {
 		g.WithLabelValues(backupSchedule).Set(float64(time.Now().Unix()))
 	}
 }
