@@ -9,7 +9,7 @@
 
 ## Prerequisites
 
-* Access to a Kubernetes cluster, version 1.7 or later. Version 1.7.5 or later is required to run `velero backup delete`.
+* Access to a Kubernetes cluster, version 1.7 or later.
 * A DNS server on the cluster
 * `kubectl` installed
 * [Go][5] installed (minimum version 1.8)
@@ -34,22 +34,34 @@ Download the archive named `Source code` from the [release page][22] and extract
 Note that the Makefile targets assume building from a git repository. When building from an archive, you will be limited to the `go build` commands described below.
 
 ## Build
+There are a number of different ways to build `velero` depending on your needs. This section outlines the main possibilities.
 
-You can build your Velero image locally on the machine where you run your cluster, or you can push it to a private registry. This section covers both workflows.
-
-Set the `$REGISTRY` environment variable (used in the `Makefile`) to push the Velero images to your own registry. This allows any node in your cluster to pull your locally built image.
-
-In the Velero root directory, to build your container with the tag `$REGISTRY/velero:$VERSION`, run:
-
+To build the `velero` binary on your local machine, compiled for your OS and architecture, run:
+```bash
+go build ./cmd/velero
 ```
+or:
+```bash
+make local
+```
+
+The latter will place the compiled binary under `$PWD/_output/bin/$GOOS/$GOARCH`, and will splice version and git commit information in so that `velero version` displays proper output.
+
+To build the `velero` binary targeting `linux/amd64` within a build container on your local machine, run:
+```bash
+make build
+```
+
+See the **Cross compiling** section below for details on building for alternate OS/architecture combinations.
+
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
+```bash
 make container
 ```
 
-To push your image to a registry, use `make push`.
-
-To build only the `velero` binary, run:
-```
-go build ./cmd/velero
+To push your image to a registry, run:
+```bash
+make push
 ```
 
 ### Update generated files
@@ -96,7 +108,7 @@ files (clientset, listers, shared informers, docs) are up to date.
 
 ### Prerequisites 
 
-When running Velero, you will need to account for the following (all of which are handled in the [`/examples`][6] manifests):
+When running Velero, you will need to ensure that you set up all of the following:
 
 * Appropriate RBAC permissions in the cluster
   * Read access for all data from the source cluster and namespaces
@@ -144,70 +156,62 @@ Azure:
 
   7. AZURE_RESOURCE_GROUP
 
-#### 2. Create resources in a cluster
+#### 2. Create required Velero resources in the cluster
 
-You may create resources on a cluster using our [example configurations][19].
+You can use the `velero install` command to install velero into your cluster, then remove the deployment from the cluster, leaving you
+with all of the required in-cluster resources.
 
 ##### Example
 
-Here is how to setup using an existing cluster in AWS: At the root of the Velero repo:
+This examples assumes you are using an existing cluster in AWS.
 
-- Edit `examples/aws/05-backupstoragelocation.yaml` to point to your AWS S3 bucket and region. Note: you can run `aws s3api list-buckets` to get the name of all your buckets.
-
-- (Optional) Edit `examples/aws/06-volumesnapshotlocation.yaml` to point to your AWS region.
-
-Then run the commands below.
-
-`00-prereqs.yaml` contains all our CustomResourceDefinitions (CRDs) that allow us to perform CRUD operations on backups, restores, schedules, etc. it also contains the `velero` namespace, the `velero` ServiceAccount, and a cluster role binding to grant the `velero` ServiceAccount the cluster-admin role:
+Using the `velero` binary that you've built, run `velero install`:
 
 ```bash
-kubectl apply -f examples/common/00-prereqs.yaml
+# velero install requires a credentials file to exist, but we will
+# not be using it since we're running the server locally, so just 
+# create an empty file to pass to the install command.
+touch fake-credentials-file
+
+velero install \
+  --provider aws \
+  --bucket $BUCKET \
+  --backup-location-config region=$REGION \
+  --snapshot-location-config region=$REGION \
+  --secret-file ./fake-credentials-file
+
+# since we're running the velero server locally, we don't
+# want the in-cluster deployment to be running.
+kubectl --namespace velero delete deployment velero
+
+rm fake-credentials-file
 ```
 
-`10-deployment.yaml` is a sample Velero config resource for AWS:
+#### 3. Start the Velero server locally
 
-```bash
-kubectl apply -f examples/aws/10-deployment.yaml
-```
+* Make sure the `velero` binary you build is in your `PATH`, or specify the full path.
 
-And `05-backupstoragelocation.yaml` specifies the location of your backup storage, together with the optional `06-volumesnapshotlocation.yaml`:
-
-```bash
-kubectl apply -f examples/aws/05-backupstoragelocation.yaml
-```
-
-or
-
-```bash
-kubectl apply -f examples/aws/05-backupstoragelocation.yaml examples/aws/06-volumesnapshotlocation.yaml
-```
-
-### 3. Start the Velero server
-
-* Make sure `velero` is in your `PATH` or specify the full path.
-
-* Set variable for Velero as needed. The variables below can be exported as environment variables or passed as CLI cmd flags:
-  * `--kubeconfig`: set the path to the kubeconfig file the Velero server uses to talk to the Kubernetes apiserver
-  * `--namespace`: the set namespace where the Velero server should look for backups, schedules, restores
-  * `--log-level`: set the Velero server's log level
-  * `--plugin-dir`: set the directory where the Velero server looks for plugins
-  * `--metrics-address`: set the bind address and port where Prometheus metrics are exposed
-
-* Start the server: `velero server`
+* Start the server: `velero server [CLI flags]`. The following CLI flags may be useful to customize, but see `velero server --help` for full details:
+  * `--kubeconfig`: set the path to the kubeconfig file the Velero server uses to talk to the Kubernetes apiserver (default `$KUBECONFIG`)
+  * `--namespace`: the set namespace where the Velero server should look for backups, schedules, restores (default `velero`)
+  * `--log-level`: set the Velero server's log level (default `info`)
+  * `--plugin-dir`: set the directory where the Velero server looks for plugins (default `/plugins`)
+  * `--metrics-address`: set the bind address and port where Prometheus metrics are exposed (default `:8085`)
 
 ### Option 2: Run your Velero server in a deployment
 
-1. Install Velero using a deployment:
+1. Ensure you've built a `velero` container image and either loaded it onto your cluster's nodes, or pushed it to a registry (see [build][3]).
 
-We have examples of deployments for different cloud providers in `examples/<cloud-provider>/10-deployment.yaml`.
-
-2. Replace the deployment's default Velero image with the image that you built. Run:
-
+1. Install Velero into the cluster (the example below assumes you're using AWS):
+```bash
+velero install \
+  --provider aws \
+  --image $YOUR_CONTAINER_IMAGE \
+  --bucket $BUCKET \
+  --backup-location-config region=$REGION \
+  --snapshot-location-config region=$REGION \
+  --secret-file $YOUR_AWS_CREDENTIALS_FILE
 ```
-kubectl --namespace=velero set image deployment/velero velero=$REGISTRY/velero:$VERSION
-```
-
-where `$REGISTRY` and `$VERSION` are the values that you built Velero with.
 
 ## 5. Vendoring dependencies
 
