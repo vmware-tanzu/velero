@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,12 +105,6 @@ func (h *helper) Refresh() error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
-	shortcutExpander, err := kcmdutil.NewShortcutExpander(mapper, h.discoveryClient, h.logger)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-	h.mapper = shortcutExpander
 
 	preferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
 	if err != nil {
@@ -123,6 +117,12 @@ func (h *helper) Refresh() error {
 	)
 
 	sortResources(h.resources)
+
+	shortcutExpander, err := kcmdutil.NewShortcutExpander(restmapper.NewDiscoveryRESTMapper(groupResources), h.resources, h.logger)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	h.mapper = shortcutExpander
 
 	h.resourcesMap = make(map[schema.GroupVersionResource]metav1.APIResource)
 	for _, resourceGroup := range h.resources {
