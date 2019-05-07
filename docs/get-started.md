@@ -61,7 +61,7 @@ These instructions start the Velero server and a Minio instance that is accessib
         --provider aws \
         --bucket velero \
         --secret-file ./credentials-velero \
-        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 \
+        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
     ```
 
     Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
