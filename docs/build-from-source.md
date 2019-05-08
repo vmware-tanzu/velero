@@ -45,7 +45,7 @@ or:
 make local
 ```
 
-The latter will place the compiled binary under `$PWD/_output/bin/$GOOS/$GOARCH`, and will splice version and git commit information in so that `velero version` displays proper output.
+The latter will place the compiled binary under `$PWD/_output/bin/$GOOS/$GOARCH`, and will splice version and git commit information in so that `velero version` displays proper output. `velero install` will also use the version information to determine which tagged image to deploy.
 
 To build the `velero` binary targeting `linux/amd64` within a build container on your local machine, run:
 ```bash
@@ -180,8 +180,10 @@ velero install \
   --snapshot-location-config region=$REGION \
   --secret-file ./fake-credentials-file
 
-# since we're running the velero server locally, we don't
-# want the in-cluster deployment to be running.
+# 'velero install' creates an in-cluster deployment of the
+# velero server using an official velero image, but we want 
+# to run the velero server on our local machine using the 
+# binary we built, so delete the in-cluster deployment.
 kubectl --namespace velero delete deployment velero
 
 rm fake-credentials-file
