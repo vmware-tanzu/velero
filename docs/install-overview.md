@@ -24,6 +24,8 @@ The Velero client includes an `install` command to specify the settings for each
         [--backup-location-config]
         [--snapshot-location-config]
         [--namespace]
+        [--use-volume-snapshots]
+        [--use-restic]
 ```
         
 For provider-specific instructions, see:
@@ -32,6 +34,8 @@ For provider-specific instructions, see:
 * [Run Velero on GCP][1]
 * [Run Velero on Azure][2]
 * [Use IBM Cloud Object Store as Velero's storage destination][4]
+
+When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
 To see the YAML applied by the `velero install` command, use the `--dry-run -o yaml` arguments.
 

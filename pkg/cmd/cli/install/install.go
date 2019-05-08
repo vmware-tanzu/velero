@@ -50,6 +50,7 @@ type InstallOptions struct {
 	VolumeSnapshotConfig flag.Map
 	UseRestic            bool
 	Wait                 bool
+	UseVolumeSnapshots   bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -62,6 +63,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "namespace to install Velero and associated data into. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
+	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
 	flags.BoolVar(&o.RestoreOnly, "restore-only", o.RestoreOnly, "run the server in restore-only mode. Optional.")
 	flags.BoolVar(&o.DryRun, "dry-run", o.DryRun, "generate resources, but don't send them to the cluster. Use with -o. Optional.")
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
@@ -75,6 +77,8 @@ func NewInstallOptions() *InstallOptions {
 		Image:                install.DefaultImage,
 		BackupStorageConfig:  flag.NewMap(),
 		VolumeSnapshotConfig: flag.NewMap(),
+		// Default to creating a VSL unless we're told otherwise
+		UseVolumeSnapshots: true,
 	}
 }
 
@@ -89,16 +93,17 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		return nil, err
 	}
 	return &install.VeleroOptions{
-		Namespace:    o.Namespace,
-		Image:        o.Image,
-		ProviderName: o.ProviderName,
-		Bucket:       o.BucketName,
-		Prefix:       o.Prefix,
-		SecretData:   secretData,
-		RestoreOnly:  o.RestoreOnly,
-		UseRestic:    o.UseRestic,
-		BSLConfig:    o.BackupStorageConfig.Data(),
-		VSLConfig:    o.VolumeSnapshotConfig.Data(),
+		Namespace:          o.Namespace,
+		Image:              o.Image,
+		ProviderName:       o.ProviderName,
+		Bucket:             o.BucketName,
+		Prefix:             o.Prefix,
+		SecretData:         secretData,
+		RestoreOnly:        o.RestoreOnly,
+		UseRestic:          o.UseRestic,
+		UseVolumeSnapshots: o.UseVolumeSnapshots,
+		BSLConfig:          o.BackupStorageConfig.Data(),
+		VSLConfig:          o.VolumeSnapshotConfig.Data(),
 	}, nil
 }
 
