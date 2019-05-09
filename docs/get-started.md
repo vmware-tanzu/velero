@@ -61,16 +61,14 @@ These instructions start the Velero server and a Minio instance that is accessib
         --provider aws \
         --bucket velero \
         --secret-file ./credentials-velero \
+        --use-volume-snapshots=false \
         --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
     ```
 
+    This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`).
+
     Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-1. Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's not relevant for this scenario:
-
-    ```bash
-    kubectl -n velero delete volumesnapshotlocation.velero.io default
-    ```
 
 1. Deploy the example nginx application:
 

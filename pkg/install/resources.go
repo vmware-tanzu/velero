@@ -175,16 +175,17 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 }
 
 type VeleroOptions struct {
-	Namespace    string
-	Image        string
-	ProviderName string
-	Bucket       string
-	Prefix       string
-	SecretData   []byte
-	RestoreOnly  bool
-	UseRestic    bool
-	BSLConfig    map[string]string
-	VSLConfig    map[string]string
+	Namespace          string
+	Image              string
+	ProviderName       string
+	Bucket             string
+	Prefix             string
+	SecretData         []byte
+	RestoreOnly        bool
+	UseRestic          bool
+	UseVolumeSnapshots bool
+	BSLConfig          map[string]string
+	VSLConfig          map[string]string
 }
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
@@ -213,8 +214,11 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
 	appendUnstructured(resources, bsl)
 
-	vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
-	appendUnstructured(resources, vsl)
+	// A snapshot location may not be desirable for users relying on restic
+	if o.UseVolumeSnapshots {
+		vsl := VolumeSnapshotLocation(o.Namespace, o.ProviderName, o.VSLConfig)
+		appendUnstructured(resources, vsl)
+	}
 
 	deploy := Deployment(o.Namespace,
 		WithImage(o.Image),
