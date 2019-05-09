@@ -90,7 +90,7 @@ You're now ready to use Velero with restic.
 
     This annotation can also be provided in a pod template spec if you use a controller to manage your pods.
 
-1. Take an Velero backup:
+1. Take a Velero backup:
 
     ```bash
     velero backup create NAME OPTIONS...

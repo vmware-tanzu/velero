@@ -35,7 +35,7 @@ gsutil mb gs://$BUCKET/
 
 ## Create service account
 
-To integrate Velero with GCP, create an Velero-specific [Service Account][15]:
+To integrate Velero with GCP, create a Velero-specific [Service Account][15]:
 
 1. View your current config settings:
 
