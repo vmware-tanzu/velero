@@ -95,7 +95,7 @@ az storage container create -n $BLOB_CONTAINER --public-access off --account-nam
 
 ## Create service principal
 
-To integrate Velero with Azure, you must create an Velero-specific [service principal][17].
+To integrate Velero with Azure, you must create a Velero-specific [service principal][17].
 
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
@@ -146,6 +146,10 @@ velero install \
 ```
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
+
+(Optional) Specify [additional configurable parameters][21] for the `--backup-location-config` flag.
+
+(Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
