@@ -61,16 +61,14 @@ These instructions start the Velero server and a Minio instance that is accessib
         --provider aws \
         --bucket velero \
         --secret-file ./credentials-velero \
-        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000 \
+        --use-volume-snapshots=false \
+        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
     ```
+
+    This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`).
 
     Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-1. Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's not relevant for this scenario:
-
-    ```bash
-    kubectl -n velero delete volumesnapshotlocation.velero.io default
-    ```
 
 1. Deploy the example nginx application:
 
@@ -191,7 +189,7 @@ kubectl delete crds -l component=velero
 kubectl delete -f examples/nginx-app/base.yaml
 ```
 
-## Expose Minio outside your cluster
+## Expose Minio outside your cluster with a Service
 
 When you run commands to get logs or describe a backup, the Velero server generates a pre-signed URL to download the requested items. To access these URLs from outside the cluster -- that is, from your Velero client -- you need to make Minio available outside the cluster. You can:
 
@@ -229,6 +227,26 @@ You must also get the Minio URL, which you can then specify as the value of the 
           ```
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_FROM_PREVIOUS_STEP>` as a field under `spec.config`. You must include the `http://` or `https://` prefix.
+
+## Expose Minio outside your cluster with Kubernetes in Docker (KinD):
+
+Kubernetes in Docker currently does not have support for NodePort services (see [this issue](https://github.com/kubernetes-sigs/kind/issues/99)). In this case, you can use a port forward to access the Minio bucket.
+
+In a terminal, run the following:
+
+```shell
+MINIO_POD=$(kubectl get pods -n velero -l component=minio -o jsonpath='{.items[0].metadata.name}')
+
+kubectl port-forwward $MINIO_POD -n velero 9000:9000
+```
+
+Then, in another terminal:
+
+```shell
+kubectl edit backupstoragelocation default -n velero
+```
+
+Add `publicUrl: http://localhost:9000` under the `spec.config` section.
 
 ### Work with Ingress
 

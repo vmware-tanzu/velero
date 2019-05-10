@@ -8,7 +8,7 @@
     <a href="{{latest_url}}">latest version</a>.
     </p>
   </div>
-{% elsif page.version contains 'beta' or page.version contains 'alpha' %}
+{% elsif page.version contains 'beta' or page.version contains 'alpha' or page.version contains 'rc' %}
   <div class="version-warning">
     <p>
     <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
