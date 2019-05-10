@@ -1,3 +1,23 @@
+## v1.0.0-rc.1
+#### 2019-05-10
+
+This is our first release candidate for v1.0. See the **All Changes** section below for details of changes since `v1.0.0-beta.1`. We expect this to be the final release prior to the general availability of `v1.0.0`. Please try it out in your non-critical environments!
+
+### Download
+- https://github.com/heptio/velero/releases/tag/v1.0.0-rc.1
+
+### Container Image
+`gcr.io/heptio-images/velero:v1.0.0-rc.1`
+
+### Documentation
+https://heptio.github.io/velero/v1.0.0-rc.1/
+
+### All Changes
+* `velero backup download`: check for backup existence before attempting download (#1447, @fabito)
+* use the discovery helper's cached resources list when resolving resource short names (#1457, @skriss)
+* add `backup_last_successful_timestamp` prometheus metric (#1448, @fabito)
+* `velero install`: add `--use-volume-snapshots` flag to optionally turn off creation of volume snapshot locations (#1462, @nrb)
+
 ## v1.0.0-beta.1
 #### 2019-05-03
 
