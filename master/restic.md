@@ -1,6 +1,6 @@
 # Restic Integration
 
-Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1].
+Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it currently fits your use case.
 
 Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of 
 the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks). 
@@ -90,7 +90,7 @@ You're now ready to use Velero with restic.
 
     This annotation can also be provided in a pod template spec if you use a controller to manage your pods.
 
-1. Take an Velero backup:
+1. Take a Velero backup:
 
     ```bash
     velero backup create NAME OPTIONS...
@@ -128,6 +128,10 @@ common encryption key for all restic repositories created by Velero. **This mean
 bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
 appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in 
 a future release.
+- The current Velero/restic integration relies on using pod names to associate restic backups with their parents. If a pod is restarted, such as with a Deployment, 
+the next restic backup taken will be treated as a completely new backup, not an incremental one.
+- Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual 
+difference is small.
 
 ## Customize Restore Helper Image
 

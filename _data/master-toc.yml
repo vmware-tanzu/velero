@@ -48,7 +48,7 @@ toc:
   - title: Customize Velero
     subfolderitems:
       - page: Build from source
-        url: /build-from-scratch
+        url: /build-from-source
       - page: Run in any namespace
         url: /namespace
       - page: Extend

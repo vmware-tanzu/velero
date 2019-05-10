@@ -41,7 +41,7 @@ Several comments:
 
 3. After successfully creating a Service credential, you can view the JSON definition of the credential. Under the `cos_hmac_keys` entry there are `access_key_id` and `secret_access_key`. We will use them in the next step.
 
-4. Create an Velero-specific credentials file (`credentials-velero`) in your local directory:
+4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
 
     ```
     [default]
@@ -59,9 +59,12 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 velero install \
     --provider aws \
     --bucket <YOUR_BUCKET> \
-    --secret-file ./credentials-velero
+    --secret-file ./credentials-velero \
+    --use-volume-snapshots=false \
     --backup-location-config region=<YOUR_REGION>,s3ForcePathStyle="true",s3Url=<YOUR_URL_ACCESS_POINT>
 ```
+
+Velero does not currently have a volume snapshot plugin for IBM Cloud, so creating volume snapshots is disabled.
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
