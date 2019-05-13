@@ -47,8 +47,19 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 4                  | Month            | 1-12,*            |
 | 5                  | Day of Week      | 0-7,*             |`,
 
-		Example: `velero create schedule NAME --schedule="0 */6 * * *"`,
-		Args:    cobra.ExactArgs(1),
+		Example: `	# Create a backup every 6 hours
+	velero create schedule NAME --schedule="0 */6 * * *"
+
+	# Create a backup every 6 hours with the @every notation
+	velero create schedule NAME --schedule="@every 6h"
+
+	# Create a daily backup of the web namespace
+	velero create schedule NAME --schedule="@every 1d" --included-namespaces web
+
+	# Create a weekly backup, each living for 90 days (2160 hours)
+	velero create schedule NAME --schedules="@every 7d" --ttl 2160h0m0s
+	`,
+		Args: cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Complete(args, f))
 			cmd.CheckError(o.Validate(c, args, f))
