@@ -24,6 +24,7 @@ import (
 	"github.com/heptio/velero/pkg/cmd/cli/backuplocation"
 	"github.com/heptio/velero/pkg/cmd/cli/restore"
 	"github.com/heptio/velero/pkg/cmd/cli/schedule"
+	"github.com/heptio/velero/pkg/cmd/cli/snapshotlocation"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -38,6 +39,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		schedule.NewCreateCommand(f, "schedule"),
 		restore.NewCreateCommand(f, "restore"),
 		backuplocation.NewCreateCommand(f, "backup-location"),
+		snapshotlocation.NewCreateCommand(f, "snapshot-location"),
 	)
 
 	return c
