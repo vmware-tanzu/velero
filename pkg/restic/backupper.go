@@ -168,6 +168,10 @@ ForEachVolume:
 		case res := <-resultsChan:
 			switch res.Status.Phase {
 			case velerov1api.PodVolumeBackupPhaseCompleted:
+				if res.Status.SnapshotID == "" {
+					delete(volumeSnapshots, res.Spec.Volume)
+					break
+				}
 				volumeSnapshots[res.Spec.Volume] = res.Status.SnapshotID
 			case velerov1api.PodVolumeBackupPhaseFailed:
 				errs = append(errs, errors.Errorf("pod volume backup failed: %s", res.Status.Message))
