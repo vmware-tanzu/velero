@@ -1,1 +1,0 @@
-switch from `restic stats` to `restic snapshots` for checking restic repository existence

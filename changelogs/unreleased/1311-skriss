@@ -1,1 +1,0 @@
-Allow restic restore helper image name to be optionally specified via ConfigMap
