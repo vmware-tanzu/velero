@@ -42,6 +42,19 @@ _*backups created prior to v0.10 stored snapshot metadata in the `status.volumeB
     velero backup-location get
     ```
 
+1. Fetch your bucket credentials and make them accessible to Velero
+
+    ```bash
+    # AWS
+    AWS_SHARED_CREDENTIALS_FILE=$(kubectl get secrets/<YOUR_SECRET_NAME> -n velero -o jsonpath="{.data.cloud}" | base64 -d)
+
+    #GCP
+    GOOGLE_APPLICATION_CREDENTIALS=$(kubectl get secrets/<YOUR_SECRET_NAME> -n velero -o jsonpath="{.data.cloud}" | base64 -d)
+
+    # Azure
+    source $(kubectl get secrets/<YOUR_SECRET_NAME> -n velero -o jsonpath="{.data.cloud}" | base64 -d)
+    ```
+
 1. For each backup storage location that you want to use with Velero 1.0, replace any legacy pre-v0.11 backup metadata with the equivalent current formats:
     ```bash
     # - BACKUP_LOCATION_NAME is the name of a backup location from the previous step, whose
