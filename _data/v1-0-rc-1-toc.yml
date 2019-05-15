@@ -57,5 +57,7 @@ toc:
     subfolderitems:
       - page: Backup file format
         url: /output-file-format
+      - page: API types
+        url: /api-types
       - page: FAQ
         url: /faq
