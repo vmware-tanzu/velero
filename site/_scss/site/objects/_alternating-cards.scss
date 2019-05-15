@@ -1,0 +1,28 @@
+.alternating-cards {
+  .row {
+    border: 1px solid $border-color;
+    margin-bottom: 30px;
+  }
+  .icon {
+    min-height: 220px;
+    background: red; // default
+    text-align: center;
+    position: relative;
+    img {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  }
+  .card-body {
+    padding: 40px 130px 32px 30px;
+    .card-title {
+      font-weight: $font-weight-medium;
+    }
+    p {
+      font-weight: $font-weight-light;
+      font-size: 0.875rem;
+    }
+  }
+}

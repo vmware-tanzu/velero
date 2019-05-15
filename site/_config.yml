@@ -1,0 +1,174 @@
+# Site settings
+title: Velero
+email:
+author: Velero Authors
+description:
+url:
+logo: Velero.svg
+vm_logo: vm-logo.png
+gh_repo: https://github.com/heptio/velero
+hero: 
+  background-color: med-blue
+footer:
+  title: Getting Started
+  content: To help you get started, see the documentation. For additional information and resources, see the Velero wiki.
+  cta_title: ''
+  cta_url: /docs/master
+  cta_text: Documentation
+  vm-link: http://vmware.github.io/
+
+footer_social_links:  
+  Twitter:
+    fa_icon: fab fa-twitter
+    url: https://twitter.com/projectvelero
+  Slack:
+    fa_icon: fab fa-slack
+    url: https://kubernetes.slack.com/messages/velero
+  User Group:
+    fa_icon: fas fa-users
+    url: https://groups.google.com/forum/#!forum/projectvelero
+  RSS: 
+    fa_icon: fa fa-rss
+    url: feed.xml
+    
+defaults:
+  - scope:
+      path: "" # an empty string here means all files in the project
+      type: "posts" 
+    values:
+      layout: "posts"
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
+  - scope:
+      path: docs/master
+    values:
+      version: master
+      gh: https://github.com/heptio/velero/tree/master
+      layout: "docs"
+  - scope:
+      path: docs/v1.0.0-rc.1
+    values:
+      version: v1.0.0-rc.1
+      gh: https:/github.com/heptio/velero/tree/v1.0.0-rc.1
+      layout: "docs"
+  - scope:
+      path: docs/v0.11.0
+    values:
+      version: v0.11.0
+      gh: https:/github.com/heptio/velero/tree/v0.11.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.10.0
+    values:
+      version: v0.10.0
+      gh: https:/github.com/heptio/velero/tree/v0.10.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.9.0
+    values:
+      version: v0.9.0
+      gh: https:/github.com/heptio/velero/tree/v0.9.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.8.1
+    values:
+      version: v0.8.1
+      gh: https:/github.com/heptio/velero/tree/v0.8.1
+      layout: "docs"
+  - scope:
+      path: docs/v0.8.0
+    values:
+      version: v0.8.0
+      gh: https:/github.com/heptio/velero/tree/v0.8.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.7.1
+    values:
+      version: v0.7.1
+      gh: https://github.com/heptio/velero/tree/v0.7.1
+      layout: "docs"
+  - scope:
+      path: docs/v0.7.0
+    values:
+      version: v0.7.0
+      gh: https://github.com/heptio/velero/tree/v0.7.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.6.0
+    values:
+      version: v0.6.0
+      gh: https://github.com/heptio/velero/tree/v0.6.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.5.0
+    values:
+      version: v0.5.0
+      gh: https://github.com/heptio/velero/tree/v0.5.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.4.0
+    values:
+      version: v0.4.0
+      gh: https://github.com/heptio/velero/tree/v0.4.0
+      layout: "docs"
+  - scope:
+      path: docs/v0.3.0
+    values:
+      version: v0.3.0
+      gh: https://github.com/heptio/velero/tree/v0.3.0
+      layout: "docs"
+
+collections:
+  - contributors
+  - casestudies
+
+versioning: true
+latest: v0.11.0
+versions:
+- v1.0.0-rc.1
+- v0.11.0
+- v0.10.0
+- v0.9.0
+- v0.8.1
+- v0.8.0
+- v0.7.1
+- v0.7.0
+- v0.6.0
+- v0.5.0
+- v0.4.0
+- v0.3.0
+
+# Build settings
+permalink: :title/
+sass:
+  sass_dir: css
+  style: :compressed
+
+# Use the following plug-ins
+plugins:
+  - jekyll-readme-index # use README.md as index.html
+  - jekyll-sitemap # Create a sitemap using the official Jekyll sitemap gem
+  - jekyll-feed # Create an Atom feed using the official Jekyll feed gem
+  - jekyll-relative-links # Used to auto generate md links to html links
+  - jekyll-optional-front-matter # Parse Markdown files that do not have front-matter callouts
+  - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
+  - jekyll-paginate # pagination object for collections (e.g. posts)
+
+
+# Include these subdirectories
+include: 
+  - CONTRIBUTING.md
+  - README.md
+
+# Exclude these files from your production _site
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README-JEKYLL.md
+  - LICENSE
+  - CNAME
+  - Runbook.docx
+  - '*.sh'

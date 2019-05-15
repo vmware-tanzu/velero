@@ -1,0 +1,37 @@
+<div class="alert alert-primary" role="alert">
+{% if page.version == 'master' %}
+  <p>
+  <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+  This is the documentation for the latest development version of Velero. Both code and docs may be
+  unstable, and these docs are not guaranteed to be up to date or correct. See the
+  <a href="{{latest_url}}">latest version</a>.
+  </p>
+{% elsif page.version contains 'beta' or page.version contains 'alpha' or page.version contains 'rc' %}
+  <p>
+  <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+  This is the documentation for the latest pre-production version of Velero. Both code and docs may be
+  unstable, and these docs only a best-guess effort at being up to date or correct. See the
+  <a href="{{latest_url}}">latest version</a>.
+  </p>
+{% elsif page.version != site.latest %}
+  <p>
+  <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+  Documentation for version {{ page.version }} is no longer actively maintained.
+  The version you are currently viewing is a static snapshot.
+  For up-to-date documentation, see the <a href="{{latest_url}}">latest version</a>.
+  </p>
+  <p>
+  <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+  Heptio Ark is now Velero! v0.11 is our first release with the new name. For instructions on 
+  migrating your Ark deployments and data to Velero, please see the Upgrade section in the <a href="{{latest_url}}">latest version</a>.
+  For more details on the renaming, please read our <a href="https://blogs.vmware.com/cloudnative/2019/02/05/welcoming-heptio-open-source-projects-to-vmware/">blog post</a>.
+  </p>
+{% elsif page.version == site.latest %}
+  <p>
+  <i class="fa fa-exclamation-triangle" aria-hidden="true"></i>
+  Heptio Ark is now Velero! v0.11 is our first release with the new name. For instructions on 
+  migrating your Ark deployments and data to Velero, please see the Upgrade section in the <a href="{{latest_url}}">latest version</a>.
+  For more details on the renaming, please read our <a href="https://blogs.vmware.com/cloudnative/2019/02/05/welcoming-heptio-open-source-projects-to-vmware/">blog post</a>.
+  </p>
+{% endif %}
+</div>

@@ -1,0 +1,38 @@
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: $font-weight-medium;
+}
+
+h1,
+h5,
+h6 {
+  font-weight: $font-weight-semibold;
+}
+
+h1 {
+  font-size: 2.875rem;
+  color: $body-color-darkest;
+
+  @include media-breakpoint-down(sm) {
+    font-size: 1.625rem;
+  }
+}
+
+h2 {
+  color: $body-color-darkest;
+  margin-bottom: 2rem;
+}
+
+h5 {
+  font-size: 1.375rem;
+  margin-bottom: 1.25rem;
+}
+
+strong {
+  font-weight: $font-weight-semibold;
+}
