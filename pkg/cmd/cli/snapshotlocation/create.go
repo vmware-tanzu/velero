@@ -66,7 +66,7 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the volume snapshot provider (e.g. aws, azure, gcp)")
+	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the volume snapshot provider (e.g. aws, azure, gcp, alibabacloud)")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the volume snapshot location")
 }

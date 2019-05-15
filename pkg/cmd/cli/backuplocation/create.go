@@ -68,7 +68,7 @@ func NewCreateOptions() *CreateOptions {
 }
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
-	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the backup storage provider (e.g. aws, azure, gcp)")
+	flags.StringVar(&o.Provider, "provider", o.Provider, "name of the backup storage provider (e.g. aws, azure, gcp, alibabacloud)")
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")

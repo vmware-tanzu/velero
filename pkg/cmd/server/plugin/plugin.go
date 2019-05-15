@@ -22,6 +22,7 @@ import (
 
 	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/cloudprovider/alibabacloud"
 	"github.com/heptio/velero/pkg/cloudprovider/aws"
 	"github.com/heptio/velero/pkg/cloudprovider/azure"
 	"github.com/heptio/velero/pkg/cloudprovider/gcp"
@@ -41,9 +42,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterObjectStore("velero.io/aws", newAwsObjectStore).
 				RegisterObjectStore("velero.io/azure", newAzureObjectStore).
 				RegisterObjectStore("velero.io/gcp", newGcpObjectStore).
+				RegisterObjectStore("velero.io/alibabacloud", newAlibabaCloudObjectStore).
 				RegisterVolumeSnapshotter("velero.io/aws", newAwsVolumeSnapshotter).
 				RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
 				RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
+				RegisterVolumeSnapshotter("velero.io/alibabacloud", newAlibabaCloudVolumeSnapshotter).
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/serviceaccount", newServiceAccountBackupItemAction(f)).
@@ -75,6 +78,9 @@ func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewObjectStore(logger), nil
 }
 
+func newAlibabaCloudObjectStore(logger logrus.FieldLogger) (interface{}, error) {
+	return alibabacloud.NewObjectStore(logger), nil
+}
 func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
 	return aws.NewVolumeSnapshotter(logger), nil
 }
@@ -85,6 +91,10 @@ func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
 
 func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
 	return gcp.NewVolumeSnapshotter(logger), nil
+}
+
+func newAlibabaCloudVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
+	return alibabacloud.NewVolumeSnapshotter(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {

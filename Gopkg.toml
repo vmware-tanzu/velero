@@ -132,3 +132,11 @@
 [[override]]
   name = "golang.org/x/sys"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/aliyun/aliyun-oss-go-sdk"
+  version = "1.9.6"
+
+[[constraint]]
+  name = "github.com/aliyun/alibaba-cloud-sdk-go"
+  version = "1.27.7"

@@ -142,6 +142,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 									Name:  "AZURE_CREDENTIALS_FILE",
 									Value: "/credentials/cloud",
 								},
+								{
+									Name:  "ALIBABA_CLOUD_CREDENTIALS_FILE",
+									Value: "/credentials/cloud",
+								},
 							},
 						},
 					},

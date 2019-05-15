@@ -47,6 +47,33 @@
   version = "v11.1.2"
 
 [[projects]]
+  digest = "1:afcc4d8f4a3b162a90e84451fd4dbbc67edf5c3c3aeace09557f04f91eb85c9d"
+  name = "github.com/aliyun/alibaba-cloud-sdk-go"
+  packages = [
+    "sdk",
+    "sdk/auth",
+    "sdk/auth/credentials",
+    "sdk/auth/signers",
+    "sdk/endpoints",
+    "sdk/errors",
+    "sdk/requests",
+    "sdk/responses",
+    "sdk/utils",
+    "services/ecs",
+  ]
+  pruneopts = "NUT"
+  revision = "cad214d7d71fba7883fcf3b7e550ba782c15b400"
+  version = "1.27.7"
+
+[[projects]]
+  digest = "1:c5c73365822fb6a7bbe288316868057ae58447ddd95ecef466b6dbe93c37670e"
+  name = "github.com/aliyun/aliyun-oss-go-sdk"
+  packages = ["oss"]
+  pruneopts = "NUT"
+  revision = "08079eb9f6aaa13ee00b8fade6ceeffa138bf877"
+  version = "v1.9.6"
+
+[[projects]]
   digest = "1:f41188abdb95b92995643a927f5bdd208389822a8e1aba00d85633ae51b85c85"
   name = "github.com/aws/aws-sdk-go"
   packages = [
@@ -1004,6 +1031,9 @@
     "github.com/Azure/go-autorest/autorest/adal",
     "github.com/Azure/go-autorest/autorest/azure",
     "github.com/Azure/go-autorest/autorest/to",
+    "github.com/aliyun/alibaba-cloud-sdk-go/sdk/requests",
+    "github.com/aliyun/alibaba-cloud-sdk-go/services/ecs",
+    "github.com/aliyun/aliyun-oss-go-sdk/oss",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
