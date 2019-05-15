@@ -11,4 +11,4 @@ Here we list the API types that have some functionality that you can only config
 
 [1]: backup.md
 [2]: backupstoragelocation.md
-[3]: volumesnapshotlocation.d
+[3]: volumesnapshotlocation.md
