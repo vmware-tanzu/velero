@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.12-stretch
+FROM golang:1.12
 
 RUN mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
