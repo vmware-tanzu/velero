@@ -11,8 +11,8 @@ If you’re a newcomer, check out the “[Good first issue](https://github.com/h
 
 * Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero​](https://groups.google.com/forum/#!forum/projectvelero)
 
-* Join our mailing list to get updates on the project and invites to community meetings: <https://groups.google.com/forum/#!forum/projectvelero>
+* Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
 
 * Join the Velero community meetings every 1st and 3rd Tuesday:​ <https://github.com/heptio/velero-community>
 
-* See previous community meetings here: <https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM>
+* See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
