@@ -11,7 +11,7 @@ hero:
   background-color: med-blue
 footer:
   title: Getting Started
-  content: To help you get started, see the documentation. For additional information and resources, see the Velero wiki.
+  content: To help you get started, see the documentation.
   cta_title: ''
   cta_url: /docs/master
   cta_text: Documentation
