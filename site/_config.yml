@@ -43,6 +43,11 @@ defaults:
     values:
       layout: "default"
   - scope:
+      path: docs/latest
+    values:
+      version: latest
+      layout: "docs"
+  - scope:
       path: docs/master
     values:
       version: master
