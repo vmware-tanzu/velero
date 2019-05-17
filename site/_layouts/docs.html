@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+{% include head.html %}
+{% if page.version != "master" %}
+  <!-- Block google from indexing versioned docs -->
+  <meta name="robots" content="noindex">
+{% endif %}
+<body id="docs">
+  <div class="container-fluid site-outer-container">
+    <div class="site-container">
+      {% include site-header.html %}
+      <div class="post-single-hero bg-color-{{ site.hero.background-color }}">
+        <div class="section">
+            <div class="section-content">
+              <h1>Documentation</h1>
+            </div>
+        </div>
+      </div>
+        <div class="post-single-body">
+        <div class="section section-card">
+            <div class="section-content pt-4 pb-0">
+              <div class="row">
+                <div class="col-md-3">
+                {% include versions.html %} 
+                {% include nav.html %}
+                </div>
+                <div class="col-md-8 offset-md-1">
+                {% include version-warning.html %}
+                {{ content }}
+                </div>
+              </div>
+            </div>
+        </div>
+        </div>
+      {% include footer.html %}
+    </div>
+  </div>
+</body>
+
+</html>

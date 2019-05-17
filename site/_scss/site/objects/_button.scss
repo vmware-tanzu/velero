@@ -1,0 +1,59 @@
+.btn {
+  padding: {
+    top: 13px;
+    bottom: 9px;
+  }
+  font-size: 0.75rem;
+  border-radius: 5px;  
+  text-transform: uppercase;
+  font-weight: $font-weight-bold;
+  &.btn-no-border {
+    border-width: 0 !important;
+  }
+  &:hover {
+    text-decoration: underlin;
+  }
+}
+
+.btn-sm {
+  padding: 12px 52px;
+}
+
+.btn-primary {
+  color: $button-primary-foreground;
+  background-color: $button-primary-background;
+  border-color: $button-primary-foreground;
+  &:hover {
+    color: $button-primary-background;
+    background-color: $button-primary-background-hover;
+    border-color: $button-primary-border-hover;
+    text-decoration: underline;
+  }
+}
+
+.btn-secondary {  
+  color: $button-secondary-foreground;
+  background-color: $button-secondary-background;
+  border-color: $button-secondary-border;
+  &:hover {
+    color: $button-secondary-background;
+    background-color: $button-secondary-background-hover;
+    border-color: $button-secondary-border-hover;
+    text-decoration: underline;
+  }
+}
+
+.btn-outline-primary {
+  color: $button-primary-foreground;
+  background-color: transparent;
+  border-color: $button-primary-foreground;
+  &:hover {
+    color: $white;
+    background: $button-primary-foreground;
+  }
+}
+.btn-outline-light {
+  &:hover {
+    color: $button-primary-foreground;
+  }
+}
