@@ -7,7 +7,7 @@ url:
 logo: Velero.svg
 vm_logo: vm-logo.png
 gh_repo: https://github.com/heptio/velero
-hero: 
+hero:
   background-color: med-blue
 footer:
   title: Getting Started
@@ -17,24 +17,24 @@ footer:
   cta_text: Documentation
   vm-link: http://vmware.github.io/
 
-footer_social_links:  
+footer_social_links:
   Twitter:
     fa_icon: fab fa-twitter
     url: https://twitter.com/projectvelero
   Slack:
     fa_icon: fab fa-slack
     url: https://kubernetes.slack.com/messages/velero
-  User Group:
+  Google Groups:
     fa_icon: fas fa-users
     url: https://groups.google.com/forum/#!forum/projectvelero
-  RSS: 
+  RSS:
     fa_icon: fa fa-rss
     url: feed.xml
-    
+
 defaults:
   - scope:
       path: "" # an empty string here means all files in the project
-      type: "posts" 
+      type: "posts"
     values:
       layout: "posts"
   - scope:
@@ -159,7 +159,7 @@ plugins:
 
 
 # Include these subdirectories
-include: 
+include:
   - CONTRIBUTING.md
   - README.md
 

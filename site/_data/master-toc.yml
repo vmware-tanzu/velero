@@ -28,7 +28,7 @@ toc:
       - page: Run on GCP
         url: /gcp-config
       - page: Restic Setup
-        url: /restic    
+        url: /restic
   - title: Use
     subfolderitems:
       - page: Disaster Recovery
@@ -65,4 +65,5 @@ toc:
         url: /api-types
       - page: FAQ
         url: /faq
-
+      - page: ZenHub
+        url: /zenhub

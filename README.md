@@ -20,14 +20,14 @@ You can run Velero in clusters on a cloud provider or on-premises. For detailed 
 ## Installation
 
 We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
-command-line client **and** version-specific sample YAML files for deploying Velero to your cluster. 
+command-line client **and** version-specific sample YAML files for deploying Velero to your cluster.
 Follow the instructions under the **Install** section of [our documentation][29] to get started.
 
 _The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
 ## More information
 
-[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more. 
+[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more.
 
 Please use the version selector at the top of the site to ensure you are using the appropriate documentation for your version of Velero.
 
@@ -71,11 +71,11 @@ See [the list of releases][6] to find out about feature changes.
 
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-[26]: https://github.com/heptio/velero/blob/master/docs/zenhub.md
+[26]: https://velero.io/docs/v0.11.0/zenhub
 
 
-[29]: https://heptio.github.io/velero/
-[30]: /docs/troubleshooting.md
+[29]: https://velero.io/docs/v0.11.0/
+[30]: https://velero.io/docs/v0.11.0/troubleshooting
 
-[99]: /docs/support-matrix.md
-[100]: /docs/img/velero.png
+[99]: https://velero.io/docs/v0.11.0/support-matrix
+[100]: /site/docs/master/img/velero.png
