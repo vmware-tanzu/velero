@@ -128,6 +128,7 @@ collections:
 versioning: true
 latest: v0.11.0
 versions:
+- master
 - v1.0.0-rc.1
 - v0.11.0
 - v0.10.0
