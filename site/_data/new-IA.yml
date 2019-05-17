@@ -27,6 +27,8 @@ toc:
     subfolderitems:
       - page: Backup file format
         url: /output-file-format
+      - page: API types
+        url: /api-types
   - title: Tutorials
     subfolderitems:
       - page: Disaster Recovery
