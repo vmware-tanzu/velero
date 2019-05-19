@@ -37,6 +37,24 @@ _*backups created prior to v0.10 stored snapshot metadata in the `status.volumeB
     kubectl -n velero scale deployment/velero --replicas 0
     ```
 
+1. Fetch velero's credentials for accessing your object storage bucket and store them locally for use by `velero migrate-backups`:
+    ```bash
+    # for AWS
+    export AWS_SHARED_CREDENTIALS_FILE=./velero-migrate-backups-credentials
+    kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.cloud}" | base64 --decode > $AWS_SHARED_CREDENTIALS_FILE
+
+    # for Azure
+    export AZURE_SUBSCRIPTION_ID=$(kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.AZURE_SUBSCRIPTION_ID}" | base64 --decode)
+    export AZURE_TENANT_ID=$(kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.AZURE_TENANT_ID}" | base64 --decode)
+    export AZURE_CLIENT_ID=$(kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.AZURE_CLIENT_ID}" | base64 --decode)
+    export AZURE_CLIENT_SECRET=$(kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.AZURE_CLIENT_SECRET}" | base64 --decode)
+    export AZURE_RESOURCE_GROUP=$(kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.AZURE_RESOURCE_GROUP}" | base64 --decode)
+
+    # for GCP
+    export GOOGLE_APPLICATION_CREDENTIALS=./velero-migrate-backups-credentials
+    kubectl -n velero get secret cloud-credentials -o jsonpath="{.data.cloud}" | base64 --decode > $GOOGLE_APPLICATION_CREDENTIALS
+    ```
+
 1. List all of your backup storage locations:
     ```bash
     velero backup-location get
@@ -57,6 +75,24 @@ _*backups created prior to v0.10 stored snapshot metadata in the `status.volumeB
 1. Scale up your deployment:
     ```bash
     kubectl -n velero scale deployment/velero --replicas 1
+    ```
+
+1. Remove the local velero credentials:
+    ```bash
+    # for AWS
+    rm $AWS_SHARED_CREDENTIALS_FILE
+    unset AWS_SHARED_CREDENTIALS_FILE
+
+    # for Azure
+    unset AZURE_SUBSCRIPTION_ID
+    unset AZURE_TENANT_ID
+    unset AZURE_CLIENT_ID
+    unset AZURE_CLIENT_SECRET
+    unset AZURE_RESOURCE_GROUP
+
+    # for GCP
+    rm $GOOGLE_APPLICATION_CREDENTIALS
+    unset GOOGLE_APPLICATION_CREDENTIALS
     ```
 
 ### Part 2 - Upgrade Components to Velero 1.0
