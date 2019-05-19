@@ -74,7 +74,7 @@ See [the list of releases][6] to find out about feature changes.
 [26]: https://github.com/heptio/velero/blob/master/docs/zenhub.md
 
 
-[29]: https://heptio.github.io/velero/
+[29]: https://velero.io/docs/v1.0.0-rc.1/
 [30]: troubleshooting.md
 
 [99]: support-matrix.md
