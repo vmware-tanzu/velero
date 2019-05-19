@@ -79,4 +79,4 @@ kubectl delete crds -l component=ark
 kubectl delete clusterrolebindings -l component=ark
 ```
 
-[1]: https://heptio.github.io/velero/v0.10.0/upgrading-to-v0.10
+[1]: https://velero.io/docs/v0.10.0/upgrading-to-v0.10
