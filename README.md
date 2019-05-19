@@ -71,11 +71,11 @@ See [the list of releases][6] to find out about feature changes.
 
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-[26]: https://velero.io/docs/v0.11.0/zenhub
+[26]: https://velero.io/docs/v1.0.0/zenhub
 
 
-[29]: https://velero.io/docs/v0.11.0/
-[30]: https://velero.io/docs/v0.11.0/troubleshooting
+[29]: https://velero.io/docs/v1.0.0/
+[30]: https://velero.io/docs/v1.0.0/troubleshooting
 
-[99]: https://velero.io/docs/v0.11.0/support-matrix
+[99]: https://velero.io/docs/v1.0.0/support-matrix
 [100]: /site/docs/master/img/velero.png
