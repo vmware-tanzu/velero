@@ -19,9 +19,8 @@ You can run Velero in clusters on a cloud provider or on-premises. For detailed 
 
 ## Installation
 
-We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
-command-line client **and** version-specific sample YAML files for deploying Velero to your cluster.
-Follow the instructions under the **Install** section of [our documentation][29] to get started.
+We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the 
+`velero` command-line client. Follow the instructions under the **Install** section of [our documentation][29] to get started.
 
 _The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
