@@ -1,1 +1,0 @@
-Fix for #1312, use describe to determine if AWS EBS snapshot is encrypted and explicitly pass that value in EC2 CreateVolume call.

@@ -1,1 +1,0 @@
-set backup's start timestamp before patching it to InProgress so start times display in `velero backup get` while in progress

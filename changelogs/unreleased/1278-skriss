@@ -1,1 +1,0 @@
-Pass --log-level flag to internal/external plugins, matching Velero server's log level

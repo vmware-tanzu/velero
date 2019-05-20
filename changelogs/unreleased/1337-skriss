@@ -1,1 +1,0 @@
-velero backup logs & velero restore logs: show helpful error message if backup/restore does not exist or is not finished processing

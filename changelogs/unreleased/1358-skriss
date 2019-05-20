@@ -1,1 +1,0 @@
-instantiate the plugin manager with the per-restore logger so plugin logs are captured in the per-restore log

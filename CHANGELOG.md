@@ -1,10 +1,11 @@
+## Current release:
+  * [CHANGELOG-1.0.md][10]
+
 ## Development release:
   * [Unreleased Changes][0]
 
-## Current release:
-  * [CHANGELOG-0.11.md][9]
-
 ## Older releases:
+  * [CHANGELOG-0.11.md][9]
   * [CHANGELOG-0.10.md][8]
   * [CHANGELOG-0.9.md][7]
   * [CHANGELOG-0.8.md][6]
@@ -15,6 +16,7 @@
   * [CHANGELOG-0.3.md][1]
 
 
+[10]: https://github.com/heptio/velero/blob/master/changelogs/CHANGELOG-1.0.md
 [9]: https://github.com/heptio/velero/blob/master/changelogs/CHANGELOG-0.11.md
 [8]: https://github.com/heptio/velero/blob/master/changelogs/CHANGELOG-0.10.md
 [7]: https://github.com/heptio/velero/blob/master/changelogs/CHANGELOG-0.9.md

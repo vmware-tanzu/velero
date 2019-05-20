@@ -1,1 +1,0 @@
-aws/azure/gcp: fail fast if unsupported keys are provided in BackupStorageLocation/VolumeSnapshotLocation config

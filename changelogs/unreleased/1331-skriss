@@ -1,1 +1,0 @@
-Improve error message around invalid S3 URLs, and gracefully handle trailing backslashes.
