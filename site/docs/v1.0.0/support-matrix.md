@@ -40,6 +40,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 | [Restic][1]                      | Velero Team        | [Slack][10], [GitHub Issue][11] |
 | [Portworx][6]                    | Portworx        | [Slack][13], [GitHub Issue][14] |
 | [DigitalOcean][7]                | StackPointCloud |                                 |
+| [OpenEBS][18]                     | OpenEBS       | [Slack][19], [GitHub Issue][20] |
 
 ### Adding a new plugin
 
@@ -64,3 +65,6 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [15]: api-types/backupstoragelocation.md#aws
 [16]: http://www.noobaa.com/
 [17]: restic.md
+[18]: https://github.com/openebs/velero-plugin
+[19]: https://openebs-community.slack.com/
+[20]: https://github.com/openebs/velero-plugin/issues
