@@ -131,7 +131,7 @@ func (c *FakeBackups) DeleteCollection(options *v1.DeleteOptions, listOptions v1
 // Patch applies the patch and returns the patched backup.
 func (c *FakeBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.Backup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(backupsResource, c.ns, name, data, subresources...), &velerov1.Backup{})
+		Invokes(testing.NewPatchSubresourceAction(backupsResource, c.ns, name, pt, data, subresources...), &velerov1.Backup{})
 
 	if obj == nil {
 		return nil, err

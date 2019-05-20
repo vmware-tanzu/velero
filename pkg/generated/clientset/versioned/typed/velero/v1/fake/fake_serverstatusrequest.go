@@ -131,7 +131,7 @@ func (c *FakeServerStatusRequests) DeleteCollection(options *v1.DeleteOptions, l
 // Patch applies the patch and returns the patched serverStatusRequest.
 func (c *FakeServerStatusRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, name, data, subresources...), &velerov1.ServerStatusRequest{})
+		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, name, pt, data, subresources...), &velerov1.ServerStatusRequest{})
 
 	if obj == nil {
 		return nil, err

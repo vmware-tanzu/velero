@@ -75,8 +75,3 @@ var _ clientset.Interface = &Clientset{}
 func (c *Clientset) VeleroV1() velerov1.VeleroV1Interface {
 	return &fakevelerov1.FakeVeleroV1{Fake: &c.Fake}
 }
-
-// Velero retrieves the VeleroV1Client
-func (c *Clientset) Velero() velerov1.VeleroV1Interface {
-	return &fakevelerov1.FakeVeleroV1{Fake: &c.Fake}
-}

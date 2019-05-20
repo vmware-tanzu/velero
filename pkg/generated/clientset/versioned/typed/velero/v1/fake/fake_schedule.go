@@ -131,7 +131,7 @@ func (c *FakeSchedules) DeleteCollection(options *v1.DeleteOptions, listOptions 
 // Patch applies the patch and returns the patched schedule.
 func (c *FakeSchedules) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.Schedule, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, data, subresources...), &velerov1.Schedule{})
+		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, pt, data, subresources...), &velerov1.Schedule{})
 
 	if obj == nil {
 		return nil, err

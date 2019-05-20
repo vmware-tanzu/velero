@@ -131,7 +131,7 @@ func (c *FakePodVolumeBackups) DeleteCollection(options *v1.DeleteOptions, listO
 // Patch applies the patch and returns the patched podVolumeBackup.
 func (c *FakePodVolumeBackups) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.PodVolumeBackup, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(podvolumebackupsResource, c.ns, name, data, subresources...), &velerov1.PodVolumeBackup{})
+		Invokes(testing.NewPatchSubresourceAction(podvolumebackupsResource, c.ns, name, pt, data, subresources...), &velerov1.PodVolumeBackup{})
 
 	if obj == nil {
 		return nil, err
