@@ -10,7 +10,7 @@ hero:
   content: Velero is an open source tool to safely backup and restore, perform disaster recovery, and migrate Kubernetes cluster resources and persistent volumes.
   cta_link1:
     text: Latest Release Information
-    url: https://blogs.vmware.com/cloudnative/2019/02/28/velero-v0-11-delivers-an-open-source-tool-to-back-up-and-migrate-kubernetes-clusters/
+    url: /velero-1.0-has-arrived/
   cta_link2:
     text:  Download Velero
     url: https://github.com/heptio/velero/releases/tag/v1.0.0
@@ -41,7 +41,7 @@ secondary_ctas:
 #reference:
 #  title: Lorem Ipsum
 #  content: Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-#  links: 
+#  links:
 #    ISO: http://www.example.com
 #    OVA: http://www.example.com
 #    Amazon Machine Image: http://www.example.com
@@ -53,7 +53,7 @@ secondary_ctas:
     <div class="section-content">
       <div class="hero-content">
         <h1 class="mb-3">{{ page.hero.headline }}</h1>
-        <p>{{ page.hero.content }}</p>        
+        <p>{{ page.hero.content }}</p>
       </div>
       <div class="hero-cta mt-4">
         <a href="{{ page.hero.cta_link1.url }}" class="btn btn-primary mb-3 mb-sm-0">{{ page.hero.cta_link1.text }}</a>
@@ -139,7 +139,7 @@ secondary_ctas:
         <div class="col">
           <h2 class="text-center">{{ page.reference.title }}</h2>
           <p>{{ page.reference.content }}</p>
-  
+
           <ul>
             {% for link in page.reference.links %}
             <li><a href="{{ link[1] }}">{{ link[0] }}</a></li>
@@ -156,7 +156,7 @@ secondary_ctas:
       <div class="row">
         <div class="col">
           <h2>Features</h2>
-        </div>          
+        </div>
       </div>
       {% assign limit = 3 %}
       {% include case-studies-alternating.html %}
@@ -167,7 +167,7 @@ secondary_ctas:
   <div class="section-content">
     <div class="row">
       <div class="col">
-        <h2>Blog Highlights</h2>        
+        <h2>Blog Highlights</h2>
       </div>
     </div>
     {% assign limit = 3 %}
