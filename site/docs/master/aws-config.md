@@ -17,13 +17,13 @@ If you do not have the `aws` CLI locally installed, follow the [user guide][5] t
 Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
-1. Extract the tarball:
-    ```bash
-    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
-    ```
+2. Extract the tarball:
+```bash
+tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
+```
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
-1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
+3. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
 ## Create S3 bucket
 
@@ -50,91 +50,87 @@ aws s3api create-bucket \
 For more information, see [the AWS documentation on IAM users][14].
 
 1. Create the IAM user:
+```bash
+aws iam create-user --user-name velero
+```
 
-    ```bash
-    aws iam create-user --user-name velero
-    ```
-    
-    > If you'll be using Velero to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
+    If you'll be using Velero to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
 2. Attach policies to give `velero` the necessary permissions:
-
-    ```bash
-    cat > velero-policy.json <<EOF
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "ec2:DescribeVolumes",
-                    "ec2:DescribeSnapshots",
-                    "ec2:CreateTags",
-                    "ec2:CreateVolume",
-                    "ec2:CreateSnapshot",
-                    "ec2:DeleteSnapshot"
-                ],
-                "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:GetObject",
-                    "s3:DeleteObject",
-                    "s3:PutObject",
-                    "s3:AbortMultipartUpload",
-                    "s3:ListMultipartUploadParts"
-                ],
-                "Resource": [
-                    "arn:aws:s3:::${BUCKET}/*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:ListBucket"
-                ],
-                "Resource": [
-                    "arn:aws:s3:::${BUCKET}"
-                ]
-            }
-        ]
-    }
-    EOF
-
-    aws iam put-user-policy \
-      --user-name velero \
-      --policy-name velero \
-      --policy-document file://velero-policy.json
-    ```
+```bash
+cat > velero-policy.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeVolumes",
+                "ec2:DescribeSnapshots",
+                "ec2:CreateTags",
+                "ec2:CreateVolume",
+                "ec2:CreateSnapshot",
+                "ec2:DeleteSnapshot"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:DeleteObject",
+                "s3:PutObject",
+                "s3:AbortMultipartUpload",
+                "s3:ListMultipartUploadParts"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${BUCKET}/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${BUCKET}"
+            ]
+        }
+    ]
+}
+EOF
+```
+```bash
+aws iam put-user-policy \
+  --user-name velero \
+  --policy-name velero \
+  --policy-document file://velero-policy.json
+```
 
 3. Create an access key for the user:
-
-    ```bash
-    aws iam create-access-key --user-name velero
-    ```
+```bash
+aws iam create-access-key --user-name velero
+```
 
     The result should look like:
-
-    ```json
-     {
-        "AccessKey": {
-              "UserName": "velero",
-              "Status": "Active",
-              "CreateDate": "2017-07-31T22:24:41.576Z",
-              "SecretAccessKey": <AWS_SECRET_ACCESS_KEY>,
-              "AccessKeyId": <AWS_ACCESS_KEY_ID>
-          }
-     }
-    ```
+```json
+{
+  "AccessKey": {
+        "UserName": "velero",
+        "Status": "Active",
+        "CreateDate": "2017-07-31T22:24:41.576Z",
+        "SecretAccessKey": <AWS_SECRET_ACCESS_KEY>,
+        "AccessKeyId": <AWS_ACCESS_KEY_ID>
+  }
+}
+```
 
 4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
-
-    ```
-    [default]
-    aws_access_key_id=<AWS_ACCESS_KEY_ID>
-    aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
-    ```
+```bash
+[default]
+aws_access_key_id=<AWS_ACCESS_KEY_ID>
+aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
+```
 
     where the access key id and secret are the values returned from the `create-access-key` request.
 
@@ -165,26 +161,26 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 * If you have multiple clusters and you want to support migration of resources between them, you can use `kubectl edit deploy/velero -n velero` to edit your deployment:
 
     * Add the environment variable `AWS_CLUSTER_NAME` under `spec.template.spec.env`, with the current cluster's name. When restoring backup, it will make Velero (and cluster it's running on) claim ownership of AWS volumes created from snapshots taken on different cluster.
-    The best way to get the current cluster's name is to either check it with used deployment tool or to read it directly from the EC2 instances tags. 
-    
+    The best way to get the current cluster's name is to either check it with used deployment tool or to read it directly from the EC2 instances tags.
+
       The following listing shows how to get the cluster's nodes EC2 Tags. First, get the nodes external IDs (EC2 IDs):
 
-        ```bash
-        kubectl get nodes -o jsonpath='{.items[*].spec.externalID}'
-        ```
-    
+      ```bash
+      kubectl get nodes -o jsonpath='{.items[*].spec.externalID}'
+      ```
+
       Copy one of the returned IDs `<ID>` and use it with the `aws` CLI tool to search for one of the following:
 
       * The `kubernetes.io/cluster/<AWS_CLUSTER_NAME>` tag of the value `owned`. The `<AWS_CLUSTER_NAME>` is then your cluster's name:
 
-          ```bash
-          aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=value,Values=owned"
-          ```
-    
+        ```bash
+        aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=value,Values=owned"
+        ```
+
       * If the first output returns nothing, then check for the legacy Tag `KubernetesCluster` of the value `<AWS_CLUSTER_NAME>`:
 
-          ```bash
-          aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=key,Values=KubernetesCluster"
+        ```bash
+        aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=key,Values=KubernetesCluster"
         ```
 
 ## ALTERNATIVE: Setup permissions using kube2iam
@@ -196,113 +192,109 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 It can be set up for Velero by creating a role that will have required permissions, and later by adding the permissions annotation on the velero deployment to define which role it should use internally.
 
 1. Create a Trust Policy document to allow the role being used for EC2 management & assume kube2iam role:
-
-    ```bash
-    cat > velero-trust-policy.json <<EOF
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Principal": {
-                    "Service": "ec2.amazonaws.com"
-                },
-                "Action": "sts:AssumeRole"
+```bash
+cat > velero-trust-policy.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
             },
-            {
-                "Effect": "Allow",
-                "Principal": {
-                    "AWS": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<ROLE_CREATED_WHEN_INITIALIZING_KUBE2IAM>"
-                },
-                "Action": "sts:AssumeRole"
-            }
-        ]
-    }
-    EOF
-    ```
+            "Action": "sts:AssumeRole"
+        },
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/<ROLE_CREATED_WHEN_INITIALIZING_KUBE2IAM>"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+```
 
 2. Create the IAM role:
-
-    ```bash
-    aws iam create-role --role-name velero --assume-role-policy-document file://./velero-trust-policy.json
-    ```
+```bash
+aws iam create-role --role-name velero --assume-role-policy-document file://./velero-trust-policy.json
+```
 
 3. Attach policies to give `velero` the necessary permissions:
-
-    ```bash
-    BUCKET=<YOUR_BUCKET>
-    cat > velero-policy.json <<EOF
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "ec2:DescribeVolumes",
-                    "ec2:DescribeSnapshots",
-                    "ec2:CreateTags",
-                    "ec2:CreateVolume",
-                    "ec2:CreateSnapshot",
-                    "ec2:DeleteSnapshot"
-                ],
-                "Resource": "*"
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:GetObject",
-                    "s3:DeleteObject",
-                    "s3:PutObject",
-                    "s3:AbortMultipartUpload",
-                    "s3:ListMultipartUploadParts"
-                ],
-                "Resource": [
-                    "arn:aws:s3:::${BUCKET}/*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:ListBucket"
-                ],
-                "Resource": [
-                    "arn:aws:s3:::${BUCKET}"
-                ]
-            }
-        ]
-    }
-    EOF
-
-    aws iam put-role-policy \
-      --role-name velero \
-      --policy-name velero-policy \
-      --policy-document file://./velero-policy.json
-    ```
+```bash
+BUCKET=<YOUR_BUCKET>
+cat > velero-policy.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeVolumes",
+                "ec2:DescribeSnapshots",
+                "ec2:CreateTags",
+                "ec2:CreateVolume",
+                "ec2:CreateSnapshot",
+                "ec2:DeleteSnapshot"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:DeleteObject",
+                "s3:PutObject",
+                "s3:AbortMultipartUpload",
+                "s3:ListMultipartUploadParts"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${BUCKET}/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${BUCKET}"
+            ]
+        }
+    ]
+}
+EOF
+```
+```bash
+aws iam put-role-policy \
+  --role-name velero \
+  --policy-name velero-policy \
+  --policy-document file://./velero-policy.json
+```
 4. Update `AWS_ACCOUNT_ID` & `VELERO_ROLE_NAME` with `kubectl edit deploy/velero -n velero` and add the following annotation:
-
-    ```
-    ---
-    apiVersion: apps/v1beta1
-    kind: Deployment
-    metadata:
-        namespace: velero
-        name: velero
-    spec:
-        replicas: 1
-        template:
-            metadata:
-                labels:
-                    component: velero
-                annotations:
-                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
-    ...
-    ```
+```
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+    namespace: velero
+    name: velero
+spec:
+    replicas: 1
+    template:
+        metadata:
+            labels:
+                component: velero
+            annotations:
+                iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
+```
 
 ## Installing the nginx example (optional)
 
 If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
-    * Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
+Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
