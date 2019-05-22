@@ -1,6 +1,6 @@
 # Disaster recovery
 
-*Using Schedules and Restore-Only Mode*
+*Using Schedules and Read-Only Backup Storage Locations*
 
 If you periodically back up your cluster's resources, you are able to return to a previous state in case of some unexpected mishap, such as a service outage. Doing so with Velero looks like the following:
 
@@ -14,7 +14,14 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 1.  A disaster happens and you need to recreate your resources.
 
-1.  Update the Velero server deployment, adding the argument for the `server` command flag `restore-only` set to `true`. This prevents Backup objects from being created or deleted during your Restore process.
+1.  Update your backup storage location to be in read-only mode. This prevents Backup objects from being created or deleted in the backup storage location during your Restore process:
+
+    ```bash
+    kubectl patch backupstoragelocation <STORAGE LOCATION NAME> \
+        --namespace velero \
+        --type merge \
+        --patch '{"spec":{"accessMode":"ReadOnly"}}'
+    ```
 
 1.  Create a restore with your most recent Velero Backup:
 

@@ -12,9 +12,8 @@ Velero can help you port your resources from one cluster to another, as long as 
 
     The default TTL is 30 days (720 hours); you can use the `--ttl` flag to change this as necessary.
 
-1.  *(Cluster 2)* Add the `--restore-only` flag to the server spec in the Velero deployment YAML.
-
-1.  *(Cluster 2)* Make sure that the `BackupStorageLocation` and `VolumeSnapshotLocation` CRDs match the ones from *Cluster 1*, so that your new Velero server instance points to the same bucket.
+1.  *(Cluster 2)* Configure `BackupStorageLocations` and `VolumeSnapshotLocations`, pointing to the locations used by *Cluster 1*, using `velero backup-location create` and `velero snapshot-location create`. Make sure to configure the `BackupStorageLocations` as read-only
+    by using the `--access-mode=ReadOnly` flag for `velero backup-location create`.
 
 1.  *(Cluster 2)* Make sure that the Velero Backup object is created. Velero resources are synchronized with the backup files in cloud storage.
 

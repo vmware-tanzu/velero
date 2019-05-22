@@ -31,7 +31,7 @@ The **restore** operation allows you to restore all of the objects and persisten
 
 The default name of a restore is `<BACKUP NAME>-<TIMESTAMP>`, where `<TIMESTAMP>` is formatted as *YYYYMMDDhhmmss*. You can also specify a custom name. A restored object also includes a label with key `velero.io/restore-name` and value `<RESTORE NAME>`.
 
-You can also run the Velero server in restore-only mode, which disables backup, schedule, and garbage collection functionality during disaster recovery.
+You can also configure backup storage locations in read-only mode, which disables backup creation and deletion for the storage location during disaster recovery. 
 
 ## Backup workflow
 

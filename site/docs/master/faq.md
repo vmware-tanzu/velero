@@ -38,6 +38,7 @@ and not to use prefixes at all.
 
 Related to this, if you need to restore a backup that was created in cluster A into cluster B, you may 
 configure cluster B with a backup storage location that points to cluster A's bucket/prefix. If you do
-this, you should use restore-only mode in cluster B's Velero instance (via the `--restore-only` flag on 
-the `velero server` command specified in your Velero deployment) while it's configured to use cluster A's 
-bucket/prefix. This will ensure no new backups are created, and no existing backups are deleted or overwritten.
+this, you should configure the storage location pointing to cluster A's bucket/prefix in `ReadOnly` mode
+via the `--access-mode=ReadOnly` flag on the `velero backup-location create` command. This will ensure no
+new backups are created from Cluster B in Cluster A's bucket/prefix, and no existing backups are deleted
+or overwritten.
