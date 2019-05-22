@@ -17,17 +17,17 @@ For details, see the documentation topics for individual cloud providers.
 The Velero client includes an `install` command to specify the settings for each supported cloud provider. You can install Velero for the included cloud providers using the following command:
 
 ```bash
-    velero install \
-        --provider <YOUR_PROVIDER> \
-        --bucket <YOUR_BUCKET> \
-        --secret-file <PATH_TO_FILE> \
-        [--backup-location-config]
-        [--snapshot-location-config]
-        [--namespace]
-        [--use-volume-snapshots]
-        [--use-restic]
+velero install \
+    --provider <YOUR_PROVIDER> \
+    --bucket <YOUR_BUCKET> \
+    --secret-file <PATH_TO_FILE> \
+    [--backup-location-config]
+    [--snapshot-location-config]
+    [--namespace]
+    [--use-volume-snapshots]
+    [--use-restic]
 ```
-        
+
 For provider-specific instructions, see:
 
 * [Run Velero on AWS][0]
@@ -43,10 +43,10 @@ For more complex installation needs, use either the generated YAML, or the Helm 
 
 ## On-premises
 
-You can run Velero in an on-premises cluster in different ways depending on your requirements. 
+You can run Velero in an on-premises cluster in different ways depending on your requirements.
 
 First, you must select an object storage backend that Velero can use to store backup data. [Compatible Storage Providers][99] contains information on various
-options that are supported or have been reported to work by users. [Minio][101] is an option if you want to keep your backup data on-premises and you are 
+options that are supported or have been reported to work by users. [Minio][101] is an option if you want to keep your backup data on-premises and you are
 not using another storage platform that offers an S3-compatible object storage API.
 
 Second, if you need to back up persistent volume data, you must select a volume backup solution. [Volume Snapshot Providers][100] contains information on
@@ -72,19 +72,19 @@ After you set up the Velero server, try these examples:
 1. Start the sample nginx app:
 
     ```bash
-    kubectl apply -f examples/nginx-app/base.yaml
+kubectl apply -f examples/nginx-app/base.yaml
     ```
 
 1. Create a backup:
 
     ```bash
-    velero backup create nginx-backup --include-namespaces nginx-example
+velero backup create nginx-backup --include-namespaces nginx-example
     ```
 
 1. Simulate a disaster:
 
     ```bash
-    kubectl delete namespaces nginx-example
+kubectl delete namespaces nginx-example
     ```
 
     Wait for the namespace to be deleted.
@@ -92,7 +92,7 @@ After you set up the Velero server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    velero restore create --from-backup nginx-backup
+velero restore create --from-backup nginx-backup
     ```
 
 ### Snapshot example (with PersistentVolumes)
@@ -102,19 +102,19 @@ After you set up the Velero server, try these examples:
 1. Start the sample nginx app:
 
     ```bash
-    kubectl apply -f examples/nginx-app/with-pv.yaml
+kubectl apply -f examples/nginx-app/with-pv.yaml
     ```
 
 1. Create a backup with PV snapshotting:
 
     ```bash
-    velero backup create nginx-backup --include-namespaces nginx-example
+velero backup create nginx-backup --include-namespaces nginx-example
     ```
 
 1. Simulate a disaster:
 
     ```bash
-    kubectl delete namespaces nginx-example
+kubectl delete namespaces nginx-example
     ```
 
     Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Delete", these commands should trigger your cloud provider to delete the disk that backs the PV. Deletion is asynchronous, so this may take some time. **Before continuing to the next step, check your cloud provider to confirm that the disk no longer exists.**
@@ -122,7 +122,7 @@ After you set up the Velero server, try these examples:
 1. Restore your lost resources:
 
     ```bash
-    velero restore create --from-backup nginx-backup
+velero restore create --from-backup nginx-backup
     ```
 
 [0]: aws-config.md

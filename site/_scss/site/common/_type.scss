@@ -36,3 +36,16 @@ h5 {
 strong {
   font-weight: $font-weight-semibold;
 }
+pre {
+  display: block;
+  font-size: $code-font-size;
+  color: $pre-color;
+  background-color: #f2f2f2;
+
+  // Account for some code outputs that place code tags in pre tags
+  code {
+    font-size: inherit;
+    color: inherit;
+    word-break: normal;
+  }
+}

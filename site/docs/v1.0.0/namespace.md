@@ -7,7 +7,7 @@ First, ensure you've [downloaded & extracted the latest release][0].
 Then, install Velero using the `--namespace` flag:
 
 ```bash
-     velero install --bucket <YOUR_BUCKET> --provider <YOUR_PROVIDER> --namespace <YOUR_NAMESPACE>
+velero install --bucket <YOUR_BUCKET> --provider <YOUR_PROVIDER> --namespace <YOUR_NAMESPACE>
 ```
 
 
@@ -17,7 +17,7 @@ Then, install Velero using the `--namespace` flag:
 To specify the namespace for all Velero client commands, run:
 
 ```bash
-    velero client config set namespace=<NAMESPACE_VALUE>
+velero client config set namespace=<NAMESPACE_VALUE>
 ```
 
 

@@ -43,5 +43,7 @@ site/.sass-cache
 site/.jekyll
 site/.jekyll-metadata
 site/.bundle
+site/vendor
+.ruby-version
 
 .vs
