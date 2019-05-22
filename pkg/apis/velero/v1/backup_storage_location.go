@@ -67,9 +67,8 @@ type BackupStorageLocationSpec struct {
 
 	StorageType `json:",inline"`
 
-	// ReadOnly is whether the backup storage location is in read-only mode. If true,
-	// backups cannot be created or deleted in this location.
-	ReadOnly bool `json:"readOnly"`
+	// AccessMode defines the permissions for the backup storage location.
+	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
@@ -94,10 +93,17 @@ const (
 	BackupStorageLocationAccessModeReadWrite BackupStorageLocationAccessMode = "ReadWrite"
 )
 
+// TODO(2.0): remove the AccessMode field from BackupStorageLocationStatus.
+
 // BackupStorageLocationStatus describes the current status of a Velero BackupStorageLocation.
 type BackupStorageLocationStatus struct {
-	Phase              BackupStorageLocationPhase      `json:"phase,omitempty"`
-	AccessMode         BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
-	LastSyncedRevision types.UID                       `json:"lastSyncedRevision,omitempty"`
-	LastSyncedTime     metav1.Time                     `json:"lastSyncedTime,omitempty"`
+	Phase              BackupStorageLocationPhase `json:"phase,omitempty"`
+	LastSyncedRevision types.UID                  `json:"lastSyncedRevision,omitempty"`
+	LastSyncedTime     metav1.Time                `json:"lastSyncedTime,omitempty"`
+
+	// AccessMode is an unused field.
+	//
+	// Deprecated: there is now an AccessMode field on the Spec and this field
+	// will be removed entirely as of v2.0.
+	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }

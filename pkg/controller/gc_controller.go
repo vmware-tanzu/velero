@@ -145,7 +145,7 @@ func (c *gcController) processQueueItem(key string) error {
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if loc.Spec.ReadOnly {
+	if loc.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		log.Infof("Backup cannot be garbage-collected because backup storage location %s is currently in read-only mode", loc.Name)
 		return nil
 	}

@@ -221,7 +221,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if location.Spec.ReadOnly {
+	if location.Spec.AccessMode == v1.BackupStorageLocationAccessModeReadOnly {
 		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))
