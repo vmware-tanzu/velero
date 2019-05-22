@@ -66,13 +66,12 @@ cat > velero-policy.json <<EOF
     "Version": "2012-10-17",
     "Statement": [
         {
-                "Effect": "Allow",
+            "Effect": "Allow",
             "Action": [
                 "ec2:DescribeVolumes",
-
-                    "ec2:DescribeSnapshots",
+                "ec2:DescribeSnapshots",
                 "ec2:CreateTags",
-                    "ec2:CreateVolume",
+                "ec2:CreateVolume",
                 "ec2:CreateSnapshot",
                 "ec2:DeleteSnapshot"
             ],

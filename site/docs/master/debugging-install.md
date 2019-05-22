@@ -1,7 +1,3 @@
----
-title: Debugging
----
-
 # Debugging Installation Issues
 
 ## General
