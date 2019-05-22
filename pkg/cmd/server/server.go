@@ -629,6 +629,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
 			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 		)
 
 		return controllerRunInfo{

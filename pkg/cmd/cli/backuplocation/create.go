@@ -59,6 +59,7 @@ type CreateOptions struct {
 	Prefix   string
 	Config   flag.Map
 	Labels   flag.Map
+	ReadOnly bool
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -73,6 +74,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
+	flags.BoolVar(&o.ReadOnly, "read-only", o.ReadOnly, "whether the backup storage location should be created as read-only.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -111,7 +113,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					Prefix: o.Prefix,
 				},
 			},
-			Config: o.Config.Data(),
+			Config:   o.Config.Data(),
+			ReadOnly: o.ReadOnly,
 		},
 	}
 

@@ -66,6 +66,10 @@ type BackupStorageLocationSpec struct {
 	Config map[string]string `json:"config"`
 
 	StorageType `json:",inline"`
+
+	// ReadOnly is whether the backup storage location is in read-only mode. If true,
+	// backups cannot be created or deleted in this location.
+	ReadOnly bool `json:"readOnly"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.

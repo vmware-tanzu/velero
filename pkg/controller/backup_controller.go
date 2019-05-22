@@ -318,6 +318,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		}
 	} else {
 		request.StorageLocation = storageLocation
+
+		if request.StorageLocation.Spec.ReadOnly {
+			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
+				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
+		}
 	}
 
 	// validate and get the backup's VolumeSnapshotLocations, and store the
