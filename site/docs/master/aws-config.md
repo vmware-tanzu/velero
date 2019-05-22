@@ -18,9 +18,10 @@ Velero. The tarballs for each release contain the `velero` command-line client. 
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 2. Extract the tarball:
-```bash
+
+    ```bash
 tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
-```
+    ```
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 3. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -50,25 +51,28 @@ aws s3api create-bucket \
 For more information, see [the AWS documentation on IAM users][14].
 
 1. Create the IAM user:
-```bash
+
+    ```bash
 aws iam create-user --user-name velero
-```
+    ```
 
     If you'll be using Velero to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
 2. Attach policies to give `velero` the necessary permissions:
-```bash
+
+    ```bash
 cat > velero-policy.json <<EOF
 {
     "Version": "2012-10-17",
     "Statement": [
         {
-            "Effect": "Allow",
+                "Effect": "Allow",
             "Action": [
                 "ec2:DescribeVolumes",
-                "ec2:DescribeSnapshots",
+
+                    "ec2:DescribeSnapshots",
                 "ec2:CreateTags",
-                "ec2:CreateVolume",
+                    "ec2:CreateVolume",
                 "ec2:CreateSnapshot",
                 "ec2:DeleteSnapshot"
             ],
@@ -99,21 +103,23 @@ cat > velero-policy.json <<EOF
     ]
 }
 EOF
-```
-```bash
+    ```
+    ```bash
 aws iam put-user-policy \
   --user-name velero \
   --policy-name velero \
   --policy-document file://velero-policy.json
-```
+    ```
 
 3. Create an access key for the user:
-```bash
+
+    ```bash
 aws iam create-access-key --user-name velero
-```
+    ```
 
     The result should look like:
-```json
+
+    ```json
 {
   "AccessKey": {
         "UserName": "velero",
@@ -123,14 +129,15 @@ aws iam create-access-key --user-name velero
         "AccessKeyId": <AWS_ACCESS_KEY_ID>
   }
 }
-```
+    ```
 
 4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
-```bash
+
+    ```bash
 [default]
 aws_access_key_id=<AWS_ACCESS_KEY_ID>
 aws_secret_access_key=<AWS_SECRET_ACCESS_KEY>
-```
+    ```
 
     where the access key id and secret are the values returned from the `create-access-key` request.
 
@@ -192,7 +199,8 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 It can be set up for Velero by creating a role that will have required permissions, and later by adding the permissions annotation on the velero deployment to define which role it should use internally.
 
 1. Create a Trust Policy document to allow the role being used for EC2 management & assume kube2iam role:
-```bash
+
+    ```bash
 cat > velero-trust-policy.json <<EOF
 {
     "Version": "2012-10-17",
@@ -214,15 +222,17 @@ cat > velero-trust-policy.json <<EOF
     ]
 }
 EOF
-```
+    ```
 
 2. Create the IAM role:
-```bash
+
+    ```bash
 aws iam create-role --role-name velero --assume-role-policy-document file://./velero-trust-policy.json
-```
+    ```
 
 3. Attach policies to give `velero` the necessary permissions:
-```bash
+
+    ```bash
 BUCKET=<YOUR_BUCKET>
 cat > velero-policy.json <<EOF
 {
@@ -265,15 +275,17 @@ cat > velero-policy.json <<EOF
     ]
 }
 EOF
-```
-```bash
+    ```
+    ```bash
 aws iam put-role-policy \
   --role-name velero \
   --policy-name velero-policy \
   --policy-document file://./velero-policy.json
-```
+    ```
+
 4. Update `AWS_ACCOUNT_ID` & `VELERO_ROLE_NAME` with `kubectl edit deploy/velero -n velero` and add the following annotation:
-```
+
+    ```
 ---
 apiVersion: apps/v1beta1
 kind: Deployment
@@ -288,7 +300,7 @@ spec:
                 component: velero
             annotations:
                 iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
-```
+    ```
 
 ## Installing the nginx example (optional)
 
