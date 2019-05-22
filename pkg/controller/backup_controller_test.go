@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -145,6 +145,12 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			name:         "non-existent backup location fails validation",
 			backup:       velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("nonexistent").Backup,
 			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
+		},
+		{
+			name:           "backup for read-only backup location fails validation",
+			backup:         velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("read-only").Backup,
+			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("read-only").WithAccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation,
+			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 	}
 
@@ -348,6 +354,34 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 				Spec: v1.BackupSpec{
 					StorageLocation: "alt-loc",
+				},
+				Status: v1.BackupStatus{
+					Phase:               v1.BackupPhaseCompleted,
+					Version:             1,
+					StartTimestamp:      metav1.NewTime(now),
+					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          metav1.NewTime(now),
+				},
+			},
+		},
+		{
+			name:   "backup for a location with ReadWrite access mode gets processed",
+			backup: velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("read-write").Backup,
+			backupLocation: velerotest.NewTestBackupStorageLocation().
+				WithName("read-write").
+				WithObjectStorage("store-1").
+				WithAccessMode(v1.BackupStorageLocationAccessModeReadWrite).
+				BackupStorageLocation,
+			expectedResult: &v1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: v1.DefaultNamespace,
+					Name:      "backup-1",
+					Labels: map[string]string{
+						"velero.io/storage-location": "read-write",
+					},
+				},
+				Spec: v1.BackupSpec{
+					StorageLocation: "read-write",
 				},
 				Status: v1.BackupStatus{
 					Phase:               v1.BackupPhaseCompleted,

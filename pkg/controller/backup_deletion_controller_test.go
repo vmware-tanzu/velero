@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -267,7 +266,12 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("patching to InProgress fails", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
+		backup := velerotest.NewTestBackup().WithName("foo").WithStorageLocation("default").Backup
+		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+
+		td := setupBackupDeletionControllerTest(backup)
+
+		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, errors.New("bad")
@@ -275,11 +279,31 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		err := td.controller.processRequest(td.req)
 		assert.EqualError(t, err, "error patching DeleteBackupRequest: bad")
+
+		expectedActions := []core.Action{
+			core.NewGetAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				backup.Namespace,
+				backup.Name,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"InProgress"}}`),
+			),
+		}
+		assert.Equal(t, expectedActions, td.client.Actions())
 	})
 
 	t.Run("patching backup to Deleting fails", func(t *testing.T) {
-		backup := velerotest.NewTestBackup().WithName("foo").Backup
+		backup := velerotest.NewTestBackup().WithName("foo").WithStorageLocation("default").Backup
+		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+
 		td := setupBackupDeletionControllerTest(backup)
+
+		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -290,23 +314,13 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		err := td.controller.processRequest(td.req)
 		assert.EqualError(t, err, "error patching Backup: bad")
-	})
-
-	t.Run("unable to find backup", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
-
-		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
-			return true, nil, apierrors.NewNotFound(v1.SchemeGroupVersion.WithResource("backups").GroupResource(), "foo")
-		})
-
-		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
-			return true, td.req, nil
-		})
-
-		err := td.controller.processRequest(td.req)
-		require.NoError(t, err)
 
 		expectedActions := []core.Action{
+			core.NewGetAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				backup.Namespace,
+				backup.Name,
+			),
 			core.NewPatchAction(
 				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
 				td.req.Namespace,
@@ -314,6 +328,24 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				types.MergePatchType,
 				[]byte(`{"status":{"phase":"InProgress"}}`),
 			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				backup.Namespace,
+				backup.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"phase":"Deleting"}}`),
+			),
+		}
+		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
+	t.Run("unable to find backup", func(t *testing.T) {
+		td := setupBackupDeletionControllerTest()
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
 			core.NewGetAction(
 				v1.SchemeGroupVersion.WithResource("backups"),
 				td.req.Namespace,
@@ -325,6 +357,61 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 				td.req.Name,
 				types.MergePatchType,
 				[]byte(`{"status":{"errors":["backup not found"],"phase":"Processed"}}`),
+			),
+		}
+
+		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
+	t.Run("unable to find backup storage location", func(t *testing.T) {
+		backup := velerotest.NewTestBackup().WithName("foo").WithStorageLocation("default").Backup
+
+		td := setupBackupDeletionControllerTest(backup)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewGetAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"errors":["backup storage location default not found"],"phase":"Processed"}}`),
+			),
+		}
+
+		assert.Equal(t, expectedActions, td.client.Actions())
+	})
+
+	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
+		backup := velerotest.NewTestBackup().WithName("foo").WithStorageLocation("default").Backup
+		location := velerotest.NewTestBackupStorageLocation().WithName("default").WithAccessMode(v1.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation
+
+		td := setupBackupDeletionControllerTest(backup)
+
+		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
+
+		err := td.controller.processRequest(td.req)
+		require.NoError(t, err)
+
+		expectedActions := []core.Action{
+			core.NewGetAction(
+				v1.SchemeGroupVersion.WithResource("backups"),
+				td.req.Namespace,
+				td.req.Spec.BackupName,
+			),
+			core.NewPatchAction(
+				v1.SchemeGroupVersion.WithResource("deletebackuprequests"),
+				td.req.Namespace,
+				td.req.Name,
+				types.MergePatchType,
+				[]byte(`{"status":{"errors":["cannot delete backup because backup storage location default is currently in read-only mode"],"phase":"Processed"}}`),
 			),
 		}
 
