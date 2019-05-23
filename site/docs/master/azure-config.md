@@ -28,7 +28,7 @@ consider using Premium Managed Disks, which are SSD backed.
 Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
-2. Extract the tarball:
+1. Extract the tarball:
 
     ```bash
     tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
@@ -36,7 +36,7 @@ of the Velero repository is under active development and is not guaranteed to be
 
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
-3. Move the `velero` binary from the Velero directory to somewhere in your PATH.
+1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
 ## Create Azure storage account and blob container
 
@@ -133,7 +133,7 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
     AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
-3. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
+1. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
     ```
     cat << EOF  > ./credentials-velero
