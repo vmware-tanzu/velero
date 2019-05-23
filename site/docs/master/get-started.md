@@ -26,9 +26,11 @@ Velero. The tarballs for each release contain the `velero` command-line client. 
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
+
     ```bash
-tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
+
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -36,6 +38,7 @@ tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
 #### MacOS Installation
 
 On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
+
 ```bash
 brew install velero
 ```
@@ -47,23 +50,23 @@ These instructions start the Velero server and a Minio instance that is accessib
 1. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
 
     ```
-[default]
-aws_access_key_id = minio
-aws_secret_access_key = minio123
+    [default]
+    aws_access_key_id = minio
+    aws_secret_access_key = minio123
     ```
 
 1. Start the server and the local storage service. In the Velero directory, run:
 
     ```
-kubectl apply -f examples/minio/00-minio-deployment.yaml
+    kubectl apply -f examples/minio/00-minio-deployment.yaml
     ```
     ```
-velero install \
-    --provider aws \
-    --bucket velero \
-    --secret-file ./credentials-velero \
-    --use-volume-snapshots=false \
-    --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
+    velero install \
+        --provider aws \
+        --bucket velero \
+        --secret-file ./credentials-velero \
+        --use-volume-snapshots=false \
+        --backup-location-config region=minio,s3ForcePathStyle="true",s3Url=http://minio.velero.svc:9000
     ```
 
     This example assumes that it is running within a local cluster without a volume provider capable of snapshots, so no `VolumeSnapshotLocation` is created (`--use-volume-snapshots=false`).
@@ -74,14 +77,14 @@ velero install \
 1. Deploy the example nginx application:
 
     ```bash
-kubectl apply -f examples/nginx-app/base.yaml
+    kubectl apply -f examples/nginx-app/base.yaml
     ```
 
 1. Check to see that both the Velero and nginx deployments are successfully created:
 
     ```
-kubectl get deployments -l component=velero --namespace=velero
-kubectl get deployments --namespace=nginx-example
+    kubectl get deployments -l component=velero --namespace=velero
+    kubectl get deployments --namespace=nginx-example
     ```
 
 ### Back up
@@ -89,25 +92,25 @@ kubectl get deployments --namespace=nginx-example
 1. Create a backup for any object that matches the `app=nginx` label selector:
 
     ```
-velero backup create nginx-backup --selector app=nginx
+    velero backup create nginx-backup --selector app=nginx
     ```
 
-   Alternatively if you want to backup all objects *except* those matching the label `backup=ignore`:
+    Alternatively if you want to backup all objects *except* those matching the label `backup=ignore`:
 
-   ```
-velero backup create nginx-backup --selector 'backup notin (ignore)'
-   ```
+    ```
+    velero backup create nginx-backup --selector 'backup notin (ignore)'
+    ```
 
 1. (Optional) Create regularly scheduled backups based on a cron expression using the `app=nginx` label selector:
 
     ```
-velero schedule create nginx-daily --schedule="0 1 * * *" --selector app=nginx
+    velero schedule create nginx-daily --schedule="0 1 * * *" --selector app=nginx
     ```
 
     Alternatively, you can use some non-standard shorthand cron expressions:
 
     ```
-velero schedule create nginx-daily --schedule="@daily" --selector app=nginx
+    velero schedule create nginx-daily --schedule="@daily" --selector app=nginx
     ```
 
     See the [cron package's documentation][30] for more usage examples.
@@ -115,15 +118,15 @@ velero schedule create nginx-daily --schedule="@daily" --selector app=nginx
 1. Simulate a disaster:
 
     ```
-kubectl delete namespace nginx-example
+    kubectl delete namespace nginx-example
     ```
 
 1. To check that the nginx deployment and service are gone, run:
 
     ```
-kubectl get deployments --namespace=nginx-example
-kubectl get services --namespace=nginx-example
-kubectl get namespace/nginx-example
+    kubectl get deployments --namespace=nginx-example
+    kubectl get services --namespace=nginx-example
+    kubectl get namespace/nginx-example
     ```
 
     You should get no results.
@@ -135,20 +138,20 @@ kubectl get namespace/nginx-example
 1. Run:
 
     ```
-velero restore create --from-backup nginx-backup
+    velero restore create --from-backup nginx-backup
     ```
 
 1. Run:
 
     ```
-velero restore get
+    velero restore get
     ```
 
     After the restore finishes, the output looks like the following:
 
     ```
-NAME                          BACKUP         STATUS      WARNINGS   ERRORS    CREATED                         SELECTOR
-nginx-backup-20170727200524   nginx-backup   Completed   0          0         2017-07-27 20:05:24 +0000 UTC   <none>
+    NAME                          BACKUP         STATUS      WARNINGS   ERRORS    CREATED                         SELECTOR
+    nginx-backup-20170727200524   nginx-backup   Completed   0          0         2017-07-27 20:05:24 +0000 UTC   <none>
     ```
 
 NOTE: The restore can take a few moments to finish. During this time, the `STATUS` column reads `InProgress`.
@@ -211,21 +214,19 @@ You must also get the Minio URL, which you can then specify as the value of the 
 
 1.  Get the Minio URL:
 
-    - if you're running Minikube:
+  - if you're running Minikube:
 
       ```shell
       minikube service minio --namespace=velero --url
       ```
 
-    - in any other environment:
+  - in any other environment:
+    1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Velero client.
+    1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
 
-      1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Velero client.
-
-      1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
-
-          ```shell
-          kubectl -n velero get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
-          ```
+        ```shell
+        kubectl -n velero get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
+        ```
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_FROM_PREVIOUS_STEP>` as a field under `spec.config`. You must include the `http://` or `https://` prefix.
 

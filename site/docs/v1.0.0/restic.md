@@ -30,20 +30,20 @@ Ensure you've [downloaded latest release][3].
 
 To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
-   Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
-   thereby requires modifying the restic daemonset after installing.
+Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
+ thereby requires modifying the restic daemonset after installing.
 
-  ```yaml
+```yaml
 hostPath:
   path: /var/lib/kubelet/pods
-  ```
+```
 
-  to
+to
 
-  ```yaml
+```yaml
 hostPath:
   path: /opt/rke/var/lib/kubelet/pods
-  ```
+```
 
 You're now ready to use Velero with restic.
 
@@ -52,7 +52,7 @@ You're now ready to use Velero with restic.
 1. Run the following for each pod that contains a volume to back up:
 
     ```bash
-kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
+    kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup-volumes=YOUR_VOLUME_NAME_1,YOUR_VOLUME_NAME_2,...
     ```
 
     where the volume names are the names of the volumes in the pod spec.
@@ -60,32 +60,32 @@ kubectl -n YOUR_POD_NAMESPACE annotate pod/YOUR_POD_NAME backup.velero.io/backup
     For example, for the following pod:
 
     ```yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: sample
-  namespace: foo
-spec:
-  containers:
-  - image: k8s.gcr.io/test-webserver
-    name: test-webserver
-    volumeMounts:
-    - name: pvc-volume
-      mountPath: /volume-1
-    - name: emptydir-volume
-      mountPath: /volume-2
-  volumes:
-  - name: pvc-volume
-    persistentVolumeClaim:
-      claimName: test-volume-claim
-  - name: emptydir-volume
-    emptyDir: {}
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: sample
+      namespace: foo
+    spec:
+      containers:
+      - image: k8s.gcr.io/test-webserver
+        name: test-webserver
+        volumeMounts:
+        - name: pvc-volume
+          mountPath: /volume-1
+        - name: emptydir-volume
+          mountPath: /volume-2
+      volumes:
+      - name: pvc-volume
+        persistentVolumeClaim:
+          claimName: test-volume-claim
+      - name: emptydir-volume
+        emptyDir: {}
     ```
 
     You'd run:
 
     ```bash
-kubectl -n foo annotate pod/sample backup.velero.io/backup-volumes=pvc-volume,emptydir-volume
+    kubectl -n foo annotate pod/sample backup.velero.io/backup-volumes=pvc-volume,emptydir-volume
     ```
 
     This annotation can also be provided in a pod template spec if you use a controller to manage your pods.
@@ -93,16 +93,16 @@ kubectl -n foo annotate pod/sample backup.velero.io/backup-volumes=pvc-volume,em
 1. Take a Velero backup:
 
     ```bash
-velero backup create NAME OPTIONS...
+    velero backup create NAME OPTIONS...
     ```
 
 1. When the backup completes, view information about the backups:
 
     ```bash
-velero backup describe YOUR_BACKUP_NAME
+    velero backup describe YOUR_BACKUP_NAME
     ```
     ```bash
-kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
+    kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
     ```
 
 ## Restore
@@ -110,16 +110,16 @@ kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME
 1. Restore from your Velero backup:
 
     ```bash
-velero restore create --from-backup BACKUP_NAME OPTIONS...
+    velero restore create --from-backup BACKUP_NAME OPTIONS...
     ```
 
 1. When the restore completes, view information about your pod volume restores:
 
     ```bash
-velero restore describe YOUR_RESTORE_NAME
+    velero restore describe YOUR_RESTORE_NAME
     ```
     ```bash
-kubectl -n velero get podvolumerestores -l velero.io/restore-name=YOUR_RESTORE_NAME -o yaml
+    kubectl -n velero get podvolumerestores -l velero.io/restore-name=YOUR_RESTORE_NAME -o yaml
     ```
 
 ## Limitations

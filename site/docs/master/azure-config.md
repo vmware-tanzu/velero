@@ -31,7 +31,7 @@ of the Velero repository is under active development and is not guaranteed to be
 2. Extract the tarball:
 
     ```bash
-tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
 
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
@@ -88,13 +88,13 @@ az storage container create -n $BLOB_CONTAINER --public-access off --account-nam
     when you provision your cluster in Azure, since this is the resource group that contains your cluster's virtual machines/disks.
 
     ```bash
-AZURE_RESOURCE_GROUP=<NAME_OF_RESOURCE_GROUP>
+    AZURE_RESOURCE_GROUP=<NAME_OF_RESOURCE_GROUP>
     ```
 
     If you are unsure of the Resource Group name, run the following command to get a list that you can select from. Then set the `AZURE_RESOURCE_GROUP` environment variable to the appropriate value.
 
     ```bash
-az group list --query '[].{ ResourceGroup: name, Location:location }'
+    az group list --query '[].{ ResourceGroup: name, Location:location }'
     ```
 
     Get your cluster's Resource Group name from the `ResourceGroup` value in the response, and use it to set `$AZURE_RESOURCE_GROUP`.
@@ -106,8 +106,8 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
 1. Obtain your Azure Account Subscription ID and Tenant ID:
 
     ```bash
-AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
-AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
+    AZURE_SUBSCRIPTION_ID=`az account list --query '[?isDefault].id' -o tsv`
+    AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
 
 1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
@@ -117,32 +117,32 @@ AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     Create service principal and specify your own password:
 
     ```bash
-AZURE_CLIENT_SECRET=super_secret_and_high_entropy_password_replace_me_with_your_own
-az ad sp create-for-rbac --name "velero" --role "Contributor" --password $AZURE_CLIENT_SECRET
+    AZURE_CLIENT_SECRET=super_secret_and_high_entropy_password_replace_me_with_your_own
+    az ad sp create-for-rbac --name "velero" --role "Contributor" --password $AZURE_CLIENT_SECRET
     ```
 
     Or create service principal and let the CLI generate a password for you. Make sure to capture the password.
 
     ```bash
-AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv`
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv`
     ```
 
     After creating the service principal, obtain the client id.
 
     ```bash
-AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
+    AZURE_CLIENT_ID=`az ad sp list --display-name "velero" --query '[0].appId' -o tsv`
     ```
 
 3. Now you need to create a file that contains all the environment variables you just set. The command looks like the following:
 
-    ```bash
-cat << EOF  > ./credentials-velero
-AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
-AZURE_TENANT_ID=${AZURE_TENANT_ID}
-AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
-EOF
+    ```
+    cat << EOF  > ./credentials-velero
+    AZURE_SUBSCRIPTION_ID=${AZURE_SUBSCRIPTION_ID}
+    AZURE_TENANT_ID=${AZURE_TENANT_ID}
+    AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+    AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+    AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+    EOF
     ```
 
 ## Install and start Velero

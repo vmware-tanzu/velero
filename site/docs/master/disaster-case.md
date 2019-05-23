@@ -9,6 +9,7 @@ If you periodically back up your cluster's resources, you are able to return to 
     ```
     velero schedule create <SCHEDULE NAME> --schedule "0 7 * * *"
     ```
+    
     This creates a Backup object with the name `<SCHEDULE NAME>-<TIMESTAMP>`.
 
 1.  A disaster happens and you need to recreate your resources.
@@ -16,9 +17,7 @@ If you periodically back up your cluster's resources, you are able to return to 
 1.  Update the Velero server deployment, adding the argument for the `server` command flag `restore-only` set to `true`. This prevents Backup objects from being created or deleted during your Restore process.
 
 1.  Create a restore with your most recent Velero Backup:
+
     ```
     velero restore create --from-backup <SCHEDULE NAME>-<TIMESTAMP>
     ```
-
-
-

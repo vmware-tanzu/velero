@@ -1,5 +1,5 @@
 # Use IBM Cloud Object Storage as Velero's storage destination.
-You can deploy Velero on IBM [Public][5] or [Private][4] clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Velero's backups. 
+You can deploy Velero on IBM [Public][5] or [Private][4] clouds, or even on any other Kubernetes cluster, but anyway you can use IBM Cloud Object Store as a destination for Velero's backups.
 
 To set up IBM Cloud Object Storage (COS) as Velero's destination, you:
 
@@ -18,9 +18,11 @@ Velero. The tarballs for each release contain the `velero` command-line client. 
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
+
     ```bash
-    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
+
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -80,14 +82,14 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 
 If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
-    * Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.
+Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.
 
 
-  [0]: namespace.md
-  [1]: https://console.bluemix.net/docs/services/cloud-object-storage/basics/order-storage.html#creating-a-new-resource-instance
-  [2]: https://console.bluemix.net/docs/services/cloud-object-storage/getting-started.html#create-buckets
-  [3]: https://console.bluemix.net/docs/services/cloud-object-storage/iam/service-credentials.html#service-credentials
-  [4]: https://www.ibm.com/support/knowledgecenter/SSBS6K_2.1.0/kc_welcome_containers.html
-  [5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
-  [6]: api-types/backupstoragelocation.md#aws
-  [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+[0]: namespace.md
+[1]: https://console.bluemix.net/docs/services/cloud-object-storage/basics/order-storage.html#creating-a-new-resource-instance
+[2]: https://console.bluemix.net/docs/services/cloud-object-storage/getting-started.html#create-buckets
+[3]: https://console.bluemix.net/docs/services/cloud-object-storage/iam/service-credentials.html#service-credentials
+[4]: https://www.ibm.com/support/knowledgecenter/SSBS6K_2.1.0/kc_welcome_containers.html
+[5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
+[6]: api-types/backupstoragelocation.md#aws
+[14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html

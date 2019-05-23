@@ -72,19 +72,19 @@ After you set up the Velero server, try these examples:
 1. Start the sample nginx app:
 
     ```bash
-kubectl apply -f examples/nginx-app/base.yaml
+    kubectl apply -f examples/nginx-app/base.yaml
     ```
 
 1. Create a backup:
 
     ```bash
-velero backup create nginx-backup --include-namespaces nginx-example
+    velero backup create nginx-backup --include-namespaces nginx-example
     ```
 
 1. Simulate a disaster:
 
     ```bash
-kubectl delete namespaces nginx-example
+    kubectl delete namespaces nginx-example
     ```
 
     Wait for the namespace to be deleted.
@@ -92,7 +92,7 @@ kubectl delete namespaces nginx-example
 1. Restore your lost resources:
 
     ```bash
-velero restore create --from-backup nginx-backup
+    velero restore create --from-backup nginx-backup
     ```
 
 ### Snapshot example (with PersistentVolumes)
@@ -102,19 +102,19 @@ velero restore create --from-backup nginx-backup
 1. Start the sample nginx app:
 
     ```bash
-kubectl apply -f examples/nginx-app/with-pv.yaml
+    kubectl apply -f examples/nginx-app/with-pv.yaml
     ```
 
 1. Create a backup with PV snapshotting:
 
     ```bash
-velero backup create nginx-backup --include-namespaces nginx-example
+    velero backup create nginx-backup --include-namespaces nginx-example
     ```
 
 1. Simulate a disaster:
 
     ```bash
-kubectl delete namespaces nginx-example
+    kubectl delete namespaces nginx-example
     ```
 
     Because the default [reclaim policy][19] for dynamically-provisioned PVs is "Delete", these commands should trigger your cloud provider to delete the disk that backs the PV. Deletion is asynchronous, so this may take some time. **Before continuing to the next step, check your cloud provider to confirm that the disk no longer exists.**
@@ -122,7 +122,7 @@ kubectl delete namespaces nginx-example
 1. Restore your lost resources:
 
     ```bash
-velero restore create --from-backup nginx-backup
+    velero restore create --from-backup nginx-backup
     ```
 
 [0]: aws-config.md

@@ -19,9 +19,9 @@ of the Velero repository is under active development and is not guaranteed to be
 
 2. Extract the tarball:
 
-    ```bash
+```
 tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
-    ```
+```
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 3. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -53,81 +53,81 @@ For more information, see [the AWS documentation on IAM users][14].
 1. Create the IAM user:
 
     ```bash
-aws iam create-user --user-name velero
+    aws iam create-user --user-name velero
     ```
 
     If you'll be using Velero to backup multiple clusters with multiple S3 buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
 2. Attach policies to give `velero` the necessary permissions:
 
-    ```bash
-cat > velero-policy.json <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ec2:DescribeVolumes",
-                "ec2:DescribeSnapshots",
-                "ec2:CreateTags",
-                "ec2:CreateVolume",
-                "ec2:CreateSnapshot",
-                "ec2:DeleteSnapshot"
-            ],
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject",
-                "s3:DeleteObject",
-                "s3:PutObject",
-                "s3:AbortMultipartUpload",
-                "s3:ListMultipartUploadParts"
-            ],
-            "Resource": [
-                "arn:aws:s3:::${BUCKET}/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListBucket"
-            ],
-            "Resource": [
-                "arn:aws:s3:::${BUCKET}"
-            ]
-        }
-    ]
-}
-EOF
+    ```
+    cat > velero-policy.json <<EOF
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "ec2:DescribeVolumes",
+                    "ec2:DescribeSnapshots",
+                    "ec2:CreateTags",
+                    "ec2:CreateVolume",
+                    "ec2:CreateSnapshot",
+                    "ec2:DeleteSnapshot"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:PutObject",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListMultipartUploadParts"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::${BUCKET}/*"
+                ]
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:ListBucket"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::${BUCKET}"
+                ]
+            }
+        ]
+    }
+    EOF
     ```
     ```bash
-aws iam put-user-policy \
-  --user-name velero \
-  --policy-name velero \
-  --policy-document file://velero-policy.json
+    aws iam put-user-policy \
+      --user-name velero \
+      --policy-name velero \
+      --policy-document file://velero-policy.json
     ```
 
 3. Create an access key for the user:
 
     ```bash
-aws iam create-access-key --user-name velero
+    aws iam create-access-key --user-name velero
     ```
 
     The result should look like:
 
     ```json
-{
-  "AccessKey": {
-        "UserName": "velero",
-        "Status": "Active",
-        "CreateDate": "2017-07-31T22:24:41.576Z",
-        "SecretAccessKey": <AWS_SECRET_ACCESS_KEY>,
-        "AccessKeyId": <AWS_ACCESS_KEY_ID>
-  }
-}
+    {
+      "AccessKey": {
+            "UserName": "velero",
+            "Status": "Active",
+            "CreateDate": "2017-07-31T22:24:41.576Z",
+            "SecretAccessKey": <AWS_SECRET_ACCESS_KEY>,
+            "AccessKeyId": <AWS_ACCESS_KEY_ID>
+      }
+    }
     ```
 
 4. Create a Velero-specific credentials file (`credentials-velero`) in your local directory:
