@@ -14,7 +14,7 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 1.  A disaster happens and you need to recreate your resources.
 
-1.  Update your backup storage location to be in read-only mode. This prevents Backup objects from being created or deleted in the backup storage location during your Restore process:
+1.  Update your backup storage location to read-only mode (this prevents backup objects from being created or deleted in the backup storage location during the restore process):
 
     ```bash
     kubectl patch backupstoragelocation <STORAGE LOCATION NAME> \
@@ -27,4 +27,13 @@ If you periodically back up your cluster's resources, you are able to return to 
 
     ```
     velero restore create --from-backup <SCHEDULE NAME>-<TIMESTAMP>
+    ```
+
+1. When ready, revert your backup storage location to read-write mode:
+
+   ```bash
+   kubectl patch backupstoragelocation <STORAGE LOCATION NAME> \
+       --namespace velero \
+       --type merge \
+       --patch '{"spec":{"accessMode":"ReadWrite"}}'
     ```
