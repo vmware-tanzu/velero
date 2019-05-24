@@ -30,8 +30,8 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `provider` | String (Velero natively supports `aws`, `gcp`, and `azure`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the volume. |
-| `config` | See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.
+| `provider` | String (Velero natively supports `aws`, `gcp`, `azure` and `alibabacloud`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the volume. |
+| `config` | See the corresponding [AWS][0], [GCP][1], [Azure][2] and [AlibabaCloud][6]-specific configs or your provider's documentation.
 
 #### AWS
 
@@ -59,9 +59,20 @@ The configurable parameters are as follows:
 | `snapshotLocation` | string | Empty | *Example*: "us-central1"<br><br>See [GCP documentation][4] for the full list.<br><br>If not specified the snapshots are stored in the [default location][5]. |
 | `project` | string | Empty | The project ID where snapshots should be stored, if different than the project that your IAM account is in. Optional. |
 
+
+#### AlibabaCloud
+
+##### config
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `region` | string | Empty | *Example*: "cn-hangzhou"<br><br>See [AlibabaCloud documentation][7] for the full list.<br> |
+
 [0]: #aws
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
 [4]: https://cloud.google.com/storage/docs/locations#available_locations
 [5]: https://cloud.google.com/compute/docs/disks/create-snapshots#default_location
+[6]: #alibabacloud
+[7]: https://www.alibabacloud.com/help/doc-detail/31837.htm

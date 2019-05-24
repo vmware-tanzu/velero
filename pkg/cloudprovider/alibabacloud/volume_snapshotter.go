@@ -18,6 +18,8 @@ package alibabacloud
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -33,7 +35,10 @@ import (
 	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
-const ackClusterNameKey = "ACK_CLUSTER_NAME"
+const (
+	ackClusterNameKey = "ACK_CLUSTER_NAME"
+	metadataUrl       = "http://100.100.100.200/latest/meta-data/"
+)
 
 type VolumeSnapshotter struct {
 	log logrus.FieldLogger
@@ -100,6 +105,11 @@ func (b *VolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vol
 	}
 
 	tags := getTagsForCluster(snapRes.Snapshots.Snapshot[0].Tags.Tag)
+
+	volumeAZ, err = GetMetaData("zone-id")
+	if err != nil {
+		return "", errors.Errorf("failed to get zone-id, got %v", err)
+	}
 
 	// filter tags through getTagsForCluster() function in order to apply
 	// proper ownership tags to restored volumes
@@ -351,4 +361,17 @@ func (b *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, vol
 	}
 
 	return &unstructured.Unstructured{Object: res}, nil
+}
+
+func GetMetaData(resource string) (string, error) {
+	resp, err := http.Get(metadataUrl + resource)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }

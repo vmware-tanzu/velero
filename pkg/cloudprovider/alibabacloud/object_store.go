@@ -187,11 +187,12 @@ func (o *ObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]st
 			o.log.Errorf("failed to list objects: %v", err)
 			return res, err
 		}
-		marker = oss.Marker(lor.NextMarker)
-		if !lor.IsTruncated {
+		res = append(res, lor.CommonPrefixes...)
+		if lor.IsTruncated {
+			marker = oss.Marker(lor.NextMarker)
+		} else {
 			break
 		}
-		res = append(res, lor.CommonPrefixes...)
 	}
 
 	return res, nil
@@ -211,12 +212,13 @@ func (o *ObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 		if err != nil {
 			o.log.Errorf("failed to list objects: %v", err)
 		}
-		marker = oss.Marker(lor.NextMarker)
-		if !lor.IsTruncated {
-			break
-		}
 		for _, obj := range lor.Objects {
 			res = append(res, obj.Key)
+		}
+		if lor.IsTruncated {
+			marker = oss.Marker(lor.NextMarker)
+		} else {
+			break
 		}
 	}
 

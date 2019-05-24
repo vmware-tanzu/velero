@@ -30,11 +30,11 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `provider` | String (Velero natively supports `aws`, `gcp`, and `azure`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the backups. |
+| `provider` | String (Velero natively supports `aws`, `gcp`, `azure` and `alibabacloud`. Other providers may be available via external plugins.)| Required Field | The name for whichever cloud provider will be used to actually store the backups. |
 | `objectStorage` | ObjectStorageLocation | Specification of the object storage for the given provider. |
 | `objectStorage/bucket` | String | Required Field | The storage bucket where backups are to be uploaded. |
 | `objectStorage/prefix` | String | Optional Field | The directory inside a storage bucket where backups are to be uploaded. |
-| `config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
+| `config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], [Azure][2] and [AlibabaCloud][4]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
 
 #### AWS
 
@@ -64,8 +64,14 @@ The configurable parameters are as follows:
 
 No parameters required.
 
+#### AlibabaCloud
+
+No parameters required.
+
+
 [0]: #aws
 [1]: #gcp
 [2]: #azure
 [3]: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[4]: #alibabacloud
 [10]: http://docs.aws.amazon.com/kms/latest/developerguide/overview.html
