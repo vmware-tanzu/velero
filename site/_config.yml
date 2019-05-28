@@ -7,6 +7,7 @@ url:
 logo: Velero.svg
 vm_logo: vm-logo.png
 gh_repo: https://github.com/heptio/velero
+markdown: redcarpet
 hero:
   background-color: med-blue
 footer:
@@ -173,3 +174,6 @@ exclude:
   - CNAME
   - Runbook.docx
   - '*.sh'
+
+redcarpet:
+    extensions: ["no_intra_emphasis", "tables", "autolink", "strikethrough", "with_toc_data"]

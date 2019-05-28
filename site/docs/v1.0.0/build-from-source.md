@@ -37,10 +37,13 @@ Note that the Makefile targets assume building from a git repository. When build
 There are a number of different ways to build `velero` depending on your needs. This section outlines the main possibilities.
 
 To build the `velero` binary on your local machine, compiled for your OS and architecture, run:
+
 ```bash
 go build ./cmd/velero
 ```
+
 or:
+
 ```bash
 make local
 ```
@@ -48,6 +51,7 @@ make local
 The latter will place the compiled binary under `$PWD/_output/bin/$GOOS/$GOARCH`, and will splice version and git commit information in so that `velero version` displays proper output. `velero install` will also use the version information to determine which tagged image to deploy.
 
 To build the `velero` binary targeting `linux/amd64` within a build container on your local machine, run:
+
 ```bash
 make build
 ```
@@ -55,11 +59,13 @@ make build
 See the **Cross compiling** section below for details on building for alternate OS/architecture combinations.
 
 To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
+
 ```bash
 make container
 ```
 
 To push your image to a registry, run:
+
 ```bash
 make push
 ```
@@ -82,7 +88,7 @@ Run `make update` to regenerate files if you make the following changes:
 
 Run [generate-proto.sh][13] to regenerate files if you make the following changes:
 
-* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14] and compiler plugin `protoc-gen-go` version v1.0.0. 
+* Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14] and compiler plugin `protoc-gen-go` version v1.0.0.
 
 ### Cross compiling
 
@@ -106,7 +112,7 @@ files (clientset, listers, shared informers, docs) are up to date.
 
 ## 4. Run
 
-### Prerequisites 
+### Prerequisites
 
 When running Velero, you will need to ensure that you set up all of the following:
 
@@ -169,7 +175,7 @@ Using the `velero` binary that you've built, run `velero install`:
 
 ```bash
 # velero install requires a credentials file to exist, but we will
-# not be using it since we're running the server locally, so just 
+# not be using it since we're running the server locally, so just
 # create an empty file to pass to the install command.
 touch fake-credentials-file
 
@@ -181,8 +187,8 @@ velero install \
   --secret-file ./fake-credentials-file
 
 # 'velero install' creates an in-cluster deployment of the
-# velero server using an official velero image, but we want 
-# to run the velero server on our local machine using the 
+# velero server using an official velero image, but we want
+# to run the velero server on our local machine using the
 # binary we built, so delete the in-cluster deployment.
 kubectl --namespace velero delete deployment velero
 
@@ -205,15 +211,16 @@ rm fake-credentials-file
 1. Ensure you've built a `velero` container image and either loaded it onto your cluster's nodes, or pushed it to a registry (see [build][3]).
 
 1. Install Velero into the cluster (the example below assumes you're using AWS):
-```bash
-velero install \
-  --provider aws \
-  --image $YOUR_CONTAINER_IMAGE \
-  --bucket $BUCKET \
-  --backup-location-config region=$REGION \
-  --snapshot-location-config region=$REGION \
-  --secret-file $YOUR_AWS_CREDENTIALS_FILE
-```
+
+    ```bash
+    velero install \
+      --provider aws \
+      --image $YOUR_CONTAINER_IMAGE \
+      --bucket $BUCKET \
+      --backup-location-config region=$REGION \
+      --snapshot-location-config region=$REGION \
+      --secret-file $YOUR_AWS_CREDENTIALS_FILE
+    ```
 
 ## 5. Vendoring dependencies
 

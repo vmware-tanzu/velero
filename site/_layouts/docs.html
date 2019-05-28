@@ -1,10 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-{% include head.html %}
+{% include head-docs.html %}
 {% if page.version != "master" %}
   <!-- Block google from indexing versioned docs -->
   <meta name="robots" content="noindex">
 {% endif %}
+{% if page.name != "README.md" %}
+  <title>{{ site.title }} Docs - {{page.title}}</title>
+{% endif %}
+{% if page.name == "README.md" %}
+  <title>{{ site.title }} Docs - Overview</title>
+{% endif %}
+
 <body id="docs">
   <div class="container-fluid site-outer-container">
     <div class="site-container">
@@ -21,7 +28,7 @@
             <div class="section-content pt-4 pb-0">
               <div class="row">
                 <div class="col-md-3">
-                {% include versions.html %} 
+                {% include versions.html %}
                 {% include nav.html %}
                 </div>
                 <div class="col-md-8 offset-md-1">

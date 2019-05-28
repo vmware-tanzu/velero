@@ -1,8 +1,8 @@
 ## Getting started
 
-The following example sets up the Velero server and client, then backs up and restores a sample application. 
+The following example sets up the Velero server and client, then backs up and restores a sample application.
 
-For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster. 
+For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
 For additional functionality with this setup, see the docs on how to [expose Minio outside your cluster][31].
 
 **NOTE** The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.
@@ -26,9 +26,11 @@ Velero. The tarballs for each release contain the `velero` command-line client. 
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
+
     ```bash
-    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
+
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -36,6 +38,7 @@ of the Velero repository is under active development and is not guaranteed to be
 #### MacOS Installation
 
 On Mac, you can use [HomeBrew](https://brew.sh) to install the `velero` client:
+
 ```bash
 brew install velero
 ```
@@ -54,9 +57,10 @@ These instructions start the Velero server and a Minio instance that is accessib
 
 1. Start the server and the local storage service. In the Velero directory, run:
 
-    ```bash
+    ```
     kubectl apply -f examples/minio/00-minio-deployment.yaml
-
+    ```
+    ```
     velero install \
         --provider aws \
         --bucket velero \
@@ -91,11 +95,11 @@ These instructions start the Velero server and a Minio instance that is accessib
     velero backup create nginx-backup --selector app=nginx
     ```
 
-   Alternatively if you want to backup all objects *except* those matching the label `backup=ignore`:
+    Alternatively if you want to backup all objects *except* those matching the label `backup=ignore`:
 
-   ```
-   velero backup create nginx-backup --selector 'backup notin (ignore)'
-   ```
+    ```
+    velero backup create nginx-backup --selector 'backup notin (ignore)'
+    ```
 
 1. (Optional) Create regularly scheduled backups based on a cron expression using the `app=nginx` label selector:
 
@@ -126,7 +130,7 @@ These instructions start the Velero server and a Minio instance that is accessib
     ```
 
     You should get no results.
-    
+
     NOTE: You might need to wait for a few minutes for the namespace to be fully cleaned up.
 
 ### Restore
@@ -210,21 +214,19 @@ You must also get the Minio URL, which you can then specify as the value of the 
 
 1.  Get the Minio URL:
 
-    - if you're running Minikube:
+  - if you're running Minikube:
 
       ```shell
       minikube service minio --namespace=velero --url
       ```
 
-    - in any other environment:
+  - in any other environment:
+    1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Velero client.
+    1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
 
-      1.  Get the value of an external IP address or DNS name of any node in your cluster. You must be able to reach this address from the Velero client.
-
-      1.  Append the value of the NodePort to get a complete URL. You can get this value by running:
-
-          ```shell
-          kubectl -n velero get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
-          ```
+        ```shell
+        kubectl -n velero get svc/minio -o jsonpath='{.spec.ports[0].nodePort}'
+        ```
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_FROM_PREVIOUS_STEP>` as a field under `spec.config`. You must include the `http://` or `https://` prefix.
 
@@ -252,7 +254,7 @@ Add `publicUrl: http://localhost:9000` under the `spec.config` section.
 
 Configuring Ingress for your cluster is out of scope for the Velero documentation. If you have already set up Ingress, however, it makes sense to continue with it while you run the example Velero configuration with Minio.
 
-In this case: 
+In this case:
 
 1.  Keep the Service type as `ClusterIP`.
 

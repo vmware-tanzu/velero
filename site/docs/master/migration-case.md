@@ -9,6 +9,7 @@ Velero can help you port your resources from one cluster to another, as long as 
     ```
     velero backup create <BACKUP-NAME>
     ```
+
     The default TTL is 30 days (720 hours); you can use the `--ttl` flag to change this as necessary.
 
 1.  *(Cluster 2)* Add the `--restore-only` flag to the server spec in the Velero deployment YAML.

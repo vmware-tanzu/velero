@@ -2,15 +2,15 @@
 
 Velero has support for backing up and restoring Kubernetes volumes using a free open-source backup tool called [restic][1]. This support is considered beta quality. Please see the list of [limitations](#limitations) to understand if it currently fits your use case.
 
-Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of 
-the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks). 
-We also provide a plugin model that enables anyone to implement additional object and block storage backends, outside the 
+Velero has always allowed you to take snapshots of persistent volumes as part of your backups if you’re using one of
+the supported cloud providers’ block storage offerings (Amazon EBS Volumes, Azure Managed Disks, Google Persistent Disks).
+We also provide a plugin model that enables anyone to implement additional object and block storage backends, outside the
 main Velero repository.
 
 We integrated restic with Velero so that users have an out-of-the-box solution for backing up and restoring almost any type of Kubernetes
 volume*. This is a new capability for Velero, not a replacement for existing functionality. If you're running on AWS, and
 taking EBS snapshots as part of your regular Velero backups, there's no need to switch to using restic. However, if you've
-been waiting for a snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir, 
+been waiting for a snapshot plugin for your storage platform, or if you're using EFS, AzureFile, NFS, emptyDir,
 local, or any other volume type that doesn't have a native snapshot concept, restic might be for you.
 
 Restic is not tied to a specific storage platform, which means that this integration also paves the way for future work to enable
@@ -30,20 +30,20 @@ Ensure you've [downloaded latest release][3].
 
 To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
-   Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
-   thereby requires modifying the restic daemonset after installing.
+Please note: In RancherOS , the path is not `/var/lib/kubelet/pods` , rather it is `/opt/rke/var/lib/kubelet/pods`
+ thereby requires modifying the restic daemonset after installing.
 
-  ```yaml
-  hostPath:
-    path: /var/lib/kubelet/pods
-  ```
+```yaml
+hostPath:
+  path: /var/lib/kubelet/pods
+```
 
-  to
+to
 
-  ```yaml
-  hostPath:
-    path: /opt/rke/var/lib/kubelet/pods
-  ```
+```yaml
+hostPath:
+  path: /opt/rke/var/lib/kubelet/pods
+```
 
 You're now ready to use Velero with restic.
 
@@ -76,7 +76,7 @@ You're now ready to use Velero with restic.
           mountPath: /volume-2
       volumes:
       - name: pvc-volume
-        persistentVolumeClaim: 
+        persistentVolumeClaim:
           claimName: test-volume-claim
       - name: emptydir-volume
         emptyDir: {}
@@ -100,7 +100,8 @@ You're now ready to use Velero with restic.
 
     ```bash
     velero backup describe YOUR_BACKUP_NAME
-
+    ```
+    ```bash
     kubectl -n velero get podvolumebackups -l velero.io/backup-name=YOUR_BACKUP_NAME -o yaml
     ```
 
@@ -116,21 +117,22 @@ You're now ready to use Velero with restic.
 
     ```bash
     velero restore describe YOUR_RESTORE_NAME
-
+    ```
+    ```bash
     kubectl -n velero get podvolumerestores -l velero.io/restore-name=YOUR_RESTORE_NAME -o yaml
     ```
 
 ## Limitations
 
 - `hostPath` volumes are not supported. [Local persistent volumes][4] are supported.
-- Those of you familiar with [restic][1] may know that it encrypts all of its data. We've decided to use a static, 
+- Those of you familiar with [restic][1] may know that it encrypts all of its data. We've decided to use a static,
 common encryption key for all restic repositories created by Velero. **This means that anyone who has access to your
 bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
-appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in 
+appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in
 a future release.
-- The current Velero/restic integration relies on using pod names to associate restic backups with their parents. If a pod is restarted, such as with a Deployment, 
+- The current Velero/restic integration relies on using pod names to associate restic backups with their parents. If a pod is restarted, such as with a Deployment,
 the next restic backup taken will be treated as a completely new backup, not an incremental one.
-- Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual 
+- Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
 
 ## Customize Restore Helper Image
@@ -225,11 +227,11 @@ and `restic prune`.
 - `PodVolumeBackup` - represents a restic backup of a volume in a pod. The main Velero backup process creates
 one or more of these when it finds an annotated pod. Each node in the cluster runs a controller for this
 resource (in a daemonset) that handles the `PodVolumeBackups` for pods on that node. The controller executes
-`restic backup` commands to backup pod volume data. 
+`restic backup` commands to backup pod volume data.
 
 - `PodVolumeRestore` - represents a restic restore of a pod volume. The main Velero restore process creates one
-or more of these when it encounters a pod that has associated restic backups. Each node in the cluster runs a 
-controller for this resource (in the same daemonset as above) that handles the `PodVolumeRestores` for pods 
+or more of these when it encounters a pod that has associated restic backups. Each node in the cluster runs a
+controller for this resource (in the same daemonset as above) that handles the `PodVolumeRestores` for pods
 on that node. The controller executes `restic restore` commands to restore pod volume data.
 
 ### Backup

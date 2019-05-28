@@ -1,9 +1,9 @@
 # Run Velero on GCP
 
-You can run Kubernetes on Google Cloud Platform in either: 
+You can run Kubernetes on Google Cloud Platform in either:
 
 * Kubernetes on Google Compute Engine virtual machines
-* Google Kubernetes Engine 
+* Google Kubernetes Engine
 
 If you do not have the `gcloud` and `gsutil` CLIs locally installed, follow the [user guide][16] to set them up.
 
@@ -16,9 +16,11 @@ Velero. The tarballs for each release contain the `velero` command-line client. 
 of the Velero repository is under active development and is not guaranteed to be stable!_
 
 1. Extract the tarball:
+
     ```bash
-    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to 
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
     ```
+
     We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
@@ -44,7 +46,7 @@ To integrate Velero with GCP, create a Velero-specific [Service Account][15]:
     ```
 
     Store the `project` value from the results in the environment variable `$PROJECT_ID`.
-    
+
     ```bash
     PROJECT_ID=$(gcloud config get-value project)
     ```
@@ -64,7 +66,7 @@ To integrate Velero with GCP, create a Velero-specific [Service Account][15]:
     ```
 
     Set the `$SERVICE_ACCOUNT_EMAIL` variable to match its `email` value.
-    
+
     ```bash
     SERVICE_ACCOUNT_EMAIL=$(gcloud iam service-accounts list \
       --filter="displayName:Velero service account" \
@@ -74,7 +76,6 @@ To integrate Velero with GCP, create a Velero-specific [Service Account][15]:
 3. Attach policies to give `velero` the necessary permissions to function:
 
     ```bash
-    
     ROLE_PERMISSIONS=(
         compute.disks.get
         compute.disks.create
@@ -136,14 +137,13 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 
 If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
-    * Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
+Replace `<YOUR_STORAGE_CLASS_NAME>` with `standard`. This is GCP's default `StorageClass` name.
 
 
-  [0]: namespace.md
-  [7]: api-types/backupstoragelocation.md#gcp
-  [8]: api-types/volumesnapshotlocation.md#gcp
-  [15]: https://cloud.google.com/compute/docs/access/service-accounts
-  [16]: https://cloud.google.com/sdk/docs/
-  [20]: faq.md
-  [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#iam-rolebinding-bootstrap
-
+[0]: namespace.md
+[7]: api-types/backupstoragelocation.md#gcp
+[8]: api-types/volumesnapshotlocation.md#gcp
+[15]: https://cloud.google.com/compute/docs/access/service-accounts
+[16]: https://cloud.google.com/sdk/docs/
+[20]: faq.md
+[22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#iam-rolebinding-bootstrap

@@ -18,22 +18,26 @@ You can use the following annotations on a pod to make Velero execute a hook whe
 
 #### Pre hooks
 
-| Annotation Name | Description |
-| --- | --- |
-| `pre.hook.backup.velero.io/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
-| `pre.hook.backup.velero.io/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
-| `pre.hook.backup.velero.io/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
-| `pre.hook.backup.velero.io/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
+* `pre.hook.backup.velero.io/container`
+  * The container where the command should be executed. Defaults to the first container in the pod. Optional.
+* `pre.hook.backup.velero.io/command`
+  * The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`
+* `pre.hook.backup.velero.io/on-error`
+  * What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional.
+* `pre.hook.backup.velero.io/timeout`
+  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional.
 
 
 #### Post hooks
 
-| Annotation Name | Description |
-| --- | --- |
-| `post.hook.backup.velero.io/container` | The container where the command should be executed.  Defaults to the first container in the pod. Optional. |
-| `post.hook.backup.velero.io/command` | The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]` |
-| `post.hook.backup.velero.io/on-error` | What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional. |
-| `post.hook.backup.velero.io/timeout` | How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional. |
+* `post.hook.backup.velero.io/container`
+  * The container where the command should be executed. Defaults to the first container in the pod. Optional.
+* `post.hook.backup.velero.io/command`
+  * The command to execute. If you need multiple arguments, specify the command as a JSON array, such as `["/usr/bin/uname", "-a"]`
+* `post.hook.backup.velero.io/on-error`
+  * What to do if the command returns a non-zero exit code.  Defaults to Fail. Valid values are Fail and Continue. Optional.
+* `post.hook.backup.velero.io/timeout`
+  * How long to wait for the command to execute. The hook is considered in error if the command exceeds the timeout. Defaults to 30s. Optional.
 
 ### Specifying Hooks in the Backup Spec
 

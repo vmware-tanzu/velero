@@ -76,6 +76,7 @@ velero backup-location create s3-alt-region \
 ```
 
 During backup creation:
+
 ```shell
 # The Velero server will automatically store backups in the backup storage location named "default" if
 # one is not specified when creating the backup. You can alter which backup storage location is used
@@ -83,7 +84,9 @@ During backup creation:
 # by the Velero deployment) to the name of a different backup storage location.
 velero backup create full-cluster-backup
 ```
+
 Or:
+
 ```shell
 velero backup create full-cluster-alternate-location-backup \
     --storage-location s3-alt-region
@@ -106,10 +109,10 @@ velero snapshot-location create portworx-cloud \
 During backup creation:
 
 ```shell
-# Note that since in this example we have two possible volume snapshot locations for the Portworx 
+# Note that since in this example we have two possible volume snapshot locations for the Portworx
 # provider, we need to explicitly specify which one to use when creating a backup. Alternately,
 # you can set the --default-volume-snapshot-locations flag on the `velero server` command (run by
-# the Velero deployment) to specify which location should be used for each provider by default, in 
+# the Velero deployment) to specify which location should be used for each provider by default, in
 # which case you don't need to specify it when creating a backup.
 velero backup create local-snapshot-backup \
     --volume-snapshot-locations portworx-local
@@ -140,8 +143,9 @@ velero snapshot-location create ebs-us-west-1 \
 ```
 
 During backup creation:
+
 ```shell
-# Velero will automatically use your configured backup storage location and volume snapshot location. 
+# Velero will automatically use your configured backup storage location and volume snapshot location.
 # Nothing needs to be specified when creating a backup.
 velero backup create full-cluster-backup
 ```

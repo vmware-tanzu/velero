@@ -16,10 +16,13 @@ backup-test-2-20170726180515  backup-test-2   Completed   0          1         2
 ```
 
 To delve into the warnings and errors into more detail, you can use `velero restore describe`:
-```
+
+```bash
 velero restore describe backup-test-20170726180512
 ```
+
 The output looks like this:
+
 ```
 Name:         backup-test-20170726180512
 Namespace:    velero
