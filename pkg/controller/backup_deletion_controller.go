@@ -19,9 +19,10 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +33,7 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -192,18 +193,6 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return err
 	}
 
-	// Update status to InProgress and set backup-name label if needed
-	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
-
-		if req.Labels[v1.BackupNameLabel] == "" {
-			req.Labels[v1.BackupNameLabel] = label.GetValidName(req.Spec.BackupName)
-		}
-	})
-	if err != nil {
-		return err
-	}
-
 	// Get the backup we're trying to delete
 	backup, err := c.backupClient.Backups(req.Namespace).Get(req.Spec.BackupName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -216,7 +205,40 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return err
 	}
 	if err != nil {
-		return errors.Wrap(err, "error getting Backup")
+		return errors.Wrap(err, "error getting backup")
+	}
+
+	// Don't allow deleting backups in read-only storage locations
+	location, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
+	if apierrors.IsNotFound(err) {
+		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("backup storage location %s not found", backup.Spec.StorageLocation))
+		})
+		return err
+	}
+	if err != nil {
+		return errors.Wrap(err, "error getting backup storage location")
+	}
+
+	if location.Spec.AccessMode == v1.BackupStorageLocationAccessModeReadOnly {
+		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))
+		})
+		return err
+	}
+
+	// Update status to InProgress and set backup-name label if needed
+	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
+		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
+
+		if req.Labels[v1.BackupNameLabel] == "" {
+			req.Labels[v1.BackupNameLabel] = label.GetValidName(req.Spec.BackupName)
+		}
+	})
+	if err != nil {
+		return err
 	}
 
 	// Set backup-uid label if needed
@@ -246,9 +268,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	pluginManager := c.newPluginManager(log)
 	defer pluginManager.CleanupClients()
 
-	backupStore, backupStoreErr := c.backupStoreForBackup(backup, pluginManager, log)
-	if backupStoreErr != nil {
-		errs = append(errs, backupStoreErr.Error())
+	backupStore, err := c.newBackupStore(location, pluginManager, log)
+	if err != nil {
+		errs = append(errs, err.Error())
 	}
 
 	if backupStore != nil {
@@ -375,19 +397,6 @@ func volumeSnapshotterForSnapshotLocation(
 	return volumeSnapshotter, nil
 }
 
-func (c *backupDeletionController) backupStoreForBackup(backup *v1.Backup, pluginManager clientmgmt.Manager, log logrus.FieldLogger) (persistence.BackupStore, error) {
-	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	backupStore, err := c.newBackupStore(backupLocation, pluginManager, log)
-	if err != nil {
-		return nil, err
-	}
-
-	return backupStore, nil
-}
 func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{

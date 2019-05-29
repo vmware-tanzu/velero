@@ -26,7 +26,7 @@ import (
 )
 
 var (
-	backupStorageLocationColumns = []string{"NAME", "PROVIDER", "BUCKET/PREFIX"}
+	backupStorageLocationColumns = []string{"NAME", "PROVIDER", "BUCKET/PREFIX", "ACCESS MODE"}
 )
 
 func printBackupStorageLocationList(list *v1.BackupStorageLocationList, w io.Writer, options printers.PrintOptions) error {
@@ -52,12 +52,18 @@ func printBackupStorageLocation(location *v1.BackupStorageLocation, w io.Writer,
 		bucketAndPrefix += "/" + location.Spec.ObjectStorage.Prefix
 	}
 
+	accessMode := location.Spec.AccessMode
+	if accessMode == "" {
+		accessMode = v1.BackupStorageLocationAccessModeReadWrite
+	}
+
 	if _, err := fmt.Fprintf(
 		w,
-		"%s\t%s\t%s",
+		"%s\t%s\t%s\t%s",
 		name,
 		location.Spec.Provider,
 		bucketAndPrefix,
+		accessMode,
 	); err != nil {
 		return err
 	}

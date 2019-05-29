@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,5 +64,10 @@ func (b *TestBackupStorageLocation) WithObjectStorage(bucketName string) *TestBa
 		b.Spec.StorageType.ObjectStorage = &v1.ObjectStorageLocation{}
 	}
 	b.Spec.ObjectStorage.Bucket = bucketName
+	return b
+}
+
+func (b *TestBackupStorageLocation) WithAccessMode(accessMode v1.BackupStorageLocationAccessMode) *TestBackupStorageLocation {
+	b.Spec.AccessMode = accessMode
 	return b
 }
