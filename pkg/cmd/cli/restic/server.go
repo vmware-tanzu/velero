@@ -61,6 +61,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 
 			s.run()
 		},
+		Hidden: true,
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
