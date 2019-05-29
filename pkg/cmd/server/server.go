@@ -734,6 +734,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().ServerStatusRequests(),
+			s.pluginRegistry,
 		)
 
 		return controllerRunInfo{

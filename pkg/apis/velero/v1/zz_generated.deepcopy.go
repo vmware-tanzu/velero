@@ -1227,6 +1227,17 @@ func (in *ServerStatusRequestSpec) DeepCopy() *ServerStatusRequestSpec {
 func (in *ServerStatusRequestStatus) DeepCopyInto(out *ServerStatusRequestStatus) {
 	*out = *in
 	in.ProcessedTimestamp.DeepCopyInto(&out.ProcessedTimestamp)
+	if in.Plugins != nil {
+		in, out := &in.Plugins, &out.Plugins
+		*out = make([][]string, len(*in))
+		for i := range *in {
+			if (*in)[i] != nil {
+				in, out := &(*in)[i], &(*out)[i]
+				*out = make([]string, len(*in))
+				copy(*out, *in)
+			}
+		}
+	}
 	return
 }
 

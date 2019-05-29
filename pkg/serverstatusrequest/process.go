@@ -29,13 +29,15 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 const ttl = time.Minute
 
 // Process fills out new ServerStatusRequest objects and deletes processed ones
 // that have expired.
-func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerStatusRequestsGetter, clock clock.Clock, log logrus.FieldLogger) error {
+func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerStatusRequestsGetter, pluginRegistry clientmgmt.Registry, clock clock.Clock, log logrus.FieldLogger) error {
 	switch req.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
@@ -43,6 +45,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 			req.Status.ServerVersion = buildinfo.Version
 			req.Status.ProcessedTimestamp.Time = clock.Now()
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
+			req.Status.Plugins = plugins(pluginRegistry, log)
 		}))
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
@@ -87,4 +90,18 @@ func patch(client velerov1client.ServerStatusRequestsGetter, req *velerov1api.Se
 	}
 
 	return nil
+}
+
+func plugins(pluginRegistry clientmgmt.Registry, log logrus.FieldLogger) [][]string {
+	var plugins [][]string
+	for _, v := range framework.AllPluginKinds() {
+		list := pluginRegistry.List(v)
+		for _, plugin := range list {
+			var pluginAttrs []string
+			pluginAttrs = append(pluginAttrs, plugin.Name)
+			pluginAttrs = append(pluginAttrs, plugin.Kind.String())
+			plugins = append(plugins, pluginAttrs)
+		}
+	}
+	return plugins
 }

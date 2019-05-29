@@ -16,7 +16,9 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -56,6 +58,9 @@ type ServerStatusRequestStatus struct {
 
 	// ServerVersion is the Velero server version.
 	ServerVersion string `json:"serverVersion"`
+
+	// Plugins list information about the plugins running on the Velero server
+	Plugins [][]string `json:"plugins"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

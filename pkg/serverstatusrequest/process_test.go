@@ -30,6 +30,8 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	"github.com/heptio/velero/pkg/util/test"
 )
 
 func statusRequestBuilder() *Builder {
@@ -105,8 +107,12 @@ func TestProcess(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.req)
+			logger := test.NewLogger()
+			logLevel := logrus.InfoLevel
+			dir := "/plugins"
+			registry := clientmgmt.NewRegistry(dir, logger, logLevel)
 
-			err := Process(tc.req, client.VeleroV1(), clock.NewFakeClock(now), logrus.StandardLogger())
+			err := Process(tc.req, client.VeleroV1(), registry, clock.NewFakeClock(now), logrus.StandardLogger())
 			if tc.expectedErrMsg == "" {
 				assert.Nil(t, err)
 			} else {
