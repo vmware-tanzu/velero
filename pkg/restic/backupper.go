@@ -168,7 +168,7 @@ ForEachVolume:
 		case res := <-resultsChan:
 			switch res.Status.Phase {
 			case velerov1api.PodVolumeBackupPhaseCompleted:
-				if res.Status.SnapshotID == "" {
+				if res.Status.SnapshotID == "" { // when the volume is empty there is no restic snapshot, so best to exclude it
 					delete(volumeSnapshots, res.Spec.Volume)
 					break
 				}

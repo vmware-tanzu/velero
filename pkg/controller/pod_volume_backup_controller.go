@@ -254,7 +254,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		r.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
 		r.Status.SnapshotID = snapshotID
 		if emptySnapshot {
-			r.Status.Message = "backup completed with an empty volume"
+			r.Status.Message = "volume was empty so no snapshot was taken"
 		}
 	})
 	if err != nil {
