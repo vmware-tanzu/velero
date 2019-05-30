@@ -1,0 +1,1 @@
+Stop returning an error when a restic volume is empty since it is a valid scenario.

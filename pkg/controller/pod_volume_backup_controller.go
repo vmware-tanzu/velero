@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -228,23 +228,34 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 
 	var stdout, stderr string
 
+	var emptySnapshot bool
 	if stdout, stderr, err = veleroexec.RunCommand(resticCmd.Cmd()); err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
-		return c.fail(req, fmt.Sprintf("error running restic backup, stderr=%s: %s", stderr, err.Error()), log)
+		if strings.Contains(stderr, "snapshot is empty") {
+			emptySnapshot = true
+		} else {
+			log.WithError(errors.WithStack(err)).Errorf("Error running command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
+			return c.fail(req, fmt.Sprintf("error running restic backup, stderr=%s: %s", stderr, err.Error()), log)
+		}
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 
-	snapshotID, err := restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env)
-	if err != nil {
-		log.WithError(err).Error("Error getting SnapshotID")
-		return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)
+	var snapshotID string
+	if !emptySnapshot {
+		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env)
+		if err != nil {
+			log.WithError(err).Error("Error getting SnapshotID")
+			return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)
+		}
 	}
 
 	// update status to Completed with path & snapshot id
 	req, err = c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
 		r.Status.Path = path
-		r.Status.SnapshotID = snapshotID
 		r.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
+		r.Status.SnapshotID = snapshotID
+		if emptySnapshot {
+			r.Status.Message = "volume was empty so no snapshot was taken"
+		}
 	})
 	if err != nil {
 		log.WithError(err).Error("Error setting phase to Completed")
