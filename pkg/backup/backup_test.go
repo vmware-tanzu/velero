@@ -51,20 +51,17 @@ var (
 	falsePointer = &falseVal
 )
 
-type fakeAction struct {
+// recordResourcesAction is a backup item action that can be configured
+// to run for specific resources/namespaces and simply records the items
+// that it is executed for.
+type recordResourcesAction struct {
 	selector        velero.ResourceSelector
 	ids             []string
 	backups         []v1.Backup
 	additionalItems []velero.ResourceIdentifier
 }
 
-var _ velero.BackupItemAction = &fakeAction{}
-
-func newFakeAction(resource string) *fakeAction {
-	return (&fakeAction{}).ForResource(resource)
-}
-
-func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
 		return item, a.additionalItems, err
@@ -75,77 +72,28 @@ func (a *fakeAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runt
 	return item, a.additionalItems, nil
 }
 
-func (a *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
+func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-func (a *fakeAction) ForResource(resource string) *fakeAction {
-	a.selector.IncludedResources = []string{resource}
+func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
+	a.selector.IncludedResources = append(a.selector.IncludedResources, resource)
 	return a
 }
 
-func TestResolveActions(t *testing.T) {
-	tests := []struct {
-		name                string
-		input               []velero.BackupItemAction
-		expected            []resolvedAction
-		resourcesWithErrors []string
-		expectError         bool
-	}{
-		{
-			name:     "empty input",
-			input:    []velero.BackupItemAction{},
-			expected: nil,
-		},
-		{
-			name:        "resolve error",
-			input:       []velero.BackupItemAction{&fakeAction{selector: velero.ResourceSelector{LabelSelector: "=invalid-selector"}}},
-			expected:    nil,
-			expectError: true,
-		},
-		{
-			name:  "resolved",
-			input: []velero.BackupItemAction{newFakeAction("foo"), newFakeAction("bar")},
-			expected: []resolvedAction{
-				{
-					BackupItemAction:          newFakeAction("foo"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foodies.somegroup"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-				{
-					BackupItemAction:          newFakeAction("bar"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("barnacles.anothergroup"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-		},
-	}
+func (a *recordResourcesAction) ForNamespace(namespace string) *recordResourcesAction {
+	a.selector.IncludedNamespaces = append(a.selector.IncludedNamespaces, namespace)
+	return a
+}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resources := map[schema.GroupVersionResource]schema.GroupVersionResource{
-				{Resource: "foo"}: {Group: "somegroup", Resource: "foodies"},
-				{Resource: "fie"}: {Group: "somegroup", Resource: "fields"},
-				{Resource: "bar"}: {Group: "anothergroup", Resource: "barnacles"},
-				{Resource: "baz"}: {Group: "anothergroup", Resource: "bazaars"},
-			}
-			discoveryHelper := velerotest.NewFakeDiscoveryHelper(false, resources)
+func (a *recordResourcesAction) ForLabelSelector(selector string) *recordResourcesAction {
+	a.selector.LabelSelector = selector
+	return a
+}
 
-			actual, err := resolveActions(test.input, discoveryHelper)
-			gotError := err != nil
-
-			if e, a := test.expectError, gotError; e != a {
-				t.Fatalf("error: expected %t, got %t", e, a)
-			}
-			if test.expectError {
-				return
-			}
-
-			assert.Equal(t, test.expected, actual)
-		})
-	}
+func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdentifier) *recordResourcesAction {
+	a.additionalItems = items
+	return a
 }
 
 var (
@@ -277,24 +225,6 @@ func TestBackup(t *testing.T) {
 		backupGroupErrors  map[*metav1.APIResourceList]error
 		expectedError      error
 	}{
-		{
-			name: "error resolving actions returns an error",
-			backup: &v1.Backup{
-				Spec: v1.BackupSpec{
-					// cm - shortcut in legacy api group
-					// csr - shortcut in certificates.k8s.io api group
-					// roles - fully qualified in rbac.authorization.k8s.io api group
-					IncludedResources:  []string{"cm", "csr", "roles"},
-					IncludedNamespaces: []string{"a", "b"},
-					ExcludedNamespaces: []string{"c", "d"},
-				},
-			},
-			actions:            []velero.BackupItemAction{new(appliesToErrorAction)},
-			expectedNamespaces: collections.NewIncludesExcludes().Includes("a", "b").Excludes("c", "d"),
-			expectedResources:  collections.NewIncludesExcludes().Includes("configmaps", "certificatesigningrequests.certificates.k8s.io", "roles.rbac.authorization.k8s.io"),
-			expectedHooks:      []resourceHook{},
-			expectedError:      errors.New("error calling AppliesTo"),
-		},
 		{
 			name: "error resolving hooks returns an error",
 			backup: &v1.Backup{
@@ -464,18 +394,6 @@ func TestBackup(t *testing.T) {
 
 		})
 	}
-}
-
-// appliesToErrorAction is a backup item action that always returns
-// an error when AppliesTo() is called.
-type appliesToErrorAction struct{}
-
-func (a *appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
-	return velero.ResourceSelector{}, errors.New("error calling AppliesTo")
-}
-
-func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	panic("not implemented")
 }
 
 type mockGroupBackupperFactory struct {

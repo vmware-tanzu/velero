@@ -20,11 +20,14 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -42,6 +45,8 @@ import (
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/heptio/velero/pkg/kuberesource"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
 )
 
@@ -582,6 +587,569 @@ func TestBackupResourceOrdering(t *testing.T) {
 	}
 }
 
+func TestBackupActionsRunForCorrectItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*apiResource
+
+		// actions is a map from a recordResourcesAction (which will record the items it was called for)
+		// to a slice of expected items, formatted as {namespace}/{name}.
+		actions map[*recordResourcesAction][]string
+	}{
+		{
+			name: "single action with no selector runs for all items",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction): {"ns-1/pod-1", "ns-2/pod-2", "pv-1", "pv-2"},
+			},
+		},
+		{
+			name: "single action with a resource selector for namespaced resources runs only for matching resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods"): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name: "single action with a resource selector for cluster-scoped resources runs only for matching resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("persistentvolumes"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			// TODO this seems like a bug
+			name: "single action with a namespace selector runs for resources in that namespace plus cluster-scoped resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvcs(
+					newPVC("ns-1", "pvc-1"),
+					newPVC("ns-2", "pvc-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1", "pv-1", "pv-2"},
+			},
+		},
+		{
+			name: "single action with a resource and namespace selector runs only for matching resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods").ForNamespace("ns-1"): {"ns-1/pod-1"},
+			},
+		},
+		{
+			name: "multiple actions, each with a different resource selector using short name, run for matching resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("po"): {"ns-1/pod-1", "ns-2/pod-2"},
+				new(recordResourcesAction).ForResource("pv"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			name: "actions with selectors that don't match anything don't run for any resources",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+				pvcs(
+					newPVC("ns-2", "pvc-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
+				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			actions := []velero.BackupItemAction{}
+			for action := range tc.actions {
+				actions = append(actions, action)
+			}
+
+			err := h.backupper.Backup(h.log, req, backupFile, actions, nil)
+			assert.NoError(t, err)
+
+			for action, want := range tc.actions {
+				assert.Equal(t, want, action.ids)
+			}
+		})
+	}
+}
+
+func TestBackupWithInvalidActions(t *testing.T) {
+	// all test cases in this function are expected to cause the method under test
+	// to return an error, so no expected results need to be set up.
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*apiResource
+		actions      []velero.BackupItemAction
+	}{
+		{
+			name: "action with invalid label selector results in an error",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("foo", "bar"),
+					newPod("zoo", "raz"),
+				),
+				pvs(
+					newPV("bar"),
+					newPV("baz"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				new(recordResourcesAction).ForLabelSelector("=invalid-selector"),
+			},
+		},
+		{
+			name: "action returning an error from AppliesTo results in an error",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("foo", "bar"),
+					newPod("zoo", "raz"),
+				),
+				pvs(
+					newPV("bar"),
+					newPV("baz"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&appliesToErrorAction{},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			assert.Error(t, h.backupper.Backup(h.log, req, backupFile, tc.actions, nil))
+		})
+	}
+}
+
+// appliesToErrorAction is a backup item action that always returns
+// an error when AppliesTo() is called.
+type appliesToErrorAction struct{}
+
+func (a *appliesToErrorAction) AppliesTo() (velero.ResourceSelector, error) {
+	return velero.ResourceSelector{}, errors.New("error calling AppliesTo")
+}
+
+func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	panic("not implemented")
+}
+
+func TestBackupActionModifications(t *testing.T) {
+	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
+	// method modifies the item being passed in by calling the 'modify' function on it.
+	modifyingActionGetter := func(modify func(*unstructured.Unstructured)) *pluggableAction {
+		return &pluggableAction{
+			executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+				obj, ok := item.(*unstructured.Unstructured)
+				if !ok {
+					return nil, nil, errors.Errorf("unexpected type %T", item)
+				}
+
+				res := obj.DeepCopy()
+				modify(res)
+
+				return res, nil, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*apiResource
+		actions      []velero.BackupItemAction
+		want         map[string]unstructuredObject
+	}{
+		{
+			name:   "action that adds a label to item gets persisted",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}),
+			},
+			want: map[string]unstructuredObject{
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, withLabel(newPod("ns-1", "pod-1"), "updated", "true")),
+			},
+		},
+		{
+			name:   "action that removes labels from item gets persisted",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					withLabel(newPod("ns-1", "pod-1"), "should-be-removed", "true"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(nil)
+				}),
+			},
+			want: map[string]unstructuredObject{
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, newPod("ns-1", "pod-1")),
+			},
+		},
+		{
+			name:   "action that sets a spec field on item gets persisted",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.Object["spec"].(map[string]interface{})["nodeName"] = "foo"
+				}),
+			},
+			want: map[string]unstructuredObject{
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1", Name: "pod-1"}, Spec: corev1.PodSpec{NodeName: "foo"}}),
+			},
+		},
+		{
+			// TODO this seems like a bug
+			name: "modifications to name and namespace in an action are persisted in JSON but not in filename",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetName(item.GetName() + "-updated")
+					item.SetNamespace(item.GetNamespace() + "-updated")
+				}),
+			},
+			want: map[string]unstructuredObject{
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, newPod("ns-1-updated", "pod-1-updated")),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
+			assert.NoError(t, err)
+
+			assertTarballFileContents(t, backupFile, tc.want)
+		})
+	}
+
+}
+
+func TestBackupActionAdditionalItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*apiResource
+		actions      []velero.BackupItemAction
+		want         []string
+	}{
+		{
+			name:   "additional items that are already being backed up are not backed up twice",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+					newPod("ns-3", "pod-3"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
+							{GroupResource: kuberesource.Pods, Namespace: "ns-3", Name: "pod-3"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/namespaces/ns-3/pod-3.json",
+			},
+		},
+		{
+			name:   "when using a backup namespace filter, additional items that are in a non-included namespace are not backed up",
+			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+					newPod("ns-3", "pod-3"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
+							{GroupResource: kuberesource.Pods, Namespace: "ns-3", Name: "pod-3"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+			},
+		},
+		{
+			name:   "when using a backup namespace filter, additional items that are cluster-scoped are backed up",
+			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/persistentvolumes/cluster/pv-1.json",
+				"resources/persistentvolumes/cluster/pv-2.json",
+			},
+		},
+		{
+			name:   "when using a backup resource filter, additional items that are non-included resources are not backed up",
+			backup: defaultBackup().IncludedResources("pods").Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+			},
+		},
+		{
+			name:   "when IncludeClusterResources=false, additional items that are cluster-scoped are not backed up",
+			backup: defaultBackup().IncludeClusterResources(false).Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/namespaces/ns-2/pod-2.json",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
+			assert.NoError(t, err)
+
+			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
+		})
+	}
+}
+
+// pluggableAction is a backup item action that can be plugged with an Execute
+// function body at runtime.
+type pluggableAction struct {
+	selector    velero.ResourceSelector
+	executeFunc func(runtime.Unstructured, *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error)
+}
+
+func (a *pluggableAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	if a.executeFunc == nil {
+		return item, nil, nil
+	}
+
+	return a.executeFunc(item, backup)
+}
+
+func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
 type apiResource struct {
 	group      string
 	version    string
@@ -787,6 +1355,17 @@ func defaultBackup() *Builder {
 	return NewNamedBuilder(velerov1.DefaultNamespace, "backup-1")
 }
 
+func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {
+	t.Helper()
+
+	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	require.NoError(t, err)
+
+	return res
+}
+
+// assertTarballContents verifies that the gzipped tarball stored in the provided
+// backupFile contains exactly the file names specified.
 func assertTarballContents(t *testing.T, backupFile io.Reader, items ...string) {
 	t.Helper()
 
@@ -809,6 +1388,54 @@ func assertTarballContents(t *testing.T, backupFile io.Reader, items ...string) 
 	sort.Strings(files)
 	sort.Strings(items)
 	assert.Equal(t, items, files)
+}
+
+// unstructuredObject is a type alias to improve readability.
+type unstructuredObject map[string]interface{}
+
+// assertTarballFileContents verifies that the gzipped tarball stored in the provided
+// backupFile contains the files specified as keys in 'want', and for each of those
+// files verifies that the content of the file is JSON and is equivalent to the JSON
+// content stored as values in 'want'.
+func assertTarballFileContents(t *testing.T, backupFile io.Reader, want map[string]unstructuredObject) {
+	t.Helper()
+
+	gzr, err := gzip.NewReader(backupFile)
+	require.NoError(t, err)
+
+	r := tar.NewReader(gzr)
+	items := make(map[string][]byte)
+
+	for {
+		hdr, err := r.Next()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		bytes, err := ioutil.ReadAll(r)
+		require.NoError(t, err)
+
+		items[hdr.Name] = bytes
+	}
+
+	for name, wantItem := range want {
+		gotData, ok := items[name]
+		assert.True(t, ok, "did not find item %s in tarball", name)
+		if !ok {
+			continue
+		}
+
+		// json-unmarshal the data from the tarball
+		var got unstructuredObject
+		err := json.Unmarshal(gotData, &got)
+		assert.NoError(t, err)
+		if err != nil {
+			continue
+		}
+
+		assert.Equal(t, wantItem, got)
+	}
 }
 
 // assertTarballOrdering ensures that resources were written to the tarball in the expected

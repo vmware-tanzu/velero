@@ -57,17 +57,6 @@ func TestBackupItemSkips(t *testing.T) {
 		backedUpItems map[itemKey]struct{}
 	}{
 		{
-			testName:      "resource already backed up",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes(),
-			backedUpItems: map[itemKey]struct{}{
-				{resource: "bar.foo", namespace: "ns", name: "foo"}: {},
-			},
-		},
-		{
 			testName:      "terminating resource",
 			namespace:     "ns",
 			name:          "foo",
@@ -139,52 +128,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			item:          `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
 			expectError:   true,
 			tarWriteError: true,
-		},
-		{
-			name:                      "action invoked - cluster-scoped",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/cluster/bar.json",
-			customAction:              true,
-			expectedActionID:          "bar",
-		},
-		{
-			name:                      "action invoked - namespaced",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-		},
-		{
-			name:                      "action invoked - additional items",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
-					Namespace:     "ns1",
-					Name:          "n1",
-				},
-				{
-					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
-					Namespace:     "ns2",
-					Name:          "n2",
-				},
-			},
-			customActionAdditionalItems: []runtime.Unstructured{
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
-			},
 		},
 		{
 			name:                      "action invoked - additional items - error",
@@ -286,7 +229,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				action        *fakeAction
+				action        *recordResourcesAction
 				backup        = new(Request)
 				groupResource = schema.ParseGroupResource("resource.group")
 				backedUpItems = make(map[itemKey]struct{})
@@ -322,9 +265,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 
 			if test.customAction {
-				action = &fakeAction{
-					additionalItems: test.customActionAdditionalItemIdentifiers,
-				}
+				action = new(recordResourcesAction).WithAdditionalItems(test.customActionAdditionalItemIdentifiers)
 				backup.ResolvedActions = []resolvedAction{
 					{
 						BackupItemAction:          action,
@@ -512,59 +453,6 @@ func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Back
 
 func (a *addAnnotationAction) AppliesTo() (velero.ResourceSelector, error) {
 	panic("not implemented")
-}
-
-func TestItemActionModificationsToItemPersist(t *testing.T) {
-	var (
-		w   = &fakeTarWriter{}
-		obj = &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"namespace": "myns",
-					"name":      "bar",
-				},
-			},
-		}
-		req = &Request{
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-			ResolvedActions: []resolvedAction{
-				{
-					BackupItemAction:          &addAnnotationAction{},
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-		}
-
-		b = (&defaultItemBackupperFactory{}).newItemBackupper(
-			req,
-			make(map[itemKey]struct{}),
-			nil,
-			w,
-			&velerotest.FakeDynamicFactory{},
-			velerotest.NewFakeDiscoveryHelper(true, nil),
-			nil,
-			newPVCSnapshotTracker(),
-			nil,
-		).(*defaultItemBackupper)
-	)
-
-	// our expected backed-up object is the passed-in object plus the annotation
-	// that the backup item action adds.
-	expected := obj.DeepCopy()
-	expected.SetAnnotations(map[string]string{"foo": "bar"})
-
-	// method under test
-	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("resource.group")))
-
-	// get the actual backed-up item
-	require.Len(t, w.data, 1)
-	actual, err := velerotest.GetAsMap(string(w.data[0]))
-	require.NoError(t, err)
-
-	assert.EqualValues(t, expected.Object, actual)
 }
 
 func TestResticAnnotationsPersist(t *testing.T) {
