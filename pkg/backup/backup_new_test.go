@@ -811,6 +811,9 @@ func assertTarballContents(t *testing.T, backupFile io.Reader, items ...string) 
 	assert.Equal(t, items, files)
 }
 
+// assertTarballOrdering ensures that resources were written to the tarball in the expected
+// order. Any resources *not* in orderedResources are required to come *after* all resources
+// in orderedResources, in any order.
 func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources ...string) {
 	t.Helper()
 
@@ -818,6 +821,10 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 	require.NoError(t, err)
 
 	r := tar.NewReader(gzr)
+
+	// lastSeen tracks the index in 'orderedResources' of the last resource type
+	// we saw in the tarball. Once we've seen a resource in 'orderedResources',
+	// we should never see another instance of a prior resource.
 	lastSeen := 0
 
 	for {
@@ -827,6 +834,7 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 		}
 		require.NoError(t, err)
 
+		// ignore files like metadata/version
 		if !strings.HasPrefix(hdr.Name, "resources/") {
 			continue
 		}
@@ -836,7 +844,13 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 		require.True(t, len(parts) >= 2)
 		resourceName := parts[1]
 
-		// find the index of resourceName in the expected ordering
+		// Find the index in 'orderedResources' of the resource type for
+		// the current tar item, if it exists. This index ('current') *must*
+		// be greater than or equal to 'lastSeen', which was the last resource
+		// we saw, since otherwise the current resource would be out of order. By
+		// initializing current to len(ordered), we're saying that if the resource
+		// is not explicitly in orederedResources, then it must come *after*
+		// all orderedResources.
 		current := len(orderedResources)
 		for i, item := range orderedResources {
 			if item == resourceName {
@@ -845,6 +859,8 @@ func assertTarballOrdering(t *testing.T, backupFile io.Reader, orderedResources 
 			}
 		}
 
+		// the index of the current resource must be the same as or greater than the index of
+		// the last resource we saw for the backed-up order to be correct.
 		assert.True(t, current >= lastSeen, "%s was backed up out of order", resourceName)
 		lastSeen = current
 	}
