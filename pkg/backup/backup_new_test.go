@@ -73,7 +73,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name: "included resources filter only backs up resources of those type",
+			name: "included resources filter only backs up resources of those types",
 			backup: defaultBackup().
 				IncludedResources("pods").
 				Backup(),
@@ -93,7 +93,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
-			name: "excluded resources filter only backs up resources not of those type",
+			name: "excluded resources filter only backs up resources not of those types",
 			backup: defaultBackup().
 				ExcludedResources("deployments").
 				Backup(),
