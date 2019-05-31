@@ -54,7 +54,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 	}{
 		{
 			name:   "no filters backs up everything",
-			backup: defaultBackup().Build(),
+			backup: defaultBackup().Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -76,7 +76,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "included resources filter only backs up resources of those type",
 			backup: defaultBackup().
 				IncludedResources("pods").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -96,7 +96,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "excluded resources filter only backs up resources not of those type",
 			backup: defaultBackup().
 				ExcludedResources("deployments").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -116,7 +116,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "included namespaces filter only backs up resources in those namespaces",
 			backup: defaultBackup().
 				IncludedNamespaces("foo").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -136,7 +136,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "excluded namespaces filter only backs up resources not in those namespaces",
 			backup: defaultBackup().
 				ExcludedNamespaces("zoo").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -156,7 +156,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "IncludeClusterResources=false only backs up namespaced resources",
 			backup: defaultBackup().
 				IncludeClusterResources(false).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -182,7 +182,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "label selector only backs up matching resources",
 			backup: defaultBackup().
 				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					withLabel(newPod("foo", "bar"), "a", "b"),
@@ -208,7 +208,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(true).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -232,7 +232,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(false).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -253,7 +253,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should not include cluster-scoped resource if backing up subset of namespaces and IncludeClusterResources=nil",
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -274,7 +274,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=true",
 			backup: defaultBackup().
 				IncludeClusterResources(true).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -298,7 +298,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should not include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=false",
 			backup: defaultBackup().
 				IncludeClusterResources(false).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -319,7 +319,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "should include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=nil",
 			backup: defaultBackup().
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("ns-1", "pod-1"),
@@ -343,7 +343,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "when a wildcard and a specific resource are included, the wildcard takes precedence",
 			backup: defaultBackup().
 				IncludedResources("*", "pods").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -365,7 +365,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "wildcard excludes are ignored",
 			backup: defaultBackup().
 				ExcludedResources("*").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -387,7 +387,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "unresolvable included resources are ignored",
 			backup: defaultBackup().
 				IncludedResources("pods", "unresolvable").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -407,7 +407,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "unresolvable excluded resources are ignored",
 			backup: defaultBackup().
 				ExcludedResources("deployments", "unresolvable").
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),
@@ -453,7 +453,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	}{
 		{
 			name:   "when deployments exist only in extensions, they're backed up",
-			backup: defaultBackup().Build(),
+			backup: defaultBackup().Backup(),
 			apiResources: []*apiResource{
 				extensionsDeployments(
 					newDeployment("foo", "bar"),
@@ -467,7 +467,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 		},
 		{
 			name:   "when deployments exist in both apps and extensions, only apps/deployments are backed up",
-			backup: defaultBackup().Build(),
+			backup: defaultBackup().Backup(),
 			apiResources: []*apiResource{
 				extensionsDeployments(
 					newDeployment("foo", "bar"),
@@ -509,7 +509,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	// run and verify backup 1
 	backup1 := &Request{
-		Backup: defaultBackup().Build(),
+		Backup: defaultBackup().Backup(),
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
@@ -522,7 +522,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	// run and verify backup 2
 	backup2 := &Request{
-		Backup: defaultBackup().Build(),
+		Backup: defaultBackup().Backup(),
 	}
 	backup2File := bytes.NewBuffer([]byte{})
 
@@ -541,7 +541,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 			name: "core API group: pods come before pvcs, pvcs come before pvs, pvs come before anything else",
 			backup: defaultBackup().
 				SnapshotVolumes(false).
-				Build(),
+				Backup(),
 			apiResources: []*apiResource{
 				pods(
 					newPod("foo", "bar"),

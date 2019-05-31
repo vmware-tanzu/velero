@@ -49,8 +49,8 @@ func NewNamedBuilder(namespace, name string) *Builder {
 	}
 }
 
-// Build returns the built Backup API object.
-func (b *Builder) Build() *velerov1api.Backup {
+// Backup returns the built Backup API object.
+func (b *Builder) Backup() *velerov1api.Backup {
 	return &b.backup
 }
 
