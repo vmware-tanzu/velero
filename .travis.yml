@@ -8,4 +8,4 @@ sudo: required
 services:
   - docker
 
-script: make ci
+script: hack/ci-check.sh
