@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -426,6 +427,19 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name:   "terminating resources are not backed up",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-2", Name: "pod-2", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
 			},
 		},
 	}

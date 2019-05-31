@@ -29,7 +29,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -44,57 +43,6 @@ import (
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
-
-func TestBackupItemSkips(t *testing.T) {
-	tests := []struct {
-		testName      string
-		namespace     string
-		name          string
-		namespaces    *collections.IncludesExcludes
-		groupResource schema.GroupResource
-		resources     *collections.IncludesExcludes
-		terminating   bool
-		backedUpItems map[itemKey]struct{}
-	}{
-		{
-			testName:      "terminating resource",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes(),
-			terminating:   true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.testName, func(t *testing.T) {
-			req := &Request{
-				NamespaceIncludesExcludes: test.namespaces,
-				ResourceIncludesExcludes:  test.resources,
-			}
-
-			ib := &defaultItemBackupper{
-				backupRequest: req,
-				backedUpItems: test.backedUpItems,
-			}
-
-			pod := &corev1api.Pod{
-				TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-				ObjectMeta: metav1.ObjectMeta{Namespace: test.namespace, Name: test.name},
-			}
-
-			if test.terminating {
-				pod.ObjectMeta.DeletionTimestamp = &metav1.Time{Time: time.Now()}
-			}
-			unstructuredObj, unmarshalErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
-			require.NoError(t, unmarshalErr)
-			u := &unstructured.Unstructured{Object: unstructuredObj}
-			err := ib.backupItem(velerotest.NewLogger(), u, test.groupResource)
-			assert.NoError(t, err)
-		})
-	}
-}
 
 func TestBackupItemNoSkips(t *testing.T) {
 	tests := []struct {
