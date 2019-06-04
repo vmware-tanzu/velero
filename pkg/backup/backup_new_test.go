@@ -43,7 +43,6 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
@@ -52,6 +51,7 @@ import (
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 // TestBackupResourceFiltering runs backups with different combinations
@@ -627,11 +627,11 @@ func TestBackupResourceOrdering(t *testing.T) {
 type recordResourcesAction struct {
 	selector        velero.ResourceSelector
 	ids             []string
-	backups         []v1.Backup
+	backups         []velerov1.Backup
 	additionalItems []velero.ResourceIdentifier
 }
 
-func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	metadata, err := meta.Accessor(item)
 	if err != nil {
 		return item, a.additionalItems, err
@@ -1254,6 +1254,382 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 	}
 }
 
+// volumeSnapshotterGetter is a simple implementation of the VolumeSnapshotterGetter
+// interface that returns velero.VolumeSnapshotters from a map if they exist.
+type volumeSnapshotterGetter map[string]velero.VolumeSnapshotter
+
+func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	snapshotter, ok := vsg[name]
+	if !ok {
+		return nil, errors.New("volume snapshotter not found")
+	}
+
+	return snapshotter, nil
+}
+
+func int64Ptr(val int) *int64 {
+	i := int64(val)
+	return &i
+}
+
+type volumeIdentifier struct {
+	volumeID string
+	volumeAZ string
+}
+
+type volumeInfo struct {
+	volumeType  string
+	iops        *int64
+	snapshotErr bool
+}
+
+// fakeVolumeSnapshotter is a test fake for the velero.VolumeSnapshotter interface.
+type fakeVolumeSnapshotter struct {
+	// PVVolumeNames is a map from PV name to volume ID, used as the basis
+	// for the GetVolumeID method.
+	PVVolumeNames map[string]string
+
+	// Volumes is a map from volume identifier (volume ID + AZ) to a struct
+	// of volume info, used for the GetVolumeInfo and CreateSnapshot methods.
+	Volumes map[volumeIdentifier]*volumeInfo
+}
+
+// WithVolume is a test helper for registering persistent volumes that the
+// fakeVolumeSnapshotter should handle.
+func (vs *fakeVolumeSnapshotter) WithVolume(pvName, id, az, volumeType string, iops int, snapshotErr bool) *fakeVolumeSnapshotter {
+	if vs.PVVolumeNames == nil {
+		vs.PVVolumeNames = make(map[string]string)
+	}
+	vs.PVVolumeNames[pvName] = id
+
+	if vs.Volumes == nil {
+		vs.Volumes = make(map[volumeIdentifier]*volumeInfo)
+	}
+
+	identifier := volumeIdentifier{
+		volumeID: id,
+		volumeAZ: az,
+	}
+
+	vs.Volumes[identifier] = &volumeInfo{
+		volumeType:  volumeType,
+		iops:        int64Ptr(iops),
+		snapshotErr: snapshotErr,
+	}
+
+	return vs
+}
+
+// Init is a no-op.
+func (*fakeVolumeSnapshotter) Init(config map[string]string) error {
+	return nil
+}
+
+// GetVolumeID looks up the PV name in the PVVolumeNames map and returns the result
+// if found, or an error otherwise.
+func (vs *fakeVolumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	obj := pv.(*unstructured.Unstructured)
+
+	volumeID, ok := vs.PVVolumeNames[obj.GetName()]
+	if !ok {
+		return "", errors.New("unsupported volume type")
+	}
+
+	return volumeID, nil
+}
+
+// CreateSnapshot looks up the volume in the Volume map. If it's not found, an error is
+// returned; if snapshotErr is true on the result, an error is returned; otherwise,
+// a snapshotID of "<volumeID>-snapshot" is returned.
+func (vs *fakeVolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+	vi, ok := vs.Volumes[volumeIdentifier{volumeID: volumeID, volumeAZ: volumeAZ}]
+	if !ok {
+		return "", errors.New("volume not found")
+	}
+
+	if vi.snapshotErr {
+		return "", errors.New("error calling CreateSnapshot")
+	}
+
+	return volumeID + "-snapshot", nil
+}
+
+// GetVolumeInfo returns volume info if it exists in the Volumes map
+// for the specified volume ID and AZ, or an error otherwise.
+func (vs *fakeVolumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	vi, ok := vs.Volumes[volumeIdentifier{volumeID: volumeID, volumeAZ: volumeAZ}]
+	if !ok {
+		return "", nil, errors.New("volume not found")
+	}
+
+	return vi.volumeType, vi.iops, nil
+}
+
+// CreateVolumeFromSnapshot panics because it's not expected to be used for backups.
+func (*fakeVolumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	panic("CreateVolumeFromSnapshot should not be used for backups")
+}
+
+// SetVolumeID panics because it's not expected to be used for backups.
+func (*fakeVolumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	panic("SetVolumeID should not be used for backups")
+}
+
+// DeleteSnapshot panics because it's not expected to be used for backups.
+func (*fakeVolumeSnapshotter) DeleteSnapshot(snapshotID string) error {
+	panic("DeleteSnapshot should not be used for backups")
+}
+
+// TestBackupWithSnapshots runs backups with volume snapshot locations and volume snapshotters
+// configured and verifies that snapshots are created as appropriate. Verification is done by
+// looking at the backup request's VolumeSnapshots field. This test uses the fakeVolumeSnapshotter
+// struct in place of real volume snapshotters.
+func TestBackupWithSnapshots(t *testing.T) {
+	tests := []struct {
+		name              string
+		req               *Request
+		vsls              []*velerov1.VolumeSnapshotLocation
+		apiResources      []*apiResource
+		snapshotterGetter volumeSnapshotterGetter
+		want              []*volume.Snapshot
+	}{
+		{
+			name: "persistent volume with no zone annotation creates a snapshot",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-1-snapshot",
+					},
+				},
+			},
+		},
+		{
+			name: "persistent volume with zone annotation creates a snapshot",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					withLabel(newPV("pv-1"), "failure-domain.beta.kubernetes.io/zone", "zone-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1", "type-1", 100, false),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeAZ:             "zone-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-1-snapshot",
+					},
+				},
+			},
+		},
+		{
+			name: "error returned from CreateSnapshot results in a failed snapshot",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, true),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase: volume.SnapshotPhaseFailed,
+					},
+				},
+			},
+		},
+		{
+			name: "backup with SnapshotVolumes=false does not create any snapshots",
+			req: &Request{
+				Backup: defaultBackup().SnapshotVolumes(false).Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
+			},
+			want: nil,
+		},
+		{
+			name: "backup with no volume snapshot locations does not create any snapshots",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
+			},
+			want: nil,
+		},
+		{
+			name: "backup with no volume snapshotters does not create any snapshots",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{},
+			want:              nil,
+		},
+		{
+			name: "unsupported persistent volume type does not create any snapshots",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter),
+			},
+			want: nil,
+		},
+		{
+			name: "when there are multiple volumes, snapshot locations, and snapshotters, volumes are matched to the right snapshotters",
+			req: &Request{
+				Backup: defaultBackup().Backup(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+					newSnapshotLocation("velero", "another", "another"),
+				},
+			},
+			apiResources: []*apiResource{
+				pvs(
+					newPV("pv-1"),
+					newPV("pv-2"),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
+				"another": new(fakeVolumeSnapshotter).WithVolume("pv-2", "vol-2", "", "type-2", 100, false),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-1-snapshot",
+					},
+				},
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "another",
+						PersistentVolumeName: "pv-2",
+						ProviderVolumeID:     "vol-2",
+						VolumeType:           "type-2",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-2-snapshot",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, tc.snapshotterGetter)
+			assert.NoError(t, err)
+
+			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
+		})
+	}
+}
+
 // pluggableAction is a backup item action that can be plugged with an Execute
 // function body at runtime.
 type pluggableAction struct {
@@ -1470,6 +1846,18 @@ func newPV(name string) *corev1.PersistentVolume {
 	return &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+		},
+	}
+}
+
+func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLocation {
+	return &velerov1.VolumeSnapshotLocation{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: velerov1.VolumeSnapshotLocationSpec{
+			Provider: provider,
 		},
 	}
 }
