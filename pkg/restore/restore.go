@@ -830,41 +830,40 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
-		var hasSnapshot bool
-
-		for _, snapshot := range ctx.volumeSnapshots {
-			if snapshot.Spec.PersistentVolumeName == name {
-				hasSnapshot = true
-				break
-			}
-		}
-
-		if !hasSnapshot && hasDeleteReclaimPolicy(obj.Object) {
-			ctx.log.Infof("Not restoring PV because it doesn't have a snapshot and its reclaim policy is Delete.")
-			ctx.pvsToProvision.Insert(name)
-			return warnings, errs
-		}
-
-		// Check if the PV exists in the cluster before attempting to create
-		// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-		shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
-		if err != nil {
-			addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
-			return warnings, errs
-		}
-
-		// PV's existence will be recorded later. Just skip the volume restore logic.
-		if shouldRestoreSnapshot {
-			// restore the PV from snapshot (if applicable)
-			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+		if hasSnapshot(obj.GetName(), ctx.volumeSnapshots) {
+			// Check if the PV exists in the cluster before attempting to create
+			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+			shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
 			if err != nil {
-				addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+				addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
 				return warnings, errs
 			}
-			obj = updatedObj
-		} else if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
+
+			// PV's existence will be recorded later. Just skip the volume restore logic.
+			if shouldRestoreSnapshot {
+				// restore the PV from snapshot (if applicable)
+				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+				if err != nil {
+					addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+					return warnings, errs
+				}
+				obj = updatedObj
+				// don't return, since we want to continue below with restoring the PV API
+				// object.
+			} else if err != nil {
+				addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
+				return warnings, errs
+			}
+		} else if hasResticBackup(obj, ctx) {
+			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
+			ctx.pvsToProvision.Insert(name)
 			return warnings, errs
+		} else {
+			if hasDeleteReclaimPolicy(obj.Object) {
+				ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
+				ctx.pvsToProvision.Insert(name)
+				return warnings, errs
+			}
 		}
 	}
 
@@ -1067,6 +1066,41 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	}
 
 	return warnings, errs
+}
+
+func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
+	for _, snapshot := range snapshots {
+		if snapshot.Spec.PersistentVolumeName == pvName {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *context) bool {
+	var pv v1.PersistentVolume
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, &pv); err != nil {
+		// TODO log
+		return false
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		return false
+	}
+
+	pvcPath := getItemFilePath(ctx.restoreDir, kuberesource.PersistentVolumeClaims.String(), pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name)
+	if _, err := ctx.fileSystem.Stat(pvcPath); err != nil {
+		// TODO log
+		return false
+	}
+
+	pvc, err := ctx.unmarshal(pvcPath)
+	if err != nil {
+		// TODO
+	}
+
+	return pvc.GetAnnotations()["velero.io/restic-backup"] == string(ctx.backup.UID)
 }
 
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {

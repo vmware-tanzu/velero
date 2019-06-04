@@ -39,6 +39,7 @@ import (
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/boolptr"
 	"github.com/heptio/velero/pkg/volume"
 )
 
@@ -213,6 +214,22 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		}
 	}
 
+	if groupResource == kuberesource.PersistentVolumeClaims {
+		// if this PVC is being backed up via restic, add an annotation
+		// to it in the tarball so that during a restore, we can easily
+		// identify that it has a restic backup associated with it.
+		if ib.resticSnapshotTracker.Has(metadata.GetNamespace(), metadata.GetName()) {
+			annotations := metadata.GetAnnotations()
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+
+			annotations["velero.io/restic-backup"] = string(ib.backupRequest.UID)
+
+			metadata.SetAnnotations(annotations)
+		}
+	}
+
 	if groupResource == kuberesource.Pods && pod != nil {
 		// this function will return partial results, so process volumeSnapshots
 		// even if there are errors.
@@ -371,7 +388,7 @@ const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
 func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
-	if ib.backupRequest.Spec.SnapshotVolumes != nil && !*ib.backupRequest.Spec.SnapshotVolumes {
+	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
 		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
 		return nil
 	}
@@ -387,7 +404,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	// of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
 		if ib.resticSnapshotTracker.Has(pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name) {
-			log.Info("Skipping persistent volume snapshot because volume has already been backed up with restic.")
+			log.Info("Skipping persistent volume snapshot because volume is being backed up with restic.")
 			return nil
 		}
 	}
