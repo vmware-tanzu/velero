@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,9 +31,10 @@ var (
 )
 
 func printPluginList(list *velerov1api.ServerStatusRequest, w io.Writer, options printers.PrintOptions) error {
-	sortPluginsByName(list)
+	plugins := list.Status.Plugins
+	sortByKindAndName(plugins)
 
-	for _, plugin := range list.Status.Plugins {
+	for _, plugin := range plugins {
 		if err := printPlugin(plugin, w, options); err != nil {
 			return err
 		}
@@ -41,18 +42,19 @@ func printPluginList(list *velerov1api.ServerStatusRequest, w io.Writer, options
 	return nil
 }
 
-func sortPluginsByName(list *velerov1api.ServerStatusRequest) {
-	sort.Slice(list.Status.Plugins, func(i, j int) bool {
-		return list.Status.Plugins[i][0] < list.Status.Plugins[j][0]
+func sortByKindAndName(plugins []velerov1api.PluginInfo) {
+	sort.Slice(plugins, func(i, j int) bool {
+		if plugins[i].Kind != plugins[j].Kind {
+			return plugins[i].Kind < plugins[j].Kind
+		}
+		return plugins[i].Name < plugins[j].Name
 	})
 }
 
-func printPlugin(plugin []string, w io.Writer, options printers.PrintOptions) error {
-	pluginName := plugin[0]
-	pluginKind := plugin[1]
-	name := printers.FormatResourceName(options.Kind, pluginName, options.WithKind)
+func printPlugin(plugin velerov1api.PluginInfo, w io.Writer, options printers.PrintOptions) error {
+	name := printers.FormatResourceName(options.Kind, plugin.Name, options.WithKind)
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\n", name, pluginKind); err != nil {
+	if _, err := fmt.Fprintf(w, "%s\t%s\n", name, plugin.Kind); err != nil {
 		return err
 	}
 

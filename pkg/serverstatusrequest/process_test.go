@@ -46,6 +46,16 @@ func TestProcess(t *testing.T) {
 	now = now.Local()
 
 	buildinfo.Version = "test-version-val"
+	plugins := []velerov1api.PluginInfo{
+		{
+			Name: "velero.io/aws",
+			Kind: "ObjectStore",
+		},
+		{
+			Name: "custome.io/myown",
+			Kind: "VolumeSnapshotter",
+		},
+	}
 
 	tests := []struct {
 		name           string
@@ -63,7 +73,7 @@ func TestProcess(t *testing.T) {
 				Build(),
 		},
 		{
-			name: "server status request with phase=New gets processed",
+			name: "server status request with phase=New and plugins gets processed",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseNew).
 				Build(),
@@ -71,6 +81,7 @@ func TestProcess(t *testing.T) {
 				ServerVersion(buildinfo.Version).
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now).
+				Plugins(plugins).
 				Build(),
 		},
 		{
@@ -112,6 +123,7 @@ func TestProcess(t *testing.T) {
 			dir := "/plugins"
 			registry := clientmgmt.NewRegistry(dir, logger, logLevel)
 
+			// TODO / QUESTION: how to inject fake plugins into the registry directory?
 			err := Process(tc.req, client.VeleroV1(), registry, clock.NewFakeClock(now), logrus.StandardLogger())
 			if tc.expectedErrMsg == "" {
 				assert.Nil(t, err)

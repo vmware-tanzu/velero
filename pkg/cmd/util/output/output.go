@@ -43,7 +43,7 @@ func BindFlags(flags *pflag.FlagSet) {
 	flags.Bool("show-labels", false, "show labels in the last column")
 }
 
-// BindFlagsSimple defines the output flag within the provided FlagSet.
+// BindFlagsSimple defines the output format flag only.
 func BindFlagsSimple(flags *pflag.FlagSet) {
 	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serverstatus
+package version
 
 import (
 	"fmt"
@@ -27,12 +27,13 @@ import (
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/cmd/cli/serverstatus"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
 	clientOnly := false
-	serverStatusGetter := &DefaultServerStatusGetter{
+	serverStatusGetter := &serverstatus.DefaultServerStatusGetter{
 		Namespace: f.Namespace(),
 		Timeout:   5 * time.Second,
 	}
@@ -60,7 +61,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	return c
 }
 
-func printVersion(w io.Writer, clientOnly bool, client velerov1client.ServerStatusRequestsGetter, serverStatusGetter ServerStatusGetter) {
+func printVersion(w io.Writer, clientOnly bool, client velerov1client.ServerStatusRequestsGetter, serverStatusGetter serverstatus.ServerStatusGetter) {
 	fmt.Fprintln(w, "Client:")
 	fmt.Fprintf(w, "\tVersion: %s\n", buildinfo.Version)
 	fmt.Fprintf(w, "\tGit commit: %s\n", buildinfo.FormattedGitSHA())

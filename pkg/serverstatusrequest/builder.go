@@ -72,3 +72,8 @@ func (b *Builder) ServerVersion(version string) *Builder {
 	b.serverStatusRequest.Status.ServerVersion = version
 	return b
 }
+
+func (b *Builder) Plugins(plugins []velerov1api.PluginInfo) *Builder {
+	b.serverStatusRequest.Status.Plugins = plugins
+	return b
+}

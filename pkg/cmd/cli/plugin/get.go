@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/serverstatus"
+	"github.com/heptio/velero/pkg/cmd/cli/serverstatus"
 	"github.com/heptio/velero/pkg/cmd/util/output"
 )
 

@@ -45,7 +45,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 			req.Status.ServerVersion = buildinfo.Version
 			req.Status.ProcessedTimestamp.Time = clock.Now()
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
-			req.Status.Plugins = plugins(pluginRegistry, log)
+			req.Status.Plugins = plugins(pluginRegistry)
 		}))
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
@@ -92,15 +92,16 @@ func patch(client velerov1client.ServerStatusRequestsGetter, req *velerov1api.Se
 	return nil
 }
 
-func plugins(pluginRegistry clientmgmt.Registry, log logrus.FieldLogger) [][]string {
-	var plugins [][]string
+func plugins(pluginRegistry clientmgmt.Registry) []velerov1api.PluginInfo {
+	var plugins []velerov1api.PluginInfo
 	for _, v := range framework.AllPluginKinds() {
 		list := pluginRegistry.List(v)
 		for _, plugin := range list {
-			var pluginAttrs []string
-			pluginAttrs = append(pluginAttrs, plugin.Name)
-			pluginAttrs = append(pluginAttrs, plugin.Kind.String())
-			plugins = append(plugins, pluginAttrs)
+			pluginInfo := velerov1api.PluginInfo{
+				Name: plugin.Name,
+				Kind: plugin.Kind.String(),
+			}
+			plugins = append(plugins, pluginInfo)
 		}
 	}
 	return plugins
