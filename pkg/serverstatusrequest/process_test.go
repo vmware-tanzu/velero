@@ -175,10 +175,6 @@ type fakePluginLister struct {
 	plugins []framework.PluginIdentifier
 }
 
-func (l *fakePluginLister) DiscoverPlugins() error {
-	return nil
-}
-
 func (l *fakePluginLister) List(kind framework.PluginKind) []framework.PluginIdentifier {
 	var plugins []framework.PluginIdentifier
 	for _, plugin := range l.plugins {
@@ -188,8 +184,4 @@ func (l *fakePluginLister) List(kind framework.PluginKind) []framework.PluginIde
 	}
 
 	return plugins
-}
-
-func (l *fakePluginLister) Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error) {
-	return framework.PluginIdentifier{}, nil
 }

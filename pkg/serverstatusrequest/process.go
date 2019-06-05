@@ -35,12 +35,8 @@ import (
 const ttl = time.Minute
 
 type PluginLister interface {
-	// DiscoverPlugins discovers all available plugins.
-	DiscoverPlugins() error
 	// List returns all PluginIdentifiers for kind.
 	List(kind framework.PluginKind) []framework.PluginIdentifier
-	// Get returns the PluginIdentifier for kind and name.
-	Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error)
 }
 
 // Process fills out new ServerStatusRequest objects and deletes processed ones
