@@ -27,6 +27,7 @@ _Note that these providers are not regularly tested by the Velero team._
  * [DigitalOcean][7]
  * Quobyte
  * [NooBaa][16]
+ * [Oracle Cloud][23]
 
 _Some storage providers, like Quobyte, may need a different [signature algorithm version][15]._
 
@@ -71,3 +72,4 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [20]: https://github.com/openebs/velero-plugin/issues
 [21]: https://github.com/AliyunContainerService/velero-plugin
 [22]: https://github.com/AliyunContainerService/velero-plugin/issues
+[23]: oracle-config.md
