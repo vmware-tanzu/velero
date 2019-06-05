@@ -36,12 +36,13 @@ import (
 )
 
 const (
-	s3URLKey            = "s3Url"
-	publicURLKey        = "publicUrl"
-	kmsKeyIDKey         = "kmsKeyId"
-	s3ForcePathStyleKey = "s3ForcePathStyle"
-	bucketKey           = "bucket"
-	signatureVersionKey = "signatureVersion"
+	s3URLKey             = "s3Url"
+	publicURLKey         = "publicUrl"
+	kmsKeyIDKey          = "kmsKeyId"
+	s3ForcePathStyleKey  = "s3ForcePathStyle"
+	bucketKey            = "bucket"
+	signatureVersionKey  = "signatureVersion"
+	credentialProfileKey = "profile"
 )
 
 type s3Interface interface {
@@ -92,6 +93,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		kmsKeyID            = config[kmsKeyIDKey]
 		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
 		signatureVersion    = config[signatureVersionKey]
+		credentialProfile   = config[credentialProfileKey]
 
 		// note that bucket is automatically added to the config map
 		// by the server from the ObjectStorageProviderConfig so
@@ -124,7 +126,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		return err
 	}
 
-	serverSession, err := getSession(serverConfig)
+	serverSession, err := getSession(serverConfig, credentialProfile)
 	if err != nil {
 		return err
 	}
@@ -145,7 +147,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		if err != nil {
 			return err
 		}
-		publicSession, err := getSession(publicConfig)
+		publicSession, err := getSession(publicConfig, credentialProfile)
 		if err != nil {
 			return err
 		}
