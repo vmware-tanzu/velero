@@ -57,34 +57,6 @@ func TestBackupItemSkips(t *testing.T) {
 		backedUpItems map[itemKey]struct{}
 	}{
 		{
-			testName:   "namespace not in includes list",
-			namespace:  "ns",
-			name:       "foo",
-			namespaces: collections.NewIncludesExcludes().Includes("a"),
-		},
-		{
-			testName:   "namespace in excludes list",
-			namespace:  "ns",
-			name:       "foo",
-			namespaces: collections.NewIncludesExcludes().Excludes("ns"),
-		},
-		{
-			testName:      "resource not in includes list",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes().Includes("a.b"),
-		},
-		{
-			testName:      "resource in excludes list",
-			namespace:     "ns",
-			name:          "foo",
-			groupResource: schema.GroupResource{Group: "foo", Resource: "bar"},
-			namespaces:    collections.NewIncludesExcludes(),
-			resources:     collections.NewIncludesExcludes().Excludes("bar.foo"),
-		},
-		{
 			testName:      "resource already backed up",
 			namespace:     "ns",
 			name:          "foo",
@@ -135,25 +107,6 @@ func TestBackupItemSkips(t *testing.T) {
 	}
 }
 
-func TestBackupItemSkipsClusterScopedResourceWhenIncludeClusterResourcesFalse(t *testing.T) {
-	f := false
-	ib := &defaultItemBackupper{
-		backupRequest: &Request{
-			Backup: &v1.Backup{
-				Spec: v1.BackupSpec{
-					IncludeClusterResources: &f,
-				},
-			},
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-		},
-	}
-
-	u := velerotest.UnstructuredOrDie(`{"apiVersion":"v1","kind":"Foo","metadata":{"name":"bar"}}`)
-	err := ib.backupItem(velerotest.NewLogger(), u, schema.GroupResource{Group: "foo", Resource: "bar"})
-	assert.NoError(t, err)
-}
-
 func TestBackupItemNoSkips(t *testing.T) {
 	tests := []struct {
 		name                                  string
@@ -175,29 +128,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 		trackedPVCs                           sets.String
 		expectedTrackedPVCs                   sets.String
 	}{
-		{
-			name:                      "explicit namespace include",
-			item:                      `{"metadata":{"namespace":"foo","name":"bar"}}`,
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("foo"),
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
-		},
-		{
-			name:                      "* namespace include",
-			item:                      `{"metadata":{"namespace":"foo","name":"bar"}}`,
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/foo/bar.json",
-		},
-		{
-			name:                  "cluster-scoped",
-			item:                  `{"metadata":{"name":"bar"}}`,
-			expectError:           false,
-			expectExcluded:        false,
-			expectedTarHeaderName: "resources/resource.group/cluster/bar.json",
-		},
 		{
 			name:                "tar header write error",
 			item:                `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
