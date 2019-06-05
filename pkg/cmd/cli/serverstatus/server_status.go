@@ -38,7 +38,7 @@ type DefaultServerStatusGetter struct {
 }
 
 func (g *DefaultServerStatusGetter) GetServerStatus(client velerov1client.ServerStatusRequestsGetter) (*velerov1api.ServerStatusRequest, error) {
-	req := serverstatusrequest.NewBuilder().Namespace(g.Namespace).GenerateName("velero-cli-").Build()
+	req := serverstatusrequest.NewBuilder().Namespace(g.Namespace).GenerateName("velero-cli-").ServerStatusRequest()
 
 	created, err := client.ServerStatusRequests(g.Namespace).Create(req)
 	if err != nil {

@@ -28,6 +28,7 @@ type Builder struct {
 	serverStatusRequest velerov1api.ServerStatusRequest
 }
 
+// NewBuilder returns a Builder for a ServerStatusRequest.
 func NewBuilder() *Builder {
 	return &Builder{
 		serverStatusRequest: velerov1api.ServerStatusRequest{
@@ -39,7 +40,8 @@ func NewBuilder() *Builder {
 	}
 }
 
-func (b *Builder) Build() *velerov1api.ServerStatusRequest {
+// ServerStatusRequest returns the built ServerStatusRequest API object.
+func (b *Builder) ServerStatusRequest() *velerov1api.ServerStatusRequest {
 	return &b.serverStatusRequest
 }
 

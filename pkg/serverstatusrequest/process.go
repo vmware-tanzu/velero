@@ -29,15 +29,23 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 const ttl = time.Minute
 
+type PluginLister interface {
+	// DiscoverPlugins discovers all available plugins.
+	DiscoverPlugins() error
+	// List returns all PluginIdentifiers for kind.
+	List(kind framework.PluginKind) []framework.PluginIdentifier
+	// Get returns the PluginIdentifier for kind and name.
+	Get(kind framework.PluginKind, name string) (framework.PluginIdentifier, error)
+}
+
 // Process fills out new ServerStatusRequest objects and deletes processed ones
 // that have expired.
-func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerStatusRequestsGetter, pluginRegistry clientmgmt.Registry, clock clock.Clock, log logrus.FieldLogger) error {
+func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerStatusRequestsGetter, pluginLister PluginLister, clock clock.Clock, log logrus.FieldLogger) error {
 	switch req.Status.Phase {
 	case "", velerov1api.ServerStatusRequestPhaseNew:
 		log.Info("Processing new ServerStatusRequest")
@@ -45,7 +53,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 			req.Status.ServerVersion = buildinfo.Version
 			req.Status.ProcessedTimestamp.Time = clock.Now()
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
-			req.Status.Plugins = plugins(pluginRegistry)
+			req.Status.Plugins = plugins(pluginLister)
 		}))
 	case velerov1api.ServerStatusRequestPhaseProcessed:
 		log.Debug("Checking whether ServerStatusRequest has expired")
@@ -92,10 +100,10 @@ func patch(client velerov1client.ServerStatusRequestsGetter, req *velerov1api.Se
 	return nil
 }
 
-func plugins(pluginRegistry clientmgmt.Registry) []velerov1api.PluginInfo {
+func plugins(pluginLister PluginLister) []velerov1api.PluginInfo {
 	var plugins []velerov1api.PluginInfo
 	for _, v := range framework.AllPluginKinds() {
-		list := pluginRegistry.List(v)
+		list := pluginLister.List(v)
 		for _, plugin := range list {
 			pluginInfo := velerov1api.PluginInfo{
 				Name: plugin.Name,
