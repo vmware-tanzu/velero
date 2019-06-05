@@ -76,6 +76,32 @@ func TestShouldInclude(t *testing.T) {
 			check:    "foo",
 			should:   false,
 		},
+		{
+			name:     "wildcard include",
+			includes: []string{"*.bar"},
+			check:    "foo.bar",
+			should:   true,
+		},
+		{
+			name:     "wildcard include fail",
+			includes: []string{"*.bar"},
+			check:    "bar.foo",
+			should:   false,
+		},
+		{
+			name:     "wildcard exclude",
+			includes: []string{"*"},
+			excludes: []string{"*.bar"},
+			check:    "foo.bar",
+			should:   false,
+		},
+		{
+			name:     "wildcard exclude fail",
+			includes: []string{"*"},
+			excludes: []string{"*.bar"},
+			check:    "bar.foo",
+			should:   true,
+		},
 	}
 
 	for _, test := range tests {

@@ -129,6 +129,10 @@
   name = "github.com/joho/godotenv"
   version = "~v1.3.0"
 
+[[constraint]]
+  name = "github.com/gobwas/glob"
+  version = "~v0.2.3"
+
 [[override]]
   name = "golang.org/x/sys"
   branch = "master"
