@@ -30,6 +30,7 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
 func statusRequestBuilder() *Builder {
@@ -46,37 +47,82 @@ func TestProcess(t *testing.T) {
 	buildinfo.Version = "test-version-val"
 
 	tests := []struct {
-		name           string
-		req            *velerov1api.ServerStatusRequest
-		expected       *velerov1api.ServerStatusRequest
-		expectedErrMsg string
+		name            string
+		req             *velerov1api.ServerStatusRequest
+		reqPluginLister *fakePluginLister
+		expected        *velerov1api.ServerStatusRequest
+		expectedErrMsg  string
 	}{
 		{
 			name: "server status request with empty phase gets processed",
-			req:  statusRequestBuilder().Build(),
+			req:  statusRequestBuilder().ServerStatusRequest(),
+			reqPluginLister: &fakePluginLister{
+				plugins: []framework.PluginIdentifier{
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				},
+			},
 			expected: statusRequestBuilder().
 				ServerVersion(buildinfo.Version).
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now).
-				Build(),
+				Plugins([]velerov1api.PluginInfo{
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				}).
+				ServerStatusRequest(),
 		},
 		{
 			name: "server status request with phase=New gets processed",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseNew).
-				Build(),
+				ServerStatusRequest(),
+			reqPluginLister: &fakePluginLister{
+				plugins: []framework.PluginIdentifier{
+					{
+						Name: "velero.io/aws",
+						Kind: "ObjectStore",
+					},
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				},
+			},
 			expected: statusRequestBuilder().
 				ServerVersion(buildinfo.Version).
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now).
-				Build(),
+				Plugins([]velerov1api.PluginInfo{
+					{
+						Name: "velero.io/aws",
+						Kind: "ObjectStore",
+					},
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				}).
+				ServerStatusRequest(),
 		},
 		{
 			name: "server status request with phase=Processed gets deleted if expired",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-61 * time.Second)).
-				Build(),
+				ServerStatusRequest(),
+			reqPluginLister: &fakePluginLister{
+				plugins: []framework.PluginIdentifier{
+					{
+						Name: "custom.io/myown",
+						Kind: "VolumeSnapshotter",
+					},
+				},
+			},
 			expected: nil,
 		},
 		{
@@ -84,20 +130,20 @@ func TestProcess(t *testing.T) {
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
-				Build(),
+				ServerStatusRequest(),
 			expected: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
-				Build(),
+				ServerStatusRequest(),
 		},
 		{
 			name: "server status request with invalid phase returns an error",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				Build(),
+				ServerStatusRequest(),
 			expected: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				Build(),
+				ServerStatusRequest(),
 			expectedErrMsg: "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
 		},
 	}
@@ -106,7 +152,7 @@ func TestProcess(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset(tc.req)
 
-			err := Process(tc.req, client.VeleroV1(), clock.NewFakeClock(now), logrus.StandardLogger())
+			err := Process(tc.req, client.VeleroV1(), tc.reqPluginLister, clock.NewFakeClock(now), logrus.StandardLogger())
 			if tc.expectedErrMsg == "" {
 				assert.Nil(t, err)
 			} else {
@@ -123,4 +169,19 @@ func TestProcess(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakePluginLister struct {
+	plugins []framework.PluginIdentifier
+}
+
+func (l *fakePluginLister) List(kind framework.PluginKind) []framework.PluginIdentifier {
+	var plugins []framework.PluginIdentifier
+	for _, plugin := range l.plugins {
+		if plugin.Kind == kind {
+			plugins = append(plugins, plugin)
+		}
+	}
+
+	return plugins
 }

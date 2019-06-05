@@ -16,7 +16,9 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -45,6 +47,12 @@ const (
 	ServerStatusRequestPhaseProcessed ServerStatusRequestPhase = "Processed"
 )
 
+// PluginInfo contains attributes of a Velero plugin
+type PluginInfo struct {
+	Name string `json:"name"`
+	Kind string `json:"kind"`
+}
+
 // ServerStatusRequestStatus is the current status of a ServerStatusRequest.
 type ServerStatusRequestStatus struct {
 	// Phase is the current lifecycle phase of the ServerStatusRequest.
@@ -56,6 +64,9 @@ type ServerStatusRequestStatus struct {
 
 	// ServerVersion is the Velero server version.
 	ServerVersion string `json:"serverVersion"`
+
+	// Plugins list information about the plugins running on the Velero server
+	Plugins []PluginInfo `json:"plugins"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

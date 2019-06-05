@@ -16,10 +16,6 @@ limitations under the License.
 
 package framework
 
-import (
-	"k8s.io/apimachinery/pkg/util/sets"
-)
-
 // PluginKind is a type alias for a string that describes
 // the kind of a Velero-supported plugin.
 type PluginKind string
@@ -46,11 +42,13 @@ const (
 	PluginKindPluginLister PluginKind = "PluginLister"
 )
 
-// allPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
+// AllPluginKinds contains all the valid plugin kinds that Velero supports, excluding PluginLister because that is not a
 // kind that a developer would ever need to implement (it's handled by Velero and the Velero plugin library code).
-var allPluginKinds = sets.NewString(
-	PluginKindObjectStore.String(),
-	PluginKindVolumeSnapshotter.String(),
-	PluginKindBackupItemAction.String(),
-	PluginKindRestoreItemAction.String(),
-)
+func AllPluginKinds() map[string]PluginKind {
+	allPluginKinds := make(map[string]PluginKind)
+	allPluginKinds[PluginKindObjectStore.String()] = PluginKindObjectStore
+	allPluginKinds[PluginKindVolumeSnapshotter.String()] = PluginKindVolumeSnapshotter
+	allPluginKinds[PluginKindBackupItemAction.String()] = PluginKindBackupItemAction
+	allPluginKinds[PluginKindRestoreItemAction.String()] = PluginKindRestoreItemAction
+	return allPluginKinds
+}

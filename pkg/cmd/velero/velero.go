@@ -37,9 +37,9 @@ import (
 	"github.com/heptio/velero/pkg/cmd/cli/restore"
 	"github.com/heptio/velero/pkg/cmd/cli/schedule"
 	"github.com/heptio/velero/pkg/cmd/cli/snapshotlocation"
+	"github.com/heptio/velero/pkg/cmd/cli/version"
 	"github.com/heptio/velero/pkg/cmd/server"
 	runplugin "github.com/heptio/velero/pkg/cmd/server/plugin"
-	"github.com/heptio/velero/pkg/cmd/version"
 )
 
 func NewCommand(name string) *cobra.Command {

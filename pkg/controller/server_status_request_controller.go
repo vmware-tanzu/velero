@@ -30,6 +30,7 @@ import (
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/serverstatusrequest"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
@@ -39,20 +40,23 @@ const statusRequestResyncPeriod = 5 * time.Minute
 type statusRequestController struct {
 	*genericController
 
-	client velerov1client.ServerStatusRequestsGetter
-	lister velerov1listers.ServerStatusRequestLister
-	clock  clock.Clock
+	client         velerov1client.ServerStatusRequestsGetter
+	lister         velerov1listers.ServerStatusRequestLister
+	pluginRegistry clientmgmt.Registry
+	clock          clock.Clock
 }
 
 func NewServerStatusRequestController(
 	logger logrus.FieldLogger,
 	client velerov1client.ServerStatusRequestsGetter,
 	informer velerov1informers.ServerStatusRequestInformer,
+	pluginRegistry clientmgmt.Registry,
 ) *statusRequestController {
 	c := &statusRequestController{
 		genericController: newGenericController("serverstatusrequest", logger),
 		client:            client,
 		lister:            informer.Lister(),
+		pluginRegistry:    pluginRegistry,
 
 		clock: clock.RealClock{},
 	}
@@ -102,7 +106,7 @@ func (c *statusRequestController) processItem(key string) error {
 		return errors.Wrap(err, "error getting ServerStatusRequest")
 	}
 
-	return serverstatusrequest.Process(req.DeepCopy(), c.client, c.clock, log)
+	return serverstatusrequest.Process(req.DeepCopy(), c.client, c.pluginRegistry, c.clock, log)
 }
 
 func (c *statusRequestController) enqueueAllItems() {

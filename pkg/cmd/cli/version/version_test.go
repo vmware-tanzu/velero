@@ -73,7 +73,7 @@ func TestPrintVersion(t *testing.T) {
 		{
 			name:                "server status getter returns normally",
 			clientOnly:          false,
-			serverStatusRequest: serverstatusrequest.NewBuilder().ServerVersion("v1.0.1").Build(),
+			serverStatusRequest: serverstatusrequest.NewBuilder().ServerVersion("v1.0.1").ServerStatusRequest(),
 			getterError:         nil,
 			want:                clientVersion + "Server:\n\tVersion: v1.0.1\n",
 		},
@@ -88,9 +88,9 @@ func TestPrintVersion(t *testing.T) {
 			)
 			defer serverStatusGetter.AssertExpectations(t)
 
-			// getServerStatus should only be called when clientOnly = false
+			// GetServerStatus should only be called when clientOnly = false
 			if !tc.clientOnly {
-				serverStatusGetter.On("getServerStatus", client.VeleroV1()).Return(tc.serverStatusRequest, tc.getterError)
+				serverStatusGetter.On("GetServerStatus", client.VeleroV1()).Return(tc.serverStatusRequest, tc.getterError)
 			}
 
 			printVersion(buf, tc.clientOnly, client.VeleroV1(), serverStatusGetter)
@@ -105,8 +105,8 @@ type mockServerStatusGetter struct {
 	mock.Mock
 }
 
-// getServerStatus provides a mock function with given fields: client
-func (_m *mockServerStatusGetter) getServerStatus(client v1.ServerStatusRequestsGetter) (*velerov1.ServerStatusRequest, error) {
+// GetServerStatus provides a mock function with given fields: client
+func (_m *mockServerStatusGetter) GetServerStatus(client v1.ServerStatusRequestsGetter) (*velerov1.ServerStatusRequest, error) {
 	ret := _m.Called(client)
 
 	var r0 *velerov1.ServerStatusRequest

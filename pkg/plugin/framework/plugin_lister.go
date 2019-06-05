@@ -87,7 +87,7 @@ func (c *PluginListerGRPCClient) ListPlugins() ([]PluginIdentifier, error) {
 
 	ret := make([]PluginIdentifier, len(resp.Plugins))
 	for i, id := range resp.Plugins {
-		if !allPluginKinds.Has(id.Kind) {
+		if _, ok := AllPluginKinds()[id.Kind]; !ok {
 			return nil, errors.Errorf("invalid plugin kind: %s", id.Kind)
 		}
 
@@ -126,7 +126,7 @@ func (s *PluginListerGRPCServer) ListPlugins(ctx context.Context, req *proto.Emp
 
 	plugins := make([]*proto.PluginIdentifier, len(list))
 	for i, id := range list {
-		if !allPluginKinds.Has(id.Kind.String()) {
+		if _, ok := AllPluginKinds()[id.Kind.String()]; !ok {
 			return nil, errors.Errorf("invalid plugin kind: %s", id.Kind)
 		}
 

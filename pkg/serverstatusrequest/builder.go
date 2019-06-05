@@ -28,6 +28,7 @@ type Builder struct {
 	serverStatusRequest velerov1api.ServerStatusRequest
 }
 
+// NewBuilder returns a Builder for a ServerStatusRequest.
 func NewBuilder() *Builder {
 	return &Builder{
 		serverStatusRequest: velerov1api.ServerStatusRequest{
@@ -39,7 +40,8 @@ func NewBuilder() *Builder {
 	}
 }
 
-func (b *Builder) Build() *velerov1api.ServerStatusRequest {
+// ServerStatusRequest returns the built ServerStatusRequest API object.
+func (b *Builder) ServerStatusRequest() *velerov1api.ServerStatusRequest {
 	return &b.serverStatusRequest
 }
 
@@ -70,5 +72,10 @@ func (b *Builder) ProcessedTimestamp(time time.Time) *Builder {
 
 func (b *Builder) ServerVersion(version string) *Builder {
 	b.serverStatusRequest.Status.ServerVersion = version
+	return b
+}
+
+func (b *Builder) Plugins(plugins []velerov1api.PluginInfo) *Builder {
+	b.serverStatusRequest.Status.Plugins = plugins
 	return b
 }

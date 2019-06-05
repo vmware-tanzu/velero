@@ -43,6 +43,11 @@ func BindFlags(flags *pflag.FlagSet) {
 	flags.Bool("show-labels", false, "show labels in the last column")
 }
 
+// BindFlagsSimple defines the output format flag only.
+func BindFlagsSimple(flags *pflag.FlagSet) {
+	flags.StringP("output", "o", "table", "Output display format. For create commands, display the object but do not send it to the server. Valid formats are 'table', 'json', and 'yaml'. 'table' is not valid for the install command.")
+}
+
 // ClearOutputFlagDefault sets the current and default value
 // of the "output" flag to the empty string.
 func ClearOutputFlagDefault(cmd *cobra.Command) {
@@ -153,6 +158,7 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 	printer.Handler(backupStorageLocationColumns, nil, printBackupStorageLocationList)
 	printer.Handler(volumeSnapshotLocationColumns, nil, printVolumeSnapshotLocation)
 	printer.Handler(volumeSnapshotLocationColumns, nil, printVolumeSnapshotLocationList)
+	printer.Handler(pluginColumns, nil, printPluginList)
 
 	err = printer.PrintObj(obj, os.Stdout)
 	if err != nil {
