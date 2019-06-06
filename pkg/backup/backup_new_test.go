@@ -51,6 +51,12 @@ import (
 	"github.com/heptio/velero/pkg/test"
 )
 
+// TestBackupResourceFiltering runs backups with different combinations
+// of resource filters (included/excluded resources, included/excluded
+// namespaces, label selectors, "include cluster resources" flag), and
+// verifies that the set of items written to the backup tarball are
+// correct. Validation is done by looking at the names of the files in
+// the backup tarball; the contents of the files are not checked.
 func TestBackupResourceFiltering(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -463,6 +469,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 	}
 }
 
+// TestBackupResourceCohabitation runs backups for resources that "cohabitate",
+// meaning they exist in multiple API groups (e.g. deployments.extensions and
+// deployments.apps), and verifies that only one copy of each resource is backed
+// up, with preference for the non-"extensions" API group.
 func TestBackupResourceCohabitation(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -523,6 +533,10 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	}
 }
 
+// TestBackupUsesNewCohabitatingResourcesForEachBackup ensures that when two backups are
+// run that each include cohabitating resources, one copy of the relevant resources is
+// backed up in each backup. Verification is done by looking at the contents of the backup
+// tarball. This covers a specific issue that was fixed by https://github.com/heptio/velero/pull/485.
 func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	h := newHarness(t)
 
@@ -550,6 +564,9 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	assertTarballContents(t, backup2File, "metadata/version", "resources/deployments.apps/namespaces/ns-1/deploy-1.json")
 }
 
+// TestBackupResourceOrdering runs backups of the core API group and ensures that items are backed
+// up in the expected order (pods, PVCs, PVs, everything else). Verification is done by looking
+// at the order of files written to the backup tarball.
 func TestBackupResourceOrdering(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -601,6 +618,10 @@ func TestBackupResourceOrdering(t *testing.T) {
 	}
 }
 
+// TestBackupActionsRunsForCorrectItems runs backups with backup item actions, and
+// verifies that each backup item action is run for the correct set of resources based on its
+// AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
+// which records which resources it's executed for.
 func TestBackupActionsRunForCorrectItems(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -775,6 +796,10 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 	}
 }
 
+// TestBackupWithInvalidActions runs backups with backup item actions that are invalid
+// in some way (e.g. an invalid label selector returned from AppliesTo(), an error returned
+// from AppliesTo()) and verifies that this causes the backupper.Backup(...) method to
+// return an error.
 func TestBackupWithInvalidActions(t *testing.T) {
 	// all test cases in this function are expected to cause the method under test
 	// to return an error, so no expected results need to be set up.
@@ -851,6 +876,10 @@ func (a *appliesToErrorAction) Execute(item runtime.Unstructured, backup *velero
 	panic("not implemented")
 }
 
+// TestBackupActionModifications runs backups with backup item actions that make modifications
+// to items in their Execute(...) methods and verifies that these modifications are
+// persisted to the backup tarball. Verification is done by inspecting the file contents
+// of the tarball.
 func TestBackupActionModifications(t *testing.T) {
 	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
 	// method modifies the item being passed in by calling the 'modify' function on it.
@@ -971,6 +1000,10 @@ func TestBackupActionModifications(t *testing.T) {
 
 }
 
+// TestBackupActionAdditionalItems runs backups with backup item actions that return
+// additional items to be backed up, and verifies that those items are included in the
+// backup tarball as appropriate. Verification is done by looking at the files that exist
+// in the backup tarball.
 func TestBackupActionAdditionalItems(t *testing.T) {
 	tests := []struct {
 		name         string
