@@ -82,6 +82,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		kmsKeyIDKey,
 		s3ForcePathStyleKey,
 		signatureVersionKey,
+		credentialProfileKey,
 	); err != nil {
 		return err
 	}
