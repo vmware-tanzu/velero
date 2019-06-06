@@ -61,6 +61,7 @@ To integrate Velero with GCP, create a Velero-specific [Service Account][15]:
     > If you'll be using Velero to backup multiple clusters with multiple GCS buckets, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
     Then list all accounts and find the `velero` account you just created:
+
     ```bash
     gcloud iam service-accounts list
     ```
