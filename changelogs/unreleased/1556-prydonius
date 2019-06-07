@@ -1,0 +1,1 @@
+fix panic when processing DeleteBackupRequest objects without labels

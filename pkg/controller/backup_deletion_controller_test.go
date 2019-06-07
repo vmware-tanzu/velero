@@ -460,8 +460,10 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		}
 		require.NoError(t, td.sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(snapshotLocation))
 
-		// Clear out req labels to make sure the controller adds them
-		td.req.Labels = make(map[string]string)
+		// Clear out req labels to make sure the controller adds them and does not
+		// panic when encountering a nil Labels map
+		// (https://github.com/heptio/velero/issues/1546)
+		td.req.Labels = nil
 
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {
 			return true, backup, nil

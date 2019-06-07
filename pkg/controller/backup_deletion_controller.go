@@ -229,6 +229,12 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return err
 	}
 
+	// if the request object has no labels defined, initialise an empty map since
+	// we will be updating labels
+	if req.Labels == nil {
+		req.Labels = map[string]string{}
+	}
+
 	// Update status to InProgress and set backup-name label if needed
 	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
 		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
