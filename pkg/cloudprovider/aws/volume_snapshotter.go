@@ -48,8 +48,10 @@ type VolumeSnapshotter struct {
 	ec2 *ec2.EC2
 }
 
-func getSession(config *aws.Config) (*session.Session, error) {
-	sess, err := session.NewSession(config)
+// takes AWS credential config & a profile to create a new session
+func getSession(config *aws.Config, profile string) (*session.Session, error) {
+	sessionOptions := session.Options{Config: *config, Profile: profile}
+	sess, err := session.NewSessionWithOptions(sessionOptions)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -66,18 +68,19 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, regionKey); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, regionKey, credentialProfileKey); err != nil {
 		return err
 	}
 
 	region := config[regionKey]
+	credentialProfile := config[credentialProfileKey]
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)
 	}
 
 	awsConfig := aws.NewConfig().WithRegion(region)
 
-	sess, err := getSession(awsConfig)
+	sess, err := getSession(awsConfig, credentialProfile)
 	if err != nil {
 		return err
 	}
