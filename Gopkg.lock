@@ -225,14 +225,14 @@
   revision = "ca137eb4b4389c9bc6f1a6d887f056bf16c00510"
 
 [[projects]]
-  digest = "1:143aae8d04a6133eea9c6400b90a1f47ae1100b48a1636160aba861d1b26c5b2"
+  digest = "1:980fd2c6afd6c268284d46dd66671771184a4002f6d516492cc596d2ca003543"
   name = "github.com/hashicorp/go-plugin"
   packages = [
     ".",
     "internal/plugin",
   ]
   pruneopts = "NUT"
-  revision = "3f118e8ee104b6f22aeb12453fab56aed1356186"
+  revision = "a1bc61569a26c0f65865932c0d55743b0567c494"
 
 [[projects]]
   branch = "master"

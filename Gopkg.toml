@@ -115,7 +115,7 @@
 
 [[constraint]]
   name = "github.com/hashicorp/go-plugin"
-  revision = "3f118e8ee104b6f22aeb12453fab56aed1356186"
+  revision = "a1bc61569a26c0f65865932c0d55743b0567c494"
 
 [[constraint]]
   name = "github.com/golang/protobuf"
