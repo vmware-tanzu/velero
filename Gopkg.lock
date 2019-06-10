@@ -166,14 +166,6 @@
   version = "v0.4"
 
 [[projects]]
-  branch = "master"
-  digest = "1:e2b86e41f3d669fc36b50d31d32d22c8ac656c75aa5ea89717ce7177e134ff2a"
-  name = "github.com/golang/glog"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
-
-[[projects]]
   digest = "1:a98a0b00720dc3149bf3d0c8d5726188899e5bab2f5072b9a7ef82958fbc98b2"
   name = "github.com/golang/protobuf"
   packages = [
@@ -1071,7 +1063,6 @@
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/evanphx/json-patch",
     "github.com/gobwas/glob",
-    "github.com/golang/glog",
     "github.com/golang/protobuf/proto",
     "github.com/hashicorp/go-hclog",
     "github.com/hashicorp/go-plugin",
@@ -1148,6 +1139,7 @@
     "k8s.io/client-go/tools/remotecommand",
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
+    "k8s.io/klog",
     "k8s.io/kubernetes/pkg/printers",
   ]
   solver-name = "gps-cdcl"
