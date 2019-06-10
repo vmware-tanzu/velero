@@ -86,10 +86,6 @@
 # Third party packages
 #
 [[constraint]]
-  name = "github.com/golang/glog"
-  branch = "master"
-
-[[constraint]]
   name = "github.com/robfig/cron"
   revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 
