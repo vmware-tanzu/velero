@@ -49,6 +49,8 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 		Use:   "server",
 		Short: "Run the velero restic server",
 		Long:  "Run the velero restic server",
+		// hide from list of available commands as this is not used by the CLI user
+		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))

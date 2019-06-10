@@ -150,6 +150,8 @@ func NewCommand() *cobra.Command {
 		Use:   "server",
 		Short: "Run the velero server",
 		Long:  "Run the velero server",
+		// hide from list of available commands as this is not used by the CLI user
+		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
 			// set its output to stdout.
