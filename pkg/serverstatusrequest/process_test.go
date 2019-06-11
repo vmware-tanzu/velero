@@ -17,6 +17,7 @@ limitations under the License.
 package serverstatusrequest
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -164,11 +165,23 @@ func TestProcess(t *testing.T) {
 				assert.Nil(t, res)
 				assert.True(t, apierrors.IsNotFound(err))
 			} else {
+				sortPluginsByKindAndName(tc.expected.Status.Plugins)
+				sortPluginsByKindAndName(res.Status.Plugins)
+				assert.Equal(t, tc.expected.Status.Plugins, res.Status.Plugins)
 				assert.Equal(t, tc.expected, res)
 				assert.Nil(t, err)
 			}
 		})
 	}
+}
+
+func sortPluginsByKindAndName(plugins []velerov1api.PluginInfo) {
+	sort.Slice(plugins, func(i, j int) bool {
+		if plugins[i].Kind != plugins[j].Kind {
+			return plugins[i].Kind < plugins[j].Kind
+		}
+		return plugins[i].Name < plugins[j].Name
+	})
 }
 
 type fakePluginLister struct {
