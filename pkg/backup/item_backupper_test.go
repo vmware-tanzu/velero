@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -222,10 +221,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			itemHookHandler := &mockItemHookHandler{}
 			defer itemHookHandler.AssertExpectations(t)
 			b.itemHookHandler = itemHookHandler
-
-			additionalItemBackupper := &mockItemBackupper{}
-			defer additionalItemBackupper.AssertExpectations(t)
-			b.additionalItemBackupper = additionalItemBackupper
 
 			obj := &unstructured.Unstructured{Object: item}
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePre).Return(nil)
@@ -553,13 +548,4 @@ func (w *fakeTarWriter) Write(data []byte) (int, error) {
 func (w *fakeTarWriter) WriteHeader(header *tar.Header) error {
 	w.headers = append(w.headers, header)
 	return w.writeHeaderError
-}
-
-type mockItemBackupper struct {
-	mock.Mock
-}
-
-func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
-	args := ib.Called(logger, obj, groupResource)
-	return args.Error(0)
 }
