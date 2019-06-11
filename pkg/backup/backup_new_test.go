@@ -31,6 +31,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -51,6 +52,7 @@ import (
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	testutil "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
 
@@ -1700,6 +1702,157 @@ func TestBackupWithSnapshots(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tc.want, tc.req.VolumeSnapshots)
+		})
+	}
+}
+
+// TestBackupWithInvalidHooks runs backups with invalid hook specifications and verifies
+// that an error is returned.
+func TestBackupWithInvalidHooks(t *testing.T) {
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*apiResource
+		want         error
+	}{
+		{
+			name: "hook with invalid label selector causes backup to fail",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-with-invalid-label-selector",
+							LabelSelector: &metav1.LabelSelector{
+								MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOperator("nonexistent-operator"),
+										Values:   []string{"bar"},
+									},
+								},
+							},
+						},
+					},
+				}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("foo", "bar"),
+				),
+			},
+			want: errors.New("\"nonexistent-operator\" is not a valid pod selector operator"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			assert.EqualError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil), tc.want.Error())
+		})
+	}
+}
+
+// TestBackupWithHooks runs backups with valid hook specifications and verifies that the
+// hooks are run. It uses a MockPodCommandExecutor since hooks can't actually be executed
+// in running pods during the unit test. Verification is done by asserting expected method
+// calls on the mock object.
+func TestBackupWithHooks(t *testing.T) {
+	type expectedCall struct {
+		arguments       []interface{}
+		returnArguments []interface{}
+	}
+
+	tests := []struct {
+		name                       string
+		backup                     *velerov1.Backup
+		apiResources               []*apiResource
+		wantExecutePodCommandCalls []*expectedCall
+	}{
+		{
+			name: "base case",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-1",
+							PreHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"ls", "/tmp"},
+									},
+								},
+							},
+						},
+					},
+				}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("foo", "bar"),
+					newPod("zoo", "raz"),
+				),
+			},
+			wantExecutePodCommandCalls: []*expectedCall{
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"foo",         // pod namespace
+						"bar",         // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+						},
+					},
+					returnArguments: []interface{}{nil},
+				},
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"zoo",         // pod namespace
+						"raz",         // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+						},
+					},
+					returnArguments: []interface{}{nil},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h                  = newHarness(t)
+				req                = &Request{Backup: tc.backup}
+				backupFile         = bytes.NewBuffer([]byte{})
+				podCommandExecutor = new(testutil.MockPodCommandExecutor)
+			)
+
+			h.backupper.podCommandExecutor = podCommandExecutor
+			defer podCommandExecutor.AssertExpectations(t)
+
+			for _, expect := range tc.wantExecutePodCommandCalls {
+				podCommandExecutor.On("ExecutePodCommand", expect.arguments...).Return(expect.returnArguments...)
+			}
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+			}
+
+			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil))
 		})
 	}
 }

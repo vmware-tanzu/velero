@@ -170,3 +170,9 @@ func (b *Builder) NoTypeMeta() *Builder {
 	b.backup.TypeMeta = metav1.TypeMeta{}
 	return b
 }
+
+// Hooks sets the Backup's hooks.
+func (b *Builder) Hooks(hooks velerov1api.BackupHooks) *Builder {
+	b.backup.Spec.Hooks = hooks
+	return b
+}
