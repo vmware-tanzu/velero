@@ -147,9 +147,10 @@ func NewCommand() *cobra.Command {
 	)
 
 	var command = &cobra.Command{
-		Use:   "server",
-		Short: "Run the velero server",
-		Long:  "Run the velero server",
+		Use:    "server",
+		Short:  "Run the velero server",
+		Long:   "Run the velero server",
+		Hidden: true,
 		Run: func(c *cobra.Command, args []string) {
 			// go-plugin uses log.Println to log when it's waiting for all plugin processes to complete so we need to
 			// set its output to stdout.
