@@ -45,21 +45,6 @@ const (
 	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 )
 
-// PodHasSnapshotAnnotation returns true if the object has an annotation
-// indicating that there is a restic snapshot for a volume in this pod,
-// or false otherwise.
-// Deprecated: we will stop using pod annotation to determine restic
-// volumes to backup.
-func PodHasSnapshotAnnotation(obj metav1.Object) bool {
-	for key := range obj.GetAnnotations() {
-		if strings.HasPrefix(key, podAnnotationPrefix) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // GetPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
 // of all restic snapshots for this pod.
 // Deprecated: we will stop using pod annotation to determine restic
