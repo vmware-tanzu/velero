@@ -34,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +43,7 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
@@ -49,6 +51,7 @@ import (
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 // TestBackupResourceFiltering runs backups with different combinations
@@ -618,6 +621,51 @@ func TestBackupResourceOrdering(t *testing.T) {
 	}
 }
 
+// recordResourcesAction is a backup item action that can be configured
+// to run for specific resources/namespaces and simply records the items
+// that it is executed for.
+type recordResourcesAction struct {
+	selector        velero.ResourceSelector
+	ids             []string
+	backups         []v1.Backup
+	additionalItems []velero.ResourceIdentifier
+}
+
+func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+	metadata, err := meta.Accessor(item)
+	if err != nil {
+		return item, a.additionalItems, err
+	}
+	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
+	a.backups = append(a.backups, *backup)
+
+	return item, a.additionalItems, nil
+}
+
+func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
+func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
+	a.selector.IncludedResources = append(a.selector.IncludedResources, resource)
+	return a
+}
+
+func (a *recordResourcesAction) ForNamespace(namespace string) *recordResourcesAction {
+	a.selector.IncludedNamespaces = append(a.selector.IncludedNamespaces, namespace)
+	return a
+}
+
+func (a *recordResourcesAction) ForLabelSelector(selector string) *recordResourcesAction {
+	a.selector.LabelSelector = selector
+	return a
+}
+
+func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdentifier) *recordResourcesAction {
+	a.additionalItems = items
+	return a
+}
+
 // TestBackupActionsRunsForCorrectItems runs backups with backup item actions, and
 // verifies that each backup item action is run for the correct set of resources based on its
 // AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
@@ -1154,6 +1202,34 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
+			},
+		},
+		{
+			name:   "if there's an error backing up additional items, the item the action was run for isn't backed up",
+			backup: defaultBackup().Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+					newPod("ns-3", "pod-3"),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					selector: velero.ResourceSelector{IncludedNamespaces: []string{"ns-1"}},
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.Pods, Namespace: "ns-4", Name: "pod-4"},
+							{GroupResource: kuberesource.Pods, Namespace: "ns-5", Name: "pod-5"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/namespaces/ns-3/pod-3.json",
 			},
 		},
 	}

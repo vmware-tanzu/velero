@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,62 +38,9 @@ import (
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/collections"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
-
-var (
-	trueVal      = true
-	falseVal     = false
-	truePointer  = &trueVal
-	falsePointer = &falseVal
-)
-
-// recordResourcesAction is a backup item action that can be configured
-// to run for specific resources/namespaces and simply records the items
-// that it is executed for.
-type recordResourcesAction struct {
-	selector        velero.ResourceSelector
-	ids             []string
-	backups         []v1.Backup
-	additionalItems []velero.ResourceIdentifier
-}
-
-func (a *recordResourcesAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
-	metadata, err := meta.Accessor(item)
-	if err != nil {
-		return item, a.additionalItems, err
-	}
-	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
-	a.backups = append(a.backups, *backup)
-
-	return item, a.additionalItems, nil
-}
-
-func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
-	return a.selector, nil
-}
-
-func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
-	a.selector.IncludedResources = append(a.selector.IncludedResources, resource)
-	return a
-}
-
-func (a *recordResourcesAction) ForNamespace(namespace string) *recordResourcesAction {
-	a.selector.IncludedNamespaces = append(a.selector.IncludedNamespaces, namespace)
-	return a
-}
-
-func (a *recordResourcesAction) ForLabelSelector(selector string) *recordResourcesAction {
-	a.selector.LabelSelector = selector
-	return a
-}
-
-func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdentifier) *recordResourcesAction {
-	a.additionalItems = items
-	return a
-}
 
 var (
 	v1Group = &metav1.APIResourceList{

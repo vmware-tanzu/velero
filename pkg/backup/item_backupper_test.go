@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -46,24 +45,19 @@ import (
 
 func TestBackupItemNoSkips(t *testing.T) {
 	tests := []struct {
-		name                                  string
-		item                                  string
-		namespaceIncludesExcludes             *collections.IncludesExcludes
-		expectError                           bool
-		expectExcluded                        bool
-		expectedTarHeaderName                 string
-		tarWriteError                         bool
-		tarHeaderWriteError                   bool
-		customAction                          bool
-		expectedActionID                      string
-		customActionAdditionalItemIdentifiers []velero.ResourceIdentifier
-		customActionAdditionalItems           []runtime.Unstructured
-		groupResource                         string
-		snapshottableVolumes                  map[string]velerotest.VolumeBackupInfo
-		snapshotError                         error
-		additionalItemError                   error
-		trackedPVCs                           sets.String
-		expectedTrackedPVCs                   sets.String
+		name                      string
+		item                      string
+		namespaceIncludesExcludes *collections.IncludesExcludes
+		expectError               bool
+		expectExcluded            bool
+		expectedTarHeaderName     string
+		tarWriteError             bool
+		tarHeaderWriteError       bool
+		groupResource             string
+		snapshottableVolumes      map[string]velerotest.VolumeBackupInfo
+		snapshotError             error
+		trackedPVCs               sets.String
+		expectedTrackedPVCs       sets.String
 	}{
 		{
 			name:                "tar header write error",
@@ -76,33 +70,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			item:          `{"metadata":{"name":"bar"},"spec":{"color":"green"},"status":{"foo":"bar"}}`,
 			expectError:   true,
 			tarWriteError: true,
-		},
-		{
-			name:                      "action invoked - additional items - error",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"metadata":{"namespace": "myns", "name":"bar"}}`,
-			expectError:               true,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/resource.group/namespaces/myns/bar.json",
-			customAction:              true,
-			expectedActionID:          "myns/bar",
-			customActionAdditionalItemIdentifiers: []velero.ResourceIdentifier{
-				{
-					GroupResource: schema.GroupResource{Group: "g1", Resource: "r1"},
-					Namespace:     "ns1",
-					Name:          "n1",
-				},
-				{
-					GroupResource: schema.GroupResource{Group: "g2", Resource: "r2"},
-					Namespace:     "ns2",
-					Name:          "n2",
-				},
-			},
-			customActionAdditionalItems: []runtime.Unstructured{
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g1/v1","kind":"r1","metadata":{"namespace":"ns1","name":"n1"}}`),
-				velerotest.UnstructuredOrDie(`{"apiVersion":"g2/v1","kind":"r1","metadata":{"namespace":"ns2","name":"n2"}}`),
-			},
-			additionalItemError: errors.New("foo"),
 		},
 		{
 			name:                      "takePVSnapshot is not invoked for PVs when volumeSnapshotter == nil",
@@ -177,7 +144,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				action        *recordResourcesAction
 				backup        = new(Request)
 				groupResource = schema.ParseGroupResource("resource.group")
 				backedUpItems = make(map[itemKey]struct{})
@@ -210,18 +176,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 			if test.tarWriteError {
 				w.writeError = errors.New("error")
-			}
-
-			if test.customAction {
-				action = new(recordResourcesAction).WithAdditionalItems(test.customActionAdditionalItemIdentifiers)
-				backup.ResolvedActions = []resolvedAction{
-					{
-						BackupItemAction:          action,
-						namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-						resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes(groupResource.String()),
-						selector:                  labels.Everything(),
-					},
-				}
 			}
 
 			podCommandExecutor := &velerotest.MockPodCommandExecutor{}
@@ -268,27 +222,9 @@ func TestBackupItemNoSkips(t *testing.T) {
 			defer itemHookHandler.AssertExpectations(t)
 			b.itemHookHandler = itemHookHandler
 
-			additionalItemBackupper := &mockItemBackupper{}
-			defer additionalItemBackupper.AssertExpectations(t)
-			b.additionalItemBackupper = additionalItemBackupper
-
 			obj := &unstructured.Unstructured{Object: item}
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePre).Return(nil)
 			itemHookHandler.On("handleHooks", mock.Anything, groupResource, obj, backup.ResourceHooks, hookPhasePost).Return(nil)
-
-			for i, item := range test.customActionAdditionalItemIdentifiers {
-				if test.additionalItemError != nil && i > 0 {
-					break
-				}
-				itemClient := &velerotest.FakeDynamicClient{}
-				defer itemClient.AssertExpectations(t)
-
-				dynamicFactory.On("ClientForGroupVersionResource", item.GroupResource.WithVersion("").GroupVersion(), metav1.APIResource{Name: item.Resource}, item.Namespace).Return(itemClient, nil)
-
-				itemClient.On("Get", item.Name, metav1.GetOptions{}).Return(test.customActionAdditionalItems[i], nil)
-
-				additionalItemBackupper.On("backupItem", mock.AnythingOfType("*logrus.Entry"), test.customActionAdditionalItems[i], item.GroupResource).Return(test.additionalItemError)
-			}
 
 			err = b.backupItem(velerotest.NewLogger(), obj, groupResource)
 			gotError := err != nil
@@ -328,17 +264,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 			if e, a := item, actual; !reflect.DeepEqual(e, a) {
 				t.Errorf("data: expected %s, got %s", e, a)
-			}
-
-			if test.customAction {
-				if len(action.ids) != 1 {
-					t.Errorf("unexpected custom action ids: %v", action.ids)
-				} else if e, a := test.expectedActionID, action.ids[0]; e != a {
-					t.Errorf("action.ids[0]: expected %s, got %s", e, a)
-				}
-
-				require.Equal(t, 1, len(action.backups), "unexpected custom action backups: %#v", action.backups)
-				assert.Equal(t, backup.Backup, &(action.backups[0]), "backup")
 			}
 
 			if test.snapshottableVolumes != nil {
@@ -623,13 +548,4 @@ func (w *fakeTarWriter) Write(data []byte) (int, error) {
 func (w *fakeTarWriter) WriteHeader(header *tar.Header) error {
 	w.headers = append(w.headers, header)
 	return w.writeHeaderError
-}
-
-type mockItemBackupper struct {
-	mock.Mock
-}
-
-func (ib *mockItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
-	args := ib.Called(logger, obj, groupResource)
-	return args.Error(0)
 }
