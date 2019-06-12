@@ -1,14 +1,14 @@
 ---
 title: Velero is an Open Source Tool to Back up and Migrate Kubernetes Clusters
 # image: https://placehold.it/200x200
-excerpt_separator: <!--more-->
+excerpt: Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud.
 author_name: Velero Team
 # author_avatar: https://placehold.it/64x64
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero Team']
 ---
-Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud.<!--more--> Velero consists of a server process running as a deployment in your Kubernetes cluster and a command-line interface (CLI) with which DevOps teams and platform operators configure scheduled backups, trigger ad-hoc backups, perform restores, and more.
+Velero is an open source tool to safely back up, recover, and migrate Kubernetes clusters and persistent volumes. It works both on premises and in a public cloud. Velero consists of a server process running as a deployment in your Kubernetes cluster and a command-line interface (CLI) with which DevOps teams and platform operators configure scheduled backups, trigger ad-hoc backups, perform restores, and more.
 
 ## What Makes Velero Stand Out?
 Unlike other tools which directly access the Kubernetes etcd database to perform backups and restores, Velero uses the Kubernetes API to capture the state of cluster resources and to restore them when necessary. This API-driven approach has a number of key benefits:
