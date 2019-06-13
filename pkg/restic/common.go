@@ -47,8 +47,7 @@ const (
 
 // GetPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
 // of all restic snapshots for this pod.
-// Deprecated: we will stop using pod annotation to determine restic
-// volumes to backup.
+// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken.
 func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	var res map[string]string
 
@@ -70,8 +69,7 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 
 // SetPodSnapshotAnnotation adds an annotation to a pod to indicate that
 // the specified volume has a restic snapshot with the provided id.
-// Deprecated: we will stop using pod annotation to determine restic
-// volumes to backup.
+// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken.
 func SetPodSnapshotAnnotation(obj metav1.Object, volumeName, snapshotID string) {
 	annotations := obj.GetAnnotations()
 

@@ -1,0 +1,1 @@
+Store restic PodVolumeBackups in obj storage & use tht as source of truth like regular backups.
