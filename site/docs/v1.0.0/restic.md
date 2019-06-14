@@ -30,7 +30,7 @@ Ensure you've [downloaded latest release][3].
 
 To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
-Please note: For some PaaS/CaaS platforms based on Kubernetes, RancherOS and OpenShift for instance, some modifications are required to the restic DaemonSet spec before deploying it.
+Please note: For some PaaS/CaaS platforms based on Kubernetes, RancherOS, OpenShift and Enterprise PKS for instance, some modifications are required to the restic DaemonSet spec before deploying it.
 
 **RancherOS**
 
@@ -79,6 +79,17 @@ $ oc adm policy add-scc-to-user privileged -z velero -n velero
 ```
 
 If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
+
+**Enterprise PKS**
+
+You need to enable the `Allow Privileged` option in your plan configuration so that restic is able to mount the hostpath.
+
+The hostPath should be changed from `/var/lib/kubelet/pods` to `/var/vcap/data/kubelet/pods`
+
+```yaml
+hostPath:
+  path: /var/vcap/data/kubelet/pods
+```
 
 You're now ready to use Velero with restic.
 
