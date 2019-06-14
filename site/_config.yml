@@ -157,7 +157,7 @@ plugins:
   - jekyll-optional-front-matter # Parse Markdown files that do not have front-matter callouts
   - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
   - jekyll-paginate # pagination object for collections (e.g. posts)
-
+  - jekyll-redirect-from
 
 # Include these subdirectories
 include:
