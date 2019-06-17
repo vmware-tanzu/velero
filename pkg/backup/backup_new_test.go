@@ -219,6 +219,54 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "resources with velero.io/exclude-from-backup=true label are not included",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true"),
+					newPod("zoo", "raz"),
+				),
+				deployments(
+					newDeployment("foo", "bar"),
+					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"),
+				),
+				pvs(
+					withLabel(newPV("bar"), "a", "b"),
+					withLabel(newPV("baz"), "velero.io/exclude-from-backup", "true"),
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/persistentvolumes/cluster/bar.json",
+			},
+		},
+		{
+			name: "resources with velero.io/exclude-from-backup=true label are not included even if matching label selector",
+			backup: defaultBackup().
+				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					withLabel(withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true"), "a", "b"),
+					withLabel(newPod("zoo", "raz"), "a", "b"),
+				),
+				deployments(
+					newDeployment("foo", "bar"),
+					withLabel(withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"), "a", "b"),
+				),
+				pvs(
+					withLabel(newPV("bar"), "a", "b"),
+					withLabel(withLabel(newPV("baz"), "a", "b"), "velero.io/exclude-from-backup", "true"),
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/bar.json",
+			},
+		},
+		{
 			name: "should include cluster-scoped resources if backing up subset of namespaces and IncludeClusterResources=true",
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
