@@ -1006,8 +1006,7 @@ func TestBackupActionModifications(t *testing.T) {
 			},
 		},
 		{
-			// TODO this seems like a bug
-			name: "modifications to name and namespace in an action are persisted in JSON but not in filename",
+			name: "modifications to name and namespace in an action are persisted in JSON and in filename",
 			backup: defaultBackup().
 				Backup(),
 			apiResources: []*apiResource{
@@ -1022,7 +1021,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, newPod("ns-1-updated", "pod-1-updated")),
+				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, newPod("ns-1-updated", "pod-1-updated")),
 			},
 		},
 	}
