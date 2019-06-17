@@ -19,17 +19,14 @@ package backup
 import (
 	"archive/tar"
 	"encoding/json"
-	"fmt"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -72,27 +69,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			tarWriteError: true,
 		},
 		{
-			name:                      "takePVSnapshot is not invoked for PVs when volumeSnapshotter == nil",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-		},
-		{
-			name:                      "takePVSnapshot is invoked for PVs when volumeSnapshotter != nil",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
 			name:                      "takePVSnapshot is not invoked for PVs when their claim is tracked in the restic PVC tracker",
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
@@ -104,30 +80,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			// snapshots are expected to be taken.
 			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{},
 			trackedPVCs:          sets.NewString(key("pvc-ns", "pvc"), key("another-pvc-ns", "another-pvc")),
-		},
-		{
-			name:                      "takePVSnapshot is invoked for PVs when their claim is not tracked in the restic PVC tracker",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"claimRef": {"namespace": "pvc-ns", "name": "pvc"}, "awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               false,
-			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/persistentvolumes/cluster/mypv.json",
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-			trackedPVCs: sets.NewString(key("another-pvc-ns", "another-pvc")),
-		},
-		{
-			name:                      "backup fails when takePVSnapshot fails",
-			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
-			item:                      `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:               true,
-			groupResource:             "persistentvolumes",
-			snapshottableVolumes: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {SnapshotID: "snapshot-1", AvailabilityZone: "us-east-1c"},
-			},
-			snapshotError: fmt.Errorf("failure"),
 		},
 		{
 			name:                      "pod's restic PVC volume backups (only) are tracked",
@@ -154,7 +106,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			backup.NamespaceIncludesExcludes = collections.NewIncludesExcludes()
 			backup.ResourceIncludesExcludes = collections.NewIncludesExcludes()
 			backup.SnapshotLocations = []*v1.VolumeSnapshotLocation{
-				new(v1.VolumeSnapshotLocation),
+				newSnapshotLocation("velero", "default", "default"),
 			}
 
 			if test.groupResource != "" {
@@ -186,7 +138,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 			discoveryHelper := velerotest.NewFakeDiscoveryHelper(true, nil)
 
-			volumeSnapshotterGetter := &volumeSnapshotterGetter{}
+			volumeSnapshotterGetter := make(volumeSnapshotterGetter)
 
 			b := (&defaultItemBackupperFactory{}).newItemBackupper(
 				backup,
@@ -208,7 +160,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 					Error:                test.snapshotError,
 				}
 
-				volumeSnapshotterGetter.volumeSnapshotter = volumeSnapshotter
+				volumeSnapshotterGetter["default"] = volumeSnapshotter
 			}
 
 			if test.trackedPVCs != nil {
@@ -289,17 +241,6 @@ func TestBackupItemNoSkips(t *testing.T) {
 			}
 		})
 	}
-}
-
-type volumeSnapshotterGetter struct {
-	volumeSnapshotter velero.VolumeSnapshotter
-}
-
-func (b *volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
-	if b.volumeSnapshotter != nil {
-		return b.volumeSnapshotter, nil
-	}
-	return nil, errors.New("plugin not found")
 }
 
 type addAnnotationAction struct{}
@@ -394,140 +335,6 @@ func TestResticAnnotationsPersist(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.EqualValues(t, expected.Object, actual)
-}
-
-func TestTakePVSnapshot(t *testing.T) {
-	iops := int64(1000)
-
-	tests := []struct {
-		name                   string
-		snapshotEnabled        bool
-		pv                     string
-		ttl                    time.Duration
-		expectError            bool
-		expectedVolumeID       string
-		expectedSnapshotsTaken int
-		volumeInfo             map[string]velerotest.VolumeBackupInfo
-	}{
-		{
-			name:            "snapshot disabled",
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}}`,
-			snapshotEnabled: false,
-		},
-		{
-			name:            "unsupported PV source type",
-			snapshotEnabled: true,
-			pv:              `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"unsupportedPVSource": {}}}`,
-			expectError:     false,
-		},
-		{
-			name:                   "without iops",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {Type: "gp", SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:                   "with iops",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/zone": "us-east-1c"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {Type: "io1", Iops: &iops, SnapshotID: "snap-1", AvailabilityZone: "us-east-1c"},
-			},
-		},
-		{
-			name:             "create snapshot error",
-			snapshotEnabled:  true,
-			pv:               `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv"}, "spec": {"gcePersistentDisk": {"pdName": "pd-abc123"}}}`,
-			expectedVolumeID: "pd-abc123",
-			expectError:      true,
-		},
-		{
-			name:                   "PV with label metadata but no failureDomainZone",
-			snapshotEnabled:        true,
-			pv:                     `{"apiVersion": "v1", "kind": "PersistentVolume", "metadata": {"name": "mypv", "labels": {"failure-domain.beta.kubernetes.io/region": "us-east-1"}}, "spec": {"awsElasticBlockStore": {"volumeID": "aws://us-east-1c/vol-abc123"}}}`,
-			expectError:            false,
-			expectedSnapshotsTaken: 1,
-			expectedVolumeID:       "vol-abc123",
-			ttl:                    5 * time.Minute,
-			volumeInfo: map[string]velerotest.VolumeBackupInfo{
-				"vol-abc123": {Type: "gp", SnapshotID: "snap-1"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			backup := &v1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: v1.DefaultNamespace,
-					Name:      "mybackup",
-				},
-				Spec: v1.BackupSpec{
-					SnapshotVolumes: &test.snapshotEnabled,
-					TTL:             metav1.Duration{Duration: test.ttl},
-				},
-			}
-
-			volumeSnapshotter := &velerotest.FakeVolumeSnapshotter{
-				SnapshottableVolumes: test.volumeInfo,
-				VolumeID:             test.expectedVolumeID,
-			}
-
-			ib := &defaultItemBackupper{
-				backupRequest: &Request{
-					Backup:            backup,
-					SnapshotLocations: []*v1.VolumeSnapshotLocation{new(v1.VolumeSnapshotLocation)},
-				},
-				volumeSnapshotterGetter: &volumeSnapshotterGetter{volumeSnapshotter: volumeSnapshotter},
-			}
-
-			pv, err := velerotest.GetAsMap(test.pv)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			// method under test
-			err = ib.takePVSnapshot(&unstructured.Unstructured{Object: pv}, velerotest.NewLogger())
-
-			gotErr := err != nil
-
-			if e, a := test.expectError, gotErr; e != a {
-				t.Errorf("error: expected %v, got %v", e, a)
-			}
-			if test.expectError {
-				return
-			}
-
-			if !test.snapshotEnabled {
-				// don't need to check anything else if snapshots are disabled
-				return
-			}
-
-			// we should have exactly one snapshot taken
-			require.Equal(t, test.expectedSnapshotsTaken, volumeSnapshotter.SnapshotsTaken.Len())
-
-			if test.expectedSnapshotsTaken > 0 {
-				require.Len(t, ib.backupRequest.VolumeSnapshots, 1)
-				snapshot := ib.backupRequest.VolumeSnapshots[0]
-
-				snapshotID, _ := volumeSnapshotter.SnapshotsTaken.PopAny()
-				assert.Equal(t, snapshotID, snapshot.Status.ProviderSnapshotID)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Type, snapshot.Spec.VolumeType)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].Iops, snapshot.Spec.VolumeIOPS)
-				assert.Equal(t, test.volumeInfo[test.expectedVolumeID].AvailabilityZone, snapshot.Spec.VolumeAZ)
-			}
-		})
-	}
 }
 
 type fakeTarWriter struct {
