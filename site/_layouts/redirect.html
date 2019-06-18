@@ -1,18 +1,13 @@
-{% assign parts = page.redirect.to | split: "/" %}
-{% assign basename = parts.last %}
-{% if basename == 'LATEST' %}
-  {% assign destination = "docs/" | append:site.latest | absolute_url %}
-{% else %}
-  {% assign destination = page.redirect.to %}
-{% endif %}
 <!DOCTYPE html>
-<html lang="en-US">
-  <meta charset="utf-8">
-  <title>Redirecting&hellip;</title>
-  <link rel="canonical" href="{{ destination }}">
-  <meta http-equiv="refresh" content="0; url={{ destination }}">
-  <meta name="robots" content="noindex">
-  <h1>Redirecting&hellip;</h1>
-  <a href="{{ destination }}">Click here if you are not redirected.</a>
-  <script>location="{{ destination }}"</script>
+<html lang="en">
+<head>
+  <meta http-equiv="refresh" content="0; url=/docs/{{ site.latest }}/{{ page.destination }}" />
+  <script type="text/javascript">
+    window.location.href = "/docs/{{ site.latest }}/{{ page.destination }}"
+  </script>
+  <title>Redirecting...</title>
+</head>
+<body>
+Redirecting to {{ page.destination }}. If it doesn't load, click <a href="/docs/{{ site.latest }}/{{ page.destination }}" />here</a>.
+</body>
 </html>

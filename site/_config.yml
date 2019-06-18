@@ -121,6 +121,12 @@ defaults:
       gh: https://github.com/heptio/velero/tree/v0.3.0
       layout: "docs"
 
+page_gen:
+  - data: shortlinks
+    template: redirect
+    name: key
+    dir: docs
+
 collections:
   - contributors
   - casestudies
@@ -158,6 +164,7 @@ plugins:
   - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
   - jekyll-paginate # pagination object for collections (e.g. posts)
   - jekyll-redirect-from
+#  - data_page_generator
 
 # Include these subdirectories
 include:
