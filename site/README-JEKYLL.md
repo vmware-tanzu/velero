@@ -1,3 +1,7 @@
+# Running in Docker
+
+To run this site in a Docker container, you can use `make serve-docs` from the root directory.
+
 # Dependencies for MacOS
 
 Install the following for an easy to use dev environment:

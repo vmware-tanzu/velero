@@ -214,3 +214,11 @@ changelog:
 
 release:
 	hack/goreleaser.sh
+
+serve-docs:
+	docker run \
+	--rm \
+	-v "$$(pwd)/site:/srv/jekyll" \
+	-it -p 4000:4000 \
+	jekyll/jekyll \
+	jekyll serve --livereload
