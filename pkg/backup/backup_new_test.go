@@ -267,6 +267,33 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "resources with velero.io/exclude-from-backup label specified but not 'true' are included",
+			backup: defaultBackup().
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "false"),
+					newPod("zoo", "raz"),
+				),
+				deployments(
+					newDeployment("foo", "bar"),
+					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "1"),
+				),
+				pvs(
+					withLabel(newPV("bar"), "a", "b"),
+					withLabel(newPV("baz"), "velero.io/exclude-from-backup", ""),
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/cluster/bar.json",
+				"resources/persistentvolumes/cluster/baz.json",
+			},
+		},
+		{
 			name: "should include cluster-scoped resources if backing up subset of namespaces and IncludeClusterResources=true",
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
