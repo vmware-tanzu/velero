@@ -1871,6 +1871,9 @@ func newHarness(t *testing.T) *harness {
 }
 
 func withLabel(obj metav1.Object, labelPairs ...string) metav1.Object {
+	if len(labelPairs)%2 != 0 {
+		panic("withLabel requires a series of key-value pairs")
+	}
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
