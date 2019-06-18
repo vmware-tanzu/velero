@@ -249,16 +249,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Backup(),
 			apiResources: []*apiResource{
 				pods(
-					withLabel(withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true"), "a", "b"),
+					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true", "a", "b"),
 					withLabel(newPod("zoo", "raz"), "a", "b"),
 				),
 				deployments(
 					newDeployment("foo", "bar"),
-					withLabel(withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"), "a", "b"),
+					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true", "a", "b"),
 				),
 				pvs(
 					withLabel(newPV("bar"), "a", "b"),
-					withLabel(withLabel(newPV("baz"), "a", "b"), "velero.io/exclude-from-backup", "true"),
+					withLabel(newPV("baz"), "a", "b", "velero.io/exclude-from-backup", "true"),
 				),
 			},
 			want: []string{
@@ -1870,12 +1870,14 @@ func newHarness(t *testing.T) *harness {
 	}
 }
 
-func withLabel(obj metav1.Object, key, val string) metav1.Object {
+func withLabel(obj metav1.Object, labelPairs ...string) metav1.Object {
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = make(map[string]string)
 	}
-	labels[key] = val
+	for i := 0; i < len(labelPairs); i += 2 {
+		labels[labelPairs[i]] = labelPairs[i+1]
+	}
 	obj.SetLabels(labels)
 
 	return obj
