@@ -210,12 +210,12 @@ func (_m *BackupStore) ListBackups() ([]string, error) {
 }
 
 // PutBackup provides a mock function with given fields: name, metadata, contents, log, volumeSnapshots
-func (_m *BackupStore) PutBackup(name string, metadata io.Reader, contents io.Reader, log io.Reader, volumeSnapshots io.Reader) error {
-	ret := _m.Called(name, metadata, contents, log, volumeSnapshots)
+func (_m *BackupStore) PutBackup(name string, metadata io.Reader, contents io.Reader, log io.Reader, podVolumeBackup, volumeSnapshots io.Reader) error {
+	ret := _m.Called(name, metadata, contents, log, podVolumeBackup, volumeSnapshots)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, io.Reader, io.Reader, io.Reader, io.Reader) error); ok {
-		r0 = rf(name, metadata, contents, log, volumeSnapshots)
+	if rf, ok := ret.Get(0).(func(string, io.Reader, io.Reader, io.Reader, io.Reader, io.Reader) error); ok {
+		r0 = rf(name, metadata, contents, log, podVolumeBackup, volumeSnapshots)
 	} else {
 		r0 = ret.Error(0)
 	}

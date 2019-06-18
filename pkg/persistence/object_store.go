@@ -43,7 +43,7 @@ type BackupStore interface {
 
 	ListBackups() ([]string, error)
 
-	PutBackup(name string, metadata, contents, log, volumeSnapshots io.Reader) error
+	PutBackup(name string, metadata, contents, log, podVolumeBackup, volumeSnapshots io.Reader) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
@@ -166,7 +166,7 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 	return output, nil
 }
 
-func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volumeSnapshots io.Reader) error {
+func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, podVolumeBackup, volumeSnapshots io.Reader) error {
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(name), log); err != nil {
 		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 		// backup's status.
@@ -188,6 +188,18 @@ func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, volu
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(name), contents); err != nil {
 		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
 		return kerrors.NewAggregate([]error{err, deleteErr})
+	}
+
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupPodVolumesKey(name), podVolumeBackup); err != nil {
+		errs := []error{err}
+
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(name))
+		errs = append(errs, deleteErr)
+
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
+		errs = append(errs, deleteErr)
+
+		return kerrors.NewAggregate(errs)
 	}
 
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(name), volumeSnapshots); err != nil {

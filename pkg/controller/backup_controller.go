@@ -24,6 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -58,6 +59,7 @@ type backupController struct {
 
 	backupper                pkgbackup.Backupper
 	lister                   listers.BackupLister
+	listerPodVolumes         listers.PodVolumeBackupLister
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
@@ -74,6 +76,7 @@ type backupController struct {
 
 func NewBackupController(
 	backupInformer informers.BackupInformer,
+	podVolumeBackupInformer informers.PodVolumeBackupInformer,
 	client velerov1client.BackupsGetter,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
@@ -91,6 +94,7 @@ func NewBackupController(
 		genericController:        newGenericController("backup", logger),
 		backupper:                backupper,
 		lister:                   backupInformer.Lister(),
+		listerPodVolumes:         podVolumeBackupInformer.Lister(),
 		client:                   client,
 		clock:                    &clock.RealClock{},
 		backupLogLevel:           backupLogLevel,
@@ -527,6 +531,34 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
 	}
 
+	// Find and add the PodVolumeBackup after the backup is processed
+	podVolumeBackups, err := c.listerPodVolumes.PodVolumeBackups(backup.Namespace).List(labels.Everything())
+	if err != nil {
+		return errors.Wrap(err, "error getting pod volume backups")
+	}
+
+	var podVolumeBackupName string
+	for _, podVolumeBackup := range podVolumeBackups {
+		res := strings.Split(podVolumeBackup.Name, "-")
+		if backup.Name == res[0] {
+			podVolumeBackupName = podVolumeBackup.Name
+			break
+		}
+	}
+
+	if podVolumeBackupName != "" {
+		c.logger.Info("getting pod volume backup ", podVolumeBackupName)
+		podVolumeBackup, err := c.listerPodVolumes.PodVolumeBackups(backup.Namespace).Get(podVolumeBackupName)
+		if apierrors.IsNotFound(err) {
+			c.logger.Warnf("pod volume backup %s expected but not found", podVolumeBackupName)
+			return nil
+		}
+		if err != nil {
+			return errors.Wrap(err, "error getting pod volume backup")
+		}
+		backup.PodVolumeBackup = podVolumeBackup
+	}
+
 	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
@@ -576,6 +608,17 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
 	}
 
+	podVolumeBackup := new(bytes.Buffer)
+	gzw = gzip.NewWriter(podVolumeBackup)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackup); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding pod volume backup"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
 	if len(errs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
@@ -583,7 +626,7 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		volumeSnapshots = nil
 	}
 
-	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, volumeSnapshots); err != nil {
+	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, podVolumeBackup, volumeSnapshots); err != nil {
 		errs = append(errs, err)
 	}
 

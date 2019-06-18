@@ -10,6 +10,7 @@ import (
 // materialized (e.g. backup/snapshot locations, includes/excludes, etc.)
 type Request struct {
 	*velerov1api.Backup
+	PodVolumeBackup *velerov1api.PodVolumeBackup
 
 	StorageLocation           *velerov1api.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation

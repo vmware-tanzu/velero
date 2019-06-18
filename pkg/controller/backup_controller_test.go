@@ -541,6 +541,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				genericController:      newGenericController("backup-test", logger),
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
+				listerPodVolumes:       sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
@@ -565,7 +566,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 			}
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
-			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
