@@ -206,6 +206,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	if metadata, err = meta.Accessor(obj); err != nil {
 		return errors.WithStack(err)
 	}
+	// update name and namespace in case they were modified in an action
+	name = metadata.GetName()
+	namespace = metadata.GetNamespace()
 
 	if groupResource == kuberesource.PersistentVolumes {
 		if err := ib.takePVSnapshot(obj, log); err != nil {
