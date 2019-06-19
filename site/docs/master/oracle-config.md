@@ -232,8 +232,7 @@ After creating the Velero server in your cluster, try this example:
    An error occurred: backups.velero.io "nginx-backup" not found
 
    $ velero backup get 
-   NAME     STATUS      CREATED     EXPIRES     STORAGE     LOCATION        SELECTOR
-   
+   NAME     STATUS      CREATED     EXPIRES     STORAGE     LOCATION        SELECTOR 
     ```
 
 
