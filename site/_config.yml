@@ -164,7 +164,6 @@ plugins:
   - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
   - jekyll-paginate # pagination object for collections (e.g. posts)
   - jekyll-redirect-from
-#  - data_page_generator
 
 # Include these subdirectories
 include:
