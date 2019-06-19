@@ -235,7 +235,7 @@ After creating the Velero server in your cluster, try this example:
    ```
    $ velero backup get 
    NAME     STATUS      CREATED     EXPIRES     STORAGE     LOCATION        SELECTOR 
-    ```
+   ```
 
 
 
