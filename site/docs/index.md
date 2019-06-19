@@ -1,0 +1,4 @@
+---
+redirect_to:
+- LATEST
+---
