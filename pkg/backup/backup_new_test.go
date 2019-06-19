@@ -1776,9 +1776,10 @@ func TestBackupWithHooks(t *testing.T) {
 		backup                     *velerov1.Backup
 		apiResources               []*apiResource
 		wantExecutePodCommandCalls []*expectedCall
+		wantBackedUp               []string
 	}{
 		{
-			name: "base case",
+			name: "pre hook with no resource filters runs for all pods",
 			backup: defaultBackup().
 				Hooks(velerov1.BackupHooks{
 					Resources: []velerov1.BackupResourceHookSpec{
@@ -1797,8 +1798,8 @@ func TestBackupWithHooks(t *testing.T) {
 				Backup(),
 			apiResources: []*apiResource{
 				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1806,8 +1807,8 @@ func TestBackupWithHooks(t *testing.T) {
 					arguments: []interface{}{
 						mock.Anything, // logger
 						mock.Anything, // pod
-						"foo",         // pod namespace
-						"bar",         // pod name
+						"ns-1",        // pod namespace
+						"pod-1",       // pod name
 						"hook-1",      // hook name
 						&velerov1.ExecHook{
 							Command: []string{"ls", "/tmp"},
@@ -1819,8 +1820,8 @@ func TestBackupWithHooks(t *testing.T) {
 					arguments: []interface{}{
 						mock.Anything, // logger
 						mock.Anything, // pod
-						"zoo",         // pod namespace
-						"raz",         // pod name
+						"ns-2",        // pod namespace
+						"pod-2",       // pod name
 						"hook-1",      // hook name
 						&velerov1.ExecHook{
 							Command: []string{"ls", "/tmp"},
@@ -1828,6 +1829,126 @@ func TestBackupWithHooks(t *testing.T) {
 					},
 					returnArguments: []interface{}{nil},
 				},
+			},
+			wantBackedUp: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/namespaces/ns-2/pod-2.json",
+			},
+		},
+		{
+			name: "post hook with no resource filters runs for all pods",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-1",
+							PostHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"ls", "/tmp"},
+									},
+								},
+							},
+						},
+					},
+				}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+			},
+			wantExecutePodCommandCalls: []*expectedCall{
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"ns-1",        // pod namespace
+						"pod-1",       // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+						},
+					},
+					returnArguments: []interface{}{nil},
+				},
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"ns-2",        // pod namespace
+						"pod-2",       // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+						},
+					},
+					returnArguments: []interface{}{nil},
+				},
+			},
+			wantBackedUp: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/namespaces/ns-2/pod-2.json",
+			},
+		},
+		{
+			name: "item is not backed up if hook returns an error when OnError=Fail",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-1",
+							PreHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"ls", "/tmp"},
+										OnError: velerov1.HookErrorModeFail,
+									},
+								},
+							},
+						},
+					},
+				}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+					newPod("ns-2", "pod-2"),
+				),
+			},
+			wantExecutePodCommandCalls: []*expectedCall{
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"ns-1",        // pod namespace
+						"pod-1",       // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+							OnError: velerov1.HookErrorModeFail,
+						},
+					},
+					returnArguments: []interface{}{errors.New("exec hook error")},
+				},
+				{
+					arguments: []interface{}{
+						mock.Anything, // logger
+						mock.Anything, // pod
+						"ns-2",        // pod namespace
+						"pod-2",       // pod name
+						"hook-1",      // hook name
+						&velerov1.ExecHook{
+							Command: []string{"ls", "/tmp"},
+							OnError: velerov1.HookErrorModeFail,
+						},
+					},
+					returnArguments: []interface{}{nil},
+				},
+			},
+			wantBackedUp: []string{
+				"resources/pods/namespaces/ns-2/pod-2.json",
 			},
 		},
 	}
@@ -1853,6 +1974,8 @@ func TestBackupWithHooks(t *testing.T) {
 			}
 
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil))
+
+			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
 		})
 	}
 }
