@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgclient "github.com/heptio/velero/pkg/client"
@@ -1961,15 +1960,4 @@ func (r *fakeAction) Execute(input *velero.RestoreItemActionExecuteInput) (*vele
 	}
 
 	return velero.NewRestoreItemActionExecuteOutput(res), nil
-}
-
-type fakeNamespaceClient struct {
-	createdNamespaces []*v1.Namespace
-
-	corev1.NamespaceInterface
-}
-
-func (nsc *fakeNamespaceClient) Create(ns *v1.Namespace) (*v1.Namespace, error) {
-	nsc.createdNamespaces = append(nsc.createdNamespaces, ns)
-	return ns, nil
 }
