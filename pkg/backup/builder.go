@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -66,6 +68,25 @@ func (b *Builder) Name(name string) *Builder {
 	return b
 }
 
+// Labels sets the Backup's labels.
+func (b *Builder) Labels(vals ...string) *Builder {
+	if b.backup.Labels == nil {
+		b.backup.Labels = map[string]string{}
+	}
+
+	// if we don't have an even number of values, e.g. a key and a value
+	// for each pair, add an empty-string value at the end to serve as
+	// the default value for the last key.
+	if len(vals)%2 != 0 {
+		vals = append(vals, "")
+	}
+
+	for i := 0; i < len(vals); i += 2 {
+		b.backup.Labels[vals[i]] = vals[i+1]
+	}
+	return b
+}
+
 // IncludedNamespaces sets the Backup's included namespaces.
 func (b *Builder) IncludedNamespaces(namespaces ...string) *Builder {
 	b.backup.Spec.IncludedNamespaces = namespaces
@@ -105,5 +126,47 @@ func (b *Builder) LabelSelector(selector *metav1.LabelSelector) *Builder {
 // SnapshotVolumes sets the Backup's "snapshot volumes" flag.
 func (b *Builder) SnapshotVolumes(val bool) *Builder {
 	b.backup.Spec.SnapshotVolumes = &val
+	return b
+}
+
+// Phase sets the Backup's phase.
+func (b *Builder) Phase(phase velerov1api.BackupPhase) *Builder {
+	b.backup.Status.Phase = phase
+	return b
+}
+
+// StorageLocation sets the Backup's storage location.
+func (b *Builder) StorageLocation(location string) *Builder {
+	b.backup.Spec.StorageLocation = location
+	return b
+}
+
+// VolumeSnapshotLocations sets the Backup's volume snapshot locations.
+func (b *Builder) VolumeSnapshotLocations(locations ...string) *Builder {
+	b.backup.Spec.VolumeSnapshotLocations = locations
+	return b
+}
+
+// TTL sets the Backup's TTL.
+func (b *Builder) TTL(ttl time.Duration) *Builder {
+	b.backup.Spec.TTL.Duration = ttl
+	return b
+}
+
+// Expiration sets the Backup's expiration.
+func (b *Builder) Expiration(val time.Time) *Builder {
+	b.backup.Status.Expiration.Time = val
+	return b
+}
+
+// StartTimestamp sets the Backup's start timestamp.
+func (b *Builder) StartTimestamp(val time.Time) *Builder {
+	b.backup.Status.StartTimestamp.Time = val
+	return b
+}
+
+// NoTypeMeta removes the type meta from the Backup.
+func (b *Builder) NoTypeMeta() *Builder {
+	b.backup.TypeMeta = metav1.TypeMeta{}
 	return b
 }
