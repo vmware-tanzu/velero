@@ -38,10 +38,11 @@ func (c *DiscoveryClient) ServerPreferredResources() ([]*metav1.APIResourceList,
 // TEST HELPERS
 //
 
-func (c *DiscoveryClient) WithResource(group, version, resource string, namespaced bool, shortNames ...string) *DiscoveryClient {
+// WithAPIResource adds the API resource to the discovery client.
+func (c *DiscoveryClient) WithAPIResource(resource *APIResource) *DiscoveryClient {
 	gv := metav1.GroupVersion{
-		Group:   group,
-		Version: version,
+		Group:   resource.Group,
+		Version: resource.Version,
 	}
 
 	var resourceList *metav1.APIResourceList
@@ -61,20 +62,20 @@ func (c *DiscoveryClient) WithResource(group, version, resource string, namespac
 	}
 
 	for _, itm := range resourceList.APIResources {
-		if itm.Name == resource {
+		if itm.Name == resource.Name {
 			return c
 		}
 	}
 
 	resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{
-		Name:         resource,
-		SingularName: strings.TrimSuffix(resource, "s"),
-		Namespaced:   namespaced,
-		Group:        group,
-		Version:      version,
-		Kind:         strings.Title(strings.TrimSuffix(resource, "s")),
+		Name:         resource.Name,
+		SingularName: strings.TrimSuffix(resource.Name, "s"),
+		Namespaced:   resource.Namespaced,
+		Group:        resource.Group,
+		Version:      resource.Version,
+		Kind:         strings.Title(strings.TrimSuffix(resource.Name, "s")),
 		Verbs:        metav1.Verbs([]string{"list", "create", "get", "delete"}),
-		ShortNames:   shortNames,
+		ShortNames:   []string{resource.ShortName},
 	})
 
 	return c
