@@ -196,16 +196,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Backup(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					withLabel(test.NewPod("foo", "bar"), "a", "b"),
+					test.NewPod("foo", "bar", test.WithLabels("a", "b")),
 					test.NewPod("zoo", "raz"),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
-					withLabel(test.NewDeployment("zoo", "raz"), "a", "b"),
+					test.NewDeployment("zoo", "raz", test.WithLabels("a", "b")),
 				),
 				test.PVs(
-					withLabel(test.NewPV("bar"), "a", "b"),
-					withLabel(test.NewPV("baz"), "a", "c"),
+					test.NewPV("bar", test.WithLabels("a", "b")),
+					test.NewPV("baz", test.WithLabels("a", "c")),
 				),
 			},
 			want: []string{
@@ -220,16 +220,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Backup(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "true"),
+					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true")),
 					test.NewPod("zoo", "raz"),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
-					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"),
+					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true")),
 				),
 				test.PVs(
-					withLabel(test.NewPV("bar"), "a", "b"),
-					withLabel(test.NewPV("baz"), "velero.io/exclude-from-backup", "true"),
+					test.NewPV("bar", test.WithLabels("a", "b")),
+					test.NewPV("baz", test.WithLabels("velero.io/exclude-from-backup", "true")),
 				),
 			},
 			want: []string{
@@ -245,16 +245,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Backup(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "true", "a", "b"),
-					withLabel(test.NewPod("zoo", "raz"), "a", "b"),
+					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
+					test.NewPod("zoo", "raz", test.WithLabels("a", "b")),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
-					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true", "a", "b"),
+					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
 				),
 				test.PVs(
-					withLabel(test.NewPV("bar"), "a", "b"),
-					withLabel(test.NewPV("baz"), "a", "b", "velero.io/exclude-from-backup", "true"),
+					test.NewPV("bar", test.WithLabels("a", "b")),
+					test.NewPV("baz", test.WithLabels("a", "b", "velero.io/exclude-from-backup", "true")),
 				),
 			},
 			want: []string{
@@ -268,16 +268,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Backup(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "false"),
+					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "false")),
 					test.NewPod("zoo", "raz"),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
-					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "1"),
+					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "1")),
 				),
 				test.PVs(
-					withLabel(test.NewPV("bar"), "a", "b"),
-					withLabel(test.NewPV("baz"), "velero.io/exclude-from-backup", ""),
+					test.NewPV("bar", test.WithLabels("a", "b")),
+					test.NewPV("baz", test.WithLabels("velero.io/exclude-from-backup", "")),
 				),
 			},
 			want: []string{
@@ -1042,7 +1042,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, withLabel(test.NewPod("ns-1", "pod-1"), "updated", "true")),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, test.NewPod("ns-1", "pod-1", test.WithLabels("updated", "true"))),
 			},
 		},
 		{
@@ -1050,7 +1050,7 @@ func TestBackupActionModifications(t *testing.T) {
 			backup: defaultBackup().Backup(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					withLabel(test.NewPod("ns-1", "pod-1"), "should-be-removed", "true"),
+					test.NewPod("ns-1", "pod-1", test.WithLabels("should-be-removed", "true")),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1509,7 +1509,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					withLabel(test.NewPV("pv-1"), "failure-domain.beta.kubernetes.io/zone", "zone-1"),
+					test.NewPV("pv-1", test.WithLabels("failure-domain.beta.kubernetes.io/zone", "zone-1")),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -2086,22 +2086,6 @@ func newHarness(t *testing.T) *harness {
 		},
 		log: log,
 	}
-}
-
-func withLabel(obj metav1.Object, labelPairs ...string) metav1.Object {
-	if len(labelPairs)%2 != 0 {
-		panic("withLabel requires a series of key-value pairs")
-	}
-	labels := obj.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	for i := 0; i < len(labelPairs); i += 2 {
-		labels[labelPairs[i]] = labelPairs[i+1]
-	}
-	obj.SetLabels(labels)
-
-	return obj
 }
 
 func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLocation {

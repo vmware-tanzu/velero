@@ -29,12 +29,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/test"
@@ -42,7 +42,13 @@ import (
 	testutil "github.com/heptio/velero/pkg/util/test"
 )
 
-func TestRestoreNew(t *testing.T) {
+// TestRestoreResourceFiltering runs restores with different combinations
+// of resource filters (included/excluded resources, included/excluded
+// namespaces, label selectors, "include cluster resources" flag), and
+// verifies that the set of items created in the API are correct.
+// Validation is done by looking at the namespaces/names of the items in
+// the API; contents are not checked.
+func TestRestoreResourceFiltering(t *testing.T) {
 	tests := []struct {
 		name         string
 		restore      *velerov1api.Restore
@@ -52,34 +58,427 @@ func TestRestoreNew(t *testing.T) {
 		want         map[*test.APIResource][]string
 	}{
 		{
-			name:    "base case - restore a single resource",
-			restore: defaultRestore().Backup("backup-1").Restore(),
-			backup:  backup.NewNamedBuilder(velerov1api.DefaultNamespace, "backup-1").Backup(),
+			name:    "no filters restores everything",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				add("metadata/version", []byte("1")).
-				add("resources/pods/namespaces/ns-1/pod-1.json", test.NewPod("ns-1", "pod-1")).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
 				done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
+				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-1/pod-1"},
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():  {"/pv-1", "/pv-2"},
 			},
 		},
 		{
-			name:    "restore a resource to a remapped namespace",
-			restore: defaultRestore().Backup("backup-1").NamespaceMappings("ns-1", "ns-2").Restore(),
-			backup:  backup.NewNamedBuilder(velerov1api.DefaultNamespace, "backup-1").Backup(),
+			name:    "included resources filter only restores resources of those types",
+			restore: defaultRestore().IncludedResources("pods").Restore(),
+			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				add("metadata/version", []byte("1")).
-				add("resources/pods/namespaces/ns-1/pod-1.json", test.NewPod("ns-1", "pod-1")).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
 				done(),
 			apiResources: []*test.APIResource{
 				test.Pods(),
+				test.PVs(),
 			},
 			want: map[*test.APIResource][]string{
-				test.Pods(): {"ns-2/pod-1"},
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
 			},
+		},
+		{
+			name:    "excluded resources filter only restores resources not of those types",
+			restore: defaultRestore().ExcludedResources("pvs").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "included namespaces filter only restores resources in those namespaces",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+			},
+		},
+		{
+			name:    "excluded namespaces filter only restores resources not in those namespaces",
+			restore: defaultRestore().ExcludedNamespaces("ns-2").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+			},
+		},
+		{
+			name:    "IncludeClusterResources=false only restores namespaced resources",
+			restore: defaultRestore().IncludeClusterResources(false).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+			},
+		},
+		{
+			name:    "label selector only restores matching resources",
+			restore: defaultRestore().LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1", test.WithLabels("a", "b")),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2", test.WithLabels("a", "b")),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1", test.WithLabels("a", "b")),
+					test.NewPV("pv-2", test.WithLabels("a", "c")),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-2/deploy-2"},
+				test.PVs():         {"/pv-1"},
+			},
+		},
+		{
+			name:    "should include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=true",
+			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(true).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=false",
+			restore: defaultRestore().IncludedNamespaces("ns-1").IncludeClusterResources(false).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+			},
+		},
+		{
+			name:    "should include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=true",
+			restore: defaultRestore().IncludeClusterResources(true).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "should not include cluster-scoped resources if restoring all namespaces and IncludeClusterResources=false",
+			restore: defaultRestore().IncludeClusterResources(false).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+			},
+		},
+		{
+			name:    "when a wildcard and a specific resource are included, the wildcard takes precedence",
+			restore: defaultRestore().IncludedResources("*", "pods").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "wildcard excludes are ignored",
+			restore: defaultRestore().ExcludedResources("*").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1", "ns-2/pod-2"},
+				test.Deployments(): {"ns-1/deploy-1", "ns-2/deploy-2"},
+				test.PVs():         {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:    "unresolvable included resources are ignored",
+			restore: defaultRestore().IncludedResources("pods", "unresolvable").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "unresolvable excluded resources are ignored",
+			restore: defaultRestore().ExcludedResources("deployments", "unresolvable").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
+				test.PVs():  {"/pv-1", "/pv-2"},
+			},
+		},
+		{
+			name:         "mirror pods are not restored",
+			restore:      defaultRestore().Restore(),
+			backup:       defaultBackup().Backup(),
+			tarball:      newTarWriter(t).addItems("pods", test.NewPod("ns-1", "pod-1", test.WithAnnotations(corev1api.MirrorPodAnnotationKey, "foo"))).done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			want:         map[*test.APIResource][]string{test.Pods(): {}},
+		},
+		{
+			name:         "service accounts are restored",
+			restore:      defaultRestore().Restore(),
+			backup:       defaultBackup().Backup(),
+			tarball:      newTarWriter(t).addItems("serviceaccounts", test.NewServiceAccount("ns-1", "sa-1")).done(),
+			apiResources: []*test.APIResource{test.ServiceAccounts()},
+			want:         map[*test.APIResource][]string{test.ServiceAccounts(): {"ns-1/sa-1"}},
 		},
 	}
 
@@ -110,7 +509,7 @@ func TestRestoreNew(t *testing.T) {
 }
 
 func defaultRestore() *Builder {
-	return NewNamedBuilder(velerov1api.DefaultNamespace, "restore-1")
+	return NewNamedBuilder(velerov1api.DefaultNamespace, "restore-1").Backup("backup-1")
 }
 
 // assertAPIContents asserts that the dynamic client on the provided harness contains
@@ -156,6 +555,24 @@ func newTarWriter(t *testing.T) *tarWriter {
 	tw.buf = new(bytes.Buffer)
 	tw.gzw = gzip.NewWriter(tw.buf)
 	tw.tw = tar.NewWriter(tw.gzw)
+
+	return tw
+}
+
+func (tw *tarWriter) addItems(groupVersion string, items ...metav1.Object) *tarWriter {
+	tw.t.Helper()
+
+	for _, obj := range items {
+
+		var path string
+		if obj.GetNamespace() == "" {
+			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupVersion, obj.GetName())
+		} else {
+			path = fmt.Sprintf("resources/%s/namespaces/%s/%s.json", groupVersion, obj.GetNamespace(), obj.GetName())
+		}
+
+		tw.add(path, obj)
+	}
 
 	return tw
 }

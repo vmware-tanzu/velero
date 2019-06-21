@@ -123,96 +123,6 @@ func TestPrioritizeResources(t *testing.T) {
 	}
 }
 
-func TestRestoreNamespaceFiltering(t *testing.T) {
-	tests := []struct {
-		name                 string
-		fileSystem           *velerotest.FakeFileSystem
-		baseDir              string
-		restore              *api.Restore
-		expectedReadDirs     []string
-		prioritizedResources []schema.GroupResource
-	}{
-		{
-			name:             "namespacesToRestore having * restores all namespaces",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:             "namespacesToRestore properly filters",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"b", "c"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:             "namespacesToRestore properly filters with exclusion filter",
-			fileSystem:       velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:          "bak",
-			restore:          &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, ExcludedNamespaces: []string{"a"}}},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-		{
-			name:       "namespacesToRestore properly filters with inclusion & exclusion filters",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectories("bak/resources/nodes/cluster", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/b", "bak/resources/secrets/namespaces/c"),
-			baseDir:    "bak",
-			restore: &api.Restore{
-				Spec: api.RestoreSpec{
-					IncludedNamespaces: []string{"a", "b", "c"},
-					ExcludedNamespaces: []string{"b"},
-				},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/nodes/cluster", "bak/resources/secrets/namespaces", "bak/resources/secrets/namespaces/a", "bak/resources/secrets/namespaces/c"},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "nodes"},
-				{Resource: "secrets"},
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			log := velerotest.NewLogger()
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-
-			ctx := &context{
-				restore:              test.restore,
-				namespaceClient:      nsClient,
-				fileSystem:           test.fileSystem,
-				log:                  log,
-				prioritizedResources: test.prioritizedResources,
-				restoreDir:           test.baseDir,
-			}
-
-			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
-
-			warnings, errors := ctx.restoreFromDir()
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Empty(t, errors.Velero)
-			assert.Empty(t, errors.Cluster)
-			assert.Empty(t, errors.Namespaces)
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
-		})
-	}
-}
-
 func TestRestorePriority(t *testing.T) {
 	tests := []struct {
 		name                 string
@@ -374,13 +284,6 @@ func TestNamespaceRemapping(t *testing.T) {
 }
 
 func TestRestoreResourceForNamespace(t *testing.T) {
-	var (
-		trueVal  = true
-		falseVal = false
-		truePtr  = &trueVal
-		falsePtr = &falseVal
-	)
-
 	tests := []struct {
 		name                    string
 		namespace               string
@@ -392,19 +295,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		expectedErrors          Result
 		expectedObjs            []unstructured.Unstructured
 	}{
-		{
-			name:          "basic normal case",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").ConfigMap,
-				newNamedTestConfigMap("cm-2").ConfigMap,
-			),
-		},
 		{
 			name:         "no such directory causes error",
 			namespace:    "ns-1",
@@ -436,21 +326,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				},
 			},
 			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
-		{
-			name:          "matching label selector correctly includes",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "bar"})),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ConfigMap),
-		},
-		{
-			name:          "non-matching label selector correctly excludes",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.SelectorFromSet(labels.Set(map[string]string{"foo": "not-bar"})),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithLabels(map[string]string{"foo": "bar"}).ToJSON()),
 		},
 		{
 			name:          "namespace is remapped",
@@ -491,111 +366,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				},
 			},
 			expectedObjs: toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are skipped when IncludeClusterResources=false",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: falsePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=false",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: falsePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=true",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: truePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=true",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: truePtr,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "cluster-scoped resources are not skipped when IncludeClusterResources=nil",
-			namespace:               "",
-			resourcePath:            "persistentvolumes",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("persistentvolumes/pv-1.json", newTestPV().ToJSON()),
-			expectedObjs:            toUnstructured(newTestPV().PersistentVolume),
-		},
-		{
-			name:                    "namespaced resources are not skipped when IncludeClusterResources=nil",
-			namespace:               "ns-1",
-			resourcePath:            "configmaps",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			expectedObjs:            toUnstructured(newTestConfigMap().ConfigMap),
-		},
-		{
-			name:                    "serviceaccounts are restored",
-			namespace:               "ns-1",
-			resourcePath:            "serviceaccounts",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem:              velerotest.NewFakeFileSystem().WithFile("serviceaccounts/sa-1.json", newTestServiceAccount().ToJSON()),
-			expectedObjs:            toUnstructured(newTestServiceAccount().ServiceAccount),
-		},
-		{
-			name:                    "non-mirror pods are restored",
-			namespace:               "ns-1",
-			resourcePath:            "pods",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile(
-					"pods/pod.json",
-					NewTestUnstructured().
-						WithAPIVersion("v1").
-						WithKind("Pod").
-						WithNamespace("ns-1").
-						WithName("pod1").
-						ToJSON(),
-				),
-			expectedObjs: []unstructured.Unstructured{
-				*(NewTestUnstructured().
-					WithAPIVersion("v1").
-					WithKind("Pod").
-					WithNamespace("ns-1").
-					WithName("pod1").
-					Unstructured),
-			},
-		},
-		{
-			name:                    "mirror pods are not restored",
-			namespace:               "ns-1",
-			resourcePath:            "pods",
-			labelSelector:           labels.NewSelector(),
-			includeClusterResources: nil,
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile(
-					"pods/pod.json",
-					NewTestUnstructured().
-						WithAPIVersion("v1").
-						WithKind("Pod").
-						WithNamespace("ns-1").
-						WithName("pod1").
-						WithAnnotations(v1.MirrorPodAnnotationKey).
-						ToJSON(),
-				),
 		},
 	}
 
