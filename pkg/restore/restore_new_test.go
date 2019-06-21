@@ -508,6 +508,65 @@ func TestRestoreResourceFiltering(t *testing.T) {
 	}
 }
 
+// TestRestoreNamespaceMapping runs restores with namespace mappings specified,
+// and verifies that the set of items created in the API are in the correct
+// namespaces. Validation is done by looking at the namespaces/names of the items
+// in the API; contents are not checked.
+func TestRestoreNamespaceMapping(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         map[*test.APIResource][]string
+	}{
+		{
+			name:    "namespace mappings are applied",
+			restore: defaultRestore().NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Restore(),
+			backup:  defaultBackup().Backup(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+					test.NewPod("ns-3", "pod-3"),
+				).
+				done(),
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				nil, // volume snapshots
+				tc.tarball,
+				nil, // actions
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
 func defaultRestore() *Builder {
 	return NewNamedBuilder(velerov1api.DefaultNamespace, "restore-1").Backup("backup-1")
 }

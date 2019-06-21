@@ -219,70 +219,6 @@ func TestRestorePriority(t *testing.T) {
 	}
 }
 
-func TestNamespaceRemapping(t *testing.T) {
-	var (
-		baseDir              = "bak"
-		restore              = &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}, NamespaceMapping: map[string]string{"ns-1": "ns-2"}}}
-		prioritizedResources = []schema.GroupResource{{Resource: "namespaces"}, {Resource: "configmaps"}}
-		labelSelector        = labels.NewSelector()
-		fileSystem           = velerotest.NewFakeFileSystem().
-					WithFile("bak/resources/configmaps/namespaces/ns-1/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()).
-					WithFile("bak/resources/namespaces/cluster/ns-1.json", newTestNamespace("ns-1").ToJSON())
-		expectedNS   = "ns-2"
-		expectedObjs = toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap)
-	)
-
-	resourceClient := &velerotest.FakeDynamicClient{}
-	for i := range expectedObjs {
-		addRestoreLabels(&expectedObjs[i], "", "")
-		resourceClient.On("Create", &expectedObjs[i]).Return(&expectedObjs[i], nil)
-	}
-
-	dynamicFactory := &velerotest.FakeDynamicFactory{}
-	resource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-	gv := schema.GroupVersion{Group: "", Version: "v1"}
-	dynamicFactory.On("ClientForGroupVersionResource", gv, resource, expectedNS).Return(resourceClient, nil)
-
-	nsClient := &velerotest.FakeNamespaceClient{}
-
-	ctx := &context{
-		dynamicFactory:       dynamicFactory,
-		fileSystem:           fileSystem,
-		selector:             labelSelector,
-		namespaceClient:      nsClient,
-		prioritizedResources: prioritizedResources,
-		restore:              restore,
-		backup:               &api.Backup{},
-		log:                  velerotest.NewLogger(),
-		applicableActions:    make(map[schema.GroupResource][]resolvedAction),
-		resourceClients:      make(map[resourceClientKey]pkgclient.Dynamic),
-		restoredItems:        make(map[velero.ResourceIdentifier]struct{}),
-		restoreDir:           baseDir,
-	}
-
-	nsClient.On("Get", "ns-2", metav1.GetOptions{}).Return(&v1.Namespace{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "ns-2"))
-	ns := newTestNamespace("ns-2").Namespace
-	nsClient.On("Create", ns).Return(ns, nil)
-
-	warnings, errors := ctx.restoreFromDir()
-
-	assert.Empty(t, warnings.Velero)
-	assert.Empty(t, warnings.Cluster)
-	assert.Empty(t, warnings.Namespaces)
-	assert.Empty(t, errors.Velero)
-	assert.Empty(t, errors.Cluster)
-	assert.Empty(t, errors.Namespaces)
-
-	// ensure the remapped NS (only) was created via the namespaceClient
-	nsClient.AssertExpectations(t)
-
-	// ensure that we did not try to create namespaces via dynamic client
-	dynamicFactory.AssertNotCalled(t, "ClientForGroupVersionResource", gv, metav1.APIResource{Name: "namespaces", Namespaced: true}, "")
-
-	dynamicFactory.AssertExpectations(t)
-	resourceClient.AssertExpectations(t)
-}
-
 func TestRestoreResourceForNamespace(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -326,14 +262,6 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 				},
 			},
 			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
-		{
-			name:          "namespace is remapped",
-			namespace:     "ns-2",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().WithNamespace("ns-1").ToJSON()),
-			expectedObjs:  toUnstructured(newTestConfigMap().WithNamespace("ns-2").ConfigMap),
 		},
 		{
 			name:          "custom restorer is correctly used",
