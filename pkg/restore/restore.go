@@ -1113,18 +1113,6 @@ func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 	obj.SetLabels(labels)
 }
 
-// hasControllerOwner returns whether or not an object has a controller
-// owner ref. Used to identify whether or not an object should be explicitly
-// recreated during a restore.
-func hasControllerOwner(refs []metav1.OwnerReference) bool {
-	for _, ref := range refs {
-		if ref.Controller != nil && *ref.Controller {
-			return true
-		}
-	}
-	return false
-}
-
 // isCompleted returns whether or not an object is considered completed.
 // Used to identify whether or not an object should be restored. Only Jobs or Pods are considered
 func isCompleted(obj *unstructured.Unstructured, groupResource schema.GroupResource) (bool, error) {
