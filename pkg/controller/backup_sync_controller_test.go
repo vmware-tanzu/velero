@@ -126,11 +126,11 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			locations: defaultLocationsList("ns-1"),
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-2").Backup(),
 				},
 				"bucket-2": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-3").Backup(),
 				},
 			},
 		},
@@ -140,12 +140,12 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			locations: defaultLocationsList("velero"),
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-2").Backup(),
 				},
 				"bucket-2": {
-					velerotest.NewTestBackup().WithNamespace("ns-2").WithName("backup-3").Backup,
-					velerotest.NewTestBackup().WithNamespace("velero").WithName("backup-4").Backup,
+					defaultBackup().Namespace("ns-2").Name("backup-3").Backup(),
+					defaultBackup().Namespace("velero").Name("backup-4").Backup(),
 				},
 			},
 		},
@@ -155,19 +155,19 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			locations: defaultLocationsList("ns-1"),
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-2").Backup(),
 				},
 				"bucket-2": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-3").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-4").Backup(),
 				},
 			},
 			existingBackups: []*velerov1api.Backup{
 				// add a label to each existing backup so we can differentiate it from the cloud
 				// backup during verification
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").WithStorageLocation("location-1").Backup,
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel("i-exist", "true").WithStorageLocation("location-2").Backup,
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels("i-exist", "true").StorageLocation("location-1").Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-3").Labels("i-exist", "true").StorageLocation("location-2").Backup(),
 			},
 		},
 		{
@@ -176,13 +176,13 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			locations: defaultLocationsList("ns-1"),
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").Backup(),
 				},
 			},
 			existingBackups: []*velerov1api.Backup{
 				// add a label to each existing backup so we can differentiate it from the cloud
 				// backup during verification
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel("i-exist", "true").Backup,
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels("i-exist", "true").StorageLocation("location-1").Backup(),
 			},
 		},
 		{
@@ -191,11 +191,11 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			locations: defaultLocationsList("ns-1"),
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithStorageLocation("foo").WithLabel(velerov1api.StorageLocationLabel, "foo").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").StorageLocation("foo").Labels(velerov1api.StorageLocationLabel, "foo").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-2").Backup(),
 				},
 				"bucket-2": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithStorageLocation("bar").WithLabel(velerov1api.StorageLocationLabel, "bar").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-3").StorageLocation("bar").Labels(velerov1api.StorageLocationLabel, "bar").Backup(),
 				},
 			},
 		},
@@ -206,11 +206,11 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			longLocationNameEnabled: true,
 			cloudBackups: map[string][]*velerov1api.Backup{
 				"bucket-1": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithStorageLocation("foo").WithLabel(velerov1api.StorageLocationLabel, "foo").Backup,
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-1").StorageLocation("foo").Labels(velerov1api.StorageLocationLabel, "foo").Backup(),
+					defaultBackup().Namespace("ns-1").Name("backup-2").Backup(),
 				},
 				"bucket-2": {
-					velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithStorageLocation("bar").WithLabel(velerov1api.StorageLocationLabel, "bar").Backup,
+					defaultBackup().Namespace("ns-1").Name("backup-3").StorageLocation("bar").Labels(velerov1api.StorageLocationLabel, "bar").Backup(),
 				},
 			},
 		},
@@ -328,7 +328,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 	tests := []struct {
 		name            string
 		cloudBackups    sets.String
-		k8sBackups      []*velerotest.TestBackup
+		k8sBackups      []*velerov1api.Backup
 		namespace       string
 		expectedDeletes sets.String
 	}{
@@ -336,10 +336,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupB").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupC").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backupA").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backupB").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backupC").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
 			},
 			expectedDeletes: sets.NewString("backupA", "backupB", "backupC"),
 		},
@@ -347,10 +347,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "some overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-2").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-C").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
 			},
 			expectedDeletes: sets.NewString("backup-C"),
 		},
@@ -358,10 +358,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "all overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-2").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-3").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
 			},
 			expectedDeletes: sets.NewString(),
 		},
@@ -369,13 +369,13 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no overlapping backups but including backups that are not complete",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backupA").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("Deleting").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseDeleting),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("Failed").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailed),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("FailedValidation").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailedValidation),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("InProgress").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseInProgress),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("New").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseNew),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backupA").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("Deleting").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseDeleting).Backup(),
+				defaultBackup().Namespace("ns-1").Name("Failed").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseFailed).Backup(),
+				defaultBackup().Namespace("ns-1").Name("FailedValidation").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseFailedValidation).Backup(),
+				defaultBackup().Namespace("ns-1").Name("InProgress").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseInProgress).Backup(),
+				defaultBackup().Namespace("ns-1").Name("New").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseNew).Backup(),
 			},
 			expectedDeletes: sets.NewString("backupA"),
 		},
@@ -383,10 +383,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "all overlapping backups and all backups that are not complete",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailed),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseFailedValidation),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-3").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseInProgress),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseFailed).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-2").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseFailedValidation).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-3").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseInProgress).Backup(),
 			},
 			expectedDeletes: sets.NewString(),
 		},
@@ -394,13 +394,14 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 			name:         "no completed backups in other locations are deleted",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").WithLabel(velerov1api.StorageLocationLabel, "default").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-4").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-5").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-6").WithLabel(velerov1api.StorageLocationLabel, "alternate").WithPhase(velerov1api.BackupPhaseCompleted),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backup-1").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-2").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-C").Labels(velerov1api.StorageLocationLabel, "default").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+
+				defaultBackup().Namespace("ns-1").Name("backup-4").Labels(velerov1api.StorageLocationLabel, "alternate").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-5").Labels(velerov1api.StorageLocationLabel, "alternate").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-6").Labels(velerov1api.StorageLocationLabel, "alternate").Phase(velerov1api.BackupPhaseCompleted).Backup(),
 			},
 			expectedDeletes: sets.NewString("backup-C"),
 		},
@@ -429,10 +430,10 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 
 			for _, backup := range test.k8sBackups {
 				// add test backup to informer
-				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup.Backup), "Error adding backup to informer")
+				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup), "Error adding backup to informer")
 
 				// add test backup to client
-				_, err := client.VeleroV1().Backups(test.namespace).Create(backup.Backup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(backup)
 				require.NoError(t, err, "Error adding backup to clientset")
 
 				// if we expect this backup to be deleted, set up the expected DeleteAction
@@ -464,7 +465,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 	tests := []struct {
 		name            string
 		cloudBackups    sets.String
-		k8sBackups      []*velerotest.TestBackup
+		k8sBackups      []*velerov1api.Backup
 		namespace       string
 		expectedDeletes sets.String
 	}{
@@ -472,13 +473,13 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 			name:         "some overlapping backups",
 			namespace:    "ns-1",
 			cloudBackups: sets.NewString("backup-1", "backup-2", "backup-3"),
-			k8sBackups: []*velerotest.TestBackup{
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-1").
-					WithLabel(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-2").
-					WithLabel(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").WithPhase(velerov1api.BackupPhaseCompleted),
-				velerotest.NewTestBackup().WithNamespace("ns-1").WithName("backup-C").
-					WithLabel(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").WithPhase(velerov1api.BackupPhaseCompleted),
+			k8sBackups: []*velerov1api.Backup{
+				defaultBackup().Namespace("ns-1").Name("backup-1").
+					Labels(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-2").
+					Labels(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").Phase(velerov1api.BackupPhaseCompleted).Backup(),
+				defaultBackup().Namespace("ns-1").Name("backup-C").
+					Labels(velerov1api.StorageLocationLabel, "the-really-long-location-name-that-is-much-more-than-63-c69e779").Phase(velerov1api.BackupPhaseCompleted).Backup(),
 			},
 			expectedDeletes: sets.NewString("backup-C"),
 		},
@@ -507,10 +508,10 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 
 			for _, backup := range test.k8sBackups {
 				// add test backup to informer
-				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup.Backup), "Error adding backup to informer")
+				require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup), "Error adding backup to informer")
 
 				// add test backup to client
-				_, err := client.VeleroV1().Backups(test.namespace).Create(backup.Backup)
+				_, err := client.VeleroV1().Backups(test.namespace).Create(backup)
 				require.NoError(t, err, "Error adding backup to clientset")
 
 				// if we expect this backup to be deleted, set up the expected DeleteAction

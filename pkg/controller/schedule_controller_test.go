@@ -93,7 +93,7 @@ func TestProcessSchedule(t *testing.T) {
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
 			expectedPhase:        string(api.SchedulePhaseEnabled),
-			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
+			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
@@ -101,7 +101,7 @@ func TestProcessSchedule(t *testing.T) {
 			schedule:             velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
+			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
@@ -110,7 +110,7 @@ func TestProcessSchedule(t *testing.T) {
 				WithCronSchedule("@every 5m").WithLastBackupTime("2000-01-01 00:00:00").Schedule,
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedBackupCreate: velerotest.NewTestBackup().WithNamespace("ns").WithName("name-20170101120000").WithLabel(velerov1api.ScheduleNameLabel, "name").Backup,
+			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 	}

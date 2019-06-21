@@ -66,16 +66,16 @@ func TestFetchBackupInfo(t *testing.T) {
 			name:              "lister has backup",
 			backupName:        "backup-1",
 			informerLocations: []*api.BackupStorageLocation{velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
-			informerBackups:   []*api.Backup{velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
-			expectedRes:       velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Backup()},
+			expectedRes:       defaultBackup().StorageLocation("default").Backup(),
 		},
 		{
 			name:              "lister does not have a backup, but backupSvc does",
 			backupName:        "backup-1",
-			backupStoreBackup: velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backupStoreBackup: defaultBackup().StorageLocation("default").Backup(),
 			informerLocations: []*api.BackupStorageLocation{velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation},
-			informerBackups:   []*api.Backup{velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup},
-			expectedRes:       velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Backup()},
+			expectedRes:       defaultBackup().StorageLocation("default").Backup(),
 		},
 		{
 			name:             "no backup",
@@ -241,7 +241,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
 			location:                 velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).WithExcludedNamespace("another-1").Restore,
-			backup:                   velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:                   defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: another-1"},
@@ -250,7 +250,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:                     "restore with resource in both includedResources and excludedResources fails validation",
 			location:                 velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:                  NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).WithExcludedResource("a-resource").Restore,
-			backup:                   velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:                   defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: a-resource"},
@@ -270,16 +270,10 @@ func TestProcessQueueItem(t *testing.T) {
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
 		},
 		{
-			name:     "valid restore with schedule name gets executed",
-			location: velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
-			restore:  NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
-			backup: velerotest.
-				NewTestBackup().
-				WithName("backup-1").
-				WithStorageLocation("default").
-				WithLabel(velerov1api.ScheduleNameLabel, "sched-1").
-				WithPhase(api.BackupPhaseCompleted).
-				Backup,
+			name:                 "valid restore with schedule name gets executed",
+			location:             velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
+			restore:              NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).WithSchedule("sched-1").Restore,
+			backup:               defaultBackup().StorageLocation("default").Labels(velerov1api.ScheduleNameLabel, "sched-1").Phase(api.BackupPhaseCompleted).Backup(),
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).WithSchedule("sched-1").Restore,
@@ -296,7 +290,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:                  "restorer throwing an error causes the restore to fail",
 			location:              velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:                velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:                defaultBackup().StorageLocation("default").Backup(),
 			restorerError:         errors.New("blarg"),
 			expectedErr:           false,
 			expectedPhase:         string(api.RestorePhaseInProgress),
@@ -308,7 +302,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:                 "valid restore gets executed",
 			location:             velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:              NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Restore,
-			backup:               velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:               defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
 			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Restore,
@@ -317,7 +311,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:          "restoration of nodes is not supported",
 			location:      velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Restore,
-			backup:        velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:        defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -329,7 +323,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:          "restoration of events is not supported",
 			location:      velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events", api.RestorePhaseNew).Restore,
-			backup:        velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:        defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -341,7 +335,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:          "restoration of events.events.k8s.io is not supported",
 			location:      velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events.events.k8s.io", api.RestorePhaseNew).Restore,
-			backup:        velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:        defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -353,7 +347,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:          "restoration of backups.velero.io is not supported",
 			location:      velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "backups.velero.io", api.RestorePhaseNew).Restore,
-			backup:        velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:        defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -365,7 +359,7 @@ func TestProcessQueueItem(t *testing.T) {
 			name:          "restoration of restores.velero.io is not supported",
 			location:      velerotest.NewTestBackupStorageLocation().WithName("default").WithProvider("myCloud").WithObjectStorage("bucket").BackupStorageLocation,
 			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "restores.velero.io", api.RestorePhaseNew).Restore,
-			backup:        velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:        defaultBackup().StorageLocation("default").Backup(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{
@@ -380,7 +374,7 @@ func TestProcessQueueItem(t *testing.T) {
 			expectedPhase:                   string(api.RestorePhaseInProgress),
 			expectedFinalPhase:              string(api.RestorePhaseFailed),
 			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
-			backup:                          velerotest.NewTestBackup().WithName("backup-1").WithStorageLocation("default").Backup,
+			backup:                          defaultBackup().StorageLocation("default").Backup(),
 		},
 	}
 
@@ -647,12 +641,11 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	}
 
 	// no backups created from the schedule: fail validation
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(velerotest.
-		NewTestBackup().
-		WithName("backup-1").
-		WithLabel(velerov1api.ScheduleNameLabel, "non-matching-schedule").
-		WithPhase(api.BackupPhaseCompleted).
-		Backup,
+	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
+		defaultBackup().
+			Labels(velerov1api.ScheduleNameLabel, "non-matching-schedule").
+			Phase(velerov1api.BackupPhaseCompleted).
+			Backup(),
 	))
 
 	errs := c.validateAndComplete(restore, pluginManager)
@@ -660,12 +653,12 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	assert.Empty(t, restore.Spec.BackupName)
 
 	// no completed backups created from the schedule: fail validation
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(velerotest.
-		NewTestBackup().
-		WithName("backup-2").
-		WithLabel(velerov1api.ScheduleNameLabel, "schedule-1").
-		WithPhase(api.BackupPhaseInProgress).
-		Backup,
+	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
+		defaultBackup().
+			Name("backup-2").
+			Labels(velerov1api.ScheduleNameLabel, "schedule-1").
+			Phase(velerov1api.BackupPhaseInProgress).
+			Backup(),
 	))
 
 	errs = c.validateAndComplete(restore, pluginManager)
@@ -675,21 +668,21 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 	// multiple completed backups created from the schedule: use most recent
 	now := time.Now()
 
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(velerotest.
-		NewTestBackup().
-		WithName("foo").
-		WithLabel(velerov1api.ScheduleNameLabel, "schedule-1").
-		WithPhase(api.BackupPhaseCompleted).
-		WithStartTimestamp(now).
-		Backup,
+	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
+		defaultBackup().
+			Name("foo").
+			Labels(velerov1api.ScheduleNameLabel, "schedule-1").
+			Phase(velerov1api.BackupPhaseCompleted).
+			StartTimestamp(now).
+			Backup(),
 	))
-	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(velerotest.
-		NewTestBackup().
-		WithName("bar").
-		WithLabel(velerov1api.ScheduleNameLabel, "schedule-1").
-		WithPhase(api.BackupPhaseCompleted).
-		WithStartTimestamp(now.Add(time.Second)).
-		Backup,
+	require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(
+		defaultBackup().
+			Name("foo").
+			Labels(velerov1api.ScheduleNameLabel, "schedule-1").
+			Phase(velerov1api.BackupPhaseCompleted).
+			StartTimestamp(now.Add(time.Second)).
+			Backup(),
 	))
 
 	errs = c.validateAndComplete(restore, pluginManager)
