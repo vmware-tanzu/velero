@@ -302,6 +302,11 @@ func (ib *defaultItemBackupper) executeActions(
 			continue
 		}
 
+		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
+			log.Debug("Skipping action because resource is cluster-scoped and action only applies to specific namespaces")
+			continue
+		}
+
 		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
 			log.Debug("Skipping action because label selector does not match")
 			continue

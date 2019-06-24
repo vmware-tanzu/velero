@@ -806,8 +806,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			},
 		},
 		{
-			// TODO this seems like a bug
-			name: "single action with a namespace selector runs for resources in that namespace plus cluster-scoped resources",
+			name: "single action with a namespace selector runs only for resources in that namespace",
 			backup: defaultBackup().
 				Backup(),
 			apiResources: []*test.APIResource{
@@ -823,9 +822,13 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					test.NewPV("pv-1"),
 					test.NewPV("pv-2"),
 				),
+				test.Namespaces(
+					test.NewNamespace("ns-1"),
+					test.NewNamespace("ns-2"),
+				),
 			},
 			actions: map[*recordResourcesAction][]string{
-				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1", "pv-1", "pv-2"},
+				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
 			},
 		},
 		{
