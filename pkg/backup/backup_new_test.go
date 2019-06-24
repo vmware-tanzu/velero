@@ -1767,8 +1767,11 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 // calls on the mock object.
 func TestBackupWithHooks(t *testing.T) {
 	type expectedCall struct {
-		arguments       []interface{}
-		returnArguments []interface{}
+		podNamespace string
+		podName      string
+		hookName     string
+		hook         *velerov1.ExecHook
+		err          error
 	}
 
 	tests := []struct {
@@ -1804,30 +1807,22 @@ func TestBackupWithHooks(t *testing.T) {
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-1",        // pod namespace
-						"pod-1",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
 					},
-					returnArguments: []interface{}{nil},
+					err: nil,
 				},
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-2",        // pod namespace
-						"pod-2",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
+					podNamespace: "ns-2",
+					podName:      "pod-2",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
 					},
-					returnArguments: []interface{}{nil},
+					err: nil,
 				},
 			},
 			wantBackedUp: []string{
@@ -1861,35 +1856,81 @@ func TestBackupWithHooks(t *testing.T) {
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-1",        // pod namespace
-						"pod-1",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
 					},
-					returnArguments: []interface{}{nil},
+					err: nil,
 				},
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-2",        // pod namespace
-						"pod-2",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-						},
+					podNamespace: "ns-2",
+					podName:      "pod-2",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
 					},
-					returnArguments: []interface{}{nil},
+					err: nil,
 				},
 			},
 			wantBackedUp: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
+			},
+		},
+		{
+			name: "pre and post hooks run for a pod",
+			backup: defaultBackup().
+				Hooks(velerov1.BackupHooks{
+					Resources: []velerov1.BackupResourceHookSpec{
+						{
+							Name: "hook-1",
+							PreHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"pre"},
+									},
+								},
+							},
+							PostHooks: []velerov1.BackupResourceHook{
+								{
+									Exec: &velerov1.ExecHook{
+										Command: []string{"post"},
+									},
+								},
+							},
+						},
+					},
+				}).
+				Backup(),
+			apiResources: []*apiResource{
+				pods(
+					newPod("ns-1", "pod-1"),
+				),
+			},
+			wantExecutePodCommandCalls: []*expectedCall{
+				{
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"pre"},
+					},
+					err: nil,
+				},
+				{
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"post"},
+					},
+					err: nil,
+				},
+			},
+			wantBackedUp: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
 			},
 		},
 		{
@@ -1919,32 +1960,24 @@ func TestBackupWithHooks(t *testing.T) {
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-1",        // pod namespace
-						"pod-1",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-							OnError: velerov1.HookErrorModeFail,
-						},
+					podNamespace: "ns-1",
+					podName:      "pod-1",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
+						OnError: velerov1.HookErrorModeFail,
 					},
-					returnArguments: []interface{}{errors.New("exec hook error")},
+					err: errors.New("exec hook error"),
 				},
 				{
-					arguments: []interface{}{
-						mock.Anything, // logger
-						mock.Anything, // pod
-						"ns-2",        // pod namespace
-						"pod-2",       // pod name
-						"hook-1",      // hook name
-						&velerov1.ExecHook{
-							Command: []string{"ls", "/tmp"},
-							OnError: velerov1.HookErrorModeFail,
-						},
+					podNamespace: "ns-2",
+					podName:      "pod-2",
+					hookName:     "hook-1",
+					hook: &velerov1.ExecHook{
+						Command: []string{"ls", "/tmp"},
+						OnError: velerov1.HookErrorModeFail,
 					},
-					returnArguments: []interface{}{nil},
+					err: nil,
 				},
 			},
 			wantBackedUp: []string{
@@ -1966,7 +1999,14 @@ func TestBackupWithHooks(t *testing.T) {
 			defer podCommandExecutor.AssertExpectations(t)
 
 			for _, expect := range tc.wantExecutePodCommandCalls {
-				podCommandExecutor.On("ExecutePodCommand", expect.arguments...).Return(expect.returnArguments...)
+				podCommandExecutor.On("ExecutePodCommand",
+					mock.Anything,
+					mock.Anything,
+					expect.podNamespace,
+					expect.podName,
+					expect.hookName,
+					expect.hook,
+				).Return(expect.err)
 			}
 
 			for _, resource := range tc.apiResources {
