@@ -134,42 +134,6 @@ func TestRestorePriority(t *testing.T) {
 		expectedReadDirs     []string
 	}{
 		{
-			name:       "cluster test",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
-			baseDir:    "bak",
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/cluster", "bak/resources/c/cluster"},
-		},
-		{
-			name:       "resource priorities are applied",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/cluster").WithDirectory("bak/resources/c/cluster"),
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir:    "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "c"},
-				{Resource: "b"},
-				{Resource: "a"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/c/cluster", "bak/resources/a/cluster"},
-		},
-		{
-			name:       "basic namespace",
-			fileSystem: velerotest.NewFakeFileSystem().WithDirectory("bak/resources/a/namespaces/ns-1").WithDirectory("bak/resources/c/namespaces/ns-1"),
-			restore:    &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir:    "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
-		},
-		{
 			name: "error in a single resource doesn't terminate restore immediately, but is returned",
 			fileSystem: velerotest.NewFakeFileSystem().
 				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).

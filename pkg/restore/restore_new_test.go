@@ -30,9 +30,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubetesting "k8s.io/client-go/testing"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -567,6 +569,146 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 	}
 }
 
+// TestRestoreResourcePriorities runs restores with resource priorities specified,
+// and verifies that the set of items created in the API are created in the expected
+// order. Validation is done by adding a Reactor to the fake dynamic client that records
+// resource identifiers as they're created, and comparing that to the expected order.
+func TestRestoreResourcePriorities(t *testing.T) {
+	tests := []struct {
+		name               string
+		restore            *velerov1api.Restore
+		backup             *velerov1api.Backup
+		apiResources       []*test.APIResource
+		tarball            io.Reader
+		resourcePriorities []string
+	}{
+		{
+			name:    "resources are restored according to the specified resource priorities",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+				).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
+				).
+				addItems("deployments.apps",
+					test.NewDeployment("ns-1", "deploy-1"),
+					test.NewDeployment("ns-2", "deploy-2"),
+				).
+				addItems("serviceaccounts",
+					test.NewServiceAccount("ns-1", "sa-1"),
+					test.NewServiceAccount("ns-2", "sa-2"),
+				).
+				addItems("persistentvolumeclaims",
+					test.NewPVC("ns-1", "pvc-1"),
+					test.NewPVC("ns-2", "pvc-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.PVs(),
+				test.Deployments(),
+				test.ServiceAccounts(),
+			},
+			resourcePriorities: []string{"persistentvolumes", "serviceaccounts", "pods", "deployments.apps"},
+		},
+	}
+
+	for _, tc := range tests {
+		h := newHarness(t)
+		h.restorer.resourcePriorities = tc.resourcePriorities
+
+		recorder := &createRecorder{t: t}
+		h.DynamicClient.PrependReactor("create", "*", recorder.reactor())
+
+		for _, r := range tc.apiResources {
+			h.DiscoveryClient.WithAPIResource(r)
+		}
+		require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+		warnings, errs := h.restorer.Restore(
+			h.log,
+			tc.restore,
+			tc.backup,
+			nil, // volume snapshots
+			tc.tarball,
+			nil, // actions
+			nil, // snapshot location lister
+			nil, // volume snapshotter getter
+		)
+
+		assertEmptyResults(t, warnings, errs)
+		assertResourceCreationOrder(t, tc.resourcePriorities, recorder.resources)
+	}
+}
+
+// assertResourceCreationOrder ensures that resources were created in the expected
+// order. Any resources *not* in resourcePriorities are required to come *after* all
+// resources in any order.
+func assertResourceCreationOrder(t *testing.T, resourcePriorities []string, createdResources []resourceID) {
+	// lastSeen tracks the index in 'resourcePriorities' of the last resource type
+	// we saw created. Once we've seen a resource in 'resourcePriorities', we should
+	// never see another instance of a prior resource.
+	lastSeen := 0
+
+	// Find the index in 'resourcePriorities' of the resource type for
+	// the current item, if it exists. This index ('current') *must*
+	// be greater than or equal to 'lastSeen', which was the last resource
+	// we saw, since otherwise the current resource would be out of order. By
+	// initializing current to len(ordered), we're saying that if the resource
+	// is not explicitly in orderedResources, then it must come *after*
+	// all orderedResources.
+	for _, r := range createdResources {
+		current := len(resourcePriorities)
+		for i, item := range resourcePriorities {
+			if item == r.groupResource {
+				current = i
+				break
+			}
+		}
+
+		// the index of the current resource must be the same as or greater than the index of
+		// the last resource we saw for the restored order to be correct.
+		assert.True(t, current >= lastSeen, "%s was restored out of order", r.groupResource)
+		lastSeen = current
+	}
+}
+
+type resourceID struct {
+	groupResource string
+	nsAndName     string
+}
+
+// createRecorder provides a Reactor that can be used to capture
+// resources created in a fake client.
+type createRecorder struct {
+	t         *testing.T
+	resources []resourceID
+}
+
+func (cr *createRecorder) reactor() func(kubetesting.Action) (bool, runtime.Object, error) {
+	return func(action kubetesting.Action) (bool, runtime.Object, error) {
+		createAction, ok := action.(kubetesting.CreateAction)
+		if !ok {
+			return false, nil, nil
+		}
+
+		accessor, err := meta.Accessor(createAction.GetObject())
+		assert.NoError(cr.t, err)
+
+		cr.resources = append(cr.resources, resourceID{
+			groupResource: action.GetResource().GroupResource().String(),
+			nsAndName:     fmt.Sprintf("%s/%s", action.GetNamespace(), accessor.GetName()),
+		})
+
+		return false, nil, nil
+	}
+}
+
 func defaultRestore() *Builder {
 	return NewNamedBuilder(velerov1api.DefaultNamespace, "restore-1").Backup("backup-1")
 }
@@ -618,16 +760,16 @@ func newTarWriter(t *testing.T) *tarWriter {
 	return tw
 }
 
-func (tw *tarWriter) addItems(groupVersion string, items ...metav1.Object) *tarWriter {
+func (tw *tarWriter) addItems(groupResource string, items ...metav1.Object) *tarWriter {
 	tw.t.Helper()
 
 	for _, obj := range items {
 
 		var path string
 		if obj.GetNamespace() == "" {
-			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupVersion, obj.GetName())
+			path = fmt.Sprintf("resources/%s/cluster/%s.json", groupResource, obj.GetName())
 		} else {
-			path = fmt.Sprintf("resources/%s/namespaces/%s/%s.json", groupVersion, obj.GetNamespace(), obj.GetName())
+			path = fmt.Sprintf("resources/%s/namespaces/%s/%s.json", groupResource, obj.GetNamespace(), obj.GetName())
 		}
 
 		tw.add(path, obj)
