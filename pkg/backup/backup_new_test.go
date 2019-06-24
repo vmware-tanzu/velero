@@ -33,21 +33,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	discoveryfake "k8s.io/client-go/discovery/fake"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
@@ -66,20 +60,20 @@ func TestBackupResourceFiltering(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		want         []string
 	}{
 		{
 			name:   "no filters backs up everything",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -94,14 +88,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedResources("pods").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -114,14 +108,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				ExcludedResources("deployments").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -134,14 +128,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("foo").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -154,14 +148,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				ExcludedNamespaces("zoo").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -174,18 +168,18 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludeClusterResources(false).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
-				pvs(
-					newPV("bar"),
-					newPV("baz"),
+				test.PVs(
+					test.NewPV("bar"),
+					test.NewPV("baz"),
 				),
 			},
 			want: []string{
@@ -200,18 +194,18 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					withLabel(newPod("foo", "bar"), "a", "b"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					withLabel(test.NewPod("foo", "bar"), "a", "b"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					withLabel(newDeployment("zoo", "raz"), "a", "b"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					withLabel(test.NewDeployment("zoo", "raz"), "a", "b"),
 				),
-				pvs(
-					withLabel(newPV("bar"), "a", "b"),
-					withLabel(newPV("baz"), "a", "c"),
+				test.PVs(
+					withLabel(test.NewPV("bar"), "a", "b"),
+					withLabel(test.NewPV("baz"), "a", "c"),
 				),
 			},
 			want: []string{
@@ -224,18 +218,18 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "resources with velero.io/exclude-from-backup=true label are not included",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "true"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true"),
 				),
-				pvs(
-					withLabel(newPV("bar"), "a", "b"),
-					withLabel(newPV("baz"), "velero.io/exclude-from-backup", "true"),
+				test.PVs(
+					withLabel(test.NewPV("bar"), "a", "b"),
+					withLabel(test.NewPV("baz"), "velero.io/exclude-from-backup", "true"),
 				),
 			},
 			want: []string{
@@ -249,18 +243,18 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "true", "a", "b"),
-					withLabel(newPod("zoo", "raz"), "a", "b"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "true", "a", "b"),
+					withLabel(test.NewPod("zoo", "raz"), "a", "b"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true", "a", "b"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "true", "a", "b"),
 				),
-				pvs(
-					withLabel(newPV("bar"), "a", "b"),
-					withLabel(newPV("baz"), "a", "b", "velero.io/exclude-from-backup", "true"),
+				test.PVs(
+					withLabel(test.NewPV("bar"), "a", "b"),
+					withLabel(test.NewPV("baz"), "a", "b", "velero.io/exclude-from-backup", "true"),
 				),
 			},
 			want: []string{
@@ -272,18 +266,18 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "resources with velero.io/exclude-from-backup label specified but not 'true' are included",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					withLabel(newPod("foo", "bar"), "velero.io/exclude-from-backup", "false"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					withLabel(test.NewPod("foo", "bar"), "velero.io/exclude-from-backup", "false"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					withLabel(newDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "1"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					withLabel(test.NewDeployment("zoo", "raz"), "velero.io/exclude-from-backup", "1"),
 				),
-				pvs(
-					withLabel(newPV("bar"), "a", "b"),
-					withLabel(newPV("baz"), "velero.io/exclude-from-backup", ""),
+				test.PVs(
+					withLabel(test.NewPV("bar"), "a", "b"),
+					withLabel(test.NewPV("baz"), "velero.io/exclude-from-backup", ""),
 				),
 			},
 			want: []string{
@@ -301,15 +295,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(true).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -325,15 +319,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(false).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -346,15 +340,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -367,15 +361,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludeClusterResources(true).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -391,15 +385,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludeClusterResources(false).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -412,15 +406,15 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=nil",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-1"),
-					newPod("ns-3", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-1"),
+					test.NewPod("ns-3", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			want: []string{
@@ -436,14 +430,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedResources("*", "pods").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -458,14 +452,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				ExcludedResources("*").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -480,14 +474,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedResources("pods", "unresolvable").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -500,14 +494,14 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				ExcludedResources("deployments", "unresolvable").
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -518,9 +512,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name:   "terminating resources are not backed up",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 					&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-2", Name: "pod-2", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
 				),
 			},
@@ -539,7 +533,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			h.backupper.Backup(h.log, req, backupFile, nil, nil)
@@ -557,16 +551,16 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		want         []string
 	}{
 		{
 			name:   "when deployments exist only in extensions, they're backed up",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				extensionsDeployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.ExtensionsDeployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -577,14 +571,14 @@ func TestBackupResourceCohabitation(t *testing.T) {
 		{
 			name:   "when deployments exist in both apps and extensions, only apps/deployments are backed up",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				extensionsDeployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.ExtensionsDeployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
-				deployments(
-					newDeployment("foo", "bar"),
-					newDeployment("zoo", "raz"),
+				test.Deployments(
+					test.NewDeployment("foo", "bar"),
+					test.NewDeployment("zoo", "raz"),
 				),
 			},
 			want: []string{
@@ -603,7 +597,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			h.backupper.Backup(h.log, req, backupFile, nil, nil)
@@ -626,8 +620,8 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
-	h.addItems(t, "apps", "v1", "deployments", "deploys", true, newDeployment("ns-1", "deploy-1"))
-	h.addItems(t, "extensions", "v1", "deployments", "deploys", true, newDeployment("ns-1", "deploy-1"))
+	h.addItems(t, test.Deployments(test.NewDeployment("ns-1", "deploy-1")))
+	h.addItems(t, test.ExtensionsDeployments(test.NewDeployment("ns-1", "deploy-1")))
 
 	h.backupper.Backup(h.log, backup1, backup1File, nil, nil)
 
@@ -651,29 +645,29 @@ func TestBackupResourceOrdering(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 	}{
 		{
 			name: "core API group: pods come before pvcs, pvcs come before pvs, pvs come before anything else",
 			backup: defaultBackup().
 				SnapshotVolumes(false).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				pvcs(
-					newPVC("foo", "bar"),
-					newPVC("zoo", "raz"),
+				test.PVCs(
+					test.NewPVC("foo", "bar"),
+					test.NewPVC("zoo", "raz"),
 				),
-				pvs(
-					newPV("bar"),
-					newPV("baz"),
+				test.PVs(
+					test.NewPV("bar"),
+					test.NewPV("baz"),
 				),
-				secrets(
-					newSecret("foo", "bar"),
-					newSecret("zoo", "raz"),
+				test.Secrets(
+					test.NewSecret("foo", "bar"),
+					test.NewSecret("zoo", "raz"),
 				),
 			},
 		},
@@ -688,7 +682,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			h.backupper.Backup(h.log, req, backupFile, nil, nil)
@@ -751,7 +745,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 
 		// actions is a map from a recordResourcesAction (which will record the items it was called for)
 		// to a slice of expected items, formatted as {namespace}/{name}.
@@ -761,14 +755,14 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "single action with no selector runs for all items",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -779,14 +773,14 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "single action with a resource selector for namespaced resources runs only for matching resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -797,14 +791,14 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "single action with a resource selector for cluster-scoped resources runs only for matching resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -816,18 +810,18 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "single action with a namespace selector runs for resources in that namespace plus cluster-scoped resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvcs(
-					newPVC("ns-1", "pvc-1"),
-					newPVC("ns-2", "pvc-2"),
+				test.PVCs(
+					test.NewPVC("ns-1", "pvc-1"),
+					test.NewPVC("ns-2", "pvc-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -838,14 +832,14 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "single action with a resource and namespace selector runs only for matching resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -856,14 +850,14 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "multiple actions, each with a different resource selector using short name, run for matching resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -875,16 +869,16 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			name: "actions with selectors that don't match anything don't run for any resources",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
-				pvcs(
-					newPVC("ns-2", "pvc-2"),
+				test.PVCs(
+					test.NewPVC("ns-2", "pvc-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -903,7 +897,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			actions := []velero.BackupItemAction{}
@@ -931,21 +925,21 @@ func TestBackupWithInvalidActions(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		actions      []velero.BackupItemAction
 	}{
 		{
 			name: "action with invalid label selector results in an error",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				pvs(
-					newPV("bar"),
-					newPV("baz"),
+				test.PVs(
+					test.NewPV("bar"),
+					test.NewPV("baz"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -956,14 +950,14 @@ func TestBackupWithInvalidActions(t *testing.T) {
 			name: "action returning an error from AppliesTo results in an error",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
-					newPod("zoo", "raz"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
+					test.NewPod("zoo", "raz"),
 				),
-				pvs(
-					newPV("bar"),
-					newPV("baz"),
+				test.PVs(
+					test.NewPV("bar"),
+					test.NewPV("baz"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -981,7 +975,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			assert.Error(t, h.backupper.Backup(h.log, req, backupFile, tc.actions, nil))
@@ -1027,16 +1021,16 @@ func TestBackupActionModifications(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		actions      []velero.BackupItemAction
 		want         map[string]unstructuredObject
 	}{
 		{
 			name:   "action that adds a label to item gets persisted",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1045,15 +1039,15 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, withLabel(newPod("ns-1", "pod-1"), "updated", "true")),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, withLabel(test.NewPod("ns-1", "pod-1"), "updated", "true")),
 			},
 		},
 		{
 			name:   "action that removes labels from item gets persisted",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					withLabel(newPod("ns-1", "pod-1"), "should-be-removed", "true"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					withLabel(test.NewPod("ns-1", "pod-1"), "should-be-removed", "true"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1062,15 +1056,15 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, newPod("ns-1", "pod-1")),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, test.NewPod("ns-1", "pod-1")),
 			},
 		},
 		{
 			name:   "action that sets a spec field on item gets persisted",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1079,16 +1073,16 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1", Name: "pod-1"}, Spec: corev1.PodSpec{NodeName: "foo"}}),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, &corev1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1", Name: "pod-1"}, Spec: corev1.PodSpec{NodeName: "foo"}}),
 			},
 		},
 		{
 			name: "modifications to name and namespace in an action are persisted in JSON and in filename",
 			backup: defaultBackup().
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1098,7 +1092,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, newPod("ns-1-updated", "pod-1-updated")),
+				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, test.NewPod("ns-1-updated", "pod-1-updated")),
 			},
 		},
 	}
@@ -1112,7 +1106,7 @@ func TestBackupActionModifications(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
@@ -1132,18 +1126,18 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		actions      []velero.BackupItemAction
 		want         []string
 	}{
 		{
 			name:   "additional items that are already being backed up are not backed up twice",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
-					newPod("ns-3", "pod-3"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+					test.NewPod("ns-3", "pod-3"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1168,11 +1162,11 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		{
 			name:   "when using a backup namespace filter, additional items that are in a non-included namespace are not backed up",
 			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
-					newPod("ns-3", "pod-3"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+					test.NewPod("ns-3", "pod-3"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1194,14 +1188,14 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		{
 			name:   "when using a backup namespace filter, additional items that are cluster-scoped are backed up",
 			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1225,13 +1219,13 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		{
 			name:   "when using a backup resource filter, additional items that are non-included resources are not backed up",
 			backup: defaultBackup().IncludedResources("pods").Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1253,14 +1247,14 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		{
 			name:   "when IncludeClusterResources=false, additional items that are cluster-scoped are not backed up",
 			backup: defaultBackup().IncludeClusterResources(false).Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1283,11 +1277,11 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		{
 			name:   "if there's an error backing up additional items, the item the action was run for isn't backed up",
 			backup: defaultBackup().Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
-					newPod("ns-3", "pod-3"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
+					test.NewPod("ns-3", "pod-3"),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1319,7 +1313,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			err := h.backupper.Backup(h.log, req, backupFile, tc.actions, nil)
@@ -1465,7 +1459,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		name              string
 		req               *Request
 		vsls              []*velerov1.VolumeSnapshotLocation
-		apiResources      []*apiResource
+		apiResources      []*test.APIResource
 		snapshotterGetter volumeSnapshotterGetter
 		want              []*volume.Snapshot
 	}{
@@ -1477,9 +1471,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1510,9 +1504,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					withLabel(newPV("pv-1"), "failure-domain.beta.kubernetes.io/zone", "zone-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					withLabel(test.NewPV("pv-1"), "failure-domain.beta.kubernetes.io/zone", "zone-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1544,9 +1538,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1576,9 +1570,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1591,9 +1585,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			req: &Request{
 				Backup: defaultBackup().Backup(),
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1609,9 +1603,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{},
@@ -1625,9 +1619,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "default", "default"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1644,10 +1638,10 @@ func TestBackupWithSnapshots(t *testing.T) {
 					newSnapshotLocation("velero", "another", "another"),
 				},
 			},
-			apiResources: []*apiResource{
-				pvs(
-					newPV("pv-1"),
-					newPV("pv-2"),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					test.NewPV("pv-1"),
+					test.NewPV("pv-2"),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1695,7 +1689,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			err := h.backupper.Backup(h.log, tc.req, backupFile, nil, tc.snapshotterGetter)
@@ -2039,112 +2033,28 @@ func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
 	return a.selector, nil
 }
 
-type apiResource struct {
-	group      string
-	version    string
-	name       string
-	shortName  string
-	namespaced bool
-	items      []metav1.Object
-}
-
-func pods(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "",
-		version:    "v1",
-		name:       "pods",
-		shortName:  "po",
-		namespaced: true,
-		items:      items,
-	}
-}
-
-func pvcs(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "",
-		version:    "v1",
-		name:       "persistentvolumeclaims",
-		shortName:  "pvc",
-		namespaced: true,
-		items:      items,
-	}
-}
-
-func secrets(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "",
-		version:    "v1",
-		name:       "secrets",
-		shortName:  "secrets",
-		namespaced: true,
-		items:      items,
-	}
-}
-
-func deployments(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "apps",
-		version:    "v1",
-		name:       "deployments",
-		shortName:  "deploy",
-		namespaced: true,
-		items:      items,
-	}
-}
-
-func extensionsDeployments(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "extensions",
-		version:    "v1",
-		name:       "deployments",
-		shortName:  "deploy",
-		namespaced: true,
-		items:      items,
-	}
-}
-
-func pvs(items ...metav1.Object) *apiResource {
-	return &apiResource{
-		group:      "",
-		version:    "v1",
-		name:       "persistentvolumes",
-		shortName:  "pv",
-		namespaced: false,
-		items:      items,
-	}
-}
-
 type harness struct {
-	veleroClient    *fake.Clientset
-	kubeClient      *kubefake.Clientset
-	dynamicClient   *dynamicfake.FakeDynamicClient
-	discoveryClient *test.DiscoveryClient
-	backupper       *kubernetesBackupper
-	log             logrus.FieldLogger
+	*test.APIServer
+	backupper *kubernetesBackupper
+	log       logrus.FieldLogger
 }
 
-func (h *harness) addItems(t *testing.T, group, version, resource, shortName string, namespaced bool, items ...metav1.Object) {
+func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
 	t.Helper()
 
-	h.discoveryClient.WithResource(group, version, resource, namespaced, shortName)
+	h.DiscoveryClient.WithAPIResource(resource)
 	require.NoError(t, h.backupper.discoveryHelper.Refresh())
 
-	gvr := schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
-	}
-
-	for _, item := range items {
+	for _, item := range resource.Items {
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
 		require.NoError(t, err)
 
 		unstructuredObj := &unstructured.Unstructured{Object: obj}
 
-		if namespaced {
-			_, err = h.dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Create(unstructuredObj, metav1.CreateOptions{})
+		if resource.Namespaced {
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(unstructuredObj, metav1.CreateOptions{})
 		} else {
-			_, err = h.dynamicClient.Resource(gvr).Create(unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
 	}
@@ -2153,26 +2063,16 @@ func (h *harness) addItems(t *testing.T, group, version, resource, shortName str
 func newHarness(t *testing.T) *harness {
 	t.Helper()
 
-	// API server fakes
-	var (
-		veleroClient    = fake.NewSimpleClientset()
-		kubeClient      = kubefake.NewSimpleClientset()
-		dynamicClient   = dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
-		discoveryClient = &test.DiscoveryClient{FakeDiscovery: kubeClient.Discovery().(*discoveryfake.FakeDiscovery)}
-	)
-
+	apiServer := test.NewAPIServer(t)
 	log := logrus.StandardLogger()
 
-	discoveryHelper, err := discovery.NewHelper(discoveryClient, log)
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
 	require.NoError(t, err)
 
 	return &harness{
-		veleroClient:    veleroClient,
-		kubeClient:      kubeClient,
-		dynamicClient:   dynamicClient,
-		discoveryClient: discoveryClient,
+		APIServer: apiServer,
 		backupper: &kubernetesBackupper{
-			dynamicFactory:        client.NewDynamicFactory(dynamicClient),
+			dynamicFactory:        client.NewDynamicFactory(apiServer.DynamicClient),
 			discoveryHelper:       discoveryHelper,
 			groupBackupperFactory: new(defaultGroupBackupperFactory),
 
@@ -2199,50 +2099,6 @@ func withLabel(obj metav1.Object, labelPairs ...string) metav1.Object {
 	obj.SetLabels(labels)
 
 	return obj
-}
-
-func newPod(ns, name string) *corev1.Pod {
-	return &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-	}
-}
-
-func newPVC(ns, name string) *corev1.PersistentVolumeClaim {
-	return &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-	}
-}
-
-func newSecret(ns, name string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-	}
-}
-
-func newDeployment(ns, name string) *appsv1.Deployment {
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		},
-	}
-}
-
-func newPV(name string) *corev1.PersistentVolume {
-	return &corev1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-	}
 }
 
 func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLocation {
