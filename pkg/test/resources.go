@@ -110,6 +110,17 @@ func ExtensionsDeployments(items ...metav1.Object) *APIResource {
 	}
 }
 
+func Namespaces(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "",
+		Version:    "v1",
+		Name:       "namespaces",
+		ShortName:  "ns",
+		Namespaced: false,
+		Items:      items,
+	}
+}
+
 func NewPod(ns, name string) *corev1.Pod {
 	return &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
@@ -157,6 +168,16 @@ func NewDeployment(ns, name string) *appsv1.Deployment {
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: objectMeta(ns, name),
+	}
+}
+
+func NewNamespace(name string) *corev1.Namespace {
+	return &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: objectMeta("", name),
 	}
 }
 

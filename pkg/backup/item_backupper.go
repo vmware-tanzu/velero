@@ -302,6 +302,23 @@ func (ib *defaultItemBackupper) executeActions(
 			continue
 		}
 
+		// Determine whether to run actions for cluster-scoped resources based on IncludeClusterResources
+		// NOTE: we specifically allow actions to be run for namespaces even if IncludeClusterResources is
+		// false.
+		if namespace == "" && groupResource != kuberesource.Namespaces {
+			if ib.backupRequest.Spec.IncludeClusterResources == nil {
+				// when IncludeClusterResources == nil (auto), only run actions for
+				// cluster-scoped resources if we're doing a full-cluster backup.
+				if !action.namespaceIncludesExcludes.IncludeEverything() {
+					log.Debug("Skipping action because resource is cluster-scoped and only specific namespaces are included in the backup")
+					continue
+				}
+			} else if !*ib.backupRequest.Spec.IncludeClusterResources {
+				log.Debug("Skipping action because resource is cluster-scoped and backup.spec.includeClusterResources is false")
+				continue
+			}
+
+		}
 		if !action.selector.Matches(labels.Set(metadata.GetLabels())) {
 			log.Debug("Skipping action because label selector does not match")
 			continue
