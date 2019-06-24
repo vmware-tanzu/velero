@@ -806,7 +806,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			},
 		},
 		{
-			name: "single action with a namespace selector runs only for resources in that namespace and namespace resources",
+			name: "single action with a namespace selector runs only for resources in that namespace",
 			backup: defaultBackup().
 				Backup(),
 			apiResources: []*test.APIResource{
@@ -828,7 +828,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
-				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1", "ns-1", "ns-2"},
+				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
 			},
 		},
 		{

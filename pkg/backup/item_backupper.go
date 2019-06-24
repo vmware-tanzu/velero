@@ -303,9 +303,7 @@ func (ib *defaultItemBackupper) executeActions(
 		}
 
 		// Determine whether to run actions for cluster-scoped resources based on IncludeClusterResources
-		// NOTE: we specifically allow actions to be run for namespaces even if IncludeClusterResources is
-		// false.
-		if namespace == "" && groupResource != kuberesource.Namespaces {
+		if namespace == "" {
 			if ib.backupRequest.Spec.IncludeClusterResources == nil {
 				// when IncludeClusterResources == nil (auto), only run actions for
 				// cluster-scoped resources if we're doing a full-cluster backup.
