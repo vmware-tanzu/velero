@@ -1706,7 +1706,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 	tests := []struct {
 		name         string
 		backup       *velerov1.Backup
-		apiResources []*apiResource
+		apiResources []*test.APIResource
 		want         error
 	}{
 		{
@@ -1729,9 +1729,9 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 					},
 				}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("foo", "bar"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("foo", "bar"),
 				),
 			},
 			want: errors.New("\"nonexistent-operator\" is not a valid pod selector operator"),
@@ -1747,7 +1747,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 			)
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			assert.EqualError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil), tc.want.Error())
@@ -1771,7 +1771,7 @@ func TestBackupWithHooks(t *testing.T) {
 	tests := []struct {
 		name                       string
 		backup                     *velerov1.Backup
-		apiResources               []*apiResource
+		apiResources               []*test.APIResource
 		wantExecutePodCommandCalls []*expectedCall
 		wantBackedUp               []string
 	}{
@@ -1793,10 +1793,10 @@ func TestBackupWithHooks(t *testing.T) {
 					},
 				}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1842,10 +1842,10 @@ func TestBackupWithHooks(t *testing.T) {
 					},
 				}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1898,9 +1898,9 @@ func TestBackupWithHooks(t *testing.T) {
 					},
 				}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1946,10 +1946,10 @@ func TestBackupWithHooks(t *testing.T) {
 					},
 				}).
 				Backup(),
-			apiResources: []*apiResource{
-				pods(
-					newPod("ns-1", "pod-1"),
-					newPod("ns-2", "pod-2"),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1"),
+					test.NewPod("ns-2", "pod-2"),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -2004,7 +2004,7 @@ func TestBackupWithHooks(t *testing.T) {
 			}
 
 			for _, resource := range tc.apiResources {
-				h.addItems(t, resource.group, resource.version, resource.name, resource.shortName, resource.namespaced, resource.items...)
+				h.addItems(t, resource)
 			}
 
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil))
