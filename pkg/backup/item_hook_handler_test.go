@@ -694,3 +694,11 @@ func TestResourceHookApplicableTo(t *testing.T) {
 		})
 	}
 }
+
+func parseLabelSelectorOrDie(s string) labels.Selector {
+	ret, err := labels.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
