@@ -35,14 +35,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgclient "github.com/heptio/velero/pkg/client"
+	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -90,32 +94,40 @@ func TestPrioritizeResources(t *testing.T) {
 
 	logger := velerotest.NewLogger()
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var helperResourceList []*metav1.APIResourceList
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryClient := &test.DiscoveryClient{
+				FakeDiscovery: kubefake.NewSimpleClientset().Discovery().(*discoveryfake.FakeDiscovery),
+			}
 
-			for gv, resources := range test.apiResources {
-				resourceList := &metav1.APIResourceList{GroupVersion: gv}
+			helper, err := discovery.NewHelper(discoveryClient, logger)
+			require.NoError(t, err)
+
+			// add all the test case's API resources to the discovery client
+			for gvString, resources := range tc.apiResources {
+				gv, err := schema.ParseGroupVersion(gvString)
+				require.NoError(t, err)
+
 				for _, resource := range resources {
-					resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: resource})
+					discoveryClient.WithAPIResource(&test.APIResource{
+						Group:   gv.Group,
+						Version: gv.Version,
+						Name:    resource,
+					})
 				}
-				helperResourceList = append(helperResourceList, resourceList)
 			}
 
-			helper := velerotest.NewFakeDiscoveryHelper(true, nil)
-			helper.ResourceList = helperResourceList
+			require.NoError(t, helper.Refresh())
 
-			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
+			includesExcludes := collections.NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
 
-			result, err := prioritizeResources(helper, test.priorities, includesExcludes, logger)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			result, err := prioritizeResources(helper, tc.priorities, includesExcludes, logger)
+			require.NoError(t, err)
 
-			require.Equal(t, len(test.expected), len(result))
+			require.Equal(t, len(tc.expected), len(result))
 
 			for i := range result {
-				if e, a := test.expected[i], result[i].Resource; e != a {
+				if e, a := tc.expected[i], result[i].Resource; e != a {
 					t.Errorf("index %d, expected %s, got %s", i, e, a)
 				}
 			}
