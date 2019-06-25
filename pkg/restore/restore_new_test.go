@@ -646,6 +646,81 @@ func TestRestoreResourcePriorities(t *testing.T) {
 	}
 }
 
+// TestInvalidTarballContents runs restores for tarballs that are invalid in some way, and
+// verifies that the set of items created in the API and the errors returned are correct.
+// Validation is done by looking at the namespaces/names of the items in the API and the
+// Result objects returned from the restorer.
+func TestInvalidTarballContents(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         map[*test.APIResource][]string
+		wantErrs     Result
+	}{
+		{
+			name:    "empty tarball returns an error",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				done(),
+			wantErrs: Result{
+				Velero: []string{"backup does not contain top level resources directory"},
+			},
+		},
+		{
+			name:    "invalid JSON is reported as an error and restore continues",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				add("resources/pods/namespaces/ns-1/pod-1.json", []byte("invalid JSON")).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-2"),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-2"},
+			},
+			wantErrs: Result{
+				Namespaces: map[string][]string{
+					"ns-1": {"error decoding \"resources/pods/namespaces/ns-1/pod-1.json\": invalid character 'i' looking for beginning of value"},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.DiscoveryClient.WithAPIResource(r)
+			}
+			require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				nil, // volume snapshots
+				tc.tarball,
+				nil, // actions
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings)
+			assert.Equal(t, tc.wantErrs, errs)
+			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
 // assertResourceCreationOrder ensures that resources were created in the expected
 // order. Any resources *not* in resourcePriorities are required to come *after* all
 // resources in any order.
@@ -717,6 +792,8 @@ func defaultRestore() *Builder {
 // all of the items specified in 'want' (a map from an APIResource definition to a slice
 // of resource identifiers, formatted as <namespace>/<name>).
 func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]string) {
+	t.Helper()
+
 	for r, want := range want {
 		res, err := h.DynamicClient.Resource(r.GVR()).List(metav1.ListOptions{})
 		assert.NoError(t, err)

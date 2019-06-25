@@ -135,66 +135,6 @@ func TestPrioritizeResources(t *testing.T) {
 	}
 }
 
-func TestRestorePriority(t *testing.T) {
-	tests := []struct {
-		name                 string
-		fileSystem           *velerotest.FakeFileSystem
-		restore              *api.Restore
-		baseDir              string
-		prioritizedResources []schema.GroupResource
-		expectedErrors       Result
-		expectedReadDirs     []string
-	}{
-		{
-			name: "error in a single resource doesn't terminate restore immediately, but is returned",
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
-				WithDirectory("bak/resources/c/namespaces/ns-1"),
-			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir: "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"bak/resources/a/namespaces/ns-1/invalid-json.json\": invalid character 'i' looking for beginning of value"},
-				},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			log := velerotest.NewLogger()
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-
-			ctx := &context{
-				restore:              test.restore,
-				namespaceClient:      nsClient,
-				fileSystem:           test.fileSystem,
-				prioritizedResources: test.prioritizedResources,
-				log:                  log,
-				restoreDir:           test.baseDir,
-			}
-
-			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
-
-			warnings, errors := ctx.restoreFromDir()
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
-		})
-	}
-}
-
 func TestRestoreResourceForNamespace(t *testing.T) {
 	tests := []struct {
 		name                    string
@@ -204,41 +144,8 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 		includeClusterResources *bool
 		fileSystem              *velerotest.FakeFileSystem
 		actions                 []resolvedAction
-		expectedErrors          Result
 		expectedObjs            []unstructured.Unstructured
 	}{
-		{
-			name:         "no such directory causes error",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem(),
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
-				},
-			},
-		},
-		{
-			name:         "empty directory is no-op",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem().WithDirectory("configmaps"),
-		},
-		{
-			name:          "unmarshall failure does not cause immediate return",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"configmaps/cm-1-invalid.json\": invalid character 'h' in literal true (expecting 'r')"},
-				},
-			},
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
 		{
 			name:          "custom restorer is correctly used",
 			namespace:     "ns-1",
@@ -343,7 +250,9 @@ func TestRestoreResourceForNamespace(t *testing.T) {
 			assert.Empty(t, warnings.Velero)
 			assert.Empty(t, warnings.Cluster)
 			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
+			assert.Empty(t, errors.Velero)
+			assert.Empty(t, errors.Cluster)
+			assert.Empty(t, errors.Namespaces)
 		})
 	}
 }
