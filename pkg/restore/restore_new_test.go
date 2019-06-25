@@ -32,11 +32,14 @@ import (
 	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/test"
@@ -721,6 +724,237 @@ func TestInvalidTarballContents(t *testing.T) {
 	}
 }
 
+// TestRestoreItems runs restores of specific items and validates that they are created
+// with the expected metadata/spec/status in the API.
+func TestRestoreItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         []*test.APIResource
+	}{
+		{
+			name:    "metadata other than namespace/name/labels/annotations gets removed",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					test.NewPod("ns-1", "pod-1",
+						test.WithLabels("key-1", "val-1"),
+						test.WithAnnotations("key-1", "val-1"),
+						test.WithClusterName("cluster-1"),
+						test.WithFinalizers("finalizer-1")),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1",
+						test.WithLabels("key-1", "val-1", "velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						test.WithAnnotations("key-1", "val-1"),
+					),
+				),
+			},
+		},
+		{
+			name:    "status gets removed",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					&corev1api.Pod{
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: "v1",
+							Kind:       "Pod",
+						},
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "ns-1",
+							Name:      "pod-1",
+						},
+						Status: corev1api.PodStatus{
+							Message: "a non-empty status",
+						},
+					},
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1", test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1")),
+				),
+			},
+		},
+		{
+			name:    "object gets labeled with full backup and restore names when they're both shorter than 63 characters",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(test.NewPod("ns-1", "pod-1", test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"))),
+			},
+		},
+		{
+			name: "object gets labeled with full backup and restore names when they're both equal to 63 characters",
+			restore: NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").
+				Backup("the-really-long-kube-service-name-that-is-exactly-63-characters").
+				Restore(),
+			backup: backup.NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(test.NewPod("ns-1", "pod-1", test.WithLabels(
+					"velero.io/backup-name", "the-really-long-kube-service-name-that-is-exactly-63-characters",
+					"velero.io/restore-name", "the-really-long-kube-service-name-that-is-exactly-63-characters",
+				))),
+			},
+		},
+		{
+			name: "object gets labeled with shortened backup and restore names when they're both longer than 63 characters",
+			restore: NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
+				Backup("the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
+				Restore(),
+			backup: backup.NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			want: []*test.APIResource{
+				test.Pods(test.NewPod("ns-1", "pod-1", test.WithLabels(
+					"velero.io/backup-name", "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
+					"velero.io/restore-name", "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
+				))),
+			},
+		},
+		{
+			name:    "no error when service account already exists in cluster and is identical to the backed up one",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("serviceaccounts", test.NewServiceAccount("ns-1", "sa-1")).
+				done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+			},
+		},
+		{
+			name:    "service account secrets and image pull secrets are restored when service account already exists in cluster",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("serviceaccounts", &corev1api.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns-1",
+						Name:      "sa-1",
+					},
+					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
+					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
+				}).
+				done(),
+			apiResources: []*test.APIResource{
+				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+			},
+			want: []*test.APIResource{
+				test.ServiceAccounts(&corev1api.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "ns-1",
+						Name:      "sa-1",
+					},
+					Secrets:          []corev1api.ObjectReference{{Name: "secret-1"}},
+					ImagePullSecrets: []corev1api.LocalObjectReference{{Name: "pull-secret-1"}},
+				}),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.addItems(t, r)
+			}
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				nil, // volume snapshots
+				tc.tarball,
+				nil, // actions
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+
+			for _, resource := range tc.want {
+				resourceClient := h.DynamicClient.Resource(resource.GVR())
+				for _, item := range resource.Items {
+					var client dynamic.ResourceInterface
+					if item.GetNamespace() != "" {
+						client = resourceClient.Namespace(item.GetNamespace())
+					} else {
+						client = resourceClient
+					}
+
+					res, err := client.Get(item.GetName(), metav1.GetOptions{})
+					if !assert.NoError(t, err) {
+						continue
+					}
+
+					itemJSON, err := json.Marshal(item)
+					if !assert.NoError(t, err) {
+						continue
+					}
+
+					t.Logf("%v", string(itemJSON))
+
+					u := make(map[string]interface{})
+					if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
+						continue
+					}
+					want := &unstructured.Unstructured{Object: u}
+
+					// These fields get non-nil zero values in the unstructured objects if they're
+					// empty in the structured objects. Remove them to make comparison easier.
+					unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
+					unstructured.RemoveNestedField(want.Object, "status")
+
+					assert.Equal(t, want, res)
+				}
+			}
+		})
+	}
+}
+
 // assertResourceCreationOrder ensures that resources were created in the expected
 // order. Any resources *not* in resourcePriorities are required to come *after* all
 // resources in any order.
@@ -923,5 +1157,31 @@ func newHarness(t *testing.T) *harness {
 			resticTimeout:         0,
 		},
 		log: log,
+	}
+}
+
+func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
+	t.Helper()
+
+	h.DiscoveryClient.WithAPIResource(resource)
+	require.NoError(t, h.restorer.discoveryHelper.Refresh())
+
+	for _, item := range resource.Items {
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(item)
+		require.NoError(t, err)
+
+		unstructuredObj := &unstructured.Unstructured{Object: obj}
+
+		// These fields have non-nil zero values in the unstructured objects. We remove
+		// them to make comparison easier in our tests.
+		unstructured.RemoveNestedField(unstructuredObj.Object, "metadata", "creationTimestamp")
+		unstructured.RemoveNestedField(unstructuredObj.Object, "status")
+
+		if resource.Namespaced {
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(unstructuredObj, metav1.CreateOptions{})
+		} else {
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(unstructuredObj, metav1.CreateOptions{})
+		}
+		require.NoError(t, err)
 	}
 }

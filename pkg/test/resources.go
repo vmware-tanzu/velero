@@ -294,3 +294,19 @@ func WithAnnotations(vals ...string) func(obj metav1.Object) {
 		obj.SetAnnotations(objAnnotations)
 	}
 }
+
+// WithClusterName is a functional option that applies the specified
+// cluster name to an object.
+func WithClusterName(val string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetClusterName(val)
+	}
+}
+
+// WithFinalizers is a functional option that applies the specified
+// finalizers to an object.
+func WithFinalizers(vals ...string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetFinalizers(vals)
+	}
+}
