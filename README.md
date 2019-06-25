@@ -20,7 +20,7 @@ You can run Velero in clusters on a cloud provider or on-premises. For detailed 
 ## Installation
 
 We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
-`velero` command-line client. Follow the instructions under the **Install** section of [our documentation][29] to get started.
+`velero` command-line client. Follow the [installation instructions][28] to get started.
 
 _The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
@@ -72,7 +72,7 @@ See [the list of releases][6] to find out about feature changes.
 [25]: https://kubernetes.slack.com/messages/velero
 [26]: https://velero.io/docs/zenhub
 
-
+[28]: https://velero.io/docs/install-overview
 [29]: https://velero.io/docs/
 [30]: https://velero.io/docs/troubleshooting
 
