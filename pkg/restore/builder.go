@@ -60,6 +60,42 @@ func (b *Builder) Backup(name string) *Builder {
 	return b
 }
 
+// IncludedNamespaces sets the Restore's included namespaces.
+func (b *Builder) IncludedNamespaces(namespaces ...string) *Builder {
+	b.restore.Spec.IncludedNamespaces = namespaces
+	return b
+}
+
+// ExcludedNamespaces sets the Restore's excluded namespaces.
+func (b *Builder) ExcludedNamespaces(namespaces ...string) *Builder {
+	b.restore.Spec.ExcludedNamespaces = namespaces
+	return b
+}
+
+// IncludedResources sets the Restore's included resources.
+func (b *Builder) IncludedResources(resources ...string) *Builder {
+	b.restore.Spec.IncludedResources = resources
+	return b
+}
+
+// ExcludedResources sets the Restore's excluded resources.
+func (b *Builder) ExcludedResources(resources ...string) *Builder {
+	b.restore.Spec.ExcludedResources = resources
+	return b
+}
+
+// IncludeClusterResources sets the Restore's "include cluster resources" flag.
+func (b *Builder) IncludeClusterResources(val bool) *Builder {
+	b.restore.Spec.IncludeClusterResources = &val
+	return b
+}
+
+// LabelSelector sets the Restore's label selector.
+func (b *Builder) LabelSelector(selector *metav1.LabelSelector) *Builder {
+	b.restore.Spec.LabelSelector = selector
+	return b
+}
+
 // NamespaceMappings sets the Restore's namespace mappings.
 func (b *Builder) NamespaceMappings(mapping ...string) *Builder {
 	if b.restore.Spec.NamespaceMapping == nil {

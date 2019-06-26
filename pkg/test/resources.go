@@ -121,69 +121,176 @@ func Namespaces(items ...metav1.Object) *APIResource {
 	}
 }
 
-func NewPod(ns, name string) *corev1.Pod {
-	return &corev1.Pod{
+func ServiceAccounts(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "",
+		Version:    "v1",
+		Name:       "serviceaccounts",
+		ShortName:  "sa",
+		Namespaced: true,
+		Items:      items,
+	}
+}
+
+type ObjectOpts func(metav1.Object)
+
+func NewPod(ns, name string, opts ...ObjectOpts) *corev1.Pod {
+	obj := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta(ns, name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
-func NewPVC(ns, name string) *corev1.PersistentVolumeClaim {
-	return &corev1.PersistentVolumeClaim{
+func NewPVC(ns, name string, opts ...ObjectOpts) *corev1.PersistentVolumeClaim {
+	obj := &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolumeClaim",
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta(ns, name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
-func NewPV(name string) *corev1.PersistentVolume {
-	return &corev1.PersistentVolume{
+func NewPV(name string, opts ...ObjectOpts) *corev1.PersistentVolume {
+	obj := &corev1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "PersistentVolume",
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta("", name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
-func NewSecret(ns, name string) *corev1.Secret {
-	return &corev1.Secret{
+func NewSecret(ns, name string, opts ...ObjectOpts) *corev1.Secret {
+	obj := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Secret",
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta(ns, name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
-func NewDeployment(ns, name string) *appsv1.Deployment {
-	return &appsv1.Deployment{
+func NewDeployment(ns, name string, opts ...ObjectOpts) *appsv1.Deployment {
+	obj := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
 		},
 		ObjectMeta: objectMeta(ns, name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
-func NewNamespace(name string) *corev1.Namespace {
-	return &corev1.Namespace{
+func NewServiceAccount(ns, name string, opts ...ObjectOpts) *corev1.ServiceAccount {
+	obj := &corev1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
+		ObjectMeta: objectMeta(ns, name),
+	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
+}
+
+func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
+	obj := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta("", name),
 	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
 }
 
 func objectMeta(ns, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: ns,
 		Name:      name,
+	}
+}
+
+// WithLabels is a functional option that applies the specified
+// label keys/values to an object.
+func WithLabels(labels ...string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		objLabels := obj.GetLabels()
+		if objLabels == nil {
+			objLabels = make(map[string]string)
+		}
+
+		if len(labels)%2 != 0 {
+			labels = append(labels, "")
+		}
+
+		for i := 0; i < len(labels); i += 2 {
+			objLabels[labels[i]] = labels[i+1]
+		}
+
+		obj.SetLabels(objLabels)
+	}
+}
+
+// WithAnnotations is a functional option that applies the specified
+// annotation keys/values to an object.
+func WithAnnotations(vals ...string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		objAnnotations := obj.GetAnnotations()
+		if objAnnotations == nil {
+			objAnnotations = make(map[string]string)
+		}
+
+		if len(vals)%2 != 0 {
+			vals = append(vals, "")
+		}
+
+		for i := 0; i < len(vals); i += 2 {
+			objAnnotations[vals[i]] = vals[i+1]
+		}
+
+		obj.SetAnnotations(objAnnotations)
 	}
 }
