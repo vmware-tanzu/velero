@@ -1060,6 +1060,34 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			},
 		},
 		{
+			name:    "single action with a namespace selector runs only for resources in that namespace",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1"): {"ns-1/pod-1", "ns-1/pvc-1"},
+			},
+		},
+		{
+			name:    "single action with a resource and namespace selector runs only for matching resources in that namespace",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("pods"): {"ns-1/pod-1"},
+			},
+		},
+		{
 			name:    "multiple actions, each with a different resource selector using short name, run for matching resources",
 			restore: defaultRestore().Restore(),
 			backup:  defaultBackup().Backup(),

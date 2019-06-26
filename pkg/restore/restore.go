@@ -262,9 +262,8 @@ func (kr *kubernetesRestorer) Restore(
 			log:        log,
 			fileSystem: kr.fileSystem,
 		},
-		applicableActions: make(map[schema.GroupResource][]resolvedAction),
-		resourceClients:   make(map[resourceClientKey]client.Dynamic),
-		restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
+		resourceClients: make(map[resourceClientKey]client.Dynamic),
+		restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
 	}
 
 	return restoreCtx.execute()
@@ -351,7 +350,6 @@ type context struct {
 	volumeSnapshots            []*volume.Snapshot
 	resourceTerminatingTimeout time.Duration
 	extractor                  *backupExtractor
-	applicableActions          map[schema.GroupResource][]resolvedAction
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
 }
@@ -589,10 +587,6 @@ func addToResult(r *Result, ns string, e error) {
 }
 
 func (ctx *context) getApplicableActions(groupResource schema.GroupResource, namespace string) []resolvedAction {
-	if actions, ok := ctx.applicableActions[groupResource]; ok {
-		return actions
-	}
-
 	var actions []resolvedAction
 	for _, action := range ctx.actions {
 		if !action.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
@@ -603,10 +597,13 @@ func (ctx *context) getApplicableActions(groupResource schema.GroupResource, nam
 			continue
 		}
 
+		if namespace == "" && !action.namespaceIncludesExcludes.IncludeEverything() {
+			continue
+		}
+
 		actions = append(actions, action)
 	}
 
-	ctx.applicableActions[groupResource] = actions
 	return actions
 }
 
