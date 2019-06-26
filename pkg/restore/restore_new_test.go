@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"testing"
 	"time"
 
@@ -42,8 +43,10 @@ import (
 	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/encode"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	testutil "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -950,6 +953,173 @@ func TestRestoreItems(t *testing.T) {
 
 					assert.Equal(t, want, res)
 				}
+			}
+		})
+	}
+}
+
+// recordResourcesAction is a restore item action that can be configured
+// to run for specific resources/namespaces and simply records the items
+// that it is executed for.
+type recordResourcesAction struct {
+	selector        velero.ResourceSelector
+	ids             []string
+	additionalItems []velero.ResourceIdentifier
+}
+
+func (a *recordResourcesAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
+func (a *recordResourcesAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	metadata, err := meta.Accessor(input.Item)
+	if err != nil {
+		return &velero.RestoreItemActionExecuteOutput{
+			UpdatedItem:     input.Item,
+			AdditionalItems: a.additionalItems,
+		}, err
+	}
+	a.ids = append(a.ids, kubeutil.NamespaceAndName(metadata))
+
+	return &velero.RestoreItemActionExecuteOutput{
+		UpdatedItem:     input.Item,
+		AdditionalItems: a.additionalItems,
+	}, nil
+}
+
+func (a *recordResourcesAction) ForResource(resource string) *recordResourcesAction {
+	a.selector.IncludedResources = append(a.selector.IncludedResources, resource)
+	return a
+}
+
+func (a *recordResourcesAction) ForNamespace(namespace string) *recordResourcesAction {
+	a.selector.IncludedNamespaces = append(a.selector.IncludedNamespaces, namespace)
+	return a
+}
+
+func (a *recordResourcesAction) ForLabelSelector(selector string) *recordResourcesAction {
+	a.selector.LabelSelector = selector
+	return a
+}
+
+func (a *recordResourcesAction) WithAdditionalItems(items []velero.ResourceIdentifier) *recordResourcesAction {
+	a.additionalItems = items
+	return a
+}
+
+// TestRestoreActionsRunsForCorrectItems runs restores with restore item actions, and
+// verifies that each restore item action is run for the correct set of resources based on its
+// AppliesTo() resource selector. Verification is done by using the recordResourcesAction struct,
+// which records which resources it's executed for.
+func TestRestoreActionsRunForCorrectItems(t *testing.T) {
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      map[*recordResourcesAction][]string
+	}{
+		{
+			name:    "single action with no selector runs for all items",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction): {"ns-1/pod-1", "ns-2/pod-2", "pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "single action with a resource selector for namespaced resources runs only for matching resources",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("pods"): {"ns-1/pod-1", "ns-2/pod-2"},
+			},
+		},
+		{
+			name:    "single action with a resource selector for cluster-scoped resources runs only for matching resources",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("persistentvolumes"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "multiple actions, each with a different resource selector using short name, run for matching resources",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).
+				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("po"): {"ns-1/pod-1", "ns-2/pod-2"},
+				new(recordResourcesAction).ForResource("pv"): {"pv-1", "pv-2"},
+			},
+		},
+		{
+			name:    "actions with selectors that don't match anything don't run for any resources",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				addItems("persistentvolumeclaims", test.NewPVC("ns-2", "pvc-2")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
+				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.addItems(t, r)
+			}
+
+			actions := []velero.RestoreItemAction{}
+			for action := range tc.actions {
+				actions = append(actions, action)
+			}
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				nil, // volume snapshots
+				tc.tarball,
+				actions,
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+
+			for action, want := range tc.actions {
+				sort.Strings(want)
+				sort.Strings(action.ids)
+				assert.Equal(t, want, action.ids)
 			}
 		})
 	}
