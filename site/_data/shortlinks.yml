@@ -7,3 +7,6 @@
 - title: ZenHub
   key: zenhub
   destination: zenhub
+- title: Install Overview
+  key: install-overview
+  destination: install-overview

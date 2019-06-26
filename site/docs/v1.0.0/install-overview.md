@@ -6,12 +6,6 @@ You can run Velero in any namespace, which requires additional customization. Se
 
 You can also use Velero's integration with restic, which requires additional setup. See [restic instructions][20].
 
-## Customize configuration
-
-Whether you run Velero on a cloud provider or on-premises, if you have more than one volume snapshot location for a given volume provider, you can specify its default location for backups by setting a server flag in your Velero deployment YAML.
-
-For details, see the documentation topics for individual cloud providers.
-
 ## Cloud provider
 
 The Velero client includes an `install` command to specify the settings for each supported cloud provider. You can install Velero for the included cloud providers using the following command:
@@ -53,6 +47,12 @@ Second, if you need to back up persistent volume data, you must select a volume 
 the supported options. For example, if you use [Portworx][102] for persistent storage, you can install their Velero plugin to get native Portworx snapshots as part
 of your Velero backups. If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][20], which provides a
 platform-agnostic backup solution for volume data.
+
+## Customize configuration
+
+Whether you run Velero on a cloud provider or on-premises, if you have more than one volume snapshot location for a given volume provider, you can specify its default location for backups by setting a server flag in your Velero deployment YAML.
+
+For details, see the documentation topics for individual cloud providers.
 
 ## Removing Velero
 
