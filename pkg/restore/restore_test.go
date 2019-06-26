@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/watch"
 	discoveryfake "k8s.io/client-go/discovery/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -443,27 +442,6 @@ type mockPVRestorer struct {
 func (r *mockPVRestorer) executePVAction(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
 	args := r.Called(obj)
 	return args.Get(0).(*unstructured.Unstructured), args.Error(1)
-}
-
-type mockWatch struct {
-	mock.Mock
-}
-
-func (w *mockWatch) Stop() {
-	w.Called()
-}
-
-func (w *mockWatch) ResultChan() <-chan watch.Event {
-	args := w.Called()
-	return args.Get(0).(chan watch.Event)
-}
-
-type fakeWatch struct{}
-
-func (w *fakeWatch) Stop() {}
-
-func (w *fakeWatch) ResultChan() <-chan watch.Event {
-	return make(chan watch.Event)
 }
 
 func TestResetMetadataAndStatus(t *testing.T) {

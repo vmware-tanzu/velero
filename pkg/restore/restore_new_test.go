@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -917,43 +918,7 @@ func TestRestoreItems(t *testing.T) {
 			)
 
 			assertEmptyResults(t, warnings, errs)
-
-			for _, resource := range tc.want {
-				resourceClient := h.DynamicClient.Resource(resource.GVR())
-				for _, item := range resource.Items {
-					var client dynamic.ResourceInterface
-					if item.GetNamespace() != "" {
-						client = resourceClient.Namespace(item.GetNamespace())
-					} else {
-						client = resourceClient
-					}
-
-					res, err := client.Get(item.GetName(), metav1.GetOptions{})
-					if !assert.NoError(t, err) {
-						continue
-					}
-
-					itemJSON, err := json.Marshal(item)
-					if !assert.NoError(t, err) {
-						continue
-					}
-
-					t.Logf("%v", string(itemJSON))
-
-					u := make(map[string]interface{})
-					if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
-						continue
-					}
-					want := &unstructured.Unstructured{Object: u}
-
-					// These fields get non-nil zero values in the unstructured objects if they're
-					// empty in the structured objects. Remove them to make comparison easier.
-					unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
-					unstructured.RemoveNestedField(want.Object, "status")
-
-					assert.Equal(t, want, res)
-				}
-			}
+			assertRestoredItems(t, h, tc.want)
 		})
 	}
 }
@@ -1122,6 +1087,177 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				assert.Equal(t, want, action.ids)
 			}
 		})
+	}
+}
+
+// pluggableAction is a restore item action that can be plugged with an Execute
+// function body at runtime.
+type pluggableAction struct {
+	selector    velero.ResourceSelector
+	executeFunc func(*velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error)
+}
+
+func (a *pluggableAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	if a.executeFunc == nil {
+		return &velero.RestoreItemActionExecuteOutput{
+			UpdatedItem: input.Item,
+		}, nil
+	}
+
+	return a.executeFunc(input)
+}
+
+func (a *pluggableAction) AppliesTo() (velero.ResourceSelector, error) {
+	return a.selector, nil
+}
+
+// TestRestoreActionModifications runs restores with restore item actions that modify resources, and
+// verifies that that the modified item is correctly created in the API. Verification is done by looking
+// at the full object in the API.
+func TestRestoreActionModifications(t *testing.T) {
+	// modifyingActionGetter is a helper function that returns a *pluggableAction, whose Execute(...)
+	// method modifies the item being passed in by calling the 'modify' function on it.
+	modifyingActionGetter := func(modify func(*unstructured.Unstructured)) *pluggableAction {
+		return &pluggableAction{
+			executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+				obj, ok := input.Item.(*unstructured.Unstructured)
+				if !ok {
+					return nil, errors.Errorf("unexpected type %T", input.Item)
+				}
+
+				res := obj.DeepCopy()
+				modify(res)
+
+				return &velero.RestoreItemActionExecuteOutput{
+					UpdatedItem: res,
+				}, nil
+			},
+		}
+	}
+
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		actions      []velero.RestoreItemAction
+		want         []*test.APIResource
+	}{
+		{
+			name:         "action that adds a label to item gets restored",
+			restore:      defaultRestore().Restore(),
+			backup:       defaultBackup().Backup(),
+			tarball:      newTarWriter(t).addItems("pods", test.NewPod("ns-1", "pod-1")).done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []velero.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(map[string]string{"updated": "true"})
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1", test.WithLabels("updated", "true"))),
+			},
+		},
+		{
+			name:         "action that removes a label to item gets restored",
+			restore:      defaultRestore().Restore(),
+			backup:       defaultBackup().Backup(),
+			tarball:      newTarWriter(t).addItems("pods", test.NewPod("ns-1", "pod-1", test.WithLabels("should-be-removed", "true"))).done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []velero.RestoreItemAction{
+				modifyingActionGetter(func(item *unstructured.Unstructured) {
+					item.SetLabels(nil)
+				}),
+			},
+			want: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1")),
+			},
+		},
+		// TODO action that modifies namespace/name - what's the expected behavior?
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			for _, r := range tc.apiResources {
+				h.addItems(t, r)
+			}
+
+			// every restored item should have the restore and backup name labels, set
+			// them here so we don't have to do it in every test case definition above.
+			for _, resource := range tc.want {
+				for _, item := range resource.Items {
+					labels := item.GetLabels()
+					if labels == nil {
+						labels = make(map[string]string)
+					}
+
+					labels["velero.io/restore-name"] = tc.restore.Name
+					labels["velero.io/backup-name"] = tc.restore.Spec.BackupName
+
+					item.SetLabels(labels)
+				}
+			}
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				nil, // volume snapshots
+				tc.tarball,
+				tc.actions,
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertRestoredItems(t, h, tc.want)
+		})
+	}
+}
+
+func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
+	t.Helper()
+
+	for _, resource := range want {
+		resourceClient := h.DynamicClient.Resource(resource.GVR())
+		for _, item := range resource.Items {
+			var client dynamic.ResourceInterface
+			if item.GetNamespace() != "" {
+				client = resourceClient.Namespace(item.GetNamespace())
+			} else {
+				client = resourceClient
+			}
+
+			res, err := client.Get(item.GetName(), metav1.GetOptions{})
+			if !assert.NoError(t, err) {
+				continue
+			}
+
+			itemJSON, err := json.Marshal(item)
+			if !assert.NoError(t, err) {
+				continue
+			}
+
+			t.Logf("%v", string(itemJSON))
+
+			u := make(map[string]interface{})
+			if !assert.NoError(t, json.Unmarshal(itemJSON, &u)) {
+				continue
+			}
+			want := &unstructured.Unstructured{Object: u}
+
+			// These fields get non-nil zero values in the unstructured objects if they're
+			// empty in the structured objects. Remove them to make comparison easier.
+			unstructured.RemoveNestedField(want.Object, "metadata", "creationTimestamp")
+			unstructured.RemoveNestedField(want.Object, "status")
+
+			assert.Equal(t, want, res)
+		}
 	}
 }
 
