@@ -25,6 +25,7 @@ builds:
       - amd64
       - arm
       - arm64
+      - ppc64le
     ignore:
       # don't build arm/arm64 for darwin or windows
       - goos: darwin
