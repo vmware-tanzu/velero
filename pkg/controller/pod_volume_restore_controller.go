@@ -266,7 +266,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		r.Status.StartTimestamp.Time = c.clock.Now()
 	})
 	if err != nil {
-		log.WithError(err).Error("Error setting startTimestamp and phase to InProgress")
+		log.WithError(err).Error("Error setting PodVolumeRestore startTimestamp and phase to InProgress")
 		return errors.WithStack(err)
 	}
 
@@ -301,7 +301,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 		r.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
 		r.Status.CompletionTimestamp.Time = c.clock.Now()
 	}); err != nil {
-		log.WithError(err).Error("Error setting completionTimestamp and phase to Completed")
+		log.WithError(err).Error("Error setting PodVolumeRestore completionTimestamp and phase to Completed")
 		return err
 	}
 
@@ -408,7 +408,7 @@ func (c *podVolumeRestoreController) failRestore(req *velerov1api.PodVolumeResto
 		pvr.Status.Message = msg
 		pvr.Status.CompletionTimestamp.Time = c.clock.Now()
 	}); err != nil {
-		log.WithError(err).Error("Error setting phase to Failed")
+		log.WithError(err).Error("Error setting PodVolumeRestore phase to Failed")
 		return err
 	}
 	return nil

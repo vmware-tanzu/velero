@@ -181,7 +181,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		r.Status.StartTimestamp.Time = c.clock.Now()
 	})
 	if err != nil {
-		log.WithError(err).Error("Error setting backup StartTimestamp and phase to InProgress")
+		log.WithError(err).Error("Error setting PodVolumeBackup StartTimestamp and phase to InProgress")
 		return errors.WithStack(err)
 	}
 
@@ -265,7 +265,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		}
 	})
 	if err != nil {
-		log.WithError(err).Error("Error setting phase to Completed")
+		log.WithError(err).Error("Error setting PodVolumeBackup phase to Completed")
 		return err
 	}
 
@@ -309,7 +309,7 @@ func (c *podVolumeBackupController) fail(req *velerov1api.PodVolumeBackup, msg s
 		r.Status.Message = msg
 		r.Status.CompletionTimestamp.Time = c.clock.Now()
 	}); err != nil {
-		log.WithError(err).Error("Error setting phase to Failed")
+		log.WithError(err).Error("Error setting PodVolumeBackup phase to Failed")
 		return err
 	}
 	return nil
