@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	kubetesting "k8s.io/client-go/testing"
@@ -1383,6 +1384,211 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 
 			assertEmptyResults(t, warnings, errs)
 			assertAPIContents(t, h, tc.want)
+		})
+	}
+}
+
+// TestShouldRestore runs the ShouldRestore function for various permutations of
+// existing/nonexisting/being-deleted PVs, PVCs, and namespaces, and verifies the
+// result/error matches expectations.
+func TestShouldRestore(t *testing.T) {
+	tests := []struct {
+		name         string
+		pvName       string
+		apiResources []*test.APIResource
+		namespaces   []*corev1api.Namespace
+		want         bool
+		wantErr      error
+	}{
+		{
+			name:   "when PV is not found, result is true",
+			pvName: "pv-1",
+			want:   true,
+		},
+		{
+			name:   "when PV is found and has Phase=Released, result is false",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "v1",
+						Kind:       "PersistentVolume",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "pv-1",
+					},
+					Status: corev1api.PersistentVolumeStatus{
+						Phase: corev1api.VolumeReleased,
+					},
+				}),
+			},
+			want: false,
+		},
+		{
+			name:   "when PV is found and has associated PVC and namespace that aren't deleting, result is false",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+			},
+			namespaces: []*corev1api.Namespace{test.NewNamespace("ns-1")},
+			want:       false,
+		},
+		{
+			name:   "when PV is found and has associated PVC that is deleting, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+				test.PVCs(
+					test.NewPVC("ns-1", "pvc-1", test.WithDeletionTimestamp(time.Now())),
+				),
+			},
+			want:    false,
+			wantErr: errors.New("timed out waiting for the condition"),
+		},
+		{
+			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that is terminating, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+			},
+			namespaces: []*corev1api.Namespace{
+				{
+					TypeMeta:   test.NewNamespace("").TypeMeta,
+					ObjectMeta: test.NewNamespace("ns-1").ObjectMeta,
+					Status: corev1api.NamespaceStatus{
+						Phase: corev1api.NamespaceTerminating,
+					},
+				},
+			},
+			want:    false,
+			wantErr: errors.New("timed out waiting for the condition"),
+		},
+		{
+			name:   "when PV is found, has associated PVC that's not deleting, has associated NS that has deletion timestamp, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+			},
+			namespaces: []*corev1api.Namespace{
+				test.NewNamespace("ns-1", test.WithDeletionTimestamp(time.Now())),
+			},
+			want:    false,
+			wantErr: errors.New("timed out waiting for the condition"),
+		},
+		{
+			name:   "when PV is found, associated PVC is not found, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+			},
+			want:    false,
+			wantErr: errors.New("timed out waiting for the condition"),
+		},
+		{
+			name:   "when PV is found, has associated PVC, associated namespace not found, result is false + timeout error",
+			pvName: "pv-1",
+			apiResources: []*test.APIResource{
+				test.PVs(&corev1api.PersistentVolume{
+					TypeMeta:   test.NewPV("").TypeMeta,
+					ObjectMeta: test.NewPV("pv-1").ObjectMeta,
+					Spec: corev1api.PersistentVolumeSpec{
+						ClaimRef: &corev1api.ObjectReference{
+							Namespace: "ns-1",
+							Name:      "pvc-1",
+						},
+					},
+				}),
+				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+			},
+			want:    false,
+			wantErr: errors.New("timed out waiting for the condition"),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+
+			ctx := &context{
+				log:                        h.log,
+				dynamicFactory:             client.NewDynamicFactory(h.DynamicClient),
+				namespaceClient:            h.KubeClient.CoreV1().Namespaces(),
+				resourceTerminatingTimeout: time.Millisecond,
+			}
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			for _, ns := range tc.namespaces {
+				_, err := ctx.namespaceClient.Create(ns)
+				require.NoError(t, err)
+			}
+
+			pvClient, err := ctx.dynamicFactory.ClientForGroupVersionResource(
+				schema.GroupVersion{Group: "", Version: "v1"},
+				metav1.APIResource{Name: "persistentvolumes"},
+				"",
+			)
+			require.NoError(t, err)
+
+			res, err := ctx.shouldRestore(tc.pvName, pvClient)
+			assert.Equal(t, tc.want, res)
+			if tc.wantErr != nil {
+				if assert.NotNil(t, err, "expected a non-nil error") {
+					assert.EqualError(t, err, tc.wantErr.Error())
+				}
+			} else {
+				assert.Nil(t, err)
+			}
 		})
 	}
 }

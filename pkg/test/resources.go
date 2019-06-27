@@ -17,6 +17,8 @@ limitations under the License.
 package test
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -308,5 +310,13 @@ func WithClusterName(val string) func(obj metav1.Object) {
 func WithFinalizers(vals ...string) func(obj metav1.Object) {
 	return func(obj metav1.Object) {
 		obj.SetFinalizers(vals)
+	}
+}
+
+// WithDeletionTimestamp is a functional option that applies the specified
+// deletion timestamp to an object.
+func WithDeletionTimestamp(val time.Time) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetDeletionTimestamp(&metav1.Time{Time: val})
 	}
 }
