@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -733,7 +734,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (R
 		fullPath := filepath.Join(resourcePath, file.Name())
 		obj, err := ctx.unmarshal(fullPath)
 		if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error decoding %q: %v", fullPath, err))
+			addToResult(&errs, namespace, fmt.Errorf("error decoding %q: %v", strings.Replace(fullPath, ctx.restoreDir+"/", "", -1), err))
 			continue
 		}
 

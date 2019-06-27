@@ -21,8 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -35,16 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
+	discoveryfake "k8s.io/client-go/discovery/fake"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgclient "github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/collections"
-	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
@@ -90,459 +89,43 @@ func TestPrioritizeResources(t *testing.T) {
 
 	logger := velerotest.NewLogger()
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var helperResourceList []*metav1.APIResourceList
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryClient := &test.DiscoveryClient{
+				FakeDiscovery: kubefake.NewSimpleClientset().Discovery().(*discoveryfake.FakeDiscovery),
+			}
 
-			for gv, resources := range test.apiResources {
-				resourceList := &metav1.APIResourceList{GroupVersion: gv}
+			helper, err := discovery.NewHelper(discoveryClient, logger)
+			require.NoError(t, err)
+
+			// add all the test case's API resources to the discovery client
+			for gvString, resources := range tc.apiResources {
+				gv, err := schema.ParseGroupVersion(gvString)
+				require.NoError(t, err)
+
 				for _, resource := range resources {
-					resourceList.APIResources = append(resourceList.APIResources, metav1.APIResource{Name: resource})
+					discoveryClient.WithAPIResource(&test.APIResource{
+						Group:   gv.Group,
+						Version: gv.Version,
+						Name:    resource,
+					})
 				}
-				helperResourceList = append(helperResourceList, resourceList)
 			}
 
-			helper := velerotest.NewFakeDiscoveryHelper(true, nil)
-			helper.ResourceList = helperResourceList
+			require.NoError(t, helper.Refresh())
 
-			includesExcludes := collections.NewIncludesExcludes().Includes(test.includes...).Excludes(test.excludes...)
+			includesExcludes := collections.NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
 
-			result, err := prioritizeResources(helper, test.priorities, includesExcludes, logger)
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+			result, err := prioritizeResources(helper, tc.priorities, includesExcludes, logger)
+			require.NoError(t, err)
 
-			require.Equal(t, len(test.expected), len(result))
+			require.Equal(t, len(tc.expected), len(result))
 
 			for i := range result {
-				if e, a := test.expected[i], result[i].Resource; e != a {
+				if e, a := tc.expected[i], result[i].Resource; e != a {
 					t.Errorf("index %d, expected %s, got %s", i, e, a)
 				}
 			}
-		})
-	}
-}
-
-func TestRestorePriority(t *testing.T) {
-	tests := []struct {
-		name                 string
-		fileSystem           *velerotest.FakeFileSystem
-		restore              *api.Restore
-		baseDir              string
-		prioritizedResources []schema.GroupResource
-		expectedErrors       Result
-		expectedReadDirs     []string
-	}{
-		{
-			name: "error in a single resource doesn't terminate restore immediately, but is returned",
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("bak/resources/a/namespaces/ns-1/invalid-json.json", []byte("invalid json")).
-				WithDirectory("bak/resources/c/namespaces/ns-1"),
-			restore: &api.Restore{Spec: api.RestoreSpec{IncludedNamespaces: []string{"*"}}},
-			baseDir: "bak",
-			prioritizedResources: []schema.GroupResource{
-				{Resource: "a"},
-				{Resource: "b"},
-				{Resource: "c"},
-			},
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"bak/resources/a/namespaces/ns-1/invalid-json.json\": invalid character 'i' looking for beginning of value"},
-				},
-			},
-			expectedReadDirs: []string{"bak/resources", "bak/resources/a/namespaces", "bak/resources/a/namespaces/ns-1", "bak/resources/c/namespaces", "bak/resources/c/namespaces/ns-1"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			log := velerotest.NewLogger()
-
-			nsClient := &velerotest.FakeNamespaceClient{}
-
-			ctx := &context{
-				restore:              test.restore,
-				namespaceClient:      nsClient,
-				fileSystem:           test.fileSystem,
-				prioritizedResources: test.prioritizedResources,
-				log:                  log,
-				restoreDir:           test.baseDir,
-			}
-
-			nsClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&v1.Namespace{}, nil)
-
-			warnings, errors := ctx.restoreFromDir()
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-
-			assert.Equal(t, test.expectedReadDirs, test.fileSystem.ReadDirCalls)
-		})
-	}
-}
-
-func TestRestoreResourceForNamespace(t *testing.T) {
-	tests := []struct {
-		name                    string
-		namespace               string
-		resourcePath            string
-		labelSelector           labels.Selector
-		includeClusterResources *bool
-		fileSystem              *velerotest.FakeFileSystem
-		actions                 []resolvedAction
-		expectedErrors          Result
-		expectedObjs            []unstructured.Unstructured
-	}{
-		{
-			name:         "no such directory causes error",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem(),
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error reading \"configmaps\" resource directory: open configmaps: file does not exist"},
-				},
-			},
-		},
-		{
-			name:         "empty directory is no-op",
-			namespace:    "ns-1",
-			resourcePath: "configmaps",
-			fileSystem:   velerotest.NewFakeFileSystem().WithDirectory("configmaps"),
-		},
-		{
-			name:          "unmarshall failure does not cause immediate return",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1-invalid.json", []byte("this is not valid json")).
-				WithFile("configmaps/cm-2.json", newNamedTestConfigMap("cm-2").ToJSON()),
-			expectedErrors: Result{
-				Namespaces: map[string][]string{
-					"ns-1": {"error decoding \"configmaps/cm-1-invalid.json\": invalid character 'h' in literal true (expecting 'r')"},
-				},
-			},
-			expectedObjs: toUnstructured(newNamedTestConfigMap("cm-2").ConfigMap),
-		},
-		{
-			name:          "custom restorer is correctly used",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			actions: []resolvedAction{
-				{
-					RestoreItemAction:         newFakeAction("configmaps"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("configmaps"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-			expectedObjs: toUnstructured(newTestConfigMap().WithLabels(map[string]string{"fake-restorer": "foo"}).ConfigMap),
-		},
-		{
-			name:          "custom restorer for different group/resource is not used",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			labelSelector: labels.NewSelector(),
-			fileSystem:    velerotest.NewFakeFileSystem().WithFile("configmaps/cm-1.json", newTestConfigMap().ToJSON()),
-			actions: []resolvedAction{
-				{
-					RestoreItemAction:         newFakeAction("foo-resource"),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes().Includes("foo-resource"),
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-			expectedObjs: toUnstructured(newTestConfigMap().ConfigMap),
-		},
-	}
-
-	var (
-		client                 = fake.NewSimpleClientset()
-		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
-		snapshotLocationLister = sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister()
-	)
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &velerotest.FakeDynamicClient{}
-			for i := range test.expectedObjs {
-				addRestoreLabels(&test.expectedObjs[i], "my-restore", "my-backup")
-				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
-			}
-
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
-
-			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, configMapResource, test.namespace).Return(resourceClient, nil)
-
-			pvResource := metav1.APIResource{Name: "persistentvolumes", Namespaced: false}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, pvResource, test.namespace).Return(resourceClient, nil)
-			resourceClient.On("Watch", metav1.ListOptions{}).Return(&fakeWatch{}, nil)
-			if test.resourcePath == "persistentvolumes" {
-				resourceClient.On("Get", mock.Anything, metav1.GetOptions{}).Return(&unstructured.Unstructured{}, k8serrors.NewNotFound(schema.GroupResource{Resource: "persistentvolumes"}, ""))
-			}
-
-			// Assume the persistentvolume doesn't already exist in the cluster.
-			saResource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, saResource, test.namespace).Return(resourceClient, nil)
-
-			podResource := metav1.APIResource{Name: "pods", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, podResource, test.namespace).Return(resourceClient, nil)
-
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        test.actions,
-				fileSystem:     test.fileSystem,
-				selector:       test.labelSelector,
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      "my-restore",
-					},
-					Spec: api.RestoreSpec{
-						IncludeClusterResources: test.includeClusterResources,
-						BackupName:              "my-backup",
-					},
-				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
-				pvRestorer: &pvRestorer{
-					logger: logging.DefaultLogger(logrus.DebugLevel),
-					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
-						volumeMap: map[velerotest.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-						volumeID:  "volume-1",
-					},
-					snapshotLocationLister: snapshotLocationLister,
-					backup:                 &api.Backup{},
-				},
-				applicableActions: make(map[schema.GroupResource][]resolvedAction),
-				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
-				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
-			}
-
-			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-		})
-	}
-}
-
-func TestRestoreLabels(t *testing.T) {
-	tests := []struct {
-		name                    string
-		namespace               string
-		resourcePath            string
-		backupName              string
-		restoreName             string
-		labelSelector           labels.Selector
-		includeClusterResources *bool
-		fileSystem              *velerotest.FakeFileSystem
-		actions                 []resolvedAction
-		expectedErrors          Result
-		expectedObjs            []unstructured.Unstructured
-	}{
-		{
-			name:          "backup name and restore name less than 63 characters",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			backupName:    "less-than-63-characters",
-			restoreName:   "less-than-63-characters-12345",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
-			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
-					api.BackupNameLabel:  "less-than-63-characters",
-					api.RestoreNameLabel: "less-than-63-characters-12345",
-				}).ConfigMap,
-			),
-		},
-		{
-			name:          "backup name equal to 63 characters",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			backupName:    "the-really-long-kube-service-name-that-is-exactly-63-characters",
-			restoreName:   "the-really-long-kube-service-name-that-is-exactly-63-characters-12345",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
-			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
-					api.BackupNameLabel:  "the-really-long-kube-service-name-that-is-exactly-63-characters",
-					api.RestoreNameLabel: "the-really-long-kube-service-name-that-is-exactly-63-char0871f3",
-				}).ConfigMap,
-			),
-		},
-		{
-			name:          "backup name greter than 63 characters",
-			namespace:     "ns-1",
-			resourcePath:  "configmaps",
-			backupName:    "the-really-long-kube-service-name-that-is-much-greater-than-63-characters",
-			restoreName:   "the-really-long-kube-service-name-that-is-much-greater-than-63-characters-12345",
-			labelSelector: labels.NewSelector(),
-			fileSystem: velerotest.NewFakeFileSystem().
-				WithFile("configmaps/cm-1.json", newNamedTestConfigMap("cm-1").ToJSON()),
-			expectedObjs: toUnstructured(
-				newNamedTestConfigMap("cm-1").WithLabels(map[string]string{
-					api.BackupNameLabel:  "the-really-long-kube-service-name-that-is-much-greater-th8a11b3",
-					api.RestoreNameLabel: "the-really-long-kube-service-name-that-is-much-greater-th1bf26f",
-				}).ConfigMap,
-			),
-		},
-	}
-
-	var (
-		client                 = fake.NewSimpleClientset()
-		sharedInformers        = informers.NewSharedInformerFactory(client, 0)
-		snapshotLocationLister = sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister()
-	)
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &velerotest.FakeDynamicClient{}
-			for i := range test.expectedObjs {
-				resourceClient.On("Create", &test.expectedObjs[i]).Return(&test.expectedObjs[i], nil)
-			}
-
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
-
-			configMapResource := metav1.APIResource{Name: "configmaps", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, configMapResource, test.namespace).Return(resourceClient, nil)
-
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        test.actions,
-				fileSystem:     test.fileSystem,
-				selector:       test.labelSelector,
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      test.restoreName,
-					},
-					Spec: api.RestoreSpec{
-						IncludeClusterResources: test.includeClusterResources,
-						BackupName:              test.backupName,
-					},
-				},
-				backup: &api.Backup{},
-				log:    velerotest.NewLogger(),
-				pvRestorer: &pvRestorer{
-					logger: logging.DefaultLogger(logrus.DebugLevel),
-					volumeSnapshotterGetter: &fakeVolumeSnapshotterGetter{
-						volumeMap: map[velerotest.VolumeBackupInfo]string{{SnapshotID: "snap-1"}: "volume-1"},
-						volumeID:  "volume-1",
-					},
-					snapshotLocationLister: snapshotLocationLister,
-					backup:                 &api.Backup{},
-				},
-				applicableActions: make(map[schema.GroupResource][]resolvedAction),
-				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
-				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
-			}
-
-			warnings, errors := ctx.restoreResource(test.resourcePath, test.namespace, test.resourcePath)
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, test.expectedErrors, errors)
-		})
-	}
-}
-
-func TestRestoringExistingServiceAccount(t *testing.T) {
-	fromCluster := newTestServiceAccount()
-	fromClusterUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(fromCluster.ServiceAccount)
-	require.NoError(t, err)
-
-	different := newTestServiceAccount().WithImagePullSecret("image-secret").WithSecret("secret")
-	differentUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(different.ServiceAccount)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name          string
-		expectedPatch []byte
-		fromBackup    *unstructured.Unstructured
-	}{
-		{
-			name:       "fromCluster and fromBackup are exactly the same",
-			fromBackup: &unstructured.Unstructured{Object: fromClusterUnstructured},
-		},
-		{
-			name:          "fromCluster and fromBackup are different",
-			fromBackup:    &unstructured.Unstructured{Object: differentUnstructured},
-			expectedPatch: []byte(`{"imagePullSecrets":[{"name":"image-secret"}],"secrets":[{"name":"secret"}]}`),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			resourceClient := &velerotest.FakeDynamicClient{}
-			defer resourceClient.AssertExpectations(t)
-			name := fromCluster.GetName()
-
-			// restoreResource will add the restore label to object provided to create, so we need to make a copy to provide to our expected call
-			m := make(map[string]interface{})
-			for k, v := range test.fromBackup.Object {
-				m[k] = v
-			}
-			fromBackupWithLabel := &unstructured.Unstructured{Object: m}
-			addRestoreLabels(fromBackupWithLabel, "my-restore", "my-backup")
-			// resetMetadataAndStatus will strip the creationTimestamp before calling Create
-			fromBackupWithLabel.SetCreationTimestamp(metav1.Time{Time: time.Time{}})
-
-			resourceClient.On("Create", fromBackupWithLabel).Return(new(unstructured.Unstructured), k8serrors.NewAlreadyExists(kuberesource.ServiceAccounts, name))
-			resourceClient.On("Get", name, metav1.GetOptions{}).Return(&unstructured.Unstructured{Object: fromClusterUnstructured}, nil)
-
-			if len(test.expectedPatch) > 0 {
-				resourceClient.On("Patch", name, test.expectedPatch).Return(test.fromBackup, nil)
-			}
-
-			dynamicFactory := &velerotest.FakeDynamicFactory{}
-			gv := schema.GroupVersion{Group: "", Version: "v1"}
-
-			resource := metav1.APIResource{Name: "serviceaccounts", Namespaced: true}
-			dynamicFactory.On("ClientForGroupVersionResource", gv, resource, "ns-1").Return(resourceClient, nil)
-			fromBackupJSON, err := json.Marshal(test.fromBackup)
-			require.NoError(t, err)
-			ctx := &context{
-				dynamicFactory: dynamicFactory,
-				actions:        []resolvedAction{},
-				fileSystem: velerotest.NewFakeFileSystem().
-					WithFile("foo/resources/serviceaccounts/namespaces/ns-1/sa-1.json", fromBackupJSON),
-				selector: labels.NewSelector(),
-				restore: &api.Restore{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
-						Name:      "my-restore",
-					},
-					Spec: api.RestoreSpec{
-						IncludeClusterResources: nil,
-						BackupName:              "my-backup",
-					},
-				},
-				backup:            &api.Backup{},
-				log:               velerotest.NewLogger(),
-				applicableActions: make(map[schema.GroupResource][]resolvedAction),
-				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
-				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
-			}
-			warnings, errors := ctx.restoreResource("serviceaccounts", "ns-1", "foo/resources/serviceaccounts/namespaces/ns-1/")
-
-			assert.Empty(t, warnings.Velero)
-			assert.Empty(t, warnings.Cluster)
-			assert.Empty(t, warnings.Namespaces)
-			assert.Equal(t, Result{}, errors)
 		})
 	}
 }
@@ -1372,67 +955,6 @@ func toUnstructured(objs ...runtime.Object) []unstructured.Unstructured {
 	return res
 }
 
-type testServiceAccount struct {
-	*v1.ServiceAccount
-}
-
-func newTestServiceAccount() *testServiceAccount {
-	return &testServiceAccount{
-		ServiceAccount: &v1.ServiceAccount{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "ServiceAccount",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:         "ns-1",
-				Name:              "test-sa",
-				CreationTimestamp: metav1.Time{Time: time.Now()},
-			},
-		},
-	}
-}
-
-func (sa *testServiceAccount) WithImagePullSecret(name string) *testServiceAccount {
-	secret := v1.LocalObjectReference{Name: name}
-	sa.ImagePullSecrets = append(sa.ImagePullSecrets, secret)
-	return sa
-}
-
-func (sa *testServiceAccount) WithSecret(name string) *testServiceAccount {
-	secret := v1.ObjectReference{Name: name}
-	sa.Secrets = append(sa.Secrets, secret)
-	return sa
-}
-
-func (sa *testServiceAccount) ToJSON() []byte {
-	bytes, _ := json.Marshal(sa.ServiceAccount)
-	return bytes
-}
-
-type testPersistentVolume struct {
-	*v1.PersistentVolume
-}
-
-func newTestPV() *testPersistentVolume {
-	return &testPersistentVolume{
-		PersistentVolume: &v1.PersistentVolume{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "PersistentVolume",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pv",
-			},
-			Status: v1.PersistentVolumeStatus{},
-		},
-	}
-}
-
-func (pv *testPersistentVolume) ToJSON() []byte {
-	bytes, _ := json.Marshal(pv.PersistentVolume)
-	return bytes
-}
-
 type testNamespace struct {
 	*v1.Namespace
 }
@@ -1452,60 +974,6 @@ func (ns *testNamespace) ToJSON() []byte {
 	return bytes
 }
 
-type testConfigMap struct {
-	*v1.ConfigMap
-}
-
-func newTestConfigMap() *testConfigMap {
-	return newNamedTestConfigMap("cm-1")
-}
-
-func newNamedTestConfigMap(name string) *testConfigMap {
-	return &testConfigMap{
-		ConfigMap: &v1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{
-				APIVersion: "v1",
-				Kind:       "ConfigMap",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns-1",
-				Name:      name,
-			},
-			Data: map[string]string{
-				"foo": "bar",
-			},
-		},
-	}
-}
-
-func (cm *testConfigMap) WithNamespace(name string) *testConfigMap {
-	cm.Namespace = name
-	return cm
-}
-
-func (cm *testConfigMap) WithLabels(labels map[string]string) *testConfigMap {
-	cm.Labels = labels
-	return cm
-}
-
-func (cm *testConfigMap) WithControllerOwner() *testConfigMap {
-	t := true
-	ownerRef := metav1.OwnerReference{
-		Controller: &t,
-	}
-	cm.ConfigMap.OwnerReferences = append(cm.ConfigMap.OwnerReferences, ownerRef)
-	return cm
-}
-
-func (cm *testConfigMap) ToJSON() []byte {
-	bytes, _ := json.Marshal(cm.ConfigMap)
-	return bytes
-}
-
-type fakeAction struct {
-	resource string
-}
-
 type fakeVolumeSnapshotterGetter struct {
 	fakeVolumeSnapshotter *velerotest.FakeVolumeSnapshotter
 	volumeMap             map[velerotest.VolumeBackupInfo]string
@@ -1520,43 +988,4 @@ func (r *fakeVolumeSnapshotterGetter) GetVolumeSnapshotter(provider string) (vel
 		}
 	}
 	return r.fakeVolumeSnapshotter, nil
-}
-
-func newFakeAction(resource string) *fakeAction {
-	return &fakeAction{resource}
-}
-
-func (r *fakeAction) AppliesTo() (velero.ResourceSelector, error) {
-	return velero.ResourceSelector{
-		IncludedResources: []string{r.resource},
-	}, nil
-}
-
-func (r *fakeAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-	labels, found, err := unstructured.NestedMap(input.Item.UnstructuredContent(), "metadata", "labels")
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		labels = make(map[string]interface{})
-	}
-
-	labels["fake-restorer"] = "foo"
-
-	if err := unstructured.SetNestedField(input.Item.UnstructuredContent(), labels, "metadata", "labels"); err != nil {
-		return nil, err
-	}
-
-	unstructuredObj, ok := input.Item.(*unstructured.Unstructured)
-	if !ok {
-		return nil, errors.New("Unexpected type")
-	}
-
-	// want the baseline functionality too
-	res, err := resetMetadataAndStatus(unstructuredObj)
-	if err != nil {
-		return nil, err
-	}
-
-	return velero.NewRestoreItemActionExecuteOutput(res), nil
 }
