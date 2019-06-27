@@ -337,14 +337,13 @@ status:
 						Name:      "my-restore",
 					},
 				},
-				backup:            backup,
-				log:               velerotest.NewLogger(),
-				pvsToProvision:    sets.NewString(),
-				pvRestorer:        pvRestorer,
-				namespaceClient:   nsClient,
-				applicableActions: make(map[schema.GroupResource][]resolvedAction),
-				resourceClients:   make(map[resourceClientKey]pkgclient.Dynamic),
-				restoredItems:     make(map[velero.ResourceIdentifier]struct{}),
+				backup:          backup,
+				log:             velerotest.NewLogger(),
+				pvsToProvision:  sets.NewString(),
+				pvRestorer:      pvRestorer,
+				namespaceClient: nsClient,
+				resourceClients: make(map[resourceClientKey]pkgclient.Dynamic),
+				restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
 			}
 
 			if test.haveSnapshot {
