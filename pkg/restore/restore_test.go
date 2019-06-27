@@ -324,7 +324,9 @@ status:
 				fileSystem: velerotest.NewFakeFileSystem().
 					WithFile("foo/resources/persistentvolumes/cluster/pv.json", pvBytes).
 					WithFile("foo/resources/persistentvolumeclaims/default/pvc.json", pvcBytes),
-				selector: labels.NewSelector(),
+				selector:                  labels.NewSelector(),
+				resourceIncludesExcludes:  collections.NewIncludesExcludes(),
+				namespaceIncludesExcludes: collections.NewIncludesExcludes(),
 				prioritizedResources: []schema.GroupResource{
 					kuberesource.PersistentVolumes,
 					kuberesource.PersistentVolumeClaims,

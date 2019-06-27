@@ -51,6 +51,7 @@ import (
 	"github.com/heptio/velero/pkg/label"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/boolptr"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/filesystem"
 	"github.com/heptio/velero/pkg/util/kube"
@@ -205,6 +206,11 @@ func (kr *kubernetesRestorer) Restore(
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
+	// get namespace includes-excludes
+	namespaceIncludesExcludes := collections.NewIncludesExcludes().
+		Includes(restore.Spec.IncludedNamespaces...).
+		Excludes(restore.Spec.ExcludedNamespaces...)
+
 	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
@@ -245,6 +251,8 @@ func (kr *kubernetesRestorer) Restore(
 		backup:                     backup,
 		backupReader:               backupReader,
 		restore:                    restore,
+		resourceIncludesExcludes:   resourceIncludesExcludes,
+		namespaceIncludesExcludes:  namespaceIncludesExcludes,
 		prioritizedResources:       prioritizedResources,
 		selector:                   selector,
 		log:                        log,
@@ -335,6 +343,8 @@ type context struct {
 	backupReader               io.Reader
 	restore                    *api.Restore
 	restoreDir                 string
+	resourceIncludesExcludes   *collections.IncludesExcludes
+	namespaceIncludesExcludes  *collections.IncludesExcludes
 	prioritizedResources       []schema.GroupResource
 	selector                   labels.Selector
 	log                        logrus.FieldLogger
@@ -379,10 +389,6 @@ func (ctx *context) execute() (Result, Result) {
 // directory, ctx.restoreDir.
 func (ctx *context) restoreFromDir() (Result, Result) {
 	warnings, errs := Result{}, Result{}
-
-	namespaceFilter := collections.NewIncludesExcludes().
-		Includes(ctx.restore.Spec.IncludedNamespaces...).
-		Excludes(ctx.restore.Spec.ExcludedNamespaces...)
 
 	// Make sure the top level "resources" dir exists:
 	resourcesDir := filepath.Join(ctx.restoreDir, api.ResourcesDir)
@@ -460,7 +466,7 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 			nsName := nsDir.Name()
 			nsPath := filepath.Join(nsSubDir, nsName)
 
-			if !namespaceFilter.ShouldInclude(nsName) {
+			if !ctx.namespaceIncludesExcludes.ShouldInclude(nsName) {
 				ctx.log.Infof("Skipping namespace %s", nsName)
 				continue
 			}
@@ -786,6 +792,42 @@ func getResourceID(groupResource schema.GroupResource, namespace, name string) s
 func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource schema.GroupResource, namespace string) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 	resourceID := getResourceID(groupResource, namespace, obj.GetName())
+
+	// Check if group/resource should be restored. We need to do this here since
+	// this method may be getting called for an additional item which is a group/resource
+	// that's excluded.
+	if !ctx.resourceIncludesExcludes.ShouldInclude(groupResource.String()) {
+		ctx.log.WithFields(logrus.Fields{
+			"namespace":     obj.GetNamespace(),
+			"name":          obj.GetName(),
+			"groupResource": groupResource.String(),
+		}).Info("Not restoring item because resource is excluded")
+		return warnings, errs
+	}
+
+	// Check if namespace/cluster-scoped resource should be restored. We need
+	// to do this here since this method may be getting called for an additional
+	// item which is in a namespace that's excluded, or which is cluster-scoped
+	// and should be excluded.
+	if namespace != "" {
+		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Info("Not restoring item because namespace is excluded")
+			return warnings, errs
+		}
+	} else {
+		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
+			ctx.log.WithFields(logrus.Fields{
+				"namespace":     obj.GetNamespace(),
+				"name":          obj.GetName(),
+				"groupResource": groupResource.String(),
+			}).Info("Not restoring item because it's cluster-scoped")
+			return warnings, errs
+		}
+	}
 
 	// make a copy of object retrieved from backup
 	// to make it available unchanged inside restore actions
