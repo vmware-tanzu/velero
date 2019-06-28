@@ -31,6 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/clock"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -59,6 +60,7 @@ type podVolumeRestoreController struct {
 
 	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
 	fileSystem         filesystem.Interface
+	clock              clock.Clock
 }
 
 // NewPodVolumeRestoreController creates a new pod volume restore controller.
@@ -83,6 +85,7 @@ func NewPodVolumeRestoreController(
 		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
+		clock:      &clock.RealClock{},
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -258,9 +261,12 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	var err error
 
 	// update status to InProgress
-	req, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(velerov1api.PodVolumeRestorePhaseInProgress))
+	req, err = c.patchPodVolumeRestore(req, func(r *velerov1api.PodVolumeRestore) {
+		r.Status.Phase = velerov1api.PodVolumeRestorePhaseInProgress
+		r.Status.StartTimestamp.Time = c.clock.Now()
+	})
 	if err != nil {
-		log.WithError(err).Error("Error setting phase to InProgress")
+		log.WithError(err).Error("Error setting PodVolumeRestore startTimestamp and phase to InProgress")
 		return errors.WithStack(err)
 	}
 
@@ -291,8 +297,11 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	}
 
 	// update status to Completed
-	if _, err = c.patchPodVolumeRestore(req, updatePodVolumeRestorePhaseFunc(velerov1api.PodVolumeRestorePhaseCompleted)); err != nil {
-		log.WithError(err).Error("Error setting phase to Completed")
+	if _, err = c.patchPodVolumeRestore(req, func(r *velerov1api.PodVolumeRestore) {
+		r.Status.Phase = velerov1api.PodVolumeRestorePhaseCompleted
+		r.Status.CompletionTimestamp.Time = c.clock.Now()
+	}); err != nil {
+		log.WithError(err).Error("Error setting PodVolumeRestore completionTimestamp and phase to Completed")
 		return err
 	}
 
@@ -397,15 +406,10 @@ func (c *podVolumeRestoreController) failRestore(req *velerov1api.PodVolumeResto
 	if _, err := c.patchPodVolumeRestore(req, func(pvr *velerov1api.PodVolumeRestore) {
 		pvr.Status.Phase = velerov1api.PodVolumeRestorePhaseFailed
 		pvr.Status.Message = msg
+		pvr.Status.CompletionTimestamp.Time = c.clock.Now()
 	}); err != nil {
-		log.WithError(err).Error("Error setting phase to Failed")
+		log.WithError(err).Error("Error setting PodVolumeRestore phase to Failed")
 		return err
 	}
 	return nil
-}
-
-func updatePodVolumeRestorePhaseFunc(phase velerov1api.PodVolumeRestorePhase) func(r *velerov1api.PodVolumeRestore) {
-	return func(r *velerov1api.PodVolumeRestore) {
-		r.Status.Phase = phase
-	}
 }

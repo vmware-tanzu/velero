@@ -68,6 +68,18 @@ type PodVolumeBackupStatus struct {
 
 	// Message is a message about the pod volume backup's status.
 	Message string `json:"message"`
+
+	// StartTimestamp records the time a backup was started.
+	// Separate from CreationTimestamp, since that value changes
+	// on restores.
+	// The server's time is used for StartTimestamps
+	StartTimestamp metav1.Time `json:"startTimestamp"`
+
+	// CompletionTimestamp records the time a backup was completed.
+	// Completion time is recorded even on failed backups.
+	// Completion time is recorded before uploading the backup object.
+	// The server's time is used for CompletionTimestamps
+	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
 }
 
 // +genclient
