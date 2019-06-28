@@ -45,12 +45,14 @@ import (
 	"github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
+	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	testutil "github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/volume"
 )
 
 // TestRestoreResourceFiltering runs restores with different combinations
@@ -1656,6 +1658,425 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 
 			assert.Equal(t, want, res)
 		}
+	}
+}
+
+// volumeSnapshotterGetter is a simple implementation of the VolumeSnapshotterGetter
+// interface that returns velero.VolumeSnapshotters from a map if they exist.
+type volumeSnapshotterGetter map[string]velero.VolumeSnapshotter
+
+func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error) {
+	snapshotter, ok := vsg[name]
+	if !ok {
+		return nil, errors.New("volume snapshotter not found")
+	}
+
+	return snapshotter, nil
+}
+
+// volumeSnapshotter is a test fake for the velero.VolumeSnapshotter interface
+type volumeSnapshotter struct {
+	// a map from snapshotID to volumeID
+	snapshotVolumes map[string]string
+}
+
+// Init is a no-op.
+func (vs *volumeSnapshotter) Init(config map[string]string) error {
+	return nil
+}
+
+// CreateVolumeFromSnapshot looks up the specified snapshotID in the snapshotVolumes
+// map and returns the corresponding volumeID if it exists, or an error otherwise.
+func (vs *volumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, volumeAZ string, iops *int64) (volumeID string, err error) {
+	volumeID, ok := vs.snapshotVolumes[snapshotID]
+	if !ok {
+		return "", errors.New("snapshot not found")
+	}
+
+	return volumeID, nil
+}
+
+// SetVolumeID sets the persistent volume's spec.awsElasticBlockStore.volumeID field
+// with the provided volumeID.
+func (*volumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+	unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID")
+	return pv, nil
+}
+
+// GetVolumeID panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) GetVolumeID(pv runtime.Unstructured) (string, error) {
+	panic("GetVolumeID should not be used for restores")
+}
+
+// CreateSnapshot panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[string]string) (snapshotID string, err error) {
+	panic("CreateSnapshot should not be used for restores")
+}
+
+// GetVolumeInfo panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) GetVolumeInfo(volumeID, volumeAZ string) (string, *int64, error) {
+	panic("GetVolumeInfo should not be used for restores")
+}
+
+// DeleteSnapshot panics because it's not expected to be used for restores.
+func (*volumeSnapshotter) DeleteSnapshot(snapshotID string) error {
+	panic("DeleteSnapshot should not be used for backups")
+}
+
+// TestRestorePersistentVolumes runs restores for persistent volumes and verifies that
+// they are restored as expected, including restoring volumes from snapshots when expected.
+// Verification is done by looking at the contents of the API and the metadata/spec/status of
+// the items in the API.
+func TestRestorePersistentVolumes(t *testing.T) {
+	withReclaimPolicy := func(policy corev1api.PersistentVolumeReclaimPolicy) func(*corev1api.PersistentVolume) {
+		return func(pv *corev1api.PersistentVolume) {
+			pv.Spec.PersistentVolumeReclaimPolicy = policy
+		}
+	}
+	withClaimRef := func(ns, name string) func(*corev1api.PersistentVolume) {
+		return func(pv *corev1api.PersistentVolume) {
+			pv.Spec.ClaimRef = &corev1api.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			}
+		}
+	}
+	withVolumeName := func(volumeName string) func(*corev1api.PersistentVolume) {
+		return func(pv *corev1api.PersistentVolume) {
+			pv.Spec.AWSElasticBlockStore = &corev1api.AWSElasticBlockStoreVolumeSource{
+				VolumeID: volumeName,
+			}
+		}
+	}
+	withLabels := func(labels ...string) func(*corev1api.PersistentVolume) {
+		return func(pv *corev1api.PersistentVolume) {
+			test.WithLabels(labels...)(pv)
+		}
+	}
+
+	newPV := func(name string, opts ...func(*corev1api.PersistentVolume)) *corev1api.PersistentVolume {
+		pv := test.NewPV(name)
+		for _, opt := range opts {
+			opt(pv)
+		}
+		return pv
+	}
+
+	newPVC := func(ns, name, volumeName string, annotations map[string]string) *corev1api.PersistentVolumeClaim {
+		pvc := test.NewPVC(ns, name)
+		pvc.Spec.VolumeName = volumeName
+		pvc.Annotations = annotations
+
+		return pvc
+	}
+
+	tests := []struct {
+		name                    string
+		restore                 *velerov1api.Restore
+		backup                  *velerov1api.Backup
+		tarball                 io.Reader
+		apiResources            []*test.APIResource
+		volumeSnapshots         []*volume.Snapshot
+		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
+		volumeSnapshotterGetter volumeSnapshotterGetter
+		want                    []*test.APIResource
+	}{
+		{
+			name:    "when a PV with a reclaim policy of delete has no snapshot and does not exist in-cluster, it does not get restored, and its PVC gets reset for dynamic provisioning",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes",
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withClaimRef("ns-1", "pvc-1")),
+				).
+				addItems("persistentvolumeclaims",
+					newPVC("ns-1", "pvc-1", "pv-1", map[string]string{
+						"pv.kubernetes.io/bind-completed":      "true",
+						"pv.kubernetes.io/bound-by-controller": "true",
+						"foo":                                  "bar",
+					}),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(
+					test.NewPVC(
+						"ns-1", "pvc-1",
+						test.WithAnnotations("foo", "bar"),
+						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has no snapshot and does not exist in-cluster, it gets restored, without its claim ref",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes",
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withClaimRef("ns-1", "pvc-1")),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					newPV(
+						"pv-1",
+						withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
+						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of delete has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume"))).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					newPV(
+						"pv-1",
+						withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("new-volume"),
+						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a snapshot and does not exist in-cluster, the snapshot and PV are restored",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume"))).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					newPV(
+						"pv-1",
+						withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
+						withVolumeName("new-volume"),
+						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of delete has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume"))).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume")),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume")),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume"))).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume")),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume")),
+				),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.restorer.resourcePriorities = []string{"persistentvolumes", "persistentvolumeclaims"}
+
+			// set up the VolumeSnapshotLocation informer/lister and add test data to it
+			vslInformer := velerov1informers.NewSharedInformerFactory(h.VeleroClient, 0).Velero().V1().VolumeSnapshotLocations()
+			for _, vsl := range tc.volumeSnapshotLocations {
+				require.NoError(t, vslInformer.Informer().GetStore().Add(vsl))
+			}
+
+			for _, r := range tc.apiResources {
+				h.addItems(t, r)
+			}
+
+			// Collect the IDs of all of the wanted resources so we can ensure the
+			// exact set exists in the API after restore.
+			wantIDs := make(map[*test.APIResource][]string)
+			for i, resource := range tc.want {
+				wantIDs[tc.want[i]] = []string{}
+
+				for _, item := range resource.Items {
+					wantIDs[tc.want[i]] = append(wantIDs[tc.want[i]], fmt.Sprintf("%s/%s", item.GetNamespace(), item.GetName()))
+				}
+			}
+
+			warnings, errs := h.restorer.Restore(
+				h.log,
+				tc.restore,
+				tc.backup,
+				tc.volumeSnapshots,
+				tc.tarball,
+				nil, // actions
+				vslInformer.Lister(),
+				tc.volumeSnapshotterGetter,
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, wantIDs)
+			assertRestoredItems(t, h, tc.want)
+		})
 	}
 }
 
