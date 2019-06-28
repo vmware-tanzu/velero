@@ -1286,29 +1286,28 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				test.Pods(): {"ns-1/pod-1", "ns-2/pod-2"},
 			},
 		},
-		// TODO the below test case fails, which seems like a bug
-		// {
-		// 	name:         "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
-		// 	restore:      defaultRestore().IncludedNamespaces("ns-1").Restore(),
-		// 	backup:       defaultBackup().Backup(),
-		// 	tarball:      newTarWriter(t).addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).done(),
-		// 	apiResources: []*test.APIResource{test.Pods()},
-		// 	actions: []velero.RestoreItemAction{
-		// 		&pluggableAction{
-		// 			executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-		// 				return &velero.RestoreItemActionExecuteOutput{
-		// 					UpdatedItem: input.Item,
-		// 					AdditionalItems: []velero.ResourceIdentifier{
-		// 						{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
-		// 					},
-		// 				}, nil
-		// 			},
-		// 		},
-		// 	},
-		// 	want: map[*test.APIResource][]string{
-		// 		test.Pods(): {"ns-1/pod-1"},
-		// 	},
-		// },
+		{
+			name:         "when using a restore namespace filter, additional items that are in a non-included namespace are not restored",
+			restore:      defaultRestore().IncludedNamespaces("ns-1").Restore(),
+			backup:       defaultBackup().Backup(),
+			tarball:      newTarWriter(t).addItems("pods", test.NewPod("ns-1", "pod-1"), test.NewPod("ns-2", "pod-2")).done(),
+			apiResources: []*test.APIResource{test.Pods()},
+			actions: []velero.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.Pods, Namespace: "ns-2", Name: "pod-2"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+			},
+		},
 		{
 			name:    "when using a restore namespace filter, additional items that are cluster-scoped are restored",
 			restore: defaultRestore().IncludedNamespaces("ns-1").Restore(),
@@ -1335,60 +1334,58 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				test.PVs():  {"/pv-1"},
 			},
 		},
-		// TODO the below test case fails, which seems like a bug
-		// {
-		// 	name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
-		// 	restore: defaultRestore().IncludedResources("pods").Restore(),
-		// 	backup:  defaultBackup().Backup(),
-		// 	tarball: newTarWriter(t).
-		// 		addItems("pods", test.NewPod("ns-1", "pod-1")).
-		// 		addItems("persistentvolumes", test.NewPV("pv-1")).
-		// 		done(),
-		// 	apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-		// 	actions: []velero.RestoreItemAction{
-		// 		&pluggableAction{
-		// 			executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-		// 				return &velero.RestoreItemActionExecuteOutput{
-		// 					UpdatedItem: input.Item,
-		// 					AdditionalItems: []velero.ResourceIdentifier{
-		// 						{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
-		// 					},
-		// 				}, nil
-		// 			},
-		// 		},
-		// 	},
-		// 	want: map[*test.APIResource][]string{
-		// 		test.Pods(): {"ns-1/pod-1"},
-		// 		test.PVs():  nil,
-		// 	},
-		// },
-		// TODO the below test case fails, which seems like a bug
-		// {
-		// 	name:    "when IncludeClusterResources=false, additional items that are cluster-scoped are not restored",
-		// 	restore: defaultRestore().IncludeClusterResources(false).Restore(),
-		// 	backup:  defaultBackup().Backup(),
-		// 	tarball: newTarWriter(t).
-		// 		addItems("pods", test.NewPod("ns-1", "pod-1")).
-		// 		addItems("persistentvolumes", test.NewPV("pv-1")).
-		// 		done(),
-		// 	apiResources: []*test.APIResource{test.Pods(), test.PVs()},
-		// 	actions: []velero.RestoreItemAction{
-		// 		&pluggableAction{
-		// 			executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
-		// 				return &velero.RestoreItemActionExecuteOutput{
-		// 					UpdatedItem: input.Item,
-		// 					AdditionalItems: []velero.ResourceIdentifier{
-		// 						{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
-		// 					},
-		// 				}, nil
-		// 			},
-		// 		},
-		// 	},
-		// 	want: map[*test.APIResource][]string{
-		// 		test.Pods(): {"ns-1/pod-1"},
-		// 		test.PVs():  nil,
-		// 	},
-		// },
+		{
+			name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
+			restore: defaultRestore().IncludedResources("pods").Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				addItems("persistentvolumes", test.NewPV("pv-1")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: []velero.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+				test.PVs():  nil,
+			},
+		},
+		{
+			name:    "when IncludeClusterResources=false, additional items that are cluster-scoped are not restored",
+			restore: defaultRestore().IncludeClusterResources(false).Restore(),
+			backup:  defaultBackup().Backup(),
+			tarball: newTarWriter(t).
+				addItems("pods", test.NewPod("ns-1", "pod-1")).
+				addItems("persistentvolumes", test.NewPV("pv-1")).
+				done(),
+			apiResources: []*test.APIResource{test.Pods(), test.PVs()},
+			actions: []velero.RestoreItemAction{
+				&pluggableAction{
+					executeFunc: func(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+						return &velero.RestoreItemActionExecuteOutput{
+							UpdatedItem: input.Item,
+							AdditionalItems: []velero.ResourceIdentifier{
+								{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							},
+						}, nil
+					},
+				},
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-1"},
+				test.PVs():  nil,
+			},
+		},
 	}
 
 	for _, tc := range tests {
