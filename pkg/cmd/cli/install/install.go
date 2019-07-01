@@ -43,6 +43,7 @@ type InstallOptions struct {
 	BucketName           string
 	Prefix               string
 	ProviderName         string
+	PodAnnotations       flag.Map
 	RestoreOnly          bool
 	SecretFile           string
 	DryRun               bool
@@ -60,6 +61,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
+	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero pod. Optional. Format is key1=value1,key2=value2")
 	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "namespace to install Velero and associated data into. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
@@ -70,13 +72,14 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 }
 
-// NewInstallOptions instantiates a new, default InstallOptions stuct.
+// NewInstallOptions instantiates a new, default InstallOptions struct.
 func NewInstallOptions() *InstallOptions {
 	return &InstallOptions{
 		Namespace:            api.DefaultNamespace,
 		Image:                install.DefaultImage,
 		BackupStorageConfig:  flag.NewMap(),
 		VolumeSnapshotConfig: flag.NewMap(),
+		PodAnnotations:       flag.NewMap(),
 		// Default to creating a VSL unless we're told otherwise
 		UseVolumeSnapshots: true,
 	}
@@ -98,6 +101,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		ProviderName:       o.ProviderName,
 		Bucket:             o.BucketName,
 		Prefix:             o.Prefix,
+		PodAnnotations:     o.PodAnnotations.Data(),
 		SecretData:         secretData,
 		RestoreOnly:        o.RestoreOnly,
 		UseRestic:          o.UseRestic,
