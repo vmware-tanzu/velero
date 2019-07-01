@@ -93,7 +93,8 @@ func EnsureNamespaceExistsAndIsReady(namespace *corev1api.Namespace, client core
 
 // GetVolumeDirectory gets the name of the directory on the host, under /var/lib/kubelet/pods/<podUID>/volumes/,
 // where the specified volume lives.
-func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister) (string, error) {
+// For volumes with a CSIVolumeSource, append "/mount" to the directory name.
+func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1listers.PersistentVolumeClaimLister, pvLister corev1listers.PersistentVolumeLister) (string, error) {
 	var volume *corev1api.Volume
 
 	for _, item := range pod.Spec.Volumes {
@@ -107,13 +108,29 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 		return "", errors.New("volume not found in pod")
 	}
 
+	// This case implies the administrator created the PV and attached it directly, without PVC.
+	// Note that only one VolumeSource can be populated per Volume on a pod
 	if volume.VolumeSource.PersistentVolumeClaim == nil {
+		if volume.VolumeSource.CSI != nil {
+			return volume.Name + "/mount", nil
+		}
 		return volume.Name, nil
 	}
 
+	// Most common case is that we have a PVC VolumeSource, and we need to check the PV it points to for a CSI source.
 	pvc, err := pvcLister.PersistentVolumeClaims(pod.Namespace).Get(volume.VolumeSource.PersistentVolumeClaim.ClaimName)
 	if err != nil {
 		return "", errors.WithStack(err)
+	}
+
+	pv, err := pvLister.Get(pvc.Spec.VolumeName)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	// PV's been created with a CSI source.
+	if pv.Spec.CSI != nil {
+		return pvc.Spec.VolumeName + "/mount", nil
 	}
 
 	return pvc.Spec.VolumeName, nil

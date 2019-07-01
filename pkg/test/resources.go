@@ -249,6 +249,19 @@ func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
 	return obj
 }
 
+// VolumeOpts exists because corev1.Volume does not implement metav1.Object
+type VolumeOpts func(*corev1.Volume)
+
+func NewVolume(name string, opts ...VolumeOpts) *corev1.Volume {
+	obj := &corev1.Volume{Name: name}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
+}
+
 func objectMeta(ns, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: ns,
@@ -376,15 +389,59 @@ func WithAWSEBSVolumeID(volumeID string) func(obj metav1.Object) {
 	}
 }
 
-// WithVolumeName is a functional option for persistent volume claims that sets the specified
-// volume name. It panics if the object is not a persistent volume claim.
-func WithVolumeName(name string) func(obj metav1.Object) {
+// WithCSI is a functional option for persistent volumes that sets the specified CSI driver name
+// and volume handle. It panics if the object is not a persistent volume.
+func WithCSI(driver, volumeHandle string) func(object metav1.Object) {
+	return func(obj metav1.Object) {
+		pv, ok := obj.(*corev1.PersistentVolume)
+		if !ok {
+			panic("WithCSI is only valid for persistent volumes")
+		}
+		if pv.Spec.CSI == nil {
+			pv.Spec.CSI = new(corev1.CSIPersistentVolumeSource)
+		}
+		pv.Spec.CSI.Driver = driver
+		pv.Spec.CSI.VolumeHandle = volumeHandle
+	}
+}
+
+// WithPVName is a functional option for persistent volume claims that sets the specified
+// persistent volume name. It panics if the object is not a persistent volume claim.
+func WithPVName(name string) func(obj metav1.Object) {
 	return func(obj metav1.Object) {
 		pvc, ok := obj.(*corev1.PersistentVolumeClaim)
 		if !ok {
-			panic("WithVolumeName is only valid for persistent volume claims")
+			panic("WithPVName is only valid for persistent volume claims")
 		}
 
 		pvc.Spec.VolumeName = name
+	}
+}
+
+// WithVolume is a functional option for pods that sets the specified
+// volume on the pod's Spec. It panics if the object is not a pod.
+func WithVolume(volume *corev1.Volume) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		pod, ok := obj.(*corev1.Pod)
+		if !ok {
+			panic("WithVolume is only valid for pods")
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, *volume)
+	}
+}
+
+// WithPVCSource is a functional option for volumes that creates a
+// PersistentVolumeClaimVolumeSource with the specified name.
+func WithPVCSource(claimName string) func(vol *corev1.Volume) {
+	return func(vol *corev1.Volume) {
+		vol.VolumeSource.PersistentVolumeClaim = &corev1.PersistentVolumeClaimVolumeSource{ClaimName: claimName}
+	}
+}
+
+// WithCSISource is a functional option for volumes that creates a
+// CSIVolumeSource with the specified driver name.
+func WithCSISource(driverName string) func(vol *corev1.Volume) {
+	return func(vol *corev1.Volume) {
+		vol.VolumeSource.CSI = &corev1.CSIVolumeSource{Driver: driverName}
 	}
 }

@@ -165,6 +165,7 @@ func (s *resticServer) run() {
 		s.podInformer,
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
+		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
 		os.Getenv("NODE_NAME"),
 	)
@@ -181,6 +182,7 @@ func (s *resticServer) run() {
 		s.podInformer,
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
+		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
 		os.Getenv("NODE_NAME"),
 	)
