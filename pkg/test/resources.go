@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // APIResource stores information about a specific Kubernetes API
@@ -318,6 +319,13 @@ func WithFinalizers(vals ...string) func(obj metav1.Object) {
 func WithDeletionTimestamp(val time.Time) func(obj metav1.Object) {
 	return func(obj metav1.Object) {
 		obj.SetDeletionTimestamp(&metav1.Time{Time: val})
+	}
+}
+
+// WithUID is a functional option that applies the specified UID to an object.
+func WithUID(val string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetUID(types.UID(val))
 	}
 }
 

@@ -18,6 +18,7 @@ package restic
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
@@ -88,6 +90,11 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	err = validatePodVolumesHostPath(kubeClient, "/host_pods/")
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -190,4 +197,41 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
 	wg.Wait()
+}
+
+// validatePodVolumesHostPath validates that the podVolumesPath contains a
+// directory for each Pod running on this node
+func validatePodVolumesHostPath(kubeClient kubernetes.Interface, podVolumesPath string) error {
+	files, err := ioutil.ReadDir(podVolumesPath)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// create a map of directory names inside the podVolumesPath
+	dirs := map[string]bool{}
+	for _, f := range files {
+		if f.IsDir() {
+			dirs[f.Name()] = true
+		}
+	}
+
+	pods, err := kubeClient.CoreV1().Pods("").List(metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s", os.Getenv("NODE_NAME"))})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	for _, pod := range pods.Items {
+		dirName := string(pod.GetUID())
+
+		// if the pod is a mirror pod, the directory name is the hash value of the
+		// mirror pod annotation
+		if hash, ok := pod.GetAnnotations()[v1.MirrorPodAnnotationKey]; ok {
+			dirName = hash
+		}
+
+		if _, ok := dirs[dirName]; !ok {
+			return errors.WithStack(fmt.Errorf("could not find volumes for pod %s/%s in hostpath, check if the pod volumes hostPath mount is correct", pod.GetNamespace(), pod.GetName()))
+		}
+	}
+	return nil
 }
