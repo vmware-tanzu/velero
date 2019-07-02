@@ -16,7 +16,6 @@ limitations under the License.
 package restic
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/heptio/velero/pkg/test"
+	testutil "github.com/heptio/velero/pkg/util/test"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {
@@ -66,14 +66,10 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "host_pods")
-			if err != nil {
-				t.Error(err)
-			}
-			defer os.RemoveAll(tmpDir)
+			fs := testutil.NewFakeFileSystem()
 
 			for _, dir := range tt.dirs {
-				err := os.Mkdir(filepath.Join(tmpDir, dir), os.ModePerm)
+				err := fs.MkdirAll(filepath.Join("/host_pods/", dir), os.ModePerm)
 				if err != nil {
 					t.Error(err)
 				}
@@ -87,7 +83,12 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 				}
 			}
 
-			err = validatePodVolumesHostPath(kubeClient, tmpDir)
+			s := &resticServer{
+				kubeClient: kubeClient,
+				fileSystem: fs,
+			}
+
+			err := s.validatePodVolumesHostPath()
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

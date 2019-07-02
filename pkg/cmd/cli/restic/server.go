@@ -18,7 +18,6 @@ package restic
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"sync"
@@ -42,6 +41,7 @@ import (
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/filesystem"
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
@@ -82,6 +82,7 @@ type resticServer struct {
 	logger                logrus.FieldLogger
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
+	fileSystem            filesystem.Interface
 }
 
 func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
@@ -93,10 +94,6 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	kubeClient, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
-	}
-
-	if err := validatePodVolumesHostPath(kubeClient, "/host_pods/"); err != nil {
-		return nil, err
 	}
 
 	veleroClient, err := clientset.NewForConfig(clientConfig)
@@ -134,7 +131,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	return &resticServer{
+	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
 		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, os.Getenv("VELERO_NAMESPACE"), nil),
@@ -144,7 +141,14 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 		logger:                logger,
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
-	}, nil
+		fileSystem:            filesystem.NewFileSystem(),
+	}
+
+	if err := s.validatePodVolumesHostPath(); err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 func (s *resticServer) run() {
@@ -199,15 +203,15 @@ func (s *resticServer) run() {
 	wg.Wait()
 }
 
-// validatePodVolumesHostPath validates that the podVolumesPath contains a
+// validatePodVolumesHostPath validates that the pod volumes path contains a
 // directory for each Pod running on this node
-func validatePodVolumesHostPath(kubeClient kubernetes.Interface, podVolumesPath string) error {
-	files, err := ioutil.ReadDir(podVolumesPath)
+func (s *resticServer) validatePodVolumesHostPath() error {
+	files, err := s.fileSystem.ReadDir("/host_pods/")
 	if err != nil {
 		return errors.Wrap(err, "could not read pod volumes host path")
 	}
 
-	// create a map of directory names inside the podVolumesPath
+	// create a map of directory names inside the pod volumes path
 	dirs := sets.NewString()
 	for _, f := range files {
 		if f.IsDir() {
@@ -215,7 +219,7 @@ func validatePodVolumesHostPath(kubeClient kubernetes.Interface, podVolumesPath 
 		}
 	}
 
-	pods, err := kubeClient.CoreV1().Pods("").List(metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s", os.Getenv("NODE_NAME"))})
+	pods, err := s.kubeClient.CoreV1().Pods("").List(metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s", os.Getenv("NODE_NAME"))})
 	if err != nil {
 		return errors.WithStack(err)
 	}
