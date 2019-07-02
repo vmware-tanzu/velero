@@ -37,7 +37,7 @@ TAG_LATEST ?= false
 ### These variables should not need tweaking.
 ###
 
-CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64
+CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 linux-ppc64le darwin-amd64 windows-amd64
 CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64
 
 platform_temp = $(subst -, ,$(ARCH))
