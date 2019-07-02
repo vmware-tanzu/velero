@@ -224,6 +224,7 @@ func (s *resticServer) validatePodVolumesHostPath() error {
 		return errors.WithStack(err)
 	}
 
+	valid := true
 	for _, pod := range pods.Items {
 		dirName := string(pod.GetUID())
 
@@ -234,8 +235,16 @@ func (s *resticServer) validatePodVolumesHostPath() error {
 		}
 
 		if !dirs.Has(dirName) {
-			return errors.WithStack(fmt.Errorf("could not find volumes for pod %s/%s in hostpath, check if the pod volumes hostPath mount is correct", pod.GetNamespace(), pod.GetName()))
+			valid = false
+			s.logger.WithFields(logrus.Fields{
+				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
+				"path": "/host_pods/" + dirName,
+			}).Debug("could not find volumes for pod in host path")
 		}
+	}
+
+	if !valid {
+		return errors.New("unexpected directory structure for pod volumes path, check if the pod volumes hostPath mount is correct")
 	}
 
 	return nil

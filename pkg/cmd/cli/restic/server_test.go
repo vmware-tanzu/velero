@@ -85,6 +85,7 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 
 			s := &resticServer{
 				kubeClient: kubeClient,
+				logger:     testutil.NewLogger(),
 				fileSystem: fs,
 			}
 
