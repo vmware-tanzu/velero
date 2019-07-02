@@ -1728,48 +1728,6 @@ func (*volumeSnapshotter) DeleteSnapshot(snapshotID string) error {
 // Verification is done by looking at the contents of the API and the metadata/spec/status of
 // the items in the API.
 func TestRestorePersistentVolumes(t *testing.T) {
-	withReclaimPolicy := func(policy corev1api.PersistentVolumeReclaimPolicy) func(*corev1api.PersistentVolume) {
-		return func(pv *corev1api.PersistentVolume) {
-			pv.Spec.PersistentVolumeReclaimPolicy = policy
-		}
-	}
-	withClaimRef := func(ns, name string) func(*corev1api.PersistentVolume) {
-		return func(pv *corev1api.PersistentVolume) {
-			pv.Spec.ClaimRef = &corev1api.ObjectReference{
-				Namespace: ns,
-				Name:      name,
-			}
-		}
-	}
-	withVolumeName := func(volumeName string) func(*corev1api.PersistentVolume) {
-		return func(pv *corev1api.PersistentVolume) {
-			pv.Spec.AWSElasticBlockStore = &corev1api.AWSElasticBlockStoreVolumeSource{
-				VolumeID: volumeName,
-			}
-		}
-	}
-	withLabels := func(labels ...string) func(*corev1api.PersistentVolume) {
-		return func(pv *corev1api.PersistentVolume) {
-			test.WithLabels(labels...)(pv)
-		}
-	}
-
-	newPV := func(name string, opts ...func(*corev1api.PersistentVolume)) *corev1api.PersistentVolume {
-		pv := test.NewPV(name)
-		for _, opt := range opts {
-			opt(pv)
-		}
-		return pv
-	}
-
-	newPVC := func(ns, name, volumeName string, annotations map[string]string) *corev1api.PersistentVolumeClaim {
-		pvc := test.NewPVC(ns, name)
-		pvc.Spec.VolumeName = volumeName
-		pvc.Annotations = annotations
-
-		return pvc
-	}
-
 	tests := []struct {
 		name                    string
 		restore                 *velerov1api.Restore
@@ -1787,14 +1745,13 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
 				addItems("persistentvolumes",
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withClaimRef("ns-1", "pvc-1")),
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), test.WithClaimRef("ns-1", "pvc-1")),
 				).
 				addItems("persistentvolumeclaims",
-					newPVC("ns-1", "pvc-1", "pv-1", map[string]string{
-						"pv.kubernetes.io/bind-completed":      "true",
-						"pv.kubernetes.io/bound-by-controller": "true",
-						"foo":                                  "bar",
-					}),
+					test.NewPVC("ns-1", "pvc-1",
+						test.WithVolumeName("pv-1"),
+						test.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
+					),
 				).
 				done(),
 			apiResources: []*test.APIResource{
@@ -1804,8 +1761,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(
-					test.NewPVC(
-						"ns-1", "pvc-1",
+					test.NewPVC("ns-1", "pvc-1",
 						test.WithAnnotations("foo", "bar"),
 						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 					),
@@ -1818,7 +1774,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
 				addItems("persistentvolumes",
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withClaimRef("ns-1", "pvc-1")),
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), test.WithClaimRef("ns-1", "pvc-1")),
 				).
 				done(),
 			apiResources: []*test.APIResource{
@@ -1827,10 +1783,9 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.PVs(
-					newPV(
-						"pv-1",
-						withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
-						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					test.NewPV("pv-1",
+						test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
+						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 					),
 				),
 			},
@@ -1840,7 +1795,8 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			restore: defaultRestore().Restore(),
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume"))).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), test.WithAWSEBSVolumeID("old-volume"))).
 				done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
@@ -1877,10 +1833,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.PVs(
-					newPV(
-						"pv-1",
-						withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("new-volume"),
-						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					test.NewPV("pv-1",
+						test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete),
+						test.WithAWSEBSVolumeID("new-volume"),
+						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 					),
 				),
 			},
@@ -1890,7 +1846,8 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			restore: defaultRestore().Restore(),
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume"))).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), test.WithAWSEBSVolumeID("old-volume"))).
 				done(),
 			apiResources: []*test.APIResource{
 				test.PVs(),
@@ -1927,11 +1884,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.PVs(
-					newPV(
-						"pv-1",
-						withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
-						withVolumeName("new-volume"),
-						withLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+					test.NewPV("pv-1",
+						test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain),
+						test.WithAWSEBSVolumeID("new-volume"),
+						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
 					),
 				),
 			},
@@ -1941,11 +1897,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			restore: defaultRestore().Restore(),
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume"))).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), test.WithAWSEBSVolumeID("old-volume"))).
 				done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume")),
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), test.WithAWSEBSVolumeID("old-volume")),
 				),
 				test.PVCs(),
 			},
@@ -1981,7 +1938,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			},
 			want: []*test.APIResource{
 				test.PVs(
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), withVolumeName("old-volume")),
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimDelete), test.WithAWSEBSVolumeID("old-volume")),
 				),
 			},
 		},
@@ -1990,11 +1947,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			restore: defaultRestore().Restore(),
 			backup:  defaultBackup().Backup(),
 			tarball: newTarWriter(t).
-				addItems("persistentvolumes", newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume"))).
+				addItems("persistentvolumes",
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), test.WithAWSEBSVolumeID("old-volume"))).
 				done(),
 			apiResources: []*test.APIResource{
 				test.PVs(
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume")),
+					test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), test.WithAWSEBSVolumeID("old-volume")),
 				),
 				test.PVCs(),
 			},
@@ -2029,9 +1987,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				"provider-1": &volumeSnapshotter{},
 			},
 			want: []*test.APIResource{
-				test.PVs(
-					newPV("pv-1", withReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), withVolumeName("old-volume")),
-				),
+				test.PVs(test.NewPV("pv-1", test.WithReclaimPolicy(corev1api.PersistentVolumeReclaimRetain), test.WithAWSEBSVolumeID("old-volume"))),
 			},
 		},
 	}
