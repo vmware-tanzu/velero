@@ -55,12 +55,21 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "error when pod volumes missing",
+			name: "error when all pod volumes missing",
 			pods: []*corev1.Pod{
 				test.NewPod("foo", "bar", test.WithUID("foo")),
 				test.NewPod("zoo", "raz", test.WithUID("zoo")),
 			},
 			dirs:    []string{"unexpected-dir"},
+			wantErr: true,
+		},
+		{
+			name: "error when some pod volumes missing",
+			pods: []*corev1.Pod{
+				test.NewPod("foo", "bar", test.WithUID("foo")),
+				test.NewPod("zoo", "raz", test.WithUID("zoo")),
+			},
+			dirs:    []string{"foo"},
 			wantErr: true,
 		},
 	}
