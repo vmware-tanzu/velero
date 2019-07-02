@@ -54,6 +54,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/serviceaccount", newServiceAccountRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/addPVCFromPod", newAddPVCFromPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/addPVFromPVC", newAddPVFromPVCRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/change-storageclass", newChangeStorageClassRestoreItemAction(f)).
 				Serve()
 		},
 	}
@@ -153,4 +154,15 @@ func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, 
 
 func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewAddPVFromPVCAction(logger), nil
+}
+
+func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangeStorageClassAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+	}
 }
