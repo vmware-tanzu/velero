@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -94,9 +95,8 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 		return nil, errors.WithStack(err)
 	}
 
-	err = validatePodVolumesHostPath(kubeClient, "/host_pods/")
-	if err != nil {
-		return nil, errors.WithStack(err)
+	if err := validatePodVolumesHostPath(kubeClient, "/host_pods/"); err != nil {
+		return nil, err
 	}
 
 	veleroClient, err := clientset.NewForConfig(clientConfig)
@@ -204,14 +204,14 @@ func (s *resticServer) run() {
 func validatePodVolumesHostPath(kubeClient kubernetes.Interface, podVolumesPath string) error {
 	files, err := ioutil.ReadDir(podVolumesPath)
 	if err != nil {
-		return errors.WithStack(err)
+		return errors.Wrap(err, "could not read pod volumes host path")
 	}
 
 	// create a map of directory names inside the podVolumesPath
-	dirs := map[string]bool{}
+	dirs := sets.NewString()
 	for _, f := range files {
 		if f.IsDir() {
-			dirs[f.Name()] = true
+			dirs.Insert(f.Name())
 		}
 	}
 
@@ -229,9 +229,10 @@ func validatePodVolumesHostPath(kubeClient kubernetes.Interface, podVolumesPath 
 			dirName = hash
 		}
 
-		if _, ok := dirs[dirName]; !ok {
+		if !dirs.Has(dirName) {
 			return errors.WithStack(fmt.Errorf("could not find volumes for pod %s/%s in hostpath, check if the pod volumes hostPath mount is correct", pod.GetNamespace(), pod.GetName()))
 		}
 	}
+
 	return nil
 }
