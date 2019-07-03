@@ -58,9 +58,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 
 	if config == nil || len(config.Data) == 0 {
 		a.logger.Debug("No storage class mappings found")
-		return &velero.RestoreItemActionExecuteOutput{
-			UpdatedItem: input.Item,
-		}, nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	obj, ok := input.Item.(*unstructured.Unstructured)
@@ -82,16 +80,12 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	}
 	if storageClass == "" {
 		log.Debug("Item has no storage class specified")
-		return &velero.RestoreItemActionExecuteOutput{
-			UpdatedItem: input.Item,
-		}, nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	newStorageClass, ok := config.Data[storageClass]
 	if !ok {
-		return &velero.RestoreItemActionExecuteOutput{
-			UpdatedItem: input.Item,
-		}, nil
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log.Infof("Updating item's storage class name to %s", newStorageClass)
