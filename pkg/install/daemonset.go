@@ -61,6 +61,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 						"name":      "restic",
 						"component": "velero",
 					},
+					Annotations: podAnnotations(c.annotations),
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: "velero",
