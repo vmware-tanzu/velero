@@ -45,7 +45,11 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 | 2                  | Hour             | 0-23,*            |
 | 3                  | Day of Month     | 1-31,*            |
 | 4                  | Month            | 1-12,*            |
-| 5                  | Day of Week      | 0-7,*             |`,
+| 5                  | Day of Week      | 0-7,*             |
+
+The schedule can also be expressed using "@every <duration>" syntax. The duration
+can be specified using a combination of seconds (s), minutes (m), and hours (h), for
+example: "@every 2h30m".`,
 
 		Example: `	# Create a backup every 6 hours
 	velero create schedule NAME --schedule="0 */6 * * *"
@@ -54,10 +58,10 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	velero create schedule NAME --schedule="@every 6h"
 
 	# Create a daily backup of the web namespace
-	velero create schedule NAME --schedule="@every 1d" --included-namespaces web
+	velero create schedule NAME --schedule="@every 24h" --include-namespaces web
 
 	# Create a weekly backup, each living for 90 days (2160 hours)
-	velero create schedule NAME --schedules="@every 7d" --ttl 2160h0m0s
+	velero create schedule NAME --schedules="@every 168h" --ttl 2160h0m0s
 	`,
 		Args: cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
