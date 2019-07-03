@@ -45,12 +45,20 @@ func labels() map[string]string {
 	}
 }
 
-func podAnnotations() map[string]string {
-	return map[string]string{
+func podAnnotations(userAnnotations map[string]string) map[string]string {
+	// Use the default annotations as a starting point
+	base := map[string]string{
 		"prometheus.io/scrape": "true",
 		"prometheus.io/port":   "8085",
 		"prometheus.io/path":   "/metrics",
 	}
+
+	// Merge base annotations with user annotations to enforce CLI precedence
+	for k, v := range userAnnotations {
+		base[k] = v
+	}
+
+	return base
 }
 
 func containerPorts() []corev1.ContainerPort {
@@ -180,6 +188,7 @@ type VeleroOptions struct {
 	ProviderName       string
 	Bucket             string
 	Prefix             string
+	PodAnnotations     map[string]string
 	SecretData         []byte
 	RestoreOnly        bool
 	UseRestic          bool
@@ -221,10 +230,12 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	}
 
 	deploy := Deployment(o.Namespace,
+		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 	)
 	if o.RestoreOnly {
 		deploy = Deployment(o.Namespace,
+			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithRestoreOnly(),
 		)
@@ -233,6 +244,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	if o.UseRestic {
 		ds := DaemonSet(o.Namespace,
+			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 		)
 		appendUnstructured(resources, ds)

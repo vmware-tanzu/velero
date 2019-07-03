@@ -31,11 +31,18 @@ type podTemplateConfig struct {
 	withoutCredentialsVolume bool
 	envVars                  []corev1.EnvVar
 	restoreOnly              bool
+	annotations              map[string]string
 }
 
 func WithImage(image string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.image = image
+	}
+}
+
+func WithAnnotations(annotations map[string]string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.annotations = annotations
 	}
 }
 
@@ -98,7 +105,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:      containerLabels,
-					Annotations: podAnnotations(),
+					Annotations: podAnnotations(c.annotations),
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyAlways,
