@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
@@ -39,6 +41,7 @@ import (
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/util/filesystem"
 	"github.com/heptio/velero/pkg/util/logging"
 )
 
@@ -79,6 +82,7 @@ type resticServer struct {
 	logger                logrus.FieldLogger
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
+	fileSystem            filesystem.Interface
 }
 
 func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
@@ -127,7 +131,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
-	return &resticServer{
+	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
 		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, os.Getenv("VELERO_NAMESPACE"), nil),
@@ -137,7 +141,14 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 		logger:                logger,
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
-	}, nil
+		fileSystem:            filesystem.NewFileSystem(),
+	}
+
+	if err := s.validatePodVolumesHostPath(); err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 func (s *resticServer) run() {
@@ -190,4 +201,51 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
 	wg.Wait()
+}
+
+// validatePodVolumesHostPath validates that the pod volumes path contains a
+// directory for each Pod running on this node
+func (s *resticServer) validatePodVolumesHostPath() error {
+	files, err := s.fileSystem.ReadDir("/host_pods/")
+	if err != nil {
+		return errors.Wrap(err, "could not read pod volumes host path")
+	}
+
+	// create a map of directory names inside the pod volumes path
+	dirs := sets.NewString()
+	for _, f := range files {
+		if f.IsDir() {
+			dirs.Insert(f.Name())
+		}
+	}
+
+	pods, err := s.kubeClient.CoreV1().Pods("").List(metav1.ListOptions{FieldSelector: fmt.Sprintf("spec.nodeName=%s,status.phase=Running", os.Getenv("NODE_NAME"))})
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	valid := true
+	for _, pod := range pods.Items {
+		dirName := string(pod.GetUID())
+
+		// if the pod is a mirror pod, the directory name is the hash value of the
+		// mirror pod annotation
+		if hash, ok := pod.GetAnnotations()[v1.MirrorPodAnnotationKey]; ok {
+			dirName = hash
+		}
+
+		if !dirs.Has(dirName) {
+			valid = false
+			s.logger.WithFields(logrus.Fields{
+				"pod":  fmt.Sprintf("%s/%s", pod.GetNamespace(), pod.GetName()),
+				"path": "/host_pods/" + dirName,
+			}).Debug("could not find volumes for pod in host path")
+		}
+	}
+
+	if !valid {
+		return errors.New("unexpected directory structure for host-pods volume, ensure that the host-pods volume corresponds to the pods subdirectory of the kubelet root directory")
+	}
+
+	return nil
 }
