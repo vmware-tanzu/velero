@@ -320,3 +320,63 @@ func WithDeletionTimestamp(val time.Time) func(obj metav1.Object) {
 		obj.SetDeletionTimestamp(&metav1.Time{Time: val})
 	}
 }
+
+// WithReclaimPolicy is a functional option for persistent volumes that sets
+// the specified reclaim policy. It panics if the object is not a persistent
+// volume.
+func WithReclaimPolicy(policy corev1.PersistentVolumeReclaimPolicy) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		pv, ok := obj.(*corev1.PersistentVolume)
+		if !ok {
+			panic("WithReclaimPolicy is only valid for persistent volumes")
+		}
+
+		pv.Spec.PersistentVolumeReclaimPolicy = policy
+	}
+}
+
+// WithClaimRef is a functional option for persistent volumes that sets the specified
+// claim ref. It panics if the object is not a persistent volume.
+func WithClaimRef(ns, name string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		pv, ok := obj.(*corev1.PersistentVolume)
+		if !ok {
+			panic("WithClaimRef is only valid for persistent volumes")
+		}
+
+		pv.Spec.ClaimRef = &corev1.ObjectReference{
+			Namespace: ns,
+			Name:      name,
+		}
+	}
+}
+
+// WithAWSEBSVolumeID is a functional option for persistent volumes that sets the specified
+// AWS EBS volume ID. It panics if the object is not a persistent volume.
+func WithAWSEBSVolumeID(volumeID string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		pv, ok := obj.(*corev1.PersistentVolume)
+		if !ok {
+			panic("WithClaimRef is only valid for persistent volumes")
+		}
+
+		if pv.Spec.AWSElasticBlockStore == nil {
+			pv.Spec.AWSElasticBlockStore = new(corev1.AWSElasticBlockStoreVolumeSource)
+		}
+
+		pv.Spec.AWSElasticBlockStore.VolumeID = volumeID
+	}
+}
+
+// WithVolumeName is a functional option for persistent volume claims that sets the specified
+// volume name. It panics if the object is not a persistent volume claim.
+func WithVolumeName(name string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		pvc, ok := obj.(*corev1.PersistentVolumeClaim)
+		if !ok {
+			panic("WithVolumeName is only valid for persistent volume claims")
+		}
+
+		pvc.Spec.VolumeName = name
+	}
+}
