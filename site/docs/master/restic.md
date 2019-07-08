@@ -83,13 +83,14 @@ If restic is not running in a privileged mode, it will not be able to access pod
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.
 To schedule on all nodes the namespace needs an annotation:
 ```
-oc annotate namespace < velero namespace > openshift.io/node-selector=""
+oc annotate namespace <velero namespace> openshift.io/node-selector=""
 ```
-This should be done before valero installation the ds needs to be deleted and recreated:
+This should be done before velero installation.
+Or the ds needs to be deleted and recreated:
 ```
-oc get ds restic -o yaml > ds.yaml
-# Now add the annotation
-oc create -f ds.yaml
+oc get ds restic -o yaml -n <velero namespace> > ds.yaml
+oc annotate namespace <velero namespace> openshift.io/node-selector=""
+oc create -n <velero namespace> -f ds.yaml
 ```
 
 **Enterprise PKS**
