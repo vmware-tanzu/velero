@@ -19,8 +19,10 @@ package restore
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	corev1apiclient "k8s.io/client-go/kubernetes/typed/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	storagev1client "k8s.io/client-go/kubernetes/typed/storage/v1"
 
 	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
@@ -29,29 +31,40 @@ import (
 // ChangeStorageClassAction updates a PV or PVC's storage class name
 // if a mapping is found in the plugin's config map.
 type ChangeStorageClassAction struct {
-	logger logrus.FieldLogger
-	client corev1apiclient.ConfigMapInterface
+	logger             logrus.FieldLogger
+	configMapClient    corev1client.ConfigMapInterface
+	storageClassClient storagev1client.StorageClassInterface
 }
 
-func NewChangeStorageClassAction(logger logrus.FieldLogger, client corev1apiclient.ConfigMapInterface) *ChangeStorageClassAction {
+// NewChangeStorageClassAction is the constructor for ChangeStorageClassAction.
+func NewChangeStorageClassAction(
+	logger logrus.FieldLogger,
+	configMapClient corev1client.ConfigMapInterface,
+	storageClassClient storagev1client.StorageClassInterface,
+) *ChangeStorageClassAction {
 	return &ChangeStorageClassAction{
-		logger: logger,
-		client: client,
+		logger:             logger,
+		configMapClient:    configMapClient,
+		storageClassClient: storageClassClient,
 	}
 }
 
+// AppliesTo returns the resources that ChangeStorageClassAction should
+// be run for.
 func (a *ChangeStorageClassAction) AppliesTo() (velero.ResourceSelector, error) {
 	return velero.ResourceSelector{
 		IncludedResources: []string{"persistentvolumeclaims", "persistentvolumes"},
 	}, nil
 }
 
+// Execute updates the item's spec.storageClassName if a mapping is found
+// in the config map for the plugin.
 func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	a.logger.Info("Executing ChangeStorageClassAction")
 	defer a.logger.Info("Done executing ChangeStorageClassAction")
 
 	a.logger.Debug("Getting plugin config")
-	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-storageclass", a.client)
+	config, err := getPluginConfig(framework.PluginKindRestoreItemAction, "velero.io/change-storageclass", a.configMapClient)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +98,13 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 
 	newStorageClass, ok := config.Data[storageClass]
 	if !ok {
+		log.Debugf("No mapping found for storage class %s", storageClass)
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
+	}
+
+	// validate that new storage class exists
+	if _, err := a.storageClassClient.Get(newStorageClass, metav1.GetOptions{}); err != nil {
+		return nil, errors.Wrapf(err, "error getting storage class %s from API", newStorageClass)
 	}
 
 	log.Infof("Updating item's storage class name to %s", newStorageClass)

@@ -163,6 +163,10 @@ func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.Handl
 			return nil, err
 		}
 
-		return restore.NewChangeStorageClassAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+		return restore.NewChangeStorageClassAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.StorageV1().StorageClasses(),
+		), nil
 	}
 }
