@@ -37,8 +37,8 @@ TAG_LATEST ?= false
 ### These variables should not need tweaking.
 ###
 
-CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64
-CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64
+CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
+CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64 linux-ppc64le
 
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
@@ -55,6 +55,9 @@ endif
 #ifeq ($(GOARCH),arm64)
 #		DOCKERFILE ?= Dockerfile.arm64 #aarch64/busybox
 #endif
+ifeq ($(GOARCH),ppc64le)
+                DOCKERFILE ?= Dockerfile-$(BIN)-ppc64le
+endif
 
 IMAGE = $(REGISTRY)/$(BIN)
 

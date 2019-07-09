@@ -25,16 +25,21 @@ builds:
       - amd64
       - arm
       - arm64
+      - ppc64le
     ignore:
       # don't build arm/arm64 for darwin or windows
       - goos: darwin
         goarch: arm
       - goos: darwin
         goarch: arm64
+      - goos: darwin
+        goarch: ppc64le
       - goos: windows
         goarch: arm
       - goos: windows
         goarch: arm64
+      - goos: windows
+        goarch: ppc64le
     ldflags:
       - -X "github.com/heptio/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
 archive:
