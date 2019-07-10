@@ -51,6 +51,7 @@ type podVolumeBackupController struct {
 	secretLister          corev1listers.SecretLister
 	podLister             corev1listers.PodLister
 	pvcLister             corev1listers.PersistentVolumeClaimLister
+	pvLister              corev1listers.PersistentVolumeLister
 	backupLocationLister  listers.BackupStorageLocationLister
 	nodeName              string
 
@@ -67,6 +68,7 @@ func NewPodVolumeBackupController(
 	podInformer cache.SharedIndexInformer,
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
+	pvInformer corev1informers.PersistentVolumeInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	nodeName string,
 ) Interface {
@@ -77,6 +79,7 @@ func NewPodVolumeBackupController(
 		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
 		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:             pvcInformer.Lister(),
+		pvLister:              pvInformer.Lister(),
 		backupLocationLister:  backupLocationInformer.Lister(),
 		nodeName:              nodeName,
 
@@ -191,7 +194,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		return c.fail(req, errors.Wrap(err, "error getting pod").Error(), log)
 	}
 
-	volumeDir, err := kube.GetVolumeDirectory(pod, req.Spec.Volume, c.pvcLister)
+	volumeDir, err := kube.GetVolumeDirectory(pod, req.Spec.Volume, c.pvcLister, c.pvLister)
 	if err != nil {
 		log.WithError(err).Error("Error getting volume directory name")
 		return c.fail(req, errors.Wrap(err, "error getting volume directory name").Error(), log)

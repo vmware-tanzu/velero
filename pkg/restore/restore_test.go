@@ -1752,7 +1752,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				).
 				addItems("persistentvolumeclaims",
 					test.NewPVC("ns-1", "pvc-1",
-						test.WithVolumeName("pv-1"),
+						test.WithPVName("pv-1"),
 						test.WithAnnotations("pv.kubernetes.io/bind-completed", "true", "pv.kubernetes.io/bound-by-controller", "true", "foo", "bar"),
 					),
 				).
