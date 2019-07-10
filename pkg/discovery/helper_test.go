@@ -183,7 +183,17 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 	for _, test := range tests {
 		fakeServer := velerotest.NewFakeServerResourcesInterface(test.resourceList, test.failedGroups, test.returnError)
 		t.Run(test.name, func(t *testing.T) {
-			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel))
+			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, false))
+			if test.returnError != nil {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, test.returnError, err)
+			}
+
+			assert.Equal(t, test.resourceList, resources)
+
+			resources, err = refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, true))
 			if test.returnError != nil {
 				assert.NotNil(t, err)
 			} else {

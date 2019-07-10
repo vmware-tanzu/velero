@@ -100,7 +100,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				sharedInformers = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, false)
 			)
 
 			c := &backupController{
@@ -162,7 +162,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, false)
 			)
 
 			c := &backupController{
@@ -228,7 +228,7 @@ func TestBackupLocationLabel(t *testing.T) {
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, false)
 			)
 
 			c := &backupController{
@@ -281,7 +281,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 	for _, test := range tests {
 		var (
 			clientset       = fake.NewSimpleClientset(test.backup)
-			logger          = logging.DefaultLogger(logrus.DebugLevel)
+			logger          = logging.DefaultLogger(logrus.DebugLevel, false)
 			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 		)
 
@@ -531,7 +531,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, false)
 				pluginManager   = new(pluginmocks.Manager)
 				backupStore     = new(persistencemocks.BackupStore)
 				backupper       = new(fakeBackupper)

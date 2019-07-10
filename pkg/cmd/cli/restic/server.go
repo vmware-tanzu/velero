@@ -47,6 +47,7 @@ import (
 
 func NewServerCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
+	var jsonOutputFlag bool		= false
 
 	command := &cobra.Command{
 		Use:    "server",
@@ -57,7 +58,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logLevel := logLevelFlag.Parse()
 			logrus.Infof("Setting log-level to %s", strings.ToUpper(logLevel.String()))
 
-			logger := logging.DefaultLogger(logLevel)
+			logger := logging.DefaultLogger(logLevel, jsonOutputFlag)
 			logger.Infof("Starting Velero restic server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
@@ -68,6 +69,7 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
+	command.Flags().BoolVar(&jsonOutputFlag, "log-json", false, fmt.Sprintf("log output as JSON"))
 
 	return command
 }

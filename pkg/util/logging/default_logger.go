@@ -33,8 +33,12 @@ func DefaultHooks() []logrus.Hook {
 
 // DefaultLogger returns a Logger with the default properties
 // and hooks.
-func DefaultLogger(level logrus.Level) *logrus.Logger {
+func DefaultLogger(level logrus.Level, j bool) *logrus.Logger {
 	logger := logrus.New()
+
+	if (j) {
+		logger.Formatter = new(logrus.JSONFormatter)
+	}
 
 	// Make sure the output is set to stdout so log messages don't show up as errors in cloud log dashboards.
 	logger.Out = os.Stdout

@@ -50,7 +50,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 				veleroClient = client.VeleroV1()
 			}
-
+			serverStatusGetter.Namespace = f.Namespace()
 			printVersion(os.Stdout, clientOnly, veleroClient, serverStatusGetter)
 		},
 	}

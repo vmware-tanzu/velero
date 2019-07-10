@@ -113,6 +113,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
+				false,
 			).(*restoreController)
 
 			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -206,6 +207,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				nil,
 				"default",
 				metrics.NewServerMetrics(),
+				false,
 			).(*restoreController)
 
 			if test.restore != nil {
@@ -406,6 +408,7 @@ func TestProcessQueueItem(t *testing.T) {
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
+				false,
 			).(*restoreController)
 
 			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -628,6 +631,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		nil,
 		"default",
 		nil,
+		false,
 	).(*restoreController)
 
 	restore := &api.Restore{

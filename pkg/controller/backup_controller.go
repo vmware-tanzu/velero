@@ -70,6 +70,7 @@ type backupController struct {
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
 	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	jsonOutputFlag			 bool
 }
 
 func NewBackupController(
@@ -86,6 +87,7 @@ func NewBackupController(
 	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
+	jsonOutputFlag bool,
 ) Interface {
 	c := &backupController{
 		genericController:        newGenericController("backup", logger),
@@ -102,6 +104,7 @@ func NewBackupController(
 		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
+		jsonOutputFlag:			  jsonOutputFlag,
 
 		newBackupStore: persistence.NewObjectBackupStore,
 	}
@@ -448,7 +451,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.backupLogLevel)
+	logger := logging.DefaultLogger(c.backupLogLevel, c.jsonOutputFlag)
 	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
 
 	logCounter := logging.NewLogCounterHook()

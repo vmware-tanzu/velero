@@ -84,6 +84,7 @@ type restoreController struct {
 	restoreLogLevel        logrus.Level
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
+	jsonOutputFlag		   bool
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore   func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -103,6 +104,7 @@ func NewRestoreController(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	defaultBackupLocation string,
 	metrics *metrics.ServerMetrics,
+	jsonOutputFlag bool,
 ) Interface {
 	c := &restoreController{
 		genericController:      newGenericController("restore", logger),
@@ -117,6 +119,7 @@ func NewRestoreController(
 		restoreLogLevel:        restoreLogLevel,
 		defaultBackupLocation:  defaultBackupLocation,
 		metrics:                metrics,
+		jsonOutputFlag:			jsonOutputFlag,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -412,8 +415,8 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 func (c *restoreController) runValidatedRestore(restore *api.Restore, info backupInfo) error {
 	// instantiate the per-restore logger that will output both to a temp file
 	// (for upload to object storage) and to stdout.
-	restoreLog, err := newRestoreLogger(restore, c.logger, c.restoreLogLevel)
-	if err != nil {
+	restoreLog, err := newRestoreLogger(restore, c.logger, c.restoreLogLevel, c.jsonOutputFlag)
+	if err != nil {	
 		return err
 	}
 	defer restoreLog.closeAndRemove(c.logger)
@@ -555,14 +558,14 @@ type restoreLogger struct {
 	w    *gzip.Writer
 }
 
-func newRestoreLogger(restore *api.Restore, baseLogger logrus.FieldLogger, logLevel logrus.Level) (*restoreLogger, error) {
+func newRestoreLogger(restore *api.Restore, baseLogger logrus.FieldLogger, logLevel logrus.Level, jsonOutputFlag bool) (*restoreLogger, error) {
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, errors.Wrap(err, "error creating temp file")
 	}
 	w := gzip.NewWriter(file)
 
-	logger := logging.DefaultLogger(logLevel)
+	logger := logging.DefaultLogger(logLevel, jsonOutputFlag)
 	logger.Out = io.MultiWriter(os.Stdout, w)
 
 	return &restoreLogger{

@@ -25,7 +25,11 @@ import (
 )
 
 func TestDefaultLogger(t *testing.T) {
-	logger := DefaultLogger(logrus.InfoLevel)
+	logger := DefaultLogger(logrus.InfoLevel, true)
+	assert.Equal(t, logrus.InfoLevel, logger.Level)
+	assert.Equal(t, os.Stdout, logger.Out)
+
+	logger = DefaultLogger(logrus.InfoLevel, false)
 	assert.Equal(t, logrus.InfoLevel, logger.Level)
 	assert.Equal(t, os.Stdout, logger.Out)
 
