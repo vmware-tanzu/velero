@@ -68,10 +68,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -99,10 +99,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -130,7 +130,7 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
 						"velero.io/plugin-config":     "true",
 						"velero.io/some-other-plugin": "RestoreItemAction",
@@ -161,10 +161,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{},
@@ -187,10 +187,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -212,10 +212,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -240,10 +240,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -271,10 +271,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -302,10 +302,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
@@ -328,10 +328,10 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 			configMap: &corev1api.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "velero",
-					Name:      "change-storageclass",
+					Name:      "change-storage-class",
 					Labels: map[string]string{
-						"velero.io/plugin-config":       "true",
-						"velero.io/change-storageclass": "RestoreItemAction",
+						"velero.io/plugin-config":        "true",
+						"velero.io/change-storage-class": "RestoreItemAction",
 					},
 				},
 				Data: map[string]string{
