@@ -38,7 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	discoveryfake "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
+	kubefake "k8s.io/client-go/kubernetes/fake"
 	kubetesting "k8s.io/client-go/testing"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -49,6 +51,7 @@ import (
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
+	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	testutil "github.com/heptio/velero/pkg/util/test"
@@ -2034,6 +2037,202 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			assertRestoredItems(t, h, tc.want)
 		})
 	}
+}
+
+func TestPrioritizeResources(t *testing.T) {
+	tests := []struct {
+		name         string
+		apiResources map[string][]string
+		priorities   []string
+		includes     []string
+		excludes     []string
+		expected     []string
+	}{
+		{
+			name: "priorities & ordering are correctly applied",
+			apiResources: map[string][]string{
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"*"},
+			expected:   []string{"namespaces", "configmaps", "pods", "aaa", "bbb", "ddd", "ooo", "sss"},
+		},
+		{
+			name: "includes are correctly applied",
+			apiResources: map[string][]string{
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"namespaces", "aaa", "sss"},
+			expected:   []string{"namespaces", "aaa", "sss"},
+		},
+		{
+			name: "excludes are correctly applied",
+			apiResources: map[string][]string{
+				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
+			},
+			priorities: []string{"namespaces", "configmaps", "pods"},
+			includes:   []string{"*"},
+			excludes:   []string{"ooo", "pods"},
+			expected:   []string{"namespaces", "configmaps", "aaa", "bbb", "ddd", "sss"},
+		},
+	}
+
+	logger := testutil.NewLogger()
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryClient := &test.DiscoveryClient{
+				FakeDiscovery: kubefake.NewSimpleClientset().Discovery().(*discoveryfake.FakeDiscovery),
+			}
+
+			helper, err := discovery.NewHelper(discoveryClient, logger)
+			require.NoError(t, err)
+
+			// add all the test case's API resources to the discovery client
+			for gvString, resources := range tc.apiResources {
+				gv, err := schema.ParseGroupVersion(gvString)
+				require.NoError(t, err)
+
+				for _, resource := range resources {
+					discoveryClient.WithAPIResource(&test.APIResource{
+						Group:   gv.Group,
+						Version: gv.Version,
+						Name:    resource,
+					})
+				}
+			}
+
+			require.NoError(t, helper.Refresh())
+
+			includesExcludes := collections.NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
+
+			result, err := prioritizeResources(helper, tc.priorities, includesExcludes, logger)
+			require.NoError(t, err)
+
+			require.Equal(t, len(tc.expected), len(result))
+
+			for i := range result {
+				if e, a := tc.expected[i], result[i].Resource; e != a {
+					t.Errorf("index %d, expected %s, got %s", i, e, a)
+				}
+			}
+		})
+	}
+}
+
+func TestResetMetadataAndStatus(t *testing.T) {
+	tests := []struct {
+		name        string
+		obj         *unstructured.Unstructured
+		expectedErr bool
+		expectedRes *unstructured.Unstructured
+	}{
+		{
+			name:        "no metadata causes error",
+			obj:         &unstructured.Unstructured{},
+			expectedErr: true,
+		},
+		{
+			name:        "keep name, namespace, labels, annotations only",
+			obj:         NewTestUnstructured().WithMetadata("name", "blah", "namespace", "labels", "annotations", "foo").Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata("name", "namespace", "labels", "annotations").Unstructured,
+		},
+		{
+			name:        "don't keep status",
+			obj:         NewTestUnstructured().WithMetadata().WithStatus().Unstructured,
+			expectedErr: false,
+			expectedRes: NewTestUnstructured().WithMetadata().Unstructured,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			res, err := resetMetadataAndStatus(test.obj)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expectedRes, res)
+			}
+		})
+	}
+}
+
+func TestIsCompleted(t *testing.T) {
+	tests := []struct {
+		name          string
+		expected      bool
+		content       string
+		groupResource schema.GroupResource
+		expectedErr   bool
+	}{
+		{
+			name:          "Failed pods are complete",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Failed"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Succeeded pods are complete",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Succeeded"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Pending pods aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Pending"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Running pods aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"phase": "Running"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "pods"},
+		},
+		{
+			name:          "Jobs without a completion time aren't complete",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Jobs with a completion time are completed",
+			expected:      true,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"completionTime": "bar"}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Jobs with an empty completion time are not completed",
+			expected:      false,
+			content:       `{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"ns","name":"pod1"}, "status": {"completionTime": ""}}`,
+			groupResource: schema.GroupResource{Group: "batch", Resource: "jobs"},
+		},
+		{
+			name:          "Something not a pod or a job may actually be complete, but we're not concerned with that",
+			expected:      false,
+			content:       `{"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "ns"}, "status": {"completionTime": "bar", "phase":"Completed"}}`,
+			groupResource: schema.GroupResource{Group: "", Resource: "namespaces"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			u := testutil.UnstructuredOrDie(test.content)
+			backup, err := isCompleted(u, test.groupResource)
+
+			if assert.Equal(t, test.expectedErr, err != nil) {
+				assert.Equal(t, test.expected, backup)
+			}
+		})
+	}
+}
+
+func TestGetItemFilePath(t *testing.T) {
+	res := getItemFilePath("root", "resource", "", "item")
+	assert.Equal(t, "root/resources/resource/cluster/item.json", res)
+
+	res = getItemFilePath("root", "resource", "namespace", "item")
+	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
 }
 
 // assertResourceCreationOrder ensures that resources were created in the expected

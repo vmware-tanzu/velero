@@ -259,3 +259,94 @@ func int64Ptr(val int) *int64 {
 	r := int64(val)
 	return &r
 }
+
+type testUnstructured struct {
+	*unstructured.Unstructured
+}
+
+func NewTestUnstructured() *testUnstructured {
+	obj := &testUnstructured{
+		Unstructured: &unstructured.Unstructured{
+			Object: make(map[string]interface{}),
+		},
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) WithMetadata(fields ...string) *testUnstructured {
+	return obj.withMap("metadata", fields...)
+}
+
+func (obj *testUnstructured) WithSpec(fields ...string) *testUnstructured {
+	if _, found := obj.Object["spec"]; found {
+		panic("spec already set - you probably didn't mean to do this twice!")
+	}
+	return obj.withMap("spec", fields...)
+}
+
+func (obj *testUnstructured) WithStatus(fields ...string) *testUnstructured {
+	return obj.withMap("status", fields...)
+}
+
+func (obj *testUnstructured) WithMetadataField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("metadata", field, value)
+}
+
+func (obj *testUnstructured) WithSpecField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("spec", field, value)
+}
+
+func (obj *testUnstructured) WithStatusField(field string, value interface{}) *testUnstructured {
+	return obj.withMapEntry("status", field, value)
+}
+
+func (obj *testUnstructured) WithAnnotations(fields ...string) *testUnstructured {
+	vals := map[string]string{}
+	for _, field := range fields {
+		vals[field] = "foo"
+	}
+
+	return obj.WithAnnotationValues(vals)
+}
+
+func (obj *testUnstructured) WithAnnotationValues(fieldVals map[string]string) *testUnstructured {
+	annotations := make(map[string]interface{})
+	for field, val := range fieldVals {
+		annotations[field] = val
+	}
+
+	obj = obj.WithMetadataField("annotations", annotations)
+
+	return obj
+}
+
+func (obj *testUnstructured) WithName(name string) *testUnstructured {
+	return obj.WithMetadataField("name", name)
+}
+
+func (obj *testUnstructured) withMap(name string, fields ...string) *testUnstructured {
+	m := make(map[string]interface{})
+	obj.Object[name] = m
+
+	for _, field := range fields {
+		m[field] = "foo"
+	}
+
+	return obj
+}
+
+func (obj *testUnstructured) withMapEntry(mapName, field string, value interface{}) *testUnstructured {
+	var m map[string]interface{}
+
+	if res, ok := obj.Unstructured.Object[mapName]; !ok {
+		m = make(map[string]interface{})
+		obj.Unstructured.Object[mapName] = m
+	} else {
+		m = res.(map[string]interface{})
+	}
+
+	m[field] = value
+
+	return obj
+}
