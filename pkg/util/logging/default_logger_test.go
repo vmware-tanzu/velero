@@ -25,11 +25,16 @@ import (
 )
 
 func TestDefaultLogger(t *testing.T) {
-	logger := DefaultLogger(logrus.InfoLevel)
-	assert.Equal(t, logrus.InfoLevel, logger.Level)
-	assert.Equal(t, os.Stdout, logger.Out)
+	formatFlag := NewFormatFlag()
 
-	for _, level := range logrus.AllLevels {
-		assert.Equal(t, DefaultHooks(), logger.Hooks[level])
+	for _, testFormat := range formatFlag.AllowedValues() {
+		formatFlag.Set(testFormat)
+		logger := DefaultLogger(logrus.InfoLevel, formatFlag.Parse())
+		assert.Equal(t, logrus.InfoLevel, logger.Level)
+		assert.Equal(t, os.Stdout, logger.Out)
+
+		for _, level := range logrus.AllLevels {
+			assert.Equal(t, DefaultHooks(), logger.Hooks[level])
+		}
 	}
 }

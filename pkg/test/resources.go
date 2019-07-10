@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -249,6 +250,38 @@ func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
 	return obj
 }
 
+func NewConfigMap(ns, name string, opts ...ObjectOpts) *corev1.ConfigMap {
+	obj := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: objectMeta(ns, name),
+	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
+}
+
+func NewStorageClass(name string, opts ...ObjectOpts) *storagev1.StorageClass {
+	obj := &storagev1.StorageClass{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "StorageClass",
+			APIVersion: "storage/v1",
+		},
+		ObjectMeta: objectMeta("", name),
+	}
+
+	for _, opt := range opts {
+		opt(obj)
+	}
+
+	return obj
+}
+
 // VolumeOpts exists because corev1.Volume does not implement metav1.Object
 type VolumeOpts func(*corev1.Volume)
 
@@ -418,6 +451,23 @@ func WithPVName(name string) func(obj metav1.Object) {
 	}
 }
 
+// WithStorageClassName is a functional option for persistent volumes or
+// persistent volume claims that sets the specified storage class name.
+// It panics if the object is not a persistent volume or persistent volume
+// claim.
+func WithStorageClassName(name string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		switch obj.(type) {
+		case *corev1.PersistentVolume:
+			obj.(*corev1.PersistentVolume).Spec.StorageClassName = name
+		case *corev1.PersistentVolumeClaim:
+			obj.(*corev1.PersistentVolumeClaim).Spec.StorageClassName = &name
+		default:
+			panic("WithStorageClassName is only valid for persistent volumes and persistent volume claims")
+		}
+	}
+}
+
 // WithVolume is a functional option for pods that sets the specified
 // volume on the pod's Spec. It panics if the object is not a pod.
 func WithVolume(volume *corev1.Volume) func(obj metav1.Object) {
@@ -443,5 +493,28 @@ func WithPVCSource(claimName string) func(vol *corev1.Volume) {
 func WithCSISource(driverName string) func(vol *corev1.Volume) {
 	return func(vol *corev1.Volume) {
 		vol.VolumeSource.CSI = &corev1.CSIVolumeSource{Driver: driverName}
+	}
+}
+
+// WithConfigMapData is a functional option for config maps that puts the specified
+// values in the Data field. It panics if the object is not a config map.
+func WithConfigMapData(vals ...string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		cm, ok := obj.(*corev1.ConfigMap)
+		if !ok {
+			panic("WithConfigMapData is only valid for config maps")
+		}
+
+		if cm.Data == nil {
+			cm.Data = make(map[string]string)
+		}
+
+		if len(vals)%2 != 0 {
+			vals = append(vals, "")
+		}
+
+		for i := 0; i < len(vals); i += 2 {
+			cm.Data[vals[i]] = vals[i+1]
+		}
 	}
 }

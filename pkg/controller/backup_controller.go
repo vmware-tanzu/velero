@@ -70,6 +70,7 @@ type backupController struct {
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
 	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	formatFlag               logging.Format
 }
 
 func NewBackupController(
@@ -86,6 +87,7 @@ func NewBackupController(
 	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
+	formatFlag logging.Format,
 ) Interface {
 	c := &backupController{
 		genericController:        newGenericController("backup", logger),
@@ -102,6 +104,7 @@ func NewBackupController(
 		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
+		formatFlag:               formatFlag,
 
 		newBackupStore: persistence.NewObjectBackupStore,
 	}
@@ -448,7 +451,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Log the backup to both a backup log file and to stdout. This will help see what happened if the upload of the
 	// backup log failed for whatever reason.
-	logger := logging.DefaultLogger(c.backupLogLevel)
+	logger := logging.DefaultLogger(c.backupLogLevel, c.formatFlag)
 	logger.Out = io.MultiWriter(os.Stdout, gzippedLogFile)
 
 	logCounter := logging.NewLogCounterHook()
@@ -576,6 +579,17 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
 	}
 
+	podVolumeBackups := new(bytes.Buffer)
+	gzw = gzip.NewWriter(podVolumeBackups)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackups); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding pod volume backups"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
 	if len(errs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
@@ -583,7 +597,15 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		volumeSnapshots = nil
 	}
 
-	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, volumeSnapshots); err != nil {
+	backupInfo := persistence.BackupInfo{
+		Name:             backup.Name,
+		Metadata:         backupJSON,
+		Contents:         backupContents,
+		Log:              backupLog,
+		PodVolumeBackups: podVolumeBackups,
+		VolumeSnapshots:  volumeSnapshots,
+	}
+	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)
 	}
 

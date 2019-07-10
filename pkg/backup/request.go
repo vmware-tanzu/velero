@@ -18,5 +18,6 @@ type Request struct {
 	ResourceHooks             []resourceHook
 	ResolvedActions           []resolvedAction
 
-	VolumeSnapshots []*volume.Snapshot
+	VolumeSnapshots  []*volume.Snapshot
+	PodVolumeBackups []*velerov1api.PodVolumeBackup
 }

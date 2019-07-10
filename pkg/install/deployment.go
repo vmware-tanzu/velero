@@ -19,7 +19,7 @@ package install
 import (
 	"strings"
 
-	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -74,7 +74,7 @@ func WithRestoreOnly() podTemplateOption {
 	}
 }
 
-func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deployment {
+func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
 		image: DefaultImage,
@@ -94,13 +94,13 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1beta1.Deploy
 	containerLabels := labels()
 	containerLabels["deploy"] = "velero"
 
-	deployment := &appsv1beta1.Deployment{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: objectMeta(namespace, "velero"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
-			APIVersion: appsv1beta1.SchemeGroupVersion.String(),
+			APIVersion: appsv1.SchemeGroupVersion.String(),
 		},
-		Spec: appsv1beta1.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"deploy": "velero"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{

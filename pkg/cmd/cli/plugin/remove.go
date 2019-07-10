@@ -40,7 +40,7 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 				cmd.CheckError(err)
 			}
 
-			veleroDeploy, err := kubeClient.AppsV1beta1().Deployments(f.Namespace()).Get(veleroDeployment, metav1.GetOptions{})
+			veleroDeploy, err := kubeClient.AppsV1().Deployments(f.Namespace()).Get(veleroDeployment, metav1.GetOptions{})
 			if err != nil {
 				cmd.CheckError(err)
 			}
@@ -72,7 +72,7 @@ func NewRemoveCommand(f client.Factory) *cobra.Command {
 			patchBytes, err := jsonpatch.CreateMergePatch(original, updated)
 			cmd.CheckError(err)
 
-			_, err = kubeClient.AppsV1beta1().Deployments(veleroDeploy.Namespace).Patch(veleroDeploy.Name, types.MergePatchType, patchBytes)
+			_, err = kubeClient.AppsV1().Deployments(veleroDeploy.Namespace).Patch(veleroDeploy.Name, types.MergePatchType, patchBytes)
 			cmd.CheckError(err)
 		},
 	}

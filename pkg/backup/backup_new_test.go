@@ -2101,7 +2101,7 @@ func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLoca
 }
 
 func defaultBackup() *Builder {
-	return NewNamedBuilder(velerov1.DefaultNamespace, "backup-1")
+	return NewNamedBackupBuilder(velerov1.DefaultNamespace, "backup-1")
 }
 
 func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {

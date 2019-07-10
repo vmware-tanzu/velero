@@ -15,11 +15,12 @@ velero install \
     --provider <YOUR_PROVIDER> \
     --bucket <YOUR_BUCKET> \
     --secret-file <PATH_TO_FILE> \
-    [--backup-location-config]
-    [--snapshot-location-config]
-    [--namespace]
-    [--use-volume-snapshots]
-    [--use-restic]
+    [--backup-location-config] \
+    [--snapshot-location-config] \
+    [--namespace] \
+    [--use-volume-snapshots] \
+    [--use-restic] \
+    [--pod-annotations] \
 ```
 
 For provider-specific instructions, see:
@@ -62,6 +63,18 @@ If you would like to completely uninstall Velero from your cluster, the followin
 kubectl delete namespace/velero clusterrolebinding/velero
 kubectl delete crds -l component=velero
 ```
+
+## Installing with the Helm chart
+
+When installing using the Helm chart, the provider's credential information will need to be appended into your values.
+
+The easiest way to do this is with the `--set-file` argument, available in Helm 2.10 and higher.
+
+```bash
+helm install --set-file credentials.secretContents.cloud=./credentials-velero
+```
+
+See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
 
 ## Examples
 

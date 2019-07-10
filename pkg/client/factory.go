@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
@@ -38,6 +39,9 @@ type Factory interface {
 	// KubeClient returns a Kubernetes client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	KubeClient() (kubernetes.Interface, error)
+	// DynamicClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
+	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
+	DynamicClient() (dynamic.Interface, error)
 	Namespace() string
 }
 
@@ -101,6 +105,19 @@ func (f *factory) KubeClient() (kubernetes.Interface, error) {
 		return nil, errors.WithStack(err)
 	}
 	return kubeClient, nil
+}
+
+func (f *factory) DynamicClient() (dynamic.Interface, error) {
+	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
+	if err != nil {
+		return nil, err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return dynamicClient, nil
 }
 
 func (f *factory) Namespace() string {

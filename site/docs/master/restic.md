@@ -30,11 +30,11 @@ Ensure you've [downloaded latest release][3].
 
 To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
-Please note: For some PaaS/CaaS platforms based on Kubernetes, RancherOS, OpenShift and Enterprise PKS for instance, some modifications are required to the restic DaemonSet spec before deploying it.
+Please note: For some PaaS/CaaS platforms based on Kubernetes such as RancherOS, OpenShift and Enterprise PKS, some modifications are required to the restic DaemonSet spec.
 
 **RancherOS**
 
-The path is not `/var/lib/kubelet/pods`, rather it is `/opt/rke/var/lib/kubelet/pods`
+The host path for volumes is not `/var/lib/kubelet/pods`, rather it is `/opt/rke/var/lib/kubelet/pods`
 
 ```yaml
 hostPath:
@@ -81,12 +81,17 @@ $ oc adm policy add-scc-to-user privileged -z velero -n velero
 If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
 
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.
+
 To schedule on all nodes the namespace needs an annotation:
+
 ```
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
 ```
+
 This should be done before velero installation.
+
 Or the ds needs to be deleted and recreated:
+
 ```
 oc get ds restic -o yaml -n <velero namespace> > ds.yaml
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
@@ -307,14 +312,12 @@ should be taken (`backup.velero.io/backup-volumes`)
     - finds the pod volume's subdirectory within the above volume
     - runs `restic backup`
     - updates the status of the custom resource to `Completed` or `Failed`
-1. As each `PodVolumeBackup` finishes, the main Velero process captures its restic snapshot ID and adds it as an annotation
-to the copy of the pod JSON that's stored in the Velero backup. This will be used for restores, as seen in the next section.
+1. As each `PodVolumeBackup` finishes, the main Velero process adds it to the Velero backup in a file named `<backup-name>-podvolumebackups.json.gz`. This file gets uploaded to object storage alongside the backup tarball. It will be used for restores, as seen in the next section.
 
 ### Restore
 
-1. The main Velero restore process checks each pod that it's restoring for annotations specifying a restic backup
-exists for a volume in the pod (`snapshot.velero.io/<volume-name>`)
-1. When found, Velero first ensures a restic repository exists for the pod's namespace, by:
+1. The main Velero restore process checks each existing `PodVolumeBackup` custom resource in the cluster to backup from.
+1. For each `PodVolumeBackup` found, Velero first ensures a restic repository exists for the pod's namespace, by:
     - checking if a `ResticRepository` custom resource already exists
     - if not, creating a new one, and waiting for the `ResticRepository` controller to init/check it (note that
     in this case, the actual repository should already exist in object storage, so the Velero controller will simply
@@ -337,6 +340,13 @@ within each restored volume, under `.velero`, whose name is the UID of the Veler
 1. Once all such files are found, the init container's process terminates successfully and the pod moves
 on to running other init containers/the main containers.
 
+## 3rd party controller
+
+### Monitor backup annotation
+
+Velero does not currently provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
+
+To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
 [1]: https://github.com/restic/restic
 [2]: install-overview.md
@@ -344,3 +354,4 @@ on to running other init containers/the main containers.
 [4]: https://kubernetes.io/docs/concepts/storage/volumes/#local
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
 [6]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
+[7]: https://github.com/bitsbeats/velero-pvc-watcher

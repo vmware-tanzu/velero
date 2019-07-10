@@ -33,53 +33,6 @@ import (
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
-func TestPodHasSnapshotAnnotation(t *testing.T) {
-	tests := []struct {
-		name        string
-		annotations map[string]string
-		expected    bool
-	}{
-		{
-			name:        "nil annotations",
-			annotations: nil,
-			expected:    false,
-		},
-		{
-			name:        "empty annotations",
-			annotations: make(map[string]string),
-			expected:    false,
-		},
-		{
-			name:        "non-empty map, no snapshot annotation",
-			annotations: map[string]string{"foo": "bar"},
-			expected:    false,
-		},
-		{
-			name:        "has snapshot annotation only, no suffix",
-			annotations: map[string]string{podAnnotationPrefix: "bar"},
-			expected:    true,
-		},
-		{
-			name:        "has snapshot annotation only, with suffix",
-			annotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
-			expected:    true,
-		},
-		{
-			name:        "has snapshot annotation, with suffix",
-			annotations: map[string]string{"foo": "bar", podAnnotationPrefix + "foo": "bar"},
-			expected:    true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			pod := &corev1api.Pod{}
-			pod.Annotations = test.annotations
-			assert.Equal(t, test.expected, PodHasSnapshotAnnotation(pod))
-		})
-	}
-}
-
 func TestGetPodSnapshotAnnotations(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -123,48 +76,6 @@ func TestGetPodSnapshotAnnotations(t *testing.T) {
 			pod := &corev1api.Pod{}
 			pod.Annotations = test.annotations
 			assert.Equal(t, test.expected, GetPodSnapshotAnnotations(pod))
-		})
-	}
-}
-
-func TestSetPodSnapshotAnnotation(t *testing.T) {
-	tests := []struct {
-		name        string
-		annotations map[string]string
-		volumeName  string
-		snapshotID  string
-		expected    map[string]string
-	}{
-		{
-			name:        "set snapshot annotation on pod with no annotations",
-			annotations: nil,
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{podAnnotationPrefix + "foo": "bar"},
-		},
-		{
-			name:        "set snapshot annotation on pod with existing annotations",
-			annotations: map[string]string{"existing": "annotation"},
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{"existing": "annotation", podAnnotationPrefix + "foo": "bar"},
-		},
-		{
-			name:        "snapshot annotation is overwritten if already exists",
-			annotations: map[string]string{podAnnotationPrefix + "foo": "existing"},
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{podAnnotationPrefix + "foo": "bar"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			pod := &corev1api.Pod{}
-			pod.Annotations = test.annotations
-
-			SetPodSnapshotAnnotation(pod, test.volumeName, test.snapshotID)
-			assert.Equal(t, test.expected, pod.Annotations)
 		})
 	}
 }

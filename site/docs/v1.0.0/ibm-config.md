@@ -82,7 +82,7 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 
 If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
 
-Replace `<YOUR_STORAGE_CLASS_NAME>` with your `StorageClass` name.
+Uncomment `storageClassName: <YOUR_STORAGE_CLASS_NAME>` and replace with your `StorageClass` name.
 
 
 [0]: namespace.md
