@@ -25,12 +25,12 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	storagev1api "k8s.io/api/storage/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/test"
 )
 
 // TestChangeStorageClassActionExecute runs the ChangeStorageClassAction's Execute
@@ -38,17 +38,6 @@ import (
 // Validation is done by comparing the result of the Execute method to the test case's
 // desired result.
 func TestChangeStorageClassActionExecute(t *testing.T) {
-	objectMeta := func(ns, name string) metav1.ObjectMeta {
-		return metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      name,
-		}
-	}
-
-	stringPtr := func(s string) *string {
-		return &s
-	}
-
 	tests := []struct {
 		name         string
 		pvOrPVC      interface{}
@@ -58,289 +47,94 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 		wantErr      error
 	}{
 		{
-			name: "a valid mapping for a persistent volume is applied correctly",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "storageclass-2",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-2",
-				},
-			},
+			name:    "a valid mapping for a persistent volume is applied correctly",
+			pvOrPVC: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "storageclass-2"),
+			),
+			storageClass: test.NewStorageClass("storageclass-2"),
+			want:         test.NewPV("pv-1", test.WithStorageClassName("storageclass-2")),
 		},
 		{
-			name: "a valid mapping for a persistent volume claim is applied correctly",
-			pvOrPVC: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pvc-1"),
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					StorageClassName: stringPtr("storageclass-1"),
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "storageclass-2",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pvc-1"),
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					StorageClassName: stringPtr("storageclass-2"),
-				},
-			},
+			name:    "a valid mapping for a persistent volume claim is applied correctly",
+			pvOrPVC: test.NewPVC("velero", "pvc-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "storageclass-2"),
+			),
+			storageClass: test.NewStorageClass("storageclass-2"),
+			want:         test.NewPVC("velero", "pvc-1", test.WithStorageClassName("storageclass-2")),
 		},
 		{
-			name: "when no config map exists for the plugin, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":     "true",
-						"velero.io/some-other-plugin": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "storageclass-2",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
+			name:    "when no config map exists for the plugin, the item is returned as-is",
+			pvOrPVC: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/some-other-plugin", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "storageclass-2"),
+			),
+			want: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
 		},
 		{
-			name: "when no storage class mappings exist in the plugin config map, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
+			name:    "when no storage class mappings exist in the plugin config map, the item is returned as-is",
+			pvOrPVC: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+			),
+			want: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
 		},
 		{
-			name: "when persistent volume has no storage class, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "storageclass-2",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-			},
+			name:    "when persistent volume has no storage class, the item is returned as-is",
+			pvOrPVC: test.NewPV("pv-1"),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "storageclass-2"),
+			),
+			want: test.NewPV("pv-1"),
 		},
 		{
-			name: "when persistent volume claim has no storage class, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pvc-1"),
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "storageclass-2",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pvc-1"),
-			},
+			name:    "when persistent volume claim has no storage class, the item is returned as-is",
+			pvOrPVC: test.NewPVC("velero", "pvc-1"),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "storageclass-2"),
+			),
+			want: test.NewPVC("velero", "pvc-1"),
 		},
 		{
-			name: "when persistent volume's storage class has no mapping in the config map, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-3": "storageclass-4",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
+			name:    "when persistent volume's storage class has no mapping in the config map, the item is returned as-is",
+			pvOrPVC: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-3", "storageclass-4"),
+			),
+			want: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
 		},
 		{
-			name: "when persistent volume claim's storage class has no mapping in the config map, the item is returned as-is",
-			pvOrPVC: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					StorageClassName: stringPtr("storageclass-1"),
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-3": "storageclass-4",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
-			want: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					StorageClassName: stringPtr("storageclass-1"),
-				},
-			},
+			name:    "when persistent volume claim's storage class has no mapping in the config map, the item is returned as-is",
+			pvOrPVC: test.NewPVC("velero", "pvc-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-3", "storageclass-4"),
+			),
+			want: test.NewPVC("velero", "pvc-1", test.WithStorageClassName("storageclass-1")),
 		},
 		{
-			name: "when persistent volume's storage class is mapped to a nonexistent storage class, an error is returned",
-			pvOrPVC: &corev1api.PersistentVolume{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeSpec{
-					StorageClassName: "storageclass-1",
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "nonexistent-storage-class",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
+			name:    "when persistent volume's storage class is mapped to a nonexistent storage class, an error is returned",
+			pvOrPVC: test.NewPV("pv-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "nonexistent-storage-class"),
+			),
 			wantErr: errors.New("error getting storage class nonexistent-storage-class from API: storageclasses.storage.k8s.io \"nonexistent-storage-class\" not found"),
 		},
 		{
-			name: "when persistent volume claim's storage class is mapped to a nonexistent storage class, an error is returned",
-			pvOrPVC: &corev1api.PersistentVolumeClaim{
-				ObjectMeta: objectMeta("velero", "pv-1"),
-				Spec: corev1api.PersistentVolumeClaimSpec{
-					StorageClassName: stringPtr("storageclass-1"),
-				},
-			},
-			configMap: &corev1api.ConfigMap{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "velero",
-					Name:      "change-storage-class",
-					Labels: map[string]string{
-						"velero.io/plugin-config":        "true",
-						"velero.io/change-storage-class": "RestoreItemAction",
-					},
-				},
-				Data: map[string]string{
-					"storageclass-1": "nonexistent-storage-class",
-				},
-			},
-			storageClass: &storagev1api.StorageClass{
-				ObjectMeta: objectMeta("", "storageclass-2"),
-			},
+			name:    "when persistent volume claim's storage class is mapped to a nonexistent storage class, an error is returned",
+			pvOrPVC: test.NewPVC("velero", "pvc-1", test.WithStorageClassName("storageclass-1")),
+			configMap: test.NewConfigMap("velero", "change-storage-class",
+				test.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction"),
+				test.WithConfigMapData("storageclass-1", "nonexistent-storage-class"),
+			),
 			wantErr: errors.New("error getting storage class nonexistent-storage-class from API: storageclasses.storage.k8s.io \"nonexistent-storage-class\" not found"),
 		},
 	}
