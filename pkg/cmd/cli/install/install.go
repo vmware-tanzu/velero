@@ -26,7 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"k8s.io/client-go/dynamic"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -147,7 +146,7 @@ This is useful as a starting point for more customized installations.
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args, f))
 			cmd.CheckError(o.Complete(args, f))
-			cmd.CheckError(o.Run(c))
+			cmd.CheckError(o.Run(c, f))
 		},
 	}
 
@@ -159,7 +158,7 @@ This is useful as a starting point for more customized installations.
 }
 
 // Run executes a command in the context of the provided arguments.
-func (o *InstallOptions) Run(c *cobra.Command) error {
+func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	vo, err := o.AsVeleroOptions()
 	if err != nil {
 		return err
@@ -177,12 +176,7 @@ func (o *InstallOptions) Run(c *cobra.Command) error {
 	if o.DryRun {
 		return nil
 	}
-
-	clientConfig, err := client.Config("", "", fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
-	if err != nil {
-		return err
-	}
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	dynamicClient, err := f.DynamicClient()
 	if err != nil {
 		return err
 	}
