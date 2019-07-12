@@ -36,7 +36,7 @@ import (
 // Backupper can execute restic backups of volumes in a pod.
 type Backupper interface {
 	// BackupPodVolumes backs up all annotated volumes in a pod.
-	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error)
+	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
 }
 
 type backupper struct {
@@ -96,7 +96,7 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) (map[string]string, []error) {
+func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
 	// get volumes to backup from pod's annotations
 	volumesToBackup := GetVolumesToBackup(pod)
 	if len(volumesToBackup) == 0 {
@@ -120,9 +120,10 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	b.resultsLock.Unlock()
 
 	var (
-		errs            []error
-		volumeSnapshots = make(map[string]string)
-		podVolumes      = make(map[string]corev1api.Volume)
+		errs             []error
+		volumeSnapshots  = make(map[string]string)
+		podVolumeBackups []*velerov1api.PodVolumeBackup
+		podVolumes       = make(map[string]corev1api.Volume)
 	)
 
 	// put the pod's volumes in a map for efficient lookup below
@@ -184,7 +185,19 @@ ForEachVolume:
 	delete(b.results, resultsKey(pod.Namespace, pod.Name))
 	b.resultsLock.Unlock()
 
-	return volumeSnapshots, errs
+	for volumeName, snapshotID := range volumeSnapshots {
+		var podVolumeBackup = &velerov1api.PodVolumeBackup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: volumeName,
+			},
+			Status: velerov1api.PodVolumeBackupStatus{
+				SnapshotID: snapshotID,
+			},
+		}
+		podVolumeBackups = append(podVolumeBackups, podVolumeBackup)
+	}
+
+	return podVolumeBackups, errs
 }
 
 type pvcGetter interface {

@@ -33,6 +33,7 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
@@ -217,13 +218,14 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 
 	if groupResource == kuberesource.Pods && pod != nil {
-		// this function will return partial results, so process volumeSnapshots
+		// this function will return partial results, so process podVolumeBackups
 		// even if there are errors.
-		volumeSnapshots, errs := ib.backupPodVolumes(log, pod, resticVolumesToBackup)
+		podVolumeBackups, errs := ib.backupPodVolumes(log, pod, resticVolumesToBackup)
+		ib.backupRequest.PodVolumeBackups = podVolumeBackups
 
 		// annotate the pod with the successful volume snapshots
-		for volume, snapshot := range volumeSnapshots {
-			restic.SetPodSnapshotAnnotation(metadata, volume, snapshot)
+		for _, volume := range podVolumeBackups {
+			restic.SetPodSnapshotAnnotation(metadata, volume.Name, volume.Status.SnapshotID)
 		}
 
 		backupErrs = append(backupErrs, errs...)
@@ -269,9 +271,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	return nil
 }
 
-// backupPodVolumes triggers restic backups of the specified pod volumes, and returns a map of volume name -> snapshot ID
+// backupPodVolumes triggers restic backups of the specified pod volumes, and returns a list of PodVolumeBackups
 // for volumes that were successfully backed up, and a slice of any errors that were encountered.
-func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) (map[string]string, []error) {
+func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumes) == 0 {
 		return nil, nil
 	}

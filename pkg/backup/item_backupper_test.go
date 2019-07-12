@@ -27,6 +27,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -309,9 +310,29 @@ func TestResticAnnotationsPersist(t *testing.T) {
 		).(*defaultItemBackupper)
 	)
 
+	var podVolumeBackup1 = &v1.PodVolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume-1",
+		},
+		Status: v1.PodVolumeBackupStatus{
+			SnapshotID: "snapshot-1",
+		},
+	}
+
+	var podVolumeBackup2 = &v1.PodVolumeBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "volume-2",
+		},
+		Status: v1.PodVolumeBackupStatus{
+			SnapshotID: "snapshot-2",
+		},
+	}
+
+	podVolumeBackups := []*v1.PodVolumeBackup{podVolumeBackup1, podVolumeBackup2}
+
 	resticBackupper.
 		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
-		Return(map[string]string{"volume-1": "snapshot-1", "volume-2": "snapshot-2"}, nil)
+		Return(podVolumeBackups, nil)
 
 	// our expected backed-up object is the passed-in object, plus the annotation
 	// that the backup item action adds, plus the annotations that the restic

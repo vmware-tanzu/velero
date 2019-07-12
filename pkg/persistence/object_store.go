@@ -43,7 +43,7 @@ type BackupStore interface {
 
 	ListBackups() ([]string, error)
 
-	PutBackup(name string, metadata, contents, log, podVolumeBackup, volumeSnapshots io.Reader) error
+	PutBackup(name string, metadata, contents, log, podVolumeBackups, volumeSnapshots io.Reader) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
@@ -190,7 +190,7 @@ func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, podV
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupPodVolumesKey(name), podVolumeBackup); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getPodVolumeBackupsKey(name), podVolumeBackup); err != nil {
 		errs := []error{err}
 
 		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(name))
