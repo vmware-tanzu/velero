@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -103,10 +103,10 @@ func TestBackupItemNoSkips(t *testing.T) {
 				w             = &fakeTarWriter{}
 			)
 
-			backup.Backup = new(v1.Backup)
+			backup.Backup = new(velerov1api.Backup)
 			backup.NamespaceIncludesExcludes = collections.NewIncludesExcludes()
 			backup.ResourceIncludesExcludes = collections.NewIncludesExcludes()
-			backup.SnapshotLocations = []*v1.VolumeSnapshotLocation{
+			backup.SnapshotLocations = []*velerov1api.VolumeSnapshotLocation{
 				newSnapshotLocation("velero", "default", "default"),
 			}
 
@@ -246,7 +246,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 
 type addAnnotationAction struct{}
 
-func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *velerov1api.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
 	// since item actions run out-of-proc, do a deep-copy here to simulate passing data
 	// across a process boundary.
 	copy := item.(*unstructured.Unstructured).DeepCopy()
@@ -310,25 +310,25 @@ func TestResticAnnotationsPersist(t *testing.T) {
 		).(*defaultItemBackupper)
 	)
 
-	var podVolumeBackup1 = &v1.PodVolumeBackup{
+	var podVolumeBackup1 = &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "volume-1",
 		},
-		Status: v1.PodVolumeBackupStatus{
+		Status: velerov1api.PodVolumeBackupStatus{
 			SnapshotID: "snapshot-1",
 		},
 	}
 
-	var podVolumeBackup2 = &v1.PodVolumeBackup{
+	var podVolumeBackup2 = &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "volume-2",
 		},
-		Status: v1.PodVolumeBackupStatus{
+		Status: velerov1api.PodVolumeBackupStatus{
 			SnapshotID: "snapshot-2",
 		},
 	}
 
-	podVolumeBackups := []*v1.PodVolumeBackup{podVolumeBackup1, podVolumeBackup2}
+	podVolumeBackups := []*velerov1api.PodVolumeBackup{podVolumeBackup1, podVolumeBackup2}
 
 	resticBackupper.
 		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
