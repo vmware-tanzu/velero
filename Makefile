@@ -225,3 +225,21 @@ serve-docs:
 	-it -p 4000:4000 \
 	jekyll/jekyll \
 	jekyll serve --livereload
+
+# gen-docs.sh generates a new versioned docs directory under site/docs. It follows
+# the following process:
+#	1. Copies the contents of the most recently tagged docs directory into the new
+#	   directory, to establish a useful baseline to diff against
+#	2. Adds all copied content from step 1 to git's staging area via 'git add'.
+#	3. Replaces the contents of the new docs directory with the contents of the
+#	   'master' docs directory, updating any version-specific links (e.g. to a
+#	   specific branch of the GitHub repository) to use the new version.
+#
+# The unstaged changes in the working directory can now be diff'ed against the
+# staged changes using 'git diff' to review all docs changes made since the previous 
+# tagged version. Once the unstaged changes are ready, they can be added to the
+# staging area using 'git add' and then committed.
+#
+# To run gen-docs: "NEW_DOCS_VERSION=v1.1.0 make gen-docs"
+gen-docs:
+	@hack/gen-docs.sh
