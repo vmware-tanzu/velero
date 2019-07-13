@@ -6,6 +6,7 @@ One to two sentences that describes the goal of this proposal.
 The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them.
 
 The Container Storage Interface (CSI) has [introduced an alpha snapshot API in Kubernetes v1.12][1].
+Current plans indicate it will reach beta support in Kubernetes v1.16.
 This document suggests an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
 
 ## Goals
@@ -43,31 +44,41 @@ This is also done to retain the object store as Velero's source of truth, withou
 
 ## Detailed Design
 
-### Resource plugins
+### Resource Plugins
 
 A set of [prototype][6] plugins was developed that informed this design.
 
 The plugins will be as follows:
 
-* A `BackupItemAction` for `PersistentVolumeClaim`s, named `velero.io/csi-pvc` that will create a `VolumeSnapshot.snapshot.storage.k8s.io` object from the PVC.
+* A `BackupItemAction` for `PersistentVolumeClaim`s, named `velero.io/csi-pvc` 
+The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below)
+If this field is `nil`, then the plugin will return early without taking action.
+Create a `VolumeSnapshot.snapshot.storage.k8s.io` object from the PVC.
+Label the `VolumeSnapshot` object with the [`velero.io/backup-name`][10] label for ease of lookup later.
 The CSI controllers will create a `VolumeSnapshotContent.snapshot.storage.k8s.io` object associated with the `VolumeSnapshot`.
-This plugin should label both the created `VolumeSnapshot` and `VolumeSnapshotContent` objects with [`v1.BackupNameLabel`][10] for ease of lookup later.
+Associated `VolumeSnapshotContent` objects will be retrieved and updated with the [`velero.io/backup-name`][10] label for ease of lookup later.
 `velero.io/volume-snapshot-name` will be applied as a label to the PVC so that the `VolumeSnapshot` can be found easily for restore.
 `VolumeSnapshot`, `VolumeSnapshotContent`, and `VolumeSnapshotClass` objects would be returned as additional items to be backed up.
 The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is the link to the underlying platform's snapshot, and must be preserved for restoration.
 
+The plugin will _not_ wait for the `VolumeSnapshot.Status.IsReady` field to be `true` before returning.
+This maintains current Velero behavior, though may not be desirable for all storage providers.
+
 * A `RestoreItemAction` for `VolumeSnapshotContent` objects, named `velero.io/csi-vsc`.
+Only `VolumeSnapshotContent` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 The metadata (excluding labels), `PersistentVolumeClaim.UUID`, and `VolumeSnapshotRef.UUID` fields will be cleared.
 The reference fields are cleared because the associated objects will get new UUIDs in the cluster.
 This also maps to the "import" case of [the snapshot API][1].
 
 * A `RestoreItemAction` for `VolumeSnapshot` objects, named `velero.io/csi-vs`.
+Only `VolumeSnapshot` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 Metadata (excluding labels) and `Source` fields on the object will be cleared.
 The `VolumeSnapshot.Spec.SnapshotContentName` is the link back to the `VolumeSnapshotContent` object, and thus the actual snapshot.
 The `Source` field indicates that a new CSI snapshot operation should be performed, which isn't relevant on restore.
 This follows the "import" case of [the snapshot API][1].
 
 * A `RestoreItemAction` for `PersistentVolumeClaim`s named `velero.io/csi-pvc`.
+Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 Metadata (excluding labels) will be cleared, and the `velero.io/volume-snapshot-name` label will be used to find the relevant `VolumeSnapshot`.
 A reference to the `VolumeSnapshot` will be added to the `PersistentVolumeClaim.DataSource` field.
 
@@ -90,8 +101,8 @@ var defaultRestorePriorities = []string{
     "storageclasses",
     "customresourcedefinitions",
     "volumesnapshotclass.snapshot.storage.k8s.io",
-    "volumesnapshots.snapshot.storage.k8s.io",
     "volumesnapshotcontents.snapshot.storage.k8s.io",
+    "volumesnapshots.snapshot.storage.k8s.io",
     "persistentvolumes",
     "persistentvolumeclaims",
     "secrets",
@@ -109,24 +120,18 @@ var defaultRestorePriorities = []string{
 
 A new `describeCSIVolumeSnapshots` function should be added to the [output][12] package that knows how to render the included `VolumeSnapshot` names referenced in the `csi-snapshots.json.gz` file.
 
-### CSI snapshot enablement
+### Snapshot mechanism selection
 
-Some mechanism for enabling CSI snapshots, either at a global or individual volume level, is necessary.
+The most accurate, reliable way to detect if a PersistentVolume is a CSI volume is to check for a non-`nil` [`PersistentVolume.Spec.PersistentVolumeSource.CSI`][16] field.
+Using the [`volume.beta.kubernetes.io/storage-provisioner`][14] is not viable, since the usage is for any PVC that should be dynamically provisioned, and is _not_ limited to CSI implementations.
+It was [introduced with dynamic provisioning support][15] in 2016, predating CSI.
 
-Some options are:
+In the `BackupItemAction` for PVCs, the associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`.
+Volumes with any other `PersistentVolumeSource` set will use Velero's current VolumeSnapshotter plugin code path.
 
-    * providing a command line switch for the server that will enable CSI snapshotting for all volumes.
-    * using annotations on pods to indicate which volumes to use CSI snapshotting on, akin to current restic support
-    * a ConfigMap defining which StorageClasses are CSI-enabled, allowing plugins to query based on StorageClass and use CSI if applicable
+Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Velero's current Restic code path.
+This also means Velero will continue to offer Restic as an option for CSI volumes.
 
-
-## Notes on usage
-
-In order for underlying, provider-level snapshots to be retained similarly to Velero's current functionality, the `VolumeSnapshotContent.DeletionPolicy` field must be set to `Retain`.
-
-This is most easily accomplished by setting the `VolumeSnapshotClass.DeletionPolicy` field to `Retain`, which will be inherited by all `VolumeSnapshotContent` objects associated with the `VolumeSnapshotClass`.
-
-It is not currently possible to define a deletion policy on a `VolumeSnapshot` that gets passed to a `VolumeSnapshotContent` object on an individual basis.
 
 ## Alternatives Considered
 
@@ -138,9 +143,37 @@ This is unnecessary given the fact that the `BackupItemAction` and `RestoreItemA
 * Implement CSI logic directly in Velero core code.
 The plugins could be packaged separately, but that doesn't necessarily make sense with server and client changes being made to accomodate CSI snapshot lookup.
 
+* Implementing the CSI logic entirely in external plugins.
+As mentioned above, the necessary plugins for `PersistentVolumeClaim`, `VolumeSnapshot`, and `VolumeSnapshotContent` could be hosted out-out-of-tree from Velero.
+In fact, much of the logic for creating the CSI objects will be driven entirely inside of the plugin implementation.
+
+However, Velero currently has no way for plugins to communicate that some arbitrary data should be stored in or retrieved from object storage, such as list of all `VolumeSnapshot` objects associated with a given `Backup`.
+This is important, because to display snapshots included in a backup, whether as native snapshots or Restic backups, separate JSON-encoded lists are stored within the backup on object storage.
+Snapshots are not listed directly on the `Backup` to fit within the etcd size limitations.
+Additionally, there are no client-side Velero plugin mechanisms, which means that the `velero describe backup --details` command would have no way of displaying the objects to the user, even if they were stored.
+
+## Notes on Usage
+
+In order for underlying, provider-level snapshots to be retained similarly to Velero's current functionality, the `VolumeSnapshotContent.DeletionPolicy` field must be set to `Retain`.
+
+This is most easily accomplished by setting the `VolumeSnapshotClass.DeletionPolicy` field to `Retain`, which will be inherited by all `VolumeSnapshotContent` objects associated with the `VolumeSnapshotClass`.
+
+The current default for dynamically provisioned `VolumeSnapshotContent` objects is `Delete`, which will delete the provider-level snapshot when the `VolumeSnapshotContent` object representing it is deleted.
+Additionally, the `Delete` policy will cascade a deletion of a `VolumeSnapshot`, removing the associated `VolumeSnapshotContent` object.
+
+It is not currently possible to define a deletion policy on a `VolumeSnapshot` that gets passed to a `VolumeSnapshotContent` object on an individual basis.
+
 ## Security Considerations
 
-If this proposal has an impact to the security of the product, its users, or data stored or transmitted via the product, they must be addressed here.
+This proposal does not significantly change Velero's security implications within a cluster.
+
+If a deployment is using solely CSI volumes, Velero will no longer need privileges to interact with volumes or snapshots, as these will be handled by the CSI driver.
+This reduces the provider permissions footprint of Velero.
+
+Velero must still be able to access cluster-scoped resources in order to back up `VolumeSnapshotContent` objects.
+Without these objects, the provider-level snapshots cannot be located in order to re-associate them with volumes in the event of a restore.
+
+
 
 [1]: https://kubernetes.io/blog/2018/10/09/introducing-volume-snapshot-alpha-for-kubernetes/
 [2]: https://github.com/kubernetes-csi/external-snapshotter/blob/master/pkg/apis/volumesnapshot/v1alpha1/types.go#L41
@@ -155,3 +188,6 @@ If this proposal has an impact to the security of the product, its users, or dat
 [11]: https://github.com/heptio/velero/blob/master/pkg/cmd/server/server.go#L471
 [12]: https://github.com/heptio/velero/blob/master/pkg/cmd/util/output/backup_describer.go
 [13]: https://github.com/heptio/velero/blob/master/pkg/cmd/util/output/backup_describer.go#L214
+[14]: https://github.com/kubernetes/kubernetes/blob/8ea9edbb0290e9de1e6d274e816a4002892cca6f/pkg/controller/volume/persistentvolume/util/util.go#L69
+[15]: https://github.com/kubernetes/kubernetes/pull/30285
+[16]: https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/types.go#L237
