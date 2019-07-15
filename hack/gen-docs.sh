@@ -27,6 +27,9 @@
 # staged changes using 'git diff' to review all docs changes made since the previous 
 # tagged version. Once the unstaged changes are ready, they can be added to the
 # staging area using 'git add' and then committed.
+#
+# NOTE: this script is just one step in fully generating a new set of versioned
+# docs. The full process is documented in site/README-JEKYLL.md.
 
 set -o errexit
 set -o nounset

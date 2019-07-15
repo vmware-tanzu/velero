@@ -241,5 +241,8 @@ serve-docs:
 # staging area using 'git add' and then committed.
 #
 # To run gen-docs: "NEW_DOCS_VERSION=v1.1.0 make gen-docs"
+#
+# NOTE: this target is just one step in fully generating a new set of versioned
+# docs. The full process is documented in site/README-JEKYLL.md.
 gen-docs:
 	@hack/gen-docs.sh
