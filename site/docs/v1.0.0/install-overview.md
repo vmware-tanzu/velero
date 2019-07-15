@@ -63,6 +63,18 @@ kubectl delete namespace/velero clusterrolebinding/velero
 kubectl delete crds -l component=velero
 ```
 
+## Installing with the Helm chart
+
+When installing using the Helm chart, the provider's credential information will need to be appended into your values.
+
+The easiest way to do this is with the `--set-file` argument, available in Helm 2.10 and higher.
+
+```bash
+helm install --set-file credentials.secretContents.cloud=./credentials-velero
+```
+
+See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
+
 ## Examples
 
 After you set up the Velero server, try these examples:
