@@ -16,17 +16,14 @@ hero:
     url: https://github.com/heptio/velero/releases/tag/v1.0.0
   promo1:
     icon: /img/disaster-recover-icon.svg
-    #url: http://www.example.com?box1
     title: Disaster Recovery
     content: Reduces time to recovery in case of infrastructure loss, data corruption, and/or service outages.
   promo2:
     icon: /img/data-migration-icon.svg
-    #url: http://www.example.com?box2
     title: Data Migration
     content: Enables cluster portability by easily migrating Kubernetes resources from one cluster to another​.
   promo3:
     icon: /img/data-protection-icon.svg
-    #url: http://www.example.com?box3
     title: Data Protection
     content: Offers key data protection features such as scheduled backups, retention schedules, and pre or post-backup hooks for custom actions.
 secondary_ctas:
@@ -71,7 +68,7 @@ secondary_ctas:
             <figure>
               <img src="{{ page.hero.promo1.icon }}" alt="{{ page.hero.promo1.title }}" />
             </figure>
-            {% if page.hero.promo1.url | size > 0 %}
+            {% if page.hero.promo1.url or size > 0 %}
             <h5><a href="{{ page.hero.promo1.url }}" class="dark">{{ page.hero.promo1.title }}</a></h5>
             {% else %}
             <h5>{{ page.hero.promo1.title }}</h5>
@@ -86,7 +83,7 @@ secondary_ctas:
             <figure>
               <img src="{{ page.hero.promo2.icon }}" alt="{{ page.hero.promo2.title }}" />
             </figure>
-            {% if page.hero.promo2.url | size > 0 %}
+            {% if page.hero.promo2.url or size > 0 %}
             <h5><a href="{{ page.hero.promo2.url }}" class="dark">{{ page.hero.promo2.title }}</a></h5>
             {% else %}
             <h5>{{ page.hero.promo2.title }}</h5>
@@ -101,7 +98,7 @@ secondary_ctas:
             <figure>
               <img src="{{ page.hero.promo3.icon }}" alt="{{ page.hero.promo3.title }}" />
             </figure>
-            {% if page.hero.promo3.url  | size > 0 %}
+            {% if page.hero.promo3.url  or size > 0 %}
             <h5><a href="{{ page.hero.promo3.url }}" class="dark">{{ page.hero.promo3.title }}</a></h5>
             {% else %}
             <h5>{{ page.hero.promo3.title }}</h5>
