@@ -46,14 +46,15 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
-				RegisterBackupItemAction("velero.io/serviceaccount", newServiceAccountBackupItemAction(f)).
+				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
 				RegisterRestoreItemAction("velero.io/service", newServiceRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/serviceaccount", newServiceAccountRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/addPVCFromPod", newAddPVCFromPodRestoreItemAction).
-				RegisterRestoreItemAction("velero.io/addPVFromPVC", newAddPVFromPVCRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/service-account", newServiceAccountRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/add-pv-from-pvc", newAddPVFromPVCRestoreItemAction).
+				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
 				Serve()
 		},
 	}
@@ -153,4 +154,19 @@ func newAddPVCFromPodRestoreItemAction(logger logrus.FieldLogger) (interface{}, 
 
 func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewAddPVFromPVCAction(logger), nil
+}
+
+func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangeStorageClassAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.StorageV1().StorageClasses(),
+		), nil
+	}
 }
