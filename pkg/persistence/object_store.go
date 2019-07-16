@@ -46,6 +46,7 @@ type BackupStore interface {
 	PutBackup(name string, metadata, contents, log, podVolumeBackups, volumeSnapshots io.Reader) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
+	GetBackupPodVolumes(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
@@ -298,6 +299,40 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 	}
 
 	return volumeSnapshots, nil
+}
+
+func (s *objectBackupStore) GetBackupPodVolumes(name string) ([]*velerov1api.PodVolumeBackup, error) {
+	key := s.layout.getPodVolumeBackupsKey(name)
+
+	// if the podvolumebackups file doesn't exist, we don't want to return an error, since
+	// a legacy backup or a backup with no pod volumes would not have this file, so check for
+	// its existence before attempting to get its contents.
+	ok, err := keyExists(s.objectStore, s.bucket, s.layout.getBackupDir(name), key)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if !ok {
+		return nil, nil
+	}
+
+	res, err := s.objectStore.GetObject(s.bucket, key)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Close()
+
+	gzr, err := gzip.NewReader(res)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer gzr.Close()
+
+	var podVolumeBackups []*velerov1api.PodVolumeBackup
+	if err := json.NewDecoder(gzr).Decode(&podVolumeBackups); err != nil {
+		return nil, errors.Wrap(err, "error decoding object data")
+	}
+
+	return podVolumeBackups, nil
 }
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {

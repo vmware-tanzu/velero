@@ -559,8 +559,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),
+			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().PodVolumeBackups(),
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.config.defaultBackupLocation,

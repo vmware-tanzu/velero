@@ -57,7 +57,7 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 }
 
 func defaultBackup() *pkgbackup.Builder {
-	return pkgbackup.NewNamedBuilder(velerov1api.DefaultNamespace, "backup-1")
+	return pkgbackup.NewNamedBackupBuilder(velerov1api.DefaultNamespace, "backup-1")
 }
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
