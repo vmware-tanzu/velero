@@ -40,7 +40,43 @@ per-backup/restore logs. It also passes a `--log-level` flag to each plugin bina
 flag from the main Velero process. This means that if you turn on debug logging for the Velero server via `--log-level=debug`,
 plugins will also emit debug-level logs. See the [sample repository][1] for an example of how to use the logger within your plugin.
 
+## Plugin Configuration
+
+Velero uses a ConfigMap-based convention for providing configuration to plugins. If your plugin needs to be configured at runtime, 
+define a ConfigMap like the following:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # any name can be used; Velero uses the labels (below)
+  # to identify it rather than the name
+  name: my-plugin-config
+  
+  # must be in the namespace where the velero deployment
+  # is running
+  namespace: velero
+  
+  labels:
+    # this value-less label identifies the ConfigMap as
+    # config for a plugin (i.e. the built-in change storageclass
+    # restore item action plugin)
+    velero.io/plugin-config: ""
+    
+    # add a label whose key corresponds to the fully-qualified
+    # plugin name (e.g. mydomain.io/my-plugin-name), and whose
+    # value is the plugin type (BackupItemAction, RestoreItemAction,
+    # ObjectStore, or VolumeSnapshotter)
+    <fully-qualified-plugin-name>: <plugin-type>
+
+data:
+  # add your configuration data here as key-value pairs
+```
+
+Then, in your plugin's implementation, you can read this ConfigMap to fetch the necessary configuration. See the [restic restore action][3]
+for an example of this -- in particular, the `getPluginConfig(...)` function.
 
 
 [1]: https://github.com/heptio/velero-plugin-example
 [2]: https://github.com/heptio/velero/blob/master/pkg/plugin/logger.go
+[3]: https://github.com/heptio/velero/blob/master/pkg/restore/restic_restore_action.go
