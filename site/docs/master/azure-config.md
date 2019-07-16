@@ -110,18 +110,11 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
     AZURE_TENANT_ID=`az account list --query '[?isDefault].tenantId' -o tsv`
     ```
 
-1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential. You can specify a password or let the `az ad sp create-for-rbac` command create one for you.
+1. Create a service principal with `Contributor` role. This will have subscription-wide access, so protect this credential.
 
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
-    Create service principal and specify your own password:
-
-    ```bash
-    AZURE_CLIENT_SECRET=super_secret_and_high_entropy_password_replace_me_with_your_own
-    az ad sp create-for-rbac --name "velero" --role "Contributor" --password $AZURE_CLIENT_SECRET
-    ```
-
-    Or create service principal and let the CLI generate a password for you. Make sure to capture the password.
+    Create service principal and let the CLI generate a password for you. Make sure to capture the password.
 
     ```bash
     AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv`
