@@ -303,12 +303,6 @@ It can be set up for Velero by creating a role that will have required permissio
     ...
     ```
 
-## Installing the nginx example (optional)
-
-If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
-
-Replace `<YOUR_STORAGE_CLASS_NAME>` with `gp2`. This is AWS's default `StorageClass` name.
-
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
 [6]: api-types/volumesnapshotlocation.md#aws
