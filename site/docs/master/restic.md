@@ -311,8 +311,8 @@ should be taken (`backup.velero.io/backup-volumes`)
 
 ### Restore
 
-1. The main Velero restore process checks each pod that it's restoring from a previously created restic backup by iterating through the contents of the `<backup-name>-podvolumebackups.json.gz` file.
-1. For each pod found, Velero first ensures a restic repository exists for the pod's namespace, by:
+1. The main Velero restore process checks each existing `PodVolumeBackup` custom resource in the cluster to backup from.
+1. For each `PodVolumeBackup` found, Velero first ensures a restic repository exists for the pod's namespace, by:
     - checking if a `ResticRepository` custom resource already exists
     - if not, creating a new one, and waiting for the `ResticRepository` controller to init/check it (note that
     in this case, the actual repository should already exist in object storage, so the Velero controller will simply
