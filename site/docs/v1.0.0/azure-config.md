@@ -166,12 +166,6 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
-## Installing the nginx example (optional)
-
-If you run the nginx example, in file `examples/nginx-app/with-pv.yaml`:
-
-Replace `<YOUR_STORAGE_CLASS_NAME>` with `default`. This is Azure's default `StorageClass` name.
-
 [0]: namespace.md
 [8]: api-types/volumesnapshotlocation.md#azure
 [17]: https://docs.microsoft.com/en-us/azure/active-directory/develop/active-directory-application-objects
