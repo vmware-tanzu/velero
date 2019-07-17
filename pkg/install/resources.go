@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	"github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 )
 
@@ -37,7 +37,13 @@ func imageVersion() string {
 }
 
 // DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
-var DefaultImage = "gcr.io/heptio-images/velero:" + imageVersion()
+var (
+	DefaultImage               = "gcr.io/heptio-images/velero:" + imageVersion()
+	DefaultVeleroPodCPURequest = "100m"
+	DefaultVeleroPodMemRequest = "128Mi"
+	DefaultVeleroPodCPULimit   = "200m"
+	DefaultVeleroPodMemLimit   = "256Mi"
+)
 
 func labels() map[string]string {
 	return map[string]string{
@@ -189,6 +195,7 @@ type VeleroOptions struct {
 	Bucket             string
 	Prefix             string
 	PodAnnotations     map[string]string
+	VeleroPodResources corev1.ResourceRequirements
 	SecretData         []byte
 	RestoreOnly        bool
 	UseRestic          bool
@@ -232,6 +239,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	deploy := Deployment(o.Namespace,
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
+		WithResources(o.VeleroPodResources),
 	)
 	if o.RestoreOnly {
 		deploy = Deployment(o.Namespace,

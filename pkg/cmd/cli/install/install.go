@@ -26,6 +26,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -43,6 +45,10 @@ type InstallOptions struct {
 	Prefix               string
 	ProviderName         string
 	PodAnnotations       flag.Map
+	VeleroPodCPURequest  string
+	VeleroPodMemRequest  string
+	VeleroPodCPULimit    string
+	VeleroPodMemLimit    string
 	RestoreOnly          bool
 	SecretFile           string
 	DryRun               bool
@@ -62,6 +68,10 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero and Restic pods. Optional. Format is key1=value1,key2=value2")
 	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "namespace to install Velero and associated data into. Optional.")
+	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, "CPU request for Velero pod. Optional.")
+	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, "memory request for Velero pod. Optional.")
+	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, "CPU limit for Velero pod. Optional.")
+	flags.StringVar(&o.VeleroPodMemLimit, "velero-pod-mem-limit", o.VeleroPodMemLimit, "memory limit for Velero pod. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
@@ -79,6 +89,10 @@ func NewInstallOptions() *InstallOptions {
 		BackupStorageConfig:  flag.NewMap(),
 		VolumeSnapshotConfig: flag.NewMap(),
 		PodAnnotations:       flag.NewMap(),
+		VeleroPodCPURequest:  install.DefaultVeleroPodCPURequest,
+		VeleroPodMemRequest:  install.DefaultVeleroPodMemRequest,
+		VeleroPodCPULimit:    install.DefaultVeleroPodCPULimit,
+		VeleroPodMemLimit:    install.DefaultVeleroPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
 		UseVolumeSnapshots: true,
 	}
@@ -94,6 +108,11 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	if err != nil {
 		return nil, err
 	}
+	veleroPodResources, err := parseResourceRequests(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
+	if err != nil {
+		return nil, err
+	}
+
 	return &install.VeleroOptions{
 		Namespace:          o.Namespace,
 		Image:              o.Image,
@@ -101,6 +120,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		Bucket:             o.BucketName,
 		Prefix:             o.Prefix,
 		PodAnnotations:     o.PodAnnotations.Data(),
+		VeleroPodResources: veleroPodResources,
 		SecretData:         secretData,
 		RestoreOnly:        o.RestoreOnly,
 		UseRestic:          o.UseRestic,
@@ -232,4 +252,42 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	return nil
+}
+
+// parseResourceRequests takes a set of CPU and memory requests and limit string
+// values and returns a ResourceRequirements struct to be used in a Container.
+// An error is returned if we cannot parse the request/limit.
+func parseResourceRequests(cpuRequest, memRequest, cpuLimit, memLimit string) (corev1.ResourceRequirements, error) {
+	var resources corev1.ResourceRequirements
+
+	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
+	if err != nil {
+		return resources, errors.WithMessage(err, "couldn't parse CPU request")
+	}
+
+	parsedMemRequest, err := resource.ParseQuantity(memRequest)
+	if err != nil {
+		return resources, errors.WithMessage(err, "couldn't parse memory request")
+	}
+
+	parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
+	if err != nil {
+		return resources, errors.WithMessage(err, "couldn't parse CPU limit")
+	}
+
+	parsedMemLimit, err := resource.ParseQuantity(memLimit)
+	if err != nil {
+		return resources, errors.WithMessage(err, "couldn't parse memory limit")
+	}
+
+	resources.Requests = corev1.ResourceList{
+		corev1.ResourceCPU:    parsedCPURequest,
+		corev1.ResourceMemory: parsedMemRequest,
+	}
+	resources.Limits = corev1.ResourceList{
+		corev1.ResourceCPU:    parsedCPULimit,
+		corev1.ResourceMemory: parsedMemLimit,
+	}
+
+	return resources, nil
 }
