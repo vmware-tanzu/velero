@@ -22,12 +22,12 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
-// PodVolumeBackupBuilder is a helper for concisely constructing Pod Volume Backup API objects.
+// PodVolumeBackupBuilder is a helper for concisely constructing PodVolumeBackup API objects.
 type PodVolumeBackupBuilder struct {
 	podVolumeBackup velerov1api.PodVolumeBackup
 }
 
-// NewPodVolumeBackupBuilder returns a PodVolumeBackupBuilder for a Pod volume Backup with no namespace/name.
+// NewPodVolumeBackupBuilder returns a PodVolumeBackupBuilder for a PodVolumeBackup with no namespace/name.
 func NewPodVolumeBackupBuilder() *PodVolumeBackupBuilder {
 	return NewNamedPodVolumeBackupBuilder("", "")
 }
@@ -49,24 +49,24 @@ func NewNamedPodVolumeBackupBuilder(namespace, name string) *PodVolumeBackupBuil
 	}
 }
 
-// PodVolumeBackup returns the built Pod Volume Backup API object.
+// PodVolumeBackup returns the built PodVolumeBackup API object.
 func (p *PodVolumeBackupBuilder) PodVolumeBackup() *velerov1api.PodVolumeBackup {
 	return &p.podVolumeBackup
 }
 
-// Namespace sets the Pod Volume Backup's namespace.
+// Namespace sets the PodVolumeBackup's namespace.
 func (p *PodVolumeBackupBuilder) Namespace(namespace string) *PodVolumeBackupBuilder {
 	p.podVolumeBackup.Namespace = namespace
 	return p
 }
 
-// Name sets the Backup's name.
+// Name sets the PodVolumeBackup's name.
 func (p *PodVolumeBackupBuilder) Name(name string) *PodVolumeBackupBuilder {
 	p.podVolumeBackup.Name = name
 	return p
 }
 
-// Labels sets the Backup's labels.
+// Labels sets the PodVolumeBackup's labels.
 func (p *PodVolumeBackupBuilder) Labels(vals ...string) *PodVolumeBackupBuilder {
 	if p.podVolumeBackup.Labels == nil {
 		p.podVolumeBackup.Labels = map[string]string{}
@@ -85,43 +85,7 @@ func (p *PodVolumeBackupBuilder) Labels(vals ...string) *PodVolumeBackupBuilder 
 	return p
 }
 
-// IncludedNamespaces sets the Backup's included namespaces.
-func (p *PodVolumeBackupBuilder) IncludedNamespaces(namespaces ...string) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.IncludedNamespaces = namespaces
-	return p
-}
-
-// ExcludedNamespaces sets the Backup's excluded namespaces.
-func (p *PodVolumeBackupBuilder) ExcludedNamespaces(namespaces ...string) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.ExcludedNamespaces = namespaces
-	return p
-}
-
-// IncludedResources sets the Backup's included resources.
-func (p *PodVolumeBackupBuilder) IncludedResources(resources ...string) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.IncludedResources = resources
-	return p
-}
-
-// ExcludedResources sets the Backup's excluded resources.
-func (p *PodVolumeBackupBuilder) ExcludedResources(resources ...string) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.ExcludedResources = resources
-	return p
-}
-
-// IncludeClusterResources sets the Backup's "include cluster resources" flag.
-func (p *PodVolumeBackupBuilder) IncludeClusterResources(val bool) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.IncludeClusterResources = &val
-	return p
-}
-
-// LabelSelector sets the Backup's label selector.
-func (p *PodVolumeBackupBuilder) LabelSelector(selector *metav1.LabelSelector) *PodVolumeBackupBuilder {
-	// p.podVolumeBackup.Spec.LabelSelector = selector
-	return p
-}
-
-// Phase sets the Backup's phase.
+// Phase sets the PodVolumeBackup's phase.
 func (p *PodVolumeBackupBuilder) Phase(phase velerov1api.PodVolumeBackupPhase) *PodVolumeBackupBuilder {
 	p.podVolumeBackup.Status.Phase = phase
 	return p
