@@ -283,25 +283,11 @@ It can be set up for Velero by creating a role that will have required permissio
       --policy-document file://./velero-policy.json
     ```
 
-4. Update `AWS_ACCOUNT_ID` & `VELERO_ROLE_NAME` with `kubectl edit deploy/velero -n velero` and add the following annotation:
+4. Use the `--pod-annotations` argument on `velero install` to add the following annotation:
 
-    ```
-    ---
-    apiVersion: apps/v1beta1
-    kind: Deployment
-    metadata:
-        namespace: velero
-        name: velero
-    spec:
-        replicas: 1
-        template:
-            metadata:
-                labels:
-                    component: velero
-                annotations:
-                    iam.amazonaws.com/role: arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
-    ...
-    ```
+```
+velero install --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME> [...]
+```
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
