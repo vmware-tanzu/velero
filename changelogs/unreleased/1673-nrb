@@ -1,1 +1,1 @@
-Update Velero Deployment to use apps/v1 API group
+Update Velero Deployment to use apps/v1 API group. `velero install` and `velero plugin add/remove` commands will now require Kubernetes 1.9+
