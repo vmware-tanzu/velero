@@ -31,3 +31,17 @@ This mirrors the plug-ins used by GitHub Pages on your local machine including J
 7. View your website at http://127.0.0.1:4000/
 8. Commit any changes and push everything to your fork.
 9. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
+
+
+# Adding a New Docs Version
+
+To add a new set of versioned docs to go with a new Velero release:
+
+1. In the root of the repository, run:
+
+   ```bash
+   # set to the appropriate version number
+   NEW_DOCS_VERSION=vX.Y.Z make gen-docs
+   ```
+
+1. In `site/_config.yml`, under the `defaults` field, add an entry for the new version just under `master` by copying the most recent version's entry and updating the version numbers.
