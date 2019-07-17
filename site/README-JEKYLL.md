@@ -37,7 +37,7 @@ This mirrors the plug-ins used by GitHub Pages on your local machine including J
 
 To add a new set of versioned docs to go with a new Velero release:
 
-1. In `$VELEROROOT`, run:
+1. In the root of the repository, run:
 
    ```bash
    # set to the appropriate version number
@@ -45,11 +45,3 @@ To add a new set of versioned docs to go with a new Velero release:
    ```
 
 1. In `site/_config.yml`, under the `defaults` field, add an entry for the new version just under `master` by copying the most recent version's entry and updating the version numbers.
-
-1. Also in `site/_config.yml`, update the `latest` field to have the new version number as its value.
-
-1. Also in `site/_config.yml`, add the new version to the `versions` field, just under `- master`.
-
-1. In `site/_data/`, create a new table of contents file by copying `master-toc.yml` to `vX-Y-Z.yml` and editing as needed.
-
-1. In `site/_data/toc-mapping.yml`, add an entry for the new version just under `master` by copying the most recent version's entry and updating the key and value.

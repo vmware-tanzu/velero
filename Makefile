@@ -226,23 +226,28 @@ serve-docs:
 	jekyll/jekyll \
 	jekyll serve --livereload
 
-# gen-docs.sh generates a new versioned docs directory under site/docs. It follows
+# gen-docs generates a new versioned docs directory under site/docs. It follows
 # the following process:
 #	1. Copies the contents of the most recently tagged docs directory into the new
-#	   directory, to establish a useful baseline to diff against
+#	   directory, to establish a useful baseline to diff against.
 #	2. Adds all copied content from step 1 to git's staging area via 'git add'.
 #	3. Replaces the contents of the new docs directory with the contents of the
 #	   'master' docs directory, updating any version-specific links (e.g. to a
-#	   specific branch of the GitHub repository) to use the new version.
+#	   specific branch of the GitHub repository) to use the new version
+#   4. Copies the previous version's ToC file and runs 'git add' to establish
+#      a useful baseline to diff against.
+#   5. Replaces the content of the new ToC file with the master ToC.
+#   6. Update site/_config.yml and site/_data/toc-mapping.yml to include entries
+#      for the new version.
 #
-# The unstaged changes in the working directory can now be diff'ed against the
+# The unstaged changes in the working directory can now easily be diff'ed against the
 # staged changes using 'git diff' to review all docs changes made since the previous 
 # tagged version. Once the unstaged changes are ready, they can be added to the
 # staging area using 'git add' and then committed.
 #
 # To run gen-docs: "NEW_DOCS_VERSION=v1.1.0 make gen-docs"
 #
-# NOTE: this target is just one step in fully generating a new set of versioned
-# docs. The full process is documented in site/README-JEKYLL.md.
+# **NOTE**: there are additional manual steps required to finalize the process of generating
+# a new versioned docs site. The full process is documented in site/README-JEKYLL.md.
 gen-docs:
 	@hack/gen-docs.sh
