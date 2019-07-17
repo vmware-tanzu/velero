@@ -58,7 +58,7 @@ Label the `VolumeSnapshot` object with the [`velero.io/backup-name`][10] label f
 The CSI controllers will create a `VolumeSnapshotContent.snapshot.storage.k8s.io` object associated with the `VolumeSnapshot`.
 Associated `VolumeSnapshotContent` objects will be retrieved and updated with the [`velero.io/backup-name`][10] label for ease of lookup later.
 `velero.io/volume-snapshot-name` will be applied as a label to the PVC so that the `VolumeSnapshot` can be found easily for restore.
-`VolumeSnapshot`, `VolumeSnapshotContent`, and `VolumeSnapshotClass` objects would be returned as additional items to be backed up.
+`VolumeSnapshot`, `VolumeSnapshotContent`, and `VolumeSnapshotClass` objects would be returned as additional items to be backed up. GitHub issue [1566][18] represents this work.
 The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is the link to the underlying platform's snapshot, and must be preserved for restoration.
 
 The plugin will _not_ wait for the `VolumeSnapshot.Status.IsReady` field to be `true` before returning.
@@ -94,6 +94,7 @@ These plugins should be provided with Velero, as there will also be some changes
 This will be written to a file named `csi-snapshots.json.gz`.
 
 [`defaultRestorePriorities`][11] should be rewritten to the following to accomodate proper association between the CSI objects and PVCs. `CustomResourceDefinition`s are moved up because they're necessary for creating the CSI CRDs. The CSI CRDs are created before `PersistentVolume`s and `PersistentVolumeClaim`s so that they may be used as data sources.
+GitHub issue [1565][17] represents this work.
 
 ```go
 var defaultRestorePriorities = []string{
@@ -191,3 +192,5 @@ Without these objects, the provider-level snapshots cannot be located in order t
 [14]: https://github.com/kubernetes/kubernetes/blob/8ea9edbb0290e9de1e6d274e816a4002892cca6f/pkg/controller/volume/persistentvolume/util/util.go#L69
 [15]: https://github.com/kubernetes/kubernetes/pull/30285
 [16]: https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/types.go#L237
+[17]: https://github.com/heptio/velero/issues/1565
+[18]: https://github.com/heptio/velero/issues/1566
