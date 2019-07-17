@@ -2,16 +2,13 @@
 
 Status: Draft
 
-One to two sentences that describes the goal of this proposal.
-The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them.
-
 The Container Storage Interface (CSI) has [introduced an alpha snapshot API in Kubernetes v1.12][1].
 Current plans indicate it will reach beta support in Kubernetes v1.16.
 This document suggests an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
 
 ## Goals
 
-- Enable Velero to create CSI snapshot objects
+- Enable Velero to backup and restore CSI-backed volumes using the Kubernetes CSI CustomResourceDefinition API
 
 ## Non Goals
 
@@ -29,8 +26,6 @@ The CSI working group has also developed a generic snapshotting API that any CSI
 By supporting the CSI snapshot API, Velero can extend it's support to any CSI driver, without requiring a Velero-specific plugin be written, easing the development burden on providers while also reaching more end users.
 
 ## High-Level Design
-
-One to two paragraphs that describe the high level changes that will be made to implement this proposal.
 
 In order to support CSI's snapshot API, Velero must interact with the [`VolumeSnapshot`][2] and [`VolumeSnapshotContent`][3] CRDs.
 These act as requests to the CSI driver to perform a snapshot on the underlying provider's volume.
@@ -117,7 +112,7 @@ var defaultRestorePriorities = []string{
 
 ## Velero client changes
 
-[`DescribeBackupStatus`][13] will be extended to download the `csi-snapshots.json.gz` file for processing.
+[`DescribeBackupStatus`][13] will be extended to download the `csi-snapshots.json.gz` file for processing. GitHub Issue [1568][19] captures this work.
 
 A new `describeCSIVolumeSnapshots` function should be added to the [output][12] package that knows how to render the included `VolumeSnapshot` names referenced in the `csi-snapshots.json.gz` file.
 
@@ -194,3 +189,4 @@ Without these objects, the provider-level snapshots cannot be located in order t
 [16]: https://github.com/kubernetes/kubernetes/blob/master/pkg/apis/core/types.go#L237
 [17]: https://github.com/heptio/velero/issues/1565
 [18]: https://github.com/heptio/velero/issues/1566
+[19]: https://github.com/heptio/velero/issues/1568
