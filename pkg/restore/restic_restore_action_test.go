@@ -20,10 +20,19 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/fake"
 
+	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/restic"
+	"github.com/heptio/velero/pkg/test"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -79,4 +88,54 @@ func TestGetImage(t *testing.T) {
 			assert.Equal(t, test.want, getImage(velerotest.NewLogger(), test.configMap))
 		})
 	}
+}
+
+func TestResticRestoreActionExecute(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *corev1.Pod
+		want *corev1.Pod
+	}{
+		{
+			name: "Restoring pod with no other initContainers adds the restic initContainer.",
+			pod: test.NewPod("ns-1", "pod",
+				test.WithAnnotations("snapshot.velero.io/myvol", ""),
+			),
+			want: test.NewPod("ns-1", "pod",
+				test.WithAnnotations("snapshot.velero.io/myvol", ""),
+				test.WithInitContainer(test.NewContainer(restic.InitContainer)),
+			),
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
+			require.NoError(t, err)
+
+			input := &velero.RestoreItemActionExecuteInput{
+				Item: &unstructured.Unstructured{
+					Object: unstructuredMap,
+				},
+				Restore: velerotest.NewTestRestore("my-restore", "velero", api.RestorePhaseInProgress).Restore,
+			}
+
+			clientset := fake.NewSimpleClientset()
+			a := NewResticRestoreAction(
+				logrus.StandardLogger(),
+				clientset.CoreV1().ConfigMaps("velero"),
+			)
+
+			// method under test
+			res, err := a.Execute(input)
+
+			assert.NoError(t, err)
+
+			wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
+			require.NoError(t, err)
+
+			assert.Equal(t, &unstructured.Unstructured{Object: wantUnstructured}, res.UpdatedItem)
+		})
+	}
+
 }
