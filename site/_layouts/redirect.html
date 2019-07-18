@@ -1,6 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  {% if page.name == "survey.md" %}
+  <meta http-equiv="refresh" content="0; url={{ page.redirect.to }}" />
+  <script type="text/javascript">
+    window.location.href = "{{ page.redirect.to }}"
+  </script>
+  <title>Redirecting...</title>
+</head>
+<body>
+Redirecting to {{ page.redirect.to }}. If it doesn't load, click <a href="{{ page.redirect.to }}" />here</a>.
+</body>
+</html>
+  {% endif %}
+  {% if page.name != "survey" %}
   <meta http-equiv="refresh" content="0; url=/docs/{{ site.latest }}/{{ page.destination }}" />
   <script type="text/javascript">
     window.location.href = "/docs/{{ site.latest }}/{{ page.destination }}"
@@ -11,3 +24,5 @@
 Redirecting to {{ page.destination }}. If it doesn't load, click <a href="/docs/{{ site.latest }}/{{ page.destination }}" />here</a>.
 </body>
 </html>
+{% endif %}
+
