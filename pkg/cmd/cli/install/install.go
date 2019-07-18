@@ -143,7 +143,7 @@ This is useful as a starting point for more customized installations.
 
 	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --wait
 
-	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --snapshot-location-config region=us-west-2 --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
+	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --secret-file ./an-empty-file --snapshot-location-config region=us-west-2 --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
 
 		`,
 		Run: func(c *cobra.Command, args []string) {

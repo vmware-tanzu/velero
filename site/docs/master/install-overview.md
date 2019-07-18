@@ -15,11 +15,12 @@ velero install \
     --provider <YOUR_PROVIDER> \
     --bucket <YOUR_BUCKET> \
     --secret-file <PATH_TO_FILE> \
-    [--backup-location-config]
-    [--snapshot-location-config]
-    [--namespace]
-    [--use-volume-snapshots]
-    [--use-restic]
+    [--backup-location-config] \
+    [--snapshot-location-config] \
+    [--namespace] \
+    [--use-volume-snapshots] \
+    [--use-restic] \
+    [--pod-annotations] \
 ```
 
 For provider-specific instructions, see:

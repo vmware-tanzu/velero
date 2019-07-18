@@ -285,9 +285,17 @@ It can be set up for Velero by creating a role that will have required permissio
 
 4. Use the `--pod-annotations` argument on `velero install` to add the following annotation:
 
+```bash
+velero install \
+    --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME> \
+    --provider aws \
+    --bucket $BUCKET \
+    --secret-file ./credentials-velero \
+    --backup-location-config region=$REGION \
+    --snapshot-location-config region=$REGION
 ```
-velero install --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME> [...]
-```
+
+Note that the `--secret-file` argument is required, but it can be an empty file.
 
 [0]: namespace.md
 [5]: https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html
