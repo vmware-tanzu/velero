@@ -29,6 +29,9 @@ metadata:
 spec:
   strategy:
     type: Recreate
+  selector:
+    matchLabels:
+      component: minio
   template:
     metadata:
       labels:
