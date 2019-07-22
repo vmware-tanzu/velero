@@ -262,22 +262,22 @@ func parseResourceRequests(cpuRequest, memRequest, cpuLimit, memLimit string) (c
 
 	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
 	if err != nil {
-		return resources, errors.WithMessage(err, "couldn't parse CPU request")
+		return resources, errors.Wrap(err, "couldn't parse CPU request")
 	}
 
 	parsedMemRequest, err := resource.ParseQuantity(memRequest)
 	if err != nil {
-		return resources, errors.WithMessage(err, "couldn't parse memory request")
+		return resources, errors.Wrap(err, "couldn't parse memory request")
 	}
 
 	parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
 	if err != nil {
-		return resources, errors.WithMessage(err, "couldn't parse CPU limit")
+		return resources, errors.Wrap(err, "couldn't parse CPU limit")
 	}
 
 	parsedMemLimit, err := resource.ParseQuantity(memLimit)
 	if err != nil {
-		return resources, errors.WithMessage(err, "couldn't parse memory limit")
+		return resources, errors.Wrap(err, "couldn't parse memory limit")
 	}
 
 	resources.Requests = corev1.ResourceList{
