@@ -15,7 +15,7 @@ To increase the visibility of what a backup might contain, this document propose
 
 ## Background
 
-As reported in #396, the information reported in a `velero backup describe <name> --details` command is fairly limited, and does not easily describe what resources a backup contains.
+As reported in [#396](https://github.com/heptio/velero/issues/396), the information reported in a `velero backup describe <name> --details` command is fairly limited, and does not easily describe what resources a backup contains.
 In order to see what a backup might contain, a user would have to download the backup tarball and extract it.
 This makes it difficult to keep track of different backups in a cluster.
 
@@ -44,6 +44,8 @@ secrets:
 - default/database-user-password
 configmaps:
 - default/database
+persistentvolumes:
+- my-pv
 ```
 
 The filename for this metadata will be `<backup name>-resource-list.json`.
@@ -51,7 +53,8 @@ The top-level key is the string form of the `schema.GroupResource` type that we 
 
 ### Changes in Backup controller
 
-The Backupper currently initialises a map to track the `backedUpItems` (https://github.com/heptio/velero/blob/1594bdc8d0132f548e18ffcc1db8c4cd2b042726/pkg/backup/backup.go#L269), this is passed down through GroupBackupper, ResourceBackupper and ItemBackupper. Moving the map initialisation to the BackupController will provide access to the resulting list there after a successful backup.
+The Backupper currently initialises a map to track the `backedUpItems` (https://github.com/heptio/velero/blob/1594bdc8d0132f548e18ffcc1db8c4cd2b042726/pkg/backup/backup.go#L269), this is passed down through GroupBackupper, ResourceBackupper and ItemBackupper where ItemBackupper records each backed up item.
+This property will be moved to the [Backup request struct](https://github.com/heptio/velero/blob/16910a6215cbd8f0bde385dba9879629ebcbcc28/pkg/backup/request.go#L11), allowing the BackupController to access it after a successful backup.
 
 The `backedUpItems` map is currently a flat structure and will need to be converted to the nested structure above, grouped by `schema.GroupResource`.
 
