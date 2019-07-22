@@ -240,36 +240,31 @@ func (c *backupSyncController) run() {
 			}
 
 			// process the pod volume backups from object store, if any
-			podVolumeBackups, err := backupStore.GetBackupPodVolumes(backupName)
-			if !kuberrs.IsNotFound(err) {
-				log.WithError(errors.WithStack(err)).Error("Error getting pod volumes for this backup, proceeding with sync into cluster")
-			}
-
-			if kuberrs.IsNotFound(err) {
-				log.WithError(errors.WithStack(err)).Error("Error getting pod volumes for this backup")
+			podVolumeBackups, err := backupStore.GetPodVolumeBackups(backupName)
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error getting pod volumes for this backup from backup store")
 				continue
 			}
 
 			for _, podvolumeBackup := range podVolumeBackups {
 				log = log.WithField("podVolumeBackup", podvolumeBackup.Name)
-				log.Debug("Checking this pod volume to see if it needs to be synced into the cluster")
+				log.Debug("Checking this pod volume backup to see if it needs to be synced into the cluster")
 
 				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podvolumeBackup)
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
-					log.Debug("Pod volume already exists in cluster")
+					log.Debug("Pod volume backup already exists in cluster")
 					continue
 				case err != nil && !kuberrs.IsAlreadyExists(err):
-					log.WithError(errors.WithStack(err)).Error("Error syncing pod volume into cluster")
+					log.WithError(errors.WithStack(err)).Error("Error syncing pod volume backup into cluster")
 					continue
 				default:
-					log.Debug("Synced pod volume into cluster")
+					log.Debug("Synced pod volume backup into cluster")
 				}
 			}
 		}
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
-		c.deleteOrphanedPodVolumeBackups(location.Name, backupStoreBackups, log)
 
 		// update the location's status's last-synced fields
 		patch := map[string]interface{}{
@@ -341,36 +336,6 @@ func (c *backupSyncController) deleteOrphanedBackups(locationName string, backup
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")
-		}
-	}
-}
-
-// deleteOrphanedPodVolumeBackups deletes pod volume objects (CRDs) from Kubernetes that have the specified location
-// and a phase of Completed, but no corresponding pod volume in object storage.
-func (c *backupSyncController) deleteOrphanedPodVolumeBackups(locationName string, backupStoreBackups sets.String, log logrus.FieldLogger) {
-	locationSelector := labels.Set(map[string]string{
-		velerov1api.StorageLocationLabel: label.GetValidName(locationName),
-	}).AsSelector()
-
-	podVolumeBackups, err := c.podVolumeBackupLister.PodVolumeBackups(c.namespace).List(locationSelector)
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error listing pod volume backups from cluster")
-		return
-	}
-	if len(podVolumeBackups) == 0 {
-		return
-	}
-
-	for _, podVolumeBackup := range podVolumeBackups {
-		log = log.WithField("podVolumeBackup", podVolumeBackup.Name)
-		if podVolumeBackup.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted || backupStoreBackups.Has(podVolumeBackup.Name) {
-			continue
-		}
-
-		if err := c.podVolumeBackupClient.PodVolumeBackups(podVolumeBackup.Namespace).Delete(podVolumeBackup.Name, nil); err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned pod volume backup from cluster")
-		} else {
-			log.Debug("Deleted orphaned pod volume backup from cluster")
 		}
 	}
 }

@@ -58,7 +58,6 @@ type backupController struct {
 
 	backupper                pkgbackup.Backupper
 	lister                   listers.BackupLister
-	listerPodVolumes         listers.PodVolumeBackupLister
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
@@ -595,7 +594,15 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		volumeSnapshots = nil
 	}
 
-	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, podVolumeBackups, volumeSnapshots); err != nil {
+	backupInfo := persistence.BackupInfo{
+		Name:             backup.Name,
+		Metadata:         backupJSON,
+		Contents:         backupContents,
+		Log:              backupLog,
+		PodVolumeBackups: podVolumeBackups,
+		VolumeSnapshots:  volumeSnapshots,
+	}
+	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)
 	}
 

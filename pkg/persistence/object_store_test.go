@@ -304,7 +304,15 @@ func TestPutBackup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log, tc.podVolumeBackup, tc.snapshots)
+			backupInfo := BackupInfo{
+				Name:             "backup-1",
+				Metadata:         tc.metadata,
+				Contents:         tc.contents,
+				Log:              tc.log,
+				PodVolumeBackups: tc.podVolumeBackup,
+				VolumeSnapshots:  tc.snapshots,
+			}
+			err := harness.PutBackup(backupInfo)
 
 			velerotest.AssertErrorMatches(t, tc.expectedErr, err)
 			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))

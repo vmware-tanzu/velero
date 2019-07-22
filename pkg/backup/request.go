@@ -11,7 +11,6 @@ import (
 type Request struct {
 	*velerov1api.Backup
 
-	PodVolumeBackups          []*velerov1api.PodVolumeBackup
 	StorageLocation           *velerov1api.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
@@ -19,5 +18,6 @@ type Request struct {
 	ResourceHooks             []resourceHook
 	ResolvedActions           []resolvedAction
 
-	VolumeSnapshots []*volume.Snapshot
+	VolumeSnapshots  []*volume.Snapshot
+	PodVolumeBackups []*velerov1api.PodVolumeBackup
 }

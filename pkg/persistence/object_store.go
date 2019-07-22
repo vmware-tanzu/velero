@@ -35,6 +35,11 @@ import (
 	"github.com/heptio/velero/pkg/volume"
 )
 
+type BackupInfo struct {
+	Name                                                       string
+	Metadata, Contents, Log, PodVolumeBackups, VolumeSnapshots io.Reader
+}
+
 // BackupStore defines operations for creating, retrieving, and deleting
 // Velero backup and restore data in/from a persistent backup store.
 type BackupStore interface {
@@ -43,10 +48,10 @@ type BackupStore interface {
 
 	ListBackups() ([]string, error)
 
-	PutBackup(name string, metadata, contents, log, podVolumeBackups, volumeSnapshots io.Reader) error
+	PutBackup(info BackupInfo) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
-	GetBackupPodVolumes(name string) ([]*velerov1api.PodVolumeBackup, error)
+	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
@@ -167,56 +172,56 @@ func (s *objectBackupStore) ListBackups() ([]string, error) {
 	return output, nil
 }
 
-func (s *objectBackupStore) PutBackup(name string, metadata, contents, log, podVolumeBackup, volumeSnapshots io.Reader) error {
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(name), log); err != nil {
+func (s *objectBackupStore) PutBackup(info BackupInfo) error {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupLogKey(info.Name), info.Log); err != nil {
 		// Uploading the log file is best-effort; if it fails, we log the error but it doesn't impact the
 		// backup's status.
-		s.logger.WithError(err).WithField("backup", name).Error("Error uploading log file")
+		s.logger.WithError(err).WithField("backup", info.Name).Error("Error uploading log file")
 	}
 
-	if metadata == nil {
+	if info.Metadata == nil {
 		// If we don't have metadata, something failed, and there's no point in continuing. An object
 		// storage bucket that is missing the metadata file can't be restored, nor can its logs be
 		// viewed.
 		return nil
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(name), metadata); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupMetadataKey(info.Name), info.Metadata); err != nil {
 		// failure to upload metadata file is a hard-stop
 		return err
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(name), contents); err != nil {
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupContentsKey(info.Name), info.Contents); err != nil {
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getPodVolumeBackupsKey(name), podVolumeBackup); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getPodVolumeBackupsKey(info.Name), info.PodVolumeBackups); err != nil {
 		errs := []error{err}
 
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(name))
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
 		errs = append(errs, deleteErr)
 
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
 		errs = append(errs, deleteErr)
 
 		return kerrors.NewAggregate(errs)
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(name), volumeSnapshots); err != nil {
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(info.Name), info.VolumeSnapshots); err != nil {
 		errs := []error{err}
 
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(name))
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
 		errs = append(errs, deleteErr)
 
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(name))
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
 		errs = append(errs, deleteErr)
 
 		return kerrors.NewAggregate(errs)
 	}
 
 	if err := s.putRevision(); err != nil {
-		s.logger.WithField("backup", name).WithError(err).Warn("Error updating backup store revision")
+		s.logger.WithField("backup", info.Name).WithError(err).Warn("Error updating backup store revision")
 	}
 
 	return nil
@@ -301,7 +306,7 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 	return volumeSnapshots, nil
 }
 
-func (s *objectBackupStore) GetBackupPodVolumes(name string) ([]*velerov1api.PodVolumeBackup, error) {
+func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error) {
 	key := s.layout.getPodVolumeBackupsKey(name)
 
 	// if the podvolumebackups file doesn't exist, we don't want to return an error, since

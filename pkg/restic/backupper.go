@@ -121,7 +121,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 
 	var (
 		errs             []error
-		volumeSnapshots  = make(map[string]string)
+		volumeSnapshots  = make(map[string]*velerov1api.PodVolumeBackup)
 		podVolumeBackups []*velerov1api.PodVolumeBackup
 		podVolumes       = make(map[string]corev1api.Volume)
 	)
@@ -151,13 +151,11 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
-
-		if err := errorOnly(b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup)); err != nil {
+		volumeSnapshots[volumeName] = volumeBackup
+		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
 		}
-
-		volumeSnapshots[volumeName] = ""
 	}
 
 ForEachVolume:
@@ -170,13 +168,12 @@ ForEachVolume:
 			switch res.Status.Phase {
 			case velerov1api.PodVolumeBackupPhaseCompleted:
 				if res.Status.SnapshotID == "" { // when the volume is empty there is no restic snapshot, so best to exclude it
-					delete(volumeSnapshots, res.Spec.Volume)
 					break
 				}
-				volumeSnapshots[res.Spec.Volume] = res.Status.SnapshotID
+				podVolumeBackups = append(podVolumeBackups, res)
 			case velerov1api.PodVolumeBackupPhaseFailed:
 				errs = append(errs, errors.Errorf("pod volume backup failed: %s", res.Status.Message))
-				delete(volumeSnapshots, res.Spec.Volume)
+				podVolumeBackups = append(podVolumeBackups, res)
 			}
 		}
 	}
@@ -184,18 +181,6 @@ ForEachVolume:
 	b.resultsLock.Lock()
 	delete(b.results, resultsKey(pod.Namespace, pod.Name))
 	b.resultsLock.Unlock()
-
-	for volumeName, snapshotID := range volumeSnapshots {
-		var podVolumeBackup = &velerov1api.PodVolumeBackup{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: volumeName,
-			},
-			Status: velerov1api.PodVolumeBackupStatus{
-				SnapshotID: snapshotID,
-			},
-		}
-		podVolumeBackups = append(podVolumeBackups, podVolumeBackup)
-	}
 
 	return podVolumeBackups, errs
 }

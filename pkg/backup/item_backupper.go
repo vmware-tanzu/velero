@@ -222,12 +222,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		// even if there are errors.
 		podVolumeBackups, errs := ib.backupPodVolumes(log, pod, resticVolumesToBackup)
 		ib.backupRequest.PodVolumeBackups = podVolumeBackups
-
-		// annotate the pod with the successful volume snapshots
-		for _, volume := range podVolumeBackups {
-			restic.SetPodSnapshotAnnotation(metadata, volume.Name, volume.Status.SnapshotID)
-		}
-
 		backupErrs = append(backupErrs, errs...)
 	}
 

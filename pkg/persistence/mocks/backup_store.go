@@ -4,7 +4,7 @@ package mocks
 
 import io "io"
 import mock "github.com/stretchr/testify/mock"
-
+import persistence "github.com/heptio/velero/pkg/persistence"
 import v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 import volume "github.com/heptio/velero/pkg/volume"
 
@@ -108,29 +108,6 @@ func (_m *BackupStore) GetBackupMetadata(name string) (*v1.Backup, error) {
 	return r0, r1
 }
 
-// GetBackupPodVolumes provides a mock function with given fields: name
-func (_m *BackupStore) GetBackupPodVolumes(name string) ([]*v1.PodVolumeBackup, error) {
-	ret := _m.Called(name)
-
-	var r0 []*v1.PodVolumeBackup
-	if rf, ok := ret.Get(0).(func(string) []*v1.PodVolumeBackup); ok {
-		r0 = rf(name)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*v1.PodVolumeBackup)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetBackupVolumeSnapshots provides a mock function with given fields: name
 func (_m *BackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
 	ret := _m.Called(name)
@@ -168,6 +145,29 @@ func (_m *BackupStore) GetDownloadURL(target v1.DownloadTarget) (string, error) 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(v1.DownloadTarget) error); ok {
 		r1 = rf(target)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetPodVolumeBackups provides a mock function with given fields: name
+func (_m *BackupStore) GetPodVolumeBackups(name string) ([]*v1.PodVolumeBackup, error) {
+	ret := _m.Called(name)
+
+	var r0 []*v1.PodVolumeBackup
+	if rf, ok := ret.Get(0).(func(string) []*v1.PodVolumeBackup); ok {
+		r0 = rf(name)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*v1.PodVolumeBackup)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(name)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -233,13 +233,13 @@ func (_m *BackupStore) ListBackups() ([]string, error) {
 	return r0, r1
 }
 
-// PutBackup provides a mock function with given fields: name, metadata, contents, log, podVolumeBackups, volumeSnapshots
-func (_m *BackupStore) PutBackup(name string, metadata io.Reader, contents io.Reader, log io.Reader, podVolumeBackups io.Reader, volumeSnapshots io.Reader) error {
-	ret := _m.Called(name, metadata, contents, log, podVolumeBackups, volumeSnapshots)
+// PutBackup provides a mock function with given fields: info
+func (_m *BackupStore) PutBackup(info persistence.BackupInfo) error {
+	ret := _m.Called(info)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, io.Reader, io.Reader, io.Reader, io.Reader, io.Reader) error); ok {
-		r0 = rf(name, metadata, contents, log, podVolumeBackups, volumeSnapshots)
+	if rf, ok := ret.Get(0).(func(persistence.BackupInfo) error); ok {
+		r0 = rf(info)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -84,13 +84,12 @@ func TestBackupItemNoSkips(t *testing.T) {
 		},
 		{
 			name:                      "pod's restic PVC volume backups (only) are tracked",
-			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.velero.io/backup-volumes": "volume-1,volume-2"}}}`,
+			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}}`,
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			groupResource:             "pods",
 			expectError:               false,
 			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/pods/namespaces/foo/bar.json",
-			expectedTrackedPVCs:       sets.NewString(key("foo", "bar"), key("foo", "baz")),
+			expectedTarHeaderName:     "resources/pods/cluster/.json",
 		},
 	}
 
@@ -278,9 +277,6 @@ func TestResticAnnotationsPersist(t *testing.T) {
 				"metadata": map[string]interface{}{
 					"namespace": "myns",
 					"name":      "bar",
-					"annotations": map[string]interface{}{
-						"backup.velero.io/backup-volumes": "volume-1,volume-2",
-					},
 				},
 			},
 		}
@@ -310,25 +306,18 @@ func TestResticAnnotationsPersist(t *testing.T) {
 		).(*defaultItemBackupper)
 	)
 
-	var podVolumeBackup1 = &velerov1api.PodVolumeBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "volume-1",
+	podVolumeBackups := []*velerov1api.PodVolumeBackup{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "volume-1",
+			},
 		},
-		Status: velerov1api.PodVolumeBackupStatus{
-			SnapshotID: "snapshot-1",
-		},
-	}
-
-	var podVolumeBackup2 = &velerov1api.PodVolumeBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "volume-2",
-		},
-		Status: velerov1api.PodVolumeBackupStatus{
-			SnapshotID: "snapshot-2",
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "volume-2",
+			},
 		},
 	}
-
-	podVolumeBackups := []*velerov1api.PodVolumeBackup{podVolumeBackup1, podVolumeBackup2}
 
 	resticBackupper.
 		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
@@ -343,8 +332,6 @@ func TestResticAnnotationsPersist(t *testing.T) {
 		annotations = make(map[string]string)
 	}
 	annotations["foo"] = "bar"
-	annotations["snapshot.velero.io/volume-1"] = "snapshot-1"
-	annotations["snapshot.velero.io/volume-2"] = "snapshot-2"
 	expected.SetAnnotations(annotations)
 
 	// method under test
