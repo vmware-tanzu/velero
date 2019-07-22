@@ -96,14 +96,27 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		want *corev1.Pod
 	}{
 		{
-			name: "Restoring pod with no other initContainers adds the restic initContainer.",
+			name: "Restoring pod with no other initContainers adds the restic initContainer",
 			pod: test.NewPod("ns-1", "pod",
 				test.WithAnnotations("snapshot.velero.io/myvol", ""),
 			),
 			want: test.NewPod("ns-1", "pod",
 				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(newInitContainer(initContainerImage(defaultImageBase), ""),
+				test.WithInitContainer(newResticInitContainer(initContainerImage(defaultImageBase), ""),
 					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
+			),
+		},
+		{
+			name: "Restoring pod with other initContainers adds the restic initContainer as the first one",
+			pod: test.NewPod("ns-1", "pod",
+				test.WithAnnotations("snapshot.velero.io/myvol", ""),
+				test.WithInitContainer(test.NewContainer("first-container")),
+			),
+			want: test.NewPod("ns-1", "pod",
+				test.WithAnnotations("snapshot.velero.io/myvol", ""),
+				test.WithInitContainer(newResticInitContainer(initContainerImage(defaultImageBase), ""),
+					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
+				test.WithInitContainer(test.NewContainer("first-container")),
 			),
 		},
 	}

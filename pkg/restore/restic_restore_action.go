@@ -86,7 +86,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	image := getImage(log, config)
 	log.Infof("Using image %q", image)
 
-	initContainer := newInitContainer(image, string(input.Restore.UID))
+	initContainer := newResticInitContainer(image, string(input.Restore.UID))
 
 	for volumeName := range volumeSnapshots {
 		mount := corev1.VolumeMount{
@@ -170,7 +170,7 @@ func getPluginConfig(kind framework.PluginKind, name string, client corev1client
 	return &list.Items[0], nil
 }
 
-func newInitContainer(image, restoreUID string) *corev1.Container {
+func newResticInitContainer(image, restoreUID string) *corev1.Container {
 	return &corev1.Container{
 		Name:  restic.InitContainer,
 		Image: image,
