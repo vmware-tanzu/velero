@@ -262,22 +262,30 @@ func parseResourceRequests(cpuRequest, memRequest, cpuLimit, memLimit string) (c
 
 	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
 	if err != nil {
-		return resources, errors.Wrap(err, "couldn't parse CPU request")
+		return resources, errors.Wrapf(err, `couldn't parse CPU request "%s"`, cpuRequest)
 	}
 
 	parsedMemRequest, err := resource.ParseQuantity(memRequest)
 	if err != nil {
-		return resources, errors.Wrap(err, "couldn't parse memory request")
+		return resources, errors.Wrapf(err, `couldn't parse memory request "%s"`, memRequest)
 	}
 
 	parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
 	if err != nil {
-		return resources, errors.Wrap(err, "couldn't parse CPU limit")
+		return resources, errors.Wrapf(err, `couldn't parse CPU limit "%s"`, cpuLimit)
 	}
 
 	parsedMemLimit, err := resource.ParseQuantity(memLimit)
 	if err != nil {
-		return resources, errors.Wrap(err, "couldn't parse memory limit")
+		return resources, errors.Wrapf(err, `couldn't parse memory limit "%s"`, memLimit)
+	}
+
+	if parsedCPURequest.Cmp(parsedCPULimit) > 0 {
+		return resources, errors.WithStack(errors.Errorf(`CPU request "%s" must be less than or equal to CPU limit "%s"`, cpuRequest, cpuLimit))
+	}
+
+	if parsedMemRequest.Cmp(parsedMemLimit) > 0 {
+		return resources, errors.WithStack(errors.Errorf(`Memory request "%s" must be less than or equal to Memory limit "%s"`, memRequest, memLimit))
 	}
 
 	resources.Requests = corev1.ResourceList{
