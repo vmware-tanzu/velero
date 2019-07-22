@@ -31,7 +31,6 @@ import (
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/test"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -103,7 +102,8 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			),
 			want: test.NewPod("ns-1", "pod",
 				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(test.NewContainer(restic.InitContainer)),
+				test.WithInitContainer(newInitContainer(initContainerImage(defaultImageBase), ""),
+					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
 			),
 		},
 	}

@@ -305,6 +305,15 @@ func NewContainer(name string, opts ...ContainerOpts) *corev1.Container {
 	return obj
 }
 
+// NewVolumeMount creates a VolumeMount with the provided name
+// and a MountPath of "/restores/" + name
+func NewVolumeMount(name string) *corev1.VolumeMount {
+	return &corev1.VolumeMount{
+		Name:      name,
+		MountPath: "/restores/" + name,
+	}
+}
+
 func objectMeta(ns, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{
 		Namespace: ns,
@@ -531,13 +540,24 @@ func WithConfigMapData(vals ...string) func(obj metav1.Object) {
 
 // WithInitContainer is a functional option that adds an initContainer to a pod.
 // It panics if the object is not a pod.
-func WithInitContainer(container *corev1.Container) func(obj metav1.Object) {
+func WithInitContainer(container *corev1.Container, opts ...ContainerOpts) func(obj metav1.Object) {
 	return func(obj metav1.Object) {
 		pod, ok := obj.(*corev1.Pod)
 		if !ok {
 			panic("WithInitContainer is only valid for pods")
 		}
 
+		for _, opt := range opts {
+			opt(container)
+		}
+
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, *container)
+	}
+}
+
+// WithVolumeMounts is a functional option that adds a VolumeMount to a Container.
+func WithVolumeMounts(mount *corev1.VolumeMount) func(c *corev1.Container) {
+	return func(c *corev1.Container) {
+		c.VolumeMounts = append(c.VolumeMounts, *mount)
 	}
 }

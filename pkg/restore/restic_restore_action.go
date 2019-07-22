@@ -86,35 +86,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	image := getImage(log, config)
 	log.Infof("Using image %q", image)
 
-	initContainer := corev1.Container{
-		Name:  restic.InitContainer,
-		Image: image,
-		Args:  []string{string(input.Restore.UID)},
-		Env: []corev1.EnvVar{
-			{
-				Name: "POD_NAMESPACE",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.namespace",
-					},
-				},
-			},
-			{
-				Name: "POD_NAME",
-				ValueFrom: &corev1.EnvVarSource{
-					FieldRef: &corev1.ObjectFieldSelector{
-						FieldPath: "metadata.name",
-					},
-				},
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("1Mi"),
-			},
-		},
-	}
+	initContainer := newInitContainer(image, string(input.Restore.UID))
 
 	for volumeName := range volumeSnapshots {
 		mount := corev1.VolumeMount{
@@ -125,9 +97,9 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	}
 
 	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
-		pod.Spec.InitContainers = append([]corev1.Container{initContainer}, pod.Spec.InitContainers...)
+		pod.Spec.InitContainers = append([]corev1.Container{*initContainer}, pod.Spec.InitContainers...)
 	} else {
-		pod.Spec.InitContainers[0] = initContainer
+		pod.Spec.InitContainers[0] = *initContainer
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
@@ -196,6 +168,38 @@ func getPluginConfig(kind framework.PluginKind, name string, client corev1client
 	}
 
 	return &list.Items[0], nil
+}
+
+func newInitContainer(image, restoreUID string) *corev1.Container {
+	return &corev1.Container{
+		Name:  restic.InitContainer,
+		Image: image,
+		Args:  []string{restoreUID},
+		Env: []corev1.EnvVar{
+			{
+				Name: "POD_NAMESPACE",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.namespace",
+					},
+				},
+			},
+			{
+				Name: "POD_NAME",
+				ValueFrom: &corev1.EnvVarSource{
+					FieldRef: &corev1.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("1Mi"),
+			},
+		},
+	}
 }
 
 func initContainerImage(imageBase string) string {
