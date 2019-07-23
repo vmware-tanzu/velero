@@ -7,8 +7,8 @@
 Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Velero lets you:
 
 * Take backups of your cluster and restore in case of loss.
-* Copy cluster resources to other clusters.
-* Replicate your production environment for development and testing environments.
+* Migrate cluster resources to other clusters.
+* Replicate your production cluster to development and testing clusters.
 
 Velero consists of:
 
