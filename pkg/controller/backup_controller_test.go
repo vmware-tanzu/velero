@@ -17,9 +17,11 @@ limitations under the License.
 package controller
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -554,25 +556,18 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
-
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
+			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading.
 			// Failures will display the bytes in buf.
-			// completionTimestampIsPresent := func(buf *bytes.Buffer) bool {
-			// 	return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
-			// }
-			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
-			// backupInfo := persistence.BackupInfo{
-			// 	Name: test.backup.Name,
-			// 	// Metadata:         mock.MatchedBy(completionTimestampIsPresent),
-			// 	// Contents: mock.Anything,
-			// 	// Log: mock.Anything,
-			// 	// PodVolumeBackups: mock.Anything,
-			// 	// VolumeSnapshots:  mock.Anything,
-			// }
-			// TODO: [carlisia] resolve this mock
-			backupStore.On("PutBackup", mock.Anything).Return(nil)
+			completionTimestampIsPresent := func(info persistence.BackupInfo) bool {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(info.Metadata)
+				return info.Name == test.backup.Name &&
+					strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
+			}
+			backupStore.On("PutBackup", mock.MatchedBy(completionTimestampIsPresent)).Return(nil)
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
@@ -601,6 +596,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 			assert.Equal(t, test.expectedResult, res)
 		})
 	}
+}
+
+func hasNameAndCompletionTimestamp(info persistence.BackupInfo) bool {
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(info.Metadata)
+
+	return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 }
 
 func TestValidateAndGetSnapshotLocations(t *testing.T) {

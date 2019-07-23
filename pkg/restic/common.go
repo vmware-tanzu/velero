@@ -67,21 +67,6 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	return res
 }
 
-// SetPodSnapshotAnnotation adds an annotation to a pod to indicate that
-// the specified volume has a restic snapshot with the provided id.
-// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken.
-func SetPodSnapshotAnnotation(obj metav1.Object, volumeName, snapshotID string) {
-	annotations := obj.GetAnnotations()
-
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	annotations[podAnnotationPrefix+volumeName] = snapshotID
-
-	obj.SetAnnotations(annotations)
-}
-
 // GetVolumesToBackup returns a list of volume names to backup for
 // the provided pod.
 func GetVolumesToBackup(obj metav1.Object) []string {

@@ -80,48 +80,6 @@ func TestGetPodSnapshotAnnotations(t *testing.T) {
 	}
 }
 
-func TestSetPodSnapshotAnnotation(t *testing.T) {
-	tests := []struct {
-		name        string
-		annotations map[string]string
-		volumeName  string
-		snapshotID  string
-		expected    map[string]string
-	}{
-		{
-			name:        "set snapshot annotation on pod with no annotations",
-			annotations: nil,
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{podAnnotationPrefix + "foo": "bar"},
-		},
-		{
-			name:        "set snapshot annotation on pod with existing annotations",
-			annotations: map[string]string{"existing": "annotation"},
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{"existing": "annotation", podAnnotationPrefix + "foo": "bar"},
-		},
-		{
-			name:        "snapshot annotation is overwritten if already exists",
-			annotations: map[string]string{podAnnotationPrefix + "foo": "existing"},
-			volumeName:  "foo",
-			snapshotID:  "bar",
-			expected:    map[string]string{podAnnotationPrefix + "foo": "bar"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			pod := &corev1api.Pod{}
-			pod.Annotations = test.annotations
-
-			SetPodSnapshotAnnotation(pod, test.volumeName, test.snapshotID)
-			assert.Equal(t, test.expected, pod.Annotations)
-		})
-	}
-}
-
 func TestGetVolumesToBackup(t *testing.T) {
 	tests := []struct {
 		name        string

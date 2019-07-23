@@ -121,7 +121,6 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 
 	var (
 		errs             []error
-		volumeSnapshots  = make(map[string]*velerov1api.PodVolumeBackup)
 		podVolumeBackups []*velerov1api.PodVolumeBackup
 		podVolumes       = make(map[string]corev1api.Volume)
 	)
@@ -131,6 +130,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		podVolumes[podVolume.Name] = podVolume
 	}
 
+	var numVolumeSnapshots int
 	for _, volumeName := range volumesToBackup {
 		volume, ok := podVolumes[volumeName]
 		if !ok {
@@ -151,7 +151,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 		}
 
 		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
-		volumeSnapshots[volumeName] = volumeBackup
+		numVolumeSnapshots++
 		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup); err != nil {
 			errs = append(errs, err)
 			continue
@@ -159,7 +159,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 	}
 
 ForEachVolume:
-	for i, count := 0, len(volumeSnapshots); i < count; i++ {
+	for i, count := 0, numVolumeSnapshots; i < count; i++ {
 		select {
 		case <-b.ctx.Done():
 			errs = append(errs, errors.New("timed out waiting for all PodVolumeBackups to complete"))

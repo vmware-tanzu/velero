@@ -192,15 +192,6 @@ func (c *backupSyncController) run() {
 			backup, err := c.backupClient.Backups(c.namespace).Get(backupName, metav1.GetOptions{})
 			if err == nil {
 				log.Debug("Backup already exists in cluster")
-
-				// pre-v0.10 backups won't initially have a .spec.storageLocation so fill it in
-				if backup.Spec.StorageLocation == "" {
-					log.Debug("Patching backup's .spec.storageLocation because it's missing")
-					if err := patchStorageLocation(backup, c.backupClient.Backups(c.namespace), location.Name); err != nil {
-						log.WithError(err).Error("Error patching backup's .spec.storageLocation")
-					}
-				}
-
 				continue
 			}
 
@@ -225,9 +216,8 @@ func (c *backupSyncController) run() {
 				backup.Labels = make(map[string]string)
 			}
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
-
 			// process the regular velero backup
-			_, err = c.backupClient.Backups(backup.Namespace).Create(backup)
+			backup, err = c.backupClient.Backups(backup.Namespace).Create(backup)
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
 				log.Debug("Backup already exists in cluster")
@@ -246,11 +236,17 @@ func (c *backupSyncController) run() {
 				continue
 			}
 
-			for _, podvolumeBackup := range podVolumeBackups {
-				log = log.WithField("podVolumeBackup", podvolumeBackup.Name)
+			for _, podVolumeBackup := range podVolumeBackups {
+				log = log.WithField("podVolumeBackup", podVolumeBackup.Name)
 				log.Debug("Checking this pod volume backup to see if it needs to be synced into the cluster")
 
-				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podvolumeBackup)
+				for _, or := range podVolumeBackup.ObjectMeta.OwnerReferences {
+					if or.Name == backup.Name {
+						or.UID = backup.UID
+					}
+				}
+				podVolumeBackup.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
+				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podVolumeBackup)
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
 					log.Debug("Pod volume backup already exists in cluster")
