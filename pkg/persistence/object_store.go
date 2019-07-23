@@ -91,9 +91,15 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		return nil, errors.New("object storage provider name must not be empty")
 	}
 
-	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)
-	if err != nil {
-		return nil, err
+	// trim off any leading/trailing slashes
+	bucket := strings.Trim(location.Spec.ObjectStorage.Bucket, "/")
+	prefix := strings.Trim(location.Spec.ObjectStorage.Prefix, "/")
+
+	// if there are any slashes in the middle of 'bucket', the user
+	// probably put <bucket>/<prefix> in the bucket field, which we
+	// don't support.
+	if strings.Contains(bucket, "/") {
+		return nil, errors.Errorf("backup storage location's bucket name %q must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)", location.Spec.ObjectStorage.Bucket)
 	}
 
 	// add the bucket name to the config map so that object stores can use
@@ -103,7 +109,12 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		if location.Spec.Config == nil {
 			location.Spec.Config = make(map[string]string)
 		}
-		location.Spec.Config["bucket"] = location.Spec.ObjectStorage.Bucket
+		location.Spec.Config["bucket"] = bucket
+	}
+
+	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := objectStore.Init(location.Spec.Config); err != nil {
@@ -111,14 +122,14 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 	}
 
 	log := logger.WithFields(logrus.Fields(map[string]interface{}{
-		"bucket": location.Spec.ObjectStorage.Bucket,
-		"prefix": location.Spec.ObjectStorage.Prefix,
+		"bucket": bucket,
+		"prefix": prefix,
 	}))
 
 	return &objectBackupStore{
 		objectStore: objectStore,
-		bucket:      location.Spec.ObjectStorage.Bucket,
-		layout:      NewObjectStoreLayout(location.Spec.ObjectStorage.Prefix),
+		bucket:      bucket,
+		layout:      NewObjectStoreLayout(prefix),
 		logger:      log,
 	}, nil
 }

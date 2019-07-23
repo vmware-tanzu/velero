@@ -37,6 +37,7 @@ import (
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/cloudprovider"
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
+	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/encode"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
@@ -554,6 +555,134 @@ func TestGetDownloadURL(t *testing.T) {
 			url, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
 			require.NoError(t, err)
 			assert.Equal(t, "a-url", url)
+		})
+	}
+}
+
+type objectStoreGetter map[string]velero.ObjectStore
+
+func (osg objectStoreGetter) GetObjectStore(provider string) (velero.ObjectStore, error) {
+	res, ok := osg[provider]
+	if !ok {
+		return nil, errors.New("object store not found")
+	}
+
+	return res, nil
+}
+
+// TestNewObjectBackupStore runs the NewObjectBackupStore constructor and ensures
+// that an ObjectBackupStore is constructed correctly or an appropriate error is
+// returned.
+func TestNewObjectBackupStore(t *testing.T) {
+	tests := []struct {
+		name              string
+		location          *velerov1api.BackupStorageLocation
+		objectStoreGetter objectStoreGetter
+		wantBucket        string
+		wantPrefix        string
+		wantErr           string
+	}{
+		{
+			name:     "location with no ObjectStorage field results in an error",
+			location: &velerov1api.BackupStorageLocation{},
+			wantErr:  "backup storage location does not use object storage",
+		},
+		{
+			name: "location with no Provider field results in an error",
+			location: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: new(velerov1api.ObjectStorageLocation),
+					},
+				},
+			},
+			wantErr: "object storage provider name must not be empty",
+		},
+		{
+			name: "location with a Bucket field with a '/' in the middle results in an error",
+			location: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "provider-1",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "invalid/bucket",
+						},
+					},
+				},
+			},
+			wantErr: "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
+		},
+		{
+			name: "when Bucket has a leading and trailing slash, they are both stripped",
+			location: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "provider-1",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "/bucket/",
+						},
+					},
+				},
+			},
+			objectStoreGetter: objectStoreGetter{
+				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+			},
+			wantBucket: "bucket",
+		},
+		{
+			name: "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
+			location: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "provider-1",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "/prefix/",
+						},
+					},
+				},
+			},
+			objectStoreGetter: objectStoreGetter{
+				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+			},
+			wantBucket: "bucket",
+			wantPrefix: "prefix/",
+		},
+		{
+			name: "when Prefix has no leading or trailing slash, a trailing slash is added",
+			location: &velerov1api.BackupStorageLocation{
+				Spec: velerov1api.BackupStorageLocationSpec{
+					Provider: "provider-1",
+					StorageType: velerov1api.StorageType{
+						ObjectStorage: &velerov1api.ObjectStorageLocation{
+							Bucket: "bucket",
+							Prefix: "/prefix/",
+						},
+					},
+				},
+			},
+			objectStoreGetter: objectStoreGetter{
+				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+			},
+			wantBucket: "bucket",
+			wantPrefix: "prefix/",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := NewObjectBackupStore(tc.location, tc.objectStoreGetter, velerotest.NewLogger())
+			if tc.wantErr != "" {
+				require.Equal(t, tc.wantErr, err.Error())
+			} else {
+				require.Nil(t, err)
+
+				store, ok := res.(*objectBackupStore)
+				require.True(t, ok)
+
+				assert.Equal(t, tc.wantBucket, store.bucket)
+				assert.Equal(t, tc.wantPrefix, store.layout.rootPrefix)
+			}
 		})
 	}
 }
