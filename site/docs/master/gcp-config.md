@@ -132,6 +132,8 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 
+(Optional) Specify [CPU and memory resource requests and limits][23] for the Velero pod.
+
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 [0]: namespace.md
@@ -141,3 +143,4 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [16]: https://cloud.google.com/sdk/docs/
 [20]: faq.md
 [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#iam-rolebinding-bootstrap
+[23]: install-overview.md#velero-resource-requirements

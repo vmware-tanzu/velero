@@ -157,6 +157,8 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 
+(Optional) Specify [CPU and memory resource requests and limits][23] for the Velero pod.
+
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 [0]: namespace.md
@@ -167,3 +169,4 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [20]: faq.md
 [21]: api-types/backupstoragelocation.md#azure
 [22]: https://azure.microsoft.com/en-us/services/kubernetes-service/
+[23]: install-overview.md#velero-resource-requirements
