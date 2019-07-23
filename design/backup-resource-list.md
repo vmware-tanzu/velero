@@ -33,18 +33,18 @@ A section will be added to the output of `velero backup describe <name> --detail
 This metadata will be in JSON (or YAML) format so that it can be easily inspected from the bucket outside of Velero tooling, and will contain the API resource and group, namespaces and names of the resources:
 
 ```
-deployments.apps:
+apps/v1/Deployment:
 - default/database
 - default/wordpress
-services:
+v1/Service:
 - default/database
 - default/wordpress
-secrets:
+v1/Secret:
 - default/database-root-password
 - default/database-user-password
-configmaps:
+v1/ConfigMap:
 - default/database
-persistentvolumes:
+v1/PersistentVolume:
 - my-pv
 ```
 
@@ -56,7 +56,10 @@ The top-level key is the string form of the `schema.GroupResource` type that we 
 The Backupper currently initialises a map to track the `backedUpItems` (https://github.com/heptio/velero/blob/1594bdc8d0132f548e18ffcc1db8c4cd2b042726/pkg/backup/backup.go#L269), this is passed down through GroupBackupper, ResourceBackupper and ItemBackupper where ItemBackupper records each backed up item.
 This property will be moved to the [Backup request struct](https://github.com/heptio/velero/blob/16910a6215cbd8f0bde385dba9879629ebcbcc28/pkg/backup/request.go#L11), allowing the BackupController to access it after a successful backup.
 
-The `backedUpItems` map is currently a flat structure and will need to be converted to the nested structure above, grouped by `schema.GroupResource`.
+`backedUpItems` currently uses the `schema.GroupResource` as a key for the resource.
+In order to record the API group, version and kind for the resource, this key will be constructed from the object's `schema.GroupVersionKind` in the format `{group}/{version}/{kind}` (e.g. `apps/v1/Deployment`).
+
+The `backedUpItems` map is currently a flat structure and will need to be converted to the nested structure above, grouped by `schema.GroupVersionKind` string.
 
 After converting to the right format, it can be passed to the `persistBackup` function to persist the file in object storage.
 
@@ -76,8 +79,6 @@ If we choose to store the metadata in YAML, it can likely be directly printed ou
 If the metadata file does not exist, this is an older backup and we cannot display the list of resources that were backed up.
 
 ## Open Questions
-
-- Do we want to show the group version in the metadata (i.e. do we want users to see `apps/v1/Deployment` instead of `deployments.apps`)? If so, we wouldn't be able to use the existing list of backedUpItems list, or we'd need to change it to track schema.GroupVersionKinds instead.
 
 ## Alternatives Considered
 
