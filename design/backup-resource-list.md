@@ -91,6 +91,6 @@ Additionally, if we wanted to expose more information about the backed up resour
 
 The disadvantages are:
 - downloading the whole backup archive will be larger than just downloading a smaller file with metadata
-- doesn't solve the usecase of wanting to see the list of backed up resources in the bucket outside of Velero tooling
+- reduces the metadata available in the bucket that users might want to inspect outside of Velero tooling (though this is not an explicit requirement)
 
 ## Security Considerations
