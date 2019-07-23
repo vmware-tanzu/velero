@@ -27,7 +27,7 @@ This mirrors the plug-ins used by GitHub Pages on your local machine including J
 3. `cd velero/site`
 4. `rbenv local 2.6.3`
 5. `bundle install`
-6. Serve the site and watch for markup/sass changes `jekyll serve --livereload`. You may need to run `bundle exec jekyll serve --livereload`.
+6. Serve the site and watch for markup/sass changes `jekyll serve --livereload --incremental`. You may need to run `bundle exec jekyll serve --livereload --incremental`.
 7. View your website at http://127.0.0.1:4000/
 8. Commit any changes and push everything to your fork.
 9. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
