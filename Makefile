@@ -224,7 +224,7 @@ serve-docs:
 	-v "$$(pwd)/site:/srv/jekyll" \
 	-it -p 4000:4000 \
 	jekyll/jekyll \
-	jekyll serve --livereload
+	jekyll serve --livereload --incremental
 
 # gen-docs generates a new versioned docs directory under site/docs. It follows
 # the following process:
