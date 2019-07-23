@@ -61,7 +61,7 @@ example: "@every 2h30m".`,
 	velero create schedule NAME --schedule="@every 24h" --include-namespaces web
 
 	# Create a weekly backup, each living for 90 days (2160 hours)
-	velero create schedule NAME --schedules="@every 168h" --ttl 2160h0m0s
+	velero create schedule NAME --schedule="@every 168h" --ttl 2160h0m0s
 	`,
 		Args: cobra.ExactArgs(1),
 		Run: func(c *cobra.Command, args []string) {
