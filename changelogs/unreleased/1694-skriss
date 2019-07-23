@@ -1,0 +1,1 @@
+error if backup storage location's Bucket field also contains a prefix, and gracefully handle leading/trailing slashes on Bucket and Prefix fields.
