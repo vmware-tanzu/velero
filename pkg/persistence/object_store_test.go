@@ -208,54 +208,60 @@ func TestListBackups(t *testing.T) {
 
 func TestPutBackup(t *testing.T) {
 	tests := []struct {
-		name         string
-		prefix       string
-		metadata     io.Reader
-		contents     io.Reader
-		log          io.Reader
-		snapshots    io.Reader
-		expectedErr  string
-		expectedKeys []string
+		name            string
+		prefix          string
+		metadata        io.Reader
+		contents        io.Reader
+		log             io.Reader
+		podVolumeBackup io.Reader
+		snapshots       io.Reader
+		expectedErr     string
+		expectedKeys    []string
 	}{
 		{
-			name:        "normal case",
-			metadata:    newStringReadSeeker("metadata"),
-			contents:    newStringReadSeeker("contents"),
-			log:         newStringReadSeeker("log"),
-			snapshots:   newStringReadSeeker("snapshots"),
-			expectedErr: "",
+			name:            "normal case",
+			metadata:        newStringReadSeeker("metadata"),
+			contents:        newStringReadSeeker("contents"),
+			log:             newStringReadSeeker("log"),
+			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
+			snapshots:       newStringReadSeeker("snapshots"),
+			expectedErr:     "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-logs.gz",
+				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"metadata/revision",
 			},
 		},
 		{
-			name:        "normal case with backup store prefix",
-			prefix:      "prefix-1/",
-			metadata:    newStringReadSeeker("metadata"),
-			contents:    newStringReadSeeker("contents"),
-			log:         newStringReadSeeker("log"),
-			snapshots:   newStringReadSeeker("snapshots"),
-			expectedErr: "",
+			name:            "normal case with backup store prefix",
+			prefix:          "prefix-1/",
+			metadata:        newStringReadSeeker("metadata"),
+			contents:        newStringReadSeeker("contents"),
+			log:             newStringReadSeeker("log"),
+			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
+			snapshots:       newStringReadSeeker("snapshots"),
+			expectedErr:     "",
 			expectedKeys: []string{
 				"prefix-1/backups/backup-1/velero-backup.json",
 				"prefix-1/backups/backup-1/backup-1.tar.gz",
 				"prefix-1/backups/backup-1/backup-1-logs.gz",
+				"prefix-1/backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"prefix-1/metadata/revision",
 			},
 		},
 		{
-			name:         "error on metadata upload does not upload data",
-			metadata:     new(errorReader),
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			snapshots:    newStringReadSeeker("snapshots"),
-			expectedErr:  "error readers return errors",
-			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
+			name:            "error on metadata upload does not upload data",
+			metadata:        new(errorReader),
+			contents:        newStringReadSeeker("contents"),
+			log:             newStringReadSeeker("log"),
+			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
+			snapshots:       newStringReadSeeker("snapshots"),
+			expectedErr:     "error readers return errors",
+			expectedKeys:    []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
 			name:         "error on data upload deletes metadata",
@@ -267,27 +273,30 @@ func TestPutBackup(t *testing.T) {
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 		{
-			name:        "error on log upload is ok",
-			metadata:    newStringReadSeeker("foo"),
-			contents:    newStringReadSeeker("bar"),
-			log:         new(errorReader),
-			snapshots:   newStringReadSeeker("snapshots"),
-			expectedErr: "",
+			name:            "error on log upload is ok",
+			metadata:        newStringReadSeeker("foo"),
+			contents:        newStringReadSeeker("bar"),
+			log:             new(errorReader),
+			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
+			snapshots:       newStringReadSeeker("snapshots"),
+			expectedErr:     "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
+				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"metadata/revision",
 			},
 		},
 		{
-			name:         "don't upload data when metadata is nil",
-			metadata:     nil,
-			contents:     newStringReadSeeker("contents"),
-			log:          newStringReadSeeker("log"),
-			snapshots:    newStringReadSeeker("snapshots"),
-			expectedErr:  "",
-			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
+			name:            "don't upload data when metadata is nil",
+			metadata:        nil,
+			contents:        newStringReadSeeker("contents"),
+			log:             newStringReadSeeker("log"),
+			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
+			snapshots:       newStringReadSeeker("snapshots"),
+			expectedErr:     "",
+			expectedKeys:    []string{"backups/backup-1/backup-1-logs.gz"},
 		},
 	}
 
@@ -295,7 +304,15 @@ func TestPutBackup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
-			err := harness.PutBackup("backup-1", tc.metadata, tc.contents, tc.log, tc.snapshots)
+			backupInfo := BackupInfo{
+				Name:             "backup-1",
+				Metadata:         tc.metadata,
+				Contents:         tc.contents,
+				Log:              tc.log,
+				PodVolumeBackups: tc.podVolumeBackup,
+				VolumeSnapshots:  tc.snapshots,
+			}
+			err := harness.PutBackup(backupInfo)
 
 			velerotest.AssertErrorMatches(t, tc.expectedErr, err)
 			assert.Len(t, harness.objectStore.Data[harness.bucket], len(tc.expectedKeys))

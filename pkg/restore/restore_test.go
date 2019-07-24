@@ -820,7 +820,7 @@ func TestRestoreItems(t *testing.T) {
 			restore: NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").
 				Backup("the-really-long-kube-service-name-that-is-exactly-63-characters").
 				Restore(),
-			backup: backup.NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").Backup(),
+			backup: backup.NewNamedBackupBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-exactly-63-characters").Backup(),
 			tarball: newTarWriter(t).
 				addItems("pods", test.NewPod("ns-1", "pod-1")).
 				done(),
@@ -839,7 +839,7 @@ func TestRestoreItems(t *testing.T) {
 			restore: NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
 				Backup("the-really-long-kube-service-name-that-is-much-greater-than-63-characters").
 				Restore(),
-			backup: backup.NewNamedBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").Backup(),
+			backup: backup.NewNamedBackupBuilder(velerov1api.DefaultNamespace, "the-really-long-kube-service-name-that-is-much-greater-than-63-characters").Backup(),
 			tarball: newTarWriter(t).
 				addItems("pods", test.NewPod("ns-1", "pod-1")).
 				done(),

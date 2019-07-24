@@ -31,12 +31,12 @@ type Builder struct {
 
 // NewBuilder returns a Builder for a Backup with no namespace/name.
 func NewBuilder() *Builder {
-	return NewNamedBuilder("", "")
+	return NewNamedBackupBuilder("", "")
 }
 
-// NewNamedBuilder returns a Builder for a Backup with the specified namespace
+// NewNamedBackupBuilder returns a Builder for a Backup with the specified namespace
 // and name.
-func NewNamedBuilder(namespace, name string) *Builder {
+func NewNamedBackupBuilder(namespace, name string) *Builder {
 	return &Builder{
 		backup: velerov1api.Backup{
 			TypeMeta: metav1.TypeMeta{

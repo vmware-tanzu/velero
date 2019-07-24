@@ -57,7 +57,7 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 }
 
 func defaultBackup() *pkgbackup.Builder {
-	return pkgbackup.NewNamedBuilder(velerov1api.DefaultNamespace, "backup-1")
+	return pkgbackup.NewNamedBackupBuilder(velerov1api.DefaultNamespace, "backup-1")
 }
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
@@ -556,16 +556,18 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
-
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
-
-			// Ensure we have a CompletionTimestamp when uploading.
-			// Failures will display the bytes in buf.
-			completionTimestampIsPresent := func(buf *bytes.Buffer) bool {
-				return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
-			}
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
-			backupStore.On("PutBackup", test.backup.Name, mock.MatchedBy(completionTimestampIsPresent), mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.
+			// Failures will display the bytes in buf.
+			hasNameAndCompletionTimestamp := func(info persistence.BackupInfo) bool {
+				buf := new(bytes.Buffer)
+				buf.ReadFrom(info.Metadata)
+				return info.Name == test.backup.Name &&
+					strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
+			}
+			backupStore.On("PutBackup", mock.MatchedBy(hasNameAndCompletionTimestamp)).Return(nil)
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)

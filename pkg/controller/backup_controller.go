@@ -576,6 +576,17 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
 	}
 
+	podVolumeBackups := new(bytes.Buffer)
+	gzw = gzip.NewWriter(podVolumeBackups)
+	defer gzw.Close()
+
+	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackups); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding pod volume backups"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
 	if len(errs) > 0 {
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
@@ -583,7 +594,15 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		volumeSnapshots = nil
 	}
 
-	if err := backupStore.PutBackup(backup.Name, backupJSON, backupContents, backupLog, volumeSnapshots); err != nil {
+	backupInfo := persistence.BackupInfo{
+		Name:             backup.Name,
+		Metadata:         backupJSON,
+		Contents:         backupContents,
+		Log:              backupLog,
+		PodVolumeBackups: podVolumeBackups,
+		VolumeSnapshots:  volumeSnapshots,
+	}
+	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)
 	}
 

@@ -36,7 +36,7 @@ import (
 )
 
 func defaultBackup() *backup.Builder {
-	return backup.NewNamedBuilder(api.DefaultNamespace, "backup-1")
+	return backup.NewNamedBackupBuilder(api.DefaultNamespace, "backup-1")
 }
 
 func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
