@@ -245,7 +245,11 @@ func (c *backupSyncController) run() {
 						or.UID = backup.UID
 					}
 				}
-				podVolumeBackup.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
+
+				if _, ok := podVolumeBackup.Labels[velerov1api.BackupUIDLabel]; ok {
+					podVolumeBackup.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
+				}
+
 				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podVolumeBackup)
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
