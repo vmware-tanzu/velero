@@ -87,6 +87,7 @@ func TestBackupItemNoSkips(t *testing.T) {
 			expectError:               false,
 			expectExcluded:            false,
 			expectedTarHeaderName:     "resources/pods/namespaces/foo/bar.json",
+			expectedTrackedPVCs:       sets.NewString(key("foo", "bar"), key("foo", "baz")),
 		},
 	}
 
