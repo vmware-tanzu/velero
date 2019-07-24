@@ -559,15 +559,15 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
-			// Ensure we have a CompletionTimestamp when uploading.
+			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.
 			// Failures will display the bytes in buf.
-			completionTimestampIsPresent := func(info persistence.BackupInfo) bool {
+			hasNameAndCompletionTimestamp := func(info persistence.BackupInfo) bool {
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(info.Metadata)
 				return info.Name == test.backup.Name &&
 					strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 			}
-			backupStore.On("PutBackup", mock.MatchedBy(completionTimestampIsPresent)).Return(nil)
+			backupStore.On("PutBackup", mock.MatchedBy(hasNameAndCompletionTimestamp)).Return(nil)
 
 			// add the test's backup to the informer/lister store
 			require.NotNil(t, test.backup)
@@ -596,13 +596,6 @@ func TestProcessBackupCompletions(t *testing.T) {
 			assert.Equal(t, test.expectedResult, res)
 		})
 	}
-}
-
-func hasNameAndCompletionTimestamp(info persistence.BackupInfo) bool {
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(info.Metadata)
-
-	return strings.Contains(buf.String(), `"completionTimestamp": "2006-01-02T22:04:05Z"`)
 }
 
 func TestValidateAndGetSnapshotLocations(t *testing.T) {

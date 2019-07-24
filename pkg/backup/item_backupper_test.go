@@ -27,16 +27,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/util/collections"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -84,12 +81,12 @@ func TestBackupItemNoSkips(t *testing.T) {
 		},
 		{
 			name:                      "pod's restic PVC volume backups (only) are tracked",
-			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}}`,
+			item:                      `{"apiVersion": "v1", "kind": "Pod", "spec": {"volumes": [{"name": "volume-1", "persistentVolumeClaim": {"claimName": "bar"}},{"name": "volume-2", "persistentVolumeClaim": {"claimName": "baz"}},{"name": "volume-1", "emptyDir": {}}]}, "metadata":{"namespace":"foo","name":"bar", "annotations": {"backup.velero.io/backup-volumes": "volume-1,volume-2"}}}`,
 			namespaceIncludesExcludes: collections.NewIncludesExcludes().Includes("*"),
 			groupResource:             "pods",
 			expectError:               false,
 			expectExcluded:            false,
-			expectedTarHeaderName:     "resources/pods/cluster/.json",
+			expectedTarHeaderName:     "resources/pods/namespaces/foo/bar.json",
 		},
 	}
 
@@ -267,82 +264,6 @@ func (a *addAnnotationAction) Execute(item runtime.Unstructured, backup *velerov
 
 func (a *addAnnotationAction) AppliesTo() (velero.ResourceSelector, error) {
 	panic("not implemented")
-}
-
-func TestResticAnnotationsPersist(t *testing.T) {
-	var (
-		w   = &fakeTarWriter{}
-		obj = &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"namespace": "myns",
-					"name":      "bar",
-				},
-			},
-		}
-		req = &Request{
-			NamespaceIncludesExcludes: collections.NewIncludesExcludes(),
-			ResourceIncludesExcludes:  collections.NewIncludesExcludes(),
-			ResolvedActions: []resolvedAction{
-				{
-					BackupItemAction:          &addAnnotationAction{},
-					namespaceIncludesExcludes: collections.NewIncludesExcludes(),
-					resourceIncludesExcludes:  collections.NewIncludesExcludes(),
-					selector:                  labels.Everything(),
-				},
-			},
-		}
-		resticBackupper = &resticmocks.Backupper{}
-		b               = (&defaultItemBackupperFactory{}).newItemBackupper(
-			req,
-			make(map[itemKey]struct{}),
-			nil,
-			w,
-			&velerotest.FakeDynamicFactory{},
-			velerotest.NewFakeDiscoveryHelper(true, nil),
-			resticBackupper,
-			newPVCSnapshotTracker(),
-			nil,
-		).(*defaultItemBackupper)
-	)
-
-	podVolumeBackups := []*velerov1api.PodVolumeBackup{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "volume-1",
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "volume-2",
-			},
-		},
-	}
-
-	resticBackupper.
-		On("BackupPodVolumes", mock.Anything, mock.Anything, mock.Anything).
-		Return(podVolumeBackups, nil)
-
-	// our expected backed-up object is the passed-in object, plus the annotation
-	// that the backup item action adds, plus the annotations that the restic
-	// backupper adds
-	expected := obj.DeepCopy()
-	annotations := expected.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	annotations["foo"] = "bar"
-	expected.SetAnnotations(annotations)
-
-	// method under test
-	require.NoError(t, b.backupItem(velerotest.NewLogger(), obj, schema.ParseGroupResource("pods")))
-
-	// get the actual backed-up item
-	require.Len(t, w.data, 1)
-	actual, err := velerotest.GetAsMap(string(w.data[0]))
-	require.NoError(t, err)
-
-	assert.EqualValues(t, expected.Object, actual)
 }
 
 type fakeTarWriter struct {
