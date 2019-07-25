@@ -229,8 +229,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	sa := ServiceAccount(o.Namespace)
 	appendUnstructured(resources, sa)
 
-	sec := Secret(o.Namespace, o.SecretData)
-	appendUnstructured(resources, sec)
+	if o.SecretData != nil {
+		sec := Secret(o.Namespace, o.SecretData)
+		appendUnstructured(resources, sec)
+	}
 
 	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
 	appendUnstructured(resources, bsl)
