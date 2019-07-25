@@ -20,6 +20,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -44,6 +45,7 @@ import (
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/test"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
 	testutil "github.com/heptio/velero/pkg/util/test"
@@ -2013,6 +2015,123 @@ func TestBackupWithHooks(t *testing.T) {
 			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, nil))
 
 			assertTarballContents(t, backupFile, append(tc.wantBackedUp, "metadata/version")...)
+		})
+	}
+}
+
+type fakeResticBackupperFactory struct {
+	podVolumeBackups []*velerov1.PodVolumeBackup
+}
+
+func (f *fakeResticBackupperFactory) NewBackupper(context.Context, *velerov1.Backup) (restic.Backupper, error) {
+	return &fakeResticBackupper{
+		podVolumeBackups: f.podVolumeBackups,
+	}, nil
+}
+
+type fakeResticBackupper struct {
+	podVolumeBackups []*velerov1.PodVolumeBackup
+}
+
+func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
+	return b.podVolumeBackups, nil
+}
+
+// TestBackupWithRestic runs backups of pods that are annotated for restic backup,
+// and ensures that the restic backupper is called, that the returned PodVolumeBackups
+// are added to the Request object, and that when PVCs are backed up with restic, the
+// claimed PVs are not also snapshotted using a VolumeSnapshotter.
+func TestBackupWithRestic(t *testing.T) {
+	tests := []struct {
+		name              string
+		backup            *velerov1.Backup
+		apiResources      []*test.APIResource
+		vsl               *velerov1.VolumeSnapshotLocation
+		snapshotterGetter volumeSnapshotterGetter
+		want              []*velerov1.PodVolumeBackup
+	}{
+		{
+			name:   "a pod annotated for restic backup should result in pod volume backups being returned",
+			backup: defaultBackup().Backup(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1", test.WithAnnotations("backup.velero.io/backup-volumes", "foo")),
+				),
+			},
+			want: []*velerov1.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      "pvb-1",
+					},
+				},
+			},
+		},
+		{
+			name:   "when PVC pod volumes are backed up using restic, their claimed PVs are not also snapshotted",
+			backup: defaultBackup().Backup(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					test.NewPod("ns-1", "pod-1",
+						test.WithAnnotations("backup.velero.io/backup-volumes", "vol-1,vol-2"),
+						test.WithVolume(test.NewVolume("vol-1", test.WithPVCSource("pvc-1"))),
+						test.WithVolume(test.NewVolume("vol-2", test.WithPVCSource("pvc-2"))),
+					),
+				),
+				test.PVCs(
+					test.NewPVC("ns-1", "pvc-1", test.WithPVName("pv-1")),
+					test.NewPVC("ns-1", "pvc-2", test.WithPVName("pv-2")),
+				),
+				test.PVs(
+					test.NewPV("pv-1", test.WithClaimRef("ns-1", "pvc-1")),
+					test.NewPV("pv-2", test.WithClaimRef("ns-1", "pvc-2")),
+				),
+			},
+			vsl: newSnapshotLocation("velero", "default", "default"),
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).
+					WithVolume("pv-1", "vol-1", "", "type-1", 100, false).
+					WithVolume("pv-2", "vol-2", "", "type-1", 100, false),
+			},
+			want: []*velerov1.PodVolumeBackup{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      "pvb-1",
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "velero",
+						Name:      "pvb-2",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup, SnapshotLocations: []*velerov1.VolumeSnapshotLocation{tc.vsl}}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			h.backupper.resticBackupperFactory = &fakeResticBackupperFactory{
+				podVolumeBackups: tc.want,
+			}
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			require.NoError(t, h.backupper.Backup(h.log, req, backupFile, nil, tc.snapshotterGetter))
+
+			assert.Equal(t, tc.want, req.PodVolumeBackups)
+
+			// this assumes that we don't have any test cases where some PVs should be snapshotted using a VolumeSnapshotter
+			assert.Nil(t, req.VolumeSnapshots)
 		})
 	}
 }
