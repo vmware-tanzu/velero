@@ -57,7 +57,7 @@ For details, see the documentation topics for individual cloud providers.
 
 ## Velero resource requirements
 
-By default, the Velero deployment requests 100m CPU, 128Mi memory and sets a limit of 200m CPU, 256Mi.
+By default, the Velero deployment requests 500m CPU, 128Mi memory and sets a limit of 1000m CPU, 256Mi.
 If you need to customize these resource requests and limits, you can set the following flags in your `velero install` command:
 
 ```
