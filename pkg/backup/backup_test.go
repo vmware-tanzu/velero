@@ -2059,12 +2059,7 @@ func TestBackupWithRestic(t *testing.T) {
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "velero",
-						Name:      "pvb-1",
-					},
-				},
+				NewNamedPodVolumeBackupBuilder("velero", "pvb-1").PodVolumeBackup(),
 			},
 		},
 		{
@@ -2094,18 +2089,8 @@ func TestBackupWithRestic(t *testing.T) {
 					WithVolume("pv-2", "vol-2", "", "type-1", 100, false),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "velero",
-						Name:      "pvb-1",
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: "velero",
-						Name:      "pvb-2",
-					},
-				},
+				NewNamedPodVolumeBackupBuilder("velero", "pvb-1").PodVolumeBackup(),
+				NewNamedPodVolumeBackupBuilder("velero", "pvb-2").PodVolumeBackup(),
 			},
 		},
 	}
