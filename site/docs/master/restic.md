@@ -30,11 +30,11 @@ Ensure you've [downloaded latest release][3].
 
 To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
 
-Please note: For some PaaS/CaaS platforms based on Kubernetes, RancherOS, OpenShift and Enterprise PKS for instance, some modifications are required to the restic DaemonSet spec before deploying it.
+Please note: For some PaaS/CaaS platforms based on Kubernetes such as RancherOS, OpenShift and Enterprise PKS, some modifications are required to the restic DaemonSet spec.
 
 **RancherOS**
 
-The path is not `/var/lib/kubelet/pods`, rather it is `/opt/rke/var/lib/kubelet/pods`
+The host path for volumes is not `/var/lib/kubelet/pods`, rather it is `/opt/rke/var/lib/kubelet/pods`
 
 ```yaml
 hostPath:
