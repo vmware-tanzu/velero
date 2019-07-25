@@ -81,12 +81,17 @@ $ oc adm policy add-scc-to-user privileged -z velero -n velero
 If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
 
 By default a userland openshift namespace will not schedule pods on all nodes in the cluster.
+
 To schedule on all nodes the namespace needs an annotation:
+
 ```
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
 ```
+
 This should be done before velero installation.
+
 Or the ds needs to be deleted and recreated:
+
 ```
 oc get ds restic -o yaml -n <velero namespace> > ds.yaml
 oc annotate namespace <velero namespace> openshift.io/node-selector=""
@@ -335,6 +340,13 @@ within each restored volume, under `.velero`, whose name is the UID of the Veler
 1. Once all such files are found, the init container's process terminates successfully and the pod moves
 on to running other init containers/the main containers.
 
+## 3rd party controller
+
+### Monitor backup annotation
+
+Velero does not currently provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
+
+To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
 [1]: https://github.com/restic/restic
 [2]: install-overview.md
@@ -342,3 +354,4 @@ on to running other init containers/the main containers.
 [4]: https://kubernetes.io/docs/concepts/storage/volumes/#local
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
 [6]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
+[7]: https://github.com/bitsbeats/velero-pvc-watcher
