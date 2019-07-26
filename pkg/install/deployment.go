@@ -33,6 +33,7 @@ type podTemplateConfig struct {
 	restoreOnly              bool
 	annotations              map[string]string
 	resources                corev1.ResourceRequirements
+	withSecretData           bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -66,6 +67,14 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 				},
 			},
 		})
+	}
+}
+
+func WithSecretData(secretPresent bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.withSecretData = secretPresent
+		// Since there's no secret, don't mount the credentials volume in the pods
+		c.withoutCredentialsVolume = true
 	}
 }
 
@@ -144,18 +153,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									Name:  "VELERO_SCRATCH_DIR",
 									Value: "/scratch",
 								},
-								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AWS_SHARED_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AZURE_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
 							},
 							Resources: c.resources,
 						},
@@ -199,6 +196,23 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				MountPath: "/credentials",
 			},
 		)
+	}
+
+	if c.withSecretData {
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
+			{
+				Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AWS_SHARED_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AZURE_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+		}...)
 	}
 
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, c.envVars...)

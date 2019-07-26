@@ -243,15 +243,19 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		appendUnstructured(resources, vsl)
 	}
 
+	secretPresent := o.SecretData != nil
+
 	deploy := Deployment(o.Namespace,
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 		WithResources(o.VeleroPodResources),
+		WithSecretData(secretPresent),
 	)
 	if o.RestoreOnly {
 		deploy = Deployment(o.Namespace,
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
+			WithSecretData(secretPresent),
 			WithRestoreOnly(),
 		)
 	}
@@ -262,6 +266,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
+			WithSecretData(secretPresent),
 		)
 		appendUnstructured(resources, ds)
 	}

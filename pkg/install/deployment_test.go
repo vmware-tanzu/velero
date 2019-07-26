@@ -32,7 +32,7 @@ func TestDeployment(t *testing.T) {
 	assert.Equal(t, "--restore-only", deploy.Spec.Template.Spec.Containers[0].Args[1])
 
 	deploy = Deployment("velero", WithEnvFromSecretKey("my-var", "my-secret", "my-key"))
-	envSecret := deploy.Spec.Template.Spec.Containers[0].Env[4]
+	envSecret := deploy.Spec.Template.Spec.Containers[0].Env[1]
 	assert.Equal(t, "my-var", envSecret.Name)
 	assert.Equal(t, "my-secret", envSecret.ValueFrom.SecretKeyRef.LocalObjectReference.Name)
 	assert.Equal(t, "my-key", envSecret.ValueFrom.SecretKeyRef.Key)
@@ -43,4 +43,7 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithImage("gcr.io/heptio-images/velero:v0.11"))
 	assert.Equal(t, "gcr.io/heptio-images/velero:v0.11", deploy.Spec.Template.Spec.Containers[0].Image)
 	assert.Equal(t, corev1.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+
+	deploy = Deployment("velero", WithSecretData(true))
+	assert.Equal(t, 4, len(deploy.Spec.Template.Spec.Containers[0].Env))
 }
