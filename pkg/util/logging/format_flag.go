@@ -17,6 +17,7 @@ package logging
 
 import "github.com/heptio/velero/pkg/cmd/util/flag"
 
+// Format is a string representation of the desired output format for logs
 type Format string
 
 const (
@@ -25,7 +26,7 @@ const (
 	defaultValue Format = FormatText
 )
 
-// FormatFlag is a command-line flag for setting the logurs
+// FormatFlag is a command-line flag for setting the logrus
 // log format.
 type FormatFlag struct {
 	*flag.Enum
@@ -44,7 +45,7 @@ func NewFormatFlag() *FormatFlag {
 	}
 }
 
-// Parse returns the flag's value as a logrus.Level.
+// Parse returns the flag's value as a Format.
 func (f *FormatFlag) Parse() Format {
 	return Format(f.String())
 }
