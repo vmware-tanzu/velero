@@ -31,8 +31,8 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -40,15 +40,19 @@ import (
 )
 
 func TestProcessSchedule(t *testing.T) {
+	newScheduleBuilder := func(phase velerov1api.SchedulePhase) *builder.ScheduleBuilder {
+		return builder.ForSchedule("ns", "name").Phase(phase)
+	}
+
 	tests := []struct {
 		name                     string
 		scheduleKey              string
-		schedule                 *api.Schedule
+		schedule                 *velerov1api.Schedule
 		fakeClockTime            string
 		expectedErr              bool
 		expectedPhase            string
 		expectedValidationErrors []string
-		expectedBackupCreate     *api.Backup
+		expectedBackupCreate     *velerov1api.Backup
 		expectedLastBackup       string
 	}{
 		{
@@ -63,51 +67,50 @@ func TestProcessSchedule(t *testing.T) {
 		},
 		{
 			name:        "schedule with phase FailedValidation does not get processed",
-			schedule:    velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseFailedValidation).Schedule,
+			schedule:    newScheduleBuilder(velerov1api.SchedulePhaseFailedValidation).Result(),
 			expectedErr: false,
 		},
 		{
 			name:                     "schedule with phase New gets validated and failed if invalid",
-			schedule:                 velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).Schedule,
+			schedule:                 newScheduleBuilder(velerov1api.SchedulePhaseNew).Result(),
 			expectedErr:              false,
-			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase <blank> gets validated and failed if invalid",
-			schedule:                 velerotest.NewTestSchedule("ns", "name").Schedule,
+			schedule:                 newScheduleBuilder(velerov1api.SchedulePhase("")).Result(),
 			expectedErr:              false,
-			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                     "schedule with phase Enabled gets re-validated and failed if invalid",
-			schedule:                 velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).Schedule,
+			schedule:                 newScheduleBuilder(velerov1api.SchedulePhaseEnabled).Result(),
 			expectedErr:              false,
-			expectedPhase:            string(api.SchedulePhaseFailedValidation),
+			expectedPhase:            string(velerov1api.SchedulePhaseFailedValidation),
 			expectedValidationErrors: []string{"Schedule must be a non-empty valid Cron expression"},
 		},
 		{
 			name:                 "schedule with phase New gets validated and triggers a backup",
-			schedule:             velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseNew).WithCronSchedule("@every 5m").Schedule,
+			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseNew).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
-			expectedPhase:        string(api.SchedulePhaseEnabled),
+			expectedPhase:        string(velerov1api.SchedulePhaseEnabled),
 			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
 			name:                 "schedule with phase Enabled gets re-validated and triggers a backup if valid",
-			schedule:             velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).WithCronSchedule("@every 5m").Schedule,
+			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
 			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
 			expectedLastBackup:   "2017-01-01 12:00:00",
 		},
 		{
-			name: "schedule that's already run gets LastBackup updated",
-			schedule: velerotest.NewTestSchedule("ns", "name").WithPhase(api.SchedulePhaseEnabled).
-				WithCronSchedule("@every 5m").WithLastBackupTime("2000-01-01 00:00:00").Schedule,
+			name:                 "schedule that's already run gets LastBackup updated",
+			schedule:             newScheduleBuilder(velerov1api.SchedulePhaseEnabled).CronSchedule("@every 5m").LastBackupTime("2000-01-01 00:00:00").Result(),
 			fakeClockTime:        "2017-01-01 12:00:00",
 			expectedErr:          false,
 			expectedBackupCreate: defaultBackup().Namespace("ns").Name("name-20170101120000").Labels(velerov1api.ScheduleNameLabel, "name").NoTypeMeta().Backup(),
@@ -161,7 +164,7 @@ func TestProcessSchedule(t *testing.T) {
 					// these are the fields that may be updated by the controller
 					phase, found, err := unstructured.NestedString(patchMap, "status", "phase")
 					if err == nil && found {
-						res.Status.Phase = api.SchedulePhase(phase)
+						res.Status.Phase = velerov1api.SchedulePhase(phase)
 					}
 
 					lastBackupStr, found, err := unstructured.NestedString(patchMap, "status", "lastBackup")
@@ -192,9 +195,9 @@ func TestProcessSchedule(t *testing.T) {
 			index := 0
 
 			type PatchStatus struct {
-				ValidationErrors []string          `json:"validationErrors"`
-				Phase            api.SchedulePhase `json:"phase"`
-				LastBackup       time.Time         `json:"lastBackup"`
+				ValidationErrors []string                  `json:"validationErrors"`
+				Phase            velerov1api.SchedulePhase `json:"phase"`
+				LastBackup       time.Time                 `json:"lastBackup"`
 			}
 
 			type Patch struct {
@@ -214,7 +217,7 @@ func TestProcessSchedule(t *testing.T) {
 				expected := Patch{
 					Status: PatchStatus{
 						ValidationErrors: test.expectedValidationErrors,
-						Phase:            api.SchedulePhase(test.expectedPhase),
+						Phase:            velerov1api.SchedulePhase(test.expectedPhase),
 					},
 				}
 
@@ -227,7 +230,7 @@ func TestProcessSchedule(t *testing.T) {
 				require.True(t, len(actions) > index, "len(actions) is too small")
 
 				action := core.NewCreateAction(
-					api.SchemeGroupVersion.WithResource("backups"),
+					velerov1api.SchemeGroupVersion.WithResource("backups"),
 					created.Namespace,
 					created)
 
@@ -259,41 +262,41 @@ func parseTime(timeString string) time.Time {
 func TestGetNextRunTime(t *testing.T) {
 	tests := []struct {
 		name                      string
-		schedule                  *api.Schedule
+		schedule                  *velerov1api.Schedule
 		lastRanOffset             string
 		expectedDue               bool
 		expectedNextRunTimeOffset string
 	}{
 		{
 			name:                      "first run",
-			schedule:                  &api.Schedule{Spec: api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "just ran",
-			schedule:                  &api.Schedule{Spec: api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
 			lastRanOffset:             "0s",
 			expectedDue:               false,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "almost but not quite time to run",
-			schedule:                  &api.Schedule{Spec: api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
 			lastRanOffset:             "4m59s",
 			expectedDue:               false,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "time to run again",
-			schedule:                  &api.Schedule{Spec: api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
 			lastRanOffset:             "5m",
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "several runs missed",
-			schedule:                  &api.Schedule{Spec: api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
 			lastRanOffset:             "5h",
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
@@ -339,11 +342,11 @@ func TestParseCronSchedule(t *testing.T) {
 	// Start with a Schedule with:
 	// - schedule: once a day at 9am
 	// - last backup: 2017-08-10 12:27:00 (just happened)
-	s := &api.Schedule{
-		Spec: api.ScheduleSpec{
+	s := &velerov1api.Schedule{
+		Spec: velerov1api.ScheduleSpec{
 			Schedule: "0 9 * * *",
 		},
-		Status: api.ScheduleStatus{
+		Status: velerov1api.ScheduleStatus{
 			LastBackup: metav1.NewTime(now),
 		},
 	}
@@ -383,23 +386,23 @@ func TestParseCronSchedule(t *testing.T) {
 func TestGetBackup(t *testing.T) {
 	tests := []struct {
 		name           string
-		schedule       *api.Schedule
+		schedule       *velerov1api.Schedule
 		testClockTime  string
-		expectedBackup *api.Backup
+		expectedBackup *velerov1api.Backup
 	}{
 		{
 			name: "ensure name is formatted correctly (AM time)",
-			schedule: &api.Schedule{
+			schedule: &velerov1api.Schedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar",
 				},
-				Spec: api.ScheduleSpec{
-					Template: api.BackupSpec{},
+				Spec: velerov1api.ScheduleSpec{
+					Template: velerov1api.BackupSpec{},
 				},
 			},
 			testClockTime: "2017-07-25 09:15:00",
-			expectedBackup: &api.Backup{
+			expectedBackup: &velerov1api.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
@@ -407,22 +410,22 @@ func TestGetBackup(t *testing.T) {
 						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
-				Spec: api.BackupSpec{},
+				Spec: velerov1api.BackupSpec{},
 			},
 		},
 		{
 			name: "ensure name is formatted correctly (PM time)",
-			schedule: &api.Schedule{
+			schedule: &velerov1api.Schedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar",
 				},
-				Spec: api.ScheduleSpec{
-					Template: api.BackupSpec{},
+				Spec: velerov1api.ScheduleSpec{
+					Template: velerov1api.BackupSpec{},
 				},
 			},
 			testClockTime: "2017-07-25 14:15:00",
-			expectedBackup: &api.Backup{
+			expectedBackup: &velerov1api.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725141500",
@@ -430,18 +433,18 @@ func TestGetBackup(t *testing.T) {
 						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
-				Spec: api.BackupSpec{},
+				Spec: velerov1api.BackupSpec{},
 			},
 		},
 		{
 			name: "ensure schedule backup template is copied",
-			schedule: &api.Schedule{
+			schedule: &velerov1api.Schedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar",
 				},
-				Spec: api.ScheduleSpec{
-					Template: api.BackupSpec{
+				Spec: velerov1api.ScheduleSpec{
+					Template: velerov1api.BackupSpec{
 						IncludedNamespaces: []string{"ns-1", "ns-2"},
 						ExcludedNamespaces: []string{"ns-3"},
 						IncludedResources:  []string{"foo", "bar"},
@@ -452,7 +455,7 @@ func TestGetBackup(t *testing.T) {
 				},
 			},
 			testClockTime: "2017-07-25 09:15:00",
-			expectedBackup: &api.Backup{
+			expectedBackup: &velerov1api.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725091500",
@@ -460,7 +463,7 @@ func TestGetBackup(t *testing.T) {
 						velerov1api.ScheduleNameLabel: "bar",
 					},
 				},
-				Spec: api.BackupSpec{
+				Spec: velerov1api.BackupSpec{
 					IncludedNamespaces: []string{"ns-1", "ns-2"},
 					ExcludedNamespaces: []string{"ns-3"},
 					IncludedResources:  []string{"foo", "bar"},
@@ -472,7 +475,7 @@ func TestGetBackup(t *testing.T) {
 		},
 		{
 			name: "ensure schedule labels is copied",
-			schedule: &api.Schedule{
+			schedule: &velerov1api.Schedule{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar",
@@ -481,12 +484,12 @@ func TestGetBackup(t *testing.T) {
 						"bar": "baz",
 					},
 				},
-				Spec: api.ScheduleSpec{
-					Template: api.BackupSpec{},
+				Spec: velerov1api.ScheduleSpec{
+					Template: velerov1api.BackupSpec{},
 				},
 			},
 			testClockTime: "2017-07-25 14:15:00",
-			expectedBackup: &api.Backup{
+			expectedBackup: &velerov1api.Backup{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "foo",
 					Name:      "bar-20170725141500",
@@ -496,7 +499,7 @@ func TestGetBackup(t *testing.T) {
 						"foo":                         "bar",
 					},
 				},
-				Spec: api.BackupSpec{},
+				Spec: velerov1api.BackupSpec{},
 			},
 		},
 	}
