@@ -1,6 +1,6 @@
 # Expose list of backed up resources in backup details
 
-Status: Draft
+Status: Accepted
 
 To increase the visibility of what a backup might contain, this document proposes storing metadata about backed up resources in object storage and adding a new section to the detailed backup description output to list them.
 
