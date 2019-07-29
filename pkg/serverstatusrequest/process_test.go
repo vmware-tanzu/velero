@@ -29,13 +29,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
-func statusRequestBuilder() *Builder {
-	return NewBuilder().Namespace(velerov1api.DefaultNamespace).Name("sr-1")
+func statusRequestBuilder() *builder.ServerStatusRequestBuilder {
+	return builder.ForServerStatusRequest(velerov1api.DefaultNamespace, "sr-1")
 }
 
 func TestProcess(t *testing.T) {
@@ -56,7 +57,7 @@ func TestProcess(t *testing.T) {
 	}{
 		{
 			name: "server status request with empty phase gets processed",
-			req:  statusRequestBuilder().ServerStatusRequest(),
+			req:  statusRequestBuilder().Result(),
 			reqPluginLister: &fakePluginLister{
 				plugins: []framework.PluginIdentifier{
 					{
@@ -75,13 +76,13 @@ func TestProcess(t *testing.T) {
 						Kind: "VolumeSnapshotter",
 					},
 				}).
-				ServerStatusRequest(),
+				Result(),
 		},
 		{
 			name: "server status request with phase=New gets processed",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseNew).
-				ServerStatusRequest(),
+				Result(),
 			reqPluginLister: &fakePluginLister{
 				plugins: []framework.PluginIdentifier{
 					{
@@ -108,14 +109,14 @@ func TestProcess(t *testing.T) {
 						Kind: "VolumeSnapshotter",
 					},
 				}).
-				ServerStatusRequest(),
+				Result(),
 		},
 		{
 			name: "server status request with phase=Processed gets deleted if expired",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-61 * time.Second)).
-				ServerStatusRequest(),
+				Result(),
 			reqPluginLister: &fakePluginLister{
 				plugins: []framework.PluginIdentifier{
 					{
@@ -131,20 +132,20 @@ func TestProcess(t *testing.T) {
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
-				ServerStatusRequest(),
+				Result(),
 			expected: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhaseProcessed).
 				ProcessedTimestamp(now.Add(-59 * time.Second)).
-				ServerStatusRequest(),
+				Result(),
 		},
 		{
 			name: "server status request with invalid phase returns an error",
 			req: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				ServerStatusRequest(),
+				Result(),
 			expected: statusRequestBuilder().
 				Phase(velerov1api.ServerStatusRequestPhase("an-invalid-phase")).
-				ServerStatusRequest(),
+				Result(),
 			expectedErrMsg: "unexpected ServerStatusRequest phase \"an-invalid-phase\"",
 		},
 	}

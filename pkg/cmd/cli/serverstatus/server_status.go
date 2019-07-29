@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	"github.com/heptio/velero/pkg/serverstatusrequest"
 )
 
 type ServerStatusGetter interface {
@@ -38,7 +38,10 @@ type DefaultServerStatusGetter struct {
 }
 
 func (g *DefaultServerStatusGetter) GetServerStatus(client velerov1client.ServerStatusRequestsGetter) (*velerov1api.ServerStatusRequest, error) {
-	req := serverstatusrequest.NewBuilder().Namespace(g.Namespace).GenerateName("velero-cli-").ServerStatusRequest()
+	req := builder.ForServerStatusRequest(g.Namespace, "").
+		ObjectMeta(
+			builder.WithGenerateName("velero-cli-"),
+		).Result()
 
 	created, err := client.ServerStatusRequests(g.Namespace).Create(req)
 	if err != nil {
