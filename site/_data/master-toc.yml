@@ -13,8 +13,6 @@ toc:
     subfolderitems:
       - page: Overview
         url: /install-overview
-      - page: Upgrade to 1.0
-        url: /upgrade-to-1.0
       - page: Quick Start with In-Cluster Minio
         url: /get-started
       - page: Run on AWS
