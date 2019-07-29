@@ -94,3 +94,10 @@ func WithUID(val string) func(obj metav1.Object) {
 		obj.SetUID(types.UID(val))
 	}
 }
+
+// WithGenerateName is a functional option that applies the specified generate name to an object.
+func WithGenerateName(val string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetGenerateName(val)
+	}
+}
