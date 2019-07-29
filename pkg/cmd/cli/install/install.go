@@ -164,6 +164,8 @@ This is useful as a starting point for more customized installations.
 
 	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --secret-file ./an-empty-file --snapshot-location-config region=us-west-2 --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
 
+	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
+
 		`,
 		Run: func(c *cobra.Command, args []string) {
 			cmd.CheckError(o.Validate(c, args, f))
