@@ -29,6 +29,10 @@ toc:
         url: /disaster-case
       - page: Cluster migration
         url: /migration-case
+      - page: Backup reference
+        url: /backup-reference
+      - page: Restore reference
+        url: /restore-reference
   - title: Troubleshoot
     subfolderitems:
       - page: Troubleshooting
