@@ -13,7 +13,7 @@ toc:
     subfolderitems:
       - page: Overview
         url: /install-overview
-      - page: Quick Start with In-Cluster Minio
+      - page: Quick start with in-cluster MinIO
         url: /get-started
       - page: Run on AWS
         url: /aws-config
@@ -21,11 +21,11 @@ toc:
         url: /azure-config
       - page: Run on GCP
         url: /gcp-config
-      - page: Restic Setup
+      - page: Restic setup
         url: /restic
   - title: Use
     subfolderitems:
-      - page: Disaster Recovery
+      - page: Disaster recovery
         url: /disaster-case
       - page: Cluster migration
         url: /migration-case
@@ -39,7 +39,7 @@ toc:
         url: /debugging-restores
       - page: Troubleshoot Restic
         url: /restic#troubleshooting
-  - title: Customize Velero
+  - title: Customize
     subfolderitems:
       - page: Build from source
         url: /build-from-source
