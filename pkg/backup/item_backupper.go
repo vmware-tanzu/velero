@@ -161,6 +161,8 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 	ib.backedUpItems[key] = struct{}{}
 
+	log.Debug(obj.GetObjectKind().GroupVersionKind().GroupVersion().String() + "/" + obj.GetObjectKind().GroupVersionKind().Kind)
+
 	log.Info("Backing up item")
 
 	log.Debug("Executing pre hooks")
