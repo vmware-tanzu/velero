@@ -48,7 +48,7 @@ v1/PersistentVolume:
 - my-pv
 ```
 
-The filename for this metadata will be `<backup name>-resource-list.json`.
+The filename for this metadata will be `<backup name>-resource-list.json.gz`.
 The top-level key is the string form of the `schema.GroupResource` type that we currently keep track of in the backup controller code path.
 
 ### Changes in Backup controller
