@@ -32,6 +32,7 @@ type podTemplateConfig struct {
 	envVars                  []corev1.EnvVar
 	restoreOnly              bool
 	annotations              map[string]string
+	resources                corev1.ResourceRequirements
 }
 
 func WithImage(image string) podTemplateOption {
@@ -71,6 +72,12 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 func WithRestoreOnly() podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.restoreOnly = true
+	}
+}
+
+func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.resources = resources
 	}
 }
 
@@ -150,6 +157,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									Value: "/credentials/cloud",
 								},
 							},
+							Resources: c.resources,
 						},
 					},
 					Volumes: []corev1.Volume{

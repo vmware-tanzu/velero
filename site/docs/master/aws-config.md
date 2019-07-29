@@ -161,6 +161,8 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify [additional configurable parameters][6] for the `--snapshot-location-config` flag.
 
+(Optional) Specify [CPU and memory resource requests and limits][22] for the Velero pod.
+
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
 ## Setting AWS_CLUSTER_NAME (Optional)
@@ -303,3 +305,4 @@ Note that the `--secret-file` argument is required, but it can be an empty file.
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
 [20]: faq.md
 [21]: api-types/backupstoragelocation.md#aws
+[22]: install-overview.md#velero-resource-requirements

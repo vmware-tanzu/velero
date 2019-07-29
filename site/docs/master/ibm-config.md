@@ -70,6 +70,8 @@ Velero does not currently have a volume snapshot plugin for IBM Cloud, so creati
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
+(Optional) Specify [CPU and memory resource requests and limits][15] for the Velero pod.
+
 Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
 
 ```bash
@@ -92,3 +94,4 @@ Uncomment `storageClassName: <YOUR_STORAGE_CLASS_NAME>` and replace with your `S
 [5]: https://console.bluemix.net/docs/containers/container_index.html#container_index
 [6]: api-types/backupstoragelocation.md#aws
 [14]: http://docs.aws.amazon.com/IAM/latest/UserGuide/introduction.html
+[15]: install-overview.md#velero-resource-requirements
