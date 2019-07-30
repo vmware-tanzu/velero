@@ -656,7 +656,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 					StorageType: velerov1api.StorageType{
 						ObjectStorage: &velerov1api.ObjectStorageLocation{
 							Bucket: "bucket",
-							Prefix: "/prefix/",
+							Prefix: "prefix",
 						},
 					},
 				},
