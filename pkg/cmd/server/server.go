@@ -119,6 +119,7 @@ type serverConfig struct {
 	clientQPS                                                               float32
 	clientBurst                                                             int
 	profilerAddress                                                         string
+	formatFlag                                                              *logging.FormatFlag
 }
 
 type controllerRunInfo struct {
@@ -143,6 +144,7 @@ func NewCommand() *cobra.Command {
 			clientBurst:                    defaultClientBurst,
 			profilerAddress:                defaultProfilerAddress,
 			resourceTerminatingTimeout:     defaultResourceTerminatingTimeout,
+			formatFlag:                     logging.NewFormatFlag(),
 		}
 	)
 
@@ -157,12 +159,16 @@ func NewCommand() *cobra.Command {
 			log.SetOutput(os.Stdout)
 
 			logLevel := logLevelFlag.Parse()
+			format := config.formatFlag.Parse()
+
 			// Make sure we log to stdout so cloud log dashboards don't show this as an error.
 			logrus.SetOutput(os.Stdout)
-			logrus.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			// Velero's DefaultLogger logs to stdout, so all is good there.
-			logger := logging.DefaultLogger(logLevel)
+			logger := logging.DefaultLogger(logLevel, format)
+
+			logger.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
+
 			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
 			// NOTE: the namespace flag is bound to velero's persistent flags when the root velero command
@@ -191,6 +197,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	command.Flags().Var(logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(logLevelFlag.AllowedValues(), ", ")))
+	command.Flags().Var(config.formatFlag, "log-format", fmt.Sprintf("the format for log output. Valid values are %s.", strings.Join(config.formatFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Velero plugins")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "the address to expose prometheus metrics")
 	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster")
@@ -602,6 +609,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
+			s.config.formatFlag.Parse(),
 		)
 
 		return controllerRunInfo{
@@ -692,6 +700,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			newPluginManager,
 			s.config.defaultBackupLocation,
 			s.metrics,
+			s.config.formatFlag.Parse(),
 		)
 
 		return controllerRunInfo{

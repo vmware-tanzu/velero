@@ -47,6 +47,7 @@ import (
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	pkgrestore "github.com/heptio/velero/pkg/restore"
+	"github.com/heptio/velero/pkg/util/logging"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
@@ -85,6 +86,8 @@ func TestFetchBackupInfo(t *testing.T) {
 		},
 	}
 
+	formatFlag := logging.FormatText
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
@@ -113,6 +116,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
+				formatFlag,
 			).(*restoreController)
 
 			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -183,6 +187,8 @@ func TestProcessQueueItemSkips(t *testing.T) {
 		},
 	}
 
+	formatFlag := logging.FormatText
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
@@ -206,6 +212,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				nil,
 				"default",
 				metrics.NewServerMetrics(),
+				formatFlag,
 			).(*restoreController)
 
 			if test.restore != nil {
@@ -378,6 +385,8 @@ func TestProcessQueueItem(t *testing.T) {
 		},
 	}
 
+	formatFlag := logging.FormatText
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
@@ -406,6 +415,7 @@ func TestProcessQueueItem(t *testing.T) {
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				"default",
 				metrics.NewServerMetrics(),
+				formatFlag,
 			).(*restoreController)
 
 			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
@@ -607,6 +617,8 @@ func TestProcessQueueItem(t *testing.T) {
 }
 
 func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
+	formatFlag := logging.FormatText
+
 	var (
 		client          = fake.NewSimpleClientset()
 		sharedInformers = informers.NewSharedInformerFactory(client, 0)
@@ -628,6 +640,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		nil,
 		"default",
 		nil,
+		formatFlag,
 	).(*restoreController)
 
 	restore := &api.Restore{
@@ -705,7 +718,6 @@ func TestBackupXorScheduleProvided(t *testing.T) {
 	r.Spec.BackupName = ""
 	r.Spec.ScheduleName = "schedule-1"
 	assert.True(t, backupXorScheduleProvided(r))
-
 }
 
 func TestMostRecentCompletedBackup(t *testing.T) {

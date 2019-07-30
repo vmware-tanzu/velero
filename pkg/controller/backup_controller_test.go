@@ -98,14 +98,16 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
 			var (
 				sharedInformers = informers.NewSharedInformerFactory(fake.NewSimpleClientset(), 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
 			c := &backupController{
 				genericController: newGenericController("backup-test", logger),
 				lister:            sharedInformers.Velero().V1().Backups().Lister(),
+				formatFlag:        formatFlag,
 			}
 
 			if test.backup != nil {
@@ -159,10 +161,11 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
 			c := &backupController{
@@ -173,6 +176,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				clock:                  &clock.RealClock{},
+				formatFlag:             formatFlag,
 			}
 
 			require.NotNil(t, test.backup)
@@ -225,10 +229,12 @@ func TestBackupLocationLabel(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
+
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
 			c := &backupController{
@@ -239,6 +245,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  test.backupLocation.Name,
 				clock:                  &clock.RealClock{},
+				formatFlag:             formatFlag,
 			}
 
 			res := c.prepareBackupRequest(test.backup)
@@ -279,9 +286,10 @@ func TestDefaultBackupTTL(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		formatFlag := logging.FormatText
 		var (
 			clientset       = fake.NewSimpleClientset(test.backup)
-			logger          = logging.DefaultLogger(logrus.DebugLevel)
+			logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 		)
 
@@ -292,6 +300,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
 				clock:                  clock.NewFakeClock(now),
+				formatFlag:             formatFlag,
 			}
 
 			res := c.prepareBackupRequest(test.backup)
@@ -528,10 +537,11 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			formatFlag := logging.FormatText
 			var (
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
-				logger          = logging.DefaultLogger(logrus.DebugLevel)
+				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 				pluginManager   = new(pluginmocks.Manager)
 				backupStore     = new(persistencemocks.BackupStore)
 				backupper       = new(fakeBackupper)
@@ -551,7 +561,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 				newBackupStore: func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStore, nil
 				},
-				backupper: backupper,
+				backupper:  backupper,
+				formatFlag: formatFlag,
 			}
 
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)

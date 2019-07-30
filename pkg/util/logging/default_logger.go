@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,9 +32,13 @@ func DefaultHooks() []logrus.Hook {
 }
 
 // DefaultLogger returns a Logger with the default properties
-// and hooks.
-func DefaultLogger(level logrus.Level) *logrus.Logger {
+// and hooks. The desired output format is passed as a LogFormat Enum.
+func DefaultLogger(level logrus.Level, format Format) *logrus.Logger {
 	logger := logrus.New()
+
+	if format == FormatJSON {
+		logger.Formatter = new(logrus.JSONFormatter)
+	}
 
 	// Make sure the output is set to stdout so log messages don't show up as errors in cloud log dashboards.
 	logger.Out = os.Stdout
