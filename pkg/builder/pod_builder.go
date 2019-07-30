@@ -63,3 +63,9 @@ func (b *PodBuilder) Volumes(volumes ...*corev1api.Volume) *PodBuilder {
 	}
 	return b
 }
+
+// NodeName sets the pod's node name
+func (b *PodBuilder) NodeName(val string) *PodBuilder {
+	b.object.Spec.NodeName = val
+	return b
+}

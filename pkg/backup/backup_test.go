@@ -71,8 +71,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -93,8 +93,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -113,8 +113,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -133,8 +133,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -153,8 +153,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -173,16 +173,16 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
 					test.NewDeployment("zoo", "raz"),
 				),
 				test.PVs(
-					test.NewPV("bar"),
-					test.NewPV("baz"),
+					builder.ForPersistentVolume("bar").Result(),
+					builder.ForPersistentVolume("baz").Result(),
 				),
 			},
 			want: []string{
@@ -199,8 +199,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar", test.WithLabels("a", "b")),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -223,8 +223,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true")),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -248,8 +248,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
-					test.NewPod("zoo", "raz", test.WithLabels("a", "b")),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")).Result(),
+					builder.ForPod("zoo", "raz").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -271,8 +271,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "false")),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "false")).Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -300,9 +300,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -324,9 +324,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -345,9 +345,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -366,9 +366,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -390,9 +390,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -411,9 +411,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-1"),
-					test.NewPod("ns-3", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-1").Result(),
+					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -435,8 +435,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -457,8 +457,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -479,8 +479,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -499,8 +499,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
 					test.NewDeployment("foo", "bar"),
@@ -517,8 +517,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns-2", Name: "pod-2", DeletionTimestamp: &metav1.Time{Time: time.Now()}}},
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
 				),
 			},
 			want: []string{
@@ -657,8 +657,8 @@ func TestBackupResourceOrdering(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVCs(
 					test.NewPVC("foo", "bar"),
@@ -760,8 +760,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -778,8 +778,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -796,8 +796,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -814,8 +814,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVCs(
 					test.NewPVC("ns-1", "pvc-1"),
@@ -840,8 +840,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -858,8 +858,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -877,7 +877,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 				test.PVCs(
 					test.NewPVC("ns-2", "pvc-2"),
@@ -940,8 +940,8 @@ func TestBackupWithInvalidActions(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVs(
 					test.NewPV("bar"),
@@ -958,8 +958,8 @@ func TestBackupWithInvalidActions(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
-					test.NewPod("zoo", "raz"),
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVs(
 					test.NewPV("bar"),
@@ -1036,7 +1036,7 @@ func TestBackupActionModifications(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1045,7 +1045,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, test.NewPod("ns-1", "pod-1", test.WithLabels("updated", "true"))),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("updated", "true")).Result()),
 			},
 		},
 		{
@@ -1053,7 +1053,7 @@ func TestBackupActionModifications(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1", test.WithLabels("should-be-removed", "true")),
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("should-be-removed", "true")).Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1062,7 +1062,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, test.NewPod("ns-1", "pod-1")),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").Result()),
 			},
 		},
 		{
@@ -1070,7 +1070,7 @@ func TestBackupActionModifications(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1079,7 +1079,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, &corev1.Pod{TypeMeta: metav1.TypeMeta{Kind: "Pod", APIVersion: "v1"}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1", Name: "pod-1"}, Spec: corev1.PodSpec{NodeName: "foo"}}),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").NodeName("foo").Result()),
 			},
 		},
 		{
@@ -1088,7 +1088,7 @@ func TestBackupActionModifications(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1098,7 +1098,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, test.NewPod("ns-1-updated", "pod-1-updated")),
+				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, builder.ForPod("ns-1-updated", "pod-1-updated").Result()),
 			},
 		},
 	}
@@ -1141,9 +1141,9 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
-					test.NewPod("ns-3", "pod-3"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1170,9 +1170,9 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
-					test.NewPod("ns-3", "pod-3"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1196,8 +1196,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -1227,7 +1227,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().IncludedResources("pods").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -1255,8 +1255,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().IncludeClusterResources(false).Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -1285,9 +1285,9 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
-					test.NewPod("ns-3", "pod-3"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1737,7 +1737,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("foo", "bar"),
+					builder.ForPod("foo", "bar").Result(),
 				),
 			},
 			want: errors.New("\"nonexistent-operator\" is not a valid pod selector operator"),
@@ -1801,8 +1801,8 @@ func TestBackupWithHooks(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1850,8 +1850,8 @@ func TestBackupWithHooks(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1906,7 +1906,7 @@ func TestBackupWithHooks(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
+					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -1954,8 +1954,8 @@ func TestBackupWithHooks(t *testing.T) {
 				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1"),
-					test.NewPod("ns-2", "pod-2"),
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 			},
 			wantExecutePodCommandCalls: []*expectedCall{
@@ -2056,7 +2056,7 @@ func TestBackupWithRestic(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1", test.WithAnnotations("backup.velero.io/backup-volumes", "foo")),
+					builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).Result(),
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{
