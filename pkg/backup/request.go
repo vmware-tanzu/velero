@@ -6,6 +6,12 @@ import (
 	"github.com/heptio/velero/pkg/volume"
 )
 
+type itemKey struct {
+	resource  string
+	namespace string
+	name      string
+}
+
 // Request is a request for a backup, with all references to other objects
 // materialized (e.g. backup/snapshot locations, includes/excludes, etc.)
 type Request struct {
@@ -20,4 +26,5 @@ type Request struct {
 
 	VolumeSnapshots  []*volume.Snapshot
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
+	BackedUpItems    map[itemKey]struct{}
 }

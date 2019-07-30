@@ -37,7 +37,6 @@ type groupBackupperFactory interface {
 		backupRequest *Request,
 		dynamicFactory client.DynamicFactory,
 		discoveryHelper discovery.Helper,
-		backedUpItems map[itemKey]struct{},
 		cohabitatingResources map[string]*cohabitatingResource,
 		podCommandExecutor podexec.PodCommandExecutor,
 		tarWriter tarWriter,
@@ -54,7 +53,6 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 	backupRequest *Request,
 	dynamicFactory client.DynamicFactory,
 	discoveryHelper discovery.Helper,
-	backedUpItems map[itemKey]struct{},
 	cohabitatingResources map[string]*cohabitatingResource,
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
@@ -67,7 +65,6 @@ func (f *defaultGroupBackupperFactory) newGroupBackupper(
 		backupRequest:           backupRequest,
 		dynamicFactory:          dynamicFactory,
 		discoveryHelper:         discoveryHelper,
-		backedUpItems:           backedUpItems,
 		cohabitatingResources:   cohabitatingResources,
 		podCommandExecutor:      podCommandExecutor,
 		tarWriter:               tarWriter,
@@ -88,7 +85,6 @@ type defaultGroupBackupper struct {
 	backupRequest            *Request
 	dynamicFactory           client.DynamicFactory
 	discoveryHelper          discovery.Helper
-	backedUpItems            map[itemKey]struct{}
 	cohabitatingResources    map[string]*cohabitatingResource
 	podCommandExecutor       podexec.PodCommandExecutor
 	tarWriter                tarWriter
@@ -120,7 +116,6 @@ func (gb *defaultGroupBackupper) backupGroup(group *metav1.APIResourceList) erro
 		gb.backupRequest,
 		gb.dynamicFactory,
 		gb.discoveryHelper,
-		gb.backedUpItems,
 		gb.cohabitatingResources,
 		gb.podCommandExecutor,
 		gb.tarWriter,
