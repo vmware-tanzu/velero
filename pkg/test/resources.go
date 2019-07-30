@@ -19,7 +19,6 @@ package test
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -136,22 +135,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 }
 
 type ObjectOpts func(metav1.Object)
-
-func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
-	obj := &corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Namespace",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta("", name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
 
 func NewStorageClass(name string, opts ...ObjectOpts) *storagev1.StorageClass {
 	obj := &storagev1.StorageClass{

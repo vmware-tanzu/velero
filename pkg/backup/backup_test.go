@@ -826,8 +826,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPersistentVolume("pv-2").Result(),
 				),
 				test.Namespaces(
-					test.NewNamespace("ns-1"),
-					test.NewNamespace("ns-2"),
+					builder.ForNamespace("ns-1").Result(),
+					builder.ForNamespace("ns-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{

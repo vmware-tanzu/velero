@@ -1478,7 +1478,7 @@ func TestShouldRestore(t *testing.T) {
 				),
 				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
-			namespaces: []*corev1api.Namespace{test.NewNamespace("ns-1")},
+			namespaces: []*corev1api.Namespace{builder.ForNamespace("ns-1").Result()},
 			want:       false,
 		},
 		{
@@ -1505,13 +1505,7 @@ func TestShouldRestore(t *testing.T) {
 				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			namespaces: []*corev1api.Namespace{
-				{
-					TypeMeta:   test.NewNamespace("").TypeMeta,
-					ObjectMeta: test.NewNamespace("ns-1").ObjectMeta,
-					Status: corev1api.NamespaceStatus{
-						Phase: corev1api.NamespaceTerminating,
-					},
-				},
+				builder.ForNamespace("ns-1").Phase(corev1api.NamespaceTerminating).Result(),
 			},
 			want:    false,
 			wantErr: errors.New("timed out waiting for the condition"),
@@ -1526,7 +1520,7 @@ func TestShouldRestore(t *testing.T) {
 				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			namespaces: []*corev1api.Namespace{
-				test.NewNamespace("ns-1", test.WithDeletionTimestamp(time.Now())),
+				builder.ForNamespace("ns-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
 			},
 			want:    false,
 			wantErr: errors.New("timed out waiting for the condition"),
