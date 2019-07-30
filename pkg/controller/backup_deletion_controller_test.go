@@ -424,9 +424,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
-		restore1 := velerotest.NewTestRestore("velero", "restore-1", v1.RestorePhaseCompleted).WithBackup("foo").Restore
-		restore2 := velerotest.NewTestRestore("velero", "restore-2", v1.RestorePhaseCompleted).WithBackup("foo").Restore
-		restore3 := velerotest.NewTestRestore("velero", "restore-3", v1.RestorePhaseCompleted).WithBackup("some-other-backup").Restore
+		restore1 := builder.ForRestore("velero", "restore-1").Phase(v1.RestorePhaseCompleted).Backup("foo").Result()
+		restore2 := builder.ForRestore("velero", "restore-2").Phase(v1.RestorePhaseCompleted).Backup("foo").Result()
+		restore3 := builder.ForRestore("velero", "restore-3").Phase(v1.RestorePhaseCompleted).Backup("some-other-backup").Result()
 
 		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
 
@@ -570,12 +570,18 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
-		restore1 := velerotest.NewTestRestore("velero", "restore-1", v1.RestorePhaseCompleted).
-			WithBackup("the-really-long-backup-name-that-is-much-more-than-63-characters").Restore
-		restore2 := velerotest.NewTestRestore("velero", "restore-2", v1.RestorePhaseCompleted).
-			WithBackup("the-really-long-backup-name-that-is-much-more-than-63-characters").Restore
-		restore3 := velerotest.NewTestRestore("velero", "restore-3", v1.RestorePhaseCompleted).
-			WithBackup("some-other-backup").Restore
+		restore1 := builder.ForRestore("velero", "restore-1").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("the-really-long-backup-name-that-is-much-more-than-63-characters").
+			Result()
+		restore2 := builder.ForRestore("velero", "restore-2").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("the-really-long-backup-name-that-is-much-more-than-63-characters").
+			Result()
+		restore3 := builder.ForRestore("velero", "restore-3").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("some-other-backup").
+			Result()
 
 		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
 		td.req = pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))

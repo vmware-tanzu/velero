@@ -63,27 +63,33 @@ func (b *RestoreBuilder) Backup(name string) *RestoreBuilder {
 	return b
 }
 
-// IncludedNamespaces sets the Restore's included namespaces.
+// Schedule sets the Restore's schedule name.
+func (b *RestoreBuilder) Schedule(name string) *RestoreBuilder {
+	b.object.Spec.ScheduleName = name
+	return b
+}
+
+// IncludedNamespaces appends to the Restore's included namespaces.
 func (b *RestoreBuilder) IncludedNamespaces(namespaces ...string) *RestoreBuilder {
-	b.object.Spec.IncludedNamespaces = namespaces
+	b.object.Spec.IncludedNamespaces = append(b.object.Spec.IncludedNamespaces, namespaces...)
 	return b
 }
 
-// ExcludedNamespaces sets the Restore's excluded namespaces.
+// ExcludedNamespaces appends to the Restore's excluded namespaces.
 func (b *RestoreBuilder) ExcludedNamespaces(namespaces ...string) *RestoreBuilder {
-	b.object.Spec.ExcludedNamespaces = namespaces
+	b.object.Spec.ExcludedNamespaces = append(b.object.Spec.ExcludedNamespaces, namespaces...)
 	return b
 }
 
-// IncludedResources sets the Restore's included resources.
+// IncludedResources appends to the Restore's included resources.
 func (b *RestoreBuilder) IncludedResources(resources ...string) *RestoreBuilder {
-	b.object.Spec.IncludedResources = resources
+	b.object.Spec.IncludedResources = append(b.object.Spec.IncludedResources, resources...)
 	return b
 }
 
-// ExcludedResources sets the Restore's excluded resources.
+// ExcludedResources appends to the Restore's excluded resources.
 func (b *RestoreBuilder) ExcludedResources(resources ...string) *RestoreBuilder {
-	b.object.Spec.ExcludedResources = resources
+	b.object.Spec.ExcludedResources = append(b.object.Spec.ExcludedResources, resources...)
 	return b
 }
 
@@ -113,5 +119,17 @@ func (b *RestoreBuilder) NamespaceMappings(mapping ...string) *RestoreBuilder {
 		b.object.Spec.NamespaceMapping[mapping[i]] = mapping[i+1]
 	}
 
+	return b
+}
+
+// Phase sets the Restore's phase.
+func (b *RestoreBuilder) Phase(phase velerov1api.RestorePhase) *RestoreBuilder {
+	b.object.Status.Phase = phase
+	return b
+}
+
+// RestorePVs sets the Restore's restore PVs.
+func (b *RestoreBuilder) RestorePVs(val bool) *RestoreBuilder {
+	b.object.Spec.RestorePVs = &val
 	return b
 }

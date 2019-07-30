@@ -27,6 +27,7 @@ import (
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/builder"
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
@@ -53,40 +54,40 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:        "no name should error",
 			obj:         NewTestUnstructured().WithMetadata().Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().Restore,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").Result(),
 			expectedErr: true,
 		},
 		{
 			name:        "no spec should error",
 			obj:         NewTestUnstructured().WithName("pv-1").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().Restore,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").Result(),
 			expectedErr: true,
 		},
 		{
 			name:        "ensure spec.claimRef is deleted",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).Backup(),
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("someOtherField").Unstructured,
 		},
 		{
 			name:        "ensure spec.storageClassName is retained",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).Backup(),
 			expectedRes: NewTestUnstructured().WithAnnotations("a", "b").WithName("pv-1").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:        "if backup.spec.snapshotVolumes is false, ignore restore.spec.restorePVs and return early",
 			obj:         NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("claimRef", "storageClassName", "someOtherField").Unstructured,
-			restore:     velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			restore:     builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:      defaultBackup().Phase(api.BackupPhaseInProgress).SnapshotVolumes(false).Backup(),
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithAnnotations("a", "b").WithSpec("storageClassName", "someOtherField").Unstructured,
 		},
 		{
 			name:    "restore.spec.restorePVs=false, return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(false).Restore,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:  defaultBackup().Phase(api.BackupPhaseInProgress).Backup(),
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
@@ -100,7 +101,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:    "volumeSnapshots is empty: return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
 				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
@@ -112,7 +113,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		{
 			name:    "volumeSnapshots doesn't have a snapshot for PV: return early",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
 				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
@@ -178,7 +179,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		{
 			name:    "backup with a matching volume.Snapshot for PV executes restore",
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
-			restore: velerotest.NewDefaultTestRestore().WithRestorePVs(true).Restore,
+			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
 				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,

@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/persistence"
@@ -152,7 +153,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:            "restore log request for nonexistent restore returns an error",
 			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         velerotest.NewTestRestore(v1.DefaultNamespace, "non-matching-restore", v1.RestorePhaseCompleted).WithBackup("a-backup").Restore,
+			restore:         builder.ForRestore(v1.DefaultNamespace, "non-matching-restore").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup().Name("a-backup").StorageLocation("a-location").Backup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectedErr:     "error getting Restore: restore.velero.io \"a-backup-20170912150214\" not found",
@@ -195,7 +196,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:            "restore log request with phase '' gets a url",
 			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         velerotest.NewTestRestore(v1.DefaultNamespace, "a-backup-20170912150214", v1.RestorePhaseCompleted).WithBackup("a-backup").Restore,
+			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup().Name("a-backup").StorageLocation("a-location").Backup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
@@ -203,7 +204,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:            "restore log request with phase 'New' gets a url",
 			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindRestoreLog, "a-backup-20170912150214"),
-			restore:         velerotest.NewTestRestore(v1.DefaultNamespace, "a-backup-20170912150214", v1.RestorePhaseCompleted).WithBackup("a-backup").Restore,
+			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup().Name("a-backup").StorageLocation("a-location").Backup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
@@ -211,7 +212,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:            "restore results request with phase '' gets a url",
 			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
-			restore:         velerotest.NewTestRestore(v1.DefaultNamespace, "a-backup-20170912150214", v1.RestorePhaseCompleted).WithBackup("a-backup").Restore,
+			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup().Name("a-backup").StorageLocation("a-location").Backup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
@@ -219,7 +220,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		{
 			name:            "restore results request with phase 'New' gets a url",
 			downloadRequest: newDownloadRequest(v1.DownloadRequestPhaseNew, v1.DownloadTargetKindRestoreResults, "a-backup-20170912150214"),
-			restore:         velerotest.NewTestRestore(v1.DefaultNamespace, "a-backup-20170912150214", v1.RestorePhaseCompleted).WithBackup("a-backup").Restore,
+			restore:         builder.ForRestore(v1.DefaultNamespace, "a-backup-20170912150214").Phase(v1.RestorePhaseCompleted).Backup("a-backup").Result(),
 			backup:          defaultBackup().Name("a-backup").StorageLocation("a-location").Backup(),
 			backupLocation:  newBackupLocation("a-location", "a-provider", "a-bucket"),
 			expectGetsURL:   true,
