@@ -19,6 +19,7 @@ package backup
 import (
 	"archive/tar"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -145,8 +146,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		log.Info("Skipping item because it's being deleted.")
 		return nil
 	}
+
 	key := itemKey{
-		resource:  groupResource.String(),
+		resource:  resourceKey(obj),
 		namespace: namespace,
 		name:      name,
 	}
@@ -156,8 +158,6 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return nil
 	}
 	ib.backupRequest.BackedUpItems[key] = struct{}{}
-
-	log.Debug(obj.GetObjectKind().GroupVersionKind().GroupVersion().String() + "/" + obj.GetObjectKind().GroupVersionKind().Kind)
 
 	log.Info("Backing up item")
 
@@ -480,4 +480,11 @@ func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, lo
 			Phase: volume.SnapshotPhaseNew,
 		},
 	}
+}
+
+// resourceKey returns a string representing the object's GroupVersionKind (e.g.
+// apps/v1/Deployment).
+func resourceKey(obj runtime.Unstructured) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return fmt.Sprintf("%s/%s", gvk.GroupVersion().String(), gvk.Kind)
 }
