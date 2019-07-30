@@ -67,7 +67,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 	var expected []string
 
 	for i := 0; i < 3; i++ {
-		backup := defaultBackup().Name(fmt.Sprintf("backup-%d", i)).Backup()
+		backup := builder.ForBackup(api.DefaultNamespace, fmt.Sprintf("backup-%d", i)).Result()
 		sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(backup)
 		expected = append(expected, kube.NamespaceAndName(backup))
 	}
@@ -98,7 +98,7 @@ Loop:
 }
 
 func TestGCControllerHasUpdateFunc(t *testing.T) {
-	backup := defaultBackup().Backup()
+	backup := defaultBackup().Result()
 	expected := kube.NamespaceAndName(backup)
 
 	client := fake.NewSimpleClientset(backup)
@@ -168,31 +168,31 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		},
 		{
 			name:           "unexpired backup is not deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(time.Minute)).StorageLocation("default").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(time.Minute)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
 			expectDeletion: false,
 		},
 		{
 			name:           "expired backup in read-only storage location is not deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Result(),
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectDeletion: false,
 		},
 		{
 			name:           "expired backup in read-write storage location is deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Result(),
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(api.BackupStorageLocationAccessModeReadWrite).Result(),
 			expectDeletion: true,
 		},
 		{
 			name:           "expired backup with no pending deletion requests is deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
 			expectDeletion: true,
 		},
 		{
 			name:           "expired backup with a pending deletion request is not deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
 			deleteBackupRequests: []*api.DeleteBackupRequest{
 				{
@@ -213,7 +213,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		},
 		{
 			name:           "expired backup with only processed deletion requests is deleted",
-			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Backup(),
+			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation: defaultBackupLocation,
 			deleteBackupRequests: []*api.DeleteBackupRequest{
 				{
@@ -234,7 +234,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		},
 		{
 			name:                           "create DeleteBackupRequest error returns an error",
-			backup:                         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Backup(),
+			backup:                         defaultBackup().Expiration(fakeClock.Now().Add(-time.Second)).StorageLocation("default").Result(),
 			backupLocation:                 defaultBackupLocation,
 			expectDeletion:                 true,
 			createDeleteBackupRequestError: true,

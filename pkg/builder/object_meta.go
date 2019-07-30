@@ -26,6 +26,14 @@ import (
 // ObjectMetaOpt is a functional option for ObjectMeta.
 type ObjectMetaOpt func(metav1.Object)
 
+// WithName is a functional option that applies the specified
+// name to an object.
+func WithName(val string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		obj.SetName(val)
+	}
+}
+
 // WithLabels is a functional option that applies the specified
 // label keys/values to an object.
 func WithLabels(vals ...string) func(obj metav1.Object) {

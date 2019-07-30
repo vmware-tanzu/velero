@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	"github.com/heptio/velero/pkg/kuberesource"
@@ -67,7 +68,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 	}{
 		{
 			name:   "no filters backs up everything",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -89,7 +90,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "included resources filter only backs up resources of those types",
 			backup: defaultBackup().
 				IncludedResources("pods").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -109,7 +110,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "excluded resources filter only backs up resources not of those types",
 			backup: defaultBackup().
 				ExcludedResources("deployments").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -129,7 +130,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "included namespaces filter only backs up resources in those namespaces",
 			backup: defaultBackup().
 				IncludedNamespaces("foo").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -149,7 +150,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "excluded namespaces filter only backs up resources not in those namespaces",
 			backup: defaultBackup().
 				ExcludedNamespaces("zoo").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -169,7 +170,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "IncludeClusterResources=false only backs up namespaced resources",
 			backup: defaultBackup().
 				IncludeClusterResources(false).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -195,7 +196,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "label selector only backs up matching resources",
 			backup: defaultBackup().
 				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar", test.WithLabels("a", "b")),
@@ -219,7 +220,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "resources with velero.io/exclude-from-backup=true label are not included",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true")),
@@ -244,7 +245,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "resources with velero.io/exclude-from-backup=true label are not included even if matching label selector",
 			backup: defaultBackup().
 				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
@@ -267,7 +268,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "resources with velero.io/exclude-from-backup label specified but not 'true' are included",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar", test.WithLabels("velero.io/exclude-from-backup", "false")),
@@ -296,7 +297,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(true).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -320,7 +321,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
 				IncludeClusterResources(false).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -341,7 +342,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should not include cluster-scoped resource if backing up subset of namespaces and IncludeClusterResources=nil",
 			backup: defaultBackup().
 				IncludedNamespaces("ns-1", "ns-2").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -362,7 +363,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=true",
 			backup: defaultBackup().
 				IncludeClusterResources(true).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -386,7 +387,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "should not include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=false",
 			backup: defaultBackup().
 				IncludeClusterResources(false).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -407,7 +408,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		{
 			name: "should include cluster-scoped resources if backing up all namespaces and IncludeClusterResources=nil",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -431,7 +432,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "when a wildcard and a specific resource are included, the wildcard takes precedence",
 			backup: defaultBackup().
 				IncludedResources("*", "pods").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -453,7 +454,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "wildcard excludes are ignored",
 			backup: defaultBackup().
 				ExcludedResources("*").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -475,7 +476,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "unresolvable included resources are ignored",
 			backup: defaultBackup().
 				IncludedResources("pods", "unresolvable").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -495,7 +496,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			name: "unresolvable excluded resources are ignored",
 			backup: defaultBackup().
 				ExcludedResources("deployments", "unresolvable").
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -513,7 +514,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 		},
 		{
 			name:   "terminating resources are not backed up",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -558,7 +559,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 	}{
 		{
 			name:   "when deployments exist only in extensions, they're backed up",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.ExtensionsDeployments(
 					test.NewDeployment("foo", "bar"),
@@ -572,7 +573,7 @@ func TestBackupResourceCohabitation(t *testing.T) {
 		},
 		{
 			name:   "when deployments exist in both apps and extensions, only apps/deployments are backed up",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.ExtensionsDeployments(
 					test.NewDeployment("foo", "bar"),
@@ -618,7 +619,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	// run and verify backup 1
 	backup1 := &Request{
-		Backup: defaultBackup().Backup(),
+		Backup: defaultBackup().Result(),
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
@@ -631,7 +632,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	// run and verify backup 2
 	backup2 := &Request{
-		Backup: defaultBackup().Backup(),
+		Backup: defaultBackup().Result(),
 	}
 	backup2File := bytes.NewBuffer([]byte{})
 
@@ -653,7 +654,7 @@ func TestBackupResourceOrdering(t *testing.T) {
 			name: "core API group: pods come before pvcs, pvcs come before pvs, pvs come before anything else",
 			backup: defaultBackup().
 				SnapshotVolumes(false).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -756,7 +757,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "single action with no selector runs for all items",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -774,7 +775,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "single action with a resource selector for namespaced resources runs only for matching resources",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -792,7 +793,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "single action with a resource selector for cluster-scoped resources runs only for matching resources",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -810,7 +811,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "single action with a namespace selector runs only for resources in that namespace",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -836,7 +837,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "single action with a resource and namespace selector runs only for matching resources",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -854,7 +855,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "multiple actions, each with a different resource selector using short name, run for matching resources",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -873,7 +874,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 		{
 			name: "actions with selectors that don't match anything don't run for any resources",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -936,7 +937,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 		{
 			name: "action with invalid label selector results in an error",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -954,7 +955,7 @@ func TestBackupWithInvalidActions(t *testing.T) {
 		{
 			name: "action returning an error from AppliesTo results in an error",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -1032,7 +1033,7 @@ func TestBackupActionModifications(t *testing.T) {
 	}{
 		{
 			name:   "action that adds a label to item gets persisted",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1049,7 +1050,7 @@ func TestBackupActionModifications(t *testing.T) {
 		},
 		{
 			name:   "action that removes labels from item gets persisted",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1", test.WithLabels("should-be-removed", "true")),
@@ -1066,7 +1067,7 @@ func TestBackupActionModifications(t *testing.T) {
 		},
 		{
 			name:   "action that sets a spec field on item gets persisted",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1084,7 +1085,7 @@ func TestBackupActionModifications(t *testing.T) {
 		{
 			name: "modifications to name and namespace in an action are persisted in JSON and in filename",
 			backup: defaultBackup().
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1137,7 +1138,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 	}{
 		{
 			name:   "additional items that are already being backed up are not backed up twice",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1166,7 +1167,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 		{
 			name:   "when using a backup namespace filter, additional items that are in a non-included namespace are not backed up",
-			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
+			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1192,7 +1193,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 		{
 			name:   "when using a backup namespace filter, additional items that are cluster-scoped are backed up",
-			backup: defaultBackup().IncludedNamespaces("ns-1").Backup(),
+			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1223,7 +1224,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 		{
 			name:   "when using a backup resource filter, additional items that are non-included resources are not backed up",
-			backup: defaultBackup().IncludedResources("pods").Backup(),
+			backup: defaultBackup().IncludedResources("pods").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1251,7 +1252,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 		{
 			name:   "when IncludeClusterResources=false, additional items that are cluster-scoped are not backed up",
-			backup: defaultBackup().IncludeClusterResources(false).Backup(),
+			backup: defaultBackup().IncludeClusterResources(false).Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1281,7 +1282,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 		{
 			name:   "if there's an error backing up additional items, the item the action was run for isn't backed up",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1471,7 +1472,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "persistent volume with no zone annotation creates a snapshot",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1504,7 +1505,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "persistent volume with zone annotation creates a snapshot",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1538,7 +1539,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "error returned from CreateSnapshot results in a failed snapshot",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1570,7 +1571,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "backup with SnapshotVolumes=false does not create any snapshots",
 			req: &Request{
-				Backup: defaultBackup().SnapshotVolumes(false).Backup(),
+				Backup: defaultBackup().SnapshotVolumes(false).Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1588,7 +1589,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "backup with no volume snapshot locations does not create any snapshots",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
@@ -1603,7 +1604,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "backup with no volume snapshotters does not create any snapshots",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1619,7 +1620,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "unsupported persistent volume type does not create any snapshots",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 				},
@@ -1637,7 +1638,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		{
 			name: "when there are multiple volumes, snapshot locations, and snapshotters, volumes are matched to the right snapshotters",
 			req: &Request{
-				Backup: defaultBackup().Backup(),
+				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
 					newSnapshotLocation("velero", "default", "default"),
 					newSnapshotLocation("velero", "another", "another"),
@@ -1733,7 +1734,7 @@ func TestBackupWithInvalidHooks(t *testing.T) {
 						},
 					},
 				}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("foo", "bar"),
@@ -1797,7 +1798,7 @@ func TestBackupWithHooks(t *testing.T) {
 						},
 					},
 				}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1846,7 +1847,7 @@ func TestBackupWithHooks(t *testing.T) {
 						},
 					},
 				}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1902,7 +1903,7 @@ func TestBackupWithHooks(t *testing.T) {
 						},
 					},
 				}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -1950,7 +1951,7 @@ func TestBackupWithHooks(t *testing.T) {
 						},
 					},
 				}).
-				Backup(),
+				Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1"),
@@ -2052,7 +2053,7 @@ func TestBackupWithRestic(t *testing.T) {
 	}{
 		{
 			name:   "a pod annotated for restic backup should result in pod volume backups being returned",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1", test.WithAnnotations("backup.velero.io/backup-volumes", "foo")),
@@ -2064,7 +2065,7 @@ func TestBackupWithRestic(t *testing.T) {
 		},
 		{
 			name:   "when PVC pod volumes are backed up using restic, their claimed PVs are not also snapshotted",
-			backup: defaultBackup().Backup(),
+			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
 					test.NewPod("ns-1", "pod-1",
@@ -2204,8 +2205,8 @@ func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLoca
 	}
 }
 
-func defaultBackup() *Builder {
-	return NewNamedBackupBuilder(velerov1.DefaultNamespace, "backup-1")
+func defaultBackup() *builder.BackupBuilder {
+	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1")
 }
 
 func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {

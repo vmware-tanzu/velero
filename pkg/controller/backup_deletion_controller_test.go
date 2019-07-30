@@ -267,7 +267,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("patching to InProgress fails", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
@@ -299,7 +299,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("patching backup to Deleting fails", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
@@ -365,7 +365,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("unable to find backup storage location", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -391,7 +391,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(v1.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(backup)
@@ -420,7 +420,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("full delete, no errors", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").Result()
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
@@ -566,7 +566,11 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("full delete, no errors, with backup name greater than 63 chars", func(t *testing.T) {
-		backup := defaultBackup().Name("the-really-long-backup-name-that-is-much-more-than-63-characters").Backup()
+		backup := defaultBackup().
+			ObjectMeta(
+				builder.WithName("the-really-long-backup-name-that-is-much-more-than-63-characters"),
+			).
+			Result()
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
