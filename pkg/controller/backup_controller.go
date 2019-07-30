@@ -497,8 +497,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		fatalErrs = append(fatalErrs, err)
 	}
 
-	c.logger.Debug(backup.BackedUpItems)
-
 	// Mark completion timestamp before serializing and uploading.
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
 	backup.Status.CompletionTimestamp.Time = c.clock.Now()
