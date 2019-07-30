@@ -27,7 +27,7 @@ type ConfigMapBuilder struct {
 }
 
 // ForConfigMap is the constructor for a ConfigMapBuilder.
-func ForConfigMap(name string) *ConfigMapBuilder {
+func ForConfigMap(ns, name string) *ConfigMapBuilder {
 	return &ConfigMapBuilder{
 		object: &corev1api.ConfigMap{
 			TypeMeta: metav1.TypeMeta{
@@ -35,7 +35,8 @@ func ForConfigMap(name string) *ConfigMapBuilder {
 				Kind:       "ConfigMap",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
+				Namespace: ns,
+				Name:      name,
 			},
 		},
 	}

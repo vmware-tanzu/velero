@@ -2068,19 +2068,24 @@ func TestBackupWithRestic(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
-					test.NewPod("ns-1", "pod-1",
-						test.WithAnnotations("backup.velero.io/backup-volumes", "vol-1,vol-2"),
-						test.WithVolume(test.NewVolume("vol-1", test.WithPVCSource("pvc-1"))),
-						test.WithVolume(test.NewVolume("vol-2", test.WithPVCSource("pvc-2"))),
-					),
+					builder.ForPod("ns-1", "pod-1").
+						Volumes(
+							builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+							builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+						).
+						ObjectMeta(
+							builder.WithAnnotations("backup.velero.io/backup-volumes", "vol-1,vol-2"),
+						).
+						Result(),
 				),
 				test.PVCs(
-					test.NewPVC("ns-1", "pvc-1", test.WithPVName("pv-1")),
-					test.NewPVC("ns-1", "pvc-2", test.WithPVName("pv-2")),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").VolumeName("pv-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-2").VolumeName("pv-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1", test.WithClaimRef("ns-1", "pvc-1")),
-					test.NewPV("pv-2", test.WithClaimRef("ns-1", "pvc-2")),
+
+					builder.ForPersistentVolume("pv-1").ClaimRef("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolume("pv-2").ClaimRef("ns-1", "pvc-2").Result(),
 				),
 			},
 			vsl: newSnapshotLocation("velero", "default", "default"),

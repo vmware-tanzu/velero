@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeinformers "k8s.io/client-go/informers"
 
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/test"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
@@ -152,30 +153,26 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 	}{
 		{
 			name: "Non-CSI volume with a PVC/PV returns the volume's name",
-			pod: test.NewPod("ns-1", "my-pod",
-				test.WithVolume(test.NewVolume("my-vol", test.WithPVCSource("my-pvc")))),
-			pvc:  test.NewPVC("ns-1", "my-pvc", test.WithPVName("a-pv")),
-			pv:   test.NewPV("a-pv"),
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").Result(),
 			want: "a-pv",
 		},
 		{
 			name: "CSI volume with a PVC/PV appends '/mount' to the volume name",
-			pod: test.NewPod("ns-1", "my-pod",
-				test.WithVolume(test.NewVolume("my-vol", test.WithPVCSource("my-pvc")))),
-			pvc:  test.NewPVC("ns-1", "my-pvc", test.WithPVName("a-pv")),
-			pv:   test.NewPV("a-pv", test.WithCSI("csi.test.com", "provider-volume-id")),
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").PersistentVolumeClaimSource("my-pvc").Result()).Result(),
+			pvc:  builder.ForPersistentVolumeClaim("ns-1", "my-pvc").VolumeName("a-pv").Result(),
+			pv:   builder.ForPersistentVolume("a-pv").CSI("csi.test.com", "provider-volume-id").Result(),
 			want: "a-pv/mount",
 		},
 		{
 			name: "CSI volume mounted without a PVC appends '/mount' to the volume name",
-			pod: test.NewPod("ns-1", "my-pod",
-				test.WithVolume(test.NewVolume("my-vol", test.WithCSISource("csi.test.com")))),
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").CSISource("csi.test.com").Result()).Result(),
 			want: "my-vol/mount",
 		},
 		{
 			name: "Non-CSI volume without a PVC returns the volume name",
-			pod: test.NewPod("ns-1", "my-pod",
-				test.WithVolume(test.NewVolume("my-vol"))),
+			pod:  builder.ForPod("ns-1", "my-pod").Volumes(builder.ForVolume("my-vol").Result()).Result(),
 			want: "my-vol",
 		},
 	}

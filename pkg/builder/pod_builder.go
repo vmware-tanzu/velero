@@ -27,7 +27,7 @@ type PodBuilder struct {
 }
 
 // ForPod is the constructor for a PodBuilder.
-func ForPod(name string) *PodBuilder {
+func ForPod(ns, name string) *PodBuilder {
 	return &PodBuilder{
 		object: &corev1api.Pod{
 			TypeMeta: metav1.TypeMeta{
@@ -35,7 +35,8 @@ func ForPod(name string) *PodBuilder {
 				Kind:       "Pod",
 			},
 			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
+				Namespace: ns,
+				Name:      name,
 			},
 		},
 	}
@@ -56,7 +57,9 @@ func (b *PodBuilder) ObjectMeta(opts ...ObjectMetaOpt) *PodBuilder {
 }
 
 // Volumes appends to the pod's volumes
-func (b *PodBuilder) Volumes(volumes ...corev1api.Volume) *PodBuilder {
-	b.object.Spec.Volumes = append(b.object.Spec.Volumes, volumes...)
+func (b *PodBuilder) Volumes(volumes ...*corev1api.Volume) *PodBuilder {
+	for _, v := range volumes {
+		b.object.Spec.Volumes = append(b.object.Spec.Volumes, *v)
+	}
 	return b
 }
