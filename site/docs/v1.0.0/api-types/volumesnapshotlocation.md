@@ -39,7 +39,7 @@ The configurable parameters are as follows:
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `region` | string | Empty | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list.<br><br>Queried from the AWS S3 API if not provided. |
+| `region` | string | Empty | *Example*: "us-east-1"<br><br>See [AWS documentation][3] for the full list.<br><br>Required. |
 
 #### Azure
 
