@@ -207,8 +207,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					test.NewDeployment("zoo", "raz", test.WithLabels("a", "b")),
 				),
 				test.PVs(
-					test.NewPV("bar", test.WithLabels("a", "b")),
-					test.NewPV("baz", test.WithLabels("a", "c")),
+					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a", "c")).Result(),
 				),
 			},
 			want: []string{
@@ -231,8 +231,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true")),
 				),
 				test.PVs(
-					test.NewPV("bar", test.WithLabels("a", "b")),
-					test.NewPV("baz", test.WithLabels("velero.io/exclude-from-backup", "true")),
+					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
 				),
 			},
 			want: []string{
@@ -256,8 +256,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
 				),
 				test.PVs(
-					test.NewPV("bar", test.WithLabels("a", "b")),
-					test.NewPV("baz", test.WithLabels("a", "b", "velero.io/exclude-from-backup", "true")),
+					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("a", "b", "velero.io/exclude-from-backup", "true")).Result(),
 				),
 			},
 			want: []string{
@@ -279,8 +279,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "1")),
 				),
 				test.PVs(
-					test.NewPV("bar", test.WithLabels("a", "b")),
-					test.NewPV("baz", test.WithLabels("velero.io/exclude-from-backup", "")),
+					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
+					builder.ForPersistentVolume("baz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "")).Result(),
 				),
 			},
 			want: []string{
@@ -305,8 +305,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -329,8 +329,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -350,8 +350,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -371,8 +371,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -395,8 +395,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -416,8 +416,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-3", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			want: []string{
@@ -665,8 +665,8 @@ func TestBackupResourceOrdering(t *testing.T) {
 					builder.ForPersistentVolumeClaim("zoo", "raz").Result(),
 				),
 				test.PVs(
-					test.NewPV("bar"),
-					test.NewPV("baz"),
+					builder.ForPersistentVolume("bar").Result(),
+					builder.ForPersistentVolume("baz").Result(),
 				),
 				test.Secrets(
 					test.NewSecret("foo", "bar"),
@@ -764,8 +764,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -782,8 +782,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -800,8 +800,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -822,8 +822,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 				test.Namespaces(
 					test.NewNamespace("ns-1"),
@@ -844,8 +844,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -862,8 +862,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -883,8 +883,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: map[*recordResourcesAction][]string{
@@ -944,8 +944,8 @@ func TestBackupWithInvalidActions(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVs(
-					test.NewPV("bar"),
-					test.NewPV("baz"),
+					builder.ForPersistentVolume("bar").Result(),
+					builder.ForPersistentVolume("baz").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -962,8 +962,8 @@ func TestBackupWithInvalidActions(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVs(
-					test.NewPV("bar"),
-					test.NewPV("baz"),
+					builder.ForPersistentVolume("bar").Result(),
+					builder.ForPersistentVolume("baz").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1199,8 +1199,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1229,8 +1229,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1258,8 +1258,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			actions: []velero.BackupItemAction{
@@ -1478,7 +1478,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1511,7 +1511,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1", test.WithLabels("failure-domain.beta.kubernetes.io/zone", "zone-1")),
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("failure-domain.beta.kubernetes.io/zone", "zone-1")).Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1545,7 +1545,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1577,7 +1577,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1592,7 +1592,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1610,7 +1610,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{},
@@ -1626,7 +1626,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
+					builder.ForPersistentVolume("pv-1").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
@@ -1645,8 +1645,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					test.NewPV("pv-1"),
-					test.NewPV("pv-2"),
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{

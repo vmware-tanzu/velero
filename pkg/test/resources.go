@@ -138,22 +138,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 
 type ObjectOpts func(metav1.Object)
 
-func NewPV(name string, opts ...ObjectOpts) *corev1.PersistentVolume {
-	obj := &corev1.PersistentVolume{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PersistentVolume",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta("", name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
-
 func NewSecret(ns, name string, opts ...ObjectOpts) *corev1.Secret {
 	obj := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{
