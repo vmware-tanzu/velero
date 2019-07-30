@@ -120,9 +120,19 @@ func (c *resticRepositoryController) processQueueItem(key string) error {
 	// Don't mutate the shared cache
 	reqCopy := req.DeepCopy()
 
-	switch req.Status.Phase {
-	case "", v1.ResticRepositoryPhaseNew:
+	if req.Status.Phase == "" || req.Status.Phase == v1.ResticRepositoryPhaseNew {
 		return c.initializeRepo(reqCopy, log)
+	}
+
+	// Check both ready and not-ready repos for stale locks, but if this fails
+	// for any reason, it's non-critical so we still continue on to the rest of
+	// the "process" logic.
+	log.Debug("Checking repository for stale locks")
+	if err := c.repositoryManager.UnlockRepo(reqCopy); err != nil {
+		log.WithError(err).Error("Error checking repository for stale locks")
+	}
+
+	switch req.Status.Phase {
 	case v1.ResticRepositoryPhaseReady:
 		return c.runMaintenanceIfDue(reqCopy, log)
 	case v1.ResticRepositoryPhaseNotReady:
