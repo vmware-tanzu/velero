@@ -572,7 +572,6 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 
 	volumeSnapshots := new(bytes.Buffer)
 	gzw := gzip.NewWriter(volumeSnapshots)
-	defer gzw.Close()
 
 	if err := json.NewEncoder(gzw).Encode(backup.VolumeSnapshots); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding list of volume snapshots"))
@@ -583,10 +582,19 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 
 	podVolumeBackups := new(bytes.Buffer)
 	gzw = gzip.NewWriter(podVolumeBackups)
-	defer gzw.Close()
 
 	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackups); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding pod volume backups"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
+	backupResourceList := new(bytes.Buffer)
+	gzw = gzip.NewWriter(backupResourceList)
+
+	if err := json.NewEncoder(gzw).Encode(backup.BackupResourceList()); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding backup resource list"))
 	}
 	if err := gzw.Close(); err != nil {
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
@@ -597,15 +605,17 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		backupJSON = nil
 		backupContents = nil
 		volumeSnapshots = nil
+		backupResourceList = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
-		Name:             backup.Name,
-		Metadata:         backupJSON,
-		Contents:         backupContents,
-		Log:              backupLog,
-		PodVolumeBackups: podVolumeBackups,
-		VolumeSnapshots:  volumeSnapshots,
+		Name:               backup.Name,
+		Metadata:           backupJSON,
+		Contents:           backupContents,
+		Log:                backupLog,
+		PodVolumeBackups:   podVolumeBackups,
+		VolumeSnapshots:    volumeSnapshots,
+		BackupResourceList: backupResourceList,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)

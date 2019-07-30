@@ -1,6 +1,8 @@
 package backup
 
 import (
+	"fmt"
+
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/volume"
@@ -27,4 +29,18 @@ type Request struct {
 	VolumeSnapshots  []*volume.Snapshot
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
 	BackedUpItems    map[itemKey]struct{}
+}
+
+// BackupResourceList returns the list of backed up resources grouped by the API
+// Version and Kind
+func (r *Request) BackupResourceList() map[string][]string {
+	resources := map[string][]string{}
+	for i := range r.BackedUpItems {
+		entry := i.name
+		if i.namespace != "" {
+			entry = fmt.Sprintf("%s/%s", i.namespace, i.name)
+		}
+		resources[i.resource] = append(resources[i.resource], entry)
+	}
+	return resources
 }
