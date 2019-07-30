@@ -32,7 +32,6 @@ import (
 	core "k8s.io/client-go/testing"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/heptio/velero/pkg/backup"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
@@ -43,10 +42,6 @@ import (
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
-
-func defaultPodVolumeBackup() *pkgbackup.PodVolumeBackupBuilder {
-	return pkgbackup.NewNamedPodVolumeBackupBuilder(velerov1api.DefaultNamespace, "pvb-1")
-}
 
 func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation {
 	return []*velerov1api.BackupStorageLocation{
@@ -271,13 +266,13 @@ func TestBackupSyncControllerRun(t *testing.T) {
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-1").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
 						},
 					},
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-2").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
 						},
 					},
 				},
@@ -288,9 +283,9 @@ func TestBackupSyncControllerRun(t *testing.T) {
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-4").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-1").PodVolumeBackup(),
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-2").PodVolumeBackup(),
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-3").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-3").Result(),
 						},
 					},
 				},
@@ -305,13 +300,13 @@ func TestBackupSyncControllerRun(t *testing.T) {
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-1").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-1").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
 						},
 					},
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-2").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-3").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-3").Result(),
 						},
 					},
 				},
@@ -322,16 +317,16 @@ func TestBackupSyncControllerRun(t *testing.T) {
 					&cloudBackupData{
 						backup: builder.ForBackup("ns-1", "backup-4").Result(),
 						podVolumeBackups: []*velerov1api.PodVolumeBackup{
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-1").PodVolumeBackup(),
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-5").PodVolumeBackup(),
-							defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-6").PodVolumeBackup(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-5").Result(),
+							builder.ForPodVolumeBackup("ns-1", "pvb-6").Result(),
 						},
 					},
 				},
 			},
 			existingPodVolumeBackups: []*velerov1api.PodVolumeBackup{
-				defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-1").PodVolumeBackup(),
-				defaultPodVolumeBackup().Namespace("ns-1").Name("pvb-2").PodVolumeBackup(),
+				builder.ForPodVolumeBackup("ns-1", "pvb-1").Result(),
+				builder.ForPodVolumeBackup("ns-1", "pvb-2").Result(),
 			},
 		},
 	}
