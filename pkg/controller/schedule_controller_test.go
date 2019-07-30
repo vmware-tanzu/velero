@@ -260,6 +260,10 @@ func parseTime(timeString string) time.Time {
 }
 
 func TestGetNextRunTime(t *testing.T) {
+	defaultSchedule := func() *velerov1api.Schedule {
+		return builder.ForSchedule("velero", "schedule-1").CronSchedule("@every 5m").Result()
+	}
+
 	tests := []struct {
 		name                      string
 		schedule                  *velerov1api.Schedule
@@ -269,34 +273,34 @@ func TestGetNextRunTime(t *testing.T) {
 	}{
 		{
 			name:                      "first run",
-			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  defaultSchedule(),
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "just ran",
-			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  defaultSchedule(),
 			lastRanOffset:             "0s",
 			expectedDue:               false,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "almost but not quite time to run",
-			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  defaultSchedule(),
 			lastRanOffset:             "4m59s",
 			expectedDue:               false,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "time to run again",
-			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  defaultSchedule(),
 			lastRanOffset:             "5m",
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
 		},
 		{
 			name:                      "several runs missed",
-			schedule:                  &velerov1api.Schedule{Spec: velerov1api.ScheduleSpec{Schedule: "@every 5m"}},
+			schedule:                  defaultSchedule(),
 			lastRanOffset:             "5h",
 			expectedDue:               true,
 			expectedNextRunTimeOffset: "5m",
@@ -342,14 +346,7 @@ func TestParseCronSchedule(t *testing.T) {
 	// Start with a Schedule with:
 	// - schedule: once a day at 9am
 	// - last backup: 2017-08-10 12:27:00 (just happened)
-	s := &velerov1api.Schedule{
-		Spec: velerov1api.ScheduleSpec{
-			Schedule: "0 9 * * *",
-		},
-		Status: velerov1api.ScheduleStatus{
-			LastBackup: metav1.NewTime(now),
-		},
-	}
+	s := builder.ForSchedule("velero", "schedule-1").CronSchedule("0 9 * * *").LastBackupTime(now.Format("2006-01-02 15:04:05")).Result()
 
 	logger := velerotest.NewLogger()
 
@@ -391,116 +388,46 @@ func TestGetBackup(t *testing.T) {
 		expectedBackup *velerov1api.Backup
 	}{
 		{
-			name: "ensure name is formatted correctly (AM time)",
-			schedule: &velerov1api.Schedule{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-				},
-				Spec: velerov1api.ScheduleSpec{
-					Template: velerov1api.BackupSpec{},
-				},
-			},
-			testClockTime: "2017-07-25 09:15:00",
-			expectedBackup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar-20170725091500",
-					Labels: map[string]string{
-						velerov1api.ScheduleNameLabel: "bar",
-					},
-				},
-				Spec: velerov1api.BackupSpec{},
-			},
+			name:           "ensure name is formatted correctly (AM time)",
+			schedule:       builder.ForSchedule("foo", "bar").Result(),
+			testClockTime:  "2017-07-25 09:15:00",
+			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
-			name: "ensure name is formatted correctly (PM time)",
-			schedule: &velerov1api.Schedule{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-				},
-				Spec: velerov1api.ScheduleSpec{
-					Template: velerov1api.BackupSpec{},
-				},
-			},
-			testClockTime: "2017-07-25 14:15:00",
-			expectedBackup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar-20170725141500",
-					Labels: map[string]string{
-						velerov1api.ScheduleNameLabel: "bar",
-					},
-				},
-				Spec: velerov1api.BackupSpec{},
-			},
+			name:           "ensure name is formatted correctly (PM time)",
+			schedule:       builder.ForSchedule("foo", "bar").Result(),
+			testClockTime:  "2017-07-25 14:15:00",
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).Result(),
 		},
 		{
 			name: "ensure schedule backup template is copied",
-			schedule: &velerov1api.Schedule{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-				},
-				Spec: velerov1api.ScheduleSpec{
-					Template: velerov1api.BackupSpec{
-						IncludedNamespaces: []string{"ns-1", "ns-2"},
-						ExcludedNamespaces: []string{"ns-3"},
-						IncludedResources:  []string{"foo", "bar"},
-						ExcludedResources:  []string{"baz"},
-						LabelSelector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-						TTL:                metav1.Duration{Duration: time.Duration(300)},
-					},
-				},
-			},
+			schedule: builder.ForSchedule("foo", "bar").
+				Template(builder.ForBackup("", "").
+					IncludedNamespaces("ns-1", "ns-2").
+					ExcludedNamespaces("ns-3").
+					IncludedResources("foo", "bar").
+					ExcludedResources("baz").
+					LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}}).
+					TTL(time.Duration(300)).
+					Result().
+					Spec).
+				Result(),
 			testClockTime: "2017-07-25 09:15:00",
-			expectedBackup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar-20170725091500",
-					Labels: map[string]string{
-						velerov1api.ScheduleNameLabel: "bar",
-					},
-				},
-				Spec: velerov1api.BackupSpec{
-					IncludedNamespaces: []string{"ns-1", "ns-2"},
-					ExcludedNamespaces: []string{"ns-3"},
-					IncludedResources:  []string{"foo", "bar"},
-					ExcludedResources:  []string{"baz"},
-					LabelSelector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-					TTL:                metav1.Duration{Duration: time.Duration(300)},
-				},
-			},
+			expectedBackup: builder.ForBackup("foo", "bar-20170725091500").
+				ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar")).
+				IncludedNamespaces("ns-1", "ns-2").
+				ExcludedNamespaces("ns-3").
+				IncludedResources("foo", "bar").
+				ExcludedResources("baz").
+				LabelSelector(&metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}}).
+				TTL(time.Duration(300)).
+				Result(),
 		},
 		{
-			name: "ensure schedule labels is copied",
-			schedule: &velerov1api.Schedule{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-					Labels: map[string]string{
-						"foo": "bar",
-						"bar": "baz",
-					},
-				},
-				Spec: velerov1api.ScheduleSpec{
-					Template: velerov1api.BackupSpec{},
-				},
-			},
-			testClockTime: "2017-07-25 14:15:00",
-			expectedBackup: &velerov1api.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar-20170725141500",
-					Labels: map[string]string{
-						velerov1api.ScheduleNameLabel: "bar",
-						"bar":                         "baz",
-						"foo":                         "bar",
-					},
-				},
-				Spec: velerov1api.BackupSpec{},
-			},
+			name:           "ensure schedule labels is copied",
+			schedule:       builder.ForSchedule("foo", "bar").ObjectMeta(builder.WithLabels("foo", "bar", "bar", "baz")).Result(),
+			testClockTime:  "2017-07-25 14:15:00",
+			expectedBackup: builder.ForBackup("foo", "bar-20170725141500").ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, "bar", "bar", "baz", "foo", "bar")).Result(),
 		},
 	}
 

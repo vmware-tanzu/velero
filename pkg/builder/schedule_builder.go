@@ -83,3 +83,9 @@ func (b *ScheduleBuilder) LastBackupTime(val string) *ScheduleBuilder {
 	b.object.Status.LastBackup.Time = t
 	return b
 }
+
+// Template sets the Schedule's template.
+func (b *ScheduleBuilder) Template(spec velerov1api.BackupSpec) *ScheduleBuilder {
+	b.object.Spec.Template = spec
+	return b
+}
