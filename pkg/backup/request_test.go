@@ -35,8 +35,8 @@ func TestRequest_BackupResourceList(t *testing.T) {
 
 	req := Request{BackedUpItems: backedUpItems}
 	assert.Equal(t, req.BackupResourceList(), map[string][]string{
-		"apps/v1/Deployment":  []string{"default/my-deploy"},
-		"v1/Pod":              []string{"ns1/pod1", "ns2/pod2"},
-		"v1/PersistentVolume": []string{"my-pv"},
+		"apps/v1/Deployment":  {"default/my-deploy"},
+		"v1/Pod":              {"ns1/pod1", "ns2/pod2"},
+		"v1/PersistentVolume": {"my-pv"},
 	})
 }
