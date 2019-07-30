@@ -17,11 +17,8 @@ limitations under the License.
 package test
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // APIResource stores information about a specific Kubernetes API
@@ -130,87 +127,5 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 		ShortName:  "sa",
 		Namespaced: true,
 		Items:      items,
-	}
-}
-
-type ObjectOpts func(metav1.Object)
-
-func objectMeta(ns, name string) metav1.ObjectMeta {
-	return metav1.ObjectMeta{
-		Namespace: ns,
-		Name:      name,
-	}
-}
-
-// WithLabels is a functional option that applies the specified
-// label keys/values to an object.
-func WithLabels(labels ...string) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		objLabels := obj.GetLabels()
-		if objLabels == nil {
-			objLabels = make(map[string]string)
-		}
-
-		if len(labels)%2 != 0 {
-			labels = append(labels, "")
-		}
-
-		for i := 0; i < len(labels); i += 2 {
-			objLabels[labels[i]] = labels[i+1]
-		}
-
-		obj.SetLabels(objLabels)
-	}
-}
-
-// WithAnnotations is a functional option that applies the specified
-// annotation keys/values to an object.
-func WithAnnotations(vals ...string) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		objAnnotations := obj.GetAnnotations()
-		if objAnnotations == nil {
-			objAnnotations = make(map[string]string)
-		}
-
-		if len(vals)%2 != 0 {
-			vals = append(vals, "")
-		}
-
-		for i := 0; i < len(vals); i += 2 {
-			objAnnotations[vals[i]] = vals[i+1]
-		}
-
-		obj.SetAnnotations(objAnnotations)
-	}
-}
-
-// WithClusterName is a functional option that applies the specified
-// cluster name to an object.
-func WithClusterName(val string) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		obj.SetClusterName(val)
-	}
-}
-
-// WithFinalizers is a functional option that applies the specified
-// finalizers to an object.
-func WithFinalizers(vals ...string) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		obj.SetFinalizers(vals)
-	}
-}
-
-// WithDeletionTimestamp is a functional option that applies the specified
-// deletion timestamp to an object.
-func WithDeletionTimestamp(val time.Time) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		obj.SetDeletionTimestamp(&metav1.Time{Time: val})
-	}
-}
-
-// WithUID is a functional option that applies the specified UID to an object.
-func WithUID(val string) func(obj metav1.Object) {
-	return func(obj metav1.Object) {
-		obj.SetUID(types.UID(val))
 	}
 }
