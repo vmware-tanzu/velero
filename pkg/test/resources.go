@@ -138,22 +138,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 
 type ObjectOpts func(metav1.Object)
 
-func NewPVC(ns, name string, opts ...ObjectOpts) *corev1.PersistentVolumeClaim {
-	obj := &corev1.PersistentVolumeClaim{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "PersistentVolumeClaim",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta(ns, name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
-
 func NewPV(name string, opts ...ObjectOpts) *corev1.PersistentVolume {
 	obj := &corev1.PersistentVolume{
 		TypeMeta: metav1.TypeMeta{

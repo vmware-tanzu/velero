@@ -661,8 +661,8 @@ func TestBackupResourceOrdering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.PVCs(
-					test.NewPVC("foo", "bar"),
-					test.NewPVC("zoo", "raz"),
+					builder.ForPersistentVolumeClaim("foo", "bar").Result(),
+					builder.ForPersistentVolumeClaim("zoo", "raz").Result(),
 				),
 				test.PVs(
 					test.NewPV("bar"),
@@ -818,8 +818,8 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				),
 				test.PVCs(
-					test.NewPVC("ns-1", "pvc-1"),
-					test.NewPVC("ns-2", "pvc-2"),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -880,7 +880,7 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 					builder.ForPod("ns-1", "pod-1").Result(),
 				),
 				test.PVCs(
-					test.NewPVC("ns-2", "pvc-2"),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				),
 				test.PVs(
 					test.NewPV("pv-1"),
@@ -1121,7 +1121,6 @@ func TestBackupActionModifications(t *testing.T) {
 			assertTarballFileContents(t, backupFile, tc.want)
 		})
 	}
-
 }
 
 // TestBackupActionAdditionalItems runs backups with backup item actions that return

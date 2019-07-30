@@ -618,8 +618,8 @@ func TestRestoreResourcePriorities(t *testing.T) {
 					test.NewServiceAccount("ns-2", "sa-2"),
 				).
 				addItems("persistentvolumeclaims",
-					test.NewPVC("ns-1", "pvc-1"),
-					test.NewPVC("ns-2", "pvc-2"),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
 				).
 				done(),
 			apiResources: []*test.APIResource{
@@ -1052,7 +1052,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
 				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
 				done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
@@ -1066,7 +1066,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
 				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
 				done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
@@ -1080,7 +1080,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result(), builder.ForPod("ns-2", "pod-2").Result()).
-				addItems("persistentvolumeclaims", test.NewPVC("ns-1", "pvc-1"), test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(), builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
 				addItems("persistentvolumes", test.NewPV("pv-1"), test.NewPV("pv-2")).
 				done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
@@ -1095,7 +1095,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
-				addItems("persistentvolumeclaims", test.NewPVC("ns-2", "pvc-2")).
+				addItems("persistentvolumeclaims", builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result()).
 				done(),
 			apiResources: []*test.APIResource{test.Pods(), test.PVCs(), test.PVs()},
 			actions: map[*recordResourcesAction][]string{
@@ -1483,7 +1483,7 @@ func TestShouldRestore(t *testing.T) {
 						},
 					},
 				}),
-				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			namespaces: []*corev1api.Namespace{test.NewNamespace("ns-1")},
 			want:       false,
@@ -1503,7 +1503,7 @@ func TestShouldRestore(t *testing.T) {
 					},
 				}),
 				test.PVCs(
-					test.NewPVC("ns-1", "pvc-1", test.WithDeletionTimestamp(time.Now())),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").ObjectMeta(builder.WithDeletionTimestamp(time.Now())).Result(),
 				),
 			},
 			want:    false,
@@ -1523,7 +1523,7 @@ func TestShouldRestore(t *testing.T) {
 						},
 					},
 				}),
-				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			namespaces: []*corev1api.Namespace{
 				{
@@ -1551,7 +1551,7 @@ func TestShouldRestore(t *testing.T) {
 						},
 					},
 				}),
-				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			namespaces: []*corev1api.Namespace{
 				test.NewNamespace("ns-1", test.WithDeletionTimestamp(time.Now())),
@@ -1591,7 +1591,7 @@ func TestShouldRestore(t *testing.T) {
 						},
 					},
 				}),
-				test.PVCs(test.NewPVC("ns-1", "pvc-1")),
+				test.PVCs(builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result()),
 			},
 			want:    false,
 			wantErr: errors.New("timed out waiting for the condition"),
@@ -1781,10 +1781,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			want: []*test.APIResource{
 				test.PVs(),
 				test.PVCs(
-					test.NewPVC("ns-1", "pvc-1",
-						test.WithAnnotations("foo", "bar"),
-						test.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
-					),
+					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").
+						ObjectMeta(
+							builder.WithAnnotations("foo", "bar"),
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						Result(),
 				),
 			},
 		},
