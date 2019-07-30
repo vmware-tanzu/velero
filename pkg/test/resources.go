@@ -138,22 +138,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 
 type ObjectOpts func(metav1.Object)
 
-func NewSecret(ns, name string, opts ...ObjectOpts) *corev1.Secret {
-	obj := &corev1.Secret{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Secret",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta(ns, name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
-
 func NewDeployment(ns, name string, opts ...ObjectOpts) *appsv1.Deployment {
 	obj := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
@@ -193,22 +177,6 @@ func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
 			APIVersion: "v1",
 		},
 		ObjectMeta: objectMeta("", name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
-
-func NewConfigMap(ns, name string, opts ...ObjectOpts) *corev1.ConfigMap {
-	obj := &corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ConfigMap",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta(ns, name),
 	}
 
 	for _, opt := range opts {

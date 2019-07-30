@@ -669,8 +669,8 @@ func TestBackupResourceOrdering(t *testing.T) {
 					builder.ForPersistentVolume("baz").Result(),
 				),
 				test.Secrets(
-					test.NewSecret("foo", "bar"),
-					test.NewSecret("zoo", "raz"),
+					builder.ForSecret("foo", "bar").Result(),
+					builder.ForSecret("zoo", "raz").Result(),
 				),
 			},
 		},
