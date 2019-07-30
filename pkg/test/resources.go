@@ -137,22 +137,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 
 type ObjectOpts func(metav1.Object)
 
-func NewServiceAccount(ns, name string, opts ...ObjectOpts) *corev1.ServiceAccount {
-	obj := &corev1.ServiceAccount{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "ServiceAccount",
-			APIVersion: "v1",
-		},
-		ObjectMeta: objectMeta(ns, name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
-
 func NewNamespace(name string, opts ...ObjectOpts) *corev1.Namespace {
 	obj := &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{

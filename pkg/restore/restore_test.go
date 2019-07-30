@@ -492,7 +492,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			name:         "service accounts are restored",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
-			tarball:      newTarWriter(t).addItems("serviceaccounts", test.NewServiceAccount("ns-1", "sa-1")).done(),
+			tarball:      newTarWriter(t).addItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).done(),
 			apiResources: []*test.APIResource{test.ServiceAccounts()},
 			want:         map[*test.APIResource][]string{test.ServiceAccounts(): {"ns-1/sa-1"}},
 		},
@@ -614,8 +614,8 @@ func TestRestoreResourcePriorities(t *testing.T) {
 					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("serviceaccounts",
-					test.NewServiceAccount("ns-1", "sa-1"),
-					test.NewServiceAccount("ns-2", "sa-2"),
+					builder.ForServiceAccount("ns-1", "sa-1").Result(),
+					builder.ForServiceAccount("ns-2", "sa-2").Result(),
 				).
 				addItems("persistentvolumeclaims",
 					builder.ForPersistentVolumeClaim("ns-1", "pvc-1").Result(),
@@ -873,13 +873,13 @@ func TestRestoreItems(t *testing.T) {
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
-				addItems("serviceaccounts", test.NewServiceAccount("ns-1", "sa-1")).
+				addItems("serviceaccounts", builder.ForServiceAccount("ns-1", "sa-1").Result()).
 				done(),
 			apiResources: []*test.APIResource{
-				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
 			want: []*test.APIResource{
-				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
 		},
 		{
@@ -901,7 +901,7 @@ func TestRestoreItems(t *testing.T) {
 				}).
 				done(),
 			apiResources: []*test.APIResource{
-				test.ServiceAccounts(test.NewServiceAccount("ns-1", "sa-1")),
+				test.ServiceAccounts(builder.ForServiceAccount("ns-1", "sa-1").Result()),
 			},
 			want: []*test.APIResource{
 				test.ServiceAccounts(&corev1api.ServiceAccount{
