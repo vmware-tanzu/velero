@@ -150,8 +150,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -178,8 +178,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -206,8 +206,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -234,8 +234,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2", test.WithLabels("a", "b")),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -263,8 +263,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -292,8 +292,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -320,8 +320,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -349,8 +349,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -377,8 +377,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -406,8 +406,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -435,8 +435,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -462,8 +462,8 @@ func TestRestoreResourceFiltering(t *testing.T) {
 					builder.ForPod("ns-2", "pod-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("persistentvolumes",
 					builder.ForPersistentVolume("pv-1").Result(),
@@ -610,8 +610,8 @@ func TestRestoreResourcePriorities(t *testing.T) {
 					builder.ForPersistentVolume("pv-2").Result(),
 				).
 				addItems("deployments.apps",
-					test.NewDeployment("ns-1", "deploy-1"),
-					test.NewDeployment("ns-2", "deploy-2"),
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
 				).
 				addItems("serviceaccounts",
 					test.NewServiceAccount("ns-1", "sa-1"),

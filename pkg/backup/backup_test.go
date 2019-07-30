@@ -75,8 +75,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -97,8 +97,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -117,8 +117,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -137,8 +137,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -157,8 +157,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -177,8 +177,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").Result(),
@@ -203,8 +203,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz", test.WithLabels("a", "b")),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -227,8 +227,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true")),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -252,8 +252,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").ObjectMeta(builder.WithLabels("a", "b")).Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true", "a", "b")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -275,8 +275,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz", test.WithLabels("velero.io/exclude-from-backup", "1")),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "1")).Result(),
 				),
 				test.PVs(
 					builder.ForPersistentVolume("bar").ObjectMeta(builder.WithLabels("a", "b")).Result(),
@@ -439,8 +439,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -461,8 +461,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -483,8 +483,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -503,8 +503,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 					builder.ForPod("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -562,8 +562,8 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.ExtensionsDeployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -576,12 +576,12 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.ExtensionsDeployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 				test.Deployments(
-					test.NewDeployment("foo", "bar"),
-					test.NewDeployment("zoo", "raz"),
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
 				),
 			},
 			want: []string{
@@ -623,8 +623,8 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 	}
 	backup1File := bytes.NewBuffer([]byte{})
 
-	h.addItems(t, test.Deployments(test.NewDeployment("ns-1", "deploy-1")))
-	h.addItems(t, test.ExtensionsDeployments(test.NewDeployment("ns-1", "deploy-1")))
+	h.addItems(t, test.Deployments(builder.ForDeployment("ns-1", "deploy-1").Result()))
+	h.addItems(t, test.ExtensionsDeployments(builder.ForDeployment("ns-1", "deploy-1").Result()))
 
 	h.backupper.Backup(h.log, backup1, backup1File, nil, nil)
 

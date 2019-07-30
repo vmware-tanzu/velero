@@ -19,7 +19,6 @@ package test
 import (
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -137,22 +136,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 }
 
 type ObjectOpts func(metav1.Object)
-
-func NewDeployment(ns, name string, opts ...ObjectOpts) *appsv1.Deployment {
-	obj := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Deployment",
-			APIVersion: "apps/v1",
-		},
-		ObjectMeta: objectMeta(ns, name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
 
 func NewServiceAccount(ns, name string, opts ...ObjectOpts) *corev1.ServiceAccount {
 	obj := &corev1.ServiceAccount{
