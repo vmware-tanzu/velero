@@ -35,6 +35,7 @@ import (
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -124,7 +125,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
 
 	tests := []struct {
 		name           string
@@ -152,7 +153,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:           "backup for read-only backup location fails validation",
 			backup:         defaultBackup().StorageLocation("read-only").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("read-only").WithAccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation,
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 	}
@@ -211,14 +212,13 @@ func TestBackupLocationLabel(t *testing.T) {
 		{
 			name:                   "valid backup location name should be used as a label",
 			backup:                 defaultBackup().Backup(),
-			backupLocation:         velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			backupLocation:         builder.ForBackupStorageLocation("velero", "loc-1").Result(),
 			expectedBackupLocation: "loc-1",
 		},
 		{
-			name:   "invalid storage location name should be handled while creating label",
-			backup: defaultBackup().Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().
-				WithName("defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefault").BackupStorageLocation,
+			name:                   "invalid storage location name should be handled while creating label",
+			backup:                 defaultBackup().Backup(),
+			backupLocation:         builder.ForBackupStorageLocation("velero", "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefault").Result(),
 			expectedBackupLocation: "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultd58343f",
 		},
 	}
@@ -303,7 +303,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").WithObjectStorage("store-1").BackupStorageLocation
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").ObjectStorage("store-1").Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -349,7 +349,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:           "backup with a specific backup location keeps it",
 			backup:         defaultBackup().StorageLocation("alt-loc").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("alt-loc").WithObjectStorage("store-1").BackupStorageLocation,
+			backupLocation: builder.ForBackupStorageLocation("velero", "alt-loc").ObjectStorage("store-1").Result(),
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -377,11 +377,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:   "backup for a location with ReadWrite access mode gets processed",
 			backup: defaultBackup().StorageLocation("read-write").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().
-				WithName("read-write").
-				WithObjectStorage("store-1").
-				WithAccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
-				BackupStorageLocation,
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").
+				ObjectStorage("store-1").
+				AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
+				Result(),
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",

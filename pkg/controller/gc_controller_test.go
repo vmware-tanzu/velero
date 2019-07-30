@@ -33,6 +33,7 @@ import (
 	core "k8s.io/client-go/testing"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/util/kube"
@@ -151,7 +152,7 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 
 func TestGCControllerProcessQueueItem(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "default").Result()
 
 	tests := []struct {
 		name                           string
@@ -174,13 +175,13 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		{
 			name:           "expired backup in read-only storage location is not deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("read-only").WithAccessMode(api.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation,
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectDeletion: false,
 		},
 		{
 			name:           "expired backup in read-write storage location is deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("read-write").WithAccessMode(api.BackupStorageLocationAccessModeReadWrite).BackupStorageLocation,
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(api.BackupStorageLocationAccessModeReadWrite).Result(),
 			expectDeletion: true,
 		},
 		{

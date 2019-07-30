@@ -34,6 +34,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -267,7 +268,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("patching to InProgress fails", func(t *testing.T) {
 		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -299,7 +300,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("patching backup to Deleting fails", func(t *testing.T) {
 		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -391,7 +392,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").WithAccessMode(v1.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation
+		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(v1.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
