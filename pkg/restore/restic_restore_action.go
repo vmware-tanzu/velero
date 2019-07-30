@@ -23,7 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +35,11 @@ import (
 	"github.com/heptio/velero/pkg/util/kube"
 )
 
-const defaultImageBase = "gcr.io/heptio-images/velero-restic-restore-helper"
+const (
+	defaultImageBase       = "gcr.io/heptio-images/velero-restic-restore-helper"
+	defaultCPURequestLimit = "100Mi"
+	defaultMemRequestLimit = "128Mi"
+)
 
 type ResticRestoreAction struct {
 	logger logrus.FieldLogger
@@ -86,7 +89,20 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	image := getImage(log, config)
 	log.Infof("Using image %q", image)
 
+	cpuRequest, memRequest := getResourceRequests(log, config)
+	cpuLimit, memLimit := getResourceLimits(log, config)
+
+	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
+	if err != nil {
+		log.Errorf("Couldn't parse resource requirements: %s", err)
+		resourceReqs, _ = kube.ParseResourceRequirements(
+			defaultCPURequestLimit, defaultMemRequestLimit, // requests
+			defaultCPURequestLimit, defaultMemRequestLimit, // limits
+		)
+	}
+
 	initContainer := newResticInitContainer(image, string(input.Restore.UID))
+	initContainer.Resources = resourceReqs
 
 	for volumeName := range volumeSnapshots {
 		mount := corev1.VolumeMount{
@@ -141,6 +157,28 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 	}
 }
 
+// getResourceRequests extracts the CPU and memory requests from a ConfigMap.
+// The 0 values are valid if the keys are not present
+func getResourceRequests(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
+	if config == nil {
+		log.Debug("No config found for plugin")
+		return "", ""
+	}
+
+	return config.Data["cpuRequest"], config.Data["memRequest"]
+}
+
+// getResourceRequests extracts the CPU and memory limits from a ConfigMap.
+// The 0 values are valid if the keys are not present
+func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
+	if config == nil {
+		log.Debug("No config found for plugin")
+		return "", ""
+	}
+
+	return config.Data["cpuLimit"], config.Data["memLimit"]
+}
+
 // TODO eventually this can move to pkg/plugin/framework since it'll be used across multiple
 // plugins.
 func getPluginConfig(kind framework.PluginKind, name string, client corev1client.ConfigMapInterface) (*corev1.ConfigMap, error) {
@@ -191,12 +229,6 @@ func newResticInitContainer(image, restoreUID string) *corev1.Container {
 						FieldPath: "metadata.name",
 					},
 				},
-			},
-		},
-		Resources: corev1.ResourceRequirements{
-			Limits: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("1Mi"),
 			},
 		},
 	}

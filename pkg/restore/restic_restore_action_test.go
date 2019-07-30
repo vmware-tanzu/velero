@@ -32,6 +32,7 @@ import (
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
+	"github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -89,7 +90,20 @@ func TestGetImage(t *testing.T) {
 	}
 }
 
+func defaultResticInitContainer() *corev1.Container {
+	container := newResticInitContainer(initContainerImage(defaultImageBase), "")
+	resourceReqs, _ := kube.ParseResourceRequirements(
+		defaultCPURequestLimit, defaultMemRequestLimit, // requests
+		defaultCPURequestLimit, defaultMemRequestLimit, // limits
+	)
+
+	container.Resources = resourceReqs
+	return container
+}
+
+// TestResticRestoreActionExecute tests the restic restore item action plugin's Execute method.
 func TestResticRestoreActionExecute(t *testing.T) {
+	// Need to add the ConfigMap testing
 	tests := []struct {
 		name string
 		pod  *corev1.Pod
@@ -102,7 +116,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			),
 			want: test.NewPod("ns-1", "pod",
 				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(newResticInitContainer(initContainerImage(defaultImageBase), ""),
+				test.WithInitContainer(defaultResticInitContainer(),
 					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
 			),
 		},
@@ -114,7 +128,7 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			),
 			want: test.NewPod("ns-1", "pod",
 				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(newResticInitContainer(initContainerImage(defaultImageBase), ""),
+				test.WithInitContainer(defaultResticInitContainer(),
 					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
 				test.WithInitContainer(test.NewContainer("first-container")),
 			),
