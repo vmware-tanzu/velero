@@ -93,7 +93,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
 			},
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
 			},
 			expectedErr: false,
 			expectedRes: NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
@@ -104,8 +104,8 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{},
 			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
@@ -116,8 +116,8 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
@@ -182,8 +182,8 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(true).Result(),
 			backup:  defaultBackup().Backup(),
 			locations: []*api.VolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-1").WithProvider("provider-1").VolumeSnapshotLocation,
-				velerotest.NewTestVolumeSnapshotLocation().WithName("loc-2").WithProvider("provider-2").VolumeSnapshotLocation,
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Provider("provider-1").Result(),
+				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Provider("provider-2").Result(),
 			},
 			volumeSnapshots: []*volume.Snapshot{
 				newSnapshot("pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
