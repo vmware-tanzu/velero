@@ -19,7 +19,6 @@ package test
 import (
 	"time"
 
-	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -135,22 +134,6 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 }
 
 type ObjectOpts func(metav1.Object)
-
-func NewStorageClass(name string, opts ...ObjectOpts) *storagev1.StorageClass {
-	obj := &storagev1.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "StorageClass",
-			APIVersion: "storage/v1",
-		},
-		ObjectMeta: objectMeta("", name),
-	}
-
-	for _, opt := range opts {
-		opt(obj)
-	}
-
-	return obj
-}
 
 func objectMeta(ns, name string) metav1.ObjectMeta {
 	return metav1.ObjectMeta{

@@ -31,7 +31,6 @@ import (
 
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/test"
 )
 
 // TestChangeStorageClassActionExecute runs the ChangeStorageClassAction's Execute
@@ -54,7 +53,7 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
 				Result(),
-			storageClass: test.NewStorageClass("storageclass-2"),
+			storageClass: builder.ForStorageClass("storageclass-2").Result(),
 			want:         builder.ForPersistentVolume("pv-1").StorageClass("storageclass-2").Result(),
 		},
 		{
@@ -64,7 +63,7 @@ func TestChangeStorageClassActionExecute(t *testing.T) {
 				ObjectMeta(builder.WithLabels("velero.io/plugin-config", "true", "velero.io/change-storage-class", "RestoreItemAction")).
 				Data("storageclass-1", "storageclass-2").
 				Result(),
-			storageClass: test.NewStorageClass("storageclass-2"),
+			storageClass: builder.ForStorageClass("storageclass-2").Result(),
 			want:         builder.ForPersistentVolumeClaim("velero", "pvc-1").StorageClass("storageclass-2").Result(),
 		},
 		{
