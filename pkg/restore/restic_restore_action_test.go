@@ -90,21 +90,13 @@ func TestGetImage(t *testing.T) {
 	}
 }
 
-func testResticInitContainer() *corev1api.Container {
+// TestResticRestoreActionExecute tests the restic restore item action plugin's Execute method.
+func TestResticRestoreActionExecute(t *testing.T) {
 	resourceReqs, _ := kube.ParseResourceRequirements(
 		defaultCPURequestLimit, defaultMemRequestLimit, // requests
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
 
-	return newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
-		Resources(&resourceReqs).
-		VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
-		Result()
-}
-
-// TestResticRestoreActionExecute tests the restic restore item action plugin's Execute method.
-func TestResticRestoreActionExecute(t *testing.T) {
-	// Need to add the ConfigMap testing
 	tests := []struct {
 		name string
 		pod  *corev1api.Pod
@@ -118,7 +110,10 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			want: builder.ForPod("ns-1", "pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
-				InitContainers(testResticInitContainer()).
+				InitContainers(
+					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
+						Resources(&resourceReqs).
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result()).
 				Result(),
 		},
 		{
@@ -131,7 +126,9 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(
-					testResticInitContainer(),
+					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
+						Resources(&resourceReqs).
+						VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).Result(),
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
