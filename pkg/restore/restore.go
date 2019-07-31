@@ -874,41 +874,42 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	}
 
 	if groupResource == kuberesource.PersistentVolumes {
-		var hasSnapshot bool
-
-		for _, snapshot := range ctx.volumeSnapshots {
-			if snapshot.Spec.PersistentVolumeName == name {
-				hasSnapshot = true
-				break
+		switch {
+		case hasSnapshot(name, ctx.volumeSnapshots):
+			// Check if the PV exists in the cluster before attempting to create
+			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+			shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
+			if err != nil {
+				addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+				return warnings, errs
 			}
-		}
 
-		if !hasSnapshot && hasDeleteReclaimPolicy(obj.Object) {
-			ctx.log.Infof("Not restoring PV because it doesn't have a snapshot and its reclaim policy is Delete.")
+			if shouldRestoreSnapshot {
+				ctx.log.Infof("Restoring persistent volume from snapshot.")
+				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
+				if err != nil {
+					addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+					return warnings, errs
+				}
+				obj = updatedObj
+			}
+		case hasDeleteReclaimPolicy(obj.Object):
+			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
-			return warnings, errs
-		}
 
-		// Check if the PV exists in the cluster before attempting to create
-		// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-		shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
-		if err != nil {
-			addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
-		}
+		default:
+			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
-		// PV's existence will be recorded later. Just skip the volume restore logic.
-		if shouldRestoreSnapshot {
-			// restore the PV from snapshot (if applicable)
+			// we call the pvRestorer here to clear out the PV's claimRef, so it can be re-claimed
+			// when its PVC is restored.
 			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 			if err != nil {
 				addToResult(&errs, namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
 				return warnings, errs
 			}
 			obj = updatedObj
-		} else if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error checking existence for PV %s: %v", name, err))
-			return warnings, errs
 		}
 	}
 
@@ -1123,6 +1124,16 @@ func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured
 			return nil
 		})
 	}
+}
+
+func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
+	for _, snapshot := range snapshots {
+		if snapshot.Spec.PersistentVolumeName == pvName {
+			return true
+		}
+	}
+
+	return false
 }
 
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
