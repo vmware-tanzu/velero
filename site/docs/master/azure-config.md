@@ -157,7 +157,7 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 (Optional) Specify [additional configurable parameters][8] for the `--snapshot-location-config` flag.
 
-(Optional) Specify [CPU and memory resource requests and limits][23] for the Velero pod.
+(Optional) Specify [CPU and memory resource requests and limits][23] for the Velero/restic pods.
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 

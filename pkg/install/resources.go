@@ -43,6 +43,10 @@ var (
 	DefaultVeleroPodMemRequest = "128Mi"
 	DefaultVeleroPodCPULimit   = "1000m"
 	DefaultVeleroPodMemLimit   = "256Mi"
+	DefaultResticPodCPURequest = "0"
+	DefaultResticPodMemRequest = "0"
+	DefaultResticPodCPULimit   = "0"
+	DefaultResticPodMemLimit   = "0"
 )
 
 func labels() map[string]string {
@@ -196,6 +200,7 @@ type VeleroOptions struct {
 	Prefix             string
 	PodAnnotations     map[string]string
 	VeleroPodResources corev1.ResourceRequirements
+	ResticPodResources corev1.ResourceRequirements
 	SecretData         []byte
 	RestoreOnly        bool
 	UseRestic          bool
@@ -254,6 +259,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		ds := DaemonSet(o.Namespace,
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
+			WithResources(o.ResticPodResources),
 		)
 		appendUnstructured(resources, ds)
 	}
