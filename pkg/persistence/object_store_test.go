@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/cloudprovider"
 	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
 	"github.com/heptio/velero/pkg/plugin/velero"
@@ -171,8 +172,8 @@ func TestListBackups(t *testing.T) {
 		{
 			name: "normal case",
 			storageData: map[string][]byte{
-				"backups/backup-1/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"backups/backup-2/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"backups/backup-1/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-1").Result()),
+				"backups/backup-2/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-2").Result()),
 			},
 			expectedRes: []string{"backup-1", "backup-2"},
 		},
@@ -180,8 +181,8 @@ func TestListBackups(t *testing.T) {
 			name:   "normal case with backup store prefix",
 			prefix: "velero-backups/",
 			storageData: map[string][]byte{
-				"velero-backups/backups/backup-1/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-1"}}),
-				"velero-backups/backups/backup-2/velero-backup.json": encodeToBytes(&velerov1api.Backup{ObjectMeta: metav1.ObjectMeta{Name: "backup-2"}}),
+				"velero-backups/backups/backup-1/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-1").Result()),
+				"velero-backups/backups/backup-2/velero-backup.json": encodeToBytes(builder.ForBackup("", "backup-2").Result()),
 			},
 			expectedRes: []string{"backup-1", "backup-2"},
 		},
@@ -336,16 +337,7 @@ func TestGetBackupMetadata(t *testing.T) {
 			name:       "metadata file returns correctly",
 			backupName: "foo",
 			key:        "backups/foo/velero-backup.json",
-			obj: &velerov1api.Backup{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Backup",
-					APIVersion: velerov1api.SchemeGroupVersion.String(),
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: velerov1api.DefaultNamespace,
-					Name:      "foo",
-				},
-			},
+			obj:        builder.ForBackup(velerov1api.DefaultNamespace, "foo").Result(),
 		},
 		{
 			name:       "no metadata file returns an error",
@@ -584,64 +576,30 @@ func TestNewObjectBackupStore(t *testing.T) {
 	}{
 		{
 			name:     "location with no ObjectStorage field results in an error",
-			location: &velerov1api.BackupStorageLocation{},
+			location: new(velerov1api.BackupStorageLocation),
 			wantErr:  "backup storage location does not use object storage",
 		},
 		{
-			name: "location with no Provider field results in an error",
-			location: &velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: new(velerov1api.ObjectStorageLocation),
-					},
-				},
-			},
-			wantErr: "object storage provider name must not be empty",
+			name:     "location with no Provider field results in an error",
+			location: builder.ForBackupStorageLocation("", "").Bucket("").Result(),
+			wantErr:  "object storage provider name must not be empty",
 		},
 		{
-			name: "location with a Bucket field with a '/' in the middle results in an error",
-			location: &velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "provider-1",
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: &velerov1api.ObjectStorageLocation{
-							Bucket: "invalid/bucket",
-						},
-					},
-				},
-			},
-			wantErr: "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
+			name:     "location with a Bucket field with a '/' in the middle results in an error",
+			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("invalid/bucket").Result(),
+			wantErr:  "backup storage location's bucket name \"invalid/bucket\" must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)",
 		},
 		{
-			name: "when Bucket has a leading and trailing slash, they are both stripped",
-			location: &velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "provider-1",
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: &velerov1api.ObjectStorageLocation{
-							Bucket: "/bucket/",
-						},
-					},
-				},
-			},
+			name:     "when Bucket has a leading and trailing slash, they are both stripped",
+			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("/bucket/").Result(),
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 		},
 		{
-			name: "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
-			location: &velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "provider-1",
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: &velerov1api.ObjectStorageLocation{
-							Bucket: "bucket",
-							Prefix: "/prefix/",
-						},
-					},
-				},
-			},
+			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
+			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("/prefix/").Result(),
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
 			},
@@ -649,18 +607,8 @@ func TestNewObjectBackupStore(t *testing.T) {
 			wantPrefix: "prefix/",
 		},
 		{
-			name: "when Prefix has no leading or trailing slash, a trailing slash is added",
-			location: &velerov1api.BackupStorageLocation{
-				Spec: velerov1api.BackupStorageLocationSpec{
-					Provider: "provider-1",
-					StorageType: velerov1api.StorageType{
-						ObjectStorage: &velerov1api.ObjectStorageLocation{
-							Bucket: "bucket",
-							Prefix: "prefix",
-						},
-					},
-				},
-			},
+			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
+			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("prefix").Result(),
 			objectStoreGetter: objectStoreGetter{
 				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
 			},

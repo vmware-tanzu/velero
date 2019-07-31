@@ -311,7 +311,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").ObjectStorage("store-1").Result()
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Bucket("store-1").Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -357,7 +357,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:           "backup with a specific backup location keeps it",
 			backup:         defaultBackup().StorageLocation("alt-loc").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "alt-loc").ObjectStorage("store-1").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "alt-loc").Bucket("store-1").Result(),
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -386,7 +386,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			name:   "backup for a location with ReadWrite access mode gets processed",
 			backup: defaultBackup().StorageLocation("read-write").Result(),
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").
-				ObjectStorage("store-1").
+				Bucket("store-1").
 				AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
 				Result(),
 			expectedResult: &velerov1api.Backup{

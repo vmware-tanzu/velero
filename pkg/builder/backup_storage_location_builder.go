@@ -63,12 +63,21 @@ func (b *BackupStorageLocationBuilder) Provider(name string) *BackupStorageLocat
 	return b
 }
 
-// ObjectStorage sets the BackupStorageLocation's object storage.
-func (b *BackupStorageLocationBuilder) ObjectStorage(bucketName string) *BackupStorageLocationBuilder {
+// Bucket sets the BackupStorageLocation's object storage bucket.
+func (b *BackupStorageLocationBuilder) Bucket(val string) *BackupStorageLocationBuilder {
 	if b.object.Spec.StorageType.ObjectStorage == nil {
 		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
 	}
-	b.object.Spec.ObjectStorage.Bucket = bucketName
+	b.object.Spec.ObjectStorage.Bucket = val
+	return b
+}
+
+// Prefix sets the BackupStorageLocation's object storage prefix.
+func (b *BackupStorageLocationBuilder) Prefix(val string) *BackupStorageLocationBuilder {
+	if b.object.Spec.StorageType.ObjectStorage == nil {
+		b.object.Spec.StorageType.ObjectStorage = new(velerov1api.ObjectStorageLocation)
+	}
+	b.object.Spec.ObjectStorage.Prefix = val
 	return b
 }
 
