@@ -34,6 +34,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -266,8 +267,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("patching to InProgress fails", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -298,8 +299,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("patching backup to Deleting fails", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").BackupStorageLocation
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -364,7 +365,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("unable to find backup storage location", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -390,8 +391,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").StorageLocation("default").Backup()
-		location := velerotest.NewTestBackupStorageLocation().WithName("default").WithAccessMode(v1.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").StorageLocation("default").Result()
+		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(v1.BackupStorageLocationAccessModeReadOnly).Result()
 
 		td := setupBackupDeletionControllerTest(backup)
 
@@ -419,13 +420,13 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("full delete, no errors", func(t *testing.T) {
-		backup := defaultBackup().Name("foo").Backup()
+		backup := builder.ForBackup(v1.DefaultNamespace, "foo").Result()
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
-		restore1 := velerotest.NewTestRestore("velero", "restore-1", v1.RestorePhaseCompleted).WithBackup("foo").Restore
-		restore2 := velerotest.NewTestRestore("velero", "restore-2", v1.RestorePhaseCompleted).WithBackup("foo").Restore
-		restore3 := velerotest.NewTestRestore("velero", "restore-3", v1.RestorePhaseCompleted).WithBackup("some-other-backup").Restore
+		restore1 := builder.ForRestore("velero", "restore-1").Phase(v1.RestorePhaseCompleted).Backup("foo").Result()
+		restore2 := builder.ForRestore("velero", "restore-2").Phase(v1.RestorePhaseCompleted).Backup("foo").Result()
+		restore3 := builder.ForRestore("velero", "restore-3").Phase(v1.RestorePhaseCompleted).Backup("some-other-backup").Result()
 
 		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
 
@@ -565,16 +566,26 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("full delete, no errors, with backup name greater than 63 chars", func(t *testing.T) {
-		backup := defaultBackup().Name("the-really-long-backup-name-that-is-much-more-than-63-characters").Backup()
+		backup := defaultBackup().
+			ObjectMeta(
+				builder.WithName("the-really-long-backup-name-that-is-much-more-than-63-characters"),
+			).
+			Result()
 		backup.UID = "uid"
 		backup.Spec.StorageLocation = "primary"
 
-		restore1 := velerotest.NewTestRestore("velero", "restore-1", v1.RestorePhaseCompleted).
-			WithBackup("the-really-long-backup-name-that-is-much-more-than-63-characters").Restore
-		restore2 := velerotest.NewTestRestore("velero", "restore-2", v1.RestorePhaseCompleted).
-			WithBackup("the-really-long-backup-name-that-is-much-more-than-63-characters").Restore
-		restore3 := velerotest.NewTestRestore("velero", "restore-3", v1.RestorePhaseCompleted).
-			WithBackup("some-other-backup").Restore
+		restore1 := builder.ForRestore("velero", "restore-1").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("the-really-long-backup-name-that-is-much-more-than-63-characters").
+			Result()
+		restore2 := builder.ForRestore("velero", "restore-2").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("the-really-long-backup-name-that-is-much-more-than-63-characters").
+			Result()
+		restore3 := builder.ForRestore("velero", "restore-3").
+			Phase(v1.RestorePhaseCompleted).
+			Backup("some-other-backup").
+			Result()
 
 		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
 		td.req = pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))

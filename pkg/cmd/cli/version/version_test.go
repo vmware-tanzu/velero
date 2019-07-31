@@ -26,10 +26,10 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	v1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	"github.com/heptio/velero/pkg/serverstatusrequest"
 )
 
 func TestPrintVersion(t *testing.T) {
@@ -73,7 +73,7 @@ func TestPrintVersion(t *testing.T) {
 		{
 			name:                "server status getter returns normally",
 			clientOnly:          false,
-			serverStatusRequest: serverstatusrequest.NewBuilder().ServerVersion("v1.0.1").ServerStatusRequest(),
+			serverStatusRequest: builder.ForServerStatusRequest("velero", "ssr-1").ServerVersion("v1.0.1").Result(),
 			getterError:         nil,
 			want:                clientVersion + "Server:\n\tVersion: v1.0.1\n",
 		},

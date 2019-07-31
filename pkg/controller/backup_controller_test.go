@@ -35,6 +35,7 @@ import (
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/heptio/velero/pkg/backup"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -44,7 +45,6 @@ import (
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/logging"
-	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 type fakeBackupper struct {
@@ -56,8 +56,8 @@ func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Requ
 	return args.Error(0)
 }
 
-func defaultBackup() *pkgbackup.Builder {
-	return pkgbackup.NewNamedBackupBuilder(velerov1api.DefaultNamespace, "backup-1")
+func defaultBackup() *builder.BackupBuilder {
+	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1")
 }
 
 func TestProcessBackupNonProcessedItems(t *testing.T) {
@@ -77,22 +77,22 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 		{
 			name:   "FailedValidation backup is not processed",
 			key:    "velero/backup-1",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailedValidation).Backup(),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailedValidation).Result(),
 		},
 		{
 			name:   "InProgress backup is not processed",
 			key:    "velero/backup-1",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseInProgress).Backup(),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseInProgress).Result(),
 		},
 		{
 			name:   "Completed backup is not processed",
 			key:    "velero/backup-1",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseCompleted).Backup(),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseCompleted).Result(),
 		},
 		{
 			name:   "Failed backup is not processed",
 			key:    "velero/backup-1",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailed).Backup(),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseFailed).Result(),
 		},
 	}
 
@@ -126,7 +126,7 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
 
 	tests := []struct {
 		name           string
@@ -136,25 +136,25 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 	}{
 		{
 			name:           "invalid included/excluded resources fails validation",
-			backup:         defaultBackup().IncludedResources("foo").ExcludedResources("foo").Backup(),
+			backup:         defaultBackup().IncludedResources("foo").ExcludedResources("foo").Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"Invalid included/excluded resource lists: excludes list cannot contain an item in the includes list: foo"},
 		},
 		{
 			name:           "invalid included/excluded namespaces fails validation",
-			backup:         defaultBackup().IncludedNamespaces("foo").ExcludedNamespaces("foo").Backup(),
+			backup:         defaultBackup().IncludedNamespaces("foo").ExcludedNamespaces("foo").Result(),
 			backupLocation: defaultBackupLocation,
 			expectedErrs:   []string{"Invalid included/excluded namespace lists: excludes list cannot contain an item in the includes list: foo"},
 		},
 		{
 			name:         "non-existent backup location fails validation",
-			backup:       defaultBackup().StorageLocation("nonexistent").Backup(),
+			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
 			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",
-			backup:         defaultBackup().StorageLocation("read-only").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("read-only").WithAccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).BackupStorageLocation,
+			backup:         defaultBackup().StorageLocation("read-only").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 	}
@@ -214,15 +214,14 @@ func TestBackupLocationLabel(t *testing.T) {
 	}{
 		{
 			name:                   "valid backup location name should be used as a label",
-			backup:                 defaultBackup().Backup(),
-			backupLocation:         velerotest.NewTestBackupStorageLocation().WithName("loc-1").BackupStorageLocation,
+			backup:                 defaultBackup().Result(),
+			backupLocation:         builder.ForBackupStorageLocation("velero", "loc-1").Result(),
 			expectedBackupLocation: "loc-1",
 		},
 		{
-			name:   "invalid storage location name should be handled while creating label",
-			backup: defaultBackup().Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().
-				WithName("defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefault").BackupStorageLocation,
+			name:                   "invalid storage location name should be handled while creating label",
+			backup:                 defaultBackup().Result(),
+			backupLocation:         builder.ForBackupStorageLocation("velero", "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultdefault").Result(),
 			expectedBackupLocation: "defaultdefaultdefaultdefaultdefaultdefaultdefaultdefaultd58343f",
 		},
 	}
@@ -273,13 +272,13 @@ func TestDefaultBackupTTL(t *testing.T) {
 	}{
 		{
 			name:               "backup with no TTL specified",
-			backup:             defaultBackup().Backup(),
+			backup:             defaultBackup().Result(),
 			expectedTTL:        defaultBackupTTL,
 			expectedExpiration: metav1.NewTime(now.Add(defaultBackupTTL.Duration)),
 		},
 		{
 			name:               "backup with TTL specified",
-			backup:             defaultBackup().TTL(time.Hour).Backup(),
+			backup:             defaultBackup().TTL(time.Hour).Result(),
 			expectedTTL:        metav1.Duration{Duration: 1 * time.Hour},
 			expectedExpiration: metav1.NewTime(now.Add(1 * time.Hour)),
 		},
@@ -312,7 +311,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	defaultBackupLocation := velerotest.NewTestBackupStorageLocation().WithName("loc-1").WithObjectStorage("store-1").BackupStorageLocation
+	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").ObjectStorage("store-1").Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
@@ -329,7 +328,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		// Completed
 		{
 			name:           "backup with no backup location gets the default",
-			backup:         defaultBackup().Backup(),
+			backup:         defaultBackup().Result(),
 			backupLocation: defaultBackupLocation,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
@@ -357,8 +356,8 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:           "backup with a specific backup location keeps it",
-			backup:         defaultBackup().StorageLocation("alt-loc").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().WithName("alt-loc").WithObjectStorage("store-1").BackupStorageLocation,
+			backup:         defaultBackup().StorageLocation("alt-loc").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "alt-loc").ObjectStorage("store-1").Result(),
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -385,12 +384,11 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:   "backup for a location with ReadWrite access mode gets processed",
-			backup: defaultBackup().StorageLocation("read-write").Backup(),
-			backupLocation: velerotest.NewTestBackupStorageLocation().
-				WithName("read-write").
-				WithObjectStorage("store-1").
-				WithAccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
-				BackupStorageLocation,
+			backup: defaultBackup().StorageLocation("read-write").Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").
+				ObjectStorage("store-1").
+				AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
+				Result(),
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "Backup",
@@ -417,7 +415,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:           "backup with a TTL has expiration set",
-			backup:         defaultBackup().TTL(10 * time.Minute).Backup(),
+			backup:         defaultBackup().TTL(10 * time.Minute).Result(),
 			backupLocation: defaultBackupLocation,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
@@ -447,7 +445,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:           "backup without an existing backup will succeed",
 			backupExists:   false,
-			backup:         defaultBackup().Backup(),
+			backup:         defaultBackup().Result(),
 			backupLocation: defaultBackupLocation,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
@@ -478,7 +476,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		{
 			name:           "backup with existing backup will fail",
 			backupExists:   true,
-			backup:         defaultBackup().Backup(),
+			backup:         defaultBackup().Result(),
 			backupLocation: defaultBackupLocation,
 			expectedResult: &velerov1api.Backup{
 				TypeMeta: metav1.TypeMeta{
@@ -506,7 +504,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 		{
 			name:                "error when checking if backup exists will cause backup to fail",
-			backup:              defaultBackup().Backup(),
+			backup:              defaultBackup().Result(),
 			existenceCheckError: errors.New("Backup already exists in object storage"),
 			backupLocation:      defaultBackupLocation,
 			expectedResult: &velerov1api.Backup{
@@ -613,7 +611,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	tests := []struct {
 		name                                string
 		backup                              *velerov1api.Backup
-		locations                           []*velerotest.TestVolumeSnapshotLocation
+		locations                           []*velerov1api.VolumeSnapshotLocation
 		defaultLocations                    map[string]string
 		expectedVolumeSnapshotLocationNames []string // adding these in the expected order will allow to test with better msgs in case of a test failure
 		expectedErrors                      string
@@ -621,76 +619,76 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 	}{
 		{
 			name:   "location name does not correspond to any existing location",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("random-name").Backup(),
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("random-name").Result(),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedErrors: "a VolumeSnapshotLocation CRD for the location random-name with the name specified in the backup spec needs to be created before this snapshot can be executed. Error: volumesnapshotlocation.velero.io \"random-name\" not found", expectedSuccess: false,
 		},
 		{
 			name:   "duplicate locationName per provider: should filter out dups",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").Backup(),
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").Result(),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:   "multiple non-dupe location names per provider should error",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-east-1", "aws-us-west-1").Backup(),
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-east-1", "aws-us-west-1").Result(),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedErrors:  "more than one VolumeSnapshotLocation name specified for provider aws: aws-us-west-1; unexpected name was aws-us-east-1",
 			expectedSuccess: false,
 		},
 		{
 			name:   "no location name for the provider exists, only one VSL for the provider: use it",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Backup(),
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:   "no location name for the provider exists, no default, more than one VSL for the provider: error",
-			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Backup(),
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-east-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
+			backup: defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
 			expectedErrors: "provider aws has more than one possible volume snapshot location, and none were specified explicitly or as a default",
 		},
 		{
 			name:             "no location name for the provider exists, more than one VSL for the provider: the provider's default should be added",
-			backup:           defaultBackup().Phase(velerov1api.BackupPhaseNew).Backup(),
+			backup:           defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
 			defaultLocations: map[string]string{"aws": "aws-us-east-1"},
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithName("aws-us-east-1").WithProvider("aws"),
-				velerotest.NewTestVolumeSnapshotLocation().WithName("aws-us-west-1").WithProvider("aws"),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-east-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-east-1"},
 			expectedSuccess:                     true,
 		},
 		{
 			name:            "no existing location name and no default location name given",
-			backup:          defaultBackup().Phase(velerov1api.BackupPhaseNew).Backup(),
+			backup:          defaultBackup().Phase(velerov1api.BackupPhaseNew).Result(),
 			expectedSuccess: true,
 		},
 		{
 			name:             "multiple location names for a provider, default location name for another provider",
-			backup:           defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").Backup(),
+			backup:           defaultBackup().Phase(velerov1api.BackupPhaseNew).VolumeSnapshotLocations("aws-us-west-1", "aws-us-west-1").Result(),
 			defaultLocations: map[string]string{"fake-provider": "some-name"},
-			locations: []*velerotest.TestVolumeSnapshotLocation{
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("aws").WithName("aws-us-west-1"),
-				velerotest.NewTestVolumeSnapshotLocation().WithProvider("fake-provider").WithName("some-name"),
+			locations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "aws-us-west-1").Provider("aws").Result(),
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "some-name").Provider("fake-provider").Result(),
 			},
 			expectedVolumeSnapshotLocationNames: []string{"aws-us-west-1", "some-name"},
 			expectedSuccess:                     true,
@@ -713,7 +711,7 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 			backup := test.backup.DeepCopy()
 			backup.Spec.VolumeSnapshotLocations = test.backup.Spec.VolumeSnapshotLocations
 			for _, location := range test.locations {
-				require.NoError(t, sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location.VolumeSnapshotLocation))
+				require.NoError(t, sharedInformers.Velero().V1().VolumeSnapshotLocations().Informer().GetStore().Add(location))
 			}
 
 			providerLocations, errs := c.validateAndGetSnapshotLocations(backup)

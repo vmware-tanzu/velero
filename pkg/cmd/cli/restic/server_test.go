@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/heptio/velero/pkg/test"
+	"github.com/heptio/velero/pkg/builder"
 	testutil "github.com/heptio/velero/pkg/util/test"
 )
 
@@ -39,8 +39,8 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		{
 			name: "no error when pod volumes are present",
 			pods: []*corev1.Pod{
-				test.NewPod("foo", "bar", test.WithUID("foo")),
-				test.NewPod("zoo", "raz", test.WithUID("zoo")),
+				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
 			dirs:    []string{"foo", "zoo"},
 			wantErr: false,
@@ -48,8 +48,8 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		{
 			name: "no error when pod volumes are present and there are mirror pods",
 			pods: []*corev1.Pod{
-				test.NewPod("foo", "bar", test.WithUID("foo")),
-				test.NewPod("zoo", "raz", test.WithUID("zoo"), test.WithAnnotations(v1.MirrorPodAnnotationKey, "baz")),
+				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo"), builder.WithAnnotations(v1.MirrorPodAnnotationKey, "baz")).Result(),
 			},
 			dirs:    []string{"foo", "baz"},
 			wantErr: false,
@@ -57,8 +57,8 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		{
 			name: "error when all pod volumes missing",
 			pods: []*corev1.Pod{
-				test.NewPod("foo", "bar", test.WithUID("foo")),
-				test.NewPod("zoo", "raz", test.WithUID("zoo")),
+				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
 			dirs:    []string{"unexpected-dir"},
 			wantErr: true,
@@ -66,8 +66,8 @@ func Test_validatePodVolumesHostPath(t *testing.T) {
 		{
 			name: "error when some pod volumes missing",
 			pods: []*corev1.Pod{
-				test.NewPod("foo", "bar", test.WithUID("foo")),
-				test.NewPod("zoo", "raz", test.WithUID("zoo")),
+				builder.ForPod("foo", "bar").ObjectMeta(builder.WithUID("foo")).Result(),
+				builder.ForPod("zoo", "raz").ObjectMeta(builder.WithUID("zoo")).Result(),
 			},
 			dirs:    []string{"foo"},
 			wantErr: true,
