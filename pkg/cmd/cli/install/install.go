@@ -49,6 +49,10 @@ type InstallOptions struct {
 	VeleroPodMemRequest  string
 	VeleroPodCPULimit    string
 	VeleroPodMemLimit    string
+	ResticPodCPURequest  string
+	ResticPodMemRequest  string
+	ResticPodCPULimit    string
+	ResticPodMemLimit    string
 	RestoreOnly          bool
 	SecretFile           string
 	DryRun               bool
@@ -72,6 +76,10 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, "memory request for Velero pod. Optional.")
 	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, "CPU limit for Velero pod. Optional.")
 	flags.StringVar(&o.VeleroPodMemLimit, "velero-pod-mem-limit", o.VeleroPodMemLimit, "memory limit for Velero pod. Optional.")
+	flags.StringVar(&o.ResticPodCPURequest, "restic-pod-cpu-request", o.ResticPodCPURequest, "CPU request for Restic pod. Optional.")
+	flags.StringVar(&o.ResticPodMemRequest, "restic-pod-mem-request", o.ResticPodMemRequest, "memory request for Restic pod. Optional.")
+	flags.StringVar(&o.ResticPodCPULimit, "restic-pod-cpu-limit", o.ResticPodCPULimit, "CPU limit for Restic pod. Optional.")
+	flags.StringVar(&o.ResticPodMemLimit, "restic-pod-mem-limit", o.ResticPodMemLimit, "memory limit for Restic pod. Optional.")
 	flags.Var(&o.BackupStorageConfig, "backup-location-config", "configuration to use for the backup storage location. Format is key1=value1,key2=value2")
 	flags.Var(&o.VolumeSnapshotConfig, "snapshot-location-config", "configuration to use for the volume snapshot location. Format is key1=value1,key2=value2")
 	flags.BoolVar(&o.UseVolumeSnapshots, "use-volume-snapshots", o.UseVolumeSnapshots, "whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider.")
@@ -93,6 +101,10 @@ func NewInstallOptions() *InstallOptions {
 		VeleroPodMemRequest:  install.DefaultVeleroPodMemRequest,
 		VeleroPodCPULimit:    install.DefaultVeleroPodCPULimit,
 		VeleroPodMemLimit:    install.DefaultVeleroPodMemLimit,
+		ResticPodCPURequest:  install.DefaultResticPodCPURequest,
+		ResticPodMemRequest:  install.DefaultResticPodMemRequest,
+		ResticPodCPULimit:    install.DefaultResticPodCPULimit,
+		ResticPodMemLimit:    install.DefaultResticPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
 		UseVolumeSnapshots: true,
 	}
@@ -112,6 +124,10 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	if err != nil {
 		return nil, err
 	}
+	resticPodResources, err := parseResourceRequests(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
+	if err != nil {
+		return nil, err
+	}
 
 	return &install.VeleroOptions{
 		Namespace:          o.Namespace,
@@ -121,6 +137,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		Prefix:             o.Prefix,
 		PodAnnotations:     o.PodAnnotations.Data(),
 		VeleroPodResources: veleroPodResources,
+		ResticPodResources: resticPodResources,
 		SecretData:         secretData,
 		RestoreOnly:        o.RestoreOnly,
 		UseRestic:          o.UseRestic,
@@ -165,6 +182,8 @@ This is useful as a starting point for more customized installations.
 	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --secret-file ./an-empty-file --snapshot-location-config region=us-west-2 --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
 
 	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
+
+	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --restic-pod-cpu-request=1000m --restic-pod-cpu-limit=5000m --restic-pod-mem-request=512Mi --restic-pod-mem-limit=1024Mi
 
 		`,
 		Run: func(c *cobra.Command, args []string) {

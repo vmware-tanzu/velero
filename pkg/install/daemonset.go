@@ -142,6 +142,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 									Value: "/credentials/cloud",
 								},
 							},
+							Resources: c.resources,
 						},
 					},
 				},
