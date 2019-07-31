@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,9 @@ type RepositoryManager interface {
 
 	// PruneRepo deletes unused data from a repo.
 	PruneRepo(repo *velerov1api.ResticRepository) error
+
+	// UnlockRepo removes stale locks from a repo.
+	UnlockRepo(repo *velerov1api.ResticRepository) error
 
 	// Forget removes a snapshot from the list of
 	// available snapshots in a repo.
@@ -211,6 +214,14 @@ func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error
 	defer rm.repoLocker.UnlockExclusive(repo.Name)
 
 	return rm.exec(PruneCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
+}
+
+func (rm *repositoryManager) UnlockRepo(repo *velerov1api.ResticRepository) error {
+	// restic unlock requires a non-exclusive lock
+	rm.repoLocker.Lock(repo.Name)
+	defer rm.repoLocker.Unlock(repo.Name)
+
+	return rm.exec(UnlockCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) Forget(ctx context.Context, snapshot SnapshotIdentifier) error {

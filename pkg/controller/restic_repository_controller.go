@@ -18,6 +18,7 @@ package controller
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
@@ -120,9 +121,19 @@ func (c *resticRepositoryController) processQueueItem(key string) error {
 	// Don't mutate the shared cache
 	reqCopy := req.DeepCopy()
 
-	switch req.Status.Phase {
-	case "", v1.ResticRepositoryPhaseNew:
+	if req.Status.Phase == "" || req.Status.Phase == v1.ResticRepositoryPhaseNew {
 		return c.initializeRepo(reqCopy, log)
+	}
+
+	// If the repository is ready or not-ready, check it for stale locks, but if
+	// this fails for any reason, it's non-critical so we still continue on to the
+	// rest of the "process" logic.
+	log.Debug("Checking repository for stale locks")
+	if err := c.repositoryManager.UnlockRepo(reqCopy); err != nil {
+		log.WithError(err).Error("Error checking repository for stale locks")
+	}
+
+	switch req.Status.Phase {
 	case v1.ResticRepositoryPhaseReady:
 		return c.runMaintenanceIfDue(reqCopy, log)
 	case v1.ResticRepositoryPhaseNotReady:
@@ -162,14 +173,23 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 	})
 }
 
-// ensureRepo first tries to connect to the repo, and returns if it succeeds. If it fails,
-// it attempts to init the repo, and returns the result.
+// ensureRepo checks to see if a repository exists, and attempts to initialize it if
+// it does not exist. An error is returned if the repository can't be connected to
+// or initialized.
 func ensureRepo(repo *v1.ResticRepository, repoManager restic.RepositoryManager) error {
-	if repoManager.ConnectToRepo(repo) == nil {
-		return nil
+	if err := repoManager.ConnectToRepo(repo); err != nil {
+		// If the repository has not yet been initialized, the error message will always include
+		// the following string. This is the only scenario where we should try to initialize it.
+		// Other errors (e.g. "already locked") should be returned as-is since the repository
+		// does already exist, but it can't be connected to.
+		if strings.Contains(err.Error(), "Is there a repository at the following location?") {
+			return repoManager.InitRepo(repo)
+		}
+
+		return err
 	}
 
-	return repoManager.InitRepo(repo)
+	return nil
 }
 
 func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepository, log logrus.FieldLogger) error {
