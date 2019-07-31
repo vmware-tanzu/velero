@@ -125,9 +125,9 @@ func (c *resticRepositoryController) processQueueItem(key string) error {
 		return c.initializeRepo(reqCopy, log)
 	}
 
-	// Check both ready and not-ready repos for stale locks, but if this fails
-	// for any reason, it's non-critical so we still continue on to the rest of
-	// the "process" logic.
+	// If the repository is ready or not-ready, check it for stale locks, but if
+	// this fails for any reason, it's non-critical so we still continue on to the
+	// rest of the "process" logic.
 	log.Debug("Checking repository for stale locks")
 	if err := c.repositoryManager.UnlockRepo(reqCopy); err != nil {
 		log.WithError(err).Error("Error checking repository for stale locks")
