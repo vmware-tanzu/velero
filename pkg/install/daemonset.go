@@ -138,7 +138,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		},
 	}
 
-	if !c.withoutCredentialsVolume {
+	if c.withSecret {
 		daemonSet.Spec.Template.Spec.Volumes = append(
 			daemonSet.Spec.Template.Spec.Volumes,
 			corev1.Volume{
@@ -158,9 +158,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				MountPath: "/credentials",
 			},
 		)
-	}
 
-	if c.withSecretData {
 		daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
 			{
 				Name:  "GOOGLE_APPLICATION_CREDENTIALS",

@@ -27,13 +27,12 @@ import (
 type podTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
-	image                    string
-	withoutCredentialsVolume bool
-	envVars                  []corev1.EnvVar
-	restoreOnly              bool
-	annotations              map[string]string
-	resources                corev1.ResourceRequirements
-	withSecretData           bool
+	image       string
+	envVars     []corev1.EnvVar
+	restoreOnly bool
+	annotations map[string]string
+	resources   corev1.ResourceRequirements
+	withSecret  bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -45,12 +44,6 @@ func WithImage(image string) podTemplateOption {
 func WithAnnotations(annotations map[string]string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.annotations = annotations
-	}
-}
-
-func WithoutCredentialsVolume() podTemplateOption {
-	return func(c *podTemplateConfig) {
-		c.withoutCredentialsVolume = true
 	}
 }
 
@@ -70,11 +63,9 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 	}
 }
 
-func WithSecretData(secretPresent bool) podTemplateOption {
+func WithSecret(secretPresent bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
-		c.withSecretData = secretPresent
-		// Since there's no secret, don't mount the credentials volume in the pods
-		c.withoutCredentialsVolume = true
+		c.withSecret = secretPresent
 	}
 }
 
@@ -176,7 +167,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		},
 	}
 
-	if !c.withoutCredentialsVolume {
+	if c.withSecret {
 		deployment.Spec.Template.Spec.Volumes = append(
 			deployment.Spec.Template.Spec.Volumes,
 			corev1.Volume{
@@ -196,9 +187,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				MountPath: "/credentials",
 			},
 		)
-	}
 
-	if c.withSecretData {
 		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
 			{
 				Name:  "GOOGLE_APPLICATION_CREDENTIALS",

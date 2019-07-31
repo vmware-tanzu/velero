@@ -55,6 +55,7 @@ type InstallOptions struct {
 	ResticPodMemLimit    string
 	RestoreOnly          bool
 	SecretFile           string
+	NoSecret             bool
 	DryRun               bool
 	BackupStorageConfig  flag.Map
 	VolumeSnapshotConfig flag.Map
@@ -67,7 +68,8 @@ type InstallOptions struct {
 func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.ProviderName, "provider", o.ProviderName, "provider name for backup and volume storage")
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
-	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider. Optional.")
+	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider. Cannot be used with --no-secret. Optional.")
+	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "flag indicating if a secret should be created. Cannot be used with --secret-file. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
@@ -113,7 +115,7 @@ func NewInstallOptions() *InstallOptions {
 // AsVeleroOptions translates the values provided at the command line into values used to instantiate Kubernetes resources
 func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	var secretData []byte
-	if o.SecretFile != "" {
+	if o.SecretFile != "" && !o.NoSecret {
 		realPath, err := filepath.Abs(o.SecretFile)
 		if err != nil {
 			return nil, err
@@ -182,7 +184,7 @@ This is useful as a starting point for more customized installations.
 
 	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --wait
 
-	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --snapshot-location-config region=us-west-2 --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
+	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --snapshot-location-config region=us-west-2 --no-secret --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
 
 	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
 
@@ -272,6 +274,13 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 
 	if o.ProviderName == "" {
 		return errors.New("--provider is required")
+	}
+
+	switch {
+	case o.SecretFile == "" && !o.NoSecret:
+		return errors.New("One of --secret-file or --no-secret is required")
+	case o.SecretFile != "" && o.NoSecret:
+		return errors.New("Cannot use both --secret-file and --no-secret")
 	}
 
 	return nil

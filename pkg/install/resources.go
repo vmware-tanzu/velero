@@ -249,13 +249,13 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 		WithResources(o.VeleroPodResources),
-		WithSecretData(secretPresent),
+		WithSecret(secretPresent),
 	)
 	if o.RestoreOnly {
 		deploy = Deployment(o.Namespace,
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
-			WithSecretData(secretPresent),
+			WithSecret(secretPresent),
 			WithRestoreOnly(),
 		)
 	}
@@ -263,10 +263,11 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	if o.UseRestic {
 		ds := DaemonSet(o.Namespace,
+
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
-			WithSecretData(secretPresent),
+			WithSecret(secretPresent),
 		)
 		appendUnstructured(resources, ds)
 	}

@@ -29,10 +29,11 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, "restic", ds.Spec.Template.Spec.Containers[0].Name)
 	assert.Equal(t, "velero", ds.ObjectMeta.Namespace)
 
-	ds = DaemonSet("velero", WithoutCredentialsVolume())
-	assert.Equal(t, 2, len(ds.Spec.Template.Spec.Volumes))
-
 	ds = DaemonSet("velero", WithImage("gcr.io/heptio-images/velero:v0.11"))
 	assert.Equal(t, "gcr.io/heptio-images/velero:v0.11", ds.Spec.Template.Spec.Containers[0].Image)
 	assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
+
+	ds = DaemonSet("velero", WithSecret(true))
+	assert.Equal(t, 6, len(ds.Spec.Template.Spec.Containers[0].Env))
+	assert.Equal(t, 3, len(ds.Spec.Template.Spec.Volumes))
 }
