@@ -893,6 +893,12 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				}
 				obj = updatedObj
 			}
+		case hasResticBackup(obj, ctx):
+			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
+			ctx.pvsToProvision.Insert(name)
+
+			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
+			return warnings, errs
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
@@ -1134,6 +1140,32 @@ func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
 	}
 
 	return false
+}
+
+func hasResticBackup(unstructuredPV *unstructured.Unstructured, ctx *context) bool {
+	if len(ctx.podVolumeBackups) == 0 {
+		return false
+	}
+
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredPV.Object, pv); err != nil {
+		ctx.log.WithError(err).Warnf("Unable to convert PV from unstructured to structured")
+		return false
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		return false
+	}
+
+	var found bool
+	for _, pvb := range ctx.podVolumeBackups {
+		if pvb.Spec.Pod.Namespace == pv.Spec.ClaimRef.Namespace && pvb.GetAnnotations()[restic.PVCNameAnnotation] == pv.Spec.ClaimRef.Name {
+			found = true
+			break
+		}
+	}
+
+	return found
 }
 
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {

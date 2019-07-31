@@ -35,11 +35,24 @@ import (
 )
 
 const (
-	DaemonSet                   = "restic"
-	InitContainer               = "restic-wait"
+	// DaemonSet is the name of the Velero restic daemonset.
+	DaemonSet = "restic"
+
+	// InitContainer is the name of the init container added
+	// to workload pods to help with restores.
+	InitContainer = "restic-wait"
+
+	// DefaultMaintenanceFrequency is the default time interval
+	// at which restic check & prune are run.
 	DefaultMaintenanceFrequency = 24 * time.Hour
 
+	// PVCNameAnnotation is the key for the annotation added to
+	// pod volume backups when they're for a PVC.
+	PVCNameAnnotation = "velero.io/pvc-name"
+
 	// Deprecated.
+	//
+	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
 
 	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
