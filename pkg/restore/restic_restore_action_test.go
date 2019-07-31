@@ -97,11 +97,9 @@ func testResticInitContainer() *corev1api.Container {
 	)
 
 	return newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
-		Resources(resourceReqs).
-		VolumeMounts(builder.ForVolumeMount("my-vol", "/restic/my-vol")).
+		Resources(&resourceReqs).
+		VolumeMounts(builder.ForVolumeMount("myvol", "/restores/myvol").Result()).
 		Result()
-
-	return container
 }
 
 // TestResticRestoreActionExecute tests the restic restore item action plugin's Execute method.
@@ -148,7 +146,9 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				Item: &unstructured.Unstructured{
 					Object: unstructuredMap,
 				},
-				Restore: velerotest.NewTestRestore("my-restore", "velero", api.RestorePhaseInProgress).Restore,
+				Restore: builder.ForRestore("velero", "my-restore").
+					Phase(api.RestorePhaseInProgress).
+					Result(),
 			}
 
 			clientset := fake.NewSimpleClientset()

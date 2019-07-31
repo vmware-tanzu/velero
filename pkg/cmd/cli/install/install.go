@@ -123,7 +123,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	resticPodResources, err := parseResourceRequests(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
+	resticPodResources, err := kubeutil.ParseResourceRequirements(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
 	if err != nil {
 		return nil, err
 	}
