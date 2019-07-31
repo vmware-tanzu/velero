@@ -23,22 +23,22 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestGetImage(t *testing.T) {
-	configMapWithData := func(key, val string) *corev1.ConfigMap {
-		return &corev1.ConfigMap{
+	configMapWithData := func(key, val string) *corev1api.ConfigMap {
+		return &corev1api.ConfigMap{
 			Data: map[string]string{
 				key: val,
 			},
@@ -53,7 +53,7 @@ func TestGetImage(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		configMap *corev1.ConfigMap
+		configMap *corev1api.ConfigMap
 		want      string
 	}{
 		{
@@ -90,14 +90,17 @@ func TestGetImage(t *testing.T) {
 	}
 }
 
-func defaultResticInitContainer() *corev1.Container {
-	container := newResticInitContainer(initContainerImage(defaultImageBase), "")
+func testResticInitContainer() *corev1api.Container {
 	resourceReqs, _ := kube.ParseResourceRequirements(
 		defaultCPURequestLimit, defaultMemRequestLimit, // requests
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
 
-	container.Resources = resourceReqs
+	return newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
+		Resources(resourceReqs).
+		VolumeMounts(builder.ForVolumeMount("my-vol", "/restic/my-vol")).
+		Result()
+
 	return container
 }
 
@@ -106,32 +109,33 @@ func TestResticRestoreActionExecute(t *testing.T) {
 	// Need to add the ConfigMap testing
 	tests := []struct {
 		name string
-		pod  *corev1.Pod
-		want *corev1.Pod
+		pod  *corev1api.Pod
+		want *corev1api.Pod
 	}{
 		{
 			name: "Restoring pod with no other initContainers adds the restic initContainer",
-			pod: test.NewPod("ns-1", "pod",
-				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-			),
-			want: test.NewPod("ns-1", "pod",
-				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(defaultResticInitContainer(),
-					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
-			),
+			pod: builder.ForPod("ns-1", "pod").ObjectMeta(
+				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				Result(),
+			want: builder.ForPod("ns-1", "pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				InitContainers(testResticInitContainer()).
+				Result(),
 		},
 		{
 			name: "Restoring pod with other initContainers adds the restic initContainer as the first one",
-			pod: test.NewPod("ns-1", "pod",
-				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(test.NewContainer("first-container")),
-			),
-			want: test.NewPod("ns-1", "pod",
-				test.WithAnnotations("snapshot.velero.io/myvol", ""),
-				test.WithInitContainer(defaultResticInitContainer(),
-					test.WithVolumeMounts(test.NewVolumeMount("myvol"))),
-				test.WithInitContainer(test.NewContainer("first-container")),
-			),
+			pod: builder.ForPod("ns-1", "pod").ObjectMeta(
+				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				InitContainers(builder.ForContainer("first-container", "").Result()).
+				Result(),
+			want: builder.ForPod("ns-1", "pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+				InitContainers(
+					testResticInitContainer(),
+					builder.ForContainer("first-container", "").Result()).
+				Result(),
 		},
 	}
 

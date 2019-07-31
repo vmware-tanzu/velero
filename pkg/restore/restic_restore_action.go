@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
@@ -101,21 +102,22 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 		)
 	}
 
-	initContainer := newResticInitContainer(image, string(input.Restore.UID))
-	initContainer.Resources = resourceReqs
+	initContainerBuilder := newResticInitContainerBuilder(image, string(input.Restore.UID))
+	initContainerBuilder.Resources(&resourceReqs)
 
 	for volumeName := range volumeSnapshots {
-		mount := corev1.VolumeMount{
+		mount := &corev1.VolumeMount{
 			Name:      volumeName,
 			MountPath: "/restores/" + volumeName,
 		}
-		initContainer.VolumeMounts = append(initContainer.VolumeMounts, mount)
+		initContainerBuilder.VolumeMounts(mount)
 	}
 
+	initContainer := *initContainerBuilder.Result()
 	if len(pod.Spec.InitContainers) == 0 || pod.Spec.InitContainers[0].Name != restic.InitContainer {
-		pod.Spec.InitContainers = append([]corev1.Container{*initContainer}, pod.Spec.InitContainers...)
+		pod.Spec.InitContainers = append([]corev1.Container{initContainer}, pod.Spec.InitContainers...)
 	} else {
-		pod.Spec.InitContainers[0] = *initContainer
+		pod.Spec.InitContainers[0] = initContainer
 	}
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&pod)
@@ -208,12 +210,10 @@ func getPluginConfig(kind framework.PluginKind, name string, client corev1client
 	return &list.Items[0], nil
 }
 
-func newResticInitContainer(image, restoreUID string) *corev1.Container {
-	return &corev1.Container{
-		Name:  restic.InitContainer,
-		Image: image,
-		Args:  []string{restoreUID},
-		Env: []corev1.EnvVar{
+func newResticInitContainerBuilder(image, restoreUID string) *builder.ContainerBuilder {
+	return builder.ForContainer(restic.InitContainer, image).
+		Args(restoreUID).
+		Env([]*corev1.EnvVar{
 			{
 				Name: "POD_NAMESPACE",
 				ValueFrom: &corev1.EnvVarSource{
@@ -230,8 +230,7 @@ func newResticInitContainer(image, restoreUID string) *corev1.Container {
 					},
 				},
 			},
-		},
-	}
+		}...)
 }
 
 func initContainerImage(imageBase string) string {
