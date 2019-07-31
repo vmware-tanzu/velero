@@ -233,6 +233,11 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
 	d.Println()
 
+	if details {
+		printBackupResourceList(d, backup, veleroClient)
+		d.Println()
+	}
+
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
 			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
@@ -259,6 +264,25 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	}
 
 	d.Printf("Persistent Volumes: <none included>\n")
+}
+
+func printBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface) {
+	buf := new(bytes.Buffer)
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout); err != nil {
+		d.Printf("Resource List:\t<error getting backup resource list: %v>\n", err)
+		return
+	}
+
+	var resourceList map[string][]string
+	if err := json.NewDecoder(buf).Decode(&resourceList); err != nil {
+		d.Printf("Resource List:\t<error reading backup resource list: %v>\n", err)
+		return
+	}
+
+	d.Println("Resource List:")
+	for gvk, items := range resourceList {
+		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(items, "\n\t\t- "))
+	}
 }
 
 func printSnapshot(d *Describer, pvName, snapshotID, volumeType, volumeAZ string, iops *int64) {
