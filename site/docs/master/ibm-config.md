@@ -70,7 +70,7 @@ Velero does not currently have a volume snapshot plugin for IBM Cloud, so creati
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
 
-(Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/Restic pods.
+(Optional) Specify [CPU and memory resource requests and limits][15] for the Velero/restic pods.
 
 Once the installation is complete, remove the default `VolumeSnapshotLocation` that was created by `velero install`, since it's specific to AWS and won't work for IBM Cloud:
 
