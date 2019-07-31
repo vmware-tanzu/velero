@@ -36,8 +36,13 @@ import (
 )
 
 type BackupInfo struct {
-	Name                                                                           string
-	Metadata, Contents, Log, PodVolumeBackups, VolumeSnapshots, BackupResourceList io.Reader
+	Name string
+	Metadata,
+	Contents,
+	Log,
+	PodVolumeBackups,
+	VolumeSnapshots,
+	BackupResourceList io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
