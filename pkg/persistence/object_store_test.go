@@ -505,8 +505,6 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup/my-backup-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup/my-backup-volumesnapshots.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup/my-backup-resource-list.json.gz",
-				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup/restore-my-backup-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup/restore-my-backup-results.gz",
 			},
 		},
 		{
@@ -518,8 +516,6 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup/my-backup-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup/my-backup-volumesnapshots.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup/my-backup-resource-list.json.gz",
-				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup/restore-my-backup-results.gz",
 			},
 		},
 		{
@@ -530,8 +526,6 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupLog:             "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-volumesnapshots.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-resource-list.json.gz",
-				velerov1api.DownloadTargetKindRestoreLog:            "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults:        "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
 			},
 		},
 		{
@@ -542,8 +536,6 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
-				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup-20170913154901/restore-my-backup-20170913154901-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup-20170913154901/restore-my-backup-20170913154901-results.gz",
 			},
 		},
 		{
@@ -555,8 +547,31 @@ func TestGetDownloadURL(t *testing.T) {
 				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
 				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
 				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
-				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup-20170913154901/restore-my-backup-20170913154901-logs.gz",
-				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup-20170913154901/restore-my-backup-20170913154901-results.gz",
+			},
+		},
+		{
+			name:       "restore",
+			targetName: "my-backup",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindRestoreLog:     "restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults: "restores/my-backup/restore-my-backup-results.gz",
+			},
+		},
+		{
+			name:       "restore with prefix",
+			targetName: "my-backup",
+			prefix:     "velero-backups/",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindRestoreLog:     "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults: "velero-backups/restores/my-backup/restore-my-backup-results.gz",
+			},
+		},
+		{
+			name:       "restore with multiple dashes",
+			targetName: "b-cool-20170913154901-20170913154902",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindRestoreLog:     "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
 			},
 		},
 	}
