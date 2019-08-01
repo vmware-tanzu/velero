@@ -43,6 +43,7 @@ import (
 	"github.com/heptio/velero/pkg/metrics"
 	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	"github.com/heptio/velero/pkg/restic"
 	pkgrestore "github.com/heptio/velero/pkg/restore"
 	"github.com/heptio/velero/pkg/util/collections"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
@@ -75,7 +76,7 @@ type restoreController struct {
 
 	namespace              string
 	restoreClient          velerov1client.RestoresGetter
-	backupClient           velerov1client.BackupsGetter
+	podVolumeBackupClient  velerov1client.PodVolumeBackupsGetter
 	restorer               pkgrestore.Restorer
 	backupLister           listers.BackupLister
 	restoreLister          listers.RestoreLister
@@ -94,7 +95,7 @@ func NewRestoreController(
 	namespace string,
 	restoreInformer informers.RestoreInformer,
 	restoreClient velerov1client.RestoresGetter,
-	backupClient velerov1client.BackupsGetter,
+	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
 	backupInformer informers.BackupInformer,
 	backupLocationInformer informers.BackupStorageLocationInformer,
@@ -110,7 +111,7 @@ func NewRestoreController(
 		genericController:      newGenericController("restore", logger),
 		namespace:              namespace,
 		restoreClient:          restoreClient,
-		backupClient:           backupClient,
+		podVolumeBackupClient:  podVolumeBackupClient,
 		restorer:               restorer,
 		backupLister:           backupInformer.Lister(),
 		restoreLister:          restoreInformer.Lister(),
@@ -435,13 +436,32 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
+	opts := restic.NewPodVolumeBackupListOptions(restore.Spec.BackupName)
+	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(opts)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	volumeSnapshots, err := info.backupStore.GetBackupVolumeSnapshots(restore.Spec.BackupName)
 	if err != nil {
 		return errors.Wrap(err, "error fetching volume snapshots metadata")
 	}
 
 	restoreLog.Info("starting restore")
-	restoreWarnings, restoreErrors := c.restorer.Restore(restoreLog, restore, info.backup, volumeSnapshots, backupFile, actions, c.snapshotLocationLister, pluginManager)
+
+	var podVolumeBackups []*velerov1api.PodVolumeBackup
+	for i, pvb := range podVolumeBackupList.Items {
+		podVolumeBackups[i] = &pvb
+	}
+	restoreData := pkgrestore.Data{
+		Log:              restoreLog,
+		Restore:          restore,
+		Backup:           info.backup,
+		PodVolumeBackups: podVolumeBackups,
+		VolumeSnapshots:  volumeSnapshots,
+		BackupReader:     backupFile,
+	}
+	restoreWarnings, restoreErrors := c.restorer.Restore(restoreData, actions, c.snapshotLocationLister, pluginManager)
 	restoreLog.Info("restore completed")
 
 	if logReader, err := restoreLog.done(c.logger); err != nil {

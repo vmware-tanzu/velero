@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -65,6 +66,20 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	}
 
 	return res
+}
+
+// GetVolumesForPod returns a map, of volume name -> snapshot id,
+// of the PodVolumeBackups that exist for the provided pod.
+func GetVolumesForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod) map[string]string {
+	var volumes map[string]string
+
+	for _, pvb := range podVolumeBackups {
+		if pod.GetName() == pvb.Spec.Pod.Name {
+			volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
+		}
+	}
+
+	return volumes
 }
 
 // GetVolumesToBackup returns a list of volume names to backup for

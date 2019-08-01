@@ -31,6 +31,7 @@ import (
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
+	velerofake "github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/util/kube"
 	velerotest "github.com/heptio/velero/pkg/util/test"
@@ -149,9 +150,11 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			}
 
 			clientset := fake.NewSimpleClientset()
+			clientsetVelero := velerofake.NewSimpleClientset()
 			a := NewResticRestoreAction(
 				logrus.StandardLogger(),
 				clientset.CoreV1().ConfigMaps("velero"),
+				clientsetVelero.VeleroV1().PodVolumeBackups("velero"),
 			)
 
 			// method under test

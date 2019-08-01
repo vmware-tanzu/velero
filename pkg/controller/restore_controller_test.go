@@ -19,7 +19,6 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"io/ioutil"
 	"testing"
 	"time"
@@ -822,18 +821,14 @@ type fakeRestorer struct {
 }
 
 func (r *fakeRestorer) Restore(
-	log logrus.FieldLogger,
-	restore *api.Restore,
-	backup *api.Backup,
-	volumeSnapshots []*volume.Snapshot,
-	backupReader io.Reader,
+	info pkgrestore.Data,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
 ) (pkgrestore.Result, pkgrestore.Result) {
-	res := r.Called(log, restore, backup, backupReader, actions)
+	res := r.Called(info.Log, info.Restore, info.Backup, info.BackupReader, actions)
 
-	r.calledWithArg = *restore
+	r.calledWithArg = *info.Restore
 
 	return res.Get(0).(pkgrestore.Result), res.Get(1).(pkgrestore.Result)
 }
