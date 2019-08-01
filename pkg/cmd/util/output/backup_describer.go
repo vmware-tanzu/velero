@@ -234,7 +234,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Println()
 
 	if details {
-		printBackupResourceList(d, backup, veleroClient)
+		describeBackupResourceList(d, backup, veleroClient)
 		d.Println()
 	}
 
@@ -258,12 +258,43 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 
 		d.Printf("Persistent Volumes:\n")
 		for _, snap := range snapshots {
-			printSnapshot(d, snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS)
+			describeSnapshot(d, snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS)
 		}
 		return
 	}
 
 	d.Printf("Persistent Volumes: <none included>\n")
+}
+
+func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface) {
+	buf := new(bytes.Buffer)
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout); err != nil {
+		d.Printf("Resource List:\t<error getting backup resource list: %v>\n", err)
+		return
+	}
+
+	var resourceList map[string][]string
+	if err := json.NewDecoder(buf).Decode(&resourceList); err != nil {
+		d.Printf("Resource List:\t<error reading backup resource list: %v>\n", err)
+		return
+	}
+
+	d.Println("Resource List:")
+	for gvk, items := range resourceList {
+		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(items, "\n\t\t- "))
+	}
+}
+
+func describeSnapshot(d *Describer, pvName, snapshotID, volumeType, volumeAZ string, iops *int64) {
+	d.Printf("\t%s:\n", pvName)
+	d.Printf("\t\tSnapshot ID:\t%s\n", snapshotID)
+	d.Printf("\t\tType:\t%s\n", volumeType)
+	d.Printf("\t\tAvailability Zone:\t%s\n", volumeAZ)
+	iopsString := "<N/A>"
+	if iops != nil {
+		iopsString = fmt.Sprintf("%d", *iops)
+	}
+	d.Printf("\t\tIOPS:\t%s\n", iopsString)
 }
 
 // DescribeDeleteBackupRequests describes delete backup requests in human-readable format.
