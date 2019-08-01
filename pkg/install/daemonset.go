@@ -129,18 +129,6 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 									Name:  "VELERO_SCRATCH_DIR",
 									Value: "/scratch",
 								},
-								{
-									Name:  "AZURE_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AWS_SHARED_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
 							},
 							Resources: c.resources,
 						},
@@ -150,7 +138,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 		},
 	}
 
-	if !c.withoutCredentialsVolume {
+	if c.withSecret {
 		daemonSet.Spec.Template.Spec.Volumes = append(
 			daemonSet.Spec.Template.Spec.Volumes,
 			corev1.Volume{
@@ -170,6 +158,21 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				MountPath: "/credentials",
 			},
 		)
+
+		daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
+			{
+				Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AWS_SHARED_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AZURE_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+		}...)
 	}
 
 	daemonSet.Spec.Template.Spec.Containers[0].Env = append(daemonSet.Spec.Template.Spec.Containers[0].Env, c.envVars...)

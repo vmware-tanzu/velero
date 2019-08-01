@@ -27,12 +27,12 @@ import (
 type podTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
-	image                    string
-	withoutCredentialsVolume bool
-	envVars                  []corev1.EnvVar
-	restoreOnly              bool
-	annotations              map[string]string
-	resources                corev1.ResourceRequirements
+	image       string
+	envVars     []corev1.EnvVar
+	restoreOnly bool
+	annotations map[string]string
+	resources   corev1.ResourceRequirements
+	withSecret  bool
 }
 
 func WithImage(image string) podTemplateOption {
@@ -44,12 +44,6 @@ func WithImage(image string) podTemplateOption {
 func WithAnnotations(annotations map[string]string) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.annotations = annotations
-	}
-}
-
-func WithoutCredentialsVolume() podTemplateOption {
-	return func(c *podTemplateConfig) {
-		c.withoutCredentialsVolume = true
 	}
 }
 
@@ -66,6 +60,12 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 				},
 			},
 		})
+	}
+}
+
+func WithSecret(secretPresent bool) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.withSecret = secretPresent
 	}
 }
 
@@ -144,18 +144,6 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									Name:  "VELERO_SCRATCH_DIR",
 									Value: "/scratch",
 								},
-								{
-									Name:  "GOOGLE_APPLICATION_CREDENTIALS",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AWS_SHARED_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
-								{
-									Name:  "AZURE_CREDENTIALS_FILE",
-									Value: "/credentials/cloud",
-								},
 							},
 							Resources: c.resources,
 						},
@@ -179,7 +167,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 		},
 	}
 
-	if !c.withoutCredentialsVolume {
+	if c.withSecret {
 		deployment.Spec.Template.Spec.Volumes = append(
 			deployment.Spec.Template.Spec.Volumes,
 			corev1.Volume{
@@ -199,6 +187,21 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 				MountPath: "/credentials",
 			},
 		)
+
+		deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, []corev1.EnvVar{
+			{
+				Name:  "GOOGLE_APPLICATION_CREDENTIALS",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AWS_SHARED_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "AZURE_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+		}...)
 	}
 
 	deployment.Spec.Template.Spec.Containers[0].Env = append(deployment.Spec.Template.Spec.Containers[0].Env, c.envVars...)

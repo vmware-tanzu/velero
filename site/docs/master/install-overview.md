@@ -14,7 +14,8 @@ The Velero client includes an `install` command to specify the settings for each
 velero install \
     --provider <YOUR_PROVIDER> \
     --bucket <YOUR_BUCKET> \
-    --secret-file <PATH_TO_FILE> \
+    [--secret-file <PATH_TO_FILE>] \
+    [--no-secret] \
     [--backup-location-config] \
     [--snapshot-location-config] \
     [--namespace] \
@@ -22,6 +23,8 @@ velero install \
     [--use-restic] \
     [--pod-annotations] \
 ```
+
+When using node-based IAM policies, `--secret-file` is not required, but `--no-secret` is required for confirmation.
 
 For provider-specific instructions, see:
 

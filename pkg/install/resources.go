@@ -229,8 +229,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	sa := ServiceAccount(o.Namespace)
 	appendUnstructured(resources, sa)
 
-	sec := Secret(o.Namespace, o.SecretData)
-	appendUnstructured(resources, sec)
+	if o.SecretData != nil {
+		sec := Secret(o.Namespace, o.SecretData)
+		appendUnstructured(resources, sec)
+	}
 
 	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
 	appendUnstructured(resources, bsl)
@@ -241,15 +243,19 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		appendUnstructured(resources, vsl)
 	}
 
+	secretPresent := o.SecretData != nil
+
 	deploy := Deployment(o.Namespace,
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 		WithResources(o.VeleroPodResources),
+		WithSecret(secretPresent),
 	)
 	if o.RestoreOnly {
 		deploy = Deployment(o.Namespace,
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
+			WithSecret(secretPresent),
 			WithRestoreOnly(),
 		)
 	}
@@ -257,9 +263,11 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	if o.UseRestic {
 		ds := DaemonSet(o.Namespace,
+
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
+			WithSecret(secretPresent),
 		)
 		appendUnstructured(resources, ds)
 	}
