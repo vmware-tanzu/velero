@@ -52,11 +52,12 @@ func NewDownloadCommand(f client.Factory) *cobra.Command {
 }
 
 type DownloadOptions struct {
-	Name         string
-	Output       string
-	Force        bool
-	Timeout      time.Duration
-	writeOptions int
+	Name               string
+	Output             string
+	Force              bool
+	Timeout            time.Duration
+	InsecureSkipVerify bool
+	writeOptions       int
 }
 
 func NewDownloadOptions() *DownloadOptions {
@@ -69,6 +70,7 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
 	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
+	flags.BoolVar(&o.InsecureSkipVerify, "insecureskipverify", o.InsecureSkipVerify, "accept any TLS certificate presented by the storage service")
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -111,7 +113,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout)
+	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipVerify)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

@@ -32,6 +32,7 @@ import (
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
 	timeout := time.Minute
+	insecureSkipVerify := false
 
 	c := &cobra.Command{
 		Use:   "logs BACKUP",
@@ -58,12 +59,13 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 					"until the backup has a phase of Completed or Failed and try again.", backupName)
 			}
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipVerify)
 			cmd.CheckError(err)
 		},
 	}
 
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
+	c.Flags().BoolVar(&insecureSkipVerify, "insecureskipverify", insecureSkipVerify, "accept any TLS certificate presented by the storage service")
 
 	return c
 }

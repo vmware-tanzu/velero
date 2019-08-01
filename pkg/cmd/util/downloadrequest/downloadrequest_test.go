@@ -151,7 +151,7 @@ func TestStream(t *testing.T) {
 			output := new(bytes.Buffer)
 			errCh := make(chan error)
 			go func() {
-				err := Stream(client.VeleroV1(), "namespace", "name", test.kind, output, timeout)
+				err := Stream(client.VeleroV1(), "namespace", "name", test.kind, output, timeout, false)
 				errCh <- err
 			}()
 
