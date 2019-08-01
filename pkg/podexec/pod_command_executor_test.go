@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 )
 
 func TestNewPodCommandExecutor(t *testing.T) {

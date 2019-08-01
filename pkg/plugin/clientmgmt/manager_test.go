@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/heptio/velero/pkg/plugin/framework"
-	"github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/test"
 )
 
 type mockRegistry struct {

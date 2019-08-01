@@ -36,8 +36,8 @@ import (
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
+	velerotest "github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/kube"
-	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestGCControllerEnqueueAllBackups(t *testing.T) {

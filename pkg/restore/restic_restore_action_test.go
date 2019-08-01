@@ -33,8 +33,8 @@ import (
 	"github.com/heptio/velero/pkg/buildinfo"
 	velerofake "github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	"github.com/heptio/velero/pkg/plugin/velero"
+	velerotest "github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/kube"
-	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
 func TestGetImage(t *testing.T) {

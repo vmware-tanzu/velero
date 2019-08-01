@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 )
 
 func TestPVBHandler(t *testing.T) {

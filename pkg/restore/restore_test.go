@@ -51,10 +51,10 @@ import (
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/test"
+	testutil "github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
 	kubeutil "github.com/heptio/velero/pkg/util/kube"
-	testutil "github.com/heptio/velero/pkg/util/test"
 	"github.com/heptio/velero/pkg/volume"
 )
 
