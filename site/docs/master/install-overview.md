@@ -15,6 +15,7 @@ velero install \
     --provider <YOUR_PROVIDER> \
     --bucket <YOUR_BUCKET> \
     [--secret-file <PATH_TO_FILE>] \
+    [--no-secret] \
     [--backup-location-config] \
     [--snapshot-location-config] \
     [--namespace] \
@@ -23,7 +24,7 @@ velero install \
     [--pod-annotations] \
 ```
 
-The `--secret-file` argument is optional if using node-based IAM policies.
+When using node-based IAM policies, `--secret-file` is not required, but `--no-secret` is required for confirmation.
 
 For provider-specific instructions, see:
 

@@ -293,7 +293,8 @@ velero install \
     --provider aws \
     --bucket $BUCKET \
     --backup-location-config region=$REGION \
-    --snapshot-location-config region=$REGION
+    --snapshot-location-config region=$REGION \
+    --no-secret
 ```
 
 [0]: namespace.md
