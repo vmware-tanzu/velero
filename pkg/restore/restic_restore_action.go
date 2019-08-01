@@ -38,7 +38,7 @@ import (
 
 const (
 	defaultImageBase       = "gcr.io/heptio-images/velero-restic-restore-helper"
-	defaultCPURequestLimit = "100Mi"
+	defaultCPURequestLimit = "100m"
 	defaultMemRequestLimit = "128Mi"
 )
 
@@ -95,7 +95,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 
 	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
 	if err != nil {
-		log.Errorf("Couldn't parse resource requirements: %s", err)
+		log.Errorf("Using default resource values, couldn't parse resource requirements: %s.", err)
 		resourceReqs, _ = kube.ParseResourceRequirements(
 			defaultCPURequestLimit, defaultMemRequestLimit, // requests
 			defaultCPURequestLimit, defaultMemRequestLimit, // limits
