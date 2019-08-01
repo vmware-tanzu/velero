@@ -492,60 +492,72 @@ func TestDeleteBackup(t *testing.T) {
 
 func TestGetDownloadURL(t *testing.T) {
 	tests := []struct {
-		name        string
-		targetKind  velerov1api.DownloadTargetKind
-		targetName  string
-		prefix      string
-		expectedKey string
+		name              string
+		targetName        string
+		expectedKeyByKind map[velerov1api.DownloadTargetKind]string
+		prefix            string
 	}{
 		{
-			name:        "backup contents",
-			targetKind:  velerov1api.DownloadTargetKindBackupContents,
-			targetName:  "my-backup",
-			expectedKey: "backups/my-backup/my-backup.tar.gz",
+			name:       "backup",
+			targetName: "my-backup",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup/my-backup.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup/my-backup-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup/my-backup-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup/my-backup-resource-list.json.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup/restore-my-backup-results.gz",
+			},
 		},
 		{
-			name:        "backup log",
-			targetKind:  velerov1api.DownloadTargetKindBackupLog,
-			targetName:  "my-backup",
-			expectedKey: "backups/my-backup/my-backup-logs.gz",
+			name:       "backup with prefix",
+			targetName: "my-backup",
+			prefix:     "velero-backups/",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "velero-backups/backups/my-backup/my-backup.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup/my-backup-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup/my-backup-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup/my-backup-resource-list.json.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup/restore-my-backup-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup/restore-my-backup-results.gz",
+			},
 		},
 		{
-			name:        "scheduled backup contents",
-			targetKind:  velerov1api.DownloadTargetKindBackupContents,
-			targetName:  "my-backup-20170913154901",
-			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
+			name:       "backup with multiple dashes",
+			targetName: "b-cool-20170913154901-20170913154902",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "backups/b-cool-20170913154901-20170913154902/b-cool-20170913154901-20170913154902-resource-list.json.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
+			},
 		},
 		{
-			name:        "scheduled backup log",
-			targetKind:  velerov1api.DownloadTargetKindBackupLog,
-			targetName:  "my-backup-20170913154901",
-			expectedKey: "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
+			name:       "scheduled backup",
+			targetName: "my-backup-20170913154901",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "restores/my-backup-20170913154901/restore-my-backup-20170913154901-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "restores/my-backup-20170913154901/restore-my-backup-20170913154901-results.gz",
+			},
 		},
 		{
-			name:        "backup contents with backup store prefix",
-			targetKind:  velerov1api.DownloadTargetKindBackupContents,
-			targetName:  "my-backup",
-			prefix:      "velero-backups/",
-			expectedKey: "velero-backups/backups/my-backup/my-backup.tar.gz",
-		},
-		{
-			name:        "restore log",
-			targetKind:  velerov1api.DownloadTargetKindRestoreLog,
-			targetName:  "b-20170913154901",
-			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-logs.gz",
-		},
-		{
-			name:        "restore results",
-			targetKind:  velerov1api.DownloadTargetKindRestoreResults,
-			targetName:  "b-20170913154901",
-			expectedKey: "restores/b-20170913154901/restore-b-20170913154901-results.gz",
-		},
-		{
-			name:        "restore results - backup has multiple dashes (e.g. restore of scheduled backup)",
-			targetKind:  velerov1api.DownloadTargetKindRestoreResults,
-			targetName:  "b-cool-20170913154901-20170913154902",
-			expectedKey: "restores/b-cool-20170913154901-20170913154902/restore-b-cool-20170913154901-20170913154902-results.gz",
+			name:       "scheduled backup with prefix",
+			targetName: "my-backup-20170913154901",
+			prefix:     "velero-backups/",
+			expectedKeyByKind: map[velerov1api.DownloadTargetKind]string{
+				velerov1api.DownloadTargetKindBackupContents:        "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901.tar.gz",
+				velerov1api.DownloadTargetKindBackupLog:             "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-logs.gz",
+				velerov1api.DownloadTargetKindBackupVolumeSnapshots: "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-volumesnapshots.json.gz",
+				velerov1api.DownloadTargetKindBackupResourceList:    "velero-backups/backups/my-backup-20170913154901/my-backup-20170913154901-resource-list.json.gz",
+				velerov1api.DownloadTargetKindRestoreLog:            "velero-backups/restores/my-backup-20170913154901/restore-my-backup-20170913154901-logs.gz",
+				velerov1api.DownloadTargetKindRestoreResults:        "velero-backups/restores/my-backup-20170913154901/restore-my-backup-20170913154901-results.gz",
+			},
 		},
 	}
 
@@ -553,11 +565,15 @@ func TestGetDownloadURL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("test-bucket", test.prefix)
 
-			require.NoError(t, harness.objectStore.PutObject("test-bucket", test.expectedKey, newStringReadSeeker("foo")))
+			for kind, expectedKey := range test.expectedKeyByKind {
+				t.Run(string(kind), func(t *testing.T) {
+					require.NoError(t, harness.objectStore.PutObject("test-bucket", expectedKey, newStringReadSeeker("foo")))
 
-			url, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: test.targetKind, Name: test.targetName})
-			require.NoError(t, err)
-			assert.Equal(t, "a-url", url)
+					url, err := harness.GetDownloadURL(velerov1api.DownloadTarget{Kind: kind, Name: test.targetName})
+					require.NoError(t, err)
+					assert.Equal(t, "a-url", url)
+				})
+			}
 		})
 	}
 }
