@@ -170,7 +170,7 @@ func getResourceRequests(log logrus.FieldLogger, config *corev1.ConfigMap) (stri
 	return config.Data["cpuRequest"], config.Data["memRequest"]
 }
 
-// getResourceRequests extracts the CPU and memory limits from a ConfigMap.
+// getResourceLimits extracts the CPU and memory limits from a ConfigMap.
 // The 0 values are valid if the keys are not present
 func getResourceLimits(log logrus.FieldLogger, config *corev1.ConfigMap) (string, string) {
 	if config == nil {
