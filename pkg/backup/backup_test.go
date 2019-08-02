@@ -86,6 +86,8 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 
 	h.backupper.Backup(h.log, req, backupFile, nil, nil)
 
+	// go through BackedUpItems after the backup to assemble the list of files we
+	// expect to see in the tarball and compare to see if they match
 	var expectedFiles []string
 	for item := range req.BackedUpItems {
 		file := "resources/" + gvkToResource[item.resource]
