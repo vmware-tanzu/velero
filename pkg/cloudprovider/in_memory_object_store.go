@@ -76,11 +76,8 @@ func (o *InMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
 		return false, errors.New("bucket not found")
 	}
 
-	if _, ok = bucketData[key]; !ok {
-		return false, errors.New("key not found")
-	}
-
-	return true, nil
+	_, ok = bucketData[key]
+	return ok, nil
 }
 
 func (o *InMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
