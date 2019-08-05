@@ -269,7 +269,11 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface) {
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout); err != nil {
-		d.Printf("Resource List:\t<error getting backup resource list: %v>\n", err)
+		if err == downloadrequest.ErrNotFound {
+			d.Println("Resource List:\t<backup resource list not found, this could be because this backup was taken prior to Velero 1.1.0>")
+		} else {
+			d.Printf("Resource List:\t<error getting backup resource list: %v>\n", err)
+		}
 		return
 	}
 
