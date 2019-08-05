@@ -36,8 +36,13 @@ import (
 )
 
 type BackupInfo struct {
-	Name                                                       string
-	Metadata, Contents, Log, PodVolumeBackups, VolumeSnapshots io.Reader
+	Name string
+	Metadata,
+	Contents,
+	Log,
+	PodVolumeBackups,
+	VolumeSnapshots,
+	BackupResourceList io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -220,6 +225,18 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 	}
 
 	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(info.Name), info.VolumeSnapshots); err != nil {
+		errs := []error{err}
+
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
+		errs = append(errs, deleteErr)
+
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+		errs = append(errs, deleteErr)
+
+		return kerrors.NewAggregate(errs)
+	}
+
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupResourceListKey(info.Name), info.BackupResourceList); err != nil {
 		errs := []error{err}
 
 		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))

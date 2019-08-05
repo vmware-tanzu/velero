@@ -53,6 +53,56 @@ import (
 	"github.com/heptio/velero/pkg/volume"
 )
 
+func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
+	// TODO: figure out if this can be replaced with the restmapper
+	// (https://github.com/kubernetes/apimachinery/blob/035e418f1ad9b6da47c4e01906a0cfe32f4ee2e7/pkg/api/meta/restmapper.go)
+	gvkToResource := map[string]string{
+		"v1/Pod":              "pods",
+		"apps/v1/Deployment":  "deployments.apps",
+		"v1/PersistentVolume": "persistentvolumes",
+	}
+
+	h := newHarness(t)
+	req := &Request{Backup: defaultBackup().Result()}
+	backupFile := bytes.NewBuffer([]byte{})
+
+	apiResources := []*test.APIResource{
+		test.Pods(
+			builder.ForPod("foo", "bar").Result(),
+			builder.ForPod("zoo", "raz").Result(),
+		),
+		test.Deployments(
+			builder.ForDeployment("foo", "bar").Result(),
+			builder.ForDeployment("zoo", "raz").Result(),
+		),
+		test.PVs(
+			builder.ForPersistentVolume("bar").Result(),
+			builder.ForPersistentVolume("baz").Result(),
+		),
+	}
+	for _, resource := range apiResources {
+		h.addItems(t, resource)
+	}
+
+	h.backupper.Backup(h.log, req, backupFile, nil, nil)
+
+	// go through BackedUpItems after the backup to assemble the list of files we
+	// expect to see in the tarball and compare to see if they match
+	var expectedFiles []string
+	for item := range req.BackedUpItems {
+		file := "resources/" + gvkToResource[item.resource]
+		if item.namespace != "" {
+			file = file + "/namespaces/" + item.namespace
+		} else {
+			file = file + "/cluster"
+		}
+		file = file + "/" + item.name + ".json"
+		expectedFiles = append(expectedFiles, file)
+	}
+
+	assertTarballContents(t, backupFile, append(expectedFiles, "metadata/version")...)
+}
+
 // TestBackupResourceFiltering runs backups with different combinations
 // of resource filters (included/excluded resources, included/excluded
 // namespaces, label selectors, "include cluster resources" flag), and

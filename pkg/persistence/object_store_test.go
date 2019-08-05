@@ -217,6 +217,7 @@ func TestPutBackup(t *testing.T) {
 		log             io.Reader
 		podVolumeBackup io.Reader
 		snapshots       io.Reader
+		resourceList    io.Reader
 		expectedErr     string
 		expectedKeys    []string
 	}{
@@ -227,6 +228,7 @@ func TestPutBackup(t *testing.T) {
 			log:             newStringReadSeeker("log"),
 			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
 			snapshots:       newStringReadSeeker("snapshots"),
+			resourceList:    newStringReadSeeker("resourceList"),
 			expectedErr:     "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
@@ -234,6 +236,7 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-logs.gz",
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"backups/backup-1/backup-1-resource-list.json.gz",
 				"metadata/revision",
 			},
 		},
@@ -245,6 +248,7 @@ func TestPutBackup(t *testing.T) {
 			log:             newStringReadSeeker("log"),
 			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
 			snapshots:       newStringReadSeeker("snapshots"),
+			resourceList:    newStringReadSeeker("resourceList"),
 			expectedErr:     "",
 			expectedKeys: []string{
 				"prefix-1/backups/backup-1/velero-backup.json",
@@ -252,6 +256,7 @@ func TestPutBackup(t *testing.T) {
 				"prefix-1/backups/backup-1/backup-1-logs.gz",
 				"prefix-1/backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
 				"prefix-1/metadata/revision",
 			},
 		},
@@ -262,6 +267,7 @@ func TestPutBackup(t *testing.T) {
 			log:             newStringReadSeeker("log"),
 			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
 			snapshots:       newStringReadSeeker("snapshots"),
+			resourceList:    newStringReadSeeker("resourceList"),
 			expectedErr:     "error readers return errors",
 			expectedKeys:    []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -271,6 +277,7 @@ func TestPutBackup(t *testing.T) {
 			contents:     new(errorReader),
 			log:          newStringReadSeeker("log"),
 			snapshots:    newStringReadSeeker("snapshots"),
+			resourceList: newStringReadSeeker("resourceList"),
 			expectedErr:  "error readers return errors",
 			expectedKeys: []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -281,12 +288,14 @@ func TestPutBackup(t *testing.T) {
 			log:             new(errorReader),
 			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
 			snapshots:       newStringReadSeeker("snapshots"),
+			resourceList:    newStringReadSeeker("resourceList"),
 			expectedErr:     "",
 			expectedKeys: []string{
 				"backups/backup-1/velero-backup.json",
 				"backups/backup-1/backup-1.tar.gz",
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
+				"backups/backup-1/backup-1-resource-list.json.gz",
 				"metadata/revision",
 			},
 		},
@@ -297,6 +306,7 @@ func TestPutBackup(t *testing.T) {
 			log:             newStringReadSeeker("log"),
 			podVolumeBackup: newStringReadSeeker("podVolumeBackup"),
 			snapshots:       newStringReadSeeker("snapshots"),
+			resourceList:    newStringReadSeeker("resourceList"),
 			expectedErr:     "",
 			expectedKeys:    []string{"backups/backup-1/backup-1-logs.gz"},
 		},
@@ -307,12 +317,13 @@ func TestPutBackup(t *testing.T) {
 			harness := newObjectBackupStoreTestHarness("foo", tc.prefix)
 
 			backupInfo := BackupInfo{
-				Name:             "backup-1",
-				Metadata:         tc.metadata,
-				Contents:         tc.contents,
-				Log:              tc.log,
-				PodVolumeBackups: tc.podVolumeBackup,
-				VolumeSnapshots:  tc.snapshots,
+				Name:               "backup-1",
+				Metadata:           tc.metadata,
+				Contents:           tc.contents,
+				Log:                tc.log,
+				PodVolumeBackups:   tc.podVolumeBackup,
+				VolumeSnapshots:    tc.snapshots,
+				BackupResourceList: tc.resourceList,
 			}
 			err := harness.PutBackup(backupInfo)
 

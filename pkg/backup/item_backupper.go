@@ -19,6 +19,7 @@ package backup
 import (
 	"archive/tar"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"time"
 
@@ -46,7 +47,6 @@ import (
 type itemBackupperFactory interface {
 	newItemBackupper(
 		backup *Request,
-		backedUpItems map[itemKey]struct{},
 		podCommandExecutor podexec.PodCommandExecutor,
 		tarWriter tarWriter,
 		dynamicFactory client.DynamicFactory,
@@ -61,7 +61,6 @@ type defaultItemBackupperFactory struct{}
 
 func (f *defaultItemBackupperFactory) newItemBackupper(
 	backupRequest *Request,
-	backedUpItems map[itemKey]struct{},
 	podCommandExecutor podexec.PodCommandExecutor,
 	tarWriter tarWriter,
 	dynamicFactory client.DynamicFactory,
@@ -72,7 +71,6 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 ) ItemBackupper {
 	ib := &defaultItemBackupper{
 		backupRequest:           backupRequest,
-		backedUpItems:           backedUpItems,
 		tarWriter:               tarWriter,
 		dynamicFactory:          dynamicFactory,
 		discoveryHelper:         discoveryHelper,
@@ -97,7 +95,6 @@ type ItemBackupper interface {
 
 type defaultItemBackupper struct {
 	backupRequest           *Request
-	backedUpItems           map[itemKey]struct{}
 	tarWriter               tarWriter
 	dynamicFactory          client.DynamicFactory
 	discoveryHelper         discovery.Helper
@@ -149,19 +146,18 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		log.Info("Skipping item because it's being deleted.")
 		return nil
 	}
+
 	key := itemKey{
-		resource:  groupResource.String(),
+		resource:  resourceKey(obj),
 		namespace: namespace,
 		name:      name,
 	}
 
-	if _, exists := ib.backedUpItems[key]; exists {
+	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
 		log.Info("Skipping item because it's already been backed up.")
 		return nil
 	}
-	ib.backedUpItems[key] = struct{}{}
-
-	log.Debug(obj.GetObjectKind().GroupVersionKind().GroupVersion().String() + "/" + obj.GetObjectKind().GroupVersionKind().Kind)
+	ib.backupRequest.BackedUpItems[key] = struct{}{}
 
 	log.Info("Backing up item")
 
@@ -484,4 +480,11 @@ func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, lo
 			Phase: volume.SnapshotPhaseNew,
 		},
 	}
+}
+
+// resourceKey returns a string representing the object's GroupVersionKind (e.g.
+// apps/v1/Deployment).
+func resourceKey(obj runtime.Unstructured) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return fmt.Sprintf("%s/%s", gvk.GroupVersion().String(), gvk.Kind)
 }

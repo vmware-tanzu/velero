@@ -60,12 +60,6 @@ type kubernetesBackupper struct {
 	resticTimeout          time.Duration
 }
 
-type itemKey struct {
-	resource  string
-	namespace string
-	name      string
-}
-
 type resolvedAction struct {
 	velero.BackupItemAction
 
@@ -240,6 +234,8 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		return err
 	}
 
+	backupRequest.BackedUpItems = map[itemKey]struct{}{}
+
 	podVolumeTimeout := kb.resticTimeout
 	if val := backupRequest.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
@@ -266,7 +262,6 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		backupRequest,
 		kb.dynamicFactory,
 		kb.discoveryHelper,
-		make(map[itemKey]struct{}),
 		cohabitatingResources(),
 		kb.podCommandExecutor,
 		tw,
