@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
+package kube
 
 import (
 	"testing"
@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func Test_parseResourceRequests(t *testing.T) {
+func TestParseResourceRequirements(t *testing.T) {
 	type args struct {
 		cpuRequest string
 		memRequest string
@@ -44,7 +44,7 @@ func Test_parseResourceRequests(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parseResourceRequests(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuLimit, tt.args.memLimit)
+			got, err := ParseResourceRequirements(tt.args.cpuRequest, tt.args.memRequest, tt.args.cpuLimit, tt.args.memLimit)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return

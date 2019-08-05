@@ -199,11 +199,15 @@ the next restic backup taken will be treated as a completely new backup, not an 
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
 
-## Customize Restore Helper Image
+## Customize Restore Helper Container
 
 Velero uses a helper init container when performing a restic restore. By default, the image for this container is `gcr.io/heptio-images/velero-restic-restore-helper:<VERSION>`,
 where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
-the alternate image. The ConfigMap must look like the following:
+the alternate image. 
+
+In addition, you can customize the resource requirements for the init container, should you need.
+
+The ConfigMap must look like the following:
 
 ```yaml
 apiVersion: v1
@@ -225,10 +229,28 @@ metadata:
     # that this ConfigMap is for.
     velero.io/restic: RestoreItemAction
 data:
-  # "image" is the only configurable key. The value can either
-  # include a tag or not; if the tag is *not* included, the
-  # tag from the main Velero image will automatically be used.
+  # The value for "image" can either include a tag or not;
+  # if the tag is *not* included, the tag from the main Velero
+  # image will automatically be used.
   image: myregistry.io/my-custom-helper-image[:OPTIONAL_TAG]
+
+  # "cpuRequest" sets the request.cpu value on the restic init containers during restore.
+  # If not set, it will default to "100m".
+  cpuRequest: 200m
+  
+  # "memRequest" sets the request.memory value on the restic init containers during restore.
+  # If not set, it will default to "128Mi".
+  memRequest: 128Mi
+
+  # "cpuLimit" sets the request.cpu value on the restic init containers during restore.
+  # If not set, it will default to "100m".
+  cpuLimit: 200m
+  
+  # "memLimit" sets the request.memory value on the restic init containers during restore.
+  # If not set, it will default to "128Mi".
+  memLimit: 128Mi
+
+
 ```
 
 ## Troubleshooting

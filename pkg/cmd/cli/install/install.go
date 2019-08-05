@@ -26,8 +26,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
@@ -35,6 +33,7 @@ import (
 	"github.com/heptio/velero/pkg/cmd/util/flag"
 	"github.com/heptio/velero/pkg/cmd/util/output"
 	"github.com/heptio/velero/pkg/install"
+	kubeutil "github.com/heptio/velero/pkg/util/kube"
 )
 
 // InstallOptions collects all the options for installing Velero into a Kubernetes cluster.
@@ -125,11 +124,11 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 			return nil, err
 		}
 	}
-	veleroPodResources, err := parseResourceRequests(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
+	veleroPodResources, err := kubeutil.ParseResourceRequirements(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
 	if err != nil {
 		return nil, err
 	}
-	resticPodResources, err := parseResourceRequests(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
+	resticPodResources, err := kubeutil.ParseResourceRequirements(o.ResticPodCPURequest, o.ResticPodMemRequest, o.ResticPodCPULimit, o.ResticPodMemLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -284,50 +283,4 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	}
 
 	return nil
-}
-
-// parseResourceRequests takes a set of CPU and memory requests and limit string
-// values and returns a ResourceRequirements struct to be used in a Container.
-// An error is returned if we cannot parse the request/limit.
-func parseResourceRequests(cpuRequest, memRequest, cpuLimit, memLimit string) (corev1.ResourceRequirements, error) {
-	var resources corev1.ResourceRequirements
-
-	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
-	if err != nil {
-		return resources, errors.Wrapf(err, `couldn't parse CPU request "%s"`, cpuRequest)
-	}
-
-	parsedMemRequest, err := resource.ParseQuantity(memRequest)
-	if err != nil {
-		return resources, errors.Wrapf(err, `couldn't parse memory request "%s"`, memRequest)
-	}
-
-	parsedCPULimit, err := resource.ParseQuantity(cpuLimit)
-	if err != nil {
-		return resources, errors.Wrapf(err, `couldn't parse CPU limit "%s"`, cpuLimit)
-	}
-
-	parsedMemLimit, err := resource.ParseQuantity(memLimit)
-	if err != nil {
-		return resources, errors.Wrapf(err, `couldn't parse memory limit "%s"`, memLimit)
-	}
-
-	if parsedCPURequest.Cmp(parsedCPULimit) > 0 {
-		return resources, errors.WithStack(errors.Errorf(`CPU request "%s" must be less than or equal to CPU limit "%s"`, cpuRequest, cpuLimit))
-	}
-
-	if parsedMemRequest.Cmp(parsedMemLimit) > 0 {
-		return resources, errors.WithStack(errors.Errorf(`Memory request "%s" must be less than or equal to Memory limit "%s"`, memRequest, memLimit))
-	}
-
-	resources.Requests = corev1.ResourceList{
-		corev1.ResourceCPU:    parsedCPURequest,
-		corev1.ResourceMemory: parsedMemRequest,
-	}
-	resources.Limits = corev1.ResourceList{
-		corev1.ResourceCPU:    parsedCPULimit,
-		corev1.ResourceMemory: parsedMemLimit,
-	}
-
-	return resources, nil
 }
