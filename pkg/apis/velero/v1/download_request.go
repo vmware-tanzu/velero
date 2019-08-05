@@ -31,6 +31,7 @@ const (
 	DownloadTargetKindBackupLog             DownloadTargetKind = "BackupLog"
 	DownloadTargetKindBackupContents        DownloadTargetKind = "BackupContents"
 	DownloadTargetKindBackupVolumeSnapshots DownloadTargetKind = "BackupVolumeSnapshots"
+	DownloadTargetKindBackupResourceList    DownloadTargetKind = "BackupResourceList"
 	DownloadTargetKindRestoreLog            DownloadTargetKind = "RestoreLog"
 	DownloadTargetKindRestoreResults        DownloadTargetKind = "RestoreResults"
 )
