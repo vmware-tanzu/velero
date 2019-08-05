@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/flag"
@@ -72,7 +72,6 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
-	flags.StringVar(&o.Namespace, "namespace", o.Namespace, "namespace to install Velero and associated data into. Optional.")
 	flags.StringVar(&o.VeleroPodCPURequest, "velero-pod-cpu-request", o.VeleroPodCPURequest, "CPU request for Velero pod. Optional.")
 	flags.StringVar(&o.VeleroPodMemRequest, "velero-pod-mem-request", o.VeleroPodMemRequest, "memory request for Velero pod. Optional.")
 	flags.StringVar(&o.VeleroPodCPULimit, "velero-pod-cpu-limit", o.VeleroPodCPULimit, "CPU limit for Velero pod. Optional.")
@@ -93,7 +92,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 // NewInstallOptions instantiates a new, default InstallOptions struct.
 func NewInstallOptions() *InstallOptions {
 	return &InstallOptions{
-		Namespace:            api.DefaultNamespace,
+		Namespace:            velerov1api.DefaultNamespace,
 		Image:                install.DefaultImage,
 		BackupStorageConfig:  flag.NewMap(),
 		VolumeSnapshotConfig: flag.NewMap(),
@@ -168,7 +167,9 @@ Velero Deployment and associated Restic DaemonSet.
 
 The provided secret data will be created in a Secret named 'cloud-credentials'.
 
-All namespaced resources will be placed in the 'velero' namespace.
+All namespaced resources will be placed in the 'velero' namespace by default. 
+
+The '--namespace' flag can be used to specify a different namespace to install into.
 
 Use '--wait' to wait for the Velero Deployment to be ready before proceeding.
 
@@ -251,6 +252,7 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 
 //Complete completes options for a command.
 func (o *InstallOptions) Complete(args []string, f client.Factory) error {
+	o.Namespace = f.Namespace()
 	return nil
 }
 
