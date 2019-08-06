@@ -197,6 +197,10 @@ Specify the following values in the example files:
           aws ec2 describe-tags --filters "Name=resource-id,Values=<ID>" "Name=key,Values=KubernetesCluster"
         ```
 
+* (Optional, use only to create Kubernetes Cronjob for automated backup) In `config/aws/15-backup-cronjob.yaml`:
+
+  * Replace `<NAME OF BACKUP>`,`<NAMESPACES(s) TO BE INCLUDED>`,`<RESOURCE(s) TO BE INCLUDED/CONSIDERD FOR BACKUP>` and `<LABEL(s) TO BE CONSIDERD FOR BACKUP>` with proper values.(Incase all namespaces to be considered, replace `<NAMESPACES(s) TO BE INCLUDED>` with *. For more details check the velero CLI documentations.
+
 ## Start the server
 
 In the root of your Velero directory, run:
