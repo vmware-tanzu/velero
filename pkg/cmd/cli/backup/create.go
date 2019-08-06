@@ -21,14 +21,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/heptio/velero/pkg/builder"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/flag"
