@@ -164,12 +164,6 @@ func (b *BackupBuilder) StartTimestamp(val time.Time) *BackupBuilder {
 	return b
 }
 
-// NoTypeMeta removes the type meta from the Backup.
-func (b *BackupBuilder) NoTypeMeta() *BackupBuilder {
-	b.object.TypeMeta = metav1.TypeMeta{}
-	return b
-}
-
 // Hooks sets the Backup's hooks.
 func (b *BackupBuilder) Hooks(hooks velerov1api.BackupHooks) *BackupBuilder {
 	b.object.Spec.Hooks = hooks
