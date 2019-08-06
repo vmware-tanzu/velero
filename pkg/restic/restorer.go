@@ -91,13 +91,12 @@ func newRestorer(
 	return r
 }
 
+// TODO(2.0)
+
 func (r *restorer) RestorePodVolumes(data RestoreData) []error {
-	volumesToRestore := GetVolumesForPod(data.PodVolumeBackups, data.Pod)
+	volumesToRestore := GetVolumeBackupsForPod(data.PodVolumeBackups, data.Pod)
 	if len(volumesToRestore) == 0 {
-		volumesToRestore = GetPodSnapshotAnnotations(data.Pod)
-		if len(volumesToRestore) == 0 {
-			return nil
-		}
+		return nil
 	}
 
 	repo, err := r.repoEnsurer.EnsureRepo(r.ctx, data.Restore.Namespace, data.SourceNamespace, data.BackupLocation)

@@ -1088,24 +1088,14 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		return warnings, errs
 	}
 
-	if groupResource == kuberesource.Pods {
-		if len(ctx.podVolumeBackups) == 0 {
-			if len(restic.GetPodSnapshotAnnotations(obj)) > 0 {
-				restorePodVolumeBackups(ctx, createdObj, originalNamespace)
-			}
-		}
-
-		// Find all PVBs for this pod that is being restored
-		for _, pvb := range ctx.podVolumeBackups {
-			if obj.GetName() == pvb.Spec.Pod.Name {
-				restorePodVolumeBackups(ctx, createdObj, originalNamespace)
-			}
-		}
+	if groupResource == kuberesource.Pods && len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, obj)) > 0 {
+		restorePodVolumeBackups(ctx, createdObj, originalNamespace)
 	}
 
 	return warnings, errs
 }
 
+// restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
 func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured, originalNamespace string) {
 	if ctx.resticRestorer == nil {
 		ctx.log.Warn("No restic restorer, not restoring pod's volumes")

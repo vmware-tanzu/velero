@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -46,10 +45,12 @@ const (
 	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 )
 
-// GetPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
+// getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
 // of all restic snapshots for this pod.
-// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken.
-func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
+// TODO(2.0) to remove
+// Deprecated: we will stop using pod annotations to record restic snapshot IDs after they're taken,
+// therefore we won't need to check if these annotations exist.
+func getPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	var res map[string]string
 
 	insertSafe := func(k, v string) {
@@ -68,10 +69,10 @@ func GetPodSnapshotAnnotations(obj metav1.Object) map[string]string {
 	return res
 }
 
-// GetVolumesForPod returns a map, of volume name -> snapshot id,
+// GetVolumeBackupsForPod returns a map, of volume name -> snapshot id,
 // of the PodVolumeBackups that exist for the provided pod.
-func GetVolumesForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *corev1api.Pod) map[string]string {
-	var volumes map[string]string
+func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod metav1.Object) map[string]string {
+	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
 		if pod.GetName() == pvb.Spec.Pod.Name {
@@ -79,7 +80,11 @@ func GetVolumesForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod *core
 		}
 	}
 
-	return volumes
+	if len(volumes) > 0 {
+		return volumes
+	}
+
+	return getPodSnapshotAnnotations(pod)
 }
 
 // GetVolumesToBackup returns a list of volume names to backup for

@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	"github.com/heptio/velero/pkg/builder"
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/heptio/velero/pkg/plugin/framework"
@@ -85,13 +85,10 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	for i, pvb := range podVolumeBackupList.Items {
 		podVolumeBackups[i] = &pvb
 	}
-	volumeSnapshots := restic.GetVolumesForPod(podVolumeBackups, &pod)
+	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod)
 	if len(volumeSnapshots) == 0 {
-		volumeSnapshots = restic.GetPodSnapshotAnnotations(&pod)
-		if len(volumeSnapshots) == 0 {
-			log.Debug("No restic snapshot ID annotations found")
-			return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
-		}
+		log.Debug("No restic snapshot ID annotations found")
+		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
 	log.Info("Restic snapshot ID annotations found")
