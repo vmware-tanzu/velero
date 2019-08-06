@@ -507,7 +507,7 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -570,7 +570,7 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -652,7 +652,7 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		}
 		require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-		data := Data{
+		data := Request{
 			Log:              h.log,
 			Restore:          tc.restore,
 			Backup:           tc.backup,
@@ -729,7 +729,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -944,7 +944,7 @@ func TestRestoreItems(t *testing.T) {
 				h.addItems(t, r)
 			}
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -1138,7 +1138,7 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				actions = append(actions, action)
 			}
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -1277,7 +1277,7 @@ func TestRestoreActionModifications(t *testing.T) {
 				}
 			}
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -1444,7 +1444,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				h.addItems(t, r)
 			}
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
@@ -2123,7 +2123,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				}
 			}
 
-			data := Data{
+			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,

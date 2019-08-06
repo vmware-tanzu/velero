@@ -607,7 +607,7 @@ func TestProcessQueueItem(t *testing.T) {
 				}
 			}
 
-			velerotest.ValidatePatch(t, actions[1], expected, decode)
+			velerotest.ValidatePatch(t, actions[2], expected, decode)
 
 			// explicitly capturing the argument passed to Restore myself because
 			// I want to validate the called arg as of the time of calling, but
@@ -821,7 +821,7 @@ type fakeRestorer struct {
 }
 
 func (r *fakeRestorer) Restore(
-	info pkgrestore.Data,
+	info pkgrestore.Request,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter pkgrestore.VolumeSnapshotterGetter,
