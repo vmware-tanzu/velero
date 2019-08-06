@@ -87,11 +87,11 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	}
 	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod)
 	if len(volumeSnapshots) == 0 {
-		log.Debug("No restic snapshot ID annotations found")
+		log.Debug("No restic backups found for pod")
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
-	log.Info("Restic snapshot ID annotations found")
+	log.Info("Restic backups for pod found")
 
 	// TODO we might want/need to get plugin config at the top of this method at some point; for now, wait
 	// until we know we're doing a restore before getting config.
