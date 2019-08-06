@@ -1,0 +1,1 @@
+adds the ability to define custom tags to be added to snapshots by specifying custom labels on the Backup CR with the velero backup create --labels flag
