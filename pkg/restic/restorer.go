@@ -91,8 +91,6 @@ func newRestorer(
 	return r
 }
 
-// TODO(2.0)
-
 func (r *restorer) RestorePodVolumes(data RestoreData) []error {
 	volumesToRestore := GetVolumeBackupsForPod(data.PodVolumeBackups, data.Pod)
 	if len(volumesToRestore) == 0 {
