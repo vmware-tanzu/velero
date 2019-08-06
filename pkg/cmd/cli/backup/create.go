@@ -17,8 +17,11 @@ limitations under the License.
 package backup
 
 import (
+	"errors"
 	"fmt"
 	"time"
+
+	"github.com/heptio/velero/pkg/builder"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -33,6 +36,8 @@ import (
 	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 )
+
+const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
@@ -84,13 +89,14 @@ type CreateOptions struct {
 	Wait                    bool
 	StorageLocation         string
 	SnapshotLocations       []string
+	FromSchedule            string
 
 	client veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:                     30 * 24 * time.Hour,
+		TTL:                     DefaultBackupTTL,
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
@@ -108,6 +114,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "list of locations (at most one per provider) where volume snapshots should be stored")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
+	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from a Schedule. Cannot be used with any other filters.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -126,6 +133,17 @@ func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
+	}
+
+	if o.FromSchedule != "" {
+		if (len(o.IncludeNamespaces) > 1 || o.IncludeNamespaces[0] != "*") ||
+			len(o.ExcludeNamespaces) > 0 || len(o.IncludeResources) > 0 ||
+			len(o.ExcludeResources) > 0 || o.Selector.LabelSelector != nil ||
+			o.SnapshotVolumes.Value != nil || o.TTL != DefaultBackupTTL ||
+			o.IncludeClusterResources.Value != nil ||
+			o.StorageLocation != "" || len(o.SnapshotLocations) > 0 {
+			return errors.New("backup filters cannot be set when creating a Backup from a Schedule")
+		}
 	}
 
 	if o.StorageLocation != "" {
@@ -154,13 +172,18 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	backup := &api.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
-			Name:      o.Name,
-			Labels:    o.Labels.Data(),
-		},
-		Spec: api.BackupSpec{
+	var backup *api.Backup
+	backupBuilder := builder.ForBackup(f.Namespace(), o.Name).ObjectMeta(builder.WithLabelsMap(o.Labels.Data()))
+
+	if o.FromSchedule != "" {
+		schedule, err := o.client.VeleroV1().Schedules(f.Namespace()).Get(o.FromSchedule, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		backup = backupBuilder.FromSchedule(schedule).Result()
+	} else {
+		backup = backupBuilder.Result()
+		backup.Spec = api.BackupSpec{
 			IncludedNamespaces:      o.IncludeNamespaces,
 			ExcludedNamespaces:      o.ExcludeNamespaces,
 			IncludedResources:       o.IncludeResources,
@@ -171,7 +194,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 			IncludeClusterResources: o.IncludeClusterResources.Value,
 			StorageLocation:         o.StorageLocation,
 			VolumeSnapshotLocations: o.SnapshotLocations,
-		},
+		}
 	}
 
 	if printed, err := output.PrintWithFormat(c, backup); printed || err != nil {

@@ -42,6 +42,23 @@ func WithLabels(vals ...string) func(obj metav1.Object) {
 	}
 }
 
+// WithLabelsMap is a functional option that applies the specified labels map to
+// an object.
+func WithLabelsMap(labels map[string]string) func(obj metav1.Object) {
+	return func(obj metav1.Object) {
+		objLabels := obj.GetLabels()
+		if objLabels == nil {
+			objLabels = make(map[string]string)
+		}
+
+		for k, v := range labels {
+			objLabels[k] = v
+		}
+
+		obj.SetLabels(objLabels)
+	}
+}
+
 // WithAnnotations is a functional option that applies the specified
 // annotation keys/values to an object.
 func WithAnnotations(vals ...string) func(obj metav1.Object) {
