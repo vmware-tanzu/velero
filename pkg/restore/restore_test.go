@@ -507,12 +507,16 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				nil, // actions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -566,12 +570,16 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				nil, // actions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -644,12 +652,16 @@ func TestRestoreResourcePriorities(t *testing.T) {
 		}
 		require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
+		data := Request{
+			Log:              h.log,
+			Restore:          tc.restore,
+			Backup:           tc.backup,
+			PodVolumeBackups: nil,
+			VolumeSnapshots:  nil,
+			BackupReader:     tc.tarball,
+		}
 		warnings, errs := h.restorer.Restore(
-			h.log,
-			tc.restore,
-			tc.backup,
-			nil, // volume snapshots
-			tc.tarball,
+			data,
 			nil, // actions
 			nil, // snapshot location lister
 			nil, // volume snapshotter getter
@@ -717,12 +729,16 @@ func TestInvalidTarballContents(t *testing.T) {
 			}
 			require.NoError(t, h.restorer.discoveryHelper.Refresh())
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				nil, // actions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -928,12 +944,16 @@ func TestRestoreItems(t *testing.T) {
 				h.addItems(t, r)
 			}
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				nil, // actions
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -1118,12 +1138,16 @@ func TestRestoreActionsRunForCorrectItems(t *testing.T) {
 				actions = append(actions, action)
 			}
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				actions,
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -1253,12 +1277,16 @@ func TestRestoreActionModifications(t *testing.T) {
 				}
 			}
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				tc.actions,
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -1416,12 +1444,16 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 				h.addItems(t, r)
 			}
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				nil, // volume snapshots
-				tc.tarball,
+				data,
 				tc.actions,
 				nil, // snapshot location lister
 				nil, // volume snapshotter getter
@@ -1707,6 +1739,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		volumeSnapshots         []*volume.Snapshot
 		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
 		volumeSnapshotterGetter volumeSnapshotterGetter
+		podVolumeBackups        []*velerov1api.PodVolumeBackup
 		want                    []*test.APIResource
 	}{
 		{
@@ -1997,6 +2030,71 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 			},
 		},
+
+		{
+			name:    "include podvolumebackups, and when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			tarball: newTarWriter(t).
+				addItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: velerov1api.DefaultNamespace,
+						Name:      "default",
+					},
+					Spec: velerov1api.VolumeSnapshotLocationSpec{
+						Provider: "provider-1",
+					},
+				},
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
+				// mappings as a way to verify that the snapshot is not restored, since if it were
+				// restored, we'd get an error of "snapshot not found".
+				"provider-1": &volumeSnapshotter{},
+			},
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").Result(),
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").
+						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
+						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -2025,12 +2123,16 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				}
 			}
 
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: tc.podVolumeBackups,
+				VolumeSnapshots:  tc.volumeSnapshots,
+				BackupReader:     tc.tarball,
+			}
 			warnings, errs := h.restorer.Restore(
-				h.log,
-				tc.restore,
-				tc.backup,
-				tc.volumeSnapshots,
-				tc.tarball,
+				data,
 				nil, // actions
 				vslInformer.Lister(),
 				tc.volumeSnapshotterGetter,

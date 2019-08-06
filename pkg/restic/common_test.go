@@ -75,7 +75,7 @@ func TestGetPodSnapshotAnnotations(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			pod := &corev1api.Pod{}
 			pod.Annotations = test.annotations
-			assert.Equal(t, test.expected, GetPodSnapshotAnnotations(pod))
+			assert.Equal(t, test.expected, getPodSnapshotAnnotations(pod))
 		})
 	}
 }

@@ -28,8 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
+	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
@@ -43,14 +45,16 @@ const (
 )
 
 type ResticRestoreAction struct {
-	logger logrus.FieldLogger
-	client corev1client.ConfigMapInterface
+	logger                logrus.FieldLogger
+	client                corev1client.ConfigMapInterface
+	podVolumeBackupClient velerov1client.PodVolumeBackupInterface
 }
 
-func NewResticRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface) *ResticRestoreAction {
+func NewResticRestoreAction(logger logrus.FieldLogger, client corev1client.ConfigMapInterface, podVolumeBackupClient velerov1client.PodVolumeBackupInterface) *ResticRestoreAction {
 	return &ResticRestoreAction{
-		logger: logger,
-		client: client,
+		logger:                logger,
+		client:                client,
+		podVolumeBackupClient: podVolumeBackupClient,
 	}
 }
 
@@ -71,13 +75,23 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
 
-	volumeSnapshots := restic.GetPodSnapshotAnnotations(&pod)
+	opts := restic.NewPodVolumeBackupListOptions(input.Restore.Spec.BackupName)
+	podVolumeBackupList, err := a.podVolumeBackupClient.List(opts)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var podVolumeBackups []*velerov1api.PodVolumeBackup
+	for i := range podVolumeBackupList.Items {
+		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
+	}
+	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod)
 	if len(volumeSnapshots) == 0 {
-		log.Debug("No restic snapshot ID annotations found")
+		log.Debug("No restic backups found for pod")
 		return velero.NewRestoreItemActionExecuteOutput(input.Item), nil
 	}
 
-	log.Info("Restic snapshot ID annotations found")
+	log.Info("Restic backups for pod found")
 
 	// TODO we might want/need to get plugin config at the top of this method at some point; for now, wait
 	// until we know we're doing a restore before getting config.

@@ -136,7 +136,12 @@ func newResticRestoreItemAction(f client.Factory) veleroplugin.HandlerInitialize
 			return nil, err
 		}
 
-		return restore.NewResticRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace())), nil
+		veleroClient, err := f.Client()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewResticRestoreAction(logger, client.CoreV1().ConfigMaps(f.Namespace()), veleroClient.VeleroV1().PodVolumeBackups(f.Namespace())), nil
 	}
 }
 

@@ -43,7 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
@@ -63,14 +63,20 @@ type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
+type Request struct {
+	*velerov1api.Restore
+
+	Log              logrus.FieldLogger
+	Backup           *velerov1api.Backup
+	PodVolumeBackups []*velerov1api.PodVolumeBackup
+	VolumeSnapshots  []*volume.Snapshot
+	BackupReader     io.Reader
+}
+
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(log logrus.FieldLogger,
-		restore *api.Restore,
-		backup *api.Backup,
-		volumeSnapshots []*volume.Snapshot,
-		backupReader io.Reader,
+	Restore(req Request,
 		actions []velero.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -176,11 +182,7 @@ func NewKubernetesRestorer(
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
-	log logrus.FieldLogger,
-	restore *api.Restore,
-	backup *api.Backup,
-	volumeSnapshots []*volume.Snapshot,
-	backupReader io.Reader,
+	req Request,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -189,7 +191,7 @@ func (kr *kubernetesRestorer) Restore(
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
 	// passing a non-nil empty LabelSelector.
-	ls := restore.Spec.LabelSelector
+	ls := req.Restore.Spec.LabelSelector
 	if ls == nil {
 		ls = &metav1.LabelSelector{}
 	}
@@ -200,16 +202,16 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	// get resource includes-excludes
-	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, restore.Spec.IncludedResources, restore.Spec.ExcludedResources)
-	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, log)
+	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
+	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, req.Log)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
 	// get namespace includes-excludes
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
-		Includes(restore.Spec.IncludedNamespaces...).
-		Excludes(restore.Spec.ExcludedNamespaces...)
+		Includes(req.Restore.Spec.IncludedNamespaces...).
+		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
 	if err != nil {
@@ -217,10 +219,10 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	podVolumeTimeout := kr.resticTimeout
-	if val := restore.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+	if val := req.Restore.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
 		if err != nil {
-			log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
+			req.Log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
 		} else {
 			podVolumeTimeout = parsed
 		}
@@ -231,31 +233,31 @@ func (kr *kubernetesRestorer) Restore(
 
 	var resticRestorer restic.Restorer
 	if kr.resticRestorerFactory != nil {
-		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, restore)
+		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, req.Restore)
 		if err != nil {
 			return Result{}, Result{Velero: []string{err.Error()}}
 		}
 	}
 
 	pvRestorer := &pvRestorer{
-		logger:                  log,
-		backup:                  backup,
-		snapshotVolumes:         backup.Spec.SnapshotVolumes,
-		restorePVs:              restore.Spec.RestorePVs,
-		volumeSnapshots:         volumeSnapshots,
+		logger:                  req.Log,
+		backup:                  req.Backup,
+		snapshotVolumes:         req.Backup.Spec.SnapshotVolumes,
+		restorePVs:              req.Restore.Spec.RestorePVs,
+		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		snapshotLocationLister:  snapshotLocationLister,
 	}
 
 	restoreCtx := &context{
-		backup:                     backup,
-		backupReader:               backupReader,
-		restore:                    restore,
+		backup:                     req.Backup,
+		backupReader:               req.BackupReader,
+		restore:                    req.Restore,
 		resourceIncludesExcludes:   resourceIncludesExcludes,
 		namespaceIncludesExcludes:  namespaceIncludesExcludes,
 		prioritizedResources:       prioritizedResources,
 		selector:                   selector,
-		log:                        log,
+		log:                        req.Log,
 		dynamicFactory:             kr.dynamicFactory,
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
@@ -264,10 +266,11 @@ func (kr *kubernetesRestorer) Restore(
 		resticRestorer:             resticRestorer,
 		pvsToProvision:             sets.NewString(),
 		pvRestorer:                 pvRestorer,
-		volumeSnapshots:            volumeSnapshots,
+		volumeSnapshots:            req.VolumeSnapshots,
+		podVolumeBackups:           req.PodVolumeBackups,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
 		extractor: &backupExtractor{
-			log:        log,
+			log:        req.Log,
 			fileSystem: kr.fileSystem,
 		},
 		resourceClients: make(map[resourceClientKey]client.Dynamic),
@@ -339,9 +342,9 @@ func resolveActions(actions []velero.RestoreItemAction, helper discovery.Helper)
 }
 
 type context struct {
-	backup                     *api.Backup
+	backup                     *velerov1api.Backup
 	backupReader               io.Reader
-	restore                    *api.Restore
+	restore                    *velerov1api.Restore
 	restoreDir                 string
 	resourceIncludesExcludes   *collections.IncludesExcludes
 	namespaceIncludesExcludes  *collections.IncludesExcludes
@@ -358,6 +361,7 @@ type context struct {
 	pvsToProvision             sets.String
 	pvRestorer                 PVRestorer
 	volumeSnapshots            []*volume.Snapshot
+	podVolumeBackups           []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout time.Duration
 	extractor                  *backupExtractor
 	resourceClients            map[resourceClientKey]client.Dynamic
@@ -391,7 +395,7 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 	warnings, errs := Result{}, Result{}
 
 	// Make sure the top level "resources" dir exists:
-	resourcesDir := filepath.Join(ctx.restoreDir, api.ResourcesDir)
+	resourcesDir := filepath.Join(ctx.restoreDir, velerov1api.ResourcesDir)
 	rde, err := ctx.fileSystem.DirExists(resourcesDir)
 	if err != nil {
 		addVeleroError(&errs, err)
@@ -430,7 +434,7 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 
 		resourcePath := filepath.Join(resourcesDir, rscDir.Name())
 
-		clusterSubDir := filepath.Join(resourcePath, api.ClusterScopedDir)
+		clusterSubDir := filepath.Join(resourcePath, velerov1api.ClusterScopedDir)
 		clusterSubDirExists, err := ctx.fileSystem.DirExists(clusterSubDir)
 		if err != nil {
 			addVeleroError(&errs, err)
@@ -443,7 +447,7 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 			continue
 		}
 
-		nsSubDir := filepath.Join(resourcePath, api.NamespaceScopedDir)
+		nsSubDir := filepath.Join(resourcePath, velerov1api.NamespaceScopedDir)
 		nsSubDirExists, err := ctx.fileSystem.DirExists(nsSubDir)
 		if err != nil {
 			addVeleroError(&errs, err)
@@ -518,9 +522,9 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 func getItemFilePath(rootDir, groupResource, namespace, name string) string {
 	switch namespace {
 	case "":
-		return filepath.Join(rootDir, api.ResourcesDir, groupResource, api.ClusterScopedDir, name+".json")
+		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.ClusterScopedDir, name+".json")
 	default:
-		return filepath.Join(rootDir, api.ResourcesDir, groupResource, api.NamespaceScopedDir, namespace, name+".json")
+		return filepath.Join(rootDir, velerov1api.ResourcesDir, groupResource, velerov1api.NamespaceScopedDir, namespace, name+".json")
 	}
 }
 
@@ -1037,7 +1041,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		// We know the object from the cluster won't have the backup/restore name labels, so
 		// copy them from the object we attempted to restore.
 		labels := obj.GetLabels()
-		addRestoreLabels(fromCluster, labels[api.RestoreNameLabel], labels[api.BackupNameLabel])
+		addRestoreLabels(fromCluster, labels[velerov1api.RestoreNameLabel], labels[velerov1api.BackupNameLabel])
 
 		if !equality.Semantic.DeepEqual(fromCluster, obj) {
 			switch groupResource {
@@ -1085,28 +1089,40 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		return warnings, errs
 	}
 
-	if groupResource == kuberesource.Pods && len(restic.GetPodSnapshotAnnotations(obj)) > 0 {
-		if ctx.resticRestorer == nil {
-			ctx.log.Warn("No restic restorer, not restoring pod's volumes")
-		} else {
-			ctx.globalWaitGroup.GoErrorSlice(func() []error {
-				pod := new(v1.Pod)
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
-					ctx.log.WithError(err).Error("error converting unstructured pod")
-					return []error{err}
-				}
-
-				if errs := ctx.resticRestorer.RestorePodVolumes(ctx.restore, pod, originalNamespace, ctx.backup.Spec.StorageLocation, ctx.log); errs != nil {
-					ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete restic restores of pod's volumes")
-					return errs
-				}
-
-				return nil
-			})
-		}
+	if groupResource == kuberesource.Pods && len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, obj)) > 0 {
+		restorePodVolumeBackups(ctx, createdObj, originalNamespace)
 	}
 
 	return warnings, errs
+}
+
+// restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
+func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured, originalNamespace string) {
+	if ctx.resticRestorer == nil {
+		ctx.log.Warn("No restic restorer, not restoring pod's volumes")
+	} else {
+		ctx.globalWaitGroup.GoErrorSlice(func() []error {
+			pod := new(v1.Pod)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
+				ctx.log.WithError(err).Error("error converting unstructured pod")
+				return []error{err}
+			}
+
+			data := restic.RestoreData{
+				Restore:          ctx.restore,
+				Pod:              pod,
+				PodVolumeBackups: ctx.podVolumeBackups,
+				SourceNamespace:  originalNamespace,
+				BackupLocation:   ctx.backup.Spec.StorageLocation,
+			}
+			if errs := ctx.resticRestorer.RestorePodVolumes(data); errs != nil {
+				ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete restic restores of pod's volumes")
+				return errs
+			}
+
+			return nil
+		})
+	}
 }
 
 func hasDeleteReclaimPolicy(obj map[string]interface{}) bool {
@@ -1147,8 +1163,8 @@ func addRestoreLabels(obj metav1.Object, restoreName, backupName string) {
 		labels = make(map[string]string)
 	}
 
-	labels[api.BackupNameLabel] = label.GetValidName(backupName)
-	labels[api.RestoreNameLabel] = label.GetValidName(restoreName)
+	labels[velerov1api.BackupNameLabel] = label.GetValidName(backupName)
+	labels[velerov1api.RestoreNameLabel] = label.GetValidName(restoreName)
 
 	obj.SetLabels(labels)
 }
