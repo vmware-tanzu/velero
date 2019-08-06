@@ -51,6 +51,7 @@ func WithLabelsMap(labels map[string]string) func(obj metav1.Object) {
 			objLabels = make(map[string]string)
 		}
 
+		// If the label already exists in the object, it will be overwritten
 		for k, v := range labels {
 			objLabels[k] = v
 		}
@@ -83,6 +84,7 @@ func setMapEntries(m map[string]string, vals ...string) map[string]string {
 		key := vals[i]
 		val := vals[i+1]
 
+		// If the label already exists in the object, it will be overwritten
 		m[key] = val
 	}
 
