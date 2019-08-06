@@ -232,7 +232,7 @@ func (c *backupSyncController) run() {
 			// process the pod volume backups from object store, if any
 			podVolumeBackups, err := backupStore.GetPodVolumeBackups(backupName)
 			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error getting pod volumes for this backup from backup store")
+				log.WithError(errors.WithStack(err)).Error("Error getting pod volume backups for this backup from backup store")
 				continue
 			}
 
@@ -240,15 +240,18 @@ func (c *backupSyncController) run() {
 				log = log.WithField("podVolumeBackup", podVolumeBackup.Name)
 				log.Debug("Checking this pod volume backup to see if it needs to be synced into the cluster")
 
-				for _, or := range podVolumeBackup.ObjectMeta.OwnerReferences {
-					if or.Name == backup.Name {
-						or.UID = backup.UID
+				for i, ownerRef := range podVolumeBackup.OwnerReferences {
+					if ownerRef.APIVersion == velerov1api.SchemeGroupVersion.String() && ownerRef.Kind == "Backup" && ownerRef.Name == backup.Name {
+						log.WithField("uid", backup.UID).Debugf("Updating pod volume backup's owner reference UID")
+						podVolumeBackup.OwnerReferences[i].UID = backup.UID
 					}
 				}
 
 				if _, ok := podVolumeBackup.Labels[velerov1api.BackupUIDLabel]; ok {
 					podVolumeBackup.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
 				}
+
+				podVolumeBackup.ResourceVersion = ""
 
 				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podVolumeBackup)
 				switch {
