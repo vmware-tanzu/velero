@@ -453,7 +453,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	for i := range podVolumeBackupList.Items {
 		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
-	restoreData := pkgrestore.Data{
+	restoreReq := pkgrestore.Request{
 		Log:              restoreLog,
 		Restore:          restore,
 		Backup:           info.backup,
@@ -461,7 +461,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 		VolumeSnapshots:  volumeSnapshots,
 		BackupReader:     backupFile,
 	}
-	restoreWarnings, restoreErrors := c.restorer.Restore(restoreData, actions, c.snapshotLocationLister, pluginManager)
+	restoreWarnings, restoreErrors := c.restorer.Restore(restoreReq, actions, c.snapshotLocationLister, pluginManager)
 	restoreLog.Info("restore completed")
 
 	if logReader, err := restoreLog.done(c.logger); err != nil {

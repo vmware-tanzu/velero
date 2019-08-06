@@ -63,9 +63,10 @@ type VolumeSnapshotterGetter interface {
 	GetVolumeSnapshotter(name string) (velero.VolumeSnapshotter, error)
 }
 
-type Data struct {
+type Request struct {
+	*velerov1api.Restore
+
 	Log              logrus.FieldLogger
-	Restore          *velerov1api.Restore
 	Backup           *velerov1api.Backup
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
 	VolumeSnapshots  []*volume.Snapshot
@@ -75,7 +76,7 @@ type Data struct {
 // Restorer knows how to restore a backup.
 type Restorer interface {
 	// Restore restores the backup data from backupReader, returning warnings and errors.
-	Restore(info Data,
+	Restore(req Request,
 		actions []velero.RestoreItemAction,
 		snapshotLocationLister listers.VolumeSnapshotLocationLister,
 		volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -181,7 +182,7 @@ func NewKubernetesRestorer(
 // and using data from the provided backup/backup reader. Returns a warnings and errors RestoreResult,
 // respectively, summarizing info about the restore.
 func (kr *kubernetesRestorer) Restore(
-	data Data,
+	req Request,
 	actions []velero.RestoreItemAction,
 	snapshotLocationLister listers.VolumeSnapshotLocationLister,
 	volumeSnapshotterGetter VolumeSnapshotterGetter,
@@ -190,7 +191,7 @@ func (kr *kubernetesRestorer) Restore(
 	// Nothing Selector, i.e. a selector that matches nothing. We want
 	// a selector that matches everything. This can be accomplished by
 	// passing a non-nil empty LabelSelector.
-	ls := data.Restore.Spec.LabelSelector
+	ls := req.Restore.Spec.LabelSelector
 	if ls == nil {
 		ls = &metav1.LabelSelector{}
 	}
@@ -201,16 +202,16 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	// get resource includes-excludes
-	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, data.Restore.Spec.IncludedResources, data.Restore.Spec.ExcludedResources)
-	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, data.Log)
+	resourceIncludesExcludes := getResourceIncludesExcludes(kr.discoveryHelper, req.Restore.Spec.IncludedResources, req.Restore.Spec.ExcludedResources)
+	prioritizedResources, err := prioritizeResources(kr.discoveryHelper, kr.resourcePriorities, resourceIncludesExcludes, req.Log)
 	if err != nil {
 		return Result{}, Result{Velero: []string{err.Error()}}
 	}
 
 	// get namespace includes-excludes
 	namespaceIncludesExcludes := collections.NewIncludesExcludes().
-		Includes(data.Restore.Spec.IncludedNamespaces...).
-		Excludes(data.Restore.Spec.ExcludedNamespaces...)
+		Includes(req.Restore.Spec.IncludedNamespaces...).
+		Excludes(req.Restore.Spec.ExcludedNamespaces...)
 
 	resolvedActions, err := resolveActions(actions, kr.discoveryHelper)
 	if err != nil {
@@ -218,10 +219,10 @@ func (kr *kubernetesRestorer) Restore(
 	}
 
 	podVolumeTimeout := kr.resticTimeout
-	if val := data.Restore.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+	if val := req.Restore.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
 		if err != nil {
-			data.Log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
+			req.Log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
 		} else {
 			podVolumeTimeout = parsed
 		}
@@ -232,31 +233,31 @@ func (kr *kubernetesRestorer) Restore(
 
 	var resticRestorer restic.Restorer
 	if kr.resticRestorerFactory != nil {
-		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, data.Restore)
+		resticRestorer, err = kr.resticRestorerFactory.NewRestorer(ctx, req.Restore)
 		if err != nil {
 			return Result{}, Result{Velero: []string{err.Error()}}
 		}
 	}
 
 	pvRestorer := &pvRestorer{
-		logger:                  data.Log,
-		backup:                  data.Backup,
-		snapshotVolumes:         data.Backup.Spec.SnapshotVolumes,
-		restorePVs:              data.Restore.Spec.RestorePVs,
-		volumeSnapshots:         data.VolumeSnapshots,
+		logger:                  req.Log,
+		backup:                  req.Backup,
+		snapshotVolumes:         req.Backup.Spec.SnapshotVolumes,
+		restorePVs:              req.Restore.Spec.RestorePVs,
+		volumeSnapshots:         req.VolumeSnapshots,
 		volumeSnapshotterGetter: volumeSnapshotterGetter,
 		snapshotLocationLister:  snapshotLocationLister,
 	}
 
 	restoreCtx := &context{
-		backup:                     data.Backup,
-		backupReader:               data.BackupReader,
-		restore:                    data.Restore,
+		backup:                     req.Backup,
+		backupReader:               req.BackupReader,
+		restore:                    req.Restore,
 		resourceIncludesExcludes:   resourceIncludesExcludes,
 		namespaceIncludesExcludes:  namespaceIncludesExcludes,
 		prioritizedResources:       prioritizedResources,
 		selector:                   selector,
-		log:                        data.Log,
+		log:                        req.Log,
 		dynamicFactory:             kr.dynamicFactory,
 		fileSystem:                 kr.fileSystem,
 		namespaceClient:            kr.namespaceClient,
@@ -265,11 +266,11 @@ func (kr *kubernetesRestorer) Restore(
 		resticRestorer:             resticRestorer,
 		pvsToProvision:             sets.NewString(),
 		pvRestorer:                 pvRestorer,
-		volumeSnapshots:            data.VolumeSnapshots,
-		podVolumeBackups:           data.PodVolumeBackups,
+		volumeSnapshots:            req.VolumeSnapshots,
+		podVolumeBackups:           req.PodVolumeBackups,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
 		extractor: &backupExtractor{
-			log:        data.Log,
+			log:        req.Log,
 			fileSystem: kr.fileSystem,
 		},
 		resourceClients: make(map[resourceClientKey]client.Dynamic),
