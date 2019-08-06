@@ -171,30 +171,34 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	var backup *api.Backup
-	backupBuilder := builder.ForBackup(f.Namespace(), o.Name).ObjectMeta(builder.WithLabelsMap(o.Labels.Data()))
+	backupBuilder := builder.ForBackup(f.Namespace(), o.Name)
 
 	if o.FromSchedule != "" {
 		schedule, err := o.client.VeleroV1().Schedules(f.Namespace()).Get(o.FromSchedule, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		backup = backupBuilder.FromSchedule(schedule).Result()
+		backupBuilder.FromSchedule(schedule)
 	} else {
-		backup = backupBuilder.Result()
-		backup.Spec = api.BackupSpec{
-			IncludedNamespaces:      o.IncludeNamespaces,
-			ExcludedNamespaces:      o.ExcludeNamespaces,
-			IncludedResources:       o.IncludeResources,
-			ExcludedResources:       o.ExcludeResources,
-			LabelSelector:           o.Selector.LabelSelector,
-			SnapshotVolumes:         o.SnapshotVolumes.Value,
-			TTL:                     metav1.Duration{Duration: o.TTL},
-			IncludeClusterResources: o.IncludeClusterResources.Value,
-			StorageLocation:         o.StorageLocation,
-			VolumeSnapshotLocations: o.SnapshotLocations,
+		backupBuilder.
+			IncludedNamespaces(o.IncludeNamespaces...).
+			ExcludedNamespaces(o.ExcludeNamespaces...).
+			IncludedResources(o.IncludeResources...).
+			ExcludedResources(o.ExcludeResources...).
+			LabelSelector(o.Selector.LabelSelector).
+			TTL(o.TTL).
+			StorageLocation(o.StorageLocation).
+			VolumeSnapshotLocations(o.SnapshotLocations...)
+
+		if o.SnapshotVolumes.Value != nil {
+			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)
+		}
+		if o.IncludeClusterResources.Value != nil {
+			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
 		}
 	}
+
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
 
 	if printed, err := output.PrintWithFormat(c, backup); printed || err != nil {
 		return err
