@@ -1826,15 +1826,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				},
 			},
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: velerov1api.DefaultNamespace,
-						Name:      "default",
-					},
-					Spec: velerov1api.VolumeSnapshotLocationSpec{
-						Provider: "provider-1",
-					},
-				},
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
 			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
@@ -1883,15 +1875,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				},
 			},
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: velerov1api.DefaultNamespace,
-						Name:      "default",
-					},
-					Spec: velerov1api.VolumeSnapshotLocationSpec{
-						Provider: "provider-1",
-					},
-				},
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
 			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"provider-1": &volumeSnapshotter{
@@ -1945,15 +1929,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				},
 			},
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: velerov1api.DefaultNamespace,
-						Name:      "default",
-					},
-					Spec: velerov1api.VolumeSnapshotLocationSpec{
-						Provider: "provider-1",
-					},
-				},
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
 			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID
@@ -2005,15 +1981,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				},
 			},
 			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: velerov1api.DefaultNamespace,
-						Name:      "default",
-					},
-					Spec: velerov1api.VolumeSnapshotLocationSpec{
-						Provider: "provider-1",
-					},
-				},
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
 			},
 			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
 				// the volume snapshotter fake is not configured with any snapshotID -> volumeID

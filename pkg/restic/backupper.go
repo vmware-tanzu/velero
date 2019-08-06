@@ -150,7 +150,7 @@ func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.
 			continue
 		}
 
-		volumeBackup := newPodVolumeBackup(backup, pod, volumeName, repo.Spec.ResticIdentifier)
+		volumeBackup := newPodVolumeBackup(backup, pod, volume, repo.Spec.ResticIdentifier)
 		numVolumeSnapshots++
 		if volumeBackup, err = b.repoManager.veleroClient.VeleroV1().PodVolumeBackups(volumeBackup.Namespace).Create(volumeBackup); err != nil {
 			errs = append(errs, err)
@@ -221,8 +221,8 @@ func isHostPathVolume(volume *corev1api.Volume, pvcGetter pvcGetter, pvGetter pv
 	return pv.Spec.HostPath != nil, nil
 }
 
-func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volumeName, repoIdentifier string) *velerov1api.PodVolumeBackup {
-	return &velerov1api.PodVolumeBackup{
+func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volume corev1api.Volume, repoIdentifier string) *velerov1api.PodVolumeBackup {
+	pvb := &velerov1api.PodVolumeBackup{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    backup.Namespace,
 			GenerateName: backup.Name + "-",
@@ -248,19 +248,29 @@ func newPodVolumeBackup(backup *velerov1api.Backup, pod *corev1api.Pod, volumeNa
 				Name:      pod.Name,
 				UID:       pod.UID,
 			},
-			Volume: volumeName,
+			Volume: volume.Name,
 			Tags: map[string]string{
 				"backup":     backup.Name,
 				"backup-uid": string(backup.UID),
 				"pod":        pod.Name,
 				"pod-uid":    string(pod.UID),
 				"ns":         pod.Namespace,
-				"volume":     volumeName,
+				"volume":     volume.Name,
 			},
 			BackupStorageLocation: backup.Spec.StorageLocation,
 			RepoIdentifier:        repoIdentifier,
 		},
 	}
+
+	// if the volume is for a PVC, annotate the pod volume backup with its name
+	// for easy identification as a PVC backup during restore.
+	if volume.PersistentVolumeClaim != nil {
+		pvb.SetAnnotations(map[string]string{
+			PVCNameAnnotation: volume.PersistentVolumeClaim.ClaimName,
+		})
+	}
+
+	return pvb
 }
 
 func errorOnly(_ interface{}, err error) error {
