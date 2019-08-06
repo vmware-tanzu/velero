@@ -82,8 +82,8 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 	}
 
 	var podVolumeBackups []*velerov1api.PodVolumeBackup
-	for i, pvb := range podVolumeBackupList.Items {
-		podVolumeBackups[i] = &pvb
+	for i := range podVolumeBackupList.Items {
+		podVolumeBackups = append(podVolumeBackups, &podVolumeBackupList.Items[i])
 	}
 	volumeSnapshots := restic.GetVolumeBackupsForPod(podVolumeBackups, &pod)
 	if len(volumeSnapshots) == 0 {
