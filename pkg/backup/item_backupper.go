@@ -435,10 +435,9 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	log = log.WithField("volumeID", volumeID)
 
-	tags := map[string]string{
-		"velero.io/backup": ib.backupRequest.Name,
-		"velero.io/pv":     pv.Name,
-	}
+	tags := ib.backupRequest.GetLabels()
+	tags["velero.io/backup"] = ib.backupRequest.Name
+	tags["velero.io/pv"] = pv.Name
 
 	log.Info("Getting volume information")
 	volumeType, iops, err := volumeSnapshotter.GetVolumeInfo(volumeID, pvFailureDomainZone)
