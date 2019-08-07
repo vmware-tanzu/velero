@@ -20,6 +20,8 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/heptio/velero/pkg/builder"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
@@ -33,49 +35,84 @@ import (
 	velerotest "github.com/heptio/velero/pkg/util/test"
 )
 
-func TestGetPodSnapshotAnnotations(t *testing.T) {
+func TestGetVolumeBackupsForPod(t *testing.T) {
+	testPodName := "TestPod"
+	pvbtest1 := builder.ForPodVolumeBackup("velero", "pvb-1").Result()
+	pvbtest1.Spec.Pod.Name = testPodName
+	pvbtest1.Spec.Volume = "pvbtest1-foo"
+	pvbtest1.Status.SnapshotID = "bar"
+
+	pvbtest2 := builder.ForPodVolumeBackup("velero", "pvb-2").Result()
+	pvbtest2.Spec.Pod.Name = testPodName
+	pvbtest2.Spec.Volume = "pvbtest2-abc"
+	pvbtest2.Status.SnapshotID = "123"
+
 	tests := []struct {
-		name        string
-		annotations map[string]string
-		expected    map[string]string
+		name             string
+		podVolumeBackups []*velerov1api.PodVolumeBackup
+		podAnnotations   map[string]string
+		podName          string
+		expected         map[string]string
 	}{
 		{
-			name:        "nil annotations",
-			annotations: nil,
-			expected:    nil,
+			name:           "nil annotations",
+			podAnnotations: nil,
+			expected:       nil,
 		},
 		{
-			name:        "empty annotations",
-			annotations: make(map[string]string),
-			expected:    nil,
+			name:           "empty annotations",
+			podAnnotations: make(map[string]string),
+			expected:       nil,
 		},
 		{
-			name:        "non-empty map, no snapshot annotation",
-			annotations: map[string]string{"foo": "bar"},
-			expected:    nil,
+			name:           "non-empty map, no snapshot annotation",
+			podAnnotations: map[string]string{"foo": "bar"},
+			expected:       nil,
 		},
 		{
-			name:        "has snapshot annotation only, no suffix",
-			annotations: map[string]string{podAnnotationPrefix: "bar"},
-			expected:    map[string]string{"": "bar"},
+			name:           "has snapshot annotation only, no suffix",
+			podAnnotations: map[string]string{podAnnotationPrefix: "bar"},
+			expected:       map[string]string{"": "bar"},
 		},
 		{
-			name:        "has snapshot annotation only, with suffix",
-			annotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
-			expected:    map[string]string{"foo": "bar"},
+			name:           "has snapshot annotation only, with suffix",
+			podAnnotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
+			expected:       map[string]string{"foo": "bar"},
 		},
 		{
-			name:        "has snapshot annotation, with suffix",
-			annotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			expected:    map[string]string{"foo": "bar", "abc": "123"},
+			name:           "has snapshot annotation, with suffix",
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			expected:       map[string]string{"foo": "bar", "abc": "123"},
+		},
+		{
+			name: "has snapshot annotation, with suffix, and also PVB",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				pvbtest1,
+				pvbtest2,
+			},
+			podName:        testPodName,
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "no snapshot annotation, no suffix, but with PVB",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				pvbtest1,
+				pvbtest2,
+			},
+			podName:  testPodName,
+			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			pod := &corev1api.Pod{}
-			pod.Annotations = test.annotations
-			assert.Equal(t, test.expected, getPodSnapshotAnnotations(pod))
+			pod.Annotations = test.podAnnotations
+			pod.Name = test.podName
+
+			res := GetVolumeBackupsForPod(test.podVolumeBackups, pod)
+			assert.Equal(t, test.expected, res)
 		})
 	}
 }
