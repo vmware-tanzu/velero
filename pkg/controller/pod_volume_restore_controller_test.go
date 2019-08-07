@@ -34,7 +34,7 @@ import (
 	veleroinformers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/restic"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 )
 
 func TestPVRHandler(t *testing.T) {

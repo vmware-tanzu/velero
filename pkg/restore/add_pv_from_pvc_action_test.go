@@ -27,7 +27,7 @@ import (
 
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 )
 
 func TestAddPVFromPVCActionExecute(t *testing.T) {

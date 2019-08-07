@@ -42,7 +42,7 @@ import (
 	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/volume"
 )
 

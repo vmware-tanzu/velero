@@ -31,7 +31,7 @@ import (
 
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/test"
-	velerotest "github.com/heptio/velero/pkg/util/test"
+	velerotest "github.com/heptio/velero/pkg/test"
 )
 
 func TestNamespaceAndName(t *testing.T) {

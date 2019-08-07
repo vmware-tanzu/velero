@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/test"
 )
 
 func TestClientLogger(t *testing.T) {

@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/util/test"
+	"github.com/heptio/velero/pkg/test"
 )
 
 func TestServiceAccountActionAppliesTo(t *testing.T) {
