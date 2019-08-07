@@ -42,12 +42,12 @@ builds:
         goarch: ppc64le
     ldflags:
       - -X "github.com/heptio/velero/pkg/buildinfo.Version={{ .Tag }}" -X "github.com/heptio/velero/pkg/buildinfo.GitSHA={{ .FullCommit }}" -X "github.com/heptio/velero/pkg/buildinfo.GitTreeState={{ .Env.GIT_TREE_STATE }}"
-archive:
-  name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
-  wrap_in_directory: true
-  files:
-    - LICENSE
-    - examples/**/*
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Tag }}-{{ .Os }}-{{ .Arch }}"
+    wrap_in_directory: true
+    files:
+      - LICENSE
+      - examples/**/*
 checksum:
   name_template: 'CHECKSUM'
 release:
@@ -55,3 +55,4 @@ release:
     owner: heptio
     name: velero
   draft: true
+  prerelease: auto
