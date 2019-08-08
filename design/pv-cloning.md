@@ -1,6 +1,6 @@
 # Cloning PVs While Remapping Namespaces
 
-Status: Draft
+Status: Approved
 
 Velero supports restoring resources into different namespaces than they were backed up from.
 This enables a user to, among other things, clone a namespace within a cluster.
