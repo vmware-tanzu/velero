@@ -284,8 +284,16 @@ func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, velero
 	}
 
 	d.Println("Resource List:")
-	for gvk, items := range resourceList {
-		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(items, "\n\t\t- "))
+
+	// Sort GVKs in output
+	gvks := make([]string, 0, len(resourceList))
+	for gvk := range resourceList {
+		gvks = append(gvks, gvk)
+	}
+	sort.Strings(gvks)
+
+	for _, gvk := range gvks {
+		d.Printf("\t%s:\n\t\t- %s\n", gvk, strings.Join(resourceList[gvk], "\n\t\t- "))
 	}
 }
 
