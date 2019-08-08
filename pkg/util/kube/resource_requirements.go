@@ -26,7 +26,10 @@ import (
 // values and returns a ResourceRequirements struct to be used in a Container.
 // An error is returned if we cannot parse the request/limit.
 func ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit string) (corev1.ResourceRequirements, error) {
-	var resources corev1.ResourceRequirements
+	resources := corev1.ResourceRequirements{
+		Requests: corev1.ResourceList{},
+		Limits:   corev1.ResourceList{},
+	}
 
 	parsedCPURequest, err := resource.ParseQuantity(cpuRequest)
 	if err != nil {
@@ -48,21 +51,29 @@ func ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit string
 		return resources, errors.Wrapf(err, `couldn't parse memory limit "%s"`, memLimit)
 	}
 
-	if parsedCPURequest.Cmp(parsedCPULimit) > 0 {
+	// A quantity of 0 is treated as unbounded
+	unbounded := resource.MustParse("0")
+
+	if parsedCPULimit != unbounded && parsedCPURequest.Cmp(parsedCPULimit) > 0 {
 		return resources, errors.WithStack(errors.Errorf(`CPU request "%s" must be less than or equal to CPU limit "%s"`, cpuRequest, cpuLimit))
 	}
 
-	if parsedMemRequest.Cmp(parsedMemLimit) > 0 {
+	if parsedMemLimit != unbounded && parsedMemRequest.Cmp(parsedMemLimit) > 0 {
 		return resources, errors.WithStack(errors.Errorf(`Memory request "%s" must be less than or equal to Memory limit "%s"`, memRequest, memLimit))
 	}
 
-	resources.Requests = corev1.ResourceList{
-		corev1.ResourceCPU:    parsedCPURequest,
-		corev1.ResourceMemory: parsedMemRequest,
+	// Only set resources if they are not unbounded
+	if parsedCPURequest != unbounded {
+		resources.Requests[corev1.ResourceCPU] = parsedCPURequest
 	}
-	resources.Limits = corev1.ResourceList{
-		corev1.ResourceCPU:    parsedCPULimit,
-		corev1.ResourceMemory: parsedMemLimit,
+	if parsedMemRequest != unbounded {
+		resources.Requests[corev1.ResourceMemory] = parsedMemRequest
+	}
+	if parsedCPULimit != unbounded {
+		resources.Limits[corev1.ResourceCPU] = parsedCPULimit
+	}
+	if parsedMemLimit != unbounded {
+		resources.Limits[corev1.ResourceMemory] = parsedMemLimit
 	}
 
 	return resources, nil
