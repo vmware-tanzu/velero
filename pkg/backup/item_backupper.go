@@ -219,7 +219,8 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		// this function will return partial results, so process podVolumeBackups
 		// even if there are errors.
 		podVolumeBackups, errs := ib.backupPodVolumes(log, pod, resticVolumesToBackup)
-		ib.backupRequest.PodVolumeBackups = podVolumeBackups
+
+		ib.backupRequest.PodVolumeBackups = append(ib.backupRequest.PodVolumeBackups, podVolumeBackups...)
 		backupErrs = append(backupErrs, errs...)
 	}
 
