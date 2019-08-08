@@ -14,7 +14,8 @@ This document proposes a solution that allows new copies of persistent volumes t
 
 ## Non Goals
 
-- Cloning of persistent volumes in any scenario other than when using `velero restore create --namespace-mappings ...` flag. 
+- Cloning of persistent volumes in any scenario other than when using `velero restore create --namespace-mappings ...` flag.
+- [CSI-based cloning](https://kubernetes.io/docs/concepts/storage/volume-pvc-datasource/).
 
 ## Background
 
@@ -34,6 +35,7 @@ It will also update the `spec.volumeName` of the related persistent volume claim
 In `pkg/restore/restore.go`, around [line 872](https://github.com/heptio/velero/blob/master/pkg/restore/restore.go#L872), Velero has special-case code for persistent volumes.
 This code will be updated to check for the two preconditions described in the previous section.
 If the preconditions are met, the object will be given a new name.
+The persistent volume will also be annotated with the original name, e.g. `velero.io/original-pv-name=NAME`.
 Importantly, the name change will occur **before** [line 890](https://github.com/heptio/velero/blob/master/pkg/restore/restore.go#L890), where Velero checks to see if it should restore the persistent volume.
 Additionally, the old and new persistent volume names will be recorded in a new field that will be added to the `context` struct, `renamedPVs map[string]string`.
 
