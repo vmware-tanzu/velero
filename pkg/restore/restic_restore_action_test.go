@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/buildinfo"
 	velerofake "github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
@@ -98,17 +98,24 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		defaultCPURequestLimit, defaultMemRequestLimit, // limits
 	)
 
+	var (
+		restoreName = "my-restore"
+		backupName  = "test-backup"
+		veleroNs    = "velero"
+	)
+
 	tests := []struct {
-		name string
-		pod  *corev1api.Pod
-		want *corev1api.Pod
+		name             string
+		pod              *corev1api.Pod
+		podVolumeBackups []*velerov1api.PodVolumeBackup
+		want             *corev1api.Pod
 	}{
 		{
 			name: "Restoring pod with no other initContainers adds the restic initContainer",
-			pod: builder.ForPod("ns-1", "pod").ObjectMeta(
+			pod: builder.ForPod("ns-1", "my-pod").ObjectMeta(
 				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				Result(),
-			want: builder.ForPod("ns-1", "pod").
+			want: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(
@@ -119,11 +126,12 @@ func TestResticRestoreActionExecute(t *testing.T) {
 		},
 		{
 			name: "Restoring pod with other initContainers adds the restic initContainer as the first one",
-			pod: builder.ForPod("ns-1", "pod").ObjectMeta(
-				builder.WithAnnotations("snapshot.velero.io/myvol", "")).
+			pod: builder.ForPod("ns-1", "my-pod").
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(builder.ForContainer("first-container", "").Result()).
 				Result(),
-			want: builder.ForPod("ns-1", "pod").
+			want: builder.ForPod("ns-1", "my-pod").
 				ObjectMeta(
 					builder.WithAnnotations("snapshot.velero.io/myvol", "")).
 				InitContainers(
@@ -133,10 +141,55 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					builder.ForContainer("first-container", "").Result()).
 				Result(),
 		},
+		{
+			name: "Restoring pod with other initContainers adds the restic initContainer as the first one using PVB to identify the volumes and not annotations",
+			pod: builder.ForPod("ns-1", "my-pod").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/not-used", "")).
+				InitContainers(builder.ForContainer("first-container", "").Result()).
+				Result(),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("my-pod").
+					Volume("vol-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					Result(),
+				builder.ForPodVolumeBackup(veleroNs, "pvb-2").
+					PodName("my-pod").
+					Volume("vol-2").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					Result(),
+			},
+			want: builder.ForPod("ns-1", "my-pod").
+				Volumes(
+					builder.ForVolume("vol-1").PersistentVolumeClaimSource("pvc-1").Result(),
+					builder.ForVolume("vol-2").PersistentVolumeClaimSource("pvc-2").Result(),
+				).
+				ObjectMeta(
+					builder.WithAnnotations("snapshot.velero.io/not-used", "")).
+				InitContainers(
+					newResticInitContainerBuilder(initContainerImage(defaultImageBase), "").
+						Resources(&resourceReqs).
+						VolumeMounts(builder.ForVolumeMount("vol-1", "/restores/vol-1").Result(), builder.ForVolumeMount("vol-2", "/restores/vol-2").Result()).Result(),
+					builder.ForContainer("first-container", "").Result()).
+				Result(),
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			clientset := fake.NewSimpleClientset()
+			clientsetVelero := velerofake.NewSimpleClientset()
+
+			for _, podVolumeBackup := range tc.podVolumeBackups {
+				_, err := clientsetVelero.VeleroV1().PodVolumeBackups(veleroNs).Create(podVolumeBackup)
+				require.NoError(t, err)
+			}
+
 			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pod)
 			require.NoError(t, err)
 
@@ -144,22 +197,20 @@ func TestResticRestoreActionExecute(t *testing.T) {
 				Item: &unstructured.Unstructured{
 					Object: unstructuredMap,
 				},
-				Restore: builder.ForRestore("velero", "my-restore").
-					Phase(api.RestorePhaseInProgress).
+				Restore: builder.ForRestore(veleroNs, restoreName).
+					Backup(backupName).
+					Phase(velerov1api.RestorePhaseInProgress).
 					Result(),
 			}
 
-			clientset := fake.NewSimpleClientset()
-			clientsetVelero := velerofake.NewSimpleClientset()
 			a := NewResticRestoreAction(
 				logrus.StandardLogger(),
-				clientset.CoreV1().ConfigMaps("velero"),
-				clientsetVelero.VeleroV1().PodVolumeBackups("velero"),
+				clientset.CoreV1().ConfigMaps(veleroNs),
+				clientsetVelero.VeleroV1().PodVolumeBackups(veleroNs),
 			)
 
 			// method under test
 			res, err := a.Execute(input)
-
 			assert.NoError(t, err)
 
 			wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
