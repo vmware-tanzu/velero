@@ -57,6 +57,10 @@ func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) 
 		provider = "velero.io/" + provider
 	}
 
+	if repoPrefix := location.Spec.Config["resticRepoPrefix"]; repoPrefix != "" {
+		return repoPrefix, nil
+	}
+
 	switch BackendType(provider) {
 	case AWSBackend:
 		var url string

@@ -158,7 +158,7 @@ func TestGetRepoIdentifier(t *testing.T) {
 		},
 	}
 	id, err = GetRepoIdentifier(backupLocation, "repo-1")
-	assert.EqualError(t, err, "cannot determine restic repository prefix for backup storage location")
+	assert.EqualError(t, err, "restic repository prefix (resticRepoPrefix) not specified in backup storage location's config")
 	assert.Empty(t, id)
 
 	backupLocation = &velerov1api.BackupStorageLocation{
