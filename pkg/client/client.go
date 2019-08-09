@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,12 +29,20 @@ import (
 
 // Config returns a *rest.Config, using either the kubeconfig (if specified) or an in-cluster
 // configuration.
-func Config(kubeconfig, kubecontext, baseName string) (*rest.Config, error) {
+func Config(kubeconfig, kubecontext, baseName string, qps float32, burst int) (*rest.Config, error) {
 	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
 	loadingRules.ExplicitPath = kubeconfig
 	configOverrides := &clientcmd.ConfigOverrides{CurrentContext: kubecontext}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 	clientConfig, err := kubeConfig.ClientConfig()
+	if qps > 0.0 {
+		clientConfig.QPS = qps
+	}
+
+	if burst > 0 {
+		clientConfig.Burst = burst
+	}
+
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

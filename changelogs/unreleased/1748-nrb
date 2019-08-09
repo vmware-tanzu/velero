@@ -1,0 +1,1 @@
+Use VELERO_NAMESPACE to determine what namespace Velero server is running in. For any v1.0 installations using a different namespace, the VELERO_NAMESPACE environment variable will need to be set to the correct namespace.
