@@ -18,6 +18,7 @@ package backup
 
 import (
 	"fmt"
+	"sort"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/collections"
@@ -58,5 +59,11 @@ func (r *Request) BackupResourceList() map[string][]string {
 		}
 		resources[i.resource] = append(resources[i.resource], entry)
 	}
+
+	// sort namespace/name entries for each GVK
+	for _, v := range resources {
+		sort.Strings(v)
+	}
+
 	return resources
 }

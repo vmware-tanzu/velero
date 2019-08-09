@@ -1,0 +1,1 @@
+sort output of resource list in `velero backup describe --details`

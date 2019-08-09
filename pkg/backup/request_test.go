@@ -50,9 +50,33 @@ func TestRequest_BackupResourceList(t *testing.T) {
 	}
 
 	req := Request{BackedUpItems: backedUpItems}
-	assert.Equal(t, req.BackupResourceList(), map[string][]string{
+	assert.Equal(t, map[string][]string{
 		"apps/v1/Deployment":  {"default/my-deploy"},
 		"v1/Pod":              {"ns1/pod1", "ns2/pod2"},
 		"v1/PersistentVolume": {"my-pv"},
-	})
+	}, req.BackupResourceList())
+}
+
+func TestRequest_BackupResourceListEntriesSorted(t *testing.T) {
+	items := []itemKey{
+		{
+			resource:  "v1/Pod",
+			name:      "pod2",
+			namespace: "ns2",
+		},
+		{
+			resource:  "v1/Pod",
+			name:      "pod1",
+			namespace: "ns1",
+		},
+	}
+	backedUpItems := map[itemKey]struct{}{}
+	for _, it := range items {
+		backedUpItems[it] = struct{}{}
+	}
+
+	req := Request{BackedUpItems: backedUpItems}
+	assert.Equal(t, map[string][]string{
+		"v1/Pod": {"ns1/pod1", "ns2/pod2"},
+	}, req.BackupResourceList())
 }
