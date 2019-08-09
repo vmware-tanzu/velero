@@ -20,12 +20,15 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	ctx "context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
 	"testing"
 	"time"
+
+	"github.com/heptio/velero/pkg/restic"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -1739,7 +1742,6 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		volumeSnapshots         []*volume.Snapshot
 		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
 		volumeSnapshotterGetter volumeSnapshotterGetter
-		podVolumeBackups        []*velerov1api.PodVolumeBackup
 		want                    []*test.APIResource
 	}{
 		{
@@ -2050,10 +2052,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				// restored, we'd get an error of "snapshot not found".
 				"provider-1": &volumeSnapshotter{},
 			},
-			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").Result(),
-			},
+
 			want: []*test.APIResource{
 				test.PVs(
 					builder.ForPersistentVolume("pv-1").
@@ -2095,7 +2094,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
-				PodVolumeBackups: tc.podVolumeBackups,
+				PodVolumeBackups: nil,
 				VolumeSnapshots:  tc.volumeSnapshots,
 				BackupReader:     tc.tarball,
 			}
@@ -2109,6 +2108,100 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			assertEmptyResults(t, warnings, errs)
 			assertAPIContents(t, h, wantIDs)
 			assertRestoredItems(t, h, tc.want)
+		})
+	}
+}
+
+type fakeResticRestorerFactory struct {
+	podVolumeBackups []*velerov1api.PodVolumeBackup
+}
+
+func (f *fakeResticRestorerFactory) NewRestorer(ctx.Context, *velerov1api.Restore) (restic.Restorer, error) {
+	return &fakeResticRestorer{
+		podVolumeBackups: f.podVolumeBackups,
+	}, nil
+}
+
+type fakeResticRestorer struct {
+	podVolumeBackups []*velerov1api.PodVolumeBackup
+}
+
+func (b *fakeResticRestorer) RestorePodVolumes(data restic.RestoreData) []error {
+	return nil
+}
+
+// TestBackupWithRestic runs backups of pods that are annotated for restic backup,
+// and ensures that the restic backupper is called, that the returned PodVolumeBackups
+// are added to the Request object, and that when PVCs are backed up with restic, the
+// claimed PVs are not also snapshotted using a VolumeSnapshotter.
+func TestRestoreWithRestic(t *testing.T) {
+	var (
+		backupName = "backup-1"
+		veleroNs   = "velero"
+	)
+
+	tests := []struct {
+		name         string
+		restore      *velerov1api.Restore
+		backup       *velerov1api.Backup
+		apiResources []*test.APIResource
+		tarball      io.Reader
+		want         []*velerov1api.PodVolumeBackup
+	}{
+		{
+			name:    "a pod annotated for restic backup should result in pod volume backups being returned",
+			restore: defaultRestore().Result(),
+			backup:  defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
+						Result(),
+				),
+			},
+			tarball: newTarWriter(t).addItems("pods",
+				builder.ForPod("ns-1", "pod-2").
+					ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
+					Result()).
+				done(),
+			want: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
+					PodName("pod-2").
+					Volume("vol-1").
+					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					Result(),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
+				podVolumeBackups: tc.want,
+			}
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			data := Request{
+				Log:              h.log,
+				Restore:          tc.restore,
+				Backup:           tc.backup,
+				PodVolumeBackups: nil,
+				VolumeSnapshots:  nil,
+				BackupReader:     tc.tarball,
+			}
+			warnings, errs := h.restorer.Restore(
+				data,
+				nil, // actions
+				nil, // snapshot location lister
+				nil, // volume snapshotter getter
+			)
+
+			assertEmptyResults(t, warnings, errs)
+			// assert.Equal(t, tc.want, data.PodVolumeBackups)
 		})
 	}
 }
