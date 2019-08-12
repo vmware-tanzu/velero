@@ -239,7 +239,7 @@ In a terminal, run the following:
 ```shell
 MINIO_POD=$(kubectl get pods -n velero -l component=minio -o jsonpath='{.items[0].metadata.name}')
 
-kubectl port-forwward $MINIO_POD -n velero 9000:9000
+kubectl port-forward $MINIO_POD -n velero 9000:9000
 ```
 
 Then, in another terminal:
