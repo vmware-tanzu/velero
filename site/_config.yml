@@ -2,9 +2,12 @@
 title: Velero
 email:
 author: Velero Authors
-description:
-url:
+description: Backup and migrate Kubernetes resources and persistent volumes
+url: velero.io
 logo: Velero.svg
+twitter:
+  username: projectvelero
+  card: summary
 vm_logo: vm-logo.png
 gh_repo: https://github.com/heptio/velero
 markdown: redcarpet
@@ -14,7 +17,7 @@ footer:
   title: Getting Started
   content: To help you get started, see the documentation.
   cta_title: ''
-  cta_url: /docs/master
+  cta_url: /docs
   cta_text: Documentation
   vm-link: http://vmware.github.io/
 
@@ -175,6 +178,7 @@ plugins:
   - jekyll-titles-from-headings # pull the page title from the first Markdown heading when none is specified.
   - jekyll-paginate # pagination object for collections (e.g. posts)
   - jekyll-redirect-from
+  - jekyll-seo-tag
 
 # Include these subdirectories
 include:

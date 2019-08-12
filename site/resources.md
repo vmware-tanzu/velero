@@ -1,6 +1,7 @@
 ---
 layout: page
 title: Resources
+description: Velero Resources
 id: resources
 ---
 Here you will find external resources about Velero, such as videos, podcasts, and community articles.
