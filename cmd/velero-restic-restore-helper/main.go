@@ -77,8 +77,9 @@ func done() bool {
 	return true
 }
 
-// cleanupDoneFiles returns an error if it fails to remove all of the `.velero`
-// dirs created by Velero when a restic restore completes
+// cleanupDoneFiles returns if it fails to remove all of the `.velero` dirs
+// created by Velero when a restic restore completes or when all directories
+// are removed. It does not return an error to run a 'soft' cleanup.
 func cleanupDoneFiles() {
 	children, err := ioutil.ReadDir("/restores")
 	if err != nil {
