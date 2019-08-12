@@ -93,7 +93,7 @@ func cleanupDoneFiles() {
 			continue
 		}
 		doneFileDir := filepath.Join("/restores", child.Name(), ".velero")
-		if err := os.RemoveAll(filepath.Join(doneFileDir, ".velero")); err != nil {
+		if err := os.RemoveAll(doneFileDir); err != nil {
 			fmt.Fprintf(os.Stderr, "ERROR removing .velero directory: %s\n", err)
 		}
 	}
