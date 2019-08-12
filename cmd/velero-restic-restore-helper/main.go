@@ -32,6 +32,7 @@ func main() {
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
+	defer cleanupDoneFiles()
 
 	for {
 		select {
@@ -74,4 +75,26 @@ func done() bool {
 	}
 
 	return true
+}
+
+// cleanupDoneFiles returns an error if it fails to remove all of the `.velero`
+// dirs created by Velero when a restic restore completes
+func cleanupDoneFiles() {
+	children, err := ioutil.ReadDir("/restores")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR reading /restores directory: %s\n", err)
+		return
+	}
+
+	for _, child := range children {
+		if !child.IsDir() {
+			fmt.Printf("%s is not a directory, skipping.\n", child.Name())
+			continue
+		}
+		doneFileDir := filepath.Join("/restores", child.Name(), ".velero")
+		if err := os.RemoveAll(filepath.Join(doneFileDir, ".velero")); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR removing .velero directory: %s\n", err)
+		}
+	}
+	return
 }
