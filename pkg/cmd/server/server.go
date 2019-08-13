@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -32,7 +31,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
@@ -127,7 +125,7 @@ type controllerRunInfo struct {
 	numWorkers int
 }
 
-func NewCommand() *cobra.Command {
+func NewCommand(f client.Factory) *cobra.Command {
 	var (
 		volumeSnapshotLocations = flag.NewMap().WithKeyValueDelimiter(":")
 		logLevelFlag            = logging.LogLevelFlag(logrus.InfoLevel)
@@ -171,25 +169,13 @@ func NewCommand() *cobra.Command {
 
 			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
-			// NOTE: the namespace flag is bound to velero's persistent flags when the root velero command
-			// creates the client Factory and binds the Factory's flags. We're not using a Factory here in
-			// the server because the Factory gets its basename set at creation time, and the basename is
-			// used to construct the user-agent for clients. Also, the Factory's Namespace() method uses
-			// the client config file to determine the appropriate namespace to use, and that isn't
-			// applicable to the server (it uses the method directly below instead). We could potentially
-			// add a SetBasename() method to the Factory, and tweak how Namespace() works, if we wanted to
-			// have the server use the Factory.
-			namespaceFlag := c.Flag("namespace")
-			if namespaceFlag == nil {
-				cmd.CheckError(errors.New("unable to look up namespace flag"))
-			}
-			namespace := getServerNamespace(namespaceFlag)
-
 			if volumeSnapshotLocations.Data() != nil {
 				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()
 			}
 
-			s, err := newServer(namespace, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()), config, logger)
+			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+
+			s, err := newServer(f, config, logger)
 			cmd.CheckError(err)
 
 			cmd.CheckError(s.run())
@@ -216,20 +202,6 @@ func NewCommand() *cobra.Command {
 	return command
 }
 
-func getServerNamespace(namespaceFlag *pflag.Flag) string {
-	if namespaceFlag.Changed {
-		return namespaceFlag.Value.String()
-	}
-
-	if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-		if ns := strings.TrimSpace(string(data)); len(ns) > 0 {
-			return ns
-		}
-	}
-
-	return api.DefaultNamespace
-}
-
 type server struct {
 	namespace             string
 	metricsAddress        string
@@ -251,29 +223,30 @@ type server struct {
 	config                serverConfig
 }
 
-func newServer(namespace, baseName string, config serverConfig, logger *logrus.Logger) (*server, error) {
-	clientConfig, err := client.Config("", "", baseName)
-	if err != nil {
-		return nil, err
-	}
+func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
 	if config.clientQPS < 0.0 {
 		return nil, errors.New("client-qps must be positive")
 	}
-	clientConfig.QPS = config.clientQPS
+	f.SetClientQPS(config.clientQPS)
 
 	if config.clientBurst <= 0 {
 		return nil, errors.New("client-burst must be positive")
 	}
-	clientConfig.Burst = config.clientBurst
+	f.SetClientBurst(config.clientBurst)
 
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	kubeClient, err := f.KubeClient()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
-	veleroClient, err := clientset.NewForConfig(clientConfig)
+	veleroClient, err := f.Client()
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
+	}
+
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
 	}
 
 	pluginRegistry := clientmgmt.NewRegistry(config.pluginDir, logger, logger.Level)
@@ -285,22 +258,22 @@ func newServer(namespace, baseName string, config serverConfig, logger *logrus.L
 		return nil, err
 	}
 
-	dynamicClient, err := dynamic.NewForConfig(clientConfig)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancelFunc := context.WithCancel(context.Background())
-
 	s := &server{
-		namespace:             namespace,
+		namespace:             f.Namespace(),
 		metricsAddress:        config.metricsAddress,
 		kubeClientConfig:      clientConfig,
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
 		discoveryClient:       veleroClient.Discovery(),
 		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(namespace)),
+		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		logger:                logger,

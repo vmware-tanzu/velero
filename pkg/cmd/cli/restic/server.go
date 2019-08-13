@@ -61,7 +61,8 @@ func NewServerCommand(f client.Factory) *cobra.Command {
 			logger := logging.DefaultLogger(logLevel, formatFlag.Parse())
 			logger.Infof("Starting Velero restic server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
 
-			s, err := newResticServer(logger, fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+			f.SetBasename(fmt.Sprintf("%s-%s", c.Parent().Name(), c.Name()))
+			s, err := newResticServer(logger, f)
 			cmd.CheckError(err)
 
 			s.run()
@@ -87,20 +88,16 @@ type resticServer struct {
 	fileSystem            filesystem.Interface
 }
 
-func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer, error) {
-	clientConfig, err := client.Config("", "", baseName)
+func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*resticServer, error) {
+
+	kubeClient, err := factory.KubeClient()
 	if err != nil {
 		return nil, err
 	}
 
-	kubeClient, err := kubernetes.NewForConfig(clientConfig)
+	veleroClient, err := factory.Client()
 	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-
-	veleroClient, err := clientset.NewForConfig(clientConfig)
-	if err != nil {
-		return nil, errors.WithStack(err)
+		return nil, err
 	}
 
 	// use a stand-alone pod informer because we want to use a field selector to
@@ -123,7 +120,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	// to fully-encrypted backups and have unique keys per repository.
 	secretInformer := corev1informers.NewFilteredSecretInformer(
 		kubeClient,
-		os.Getenv("VELERO_NAMESPACE"),
+		factory.Namespace(),
 		0,
 		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 		func(opts *metav1.ListOptions) {
@@ -136,7 +133,7 @@ func newResticServer(logger logrus.FieldLogger, baseName string) (*resticServer,
 	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
-		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, os.Getenv("VELERO_NAMESPACE"), nil),
+		veleroInformerFactory: informers.NewFilteredSharedInformerFactory(veleroClient, 0, factory.Namespace(), nil),
 		kubeInformerFactory:   kubeinformers.NewSharedInformerFactory(kubeClient, 0),
 		podInformer:           podInformer,
 		secretInformer:        secretInformer,

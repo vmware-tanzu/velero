@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
@@ -42,6 +43,17 @@ type Factory interface {
 	// DynamicClient returns a Kubernetes dynamic client. It uses the following priority to specify the cluster
 	// configuration: --kubeconfig flag, KUBECONFIG environment variable, in-cluster configuration.
 	DynamicClient() (dynamic.Interface, error)
+	// SetBasename changes the basename for an already-constructed client.
+	// This is useful for generating clients that require a different user-agent string below the root `velero`
+	// command, such as the server subcommand.
+	SetBasename(string)
+	// SetClientQPS sets the Queries Per Second for a client.
+	SetClientQPS(float32)
+	// SetClientBurst sets the Burst for a client.
+	SetClientBurst(int)
+	// ClientConfig returns a rest.Config struct used for client-go clients.
+	ClientConfig() (*rest.Config, error)
+	// Namespace returns the namespace which the Factory will create clients for.
 	Namespace() string
 }
 
@@ -51,6 +63,8 @@ type factory struct {
 	kubecontext string
 	baseName    string
 	namespace   string
+	clientQPS   float32
+	clientBurst int
 }
 
 // NewFactory returns a Factory.
@@ -60,12 +74,19 @@ func NewFactory(baseName string) Factory {
 		baseName: baseName,
 	}
 
+	f.namespace = os.Getenv("VELERO_NAMESPACE")
+
 	if config, err := LoadConfig(); err == nil {
-		f.namespace = config[ConfigKeyNamespace]
+		// Only override the namespace if the config key is set
+		if _, ok := config[ConfigKeyNamespace]; ok {
+			f.namespace = config[ConfigKeyNamespace]
+		}
 	} else {
 		fmt.Fprintf(os.Stderr, "WARNING: error retrieving namespace from config file: %v\n", err)
 	}
 
+	// We didn't get the namespace via env var or config file, so use the default.
+	// Command line flags will override when BindFlags is called.
 	if f.namespace == "" {
 		f.namespace = v1.DefaultNamespace
 	}
@@ -81,8 +102,12 @@ func (f *factory) BindFlags(flags *pflag.FlagSet) {
 	flags.AddFlagSet(f.flags)
 }
 
+func (f *factory) ClientConfig() (*rest.Config, error) {
+	return Config(f.kubeconfig, f.kubecontext, f.baseName, f.clientQPS, f.clientBurst)
+}
+
 func (f *factory) Client() (clientset.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +120,7 @@ func (f *factory) Client() (clientset.Interface, error) {
 }
 
 func (f *factory) KubeClient() (kubernetes.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -108,16 +133,27 @@ func (f *factory) KubeClient() (kubernetes.Interface, error) {
 }
 
 func (f *factory) DynamicClient() (dynamic.Interface, error) {
-	clientConfig, err := Config(f.kubeconfig, f.kubecontext, f.baseName)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return nil, err
 	}
-
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
 	return dynamicClient, nil
+}
+
+func (f *factory) SetBasename(name string) {
+	f.baseName = name
+}
+
+func (f *factory) SetClientQPS(qps float32) {
+	f.clientQPS = qps
+}
+
+func (f *factory) SetClientBurst(burst int) {
+	f.clientBurst = burst
 }
 
 func (f *factory) Namespace() string {

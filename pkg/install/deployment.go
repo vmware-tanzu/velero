@@ -144,6 +144,14 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									Name:  "VELERO_SCRATCH_DIR",
 									Value: "/scratch",
 								},
+								{
+									Name: "VELERO_NAMESPACE",
+									ValueFrom: &corev1.EnvVarSource{
+										FieldRef: &corev1.ObjectFieldSelector{
+											FieldPath: "metadata.namespace",
+										},
+									},
+								},
 							},
 							Resources: c.resources,
 						},

@@ -63,7 +63,7 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		backup.NewCommand(f),
 		schedule.NewCommand(f),
 		restore.NewCommand(f),
-		server.NewCommand(),
+		server.NewCommand(f),
 		version.NewCommand(f),
 		get.NewCommand(f),
 		install.NewCommand(f),
