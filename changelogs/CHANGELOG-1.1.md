@@ -1,3 +1,24 @@
+## v1.1.0-beta.2
+#### 2019-08-13
+
+### Download
+- https://github.com/heptio/velero/releases/tag/v1.1.0-beta.2
+
+### Container Image
+`gcr.io/heptio-images/velero:v1.1.0-beta.2`
+
+### Documentation
+https://velero.io/docs/v1.1.0-beta.2/
+
+### Bug Fixes
+
+* Use VELERO_NAMESPACE to determine what namespace Velero server is running in. For any v1.0 installations using a different namespace, the VELERO_NAMESPACE environment variable will need to be set to the correct namespace. (#1748, @nrb)
+* Use backup's namespace when syncing pod volume backups into cluster from object storage (#1760, @skriss)
+* support setting CPU/memory requests with unbounded limits using velero install (#1745, @prydonius)
+* sort output of resource list in `velero backup describe --details` (#1741, @prydonius)
+* upload pod volume backups from *all* pods to object storage (#1739, @skriss)
+
+
 ## v1.1.0-beta.1
 #### 2019-08-07
 
