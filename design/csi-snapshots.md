@@ -45,7 +45,9 @@ A set of [prototype][6] plugins was developed that informed this design.
 
 The plugins will be as follows:
 
-* A `BackupItemAction` for `PersistentVolumeClaim`s, named `velero.io/csi-pvc` 
+
+#### A `BackupItemAction` for `PersistentVolumeClaim`s, named `velero.io/csi-pvc` 
+
 The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below)
 If this field is `nil`, then the plugin will return early without taking action.
 Create a `VolumeSnapshot.snapshot.storage.k8s.io` object from the PVC.
@@ -59,20 +61,23 @@ The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is th
 The plugin will _not_ wait for the `VolumeSnapshot.Status.IsReady` field to be `true` before returning.
 This maintains current Velero behavior, though may not be desirable for all storage providers.
 
-* A `RestoreItemAction` for `VolumeSnapshotContent` objects, named `velero.io/csi-vsc`.
+#### A `RestoreItemAction` for `VolumeSnapshotContent` objects, named `velero.io/csi-vsc`
+
 Only `VolumeSnapshotContent` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 The metadata (excluding labels), `PersistentVolumeClaim.UUID`, and `VolumeSnapshotRef.UUID` fields will be cleared.
 The reference fields are cleared because the associated objects will get new UUIDs in the cluster.
 This also maps to the "import" case of [the snapshot API][1].
 
-* A `RestoreItemAction` for `VolumeSnapshot` objects, named `velero.io/csi-vs`.
+#### A `RestoreItemAction` for `VolumeSnapshot` objects, named `velero.io/csi-vs`
+
 Only `VolumeSnapshot` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 Metadata (excluding labels) and `Source` fields on the object will be cleared.
 The `VolumeSnapshot.Spec.SnapshotContentName` is the link back to the `VolumeSnapshotContent` object, and thus the actual snapshot.
 The `Source` field indicates that a new CSI snapshot operation should be performed, which isn't relevant on restore.
 This follows the "import" case of [the snapshot API][1].
 
-* A `RestoreItemAction` for `PersistentVolumeClaim`s named `velero.io/csi-pvc`.
+#### A `RestoreItemAction` for `PersistentVolumeClaim`s named `velero.io/csi-pvc`
+
 Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 Metadata (excluding labels) will be cleared, and the `velero.io/volume-snapshot-name` label will be used to find the relevant `VolumeSnapshot`.
 A reference to the `VolumeSnapshot` will be added to the `PersistentVolumeClaim.DataSource` field.
