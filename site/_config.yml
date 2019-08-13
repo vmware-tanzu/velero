@@ -56,10 +56,10 @@ defaults:
       gh: https://github.com/heptio/velero/tree/master
       layout: "docs"
   - scope:
-      path: docs/v1.1.0-beta.1
+      path: docs/v1.1.0-beta.2
     values:
-      version: v1.1.0-beta.1
-      gh: https://github.com/heptio/velero/tree/v1.1.0-beta.1
+      version: v1.1.0-beta.2
+      gh: https://github.com/heptio/velero/tree/v1.1.0-beta.2
       layout: "docs"
   - scope:
       path: docs/v1.0.0
@@ -148,7 +148,7 @@ versioning: true
 latest: v1.0.0
 versions:
 - master
-- v1.1.0-beta.1
+- v1.1.0-beta.2
 - v1.0.0
 - v0.11.0
 - v0.10.0
