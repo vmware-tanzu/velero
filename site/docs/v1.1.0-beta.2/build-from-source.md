@@ -238,7 +238,7 @@ If you need to add or update the vendored dependencies, see [Vendoring dependenc
 [10]: #vendoring-dependencies
 [11]: vendoring-dependencies.md
 [12]: #test
-[13]: https://github.com/heptio/velero/blob/v1.1.0-beta.1/hack/generate-proto.sh
+[13]: https://github.com/heptio/velero/blob/v1.1.0-beta.2/hack/generate-proto.sh
 [14]: https://grpc.io/docs/quickstart/go.html#install-protocol-buffers-v3
 [15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
 [16]: https://cloud.google.com/docs/authentication/getting-started#setting_the_environment_variable

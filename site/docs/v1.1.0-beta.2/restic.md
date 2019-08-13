@@ -235,19 +235,19 @@ data:
   image: myregistry.io/my-custom-helper-image[:OPTIONAL_TAG]
 
   # "cpuRequest" sets the request.cpu value on the restic init containers during restore.
-  # If not set, it will default to "100m".
+  # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuRequest: 200m
   
   # "memRequest" sets the request.memory value on the restic init containers during restore.
-  # If not set, it will default to "128Mi".
+  # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memRequest: 128Mi
 
   # "cpuLimit" sets the request.cpu value on the restic init containers during restore.
-  # If not set, it will default to "100m".
+  # If not set, it will default to "100m". A value of "0" is treated as unbounded.
   cpuLimit: 200m
   
   # "memLimit" sets the request.memory value on the restic init containers during restore.
-  # If not set, it will default to "128Mi".
+  # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memLimit: 128Mi
 
 
