@@ -4,7 +4,7 @@ Status: Draft
 
 The Container Storage Interface (CSI) has [introduced an alpha snapshot API in Kubernetes v1.12][1].
 Current plans indicate it will reach beta support in Kubernetes v1.16.
-This document suggests an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
+This proposal documents an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
 
 ## Goals
 
@@ -17,13 +17,13 @@ This document suggests an approach for integrating support for this snapshot API
 
 ## Background
 
-Velero has had support for performing persistent volume snapshots since it's inception.
+Velero has had support for performing persistent volume snapshots since its inception.
 However, support has been limited to a handful of providers.
 The plugin API introduced in Velero v0.7 enabled the community to expand the number of supported providers.
 In the meantime, the Kubernetes sig-storage advanced the CSI spec to allow for a generic storage interface, opening up the possibility of moving storage code out of the core Kubernetes code base.
 The CSI working group has also developed a generic snapshotting API that any CSI driver developer may implement, giving users the ability to snapshot volumes from a standard interface.
 
-By supporting the CSI snapshot API, Velero can extend it's support to any CSI driver, without requiring a Velero-specific plugin be written, easing the development burden on providers while also reaching more end users.
+By supporting the CSI snapshot API, Velero can extend its support to any CSI driver, without requiring a Velero-specific plugin be written, easing the development burden on providers while also reaching more end users.
 
 ## High-Level Design
 
@@ -31,7 +31,7 @@ In order to support CSI's snapshot API, Velero must interact with the [`VolumeSn
 These act as requests to the CSI driver to perform a snapshot on the underlying provider's volume.
 This can largely be accomplished with Velero `BackupItemAction` and `RestoreItemAction` plugins that operate on these CRDs.
 
-Additionally, changes to the Velero server and client code are necessary to track `VolumeSnapshots` that are associated with a given backup, similarly to how Velero tracks its own [`volume.Snapshot`][4] type.
+Additionally, changes to the Velero server and client code are necessary to track `VolumeSnapshot`s that are associated with a given backup, similarly to how Velero tracks its own [`volume.Snapshot`][4] type.
 Tracking these is important for allowing users to see what is in their backup, and provides parity for the existing `volume.Snapshot` and [`PodVolumeBackup`][5] types.
 This is also done to retain the object store as Velero's source of truth, without having to query the Kubernetes API server for associated `VolumeSnapshot`s.
 
