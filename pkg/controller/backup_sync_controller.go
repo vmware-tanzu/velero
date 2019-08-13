@@ -251,6 +251,7 @@ func (c *backupSyncController) run() {
 					podVolumeBackup.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
 				}
 
+				podVolumeBackup.Namespace = backup.Namespace
 				podVolumeBackup.ResourceVersion = ""
 
 				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podVolumeBackup)
