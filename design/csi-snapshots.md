@@ -2,7 +2,7 @@
 
 Status: Draft
 
-The Container Storage Interface (CSI) has [introduced an alpha snapshot API in Kubernetes v1.12][1].
+The Container Storage Interface (CSI) [introduced an alpha snapshot API in Kubernetes v1.12][1].
 Current plans indicate it will reach beta support in Kubernetes v1.16.
 This proposal documents an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
 
@@ -48,14 +48,22 @@ The plugins will be as follows:
 
 #### A `BackupItemAction` for `PersistentVolumeClaim`s, named `velero.io/csi-pvc` 
 
-The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below)
+This plugin will act directly on PVCs, since an implementation of Velero's VolumeSnapshotter does not have enough information about the StorageClass to properly create the `VolumeSnapshot` objects.
+
+The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below).
 If this field is `nil`, then the plugin will return early without taking action.
+
 Create a `VolumeSnapshot.snapshot.storage.k8s.io` object from the PVC.
 Label the `VolumeSnapshot` object with the [`velero.io/backup-name`][10] label for ease of lookup later.
+Also set an ownerRef on the `VolumeSnapshot` so that cascading deletion of the Velero `Backup` will delete associated `VolumeSnapshots`.
+
 The CSI controllers will create a `VolumeSnapshotContent.snapshot.storage.k8s.io` object associated with the `VolumeSnapshot`.
+
 Associated `VolumeSnapshotContent` objects will be retrieved and updated with the [`velero.io/backup-name`][10] label for ease of lookup later.
 `velero.io/volume-snapshot-name` will be applied as a label to the PVC so that the `VolumeSnapshot` can be found easily for restore.
+
 `VolumeSnapshot`, `VolumeSnapshotContent`, and `VolumeSnapshotClass` objects would be returned as additional items to be backed up. GitHub issue [1566][18] represents this work.
+
 The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is the link to the underlying platform's snapshot, and must be preserved for restoration.
 
 The plugin will _not_ wait for the `VolumeSnapshot.Status.IsReady` field to be `true` before returning.
@@ -63,24 +71,35 @@ This maintains current Velero behavior, though may not be desirable for all stor
 
 #### A `RestoreItemAction` for `VolumeSnapshotContent` objects, named `velero.io/csi-vsc`
 
+On restore, `VolumeSnapshotContent` objects are cleaned so that they may be properly associated with IDs assigned by the target cluster.
+
 Only `VolumeSnapshotContent` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
+
 The metadata (excluding labels), `PersistentVolumeClaim.UUID`, and `VolumeSnapshotRef.UUID` fields will be cleared.
 The reference fields are cleared because the associated objects will get new UUIDs in the cluster.
 This also maps to the "import" case of [the snapshot API][1].
 
 #### A `RestoreItemAction` for `VolumeSnapshot` objects, named `velero.io/csi-vs`
 
+`VolumeSnapshot` objects must be prepared for importing into the target cluster by removing IDs and metadata associated with their origin cluster.
+
 Only `VolumeSnapshot` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
+
 Metadata (excluding labels) and `Source` fields on the object will be cleared.
 The `VolumeSnapshot.Spec.SnapshotContentName` is the link back to the `VolumeSnapshotContent` object, and thus the actual snapshot.
 The `Source` field indicates that a new CSI snapshot operation should be performed, which isn't relevant on restore.
 This follows the "import" case of [the snapshot API][1].
 
+The `Backup` associated with the `VolumeSnapshot` will be queried, and set as an ownerRef on the `VolumeSnapshot` so that deletion can cascade.
+
 #### A `RestoreItemAction` for `PersistentVolumeClaim`s named `velero.io/csi-pvc`
+
+On restore, `PersistentVolumeClaims` will need to be created from the snapshot, and thus will require editing before submission.
 
 Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
 Metadata (excluding labels) will be cleared, and the `velero.io/volume-snapshot-name` label will be used to find the relevant `VolumeSnapshot`.
 A reference to the `VolumeSnapshot` will be added to the `PersistentVolumeClaim.DataSource` field.
+
 
 No special logic is required to restore `VolumeSnapshotClass` objects.
 
