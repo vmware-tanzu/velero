@@ -28,7 +28,7 @@ This progress will be read on some interval and the PodVolumeBackup Custom Resou
 ### restic restore progress
 
 The `restic ls` command returns the number of files in a backup, including the size of each file.
-This can be compared with the total size of these file in the volume periodically to calculate the completion percentage of the restore.
+This can be compared with the total size of these files in the volume periodically to calculate the completion percentage of the restore.
 The PodVolumeRestore CR's status will be updated with this information.
 
 ## Detailed Design
