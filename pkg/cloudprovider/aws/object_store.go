@@ -17,7 +17,9 @@ limitations under the License.
 package aws
 
 import (
+	"crypto/tls"
 	"io"
+	"net/http"
 	"sort"
 	"strconv"
 	"time"
@@ -36,13 +38,14 @@ import (
 )
 
 const (
-	s3URLKey             = "s3Url"
-	publicURLKey         = "publicUrl"
-	kmsKeyIDKey          = "kmsKeyId"
-	s3ForcePathStyleKey  = "s3ForcePathStyle"
-	bucketKey            = "bucket"
-	signatureVersionKey  = "signatureVersion"
-	credentialProfileKey = "profile"
+	s3URLKey              = "s3Url"
+	publicURLKey          = "publicUrl"
+	kmsKeyIDKey           = "kmsKeyId"
+	s3ForcePathStyleKey   = "s3ForcePathStyle"
+	bucketKey             = "bucket"
+	signatureVersionKey   = "signatureVersion"
+	credentialProfileKey  = "profile"
+	insecureSkipVerifyKey = "insecureSkipVerify"
 )
 
 type s3Interface interface {
@@ -83,26 +86,29 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		s3ForcePathStyleKey,
 		signatureVersionKey,
 		credentialProfileKey,
+		insecureSkipVerifyKey,
 	); err != nil {
 		return err
 	}
 
 	var (
-		region              = config[regionKey]
-		s3URL               = config[s3URLKey]
-		publicURL           = config[publicURLKey]
-		kmsKeyID            = config[kmsKeyIDKey]
-		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
-		signatureVersion    = config[signatureVersionKey]
-		credentialProfile   = config[credentialProfileKey]
+		region                = config[regionKey]
+		s3URL                 = config[s3URLKey]
+		publicURL             = config[publicURLKey]
+		kmsKeyID              = config[kmsKeyIDKey]
+		s3ForcePathStyleVal   = config[s3ForcePathStyleKey]
+		signatureVersion      = config[signatureVersionKey]
+		credentialProfile     = config[credentialProfileKey]
+		insecureSkipVerifyVal = config[insecureSkipVerifyKey]
 
 		// note that bucket is automatically added to the config map
 		// by the server from the ObjectStorageProviderConfig so
 		// doesn't need to be explicitly set by the user within
 		// config.
-		bucket           = config[bucketKey]
-		s3ForcePathStyle bool
-		err              error
+		bucket             = config[bucketKey]
+		s3ForcePathStyle   bool
+		insecureSkipVerify bool
+		err                error
 	)
 
 	if s3ForcePathStyleVal != "" {
@@ -125,6 +131,20 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	serverConfig, err := newAWSConfig(s3URL, region, s3ForcePathStyle)
 	if err != nil {
 		return err
+	}
+
+	if insecureSkipVerifyVal != "" {
+		if insecureSkipVerify, err = strconv.ParseBool(insecureSkipVerifyVal); err != nil {
+			return errors.Wrapf(err, "could not parse %s (expected bool)", insecureSkipVerifyKey)
+		}
+	}
+
+	if insecureSkipVerify {
+		serverConfig.HTTPClient = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
 	}
 
 	serverSession, err := getSession(serverConfig, credentialProfile)
