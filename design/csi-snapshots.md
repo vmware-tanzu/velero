@@ -52,6 +52,7 @@ This plugin will act directly on PVCs, since an implementation of Velero's Volum
 
 The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below).
 If this field is `nil`, then the plugin will return early without taking action.
+If the `Backup.Spec.SnapshotVolumes` value is `false`, the plugin will return early without taking action.
 
 Create a `VolumeSnapshot.snapshot.storage.k8s.io` object from the PVC.
 Label the `VolumeSnapshot` object with the [`velero.io/backup-name`][10] label for ease of lookup later.
@@ -133,6 +134,8 @@ var defaultRestorePriorities = []string{
     "replicaset",
 }
 ```
+
+
 
 ## Velero client changes
 
