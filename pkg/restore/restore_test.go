@@ -28,8 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/heptio/velero/pkg/restic"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -53,6 +51,7 @@ import (
 	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
