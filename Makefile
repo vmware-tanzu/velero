@@ -169,11 +169,11 @@ endif
 
 manifest-fsfreeze: BIN = fsfreeze-pause
 manifest-fsfreeze:
-	@docker manifest create --amend $(MULTIARCH_IMAGE):$(VERSION) \
+	@docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
 	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker manifest create --amend $(MULTIARCH_IMAGE):latest \
+	docker manifest create $(MULTIARCH_IMAGE):latest \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
 	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
@@ -212,11 +212,11 @@ push-name:
 
 manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
 .manifest-$(MULTIARCH_IMAGE):
-	@docker manifest create --amend $(MULTIARCH_IMAGE):$(VERSION) \
+	@docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
 	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker manifest create --amend $(MULTIARCH_IMAGE):latest \
+	docker manifest create $(MULTIARCH_IMAGE):latest \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
 	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
