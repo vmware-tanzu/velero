@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Copyright 2019 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ppc64le/ubuntu:bionic
 
-LABEL maintainer="Prajyot Parab <prajyot.parab@ibm.com>"
+set -o errexit
+set -o nounset
+set -o pipefail
 
-ENTRYPOINT ["/bin/bash", "-c", "while true; do sleep 10000; done"]
+if [ -z "${RESTIC_VERSION}" ]; then
+    echo "RESTIC_VERSION must be set"
+    exit 1
+fi
+
+wget --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-${RESTIC_VERSION}
+mv restic-${RESTIC_VERSION} _output/bin/linux/ppc64le/restic
+chmod +x _output/bin/linux/ppc64le/restic
+

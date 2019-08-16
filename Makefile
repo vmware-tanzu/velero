@@ -33,12 +33,16 @@ VERSION ?= master
 
 TAG_LATEST ?= false
 
+# The version of restic binary to be downloaded for power architecture
+RESTIC_VERSION ?= 0.9.4
+
 ###
 ### These variables should not need tweaking.
 ###
 
 CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
-CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64 linux-ppc64le
+CONTAINER_PLATFORMS := linux-amd64 linux-ppc64le #linux-arm linux-arm64
+MANIFEST_PLATFORMS := amd64 ppc64le
 
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
@@ -48,6 +52,8 @@ GOARCH = $(word 2, $(platform_temp))
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
 		DOCKERFILE ?= Dockerfile-$(BIN)
+local-arch:
+	@echo "local environment for amd64 is up-to-date"
 endif
 #ifeq ($(GOARCH),arm)
 #		DOCKERFILE ?= Dockerfile.arm #armel/busybox
@@ -57,9 +63,13 @@ endif
 #endif
 ifeq ($(GOARCH),ppc64le)
                 DOCKERFILE ?= Dockerfile-$(BIN)-ppc64le
+local-arch:
+	RESTIC_VERSION=$(RESTIC_VERSION) \
+        ./hack/get-restic-ppc64le.sh
 endif
 
-IMAGE = $(REGISTRY)/$(BIN)
+MULTIARCH_IMAGE = $(REGISTRY)/$(BIN)
+IMAGE = $(REGISTRY)/$(BIN)-$(GOARCH)
 
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-container' rule.
@@ -70,18 +80,28 @@ all:
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
+	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restic-restore-helper
 
-#container-%:
-#	@$(MAKE) --no-print-directory ARCH=$* container
+container-%:
+	@$(MAKE) --no-print-directory ARCH=$* container
+	@$(MAKE) --no-print-directory ARCH=$* container BIN=velero-restic-restore-helper
+	@$(MAKE) --no-print-directory ARCH=$* build-fsfreeze
 
-#push-%:
-#	@$(MAKE) --no-print-directory ARCH=$* push
+push-%:
+	@$(MAKE) --no-print-directory ARCH=$* push
+	@$(MAKE) --no-print-directory ARCH=$* push BIN=velero-restic-restore-helper
+	@$(MAKE) --no-print-directory ARCH=$* push-fsfreeze
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-#all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
+all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
 
-#all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+
+all-manifest:
+	@$(MAKE) manifest
+	@$(MAKE) manifest BIN=velero-restic-restore-helper
+	@$(MAKE) manifest-fsfreeze
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -147,12 +167,22 @@ ifeq ($(TAG_LATEST), true)
 endif
 	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
 
-all-containers:
-	$(MAKE) container
-	$(MAKE) container BIN=velero-restic-restore-helper
-	$(MAKE) build-fsfreeze
+manifest-fsfreeze: BIN = fsfreeze-pause
+manifest-fsfreeze:
+	@docker manifest create --amend $(MULTIARCH_IMAGE):$(VERSION) \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
+	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(MULTIARCH_IMAGE):$(VERSION) $(MULTIARCH_IMAGE):latest
+	docker push $(MULTIARCH_IMAGE):latest
+endif
 
-container: verify test .container-$(DOTFILE_IMAGE) container-name
+#all-containers:
+#	$(MAKE) container
+#	$(MAKE) container BIN=velero-restic-restore-helper
+#	$(MAKE) build-fsfreeze
+
+container: verify test local-arch .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
 	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
@@ -161,10 +191,10 @@ container: verify test .container-$(DOTFILE_IMAGE) container-name
 container-name:
 	@echo "container: $(IMAGE):$(VERSION)"
 
-all-push:
-	$(MAKE) push
-	$(MAKE) push BIN=velero-restic-restore-helper
-	$(MAKE) push-fsfreeze
+#all-push:
+#	$(MAKE) push
+#	$(MAKE) push BIN=velero-restic-restore-helper
+#	$(MAKE) push-fsfreeze
 
 
 push: .push-$(DOTFILE_IMAGE) push-name
@@ -178,6 +208,19 @@ endif
 
 push-name:
 	@echo "pushed: $(IMAGE):$(VERSION)"
+
+manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
+.manifest-$(MULTIARCH_IMAGE):
+	@docker manifest create --amend $(MULTIARCH_IMAGE):$(VERSION) \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
+	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	docker tag $(MULTIARCH_IMAGE):$(VERSION) $(MULTIARCH_IMAGE):latest
+	docker push $(MULTIARCH_IMAGE):latest
+endif
+
+manifest-name:
+	@echo "pushed: $(MULTIARCH_IMAGE):$(VERSION)"
 
 SKIP_TESTS ?=
 test: build-dirs
