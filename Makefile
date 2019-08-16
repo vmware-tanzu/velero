@@ -173,8 +173,9 @@ manifest-fsfreeze:
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
 	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(MULTIARCH_IMAGE):$(VERSION) $(MULTIARCH_IMAGE):latest
-	docker push $(MULTIARCH_IMAGE):latest
+	docker manifest create --amend $(MULTIARCH_IMAGE):latest \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
+	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
 
 #all-containers:
@@ -215,8 +216,9 @@ manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
 	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(MULTIARCH_IMAGE):$(VERSION) $(MULTIARCH_IMAGE):latest
-	docker push $(MULTIARCH_IMAGE):latest
+	docker manifest create --amend $(MULTIARCH_IMAGE):latest \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
+	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
 
 manifest-name:
