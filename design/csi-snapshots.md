@@ -108,6 +108,9 @@ These plugins should be provided with Velero, as there will also be some changes
 
 ### Velero server changes
 
+Any non-plugin code changes must be behind a `EnableCSI` feature flag and the behavior will be opt-in until it's exited beta status.
+This will allow the development to continue on the feature while it's in pre-production state, while also reducing the need for long-lived feature branches.
+
 [`persistBackup`][8] will be extended to query for all `VolumeSnapshot`s associated with the backup, and persist the list to JSON.
 
 [`BackupStore.PutBackup`][9] will receive an additional argument, `volumeSnapshots io.Reader`, that contains the JSON representation of `VolumeSnapshots`.
@@ -134,10 +137,29 @@ var defaultRestorePriorities = []string{
     "replicaset",
 }
 ```
+### Restic and CSI interaction
 
+Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Velero's current Restic code path.
+This also means Velero will continue to offer Restic as an option for CSI volumes.
 
+To ensure this is the case, server code must be extended so that PVCs are labeled in such a way that the CSI BackupItemAction plugin is not invoked for PVCs known to be covered by Velero.
+This can be accomplished by:
+    putting a label on the PVC, so that the AppliesTo function will only match PVCs labeled correctly.
+    using an annotation so the Execute function can inspect it and decide to exit early
+    querying for PodVolumeBackups and filtering on the pvc annotation
+    Adding a label for the associated PVC to PodVolumeBackups and query based on that selector
+
+### Garbage collection and deletion
+
+To ensure that all created resources are deleted when a backup expires or is deleted, `VolumeSnapshot`s will have an `ownerRef` defined pointing to the Velero backup that created them.
+
+In order to fully delete these objects, each `VolumeSnapshotContent`s object will need to be edited to ensure the associated provider snapshot is deleted.
+This will be done by editing the object and setting `VolumeSnapshotContent.Spec.DeletionPolicy` to `Delete`, regardless of whether or not the default policy for the class is `Retain`.
+See the Deletion Policies section below.
 
 ## Velero client changes
+
+To use CSI features, the Velero client must use the `EnableCSI` feature flag.
 
 [`DescribeBackupStatus`][13] will be extended to download the `csi-snapshots.json.gz` file for processing. GitHub Issue [1568][19] captures this work.
 
@@ -151,18 +173,6 @@ It was [introduced with dynamic provisioning support][15] in 2016, predating CSI
 
 In the `BackupItemAction` for PVCs, the associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`.
 Volumes with any other `PersistentVolumeSource` set will use Velero's current VolumeSnapshotter plugin code path.
-
-Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Velero's current Restic code path.
-This also means Velero will continue to offer Restic as an option for CSI volumes.
-
-
-### Garbage collection and deletion
-
-To ensure that all created resources are deleted when a backup expires or is deleted, `VolumeSnapshot`s will have an `ownerRef` defined pointing to the Velero backup that created them.
-
-In order to fully delete these objects, each `VolumeSnapshotContent`s object will need to be edited to ensure the associated provider snapshot is deleted.
-This will be done by editing the object and setting `VolumeSnapshotContent.Spec.DeletionPolicy` to `Delete`, regardless of whether or not the default policy for the class is `Retain`.
-See the Deletion Policies section below.
 
 
 ## Alternatives Considered
