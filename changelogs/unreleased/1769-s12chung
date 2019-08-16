@@ -1,0 +1,1 @@
+adds `insecureSkipVerify` server config for AWS storage and `--insecureSkipVerify` flag on client for self-signed certs
