@@ -153,6 +153,15 @@ Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Veler
 This also means Velero will continue to offer Restic as an option for CSI volumes.
 
 
+### Garbage collection and deletion
+
+To ensure that all created resources are deleted when a backup expires or is deleted, `VolumeSnapshot`s will have an `ownerRef` defined pointing to the Velero backup that created them.
+
+In order to fully delete these objects, each `VolumeSnapshotContent`s object will need to be edited to ensure the associated provider snapshot is deleted.
+This will be done by editing the object and setting `VolumeSnapshotContent.Spec.DeletionPolicy` to `Delete`, regardless of whether or not the default policy for the class is `Retain`.
+See the Deletion Policies section below.
+
+
 ## Alternatives Considered
 
 * Implementing similar logic in a Velero VolumeSnapshotter plugin was considered.
@@ -172,9 +181,9 @@ This is important, because to display snapshots included in a backup, whether as
 Snapshots are not listed directly on the `Backup` to fit within the etcd size limitations.
 Additionally, there are no client-side Velero plugin mechanisms, which means that the `velero describe backup --details` command would have no way of displaying the objects to the user, even if they were stored.
 
-## Notes on Usage
+## Deletion Policies
 
-In order for underlying, provider-level snapshots to be retained similarly to Velero's current functionality, the `VolumeSnapshotContent.DeletionPolicy` field must be set to `Retain`.
+In order for underlying, provider-level snapshots to be retained similarly to Velero's current functionality, the `VolumeSnapshotContent.Spec.DeletionPolicy` field must be set to `Retain`.
 
 This is most easily accomplished by setting the `VolumeSnapshotClass.DeletionPolicy` field to `Retain`, which will be inherited by all `VolumeSnapshotContent` objects associated with the `VolumeSnapshotClass`.
 
