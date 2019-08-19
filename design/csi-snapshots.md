@@ -50,6 +50,8 @@ The plugins will be as follows:
 
 This plugin will act directly on PVCs, since an implementation of Velero's VolumeSnapshotter does not have enough information about the StorageClass to properly create the `VolumeSnapshot` objects.
 
+Only `PersistentVolumeClaim` objects without the `velero.io/restic-backed` label will be processed, using the plugin's `AppliesTo` function.
+
 The associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`. (See the "Snapshot Mechanism Selection" section below).
 If this field is `nil`, then the plugin will return early without taking action.
 If the `Backup.Spec.SnapshotVolumes` value is `false`, the plugin will return early without taking action.
@@ -143,11 +145,9 @@ Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Veler
 This also means Velero will continue to offer Restic as an option for CSI volumes.
 
 To ensure this is the case, server code must be extended so that PVCs are marked in such a way that the CSI BackupItemAction plugin is not invoked for PVCs known to be backed up by restic.
-This can be accomplished by:
-    putting a label on the PVC, so that the AppliesTo function will only match PVCs labeled correctly.
-    using an annotation so the Execute function can inspect it and decide to exit early
-    querying for PodVolumeBackups and filtering on the pvc annotation
-    Adding a label for the associated PVC to PodVolumeBackups and query based on that selector
+
+The restic backupper's `BackupPodVolumes` method will be extended to get PersistentVolumeClaims where relevant and add a `velero.io/restic-backed: true` label.
+This label will be used by the `velero.io/csi-pvc` BackupItemAction plugin to ensure only PersistentVolumeClaims _without_ that label are processed.
 
 ### Garbage collection and deletion
 
