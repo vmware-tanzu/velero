@@ -70,7 +70,7 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
 	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
-	flags.BoolVar(&o.InsecureSkipVerify, "insecureskipverify", o.InsecureSkipVerify, "accept any TLS certificate presented by the storage service")
+	flags.BoolVar(&o.InsecureSkipVerify, "insecureskipverify", o.InsecureSkipVerify, "do not verify the TLS certificate for storage requests. This is susceptible to man-in-the-middle attacks.")
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
