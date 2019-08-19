@@ -142,7 +142,7 @@ var defaultRestorePriorities = []string{
 Volumes found in a `Pod`'s `backup.velero.io/backup-volumes` list will use Velero's current Restic code path.
 This also means Velero will continue to offer Restic as an option for CSI volumes.
 
-To ensure this is the case, server code must be extended so that PVCs are labeled in such a way that the CSI BackupItemAction plugin is not invoked for PVCs known to be covered by Velero.
+To ensure this is the case, server code must be extended so that PVCs are marked in such a way that the CSI BackupItemAction plugin is not invoked for PVCs known to be backed up by restic.
 This can be accomplished by:
     putting a label on the PVC, so that the AppliesTo function will only match PVCs labeled correctly.
     using an annotation so the Execute function can inspect it and decide to exit early
@@ -156,6 +156,9 @@ To ensure that all created resources are deleted when a backup expires or is del
 In order to fully delete these objects, each `VolumeSnapshotContent`s object will need to be edited to ensure the associated provider snapshot is deleted.
 This will be done by editing the object and setting `VolumeSnapshotContent.Spec.DeletionPolicy` to `Delete`, regardless of whether or not the default policy for the class is `Retain`.
 See the Deletion Policies section below.
+The edit will happen before making Kubernetes API deletion calls to ensure that the cascade works as expected.
+
+Deleting a Velero `Backup` or any associated CSI object via `kubectl` is unsupported; data will be lost or orphaned if this is done.
 
 ## Velero client changes
 
