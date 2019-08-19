@@ -74,7 +74,7 @@ This maintains current Velero behavior, though may not be desirable for all stor
 
 On restore, `VolumeSnapshotContent` objects are cleaned so that they may be properly associated with IDs assigned by the target cluster.
 
-Only `VolumeSnapshotContent` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
+Only `VolumeSnapshotContent` objects with the `velero.io/backup-name` label will be processed, using the plugin's `AppliesTo` function.
 
 The metadata (excluding labels), `PersistentVolumeClaim.UUID`, and `VolumeSnapshotRef.UUID` fields will be cleared.
 The reference fields are cleared because the associated objects will get new UUIDs in the cluster.
@@ -84,7 +84,7 @@ This also maps to the "import" case of [the snapshot API][1].
 
 `VolumeSnapshot` objects must be prepared for importing into the target cluster by removing IDs and metadata associated with their origin cluster.
 
-Only `VolumeSnapshot` objects with the `velero.io/backup-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
+Only `VolumeSnapshot` objects with the `velero.io/backup-name` label will be processed, using the plugin's `AppliesTo` function.
 
 Metadata (excluding labels) and `Source` fields on the object will be cleared.
 The `VolumeSnapshot.Spec.SnapshotContentName` is the link back to the `VolumeSnapshotContent` object, and thus the actual snapshot.
@@ -97,7 +97,7 @@ The `Backup` associated with the `VolumeSnapshot` will be queried, and set as an
 
 On restore, `PersistentVolumeClaims` will need to be created from the snapshot, and thus will require editing before submission.
 
-Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` label will be processed; if the label is missing, the plugin will return the unmodified object.
+Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` label will be processed, using the plugin's `AppliesTo` function.
 Metadata (excluding labels) will be cleared, and the `velero.io/volume-snapshot-name` label will be used to find the relevant `VolumeSnapshot`.
 A reference to the `VolumeSnapshot` will be added to the `PersistentVolumeClaim.DataSource` field.
 
