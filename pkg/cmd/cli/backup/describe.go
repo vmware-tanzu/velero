@@ -33,9 +33,9 @@ import (
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	var (
-		listOptions        metav1.ListOptions
-		details            bool
-		insecureSkipVerify bool
+		listOptions           metav1.ListOptions
+		details               bool
+		insecureSkipTLSVerify bool
 	)
 
 	c := &cobra.Command{
@@ -72,7 +72,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, veleroClient, insecureSkipVerify)
+				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, veleroClient, insecureSkipTLSVerify)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -86,7 +86,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
 	c.Flags().BoolVar(&details, "details", details, "display additional detail in the command output")
-	c.Flags().BoolVar(&insecureSkipVerify, "insecureskipverify", insecureSkipVerify, "do not verify the TLS certificate for storage requests. This is susceptible to man-in-the-middle attacks.")
+	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "do not verify the TLS certificate for storage requests. This is susceptible to man-in-the-middle attacks.")
 
 	return c
 }

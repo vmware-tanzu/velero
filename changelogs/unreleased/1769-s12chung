@@ -1,1 +1,1 @@
-adds `insecureSkipVerify` server config for AWS storage and `--insecureSkipVerify` flag on client for self-signed certs
+adds `insecureSkipTLSVerify` server config for AWS storage and `--insecure-skip-tls-verify` flag on client for self-signed certs
