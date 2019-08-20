@@ -33,6 +33,17 @@ The PodVolumeRestore CR's status will be updated with this information.
 
 ## Detailed Design
 
+## Changes to PodVolumeBackup and PodVolumeRestore Status type
+
+A new `Progress` field will be added to PodVolumeBackupStatus and PodVolumeRestoreStatus of type `PodVolumeOperationProgress`:
+
+```
+type PodVolumeOperationProgress struct {
+  TotalBytes int64
+  BytesDone int64
+}
+```
+
 ### restic backup progress
 
 restic added support for [streaming JSON output for the `restic backup` command](https://github.com/restic/restic/pull/1944) in 0.9.5.
@@ -53,12 +64,10 @@ The [command factory for backup](https://github.com/heptio/velero/blob/af4b9373f
 The code to run the `restic backup` command (https://github.com/heptio/velero/blob/af4b9373fc73047f843cd4bc3648603d780c8b74/pkg/controller/pod_volume_backup_controller.go#L241) will be changed to include a Goroutine that reads from the command's stdout stream.
 The implementation of this will largely follow [@jmontleon's PoC](https://github.com/fusor/velero/pull/4/files) of this.
 The Goroutine will periodically read the stream (every 10 seconds) and get the last printed status line.
-The line will be decoded as JSON and the `percent_done` property will be read and formatted as a percentage value.
+The line will be decoded as JSON and the `bytes_done` and `total_bytes` property will be read and the PodVolumeBackup will be patched to update `status.Progress.BytesDone` and `status.Progress.TotalBytes` respectively.
 
-The PodVolumeBackupStatus type will be extended to include a `Progress` field.
-The PodVolumeBackup will be patched to set the `status.Progress` field to the percentage value of the progress.
-
-Once the backup has completed successfully, the PodVolumeBackup will be patched to set `status.Progress = 100%`.
+Once the backup has completed successfully, the PodVolumeBackup will be patched to set `status.Progress.BytesDone = status.Progress.TotalBytes`.
+This is done since the main thread may cause early termination of the Goroutine once the operation has finished, preventing a final update to the `BytesDone` property.
 
 ### restic restore progress
 
@@ -72,15 +81,18 @@ The `restic ls <snapshot_id> --json` command provides information about the size
 ```
 
 Before beginning the restore operation, we can use the output of `restic ls` to get a list of the files that will be restored and calculate the total size of the backup.
+The PodVolumeRestore will be patched to set `status.Progress.TotalBytes` to the total size of the backup.
 
 The code to run the `restic restore` command will be changed to include a Goroutine that periodically (every 10 seconds) goes through the list of files in the backup and gets the current size of each file in the volume.
 If the file doesn't exist in the volume yet (restic hasn't started restoring it), the size is 0.
-The sum of the current size of each file is then compared with the total size of the backup to calculate a completion percentage (`cursize / totalsize * 100`).
+The sum of the current size of each file is the number of bytes transferred so far and the PodVolumeRestore will be patched to update `status.Progress.BytesDone`.
 
-The PodVolumeRestoreStatus type will be extended to include a `Progress` field.
-The PodVolumeRestore will be patched to set the `status.Progress` field to the percentage value of the progress.
+Once the restore has completed successfully, the PodVolumeRestore will be patched to set `status.Progress.BytesDone = status.Progress.TotalBytes`.
+This is done since the main thread may cause early termination of the Goroutine once the operation has finished, preventing a final update to the `BytesDone` property.
 
-Once the restore has completed successfully, the PodVolumeRestore will be patched to set `status.Progress = 100%`.
+### Velero CLI changes
+
+The output that describes detailed information about [PodVolumeBackups](https://github.com/heptio/velero/blob/559d62a2ec99f7a522924348fc4a173a0699813a/pkg/cmd/util/output/backup_describer.go#L349) and [PodVolumeRestores](https://github.com/heptio/velero/blob/559d62a2ec99f7a522924348fc4a173a0699813a/pkg/cmd/util/output/restore_describer.go#L160) will be updated to calculate and display a completion percentage from `status.Progress.TotalBytes` and `status.Progress.BytesDone` if available.
 
 ## Open Questions
 
