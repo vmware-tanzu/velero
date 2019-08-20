@@ -38,7 +38,6 @@ func DescribeBackup(
 	podVolumeBackups []velerov1api.PodVolumeBackup,
 	details bool,
 	veleroClient clientset.Interface,
-	insecureSkipTLSVerify bool,
 ) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
@@ -75,7 +74,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup, details, veleroClient, insecureSkipTLSVerify)
+		DescribeBackupStatus(d, backup, details, veleroClient)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -212,7 +211,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
+func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface) {
 	status := backup.Status
 
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
@@ -235,7 +234,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Println()
 
 	if details {
-		describeBackupResourceList(d, backup, veleroClient, insecureSkipTLSVerify)
+		describeBackupResourceList(d, backup, veleroClient)
 		d.Println()
 	}
 
@@ -246,7 +245,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		}
 
 		buf := new(bytes.Buffer)
-		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
+		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout); err != nil {
 			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
 			return
 		}
@@ -267,9 +266,9 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Persistent Volumes: <none included>\n")
 }
 
-func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
+func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface) {
 	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout); err != nil {
 		if err == downloadrequest.ErrNotFound {
 			d.Println("Resource List:\t<backup resource list not found, this could be because this backup was taken prior to Velero 1.1.0>")
 		} else {
