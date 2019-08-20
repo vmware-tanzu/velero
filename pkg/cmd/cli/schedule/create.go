@@ -93,9 +93,6 @@ func NewCreateOptions() *CreateOptions {
 
 func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	o.BackupOptions.BindFlags(flags)
-	// hide the Backup options --from-schedule flag
-	// TODO: see if there is a way to remove the flag
-	flags.MarkHidden("from-schedule")
 	flags.StringVar(&o.Schedule, "schedule", o.Schedule, "a cron expression specifying a recurring schedule for this backup to run")
 }
 

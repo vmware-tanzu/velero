@@ -68,6 +68,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
 	o.BindFlags(c.Flags())
 	o.BindWait(c.Flags())
+	o.BindFromSchedule(c.Flags())
 	output.BindFlags(c.Flags())
 	output.ClearOutputFlagDefault(c)
 
@@ -113,7 +114,6 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "list of locations (at most one per provider) where volume snapshots should be stored")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
-	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from a Schedule. Cannot be used with any other filters.")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -127,6 +127,12 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 // commands that reuse CreateOptions's BindFlags method.
 func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
+}
+
+// BindFromSchedule binds the from-schedule flag separately so it is not called
+// by other create commands that reuse CreateOptions's BindFlags method.
+func (o *CreateOptions) BindFromSchedule(flags *pflag.FlagSet) {
+	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from a Schedule. Cannot be used with any other filters.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
