@@ -71,21 +71,18 @@ This is done since the main thread may cause early termination of the Goroutine 
 
 ### restic restore progress
 
-The `restic ls <snapshot_id> --json` command provides information about the size of backed up files:
+The `restic stats <snapshot_id> --json` command provides information about the size of backups:
 
 ```
-{"time":"2019-08-14T15:16:29.105557-07:00","tree":"1de5381473aecb5548959f6e5444bb7966fe781500b5f8ec1629088674bea6a6","paths":["/Users/aadnan/Playground/restic/files"],"hostname":"aadnan-a01.vmware.com","username":"aadnan","uid":501,"gid":20,"id":"5628926b4f0e105eb33d83c619f235a8cf8f695d19955fab44bf506ece195f3a","short_id":"5628926b","struct_type":"snapshot"}
-{"name":"files","type":"dir","path":"/files","uid":501,"gid":20,"mode":2147484096,"mtime":"2019-08-14T15:16:20.53091354-07:00","atime":"2019-08-14T15:16:20.53091354-07:00","ctime":"2019-08-14T15:16:20.53091354-07:00","struct_type":"node"}
-{"name":"file1","type":"file","path":"/files/file1","uid":501,"gid":20,"size":1435500544,"mode":384,"mtime":"2019-08-14T15:16:20.491206506-07:00","atime":"2019-08-14T15:16:20.491206506-07:00","ctime":"2019-08-14T15:16:20.491234451-07:00","struct_type":"node"}
-...
+{"total_size":10558111744,"total_file_count":11}
 ```
 
-Before beginning the restore operation, we can use the output of `restic ls` to get a list of the files that will be restored and calculate the total size of the backup.
+Before beginning the restore operation, we can use the output of `restic stats` to the total size of the backup.
 The PodVolumeRestore will be patched to set `status.Progress.TotalBytes` to the total size of the backup.
 
-The code to run the `restic restore` command will be changed to include a Goroutine that periodically (every 10 seconds) goes through the list of files in the backup and gets the current size of each file in the volume.
-If the file doesn't exist in the volume yet (restic hasn't started restoring it), the size is 0.
-The sum of the current size of each file is the number of bytes transferred so far and the PodVolumeRestore will be patched to update `status.Progress.BytesDone`.
+The code to run the `restic restore` command will be changed to include a Goroutine that periodically (every 10 seconds) gets the current size of the volume.
+To get the current size of the volume, we will recursively walkthrough all files in the volume to accumulate the total size.
+The current total size is the number of bytes transferred so far and the PodVolumeRestore will be patched to update `status.Progress.BytesDone`.
 
 Once the restore has completed successfully, the PodVolumeRestore will be patched to set `status.Progress.BytesDone = status.Progress.TotalBytes`.
 This is done since the main thread may cause early termination of the Goroutine once the operation has finished, preventing a final update to the `BytesDone` property.
@@ -96,16 +93,17 @@ The output that describes detailed information about [PodVolumeBackups](https://
 
 ## Open Questions
 
-- Can we assume that the volume we are restoring in will be empty? Can it contain other artefacts? If we can assume it to be empty, we can go with the easier approach detailed below.
+- Can we assume that the volume we are restoring in will be empty? Can it contain other artefacts?
+  - Based on discussion in this PR, we are okay making the assumption that the PVC is empty and will proceed with the above proposed approach.
 
 ## Alternatives Considered
 
 ### restic restore progress
 
-If we can assume that the volume we are restoring into will be empty, we can instead use the output from `restic stats` to get the total size of the backup.
-This can then be periodically compared with the size of all files in the volume to calculate a completion percentage.
-This will be simpler as we don't need to keep track of each file in the backup, but will not work if the volume could contain other files not included in the backup.
-It's possible that certain volume types may contain hidden files that could attribute to the total size of the volume, and so this might be an overall less safe approach.
+If we cannot assume that the volume we are restoring into will be empty, we can instead use the output from `restic snapshot` to get the list of files in the backup.
+This can then be used to calculate the current total size of just those files in the volume, so that we avoid considering any other files unrelated to the backup.
+The above proposed approach is simpler than this one, as we don't need to keep track of each file in the backup, but this will be more robust if the volume could contain other files not included in the backup.
+It's possible that certain volume types may contain hidden files that could attribute to the total size of the volume, though these should be small enough that the BytesDone calculation will only be slightly inflated.
 
 Another option is to contribute progress reporting similar to `restic backup` for `restic restore` upstream.
 This may take more time, but would give us a more native view on the progress of a restore.
