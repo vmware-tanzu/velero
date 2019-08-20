@@ -77,7 +77,7 @@ The `restic stats <snapshot_id> --json` command provides information about the s
 {"total_size":10558111744,"total_file_count":11}
 ```
 
-Before beginning the restore operation, we can use the output of `restic stats` to the total size of the backup.
+Before beginning the restore operation, we can use the output of `restic stats` to get the total size of the backup.
 The PodVolumeRestore will be patched to set `status.Progress.TotalBytes` to the total size of the backup.
 
 The code to run the `restic restore` command will be changed to include a Goroutine that periodically (every 10 seconds) gets the current size of the volume.
