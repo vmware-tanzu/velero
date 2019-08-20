@@ -1,1 +1,0 @@
-adds validation for pod volumes hostPath mount on restic server startup
