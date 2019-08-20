@@ -58,10 +58,10 @@ See [the list of releases][6] to find out about feature changes.
 [2]: https://travis-ci.org/heptio/velero
 
 [4]: https://github.com/heptio/velero/issues
-[5]: https://github.com/heptio/velero/blob/v1.1.0-beta.2/CONTRIBUTING.md
+[5]: https://github.com/heptio/velero/blob/v1.1.0/CONTRIBUTING.md
 [6]: https://github.com/heptio/velero/releases
 
-[8]: https://github.com/heptio/velero/blob/v1.1.0-beta.2/CODE_OF_CONDUCT.md
+[8]: https://github.com/heptio/velero/blob/v1.1.0/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
@@ -74,7 +74,7 @@ See [the list of releases][6] to find out about feature changes.
 
 
 [28]: install-overview.md
-[29]: https://velero.io/docs/v1.1.0-beta.2/
+[29]: https://velero.io/docs/v1.1.0/
 [30]: troubleshooting.md
 
 [99]: support-matrix.md
