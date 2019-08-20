@@ -79,7 +79,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
 	c.Flags().BoolVar(&details, "details", details, "display additional detail in the command output")
-	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "do not verify the TLS certificate for storage requests. This is susceptible to man-in-the-middle attacks.")
+	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "do not verify the TLS certificate for storage requests only. This is susceptible to man-in-the-middle attacks.")
 
 	return c
 }

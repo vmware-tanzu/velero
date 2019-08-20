@@ -53,7 +53,7 @@ The configurable parameters are as follows:
 | `kmsKeyId` | string | Empty | *Example*: "502b409c-4da1-419f-a16e-eif453b3i49f" or "alias/`<KMS-Key-Alias-Name>`"<br><br>Specify an [AWS KMS key][10] id or alias to enable encryption of the backups stored in S3. Only works with AWS S3 and may require explicitly granting key usage rights.|
 | `signatureVersion` | string | `"4"` | Version of the signature algorithm used to create signed URLs that are used by velero cli to download backups or fetch logs. Possible versions are "1" and "4". Usually the default version 4 is correct, but some S3-compatible providers like Quobyte only support version 1.|
 | `profile` | string | "default" | AWS profile within the credential file to use for given store |
-| `insecureSkipTLSVerify` | bool | `false` | Set this to `true` if you do not want to verify the TLS certificate for storage requests--like self-signed certs in Minio. This is susceptible to man-in-the-middle attacks and is not recommended for production. |
+| `insecureSkipTLSVerify` | bool | `false` | Set this to `true` if you do not want to verify the TLS certificate for storage requests only--like self-signed certs in Minio. This is susceptible to man-in-the-middle attacks and is not recommended for production. |
 
 #### Azure
 

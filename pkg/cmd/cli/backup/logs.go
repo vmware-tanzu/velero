@@ -65,7 +65,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 	}
 
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
-	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "do not verify the TLS certificate for storage requests. This is susceptible to man-in-the-middle attacks.")
+	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "do not verify the TLS certificate for storage requests only. This is susceptible to man-in-the-middle attacks.")
 
 	return c
 }
