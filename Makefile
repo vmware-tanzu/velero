@@ -178,11 +178,6 @@ ifeq ($(TAG_LATEST), true)
 	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
 
-#all-containers:
-#	$(MAKE) container
-#	$(MAKE) container BIN=velero-restic-restore-helper
-#	$(MAKE) build-fsfreeze
-
 container: verify test local-arch .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
@@ -191,12 +186,6 @@ container: verify test local-arch .container-$(DOTFILE_IMAGE) container-name
 
 container-name:
 	@echo "container: $(IMAGE):$(VERSION)"
-
-#all-push:
-#	$(MAKE) push
-#	$(MAKE) push BIN=velero-restic-restore-helper
-#	$(MAKE) push-fsfreeze
-
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
