@@ -17,7 +17,6 @@ limitations under the License.
 package backup
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -140,17 +139,6 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	if o.FromSchedule != "" {
-		if (len(o.IncludeNamespaces) > 1 || o.IncludeNamespaces[0] != "*") ||
-			len(o.ExcludeNamespaces) > 0 || len(o.IncludeResources) > 0 ||
-			len(o.ExcludeResources) > 0 || o.Selector.LabelSelector != nil ||
-			o.SnapshotVolumes.Value != nil || o.TTL != DefaultBackupTTL ||
-			o.IncludeClusterResources.Value != nil ||
-			o.StorageLocation != "" || len(o.SnapshotLocations) > 0 {
-			return errors.New("backup filters cannot be set when creating a Backup from a Schedule")
-		}
-	}
-
 	if o.StorageLocation != "" {
 		if _, err := o.client.VeleroV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
 			return err
@@ -208,6 +196,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 	if printed, err := output.PrintWithFormat(c, backup); printed || err != nil {
 		return err
+	}
+
+	if o.FromSchedule != "" {
+		fmt.Println("Creating backup from schedule, all other filters are ignored.")
 	}
 
 	var backupInformer cache.SharedIndexInformer
