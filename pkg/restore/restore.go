@@ -94,6 +94,7 @@ type kubernetesRestorer struct {
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
 	fileSystem                 filesystem.Interface
+	pvRenamer                  func(string) string
 	logger                     logrus.FieldLogger
 }
 
@@ -175,6 +176,7 @@ func NewKubernetesRestorer(
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
+		pvRenamer:                  func(string) string { return "velero-clone-" + uuid.NewV4().String() },
 		fileSystem:                 filesystem.NewFileSystem(),
 	}, nil
 }
@@ -277,6 +279,7 @@ func (kr *kubernetesRestorer) Restore(
 		resourceClients: make(map[resourceClientKey]client.Dynamic),
 		restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
 		renamedPVs:      make(map[string]string),
+		pvRenamer:       kr.pvRenamer,
 	}
 
 	return restoreCtx.execute()
@@ -369,6 +372,7 @@ type context struct {
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
 	renamedPVs                 map[string]string
+	pvRenamer                  func(string) string
 }
 
 type resourceClientKey struct {
@@ -916,7 +920,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			if shouldRenamePV {
 				// give obj a new name, and record the mapping between the old and new names
 				oldName := obj.GetName()
-				newName := "velero-clone-" + uuid.NewV4().String()
+				newName := ctx.pvRenamer(oldName)
 
 				ctx.renamedPVs[oldName] = newName
 				obj.SetName(newName)
