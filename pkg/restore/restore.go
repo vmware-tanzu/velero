@@ -879,20 +879,19 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
-			renamePV, err := renamePV(ctx, obj, resourceClient)
+			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 			if err != nil {
 				addToResult(&errs, namespace, err)
 				return warnings, errs
 			}
 
 			var shouldRestoreSnapshot bool
-			switch renamePV {
-			case true:
+			if shouldRenamePV {
 				// if we're renaming the PV, we're going to give it a new random name,
 				// so we can assume it doesn't already exist in the cluster and therefore
 				// we should proceed with restoring from snapshot.
 				shouldRestoreSnapshot = true
-			case false:
+			} else {
 				// Check if the PV exists in the cluster before attempting to create
 				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
 				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
@@ -914,7 +913,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				obj = updatedObj
 			}
 
-			if renamePV {
+			if shouldRenamePV {
 				// give obj a new name, and record the mapping between the old and new names
 				oldName := obj.GetName()
 				newName := "velero-clone-" + uuid.NewV4().String()
@@ -1148,12 +1147,12 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	return warnings, errs
 }
 
-// renamePV returns a boolean indicating whether a persistent volume should be given a new name
+// shouldRenamePV returns a boolean indicating whether a persistent volume should be given a new name
 // before being restored, or an error if this cannot be determined. A persistent volume will be
 // given a new name if and only if (a) a PV with the original name already exists in-cluster, and
 // (b) in the backup, the PV is claimed by a PVC in a namespace that's being remapped during the
 // restore.
-func renamePV(ctx *context, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
+func shouldRenamePV(ctx *context, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
 	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
 		ctx.log.Debugf("Persistent volume does not need to be renamed because restore is not remapping any namespaces")
 		return false, nil
