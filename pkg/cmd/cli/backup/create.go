@@ -132,7 +132,7 @@ func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
 // BindFromSchedule binds the from-schedule flag separately so it is not called
 // by other create commands that reuse CreateOptions's BindFlags method.
 func (o *CreateOptions) BindFromSchedule(flags *pflag.FlagSet) {
-	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from a Schedule. Cannot be used with any other filters.")
+	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from the template of an existing schedule. Cannot be used with any other filters.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
