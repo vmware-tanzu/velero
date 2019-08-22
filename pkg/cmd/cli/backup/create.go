@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
@@ -165,34 +166,10 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	backupBuilder := builder.ForBackup(f.Namespace(), o.Name)
-
-	if o.FromSchedule != "" {
-		schedule, err := o.client.VeleroV1().Schedules(f.Namespace()).Get(o.FromSchedule, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		backupBuilder.FromSchedule(schedule)
-	} else {
-		backupBuilder.
-			IncludedNamespaces(o.IncludeNamespaces...).
-			ExcludedNamespaces(o.ExcludeNamespaces...).
-			IncludedResources(o.IncludeResources...).
-			ExcludedResources(o.ExcludeResources...).
-			LabelSelector(o.Selector.LabelSelector).
-			TTL(o.TTL).
-			StorageLocation(o.StorageLocation).
-			VolumeSnapshotLocations(o.SnapshotLocations...)
-
-		if o.SnapshotVolumes.Value != nil {
-			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)
-		}
-		if o.IncludeClusterResources.Value != nil {
-			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
-		}
+	backup, err := o.BuildBackup(f.Namespace())
+	if err != nil {
+		return err
 	}
-
-	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
 
 	if printed, err := output.PrintWithFormat(c, backup); printed || err != nil {
 		return err
@@ -242,7 +219,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err := o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
+	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
 	if err != nil {
 		return err
 	}
@@ -276,4 +253,36 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	fmt.Printf("Run `velero backup describe %s` or `velero backup logs %s` for more details.\n", backup.Name, backup.Name)
 
 	return nil
+}
+
+func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, error) {
+	backupBuilder := builder.ForBackup(namespace, o.Name)
+
+	if o.FromSchedule != "" {
+		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(o.FromSchedule, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		backupBuilder.FromSchedule(schedule)
+	} else {
+		backupBuilder.
+			IncludedNamespaces(o.IncludeNamespaces...).
+			ExcludedNamespaces(o.ExcludeNamespaces...).
+			IncludedResources(o.IncludeResources...).
+			ExcludedResources(o.ExcludeResources...).
+			LabelSelector(o.Selector.LabelSelector).
+			TTL(o.TTL).
+			StorageLocation(o.StorageLocation).
+			VolumeSnapshotLocations(o.SnapshotLocations...)
+
+		if o.SnapshotVolumes.Value != nil {
+			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)
+		}
+		if o.IncludeClusterResources.Value != nil {
+			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
+		}
+	}
+
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
+	return backup, nil
 }
