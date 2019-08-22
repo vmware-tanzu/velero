@@ -1,6 +1,6 @@
 # Progress reporting for restic backups and restores
 
-Status: Draft
+Status: Accepted
 
 During long-running restic backups/restores, there is no visibility into what (if anything) is happening, making it hard to know if the backup/restore is making progress or hung, how long the operation might take, etc.
 We should capture progress during restic operations and make it user-visible so that it's easier to reason about.
