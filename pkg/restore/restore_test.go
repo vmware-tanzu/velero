@@ -52,6 +52,7 @@ import (
 	"github.com/heptio/velero/pkg/kuberesource"
 	"github.com/heptio/velero/pkg/plugin/velero"
 	"github.com/heptio/velero/pkg/restic"
+	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
 	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/collections"
 	"github.com/heptio/velero/pkg/util/encode"
@@ -2001,7 +2002,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		},
 
 		{
-			name:    "include podvolumebackups, and when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
+			name:    "when a PV with a reclaim policy of retain has a snapshot and exists in-cluster, neither the snapshot nor the PV are restored",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
@@ -2112,13 +2113,12 @@ func TestRestorePersistentVolumes(t *testing.T) {
 }
 
 type fakeResticRestorerFactory struct {
+	restorer         *resticmocks.Restorer
 	podVolumeBackups []*velerov1api.PodVolumeBackup
 }
 
 func (f *fakeResticRestorerFactory) NewRestorer(ctx.Context, *velerov1api.Restore) (restic.Restorer, error) {
-	return &fakeResticRestorer{
-		podVolumeBackups: f.podVolumeBackups,
-	}, nil
+	return f.restorer, nil
 }
 
 type fakeResticRestorer struct {
@@ -2129,45 +2129,32 @@ func (b *fakeResticRestorer) RestorePodVolumes(data restic.RestoreData) []error 
 	return nil
 }
 
-// TestBackupWithRestic runs backups of pods that are annotated for restic backup,
-// and ensures that the restic backupper is called, that the returned PodVolumeBackups
-// are added to the Request object, and that when PVCs are backed up with restic, the
-// claimed PVs are not also snapshotted using a VolumeSnapshotter.
+// TestRestoreWithRestic runs restores of pods that are annotated for restic restore.
 func TestRestoreWithRestic(t *testing.T) {
-	var (
-		backupName = "backup-1"
-		veleroNs   = "velero"
-	)
-
 	tests := []struct {
-		name         string
-		restore      *velerov1api.Restore
-		backup       *velerov1api.Backup
-		apiResources []*test.APIResource
-		tarball      io.Reader
-		want         []*velerov1api.PodVolumeBackup
+		name                       string
+		restore                    *velerov1api.Restore
+		backup                     *velerov1api.Backup
+		podVolumeBackups           []*velerov1api.PodVolumeBackup
+		wantExecutedCalls          []restic.RestoreData // expected calls per pod
+		wantPods, doesNotWwantPods []*corev1api.Pod
 	}{
 		{
 			name:    "a pod annotated for restic backup should result in pod volume backups being returned",
 			restore: defaultRestore().Result(),
 			backup:  defaultBackup().Result(),
-			apiResources: []*test.APIResource{
-				test.Pods(
-					builder.ForPod("ns-1", "pod-1").
-						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
-						Result(),
-				),
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").Result(),
 			},
-			tarball: newTarWriter(t).addItems("pods",
+			wantPods: []*corev1api.Pod{
 				builder.ForPod("ns-1", "pod-2").
 					ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
-					Result()).
-				done(),
-			want: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup(veleroNs, "pvb-1").
-					PodName("pod-2").
-					Volume("vol-1").
-					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					Result(),
+			},
+			doesNotWwantPods: []*corev1api.Pod{
+				builder.ForPod("ns-2", "pod-3").
+					ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
 					Result(),
 			},
 		},
@@ -2176,22 +2163,52 @@ func TestRestoreWithRestic(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
+			restorer := new(resticmocks.Restorer)
+			defer restorer.AssertExpectations(t)
 			h.restorer.resticRestorerFactory = &fakeResticRestorerFactory{
-				podVolumeBackups: tc.want,
+				restorer: restorer,
 			}
 
-			for _, resource := range tc.apiResources {
-				h.addItems(t, resource)
+			tarball := newTarWriter(t)
+
+			// the test does not have any PVBs associated with a pod, so trying to restore the pod should fail
+			// for _, pod := range tc.doesNotWwantPods {
+			// 	tarball.addItems("pods", pod)
+
+			// 	// expectedArgs := restic.RestoreData{
+			// 	// 	Restore:          tc.restore,
+			// 	// 	Pod:              pod,
+			// 	// 	PodVolumeBackups: tc.podVolumeBackups,
+			// 	// 	SourceNamespace:  "ns-1",
+			// 	// 	BackupLocation:   "",
+			// 	// }
+			// }
+
+			// the test has PVBs associated with a pod, so trying to restore the pod should succeed
+			for _, pod := range tc.wantPods {
+				tarball.addItems("pods", pod)
+
+				expectedArgs := restic.RestoreData{
+					Restore:          tc.restore,
+					Pod:              pod,
+					PodVolumeBackups: tc.podVolumeBackups,
+					SourceNamespace:  "ns-1",
+					BackupLocation:   "",
+				}
+				restorer.
+					On("RestorePodVolumes", expectedArgs).
+					Return(nil)
 			}
 
 			data := Request{
 				Log:              h.log,
 				Restore:          tc.restore,
 				Backup:           tc.backup,
-				PodVolumeBackups: nil,
+				PodVolumeBackups: tc.podVolumeBackups,
 				VolumeSnapshots:  nil,
-				BackupReader:     tc.tarball,
+				BackupReader:     tarball.done(),
 			}
+
 			warnings, errs := h.restorer.Restore(
 				data,
 				nil, // actions
@@ -2200,7 +2217,6 @@ func TestRestoreWithRestic(t *testing.T) {
 			)
 
 			assertEmptyResults(t, warnings, errs)
-			// assert.Equal(t, tc.want, data.PodVolumeBackups)
 		})
 	}
 }

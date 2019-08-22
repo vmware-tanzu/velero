@@ -46,6 +46,11 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 	pvbtest2.Spec.Volume = "pvbtest2-abc"
 	pvbtest2.Status.SnapshotID = "123"
 
+	pvbtest3 := builder.ForPodVolumeBackup("velero", "pvb-2").Result()
+	pvbtest3.Spec.Pod.Name = "NotTestPod"
+	pvbtest3.Spec.Volume = "pvbtest2-abc"
+	pvbtest3.Status.SnapshotID = "123"
+
 	tests := []struct {
 		name             string
 		podVolumeBackups []*velerov1api.PodVolumeBackup
@@ -84,7 +89,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			expected:       map[string]string{"foo": "bar", "abc": "123"},
 		},
 		{
-			name: "has snapshot annotation, with suffix, and also PVB",
+			name: "has snapshot annotation, with suffix, and also PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				pvbtest1,
 				pvbtest2,
@@ -94,13 +99,24 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 		{
-			name: "no snapshot annotation, no suffix, but with PVB",
+			name: "no snapshot annotation, no suffix, but with PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				pvbtest1,
 				pvbtest2,
 			},
 			podName:  testPodName,
 			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "has snapshot annotation, with suffix, and with PVBs from current pod and a PVB from another pod",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				pvbtest1,
+				pvbtest2,
+				pvbtest3,
+			},
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			podName:        testPodName,
+			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 	}
 
