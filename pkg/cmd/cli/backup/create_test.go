@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,13 +19,12 @@ package backup
 import (
 	"testing"
 
-	"github.com/heptio/velero/pkg/builder"
-
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
+	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 )
 
 const testNamespace = "velero"

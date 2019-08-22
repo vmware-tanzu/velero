@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/client"
@@ -180,19 +179,19 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	var backupInformer cache.SharedIndexInformer
-	var updates chan *api.Backup
+	var updates chan *velerov1api.Backup
 	if o.Wait {
 		stop := make(chan struct{})
 		defer close(stop)
 
-		updates = make(chan *api.Backup)
+		updates = make(chan *velerov1api.Backup)
 
 		backupInformer = v1.NewBackupInformer(o.client, f.Namespace(), 0, nil)
 
 		backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
 				FilterFunc: func(obj interface{}) bool {
-					backup, ok := obj.(*api.Backup)
+					backup, ok := obj.(*velerov1api.Backup)
 					if !ok {
 						return false
 					}
@@ -200,14 +199,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
 					UpdateFunc: func(_, obj interface{}) {
-						backup, ok := obj.(*api.Backup)
+						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
 						updates <- backup
 					},
 					DeleteFunc: func(obj interface{}) {
-						backup, ok := obj.(*api.Backup)
+						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
@@ -240,7 +239,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if backup.Status.Phase != api.BackupPhaseNew && backup.Status.Phase != api.BackupPhaseInProgress {
+				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}
