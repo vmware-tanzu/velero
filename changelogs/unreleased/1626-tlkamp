@@ -1,1 +1,0 @@
-enhancement: allow users to specify additional Velero/Restic pod annotations on the command line with the pod-annotations flag.

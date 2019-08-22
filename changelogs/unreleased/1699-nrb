@@ -1,1 +1,0 @@
-Make --secret-file argument on `velero install` optional, add --no-secret flag for explicit confirmation

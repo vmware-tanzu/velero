@@ -78,5 +78,5 @@ for an example of this -- in particular, the `getPluginConfig(...)` function.
 
 
 [1]: https://github.com/heptio/velero-plugin-example
-[2]: https://github.com/heptio/velero/blob/v1.1.0-beta.2/pkg/plugin/logger.go
-[3]: https://github.com/heptio/velero/blob/v1.1.0-beta.2/pkg/restore/restic_restore_action.go
+[2]: https://github.com/heptio/velero/blob/v1.1.0/pkg/plugin/logger.go
+[3]: https://github.com/heptio/velero/blob/v1.1.0/pkg/restore/restic_restore_action.go

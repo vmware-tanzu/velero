@@ -1,1 +1,0 @@
-Hides `velero server` and `velero restic server` commands from the list of available commands as these are not intended for use by the velero CLI user.

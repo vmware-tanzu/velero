@@ -1,1 +1,0 @@
-properly restore PVs backed up with restic and a reclaim policy of "Retain"
