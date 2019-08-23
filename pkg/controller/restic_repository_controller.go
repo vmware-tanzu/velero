@@ -216,11 +216,6 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 
 	log.Info("Running maintenance on restic repository")
 
-	log.Debug("Checking repo before prune")
-	if err := c.repositoryManager.CheckRepo(req); err != nil {
-		return c.patchResticRepository(req, repoNotReady(err.Error()))
-	}
-
 	// prune failures should be displayed in the `.status.message` field but
 	// should not cause the repo to move to `NotReady`.
 	log.Debug("Pruning repo")
@@ -231,11 +226,6 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 		}); patchErr != nil {
 			return patchErr
 		}
-	}
-
-	log.Debug("Checking repo after prune")
-	if err := c.repositoryManager.CheckRepo(req); err != nil {
-		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
 	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
