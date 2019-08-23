@@ -45,6 +45,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/archive"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
@@ -272,14 +273,10 @@ func (kr *kubernetesRestorer) Restore(
 		volumeSnapshots:            req.VolumeSnapshots,
 		podVolumeBackups:           req.PodVolumeBackups,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
-		extractor: &backupExtractor{
-			log:        req.Log,
-			fileSystem: kr.fileSystem,
-		},
-		resourceClients: make(map[resourceClientKey]client.Dynamic),
-		restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
-		renamedPVs:      make(map[string]string),
-		pvRenamer:       kr.pvRenamer,
+		resourceClients:            make(map[resourceClientKey]client.Dynamic),
+		restoredItems:              make(map[velero.ResourceIdentifier]struct{}),
+		renamedPVs:                 make(map[string]string),
+		pvRenamer:                  kr.pvRenamer,
 	}
 
 	return restoreCtx.execute()
@@ -368,7 +365,6 @@ type context struct {
 	volumeSnapshots            []*volume.Snapshot
 	podVolumeBackups           []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout time.Duration
-	extractor                  *backupExtractor
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
 	renamedPVs                 map[string]string
@@ -383,7 +379,7 @@ type resourceClientKey struct {
 func (ctx *context) execute() (Result, Result) {
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
-	dir, err := ctx.extractor.unzipAndExtractBackup(ctx.backupReader)
+	dir, err := archive.NewExtractor(ctx.log, ctx.fileSystem).UnzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
 		return Result{}, Result{Velero: []string{err.Error()}}
