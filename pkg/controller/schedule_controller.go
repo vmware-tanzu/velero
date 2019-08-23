@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
@@ -286,27 +286,13 @@ func getNextRunTime(schedule *api.Schedule, cronSchedule cron.Schedule, asOf tim
 }
 
 func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
-	backup := &api.Backup{
-		Spec: item.Spec.Template,
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: item.Namespace,
-			Name:      fmt.Sprintf("%s-%s", item.Name, timestamp.Format("20060102150405")),
-		},
-	}
-
-	addLabelsToBackup(item, backup)
+	name := fmt.Sprintf("%s-%s", item.Name, timestamp.Format("20060102150405"))
+	backup := builder.
+		ForBackup(item.Namespace, name).
+		FromSchedule(item).
+		Result()
 
 	return backup
-}
-
-func addLabelsToBackup(item *api.Schedule, backup *api.Backup) {
-	labels := item.Labels
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-	labels[velerov1api.ScheduleNameLabel] = item.Name
-
-	backup.Labels = labels
 }
 
 func patchSchedule(original, updated *api.Schedule, client velerov1client.SchedulesGetter) (*api.Schedule, error) {
