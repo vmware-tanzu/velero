@@ -1,0 +1,1 @@
+remove 'restic check' calls from before/after 'restic prune' since they're redundant
