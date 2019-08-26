@@ -17,29 +17,37 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
 	"sort"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/printers"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 var (
-	pluginColumns = []string{"NAME", "KIND"}
+	pluginColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Kind"},
+	}
 )
 
-func printPluginList(list *velerov1api.ServerStatusRequest, w io.Writer, options printers.PrintOptions) error {
+func printPluginList(list *velerov1api.ServerStatusRequest, options printers.PrintOptions) ([]metav1.TableRow, error) {
 	plugins := list.Status.Plugins
 	sortByKindAndName(plugins)
 
+	rows := make([]metav1.TableRow, 0, len(plugins))
+
 	for _, plugin := range plugins {
-		if err := printPlugin(plugin, w, options); err != nil {
-			return err
+		r, err := printPlugin(plugin, options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
 func sortByKindAndName(plugins []velerov1api.PluginInfo) {
@@ -51,12 +59,10 @@ func sortByKindAndName(plugins []velerov1api.PluginInfo) {
 	})
 }
 
-func printPlugin(plugin velerov1api.PluginInfo, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, plugin.Name, options.WithKind)
+func printPlugin(plugin velerov1api.PluginInfo, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{}
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\n", name, plugin.Kind); err != nil {
-		return err
-	}
+	row.Cells = append(row.Cells, plugin.Name, plugin.Kind)
 
-	return nil
+	return []metav1.TableRow{row}, nil
 }

@@ -17,34 +17,40 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 var (
-	backupStorageLocationColumns = []string{"NAME", "PROVIDER", "BUCKET/PREFIX", "ACCESS MODE"}
+	backupStorageLocationColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Provider"},
+		{Name: "Bucket/Prefix"},
+		{Name: "Access Mode"},
+	}
 )
 
-func printBackupStorageLocationList(list *v1.BackupStorageLocationList, w io.Writer, options printers.PrintOptions) error {
+func printBackupStorageLocationList(list *v1.BackupStorageLocationList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printBackupStorageLocation(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printBackupStorageLocation(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
-func printBackupStorageLocation(location *v1.BackupStorageLocation, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, location.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", location.Namespace); err != nil {
-			return err
-		}
+func printBackupStorageLocation(location *v1.BackupStorageLocation, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: location},
 	}
 
 	bucketAndPrefix := location.Spec.ObjectStorage.Bucket
@@ -57,21 +63,12 @@ func printBackupStorageLocation(location *v1.BackupStorageLocation, w io.Writer,
 		accessMode = v1.BackupStorageLocationAccessModeReadWrite
 	}
 
-	if _, err := fmt.Fprintf(
-		w,
-		"%s\t%s\t%s\t%s",
-		name,
+	row.Cells = append(row.Cells,
+		location.Name,
 		location.Spec.Provider,
 		bucketAndPrefix,
 		accessMode,
-	); err != nil {
-		return err
-	}
+	)
 
-	if _, err := fmt.Fprint(w, printers.AppendLabels(location.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, location.Labels))
-	return err
+	return []metav1.TableRow{row}, nil
 }
