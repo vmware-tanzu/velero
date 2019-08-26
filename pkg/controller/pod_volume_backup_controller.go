@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	corev1informers "k8s.io/client-go/informers/core/v1"
@@ -235,6 +236,21 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		resticCmd.Env = env
 	}
 
+	// If this is a PVC, look for the most recent completed pod volume backup for it and get
+	// its restic snapshot ID to use as the value of the `--parent` flag. Without this,
+	// if the pod using the PVC (and therefore the directory path under /host_pods/) has
+	// changed since the PVC's last backup, restic will not be able to identify a suitable
+	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
+	if pvcUID, ok := req.Labels[velerov1api.PVCUIDLabel]; ok {
+		parentSnapshotID := getParentSnapshot(log, pvcUID, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
+		if parentSnapshotID == "" {
+			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
+		} else {
+			log.WithField("parentSnapshotID", parentSnapshotID).Info("Setting --parent flag for this backup")
+			resticCmd.ExtraFlags = append(resticCmd.ExtraFlags, fmt.Sprintf("--parent=%s", parentSnapshotID))
+		}
+	}
+
 	var stdout, stderr string
 
 	var emptySnapshot bool
@@ -275,6 +291,45 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	log.Info("Backup completed")
 
 	return nil
+}
+
+// getParentSnapshot finds the most recent completed pod volume backup for the specified PVC and returns its
+// restic snapshot ID to use as the value of the --parent flag for a new restic backup. Any errors encountered
+// are logged but not returned since they do not prevent a backup from proceeding.
+func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
+	log = log.WithField("pvcUID", pvcUID)
+	log.Infof("Looking for most recent completed pod volume backup for this PVC")
+
+	pvcBackups, err := podVolumeBackupLister.List(labels.SelectorFromSet(map[string]string{velerov1api.PVCUIDLabel: pvcUID}))
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("Error listing pod volume backups for PVC")
+		return ""
+	}
+
+	// go through all the pod volume backups for the PVC and look for the most recent completed one
+	// to use as the parent.
+	var mostRecentBackup *velerov1api.PodVolumeBackup
+	for _, backup := range pvcBackups {
+		if backup.Status.Phase != velerov1api.PodVolumeBackupPhaseCompleted {
+			continue
+		}
+
+		if mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time) {
+			mostRecentBackup = backup
+		}
+	}
+
+	if mostRecentBackup == nil {
+		log.Info("No completed pod volume backup found for PVC")
+		return ""
+	}
+
+	log.WithFields(map[string]interface{}{
+		"parentPodVolumeBackup": mostRecentBackup.Name,
+		"parentSnapshotID":      mostRecentBackup.Status.SnapshotID,
+	}).Info("Found most recent completed pod volume backup for PVC")
+
+	return mostRecentBackup.Status.SnapshotID
 }
 
 func (c *podVolumeBackupController) patchPodVolumeBackup(req *velerov1api.PodVolumeBackup, mutate func(*velerov1api.PodVolumeBackup)) (*velerov1api.PodVolumeBackup, error) {
