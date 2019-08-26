@@ -110,6 +110,9 @@ To solve the above problem, we can split existing backup flow and introduce one 
 
 This change should be implemented in both Velero as well as Velero plugins. However, Velero plugins can continue to rely on current implementation. Only way for Velero plugins to get benifitted from this approach is to implement `UploadSnapshot` method.
 
+Volumesnapshotter is designed for snapshot, this can be either cloud snapshot or local snapshot. As of now, most plugin use volumesnapshotlocations to decide the snapshot type.
+We can add new config parameter in velero command line to define snapshot type, through this, velero will decide whether to invoke `UploadSnapshot` or not.
+
 **Implementation plan for Velero:**
 
 - Add `UploadSnapshot` method to `VolumeSnapshotter` interface.
