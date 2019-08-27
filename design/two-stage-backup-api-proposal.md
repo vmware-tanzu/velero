@@ -118,7 +118,7 @@ We can add new config parameter in velero command line to define snapshot type, 
 - Add `UploadSnapshot` method to `VolumeSnapshotter` interface.
 - Generate GRPC code using codegen.
 - Implement `UploadSnapshot` method in client and server.
-- Call `UploadSnapshot` method as soon as `Post-Hook` is executed.
+- Call `UploadSnapshot` method from `itemBackupper` as soon as `CreateSnapshot` call returns. `UploadSnapshot` should run as go routine and should be tracked with backup process.
 - If Velero plugin doesn't implement `UploadSnapshot` method then handle `Unimplemented` error.
 
 **Implementation plan for Velero Plugin:**
@@ -130,7 +130,7 @@ We can add new config parameter in velero command line to define snapshot type, 
 
 ```go
 
-func UploadSnapshot(volumeID string) error {
+func UploadSnapshot(snapshotID string) error {
 ...
 }
 
