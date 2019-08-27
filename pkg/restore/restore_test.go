@@ -2119,7 +2119,8 @@ func (f *fakeResticRestorerFactory) NewRestorer(ctx.Context, *velerov1api.Restor
 	return f.restorer, nil
 }
 
-// TestRestoreWithRestic runs restores of only pods that contain associated PVBs.
+// TestRestoreWithRestic verifies that a call to Restore was made as and when
+// expected for the given pods by using a mock for the restic restorer.
 func TestRestoreWithRestic(t *testing.T) {
 	tests := []struct {
 		name                        string
