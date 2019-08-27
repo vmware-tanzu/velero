@@ -17,8 +17,10 @@ FROM golang:1.12
 RUN mkdir -p /go/src/k8s.io && \
     cd /go/src/k8s.io && \
     git config --global advice.detachedHead false && \
-    git clone -b kubernetes-1.14.0 https://github.com/kubernetes/code-generator && \
-    git clone -b kubernetes-1.14.0 https://github.com/kubernetes/apimachinery && \
+    git clone -b kubernetes-1.15.3 https://github.com/kubernetes/code-generator && \
+    git clone -b kubernetes-1.15.3 https://github.com/kubernetes/apimachinery && \
+    # vendor code-generator go modules to be compatible with pre-1.15
+    cd /go/src/k8s.io/code-generator && GO111MODULE=on go mod vendor && \
     go get golang.org/x/tools/cmd/goimports && \
     cd /go/src/golang.org/x/tools && \
     git checkout 40a48ad93fbe707101afb2099b738471f70594ec && \
