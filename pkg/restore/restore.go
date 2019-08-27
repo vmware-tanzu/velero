@@ -889,11 +889,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				return warnings, errs
 			}
 
-			// if we're renaming the PV, we're going to give it a new random name,
-			// so we can assume it doesn't already exist in the cluster and therefore
-			// we should proceed with restoring from snapshot.
-			shouldRestoreSnapshot := true
-
+			var shouldRestoreSnapshot bool
 			if !shouldRenamePV {
 				// Check if the PV exists in the cluster before attempting to create
 				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
@@ -902,6 +898,11 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
 					return warnings, errs
 				}
+			} else {
+				// if we're renaming the PV, we're going to give it a new random name,
+				// so we can assume it doesn't already exist in the cluster and therefore
+				// we should proceed with restoring from snapshot.
+				shouldRestoreSnapshot = true
 			}
 
 			if shouldRestoreSnapshot {
