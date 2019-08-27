@@ -889,13 +889,12 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				return warnings, errs
 			}
 
-			var shouldRestoreSnapshot bool
-			if shouldRenamePV {
-				// if we're renaming the PV, we're going to give it a new random name,
-				// so we can assume it doesn't already exist in the cluster and therefore
-				// we should proceed with restoring from snapshot.
-				shouldRestoreSnapshot = true
-			} else {
+			// if we're renaming the PV, we're going to give it a new random name,
+			// so we can assume it doesn't already exist in the cluster and therefore
+			// we should proceed with restoring from snapshot.
+			shouldRestoreSnapshot := true
+
+			if !shouldRenamePV {
 				// Check if the PV exists in the cluster before attempting to create
 				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
 				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
@@ -933,18 +932,21 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				annotations["velero.io/original-pv-name"] = oldName
 				obj.SetAnnotations(annotations)
 			}
+
 		case hasResticBackup(obj, ctx):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
