@@ -584,7 +584,7 @@
   revision = "26559e0f760e39c24d730d3224364aef164ee23f"
 
 [[projects]]
-  digest = "1:352a8b8a41fd11320b8b2327a4c2c8f6967578a2d54886b64748c0a46d4a8b5e"
+  digest = "1:98ef43d760c0123cf289071e1043176178c60205902a60beba99bb9f988fdcf9"
   name = "google.golang.org/api"
   packages = [
     "compute/v1",
@@ -592,6 +592,7 @@
     "googleapi",
     "googleapi/internal/uritemplates",
     "googleapi/transport",
+    "iamcredentials/v1",
     "internal",
     "iterator",
     "option",
@@ -1102,6 +1103,7 @@
     "golang.org/x/oauth2/google",
     "google.golang.org/api/compute/v1",
     "google.golang.org/api/googleapi",
+    "google.golang.org/api/iamcredentials/v1",
     "google.golang.org/api/iterator",
     "google.golang.org/api/option",
     "google.golang.org/grpc",

@@ -18,9 +18,7 @@ package gcp
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -60,13 +58,14 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
+	/* Works with both credential files and the default compute engine service account */
+	creds, err := google.FindDefaultCredentials(oauth2.NoContext, compute.ComputeScope)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	b.snapshotLocation = config[snapshotLocationKey]
 
-	project, err := extractProjectFromCreds()
-	if err != nil {
-		return err
-	}
-	b.volumeProject = project
+	b.volumeProject = creds.ProjectID
 
 	// get snapshot project from 'project' config key if specified,
 	// otherwise from the credentials file
@@ -74,11 +73,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	if b.snapshotProject == "" {
 		b.snapshotProject = b.volumeProject
 	}
-
-	client, err := google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
-	if err != nil {
-		return errors.WithStack(err)
-	}
+	client := oauth2.NewClient(oauth2.NoContext, creds.TokenSource)
 
 	gce, err := compute.New(client)
 	if err != nil {
@@ -88,28 +83,6 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	b.gce = gce
 
 	return nil
-}
-
-func extractProjectFromCreds() (string, error) {
-	credsBytes, err := ioutil.ReadFile(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
-	if err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	type credentials struct {
-		ProjectID string `json:"project_id"`
-	}
-
-	var creds credentials
-	if err := json.Unmarshal(credsBytes, &creds); err != nil {
-		return "", errors.WithStack(err)
-	}
-
-	if creds.ProjectID == "" {
-		return "", errors.New("cannot fetch project_id from GCP credentials file")
-	}
-
-	return creds.ProjectID, nil
 }
 
 // isMultiZone returns true if the failure-domain tag contains

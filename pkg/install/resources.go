@@ -91,9 +91,11 @@ func objectMeta(namespace, name string) metav1.ObjectMeta {
 	}
 }
 
-func ServiceAccount(namespace string) *corev1.ServiceAccount {
+func ServiceAccount(namespace string, annotations map[string]string) *corev1.ServiceAccount {
+	objMeta := objectMeta(namespace, "velero")
+	objMeta.Annotations = annotations
 	return &corev1.ServiceAccount{
-		ObjectMeta: objectMeta(namespace, "velero"),
+		ObjectMeta: objMeta,
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ServiceAccount",
 			APIVersion: corev1.SchemeGroupVersion.String(),
@@ -202,6 +204,7 @@ type VeleroOptions struct {
 	Bucket                            string
 	Prefix                            string
 	PodAnnotations                    map[string]string
+	ServiceAccountAnnotations         map[string]string
 	VeleroPodResources                corev1.ResourceRequirements
 	ResticPodResources                corev1.ResourceRequirements
 	SecretData                        []byte
@@ -231,7 +234,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	crb := ClusterRoleBinding(o.Namespace)
 	appendUnstructured(resources, crb)
 
-	sa := ServiceAccount(o.Namespace)
+	sa := ServiceAccount(o.Namespace, o.ServiceAccountAnnotations)
 	appendUnstructured(resources, sa)
 
 	if o.SecretData != nil {
