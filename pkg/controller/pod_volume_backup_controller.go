@@ -294,8 +294,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 }
 
 // getParentSnapshot finds the most recent completed pod volume backup for the specified PVC and returns its
-// restic snapshot ID to use as the value of the --parent flag for a new restic backup. Any errors encountered
-// are logged but not returned since they do not prevent a backup from proceeding.
+// restic snapshot ID. Any errors encountered are logged but not returned since they do not prevent a backup
+// from proceeding.
 func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
 	log = log.WithField("pvcUID", pvcUID)
 	log.Infof("Looking for most recent completed pod volume backup for this PVC")
