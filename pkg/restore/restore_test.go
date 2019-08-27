@@ -2091,12 +2091,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 			}
 
 			data := Request{
-				Log:              h.log,
-				Restore:          tc.restore,
-				Backup:           tc.backup,
-				PodVolumeBackups: nil,
-				VolumeSnapshots:  tc.volumeSnapshots,
-				BackupReader:     tc.tarball,
+				Log:             h.log,
+				Restore:         tc.restore,
+				Backup:          tc.backup,
+				VolumeSnapshots: tc.volumeSnapshots,
+				BackupReader:    tc.tarball,
 			}
 			warnings, errs := h.restorer.Restore(
 				data,
@@ -2113,20 +2112,11 @@ func TestRestorePersistentVolumes(t *testing.T) {
 }
 
 type fakeResticRestorerFactory struct {
-	restorer         *resticmocks.Restorer
-	podVolumeBackups []*velerov1api.PodVolumeBackup
+	restorer *resticmocks.Restorer
 }
 
 func (f *fakeResticRestorerFactory) NewRestorer(ctx.Context, *velerov1api.Restore) (restic.Restorer, error) {
 	return f.restorer, nil
-}
-
-type fakeResticRestorer struct {
-	podVolumeBackups []*velerov1api.PodVolumeBackup
-}
-
-func (b *fakeResticRestorer) RestorePodVolumes(data restic.RestoreData) []error {
-	return nil
 }
 
 // TestRestoreWithRestic runs restores of only pods that contain associated PVBs.
@@ -2140,7 +2130,7 @@ func TestRestoreWithRestic(t *testing.T) {
 		podWithPVBs, podWithoutPVBs []*corev1api.Pod
 	}{
 		{
-			name:         "a pod that exists in given backup and contains associated PVBs should have restored pods",
+			name:         "a pod that exists in given backup and contains associated PVBs should have should have RestorePodVolumes called",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
 			apiResources: []*test.APIResource{test.Pods()},
@@ -2158,7 +2148,7 @@ func TestRestoreWithRestic(t *testing.T) {
 			},
 		},
 		{
-			name:         "a pod that exists in given backup but does not contain associated PVBs should not have any restored pods",
+			name:         "a pod that exists in given backup but does not contain associated PVBs should not have should have RestorePodVolumes called",
 			restore:      defaultRestore().Result(),
 			backup:       defaultBackup().Result(),
 			apiResources: []*test.APIResource{test.Pods()},
@@ -2207,7 +2197,7 @@ func TestRestoreWithRestic(t *testing.T) {
 					Restore:          tc.restore,
 					Pod:              pod,
 					PodVolumeBackups: tc.podVolumeBackups,
-					SourceNamespace:  "ns-1",
+					SourceNamespace:  pod.Namespace,
 					BackupLocation:   "",
 				}
 				restorer.
@@ -2220,7 +2210,6 @@ func TestRestoreWithRestic(t *testing.T) {
 				Restore:          tc.restore,
 				Backup:           tc.backup,
 				PodVolumeBackups: tc.podVolumeBackups,
-				VolumeSnapshots:  nil,
 				BackupReader:     tarball.done(),
 			}
 
