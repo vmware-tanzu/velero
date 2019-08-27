@@ -696,7 +696,7 @@ func TestInvalidTarballContents(t *testing.T) {
 			tarball: newTarWriter(t).
 				done(),
 			wantErrs: Result{
-				Velero: []string{"backup does not contain top level resources directory"},
+				Velero: []string{"error parsing backup contents: directory \"resources\" does not exist"},
 			},
 		},
 		{

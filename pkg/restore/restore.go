@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -377,48 +376,25 @@ type resourceClientKey struct {
 }
 
 func (ctx *context) execute() (Result, Result) {
+	warnings, errs := Result{}, Result{}
+
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
 	dir, err := archive.NewExtractor(ctx.log, ctx.fileSystem).UnzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
-		return Result{}, Result{Velero: []string{err.Error()}}
+		addVeleroError(&errs, err)
+		return warnings, errs
 	}
 	defer ctx.fileSystem.RemoveAll(dir)
 
 	// need to set this for additionalItems to be restored
 	ctx.restoreDir = dir
 
-	return ctx.restoreFromDir()
-}
-
-// restoreFromDir executes a restore based on backup data contained within a local
-// directory, ctx.restoreDir.
-func (ctx *context) restoreFromDir() (Result, Result) {
-	warnings, errs := Result{}, Result{}
-
-	// Make sure the top level "resources" dir exists:
-	resourcesDir := filepath.Join(ctx.restoreDir, velerov1api.ResourcesDir)
-	rde, err := ctx.fileSystem.DirExists(resourcesDir)
+	backupResources, err := archive.NewParser(ctx.fileSystem).Parse(ctx.restoreDir)
 	if err != nil {
-		addVeleroError(&errs, err)
+		addVeleroError(&errs, errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
-	}
-	if !rde {
-		addVeleroError(&errs, errors.New("backup does not contain top level resources directory"))
-		return warnings, errs
-	}
-
-	resourceDirs, err := ctx.fileSystem.ReadDir(resourcesDir)
-	if err != nil {
-		addVeleroError(&errs, err)
-		return warnings, errs
-	}
-
-	resourceDirsMap := make(map[string]os.FileInfo)
-	for _, rscDir := range resourceDirs {
-		rscName := rscDir.Name()
-		resourceDirsMap[rscName] = rscDir
 	}
 
 	existingNamespaces := sets.NewString()
@@ -430,67 +406,31 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 			continue
 		}
 
-		rscDir := resourceDirsMap[resource.String()]
-		if rscDir == nil {
+		resourceList := backupResources[resource.String()]
+		if resourceList == nil {
 			continue
 		}
 
-		resourcePath := filepath.Join(resourcesDir, rscDir.Name())
-
-		clusterSubDir := filepath.Join(resourcePath, velerov1api.ClusterScopedDir)
-		clusterSubDirExists, err := ctx.fileSystem.DirExists(clusterSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-		if clusterSubDirExists {
-			w, e := ctx.restoreResource(resource.String(), "", clusterSubDir)
-			merge(&warnings, &w)
-			merge(&errs, &e)
-			continue
-		}
-
-		nsSubDir := filepath.Join(resourcePath, velerov1api.NamespaceScopedDir)
-		nsSubDirExists, err := ctx.fileSystem.DirExists(nsSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-		if !nsSubDirExists {
-			continue
-		}
-
-		nsDirs, err := ctx.fileSystem.ReadDir(nsSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-
-		for _, nsDir := range nsDirs {
-			if !nsDir.IsDir() {
-				continue
-			}
-			nsName := nsDir.Name()
-			nsPath := filepath.Join(nsSubDir, nsName)
-
-			if !ctx.namespaceIncludesExcludes.ShouldInclude(nsName) {
-				ctx.log.Infof("Skipping namespace %s", nsName)
+		for namespace, items := range resourceList.ItemsByNamespace {
+			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+				ctx.log.Infof("Skipping namespace %s", namespace)
 				continue
 			}
 
-			// fetch mapped NS name
-			mappedNsName := nsName
-			if target, ok := ctx.restore.Spec.NamespaceMapping[nsName]; ok {
-				mappedNsName = target
+			// get target namespace to restore into, if different
+			// from source namespace
+			targetNamespace := namespace
+			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
+				targetNamespace = target
 			}
 
 			// if we don't know whether this namespace exists yet, attempt to create
 			// it in order to ensure it exists. Try to get it from the backup tarball
 			// (in order to get any backed-up metadata), but if we don't find it there,
 			// create a blank one.
-			if !existingNamespaces.Has(mappedNsName) {
-				logger := ctx.log.WithField("namespace", nsName)
-				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", nsName), mappedNsName)
+			if namespace != "" && !existingNamespaces.Has(targetNamespace) {
+				logger := ctx.log.WithField("namespace", namespace)
+				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
 				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 					addVeleroError(&errs, err)
 					continue
@@ -498,10 +438,10 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 
 				// keep track of namespaces that we know exist so we don't
 				// have to try to create them multiple times
-				existingNamespaces.Insert(mappedNsName)
+				existingNamespaces.Insert(targetNamespace)
 			}
 
-			w, e := ctx.restoreResource(resource.String(), mappedNsName, nsPath)
+			w, e := ctx.restoreResource(resource.String(), targetNamespace, namespace, items)
 			merge(&warnings, &w)
 			merge(&errs, &e)
 		}
@@ -715,36 +655,32 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
 // empty we are restoring a cluster level resource, otherwise into the specified namespace.
-func (ctx *context) restoreResource(resource, namespace, resourcePath string) (Result, Result) {
+func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 
-	if ctx.restore.Spec.IncludeClusterResources != nil && !*ctx.restore.Spec.IncludeClusterResources && namespace == "" {
+	if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
 		return warnings, errs
 	}
 
-	if namespace != "" {
-		ctx.log.Infof("Restoring resource '%s' into namespace '%s' from: %s", resource, namespace, resourcePath)
+	if targetNamespace != "" {
+		ctx.log.Infof("Restoring resource '%s' into namespace '%s'", resource, targetNamespace)
 	} else {
-		ctx.log.Infof("Restoring cluster level resource '%s' from: %s", resource, resourcePath)
+		ctx.log.Infof("Restoring cluster level resource '%s'", resource)
 	}
 
-	files, err := ctx.fileSystem.ReadDir(resourcePath)
-	if err != nil {
-		addToResult(&errs, namespace, fmt.Errorf("error reading %q resource directory: %v", resource, err))
-		return warnings, errs
-	}
-	if len(files) == 0 {
+	if len(items) == 0 {
 		return warnings, errs
 	}
 
 	groupResource := schema.ParseGroupResource(resource)
 
-	for _, file := range files {
-		fullPath := filepath.Join(resourcePath, file.Name())
-		obj, err := ctx.unmarshal(fullPath)
+	for _, item := range items {
+		itemPath := getItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
+
+		obj, err := ctx.unmarshal(itemPath)
 		if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error decoding %q: %v", strings.Replace(fullPath, ctx.restoreDir+"/", "", -1), err))
+			addToResult(&errs, targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
 			continue
 		}
 
@@ -752,7 +688,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (R
 			continue
 		}
 
-		w, e := ctx.restoreItem(obj, groupResource, namespace)
+		w, e := ctx.restoreItem(obj, groupResource, targetNamespace)
 		merge(&warnings, &w)
 		merge(&errs, &e)
 	}
