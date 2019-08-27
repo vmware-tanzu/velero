@@ -78,7 +78,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
-			podName:        testPodName,
+			podName:        "TestPod",
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
 			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
@@ -88,7 +88,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
-			podName:  testPodName,
+			podName:  "TestPod",
 			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 		{
@@ -99,7 +99,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			podName:        testPodName,
+			podName:        "TestPod",
 			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 	}
