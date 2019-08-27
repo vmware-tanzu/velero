@@ -2129,6 +2129,7 @@ func TestRestoreWithRestic(t *testing.T) {
 		apiResources                []*test.APIResource
 		podVolumeBackups            []*velerov1api.PodVolumeBackup
 		podWithPVBs, podWithoutPVBs []*corev1api.Pod
+		want                        map[*test.APIResource][]string
 	}{
 		{
 			name:         "a pod that exists in given backup and contains associated PVBs should have should have RestorePodVolumes called",
@@ -2138,14 +2139,20 @@ func TestRestoreWithRestic(t *testing.T) {
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").Result(),
 			},
 			podWithPVBs: []*corev1api.Pod{
 				builder.ForPod("ns-1", "pod-2").
+					Result(),
+				builder.ForPod("ns-2", "pod-4").
 					Result(),
 			},
 			podWithoutPVBs: []*corev1api.Pod{
 				builder.ForPod("ns-2", "pod-3").
 					Result(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-2", "ns-2/pod-3", "ns-2/pod-4"},
 			},
 		},
 		{
@@ -2163,6 +2170,9 @@ func TestRestoreWithRestic(t *testing.T) {
 					Result(),
 				builder.ForPod("ns-2", "pod-4").
 					Result(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"ns-1/pod-3", "ns-2/pod-4"},
 			},
 		},
 	}
@@ -2222,6 +2232,7 @@ func TestRestoreWithRestic(t *testing.T) {
 			)
 
 			assertEmptyResults(t, warnings, errs)
+			assertAPIContents(t, h, tc.want)
 		})
 	}
 }
