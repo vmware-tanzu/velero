@@ -35,22 +35,6 @@ import (
 )
 
 func TestGetVolumeBackupsForPod(t *testing.T) {
-	testPodName := "TestPod"
-	pvbtest1 := builder.ForPodVolumeBackup("velero", "pvb-1").Result()
-	pvbtest1.Spec.Pod.Name = testPodName
-	pvbtest1.Spec.Volume = "pvbtest1-foo"
-	pvbtest1.Status.SnapshotID = "bar"
-
-	pvbtest2 := builder.ForPodVolumeBackup("velero", "pvb-2").Result()
-	pvbtest2.Spec.Pod.Name = testPodName
-	pvbtest2.Spec.Volume = "pvbtest2-abc"
-	pvbtest2.Status.SnapshotID = "123"
-
-	pvbtest3 := builder.ForPodVolumeBackup("velero", "pvb-2").Result()
-	pvbtest3.Spec.Pod.Name = "NotTestPod"
-	pvbtest3.Spec.Volume = "pvbtest2-abc"
-	pvbtest3.Status.SnapshotID = "123"
-
 	tests := []struct {
 		name             string
 		podVolumeBackups []*velerov1api.PodVolumeBackup
@@ -91,8 +75,8 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 		{
 			name: "has snapshot annotation, with suffix, and also PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				pvbtest1,
-				pvbtest2,
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
 			podName:        testPodName,
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
@@ -101,8 +85,8 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 		{
 			name: "no snapshot annotation, no suffix, but with PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				pvbtest1,
-				pvbtest2,
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
 			podName:  testPodName,
 			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
@@ -110,9 +94,9 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 		{
 			name: "has snapshot annotation, with suffix, and with PVBs from current pod and a PVB from another pod",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				pvbtest1,
-				pvbtest2,
-				pvbtest3,
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
 			podName:        testPodName,
