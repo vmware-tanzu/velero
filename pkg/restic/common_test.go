@@ -28,54 +28,90 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	velerotest "github.com/heptio/velero/pkg/test"
 )
 
-func TestGetPodSnapshotAnnotations(t *testing.T) {
+func TestGetVolumeBackupsForPod(t *testing.T) {
 	tests := []struct {
-		name        string
-		annotations map[string]string
-		expected    map[string]string
+		name             string
+		podVolumeBackups []*velerov1api.PodVolumeBackup
+		podAnnotations   map[string]string
+		podName          string
+		expected         map[string]string
 	}{
 		{
-			name:        "nil annotations",
-			annotations: nil,
-			expected:    nil,
+			name:           "nil annotations",
+			podAnnotations: nil,
+			expected:       nil,
 		},
 		{
-			name:        "empty annotations",
-			annotations: make(map[string]string),
-			expected:    nil,
+			name:           "empty annotations",
+			podAnnotations: make(map[string]string),
+			expected:       nil,
 		},
 		{
-			name:        "non-empty map, no snapshot annotation",
-			annotations: map[string]string{"foo": "bar"},
-			expected:    nil,
+			name:           "non-empty map, no snapshot annotation",
+			podAnnotations: map[string]string{"foo": "bar"},
+			expected:       nil,
 		},
 		{
-			name:        "has snapshot annotation only, no suffix",
-			annotations: map[string]string{podAnnotationPrefix: "bar"},
-			expected:    map[string]string{"": "bar"},
+			name:           "has snapshot annotation only, no suffix",
+			podAnnotations: map[string]string{podAnnotationPrefix: "bar"},
+			expected:       map[string]string{"": "bar"},
 		},
 		{
-			name:        "has snapshot annotation only, with suffix",
-			annotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
-			expected:    map[string]string{"foo": "bar"},
+			name:           "has snapshot annotation only, with suffix",
+			podAnnotations: map[string]string{podAnnotationPrefix + "foo": "bar"},
+			expected:       map[string]string{"foo": "bar"},
 		},
 		{
-			name:        "has snapshot annotation, with suffix",
-			annotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
-			expected:    map[string]string{"foo": "bar", "abc": "123"},
+			name:           "has snapshot annotation, with suffix",
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			expected:       map[string]string{"foo": "bar", "abc": "123"},
+		},
+		{
+			name: "has snapshot annotation, with suffix, and also PVBs",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+			},
+			podName:        "TestPod",
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "no snapshot annotation, no suffix, but with PVBs",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+			},
+			podName:  "TestPod",
+			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "has snapshot annotation, with suffix, and with PVBs from current pod and a PVB from another pod",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestAnotherPod").SnapshotID("xyz").Volume("pvbtest3-xyz").Result(),
+			},
+			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
+			podName:        "TestPod",
+			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			pod := &corev1api.Pod{}
-			pod.Annotations = test.annotations
-			assert.Equal(t, test.expected, getPodSnapshotAnnotations(pod))
+			pod.Annotations = test.podAnnotations
+			pod.Name = test.podName
+
+			res := GetVolumeBackupsForPod(test.podVolumeBackups, pod)
+			assert.Equal(t, test.expected, res)
 		})
 	}
 }
