@@ -96,7 +96,7 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestAnotherPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
 			},
 			podAnnotations: map[string]string{"x": "y", podAnnotationPrefix + "foo": "bar", podAnnotationPrefix + "abc": "123"},
 			podName:        "TestPod",
