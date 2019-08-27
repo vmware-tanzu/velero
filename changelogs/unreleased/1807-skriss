@@ -1,0 +1,1 @@
+when backing up PVCs with restic, specify --parent flag to prevent full volume rescans after pod reschedules

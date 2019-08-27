@@ -54,15 +54,13 @@ func TestIsHostPathVolume(t *testing.T) {
 			},
 		},
 	}
-	pvcGetter := &fakePVCGetter{
-		pvc: &corev1api.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns-1",
-				Name:      "pvc-1",
-			},
+	pvc := &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns-1",
+			Name:      "pvc-1",
 		},
 	}
-	isHostPath, err = isHostPathVolume(vol, pvcGetter, nil)
+	isHostPath, err = isHostPathVolume(vol, pvc, nil)
 	assert.Nil(t, err)
 	assert.False(t, isHostPath)
 
@@ -74,15 +72,13 @@ func TestIsHostPathVolume(t *testing.T) {
 			},
 		},
 	}
-	pvcGetter = &fakePVCGetter{
-		pvc: &corev1api.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns-1",
-				Name:      "pvc-1",
-			},
-			Spec: corev1api.PersistentVolumeClaimSpec{
-				VolumeName: "pv-1",
-			},
+	pvc = &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns-1",
+			Name:      "pvc-1",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "pv-1",
 		},
 	}
 	pvGetter := &fakePVGetter{
@@ -93,7 +89,7 @@ func TestIsHostPathVolume(t *testing.T) {
 			Spec: corev1api.PersistentVolumeSpec{},
 		},
 	}
-	isHostPath, err = isHostPathVolume(vol, pvcGetter, pvGetter)
+	isHostPath, err = isHostPathVolume(vol, pvc, pvGetter)
 	assert.Nil(t, err)
 	assert.False(t, isHostPath)
 
@@ -105,15 +101,13 @@ func TestIsHostPathVolume(t *testing.T) {
 			},
 		},
 	}
-	pvcGetter = &fakePVCGetter{
-		pvc: &corev1api.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: "ns-1",
-				Name:      "pvc-1",
-			},
-			Spec: corev1api.PersistentVolumeClaimSpec{
-				VolumeName: "pv-1",
-			},
+	pvc = &corev1api.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns-1",
+			Name:      "pvc-1",
+		},
+		Spec: corev1api.PersistentVolumeClaimSpec{
+			VolumeName: "pv-1",
 		},
 	}
 	pvGetter = &fakePVGetter{
@@ -128,21 +122,9 @@ func TestIsHostPathVolume(t *testing.T) {
 			},
 		},
 	}
-	isHostPath, err = isHostPathVolume(vol, pvcGetter, pvGetter)
+	isHostPath, err = isHostPathVolume(vol, pvc, pvGetter)
 	assert.Nil(t, err)
 	assert.True(t, isHostPath)
-}
-
-type fakePVCGetter struct {
-	pvc *corev1api.PersistentVolumeClaim
-}
-
-func (g *fakePVCGetter) Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolumeClaim, error) {
-	if g.pvc != nil {
-		return g.pvc, nil
-	}
-
-	return nil, errors.New("item not found")
 }
 
 type fakePVGetter struct {
