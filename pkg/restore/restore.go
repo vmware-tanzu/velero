@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -93,6 +94,7 @@ type kubernetesRestorer struct {
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
 	fileSystem                 filesystem.Interface
+	pvRenamer                  func(string) string
 	logger                     logrus.FieldLogger
 }
 
@@ -174,6 +176,7 @@ func NewKubernetesRestorer(
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
+		pvRenamer:                  func(string) string { return "velero-clone-" + uuid.NewV4().String() },
 		fileSystem:                 filesystem.NewFileSystem(),
 	}, nil
 }
@@ -275,6 +278,8 @@ func (kr *kubernetesRestorer) Restore(
 		},
 		resourceClients: make(map[resourceClientKey]client.Dynamic),
 		restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
+		renamedPVs:      make(map[string]string),
+		pvRenamer:       kr.pvRenamer,
 	}
 
 	return restoreCtx.execute()
@@ -366,6 +371,8 @@ type context struct {
 	extractor                  *backupExtractor
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
+	renamedPVs                 map[string]string
+	pvRenamer                  func(string) string
 }
 
 type resourceClientKey struct {
@@ -876,15 +883,31 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
-			// Check if the PV exists in the cluster before attempting to create
-			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-			shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
+			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 			if err != nil {
-				addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+				addToResult(&errs, namespace, err)
 				return warnings, errs
 			}
 
+			var shouldRestoreSnapshot bool
+			if !shouldRenamePV {
+				// Check if the PV exists in the cluster before attempting to create
+				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
+				if err != nil {
+					addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+					return warnings, errs
+				}
+			} else {
+				// if we're renaming the PV, we're going to give it a new random name,
+				// so we can assume it doesn't already exist in the cluster and therefore
+				// we should proceed with restoring from snapshot.
+				shouldRestoreSnapshot = true
+			}
+
 			if shouldRestoreSnapshot {
+				// even if we're renaming the PV, obj still has the old name here, because the pvRestorer
+				// uses the original name to look up metadata about the snapshot.
 				ctx.log.Infof("Restoring persistent volume from snapshot.")
 				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
@@ -893,18 +916,38 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				}
 				obj = updatedObj
 			}
+
+			if shouldRenamePV {
+				// give obj a new name, and record the mapping between the old and new names
+				oldName := obj.GetName()
+				newName := ctx.pvRenamer(oldName)
+
+				ctx.renamedPVs[oldName] = newName
+				obj.SetName(newName)
+
+				// add the original PV name as an annotation
+				annotations := obj.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations["velero.io/original-pv-name"] = oldName
+				obj.SetAnnotations(annotations)
+			}
+
 		case hasResticBackup(obj, ctx):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
@@ -1014,6 +1057,14 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			delete(annotations, "pv.kubernetes.io/bound-by-controller")
 			obj.SetAnnotations(annotations)
 		}
+
+		if newName, ok := ctx.renamedPVs[pvc.Spec.VolumeName]; ok {
+			ctx.log.Infof("Updating persistent volume claim %s/%s to reference renamed persistent volume (%s -> %s)", namespace, name, pvc.Spec.VolumeName, newName)
+			if err := unstructured.SetNestedField(obj.Object, newName, "spec", "volumeName"); err != nil {
+				addToResult(&errs, namespace, err)
+				return warnings, errs
+			}
+		}
 	}
 
 	// necessary because we may have remapped the namespace
@@ -1101,6 +1152,45 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	}
 
 	return warnings, errs
+}
+
+// shouldRenamePV returns a boolean indicating whether a persistent volume should be given a new name
+// before being restored, or an error if this cannot be determined. A persistent volume will be
+// given a new name if and only if (a) a PV with the original name already exists in-cluster, and
+// (b) in the backup, the PV is claimed by a PVC in a namespace that's being remapped during the
+// restore.
+func shouldRenamePV(ctx *context, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
+	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because restore is not remapping any namespaces")
+		return false, nil
+	}
+
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pv); err != nil {
+		return false, errors.Wrapf(err, "error converting persistent volume to structured")
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it's not claimed")
+		return false, nil
+	}
+
+	if _, ok := ctx.restore.Spec.NamespaceMapping[pv.Spec.ClaimRef.Namespace]; !ok {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it's not claimed by a PVC in a namespace that's being remapped")
+		return false, nil
+	}
+
+	_, err := client.Get(pv.Name, metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it does not exist in the cluster")
+		return false, nil
+	case err != nil:
+		return false, errors.Wrapf(err, "error checking if persistent volume exists in the cluster")
+	}
+
+	// no error returned: the PV was found in-cluster, so we need to rename it
+	return true, nil
 }
 
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod
