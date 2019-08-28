@@ -94,7 +94,8 @@ func TestParse(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			p := &Parser{
-				fs: test.NewFakeFileSystem(),
+				log: test.NewLogger(),
+				fs:  test.NewFakeFileSystem(),
 			}
 
 			for _, file := range tc.files {

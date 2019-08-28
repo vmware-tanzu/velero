@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/filesystem"
@@ -29,7 +30,8 @@ import (
 // Parser traverses an extracted archive on disk to validate
 // it and provide a helpful representation of it to consumers.
 type Parser struct {
-	fs filesystem.Interface
+	log logrus.FieldLogger
+	fs  filesystem.Interface
 }
 
 // ResourceItems contains the collection of items of a given resource type
@@ -49,9 +51,10 @@ type ResourceItems struct {
 }
 
 // NewParser constructs a Parser.
-func NewParser(fs filesystem.Interface) *Parser {
+func NewParser(log logrus.FieldLogger, fs filesystem.Interface) *Parser {
 	return &Parser{
-		fs: fs,
+		log: log,
+		fs:  fs,
 	}
 }
 
@@ -79,6 +82,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 	resources := map[string]*ResourceItems{}
 	for _, resourceDir := range resourceDirs {
 		if !resourceDir.IsDir() {
+			p.log.Warnf("Ignoring unexpected file %q in directory %q", resourceDir.Name(), strings.TrimPrefix(resourcesDir, dir+"/"))
 			continue
 		}
 
@@ -120,6 +124,7 @@ func (p *Parser) Parse(dir string) (map[string]*ResourceItems, error) {
 
 			for _, namespaceDir := range namespaceDirs {
 				if !namespaceDir.IsDir() {
+					p.log.Warnf("Ignoring unexpected file %q in directory %q", namespaceDir.Name(), strings.TrimPrefix(namespaceScopedDir, dir+"/"))
 					continue
 				}
 
@@ -151,6 +156,7 @@ func (p *Parser) getResourceItemsForScope(dir, archiveRootDir string) ([]string,
 	var items []string
 	for _, file := range files {
 		if file.IsDir() {
+			p.log.Warnf("Ignoring unexpected subdirectory %q in directory %q", file.Name(), strings.TrimPrefix(dir, archiveRootDir+"/"))
 			continue
 		}
 

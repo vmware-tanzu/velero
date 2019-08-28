@@ -391,7 +391,7 @@ func (ctx *context) execute() (Result, Result) {
 	// need to set this for additionalItems to be restored
 	ctx.restoreDir = dir
 
-	backupResources, err := archive.NewParser(ctx.fileSystem).Parse(ctx.restoreDir)
+	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
 	if err != nil {
 		addVeleroError(&errs, errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
