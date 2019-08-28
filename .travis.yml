@@ -8,4 +8,23 @@ sudo: required
 services:
   - docker
 
-script: hack/ci-check.sh
+script:
+- export BRANCH=$(if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then echo $TRAVIS_BRANCH; else echo $TRAVIS_PULL_REQUEST_BRANCH; fi)
+- echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$TRAVIS_PULL_REQUEST, BRANCH=$BRANCH"
+- hack/ci-check.sh
+
+# gcloud sdk is needed to upload docker images
+before_deploy:
+- if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
+  /dev/stdin --disable-prompts; fi
+
+deploy:
+  -provider: script
+   skip_cleanup: true
+   script: hack/gcr-push.sh
+   on:
+     repo: heptio/velero
+     all_branches: true
+
+env:
+  secure: [encrypted value goes here]

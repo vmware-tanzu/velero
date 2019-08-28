@@ -1,8 +1,13 @@
 #!/bin/sh
 
-# Return value is written into LATEST
-LATEST=""
-function latest_release() {
+if [[ -z "$TRAVIS" ]]; then
+    echo "This script is intended to be run only on Travis." >&2
+    exit 1
+fi
+
+# Return value is written into HIGHEST
+HIGHEST=""
+function highest_release() {
     # Loop through the tags since pre-release versions come before the actual versions.
     # Iterate til we find the first non-pre-release
 
@@ -17,27 +22,26 @@ function latest_release() {
         if [[ "$t" == *"beta"* || "$t" == *"alpha"* || "$t" == *"rc"* ]]; then
             continue
         fi
-        LATEST="$t"
+        HIGHEST="$t"
         break
     done
 }
 
+gcloud auth activate-service-account --key-file OUR_KEY_FILE
+unset GIT_HTTP_USER_AGENT
 
-# Always publish for master
+# only publish for master or if a tag is defined
 if [ "$BRANCH" == "master" ]; then
-    VERSION="$BRANCH" make all-containers all-push
-fi
-
-# Publish when TRAVIS_TAG is defined.
-if [ ! -z "$TRAVIS_TAG" ]; then
+    VERSION="$BRANCH" DOCKER="gcloud docker -- " make all-containers all-push
+elif [ ! -z "$TRAVIS_TAG" ]; then
     # Calculate the latest release
-    latest_release
+    highest_release
 
     # Default to pre-release
     TAG_LATEST=false
-    if [[ "$TRAVIS_TAG" == "$LATEST" ]]; then
+    if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
         TAG_LATEST=true
     fi
 
-    VERSION="$TRAVIS_TAG" TAG_LATEST="$TAG_LATEST" make all-containers all-push
+    VERSION="$TRAVIS_TAG" TAG_LATEST="$TAG_LATEST" DOCKER="gcloud docker -- " make all-containers all-push
 fi
