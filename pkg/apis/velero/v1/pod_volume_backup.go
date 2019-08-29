@@ -80,6 +80,11 @@ type PodVolumeBackupStatus struct {
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
 	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+
+	// Progress holds the total number of bytes of the volume and the current
+	// number of backed up bytes. This can be used to display progress information
+	// about the backup operation.
+	Progress PodVolumeOperationProgress `json:"progress"`
 }
 
 // +genclient

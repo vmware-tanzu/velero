@@ -39,7 +39,6 @@ import (
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/restic"
-	veleroexec "github.com/heptio/velero/pkg/util/exec"
 	"github.com/heptio/velero/pkg/util/filesystem"
 	"github.com/heptio/velero/pkg/util/kube"
 )
@@ -254,7 +253,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	var stdout, stderr string
 
 	var emptySnapshot bool
-	if stdout, stderr, err = veleroexec.RunCommand(resticCmd.Cmd()); err != nil {
+	if stdout, stderr, err = restic.RunBackup(resticCmd, log, c.updateBackupProgressFunc(req, log)); err != nil {
 		if strings.Contains(stderr, "snapshot is empty") {
 			emptySnapshot = true
 		} else {
@@ -281,6 +280,10 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		r.Status.CompletionTimestamp.Time = c.clock.Now()
 		if emptySnapshot {
 			r.Status.Message = "volume was empty so no snapshot was taken"
+		}
+		// set progress to 100%
+		if r.Status.Progress.TotalBytes != 0 {
+			r.Status.Progress.BytesDone = r.Status.Progress.TotalBytes
 		}
 	})
 	if err != nil {
@@ -359,6 +362,18 @@ func (c *podVolumeBackupController) patchPodVolumeBackup(req *velerov1api.PodVol
 	}
 
 	return req, nil
+}
+
+// updateBackupProgressFunc returns a func that takes progress info and patches
+// the PVB with the new progress
+func (c *podVolumeBackupController) updateBackupProgressFunc(req *velerov1api.PodVolumeBackup, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
+	return func(progress velerov1api.PodVolumeOperationProgress) {
+		if _, err := c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
+			r.Status.Progress = progress
+		}); err != nil {
+			log.WithError(err).Error("error updating PodVolumeBackup progress")
+		}
+	}
 }
 
 func (c *podVolumeBackupController) fail(req *velerov1api.PodVolumeBackup, msg string, log logrus.FieldLogger) error {

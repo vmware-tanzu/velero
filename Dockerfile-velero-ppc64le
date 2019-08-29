@@ -18,8 +18,8 @@ LABEL maintainer="Steve Kriss <krisss@vmware.com>"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates wget && \
-    wget --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-0.9.4 && \
-    mv restic-0.9.4 /usr/bin/restic && \
+    wget --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-0.9.5 && \
+    mv restic-0.9.5 /usr/bin/restic && \
     chmod +x /usr/bin/restic && \
     apt-get remove -y wget && \
     rm -rf /var/lib/apt/lists/*
