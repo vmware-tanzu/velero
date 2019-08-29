@@ -72,7 +72,7 @@ MULTIARCH_IMAGE = $(REGISTRY)/$(BIN)
 IMAGE = $(REGISTRY)/$(BIN)-$(GOARCH)
 
 # If you want to build all binaries, see the 'all-build' rule.
-# If you want to build all containers, see the 'all-container' rule.
+# If you want to build all containers, see the 'all-containers' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
 all:
 	@$(MAKE) build
@@ -94,11 +94,11 @@ push-%:
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
+all-containers: $(addprefix container-, $(CONTAINER_PLATFORMS))
 
 all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
 
-all-manifest:
+all-manifests:
 	@$(MAKE) manifest
 	@$(MAKE) manifest BIN=velero-restic-restore-helper
 	@$(MAKE) manifest-fsfreeze
