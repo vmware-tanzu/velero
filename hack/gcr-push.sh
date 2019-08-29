@@ -27,23 +27,26 @@ function highest_release() {
     done
 }
 
-openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
+if [ "$BRANCH" == "master" ]; then
+    VERSION="$BRANCH"
+elif [ ! -z "$TRAVIS_TAG" ]; then
+    VERSION="$TRAVIS_TAG"
+else
+    # If we're not on master and we're not building a tag, exit early.
+    exit 0
+fi
 
+# Calculate the latest release
+highest_release
+
+# Assume we're not tagging `latest` by default.
+TAG_LATEST=false
+if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
+    TAG_LATEST=true
+fi
+
+openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
 gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
 unset GIT_HTTP_USER_AGENT
 
-# only publish for master or if a tag is defined
-if [ "$BRANCH" == "master" ]; then
-    VERSION="$BRANCH" DOCKER="gcloud docker -- " make all-containers all-push
-elif [ ! -z "$TRAVIS_TAG" ]; then
-    # Calculate the latest release
-    highest_release
-
-    # Default to pre-release
-    TAG_LATEST=false
-    if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
-        TAG_LATEST=true
-    fi
-
-    VERSION="$TRAVIS_TAG" TAG_LATEST="$TAG_LATEST" DOCKER="gcloud docker -- " make all-containers all-push
-fi
+VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" DOCKER="gcloud docker -- " make all-containers all-push
