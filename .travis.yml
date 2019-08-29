@@ -25,6 +25,3 @@ deploy:
    on:
      repo: heptio/velero
      all_branches: true
-
-env:
-  secure: [encrypted value goes here]
