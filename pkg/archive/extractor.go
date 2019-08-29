@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package restore
+package archive
 
 import (
 	"archive/tar"
@@ -27,15 +27,22 @@ import (
 	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
-// backupExtractor unzips/extracts a backup tarball to a local
+// Extractor unzips/extracts a backup tarball to a local
 // temp directory.
-type backupExtractor struct {
-	log        logrus.FieldLogger
-	fileSystem filesystem.Interface
+type Extractor struct {
+	log logrus.FieldLogger
+	fs  filesystem.Interface
 }
 
-// unzipAndExtractBackup extracts a reader on a gzipped tarball to a local temp directory
-func (e *backupExtractor) unzipAndExtractBackup(src io.Reader) (string, error) {
+func NewExtractor(log logrus.FieldLogger, fs filesystem.Interface) *Extractor {
+	return &Extractor{
+		log: log,
+		fs:  fs,
+	}
+}
+
+// UnzipAndExtractBackup extracts a reader on a gzipped tarball to a local temp directory
+func (e *Extractor) UnzipAndExtractBackup(src io.Reader) (string, error) {
 	gzr, err := gzip.NewReader(src)
 	if err != nil {
 		e.log.Infof("error creating gzip reader: %v", err)
@@ -46,8 +53,8 @@ func (e *backupExtractor) unzipAndExtractBackup(src io.Reader) (string, error) {
 	return e.readBackup(tar.NewReader(gzr))
 }
 
-func (e *backupExtractor) writeFile(target string, tarRdr *tar.Reader) error {
-	file, err := e.fileSystem.Create(target)
+func (e *Extractor) writeFile(target string, tarRdr *tar.Reader) error {
+	file, err := e.fs.Create(target)
 	if err != nil {
 		return err
 	}
@@ -59,8 +66,8 @@ func (e *backupExtractor) writeFile(target string, tarRdr *tar.Reader) error {
 	return nil
 }
 
-func (e *backupExtractor) readBackup(tarRdr *tar.Reader) (string, error) {
-	dir, err := e.fileSystem.TempDir("", "")
+func (e *Extractor) readBackup(tarRdr *tar.Reader) (string, error) {
+	dir, err := e.fs.TempDir("", "")
 	if err != nil {
 		e.log.Infof("error creating temp dir: %v", err)
 		return "", err
@@ -81,7 +88,7 @@ func (e *backupExtractor) readBackup(tarRdr *tar.Reader) (string, error) {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			err := e.fileSystem.MkdirAll(target, header.FileInfo().Mode())
+			err := e.fs.MkdirAll(target, header.FileInfo().Mode())
 			if err != nil {
 				e.log.Infof("mkdirall error: %v", err)
 				return "", err
@@ -89,7 +96,7 @@ func (e *backupExtractor) readBackup(tarRdr *tar.Reader) (string, error) {
 
 		case tar.TypeReg:
 			// make sure we have the directory created
-			err := e.fileSystem.MkdirAll(filepath.Dir(target), header.FileInfo().Mode())
+			err := e.fs.MkdirAll(filepath.Dir(target), header.FileInfo().Mode())
 			if err != nil {
 				e.log.Infof("mkdirall error: %v", err)
 				return "", err
