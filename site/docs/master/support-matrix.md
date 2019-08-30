@@ -43,6 +43,7 @@ _Some storage providers, like Quobyte, may need a different [signature algorithm
 | [DigitalOcean][7]                | StackPointCloud |                                 |
 | [OpenEBS][18]                     | OpenEBS       | [Slack][19], [GitHub Issue][20] |
 | [AlibabaCloud][21]                     | AlibabaCloud       |  [GitHub Issue][22] |
+| [HPE][24]                        | HPE                | [Slack][25], [GitHub Issue][26] |
 
 ### Adding a new plugin
 
@@ -73,3 +74,6 @@ After you publish your plugin, open a PR that adds your plugin to the appropriat
 [21]: https://github.com/AliyunContainerService/velero-plugin
 [22]: https://github.com/AliyunContainerService/velero-plugin/issues
 [23]: oracle-config.md
+[24]: https://github.com/hpe-storage/velero-plugin
+[25]: https://slack.hpedev.io/
+[26]: https://github.com/hpe-storage/velero-plugin/issues
