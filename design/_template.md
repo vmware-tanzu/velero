@@ -1,7 +1,5 @@
 # Design proposal template (replace with your proposal's title)
 
-Status: {Draft,Accepted,Declined}
-
 One to two sentences that describes the goal of this proposal.
 The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them.
 
