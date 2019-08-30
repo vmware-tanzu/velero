@@ -18,6 +18,7 @@ package restore
 
 import (
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -213,10 +214,21 @@ func TestResticRestoreActionExecute(t *testing.T) {
 			res, err := a.Execute(input)
 			assert.NoError(t, err)
 
-			wantUnstructured, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.want)
-			require.NoError(t, err)
+			updatedPod := new(corev1api.Pod)
+			require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(res.UpdatedItem.UnstructuredContent(), updatedPod))
 
-			assert.Equal(t, &unstructured.Unstructured{Object: wantUnstructured}, res.UpdatedItem)
+			for _, container := range tc.want.Spec.InitContainers {
+				sort.Slice(container.VolumeMounts, func(i, j int) bool {
+					return container.VolumeMounts[i].Name < container.VolumeMounts[j].Name
+				})
+			}
+			for _, container := range updatedPod.Spec.InitContainers {
+				sort.Slice(container.VolumeMounts, func(i, j int) bool {
+					return container.VolumeMounts[i].Name < container.VolumeMounts[j].Name
+				})
+			}
+
+			assert.Equal(t, tc.want, updatedPod)
 		})
 	}
 
