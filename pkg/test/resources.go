@@ -129,3 +129,24 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 		Items:      items,
 	}
 }
+
+func CRDs(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "apiextensions.k8s.io",
+		Version:    "v1beta1",
+		Name:       "customresourcedefinitions",
+		ShortName:  "crd",
+		Namespaced: false,
+		Items:      items,
+	}
+}
+
+func VSLs(items ...metav1.Object) *APIResource {
+	return &APIResource{
+		Group:      "velero.io",
+		Version:    "v1",
+		Name:       "volumesnapshotlocations",
+		Namespaced: true,
+		Items:      items,
+	}
+}

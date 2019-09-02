@@ -90,7 +90,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 }
 
 type ItemBackupper interface {
-	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error
+	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error)
 }
 
 type defaultItemBackupper struct {
@@ -109,10 +109,12 @@ type defaultItemBackupper struct {
 
 // backupItem backs up an individual item to tarWriter. The item may be excluded based on the
 // namespaces IncludesExcludes list.
-func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) error {
+// In addition to the error return, backupItem also returns a bool indicating whether the item
+// was actually backed up.
+func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	namespace := metadata.GetNamespace()
@@ -124,31 +126,31 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
 		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
-		return nil
+		return false, nil
 	}
 
 	// NOTE: we have to re-check namespace & resource includes/excludes because it's possible that
 	// backupItem can be invoked by a custom action.
 	if namespace != "" && !ib.backupRequest.NamespaceIncludesExcludes.ShouldInclude(namespace) {
 		log.Info("Excluding item because namespace is excluded")
-		return nil
+		return false, nil
 	}
 
 	// NOTE: we specifically allow namespaces to be backed up even if IncludeClusterResources is
 	// false.
 	if namespace == "" && groupResource != kuberesource.Namespaces && ib.backupRequest.Spec.IncludeClusterResources != nil && !*ib.backupRequest.Spec.IncludeClusterResources {
 		log.Info("Excluding item because resource is cluster-scoped and backup.spec.includeClusterResources is false")
-		return nil
+		return false, nil
 	}
 
 	if !ib.backupRequest.ResourceIncludesExcludes.ShouldInclude(groupResource.String()) {
 		log.Info("Excluding item because resource is excluded")
-		return nil
+		return false, nil
 	}
 
 	if metadata.GetDeletionTimestamp() != nil {
 		log.Info("Skipping item because it's being deleted.")
-		return nil
+		return false, nil
 	}
 
 	key := itemKey{
@@ -159,7 +161,8 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
 		log.Info("Skipping item because it's already been backed up.")
-		return nil
+		// returning true since this item *is* in the backup, even though we're not backing it up here
+		return true, nil
 	}
 	ib.backupRequest.BackedUpItems[key] = struct{}{}
 
@@ -167,7 +170,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	log.Debug("Executing pre hooks")
 	if err := ib.itemHookHandler.handleHooks(log, groupResource, obj, ib.backupRequest.ResourceHooks, hookPhasePre); err != nil {
-		return err
+		return false, err
 	}
 
 	var (
@@ -203,11 +206,11 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 			backupErrs = append(backupErrs, err)
 		}
 
-		return kubeerrs.NewAggregate(backupErrs)
+		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 	obj = updatedObj
 	if metadata, err = meta.Accessor(obj); err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
 	// update name and namespace in case they were modified in an action
 	name = metadata.GetName()
@@ -234,7 +237,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 
 	if len(backupErrs) != 0 {
-		return kubeerrs.NewAggregate(backupErrs)
+		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 
 	var filePath string
@@ -246,7 +249,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	itemBytes, err := json.Marshal(obj.UnstructuredContent())
 	if err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
 
 	hdr := &tar.Header{
@@ -258,14 +261,14 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	}
 
 	if err := ib.tarWriter.WriteHeader(hdr); err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
 
 	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
-		return errors.WithStack(err)
+		return false, errors.WithStack(err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // backupPodVolumes triggers restic backups of the specified pod volumes, and returns a list of PodVolumeBackups
@@ -335,7 +338,7 @@ func (ib *defaultItemBackupper) executeActions(
 				return nil, errors.WithStack(err)
 			}
 
-			if err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
+			if _, err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
 				return nil, err
 			}
 		}
