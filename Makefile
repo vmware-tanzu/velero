@@ -21,7 +21,7 @@ BIN ?= velero
 PKG := github.com/heptio/velero
 
 # Where to push the docker image.
-REGISTRY ?= gcr.io/heptio-images
+REGISTRY ?= gcr.io/nolanb-vmware
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
