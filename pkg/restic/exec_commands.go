@@ -17,10 +17,9 @@ limitations under the License.
 package restic
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
-	"io"
+	"fmt"
 	"sync"
 	"time"
 
@@ -32,6 +31,15 @@ import (
 )
 
 const backupProgressCheckInterval = 10 * time.Second
+
+type backupStatusLine struct {
+	MessageType string `json:"message_type"`
+	// seen in status lines
+	TotalBytes int64 `json:"total_bytes"`
+	BytesDone  int64 `json:"bytes_done"`
+	// seen in summary line at the end
+	TotalBytesProcessed int64 `json:"total_bytes_processed"`
+}
 
 // GetSnapshotID runs a 'restic snapshots' command to get the ID of the snapshot
 // in the specified repo matching the set of provided tags, or an error if a
@@ -68,12 +76,7 @@ func GetSnapshotID(repoIdentifier, passwordFile string, tags map[string]string, 
 func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
 	// buffers for copying command stdout/err output into
 	stdoutBuf := new(bytes.Buffer)
-	stdoutStatBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
-	// stdoutWriter is used to copy the command's stdout to both stdoutStatBuf and
-	// stdoutBuf, the former buffer is used to scan through the output and the
-	// latter is used to return the command's output as a string
-	stdoutWriter := io.MultiWriter(stdoutStatBuf, stdoutBuf)
 
 	// create a channel to signal when to end the goroutine scanning for progress
 	// updates
@@ -81,62 +84,31 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 	var wg sync.WaitGroup
 
 	cmd := backupCmd.Cmd()
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", "", err
-	}
-	stderr, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", "", err
-	}
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
 
 	cmd.Start()
 
-	// copy command's stdout/err to buffers
 	wg.Add(1)
 	go func() {
-		io.Copy(stdoutWriter, stdout)
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		io.Copy(stderrBuf, stderr)
-		wg.Done()
-	}()
-
-	wg.Add(1)
-	go func() {
-		// track the number of bytes we've read so far
-		readBytes := 0
 		ticker := time.NewTicker(backupProgressCheckInterval)
 		for {
 			select {
 			case <-ticker.C:
-				// skip what we've already read
-				stdoutStatBuf.Next(readBytes)
-				unreadBytes := stdoutStatBuf.Len()
-
-				// scan through unread bytes by line, and record the last line
-				scanner := bufio.NewScanner(stdoutStatBuf)
-				lastLine := []byte{}
-				for scanner.Scan() {
-					lastLine = scanner.Bytes()
-				}
-
-				var stat velerov1api.PodVolumeOperationProgress
-				if err := json.Unmarshal(lastLine, &stat); err != nil {
-					log.WithError(errors.WithStack(err)).Errorf("unable to decode backup JSON line")
-					continue
+				lastLine := getLastLine(stdoutBuf.Bytes())
+				stat, err := decodeBackupStatusLine(lastLine)
+				if err != nil {
+					log.WithError(err).Errorf("error getting restic backup progress")
 				}
 
 				// if the line contains a non-empty bytes_done field, we can update the
 				// caller with the progress
 				if stat.BytesDone != 0 {
-					updateFunc(stat)
+					updateFunc(velerov1api.PodVolumeOperationProgress{
+						TotalBytes: stat.TotalBytes,
+						BytesDone:  stat.BytesDone,
+					})
 				}
-
-				readBytes = readBytes + unreadBytes
 			case <-quit:
 				ticker.Stop()
 				wg.Done()
@@ -148,5 +120,59 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 	cmd.Wait()
 	close(quit)
 	wg.Wait()
-	return stdoutBuf.String(), stderrBuf.String(), nil
+
+	summary, err := getSummaryLine(stdoutBuf.Bytes())
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+	stat, err := decodeBackupStatusLine(summary)
+	if err != nil {
+		return stdoutBuf.String(), stderrBuf.String(), err
+	}
+	if stat.MessageType != "summary" {
+		return stdoutBuf.String(), stderrBuf.String(), errors.WithStack(fmt.Errorf("error getting restic backup summary: %s", string(summary)))
+	}
+
+	// update progress to 100%
+	updateFunc(velerov1api.PodVolumeOperationProgress{
+		TotalBytes: stat.TotalBytesProcessed,
+		BytesDone:  stat.TotalBytesProcessed,
+	})
+
+	return string(summary), stderrBuf.String(), nil
+}
+
+func decodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
+	var stat backupStatusLine
+	if err := json.Unmarshal(lastLine, &stat); err != nil {
+		return stat, errors.Wrapf(err, "unable to decode backup JSON line: %s", string(lastLine))
+	}
+	return stat, nil
+}
+
+// getLastLine returns the last line of a byte array. The string is assumed to
+// have a newline at the end of it, so this returns the substring between the
+// last two newlines and the index of the penultimate line.
+func getLastLine(b []byte) []byte {
+	// subslice the byte array to ignore the newline at the end of the string
+	lastNewLineIdx := bytes.LastIndex(b[:len(b)-1], []byte("\n"))
+	return b[lastNewLineIdx+1 : len(b)-1]
+}
+
+// getSummaryLine looks for the summary JSON line
+// (`{"message_type:"summary",...`) in the restic backup command output. Due to
+// an issue in Restic, this might not always be the last line
+// (https://github.com/restic/restic/issues/2389). It returns an error if it
+// can't be found.
+func getSummaryLine(b []byte) ([]byte, error) {
+	summaryLineIdx := bytes.LastIndex(b, []byte(`{"message_type":"summary"`))
+	if summaryLineIdx < 0 {
+		return nil, errors.New("unable to find summary in restic backup command output")
+	}
+	// find the end of the summary line
+	newLineIdx := bytes.Index(b[summaryLineIdx:], []byte("\n"))
+	if newLineIdx < 0 {
+		return nil, errors.New("unable to get summary line from restic backup command output")
+	}
+	return b[summaryLineIdx : summaryLineIdx+newLineIdx], nil
 }

@@ -19,6 +19,6 @@ package v1
 // PodVolumeOperationProgress represents the progress of a
 // PodVolumeBackup/Restore (restic) operation
 type PodVolumeOperationProgress struct {
-	TotalBytes int64 `json:"total_bytes"`
-	BytesDone  int64 `json:"bytes_done"`
+	TotalBytes int64 `json:"totalBytes"`
+	BytesDone  int64 `json:"bytesDone"`
 }
