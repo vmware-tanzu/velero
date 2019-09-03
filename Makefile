@@ -172,7 +172,7 @@ push: .push-$(DOTFILE_IMAGE) push-name
 	@docker push $(IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
 	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
+	gcloud docker push $(IMAGE):latest
 endif
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
