@@ -54,7 +54,10 @@ unset GIT_HTTP_USER_AGENT
 mkdir -p /home/travis/.docker
 touch /home/travis/.docker/config.json
 # There's a prompt when trying to do this
-echo "Y" | gcloud beta auth configure-docker
+#echo "Y" | gcloud beta auth configure-docker
+
+# Use the standalone credential helper because the docker on Travis is older.
+docker-credential-gcr configure-docker
 
 echo "DIAGNOSTICS"
 ls -al .

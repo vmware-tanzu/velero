@@ -17,6 +17,7 @@ script:
 before_deploy:
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
+  - gcloud components install docker-credential-gcr
 
 deploy:
   - provider: script
