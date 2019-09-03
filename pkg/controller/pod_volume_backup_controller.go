@@ -281,10 +281,6 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		if emptySnapshot {
 			r.Status.Message = "volume was empty so no snapshot was taken"
 		}
-		// set progress to 100%
-		if r.Status.Progress.TotalBytes != 0 {
-			r.Status.Progress.BytesDone = r.Status.Progress.TotalBytes
-		}
 	})
 	if err != nil {
 		log.WithError(err).Error("Error setting PodVolumeBackup phase to Completed")
