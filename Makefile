@@ -152,7 +152,7 @@ all-containers:
 	$(MAKE) container BIN=velero-restic-restore-helper
 	$(MAKE) build-fsfreeze
 
-container: verify test .container-$(DOTFILE_IMAGE) container-name
+container: .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
 	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
