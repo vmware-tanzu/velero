@@ -51,4 +51,14 @@ unset GIT_HTTP_USER_AGENT
 # There's a prompt when trying to do this
 echo "Y" | gcloud beta auth configure-docker
 
+echo "DIAGNOSTICS"
+ls -al .
+ls -al /home/travis/.docker
+cat /home/travis/.docker/config.json
+docker --version
+gcloud --version
+echo "END DIAGNOSTICS"
+
+echo "Building and pushing container images."
+
 VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push
