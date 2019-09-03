@@ -48,6 +48,7 @@ fi
 openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
 gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
 unset GIT_HTTP_USER_AGENT
-gcloud beta auth configure-docker
+# There's a prompt when trying to do this
+echo "Y" | gcloud beta auth configure-docker
 
 VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push
