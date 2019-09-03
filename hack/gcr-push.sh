@@ -44,9 +44,10 @@ TAG_LATEST=false
 if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
     TAG_LATEST=true
 fi
-
-openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
-gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
+openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in nolanb-vmware-55ce4993acec.json.enc -out nolanb-vmware-55ce4993acec.json -d
+#openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
+#gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
+gcloud auth activate-service-account --key-file nolanb-vmware-55ce4993acec.json
 unset GIT_HTTP_USER_AGENT
 mkdir -p /home/travis/.docker
 touch /home/travis/.docker/config.json
