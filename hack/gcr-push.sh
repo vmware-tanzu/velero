@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [[ -z "$TRAVIS" ]]; then
     echo "This script is intended to be run only on Travis." >&2
