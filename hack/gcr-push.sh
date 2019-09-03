@@ -56,9 +56,6 @@ touch /home/travis/.docker/config.json
 # There's a prompt when trying to do this
 #echo "Y" | gcloud beta auth configure-docker
 
-# Use the standalone credential helper because the docker on Travis is older.
-docker-credential-gcr configure-docker
-
 echo "DIAGNOSTICS"
 ls -al .
 ls -al /home/travis/.docker

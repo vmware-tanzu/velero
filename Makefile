@@ -140,10 +140,10 @@ build-fsfreeze:
 
 push-fsfreeze: BIN = fsfreeze-pause
 push-fsfreeze:
-	@docker push $(IMAGE):$(VERSION)
+	@gcloud docker push $(IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
+	gcloud docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	gcloud docker push $(IMAGE):latest
 endif
 	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
 
@@ -169,10 +169,10 @@ all-push:
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
-	@docker push $(IMAGE):$(VERSION)
+	@gcloud docker push $(IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
+	gcloud docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
+	gcloud docker push $(IMAGE):latest
 endif
 	@docker images -q $(IMAGE):$(VERSION) > $@
 
