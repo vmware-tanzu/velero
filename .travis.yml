@@ -19,6 +19,8 @@ before_deploy:
   - sudo apt-get remove google-cloud-sdk
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
+  - ${HOME}/google-cloud-sdk/install.sh --quiet --usage-reporting false
+  - echo "$PATH"
 
 deploy:
   - provider: script
