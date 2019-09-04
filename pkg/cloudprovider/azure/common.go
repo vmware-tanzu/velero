@@ -31,6 +31,7 @@ const (
 	subscriptionIDEnvVar = "AZURE_SUBSCRIPTION_ID"
 	clientIDEnvVar       = "AZURE_CLIENT_ID"
 	clientSecretEnvVar   = "AZURE_CLIENT_SECRET"
+	cloudNameEnvVar      = "AZURE_CLOUD_NAME"
 
 	resourceGroupConfigKey = "resourceGroup"
 )
@@ -39,7 +40,7 @@ const (
 // relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
 // on info in the provided object storage location config map.
 func GetResticEnvVars(config map[string]string) (map[string]string, error) {
-	storageAccountKey, err := getStorageAccountKey(config)
+	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
 	}
@@ -63,13 +64,25 @@ func loadEnv() error {
 	return nil
 }
 
-func newServicePrincipalToken(tenantID, clientID, clientSecret, scope string) (*adal.ServicePrincipalToken, error) {
-	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+// ParseAzureEnvironment returns azure environment by name
+func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
+	var env azure.Environment
+	var err error
+	if cloudName == "" {
+		env = azure.PublicCloud
+	} else {
+		env, err = azure.EnvironmentFromName(cloudName)
+	}
+	return &env, err
+}
+
+func newServicePrincipalToken(tenantID, clientID, clientSecret string, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
+	oauthConfig, err := adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting OAuthConfig")
 	}
 
-	return adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, scope)
+	return adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, env.ResourceManagerEndpoint)
 }
 
 func getRequiredValues(getValue func(string) string, keys ...string) (map[string]string, error) {
@@ -77,7 +90,7 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	results := map[string]string{}
 
 	for _, key := range keys {
-		if val := getValue(key); val == "" {
+		if val := getValue(key); val == "" && key != cloudNameEnvVar {
 			missing = append(missing, key)
 		} else {
 			results[key] = val

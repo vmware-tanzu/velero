@@ -134,40 +134,45 @@ func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
 	return &ObjectStore{log: logger}
 }
 
-func getStorageAccountKey(config map[string]string) (string, error) {
+func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
 	// load environment vars from $AZURE_CREDENTIALS_FILE, if it exists
 	if err := loadEnv(); err != nil {
-		return "", err
+		return "", nil, err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_CLOUD_NAME
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, cloudNameEnvVar)
 	if err != nil {
-		return "", errors.Wrap(err, "unable to get all required environment variables")
+		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
+	}
+
+	env, err := parseAzureEnvironment(envVars[cloudNameEnvVar])
+	if err != nil || env == nil {
+		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
 	// 2. we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
-		return "", errors.Wrap(err, "unable to get all required config values")
+		return "", env, errors.Wrap(err, "unable to get all required config values")
 	}
 
 	// 3. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
+	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
 	if err != nil {
-		return "", errors.Wrap(err, "error getting service principal token")
+		return "", env, errors.Wrap(err, "error getting service principal token")
 	}
 
 	// 4. get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
+	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
 	// 5. get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
-		return "", errors.WithStack(err)
+		return "", env, errors.WithStack(err)
 	}
 	if res.Keys == nil || len(*res.Keys) == 0 {
-		return "", errors.New("No storage keys found")
+		return "", env, errors.New("No storage keys found")
 	}
 
 	var storageKey string
@@ -181,10 +186,10 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 	}
 
 	if storageKey == "" {
-		return "", errors.New("No storage key with Full permissions found")
+		return "", env, errors.New("No storage key with Full permissions found")
 	}
 
-	return storageKey, nil
+	return storageKey, env, nil
 }
 
 func mapLookup(data map[string]string) func(string) string {
@@ -198,13 +203,13 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		return err
 	}
 
-	storageAccountKey, err := getStorageAccountKey(config)
-	if err != nil {
+	storageAccountKey, env, err := getStorageAccountKey(config)
+	if err != nil || env == nil {
 		return err
 	}
 
 	// 6. get storageClient and blobClient
-	storageClient, err := storage.NewBasicClient(config[storageAccountConfigKey], storageAccountKey)
+	storageClient, err := storage.NewBasicClientOnSovereignCloud(config[storageAccountConfigKey], storageAccountKey, *env)
 	if err != nil {
 		return errors.Wrap(err, "error getting storage client")
 	}

@@ -162,6 +162,8 @@ Azure:
 
   7. AZURE_RESOURCE_GROUP
 
+  8. AZURE_CLOUD_NAME
+
 #### 2. Create required Velero resources in the cluster
 
 You can use the `velero install` command to install velero into your cluster, then remove the deployment from the cluster, leaving you
