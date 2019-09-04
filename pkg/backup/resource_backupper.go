@@ -216,9 +216,9 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 			continue
 		}
 
-		labelSelector := "velero.io/exclude-from-backup!=true"
+		var labelSelector string
 		if selector := rb.backupRequest.Spec.LabelSelector; selector != nil {
-			labelSelector = labelSelector + "," + metav1.FormatLabelSelector(selector)
+			labelSelector = metav1.FormatLabelSelector(selector)
 		}
 
 		log.Info("Listing items")
