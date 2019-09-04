@@ -165,8 +165,11 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
     AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
     AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
     AZURE_RESOURCE_GROUP=${AZURE_RESOURCE_GROUP}
+    AZURE_CLOUD_NAME=AzurePublicCloud
     EOF
     ```
+
+    > available `AZURE_CLOUD_NAME` values: `AzurePublicCloud`, `AzureUSGovernmentCloud`, `AzureChinaCloud`, `AzureGermanCloud`
 
 ## Install and start Velero
 
