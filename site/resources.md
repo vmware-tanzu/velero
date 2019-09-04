@@ -10,7 +10,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 <iframe width="560" height="315" src="https://www.youtube.com/embed/nc48ocI-6go" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
-* Listen to the PodCTL podcast with Carlisia Campos talking about Velero: <https://podctl.com/understanding-velero-formerly-ark/>
+* Listen to the PodCTL podcast with Carlisia Campos talking about Velero: <http://podcast.podctl.com/110399/986641-understanding-project-velero-formerly-ark>
 
 * Watch our recent webinar on backup and migration strategies:
 
