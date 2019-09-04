@@ -36,6 +36,7 @@ The configurable parameters are as follows:
 | `objectStorage/bucket` | String | Required Field | The storage bucket where backups are to be uploaded. |
 | `objectStorage/prefix` | String | Optional Field | The directory inside a storage bucket where backups are to be uploaded. |
 | `config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
+| `accessMode` | String | `ReadWrite` | How Velero can access the backup storage location. Valid values are `ReadWrite`, `ReadOnly`. |
 
 
 #### AWS
