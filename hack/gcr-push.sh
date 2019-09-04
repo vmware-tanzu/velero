@@ -46,11 +46,6 @@ TAG_LATEST=false
 if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
     TAG_LATEST=true
 fi
-openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in nolanb-vmware-55ce4993acec.json.enc -out nolanb-vmware-55ce4993acec.json -d
-gcloud auth activate-service-account --key-file nolanb-vmware-55ce4993acec.json
-#openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
-#gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
-unset GIT_HTTP_USER_AGENT
 
 echo "DIAGNOSTICS"
 ls -al .
@@ -60,6 +55,15 @@ docker --version
 gcloud --version
 which gcloud
 echo "END DIAGNOSTICS"
+
+
+openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in nolanb-vmware-55ce4993acec.json.enc -out nolanb-vmware-55ce4993acec.json -d
+gcloud auth activate-service-account --key-file nolanb-vmware-55ce4993acec.json
+#openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
+#gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
+gcloud auth configure-docker
+unset GIT_HTTP_USER_AGENT
+
 
 echo "Building and pushing container images."
 
