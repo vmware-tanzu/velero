@@ -1,3 +1,4 @@
+dist: xenial
 language: go
 
 go:
@@ -13,10 +14,13 @@ script:
   - echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$TRAVIS_PULL_REQUEST, BRANCH=$BRANCH"
   - hack/ci-check.sh
 
-# gcloud sdk is needed to upload docker images
+# gcloud sdk is needed to upload docker images, but we want an updated version
+# Do this outside our script so that it's clearly separated in the logs
 before_deploy:
+  - sudo apt-get remove google-cloud-sdk
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
+  - export PATH=${HOME}/google-cloud-sdk/bin:$PATH && echo "$PATH"
 
 deploy:
   - provider: script

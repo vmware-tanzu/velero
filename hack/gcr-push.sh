@@ -1,4 +1,24 @@
-#!/bin/sh
+#!/bin/bash
+
+# Copyright 2019 the Velero contributors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# gcr-push is invoked by the CI/CD system to deploy docker images to Google Container Registry.
+# It will build images for all commits to master and all git tags.
+# The highest, non-prerelease semantic version will also be given the `latest` tag.
+
+set +x
 
 if [[ -z "$TRAVIS" ]]; then
     echo "This script is intended to be run only on Travis." >&2
@@ -48,5 +68,7 @@ fi
 openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
 gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
 unset GIT_HTTP_USER_AGENT
+
+echo "Building and pushing container images."
 
 VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push
