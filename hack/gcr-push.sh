@@ -58,6 +58,7 @@ ls -al /home/travis/.docker
 cat /home/travis/.docker/config.json
 docker --version
 gcloud --version
+which gcloud
 echo "END DIAGNOSTICS"
 
 echo "Building and pushing container images."

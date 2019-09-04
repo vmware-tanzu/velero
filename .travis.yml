@@ -14,8 +14,9 @@ script:
   - echo "TRAVIS_BRANCH=$TRAVIS_BRANCH, PR=$TRAVIS_PULL_REQUEST, BRANCH=$BRANCH"
   - hack/ci-check.sh
 
-# gcloud sdk is needed to upload docker images
+# gcloud sdk is needed to upload docker images, but we want an updated version
 before_deploy:
+  - apt-get remove google-cloud-sdk
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
 
