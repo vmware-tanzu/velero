@@ -20,7 +20,6 @@ before_deploy:
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
   - export PATH=/home/travs/google-cloud-sdk/bin:$PATH && echo "$PATH"
-  - which gcloud
   - $HOME/gcloud --version
 
 deploy:
