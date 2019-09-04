@@ -19,8 +19,7 @@ before_deploy:
   - sudo apt-get remove google-cloud-sdk
   - if [ ! -d ${HOME}/google-cloud-sdk ]; then curl https://sdk.cloud.google.com | bash
     /dev/stdin --disable-prompts; fi
-  - export PATH=/home/travs/google-cloud-sdk/bin:$PATH
-    echo "$PATH"
+  - export PATH=/home/travs/google-cloud-sdk/bin:$PATH && echo "$PATH"
 
 deploy:
   - provider: script
