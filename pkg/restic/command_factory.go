@@ -112,3 +112,13 @@ func UnlockCommand(repoIdentifier string) *Command {
 		RepoIdentifier: repoIdentifier,
 	}
 }
+
+func StatsCommand(repoIdentifier, passwordFile, snapshotID string) *Command {
+	return &Command{
+		Command:        "stats",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		Args:           []string{snapshotID},
+		ExtraFlags:     []string{"--json"},
+	}
+}
