@@ -8,7 +8,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 * See previous community meetings here: 
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/nc48ocI-6go" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 * Listen to the PodCTL podcast with Carlisia Campos talking about Velero: <http://podcast.podctl.com/110399/986641-understanding-project-velero-formerly-ark>
 
