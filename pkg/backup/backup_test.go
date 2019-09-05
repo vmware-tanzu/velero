@@ -1330,7 +1330,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 		},
 		{
-			name:   "additional items with the velero.io/exclude-from-backup label that are non-included resources are not backed up",
+			name:   "additional items with the velero.io/exclude-from-backup label are not backed up",
 			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
