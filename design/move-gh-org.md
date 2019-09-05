@@ -25,7 +25,6 @@ Currently, the Velero repository sits under the Heptio GitHub organization. With
 - [ ] Update Netlify deploy settings. Any of the new repo owners; TBD
 - [ ] GH app: Netlify integration. Who: Any of the new repo owners; TBD
 - [ ] GH app: Slack integration. Who: Any of the new repo owners; TBD
-- [ ] Add webhook: signoff checker. Who: Any of the new repo owners; TBD
 - [ ] Add webhook: travis CI. Who: Any of the new repo owners; TBD
 - [ ] Add webhook: zenhub. Who: Any of the new repo owners; TBD
 - [ ] Each individual developer should point their origin to the new location: `git remote set-url origin git@github.com:vmware-tanzu/velero.git`. 
@@ -43,10 +42,6 @@ All action items needed for the repo transfer are listed in the Todo list above.
 Someone with owner permission on the new repository needs to go to their Travis CI account and authorize Travis CI on the repo. Here are instructions: https://docs.travis-ci.com/user/tutorial/.
 
 After this, a webhook notifications can be added following these instructions: https://docs.travis-ci.com/user/notifications/#configuring-webhook-notifications.
-
-#### Signoff checker
-
-TBD: waiting for instructions from the OSPO leadership.
 
 #### Transfering ZenHub
 
