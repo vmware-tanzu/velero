@@ -83,7 +83,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 	jwtConfig, err := google.JWTConfigFromJSON(creds)
 	if err != nil {
-		return errors.WithStack(err)
+		return errors.Wrap(err, "error parsing credentials file; should be JSON")
 	}
 	if jwtConfig.Email == "" {
 		return errors.Errorf("credentials file pointed to by %s does not contain an email", credentialsEnvVar)
