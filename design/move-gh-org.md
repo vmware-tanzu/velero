@@ -15,9 +15,10 @@ Currently, the Velero repository sits under the Heptio GitHub organization. With
 ### Todo list
 
 - [ ] Write blog post communicating the move. https://github.com/heptio/velero/issues/1841. Who: TBD.
-- [ ] Move all provider plugins into their own repo. https://github.com/heptio/velero/issues/1537. Who: @carlisia.
+- [ ] Move all 3 native provider plugins into their own individual repo. https://github.com/heptio/velero/issues/1537. Who: @carlisia.
 - [ ] Use GH UI to transfer the repository to the VMW org; must be accepted within a day. Who: new org owner; TBD
 - [ ] Make owners of this repo owners of repo in the new org. Who: new org owner; TBD
+- [ ] Update website with the correct GH links. Who: a Velero developer; TBD
 - [ ] Find/replace in all Go, script, yaml, documentation, and website files: `github.com/heptio/velero -> github.com/vmware-tanzu/velero`. Who: a Velero developer; TBD
 - [ ] Change deployment and grpc-push scripts with the new location path. Who: a Velero developer; TBD
 - [ ] Update Travis CI. Who: Any of the new repo owners; TBD
@@ -27,6 +28,7 @@ Currently, the Velero repository sits under the Heptio GitHub organization. With
 - [ ] GH app: Slack integration. Who: Any of the new repo owners; TBD
 - [ ] Add webhook: travis CI. Who: Any of the new repo owners; TBD
 - [ ] Add webhook: zenhub. Who: Any of the new repo owners; TBD
+- [ ] Add DCO for signoff check. (https://probot.github.io/apps/dco/). Who: Any of the new repo owners; TBD
 - [ ] Each individual developer should point their origin to the new location: `git remote set-url origin git@github.com:vmware-tanzu/velero.git`. 
 
 ### Notes/How-Tos
