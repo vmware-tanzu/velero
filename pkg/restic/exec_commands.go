@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -29,10 +28,13 @@ import (
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/exec"
+	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second
 const backupProgressCheckInterval = 10 * time.Second
+
+var fileSystem = filesystem.NewFileSystem()
 
 type backupStatusLine struct {
 	MessageType string `json:"message_type"`
@@ -254,13 +256,7 @@ func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string) (int64, er
 func getVolumeSize(path string) (int64, error) {
 	var size int64
 
-	dir, err := os.Open(path)
-	if err != nil {
-		return 0, errors.Wrapf(err, "error opening directory %s", path)
-	}
-	defer dir.Close()
-
-	files, err := dir.Readdir(-1)
+	files, err := fileSystem.ReadDir(path)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error reading directory %s", path)
 	}

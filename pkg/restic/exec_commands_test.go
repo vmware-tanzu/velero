@@ -19,6 +19,9 @@ package restic
 import (
 	"testing"
 
+	"github.com/heptio/velero/pkg/test"
+	"github.com/heptio/velero/pkg/util/filesystem"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -77,4 +80,29 @@ third line
 			assert.Equal(t, []byte(tt.want), getLastLine([]byte(tt.output)))
 		})
 	}
+}
+
+func Test_getVolumeSize(t *testing.T) {
+	files := map[string][]byte{
+		"/file1.txt":              []byte("file1"),
+		"/file2.txt":              []byte("file2"),
+		"/file3.txt":              []byte("file3"),
+		"/files/file4.txt":        []byte("file4"),
+		"/files/nested/file5.txt": []byte("file5"),
+	}
+	fakefs := test.NewFakeFileSystem()
+
+	var expectedSize int64
+	for path, content := range files {
+		fakefs.WithFile(path, content)
+		expectedSize += int64(len(content))
+	}
+
+	fileSystem = fakefs
+	defer func() { fileSystem = filesystem.NewFileSystem() }()
+
+	actualSize, err := getVolumeSize("/")
+
+	assert.NoError(t, err)
+	assert.Equal(t, expectedSize, actualSize)
 }
