@@ -25,6 +25,8 @@ toc:
         url: /gcp-config
       - page: Restic Setup
         url: /restic    
+      - page: Run locally
+        url: /run-locally
   - title: Use
     subfolderitems:
       - page: Disaster Recovery
