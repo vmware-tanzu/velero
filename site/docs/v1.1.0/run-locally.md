@@ -1,4 +1,4 @@
-# Run Velero locally
+# Run Velero locally in development
 
 ## Run Velero locally with a remote cluster
 
