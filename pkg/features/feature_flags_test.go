@@ -23,12 +23,18 @@ import (
 )
 
 func TestFeatureFlags(t *testing.T) {
-	newSet := NewFeatureFlagSet("feature1", "feature2")
+	// Prepare a new flag set
+	NewFeatureFlagSet("feature1", "feature2")
 
-	assert.True(t, newSet.Enabled("feature1"))
-	assert.False(t, newSet.Enabled("feature3"))
-	assert.Equal(t, []string{"feature1", "feature2"}, newSet.All())
+	assert.True(t, Enabled("feature1"))
+	assert.False(t, Enabled("feature3"))
+	assert.Equal(t, []string{"feature1", "feature2"}, All())
 
-	newSet.Enable("feature3")
-	assert.True(t, newSet.Enabled("feature3"))
+	Enable("feature3")
+	assert.True(t, Enabled("feature3"))
+	assert.Equal(t, []string{"feature1", "feature2", "feature3"}, All())
+
+	// Calling NewFeatureFlagSet re-initializes the set of flags
+	NewFeatureFlagSet()
+	assert.Empty(t, All())
 }

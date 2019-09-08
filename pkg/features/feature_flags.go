@@ -16,38 +16,47 @@ limitations under the License.
 
 package features
 
-import "k8s.io/apimachinery/pkg/util/sets"
+import (
+	"sync"
 
-type FeatureFlagSet struct {
-	flags sets.String
+	"k8s.io/apimachinery/pkg/util/sets"
+)
+
+type featureFlagSet struct {
+	mut sync.Mutex
+	set sets.String
 }
 
-type Flags interface {
-	// Enabled reports whether or not the specified flag is found.
-	Enabled(name string) bool
+// featureFlags will store all the flags for this process until NewFeatureFlagSet is called.
+var featureFlags featureFlagSet
 
-	// Enable adds the specified flags to the list of enabled flags.
-	Enable(names ...string)
+// Enabled returns True if a specified flag is enabled.
+func Enabled(name string) bool {
+	featureFlags.mut.Lock()
+	defer featureFlags.mut.Unlock()
 
-	// All returns all enabled features
-	All() []string
+	return featureFlags.set.Has(name)
 }
 
-func (f *FeatureFlagSet) Enabled(name string) bool {
-	return f.flags.Has(name)
+// Enable adds a give slice of feature names to the current feature list.
+func Enable(names ...string) {
+	featureFlags.mut.Lock()
+	defer featureFlags.mut.Unlock()
+
+	featureFlags.set.Insert(names...)
 }
 
-func (f *FeatureFlagSet) Enable(names ...string) {
-	f.flags.Insert(names...)
+// All returns enabled features as a slice of strings.
+func All() []string {
+	return featureFlags.set.List()
 }
 
-func (f *FeatureFlagSet) All() []string {
-	return f.flags.List()
-}
-
-// NewFeatureFlagSet initializes and populates a new FeatureFlagSet
-func NewFeatureFlagSet(flags ...string) *FeatureFlagSet {
-	return &FeatureFlagSet{
-		flags: sets.NewString(flags...),
+// NewFeaturesetet initializes and populates a new FeatureFlagSet.
+// This must be called to properly initialize the set for tracking flags.
+// It is also useful for selectively controlling flags during tests.
+func NewFeatureFlagSet(flags ...string) {
+	featureFlags = featureFlagSet{
+		mut: sync.Mutex{},
+		set: sets.NewString(flags...),
 	}
 }

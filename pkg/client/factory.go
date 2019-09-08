@@ -61,7 +61,6 @@ type Factory interface {
 
 type factory struct {
 	flags       *pflag.FlagSet
-	features    *features.FeatureFlagSet
 	kubeconfig  string
 	kubecontext string
 	baseName    string
@@ -101,9 +100,9 @@ func NewFactory(baseName string) Factory {
 	var cmdFeatures flag.StringArray
 	f.flags.Var(&cmdFeatures, "features", "Comma-separated list of features to enable for this Velero process. Combines with values from $HOME/.config/velero/config.json if present")
 
-	allFeatures := append(config.Features(), cmdFeatures...)
-
-	f.features = features.NewFeatureFlagSet(allFeatures...)
+	// Enable all known features for this process.
+	features.NewFeatureFlagSet(config.Features...)
+	features.Enable(cmdFeatures...)
 
 	return f
 }
