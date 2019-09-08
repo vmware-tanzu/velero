@@ -34,6 +34,11 @@ func TestFeatureFlags(t *testing.T) {
 	assert.True(t, Enabled("feature3"))
 	assert.Equal(t, []string{"feature1", "feature2", "feature3"}, All())
 
+	Disable("feature3")
+	assert.Equal(t, []string{"feature1", "feature2"}, All())
+
+	assert.Equal(t, "feature1,feature2", Serialize())
+
 	// Calling NewFeatureFlagSet re-initializes the set of flags
 	NewFeatureFlagSet()
 	assert.Empty(t, All())

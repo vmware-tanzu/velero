@@ -101,7 +101,7 @@ func NewFactory(baseName string) Factory {
 	f.flags.Var(&cmdFeatures, "features", "Comma-separated list of features to enable for this Velero process. Combines with values from $HOME/.config/velero/config.json if present")
 
 	// Enable all known features for this process.
-	features.NewFeatureFlagSet(config.Features...)
+	features.NewFeatureFlagSet(config.Features()...)
 	features.Enable(cmdFeatures...)
 
 	return f

@@ -17,6 +17,7 @@ limitations under the License.
 package features
 
 import (
+	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -38,7 +39,7 @@ func Enabled(name string) bool {
 	return featureFlags.set.Has(name)
 }
 
-// Enable adds a give slice of feature names to the current feature list.
+// Enable adds a given slice of feature names to the current feature list.
 func Enable(names ...string) {
 	featureFlags.mut.Lock()
 	defer featureFlags.mut.Unlock()
@@ -46,9 +47,22 @@ func Enable(names ...string) {
 	featureFlags.set.Insert(names...)
 }
 
+// Disable removes all feature flags in a given slice from the current feature list.
+func Disable(names ...string) {
+	featureFlags.mut.Lock()
+	defer featureFlags.mut.Unlock()
+
+	featureFlags.set.Delete(names...)
+}
+
 // All returns enabled features as a slice of strings.
 func All() []string {
 	return featureFlags.set.List()
+}
+
+// Serialize returns all features as a comma-separated string.
+func Serialize() string {
+	return strings.Join(All(), ",")
 }
 
 // NewFeaturesetet initializes and populates a new FeatureFlagSet.

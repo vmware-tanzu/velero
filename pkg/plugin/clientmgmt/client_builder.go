@@ -25,6 +25,7 @@ import (
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 
+	"github.com/heptio/velero/pkg/features"
 	"github.com/heptio/velero/pkg/plugin/framework"
 )
 
@@ -50,6 +51,7 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	}
 
 	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
+	b.commandArgs = append(b.commandArgs, "--features", features.Serialize())
 
 	return b
 }

@@ -76,6 +76,11 @@ data:
 Then, in your plugin's implementation, you can read this ConfigMap to fetch the necessary configuration. See the [restic restore action][3]
 for an example of this -- in particular, the `getPluginConfig(...)` function.
 
+## Feature Flags
+
+Velero will pass any known features flags as a comma-separated list of strings to the `--features` argument.
+
+Once parsed into a `[]string`, the features can then be registered using the `NewFeatureFlagSet` function and queried with `features.Enabled(<featureName>)`.
 
 [1]: https://github.com/heptio/velero-plugin-example
 [2]: https://github.com/heptio/velero/blob/master/pkg/plugin/logger.go
