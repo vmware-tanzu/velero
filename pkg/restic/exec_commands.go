@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -81,7 +80,6 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 	// create a channel to signal when to end the goroutine scanning for progress
 	// updates
 	quit := make(chan struct{})
-	var wg sync.WaitGroup
 
 	cmd := backupCmd.Cmd()
 	cmd.Stdout = stdoutBuf
@@ -89,7 +87,6 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 
 	cmd.Start()
 
-	wg.Add(1)
 	go func() {
 		ticker := time.NewTicker(backupProgressCheckInterval)
 		for {
@@ -111,15 +108,14 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 				}
 			case <-quit:
 				ticker.Stop()
-				wg.Done()
 				return
 			}
 		}
 	}()
 
 	cmd.Wait()
+	quit <- struct{}{}
 	close(quit)
-	wg.Wait()
 
 	summary, err := getSummaryLine(stdoutBuf.Bytes())
 	if err != nil {
