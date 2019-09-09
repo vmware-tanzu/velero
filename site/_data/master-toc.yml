@@ -25,8 +25,6 @@ toc:
         url: /gcp-config
       - page: Restic setup
         url: /restic
-      - page: Run locally
-        url: /run-locally
   - title: Use
     subfolderitems:
       - page: Disaster recovery
@@ -37,6 +35,14 @@ toc:
         url: /backup-reference
       - page: Restore reference
         url: /restore-reference
+      - page: Run in any namespace
+        url: /namespace
+      - page: Extend
+        url: /extend
+      - page: Extend with plugins
+        url: /plugins
+      - page: Extend with hooks
+        url: /hooks
   - title: Troubleshoot
     subfolderitems:
       - page: Troubleshooting
@@ -47,18 +53,12 @@ toc:
         url: /debugging-restores
       - page: Troubleshoot Restic
         url: /restic#troubleshooting
-  - title: Customize
+  - title: Contribute
     subfolderitems:
       - page: Build from source
         url: /build-from-source
-      - page: Run in any namespace
-        url: /namespace
-      - page: Extend
-        url: /extend
-      - page: Extend with plugins
-        url: /plugins
-      - page: Extend with hooks
-        url: /hooks
+      - page: Run locally
+        url: /run-locally
   - title: More information
     subfolderitems:
       - page: Backup file format
