@@ -115,7 +115,6 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 
 	cmd.Wait()
 	quit <- struct{}{}
-	close(quit)
 
 	summary, err := getSummaryLine(stdoutBuf.Bytes())
 	if err != nil {
