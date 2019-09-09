@@ -192,9 +192,7 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 	// create a channel to signal when to end the goroutine scanning for progress
 	// updates
 	quit := make(chan struct{})
-	var wg sync.WaitGroup
 
-	wg.Add(1)
 	go func() {
 		ticker := time.NewTicker(restoreProgressCheckInterval)
 		for {
@@ -211,15 +209,13 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 				})
 			case <-quit:
 				ticker.Stop()
-				wg.Done()
 				return
 			}
 		}
 	}()
 
 	stdout, stderr, err := exec.RunCommand(restoreCmd.Cmd())
-	close(quit)
-	wg.Wait()
+	quit <- struct{}{}
 
 	// update progress to 100%
 	updateFunc(velerov1api.PodVolumeOperationProgress{
