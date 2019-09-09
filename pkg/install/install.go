@@ -175,6 +175,53 @@ func DeploymentIsReady(factory client.DynamicFactory, namespace string) (bool, e
 	return isReady, err
 }
 
+// DaemonSetIsReady will poll the kubernetes API server to ensure the restic daemonset is ready, i.e. that
+// pods are scheduled and available on all of the the desired nodes.
+func DaemonSetIsReady(factory client.DynamicFactory, namespace string) (bool, error) {
+	gvk := schema.FromAPIVersionAndKind(appsv1.SchemeGroupVersion.String(), "DaemonSet")
+	apiResource := metav1.APIResource{
+		Name:       "daemonsets",
+		Namespaced: true,
+	}
+
+	c, err := factory.ClientForGroupVersionResource(gvk.GroupVersion(), apiResource, namespace)
+	if err != nil {
+		return false, errors.Wrapf(err, "Error creating client for daemonset polling")
+	}
+
+	// declare this variable out of scope so we can return it
+	var isReady bool
+	var readyObservations int32
+
+	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+		unstructuredDaemonSet, err := c.Get("restic", metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		} else if err != nil {
+			return false, errors.Wrap(err, "error waiting for daemonset to be ready")
+		}
+
+		daemonSet := new(appsv1.DaemonSet)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredDaemonSet.Object, daemonSet); err != nil {
+			return false, errors.Wrap(err, "error converting daemonset from unstructured")
+		}
+
+		if daemonSet.Status.NumberAvailable == daemonSet.Status.DesiredNumberScheduled {
+			readyObservations++
+		}
+
+		// Wait for 5 observations of the daemonset being "ready" to be consistent with our check for
+		// the deployment being ready.
+		if readyObservations > 4 {
+			isReady = true
+			return true, nil
+		} else {
+			return false, nil
+		}
+	})
+	return isReady, err
+}
+
 // GroupResources groups resources based on whether the resources are CustomResourceDefinitions or other types of kubernetes objects
 // This is useful to wait for readiness before creating CRD objects
 func GroupResources(resources *unstructured.UnstructuredList) *ResourceGroup {

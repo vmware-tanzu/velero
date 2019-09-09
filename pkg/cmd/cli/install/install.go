@@ -238,9 +238,16 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	if o.Wait {
-		fmt.Println("Waiting for Velero to be ready.")
+		fmt.Println("Waiting for Velero deployment to be ready.")
 		if _, err = install.DeploymentIsReady(factory, o.Namespace); err != nil {
 			return errors.Wrap(err, errorMsg)
+		}
+
+		if o.UseRestic {
+			fmt.Println("Waiting for Velero restic daemonset to be ready.")
+			if _, err = install.DaemonSetIsReady(factory, o.Namespace); err != nil {
+				return errors.Wrap(err, errorMsg)
+			}
 		}
 	}
 	if o.SecretFile == "" {
