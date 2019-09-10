@@ -18,6 +18,7 @@ package install
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -44,4 +45,8 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithSecret(true))
 	assert.Equal(t, 5, len(deploy.Spec.Template.Spec.Containers[0].Env))
 	assert.Equal(t, 3, len(deploy.Spec.Template.Spec.Volumes))
+
+	deploy = Deployment("velero", WithDefaultResticMaintenanceFrequency(24*time.Hour))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--default-restic-prune-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
 }
