@@ -1,1 +1,0 @@
-allows excluding resources from backups with the velero.io/exclude-from-backup=true label

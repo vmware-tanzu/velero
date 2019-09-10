@@ -23,11 +23,11 @@ import (
 
 // ValidateObjectStoreConfigKeys ensures that an object store's config
 // is valid by making sure each `config` key is in the `validKeys` list.
-// The special key "bucket" is always considered valid.
+// The special keys "bucket" and "prefix" are always considered valid.
 func ValidateObjectStoreConfigKeys(config map[string]string, validKeys ...string) error {
-	// `bucket` is automatically added to all object store config by
-	// velero, so add it as a valid key.
-	return validateConfigKeys(config, append(validKeys, "bucket")...)
+	// `bucket` and `prefix` are automatically added to all object
+	// store config by velero, so add them as valid keys.
+	return validateConfigKeys(config, append(validKeys, "bucket", "prefix")...)
 }
 
 // ValidateVolumeSnapshotterConfigKeys ensures that a volume snapshotter's

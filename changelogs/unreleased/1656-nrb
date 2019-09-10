@@ -1,1 +1,0 @@
-Respect the --kubecontext and --kubeconfig arugments for `velero install`.

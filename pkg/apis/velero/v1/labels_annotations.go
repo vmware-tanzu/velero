@@ -35,6 +35,9 @@ const (
 	// PodUIDLabel is the label key used to identify a pod by uid.
 	PodUIDLabel = "velero.io/pod-uid"
 
+	// PVCUIDLabel is the label key used to identify a PVC by uid.
+	PVCUIDLabel = "velero.io/pvc-uid"
+
 	// PodVolumeOperationTimeoutAnnotation is the annotation key used to apply
 	// a backup/restore-specific timeout value for pod volume operations (i.e.
 	// restic backups/restores).

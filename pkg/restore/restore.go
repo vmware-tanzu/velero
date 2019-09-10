@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -44,6 +44,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/archive"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/discovery"
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
@@ -93,6 +94,7 @@ type kubernetesRestorer struct {
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
 	fileSystem                 filesystem.Interface
+	pvRenamer                  func(string) string
 	logger                     logrus.FieldLogger
 }
 
@@ -174,6 +176,7 @@ func NewKubernetesRestorer(
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
+		pvRenamer:                  func(string) string { return "velero-clone-" + uuid.NewV4().String() },
 		fileSystem:                 filesystem.NewFileSystem(),
 	}, nil
 }
@@ -269,12 +272,10 @@ func (kr *kubernetesRestorer) Restore(
 		volumeSnapshots:            req.VolumeSnapshots,
 		podVolumeBackups:           req.PodVolumeBackups,
 		resourceTerminatingTimeout: kr.resourceTerminatingTimeout,
-		extractor: &backupExtractor{
-			log:        req.Log,
-			fileSystem: kr.fileSystem,
-		},
-		resourceClients: make(map[resourceClientKey]client.Dynamic),
-		restoredItems:   make(map[velero.ResourceIdentifier]struct{}),
+		resourceClients:            make(map[resourceClientKey]client.Dynamic),
+		restoredItems:              make(map[velero.ResourceIdentifier]struct{}),
+		renamedPVs:                 make(map[string]string),
+		pvRenamer:                  kr.pvRenamer,
 	}
 
 	return restoreCtx.execute()
@@ -363,9 +364,10 @@ type context struct {
 	volumeSnapshots            []*volume.Snapshot
 	podVolumeBackups           []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout time.Duration
-	extractor                  *backupExtractor
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
+	renamedPVs                 map[string]string
+	pvRenamer                  func(string) string
 }
 
 type resourceClientKey struct {
@@ -374,48 +376,25 @@ type resourceClientKey struct {
 }
 
 func (ctx *context) execute() (Result, Result) {
+	warnings, errs := Result{}, Result{}
+
 	ctx.log.Infof("Starting restore of backup %s", kube.NamespaceAndName(ctx.backup))
 
-	dir, err := ctx.extractor.unzipAndExtractBackup(ctx.backupReader)
+	dir, err := archive.NewExtractor(ctx.log, ctx.fileSystem).UnzipAndExtractBackup(ctx.backupReader)
 	if err != nil {
 		ctx.log.Infof("error unzipping and extracting: %v", err)
-		return Result{}, Result{Velero: []string{err.Error()}}
+		addVeleroError(&errs, err)
+		return warnings, errs
 	}
 	defer ctx.fileSystem.RemoveAll(dir)
 
 	// need to set this for additionalItems to be restored
 	ctx.restoreDir = dir
 
-	return ctx.restoreFromDir()
-}
-
-// restoreFromDir executes a restore based on backup data contained within a local
-// directory, ctx.restoreDir.
-func (ctx *context) restoreFromDir() (Result, Result) {
-	warnings, errs := Result{}, Result{}
-
-	// Make sure the top level "resources" dir exists:
-	resourcesDir := filepath.Join(ctx.restoreDir, velerov1api.ResourcesDir)
-	rde, err := ctx.fileSystem.DirExists(resourcesDir)
+	backupResources, err := archive.NewParser(ctx.log, ctx.fileSystem).Parse(ctx.restoreDir)
 	if err != nil {
-		addVeleroError(&errs, err)
+		addVeleroError(&errs, errors.Wrap(err, "error parsing backup contents"))
 		return warnings, errs
-	}
-	if !rde {
-		addVeleroError(&errs, errors.New("backup does not contain top level resources directory"))
-		return warnings, errs
-	}
-
-	resourceDirs, err := ctx.fileSystem.ReadDir(resourcesDir)
-	if err != nil {
-		addVeleroError(&errs, err)
-		return warnings, errs
-	}
-
-	resourceDirsMap := make(map[string]os.FileInfo)
-	for _, rscDir := range resourceDirs {
-		rscName := rscDir.Name()
-		resourceDirsMap[rscName] = rscDir
 	}
 
 	existingNamespaces := sets.NewString()
@@ -427,67 +406,31 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 			continue
 		}
 
-		rscDir := resourceDirsMap[resource.String()]
-		if rscDir == nil {
+		resourceList := backupResources[resource.String()]
+		if resourceList == nil {
 			continue
 		}
 
-		resourcePath := filepath.Join(resourcesDir, rscDir.Name())
-
-		clusterSubDir := filepath.Join(resourcePath, velerov1api.ClusterScopedDir)
-		clusterSubDirExists, err := ctx.fileSystem.DirExists(clusterSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-		if clusterSubDirExists {
-			w, e := ctx.restoreResource(resource.String(), "", clusterSubDir)
-			merge(&warnings, &w)
-			merge(&errs, &e)
-			continue
-		}
-
-		nsSubDir := filepath.Join(resourcePath, velerov1api.NamespaceScopedDir)
-		nsSubDirExists, err := ctx.fileSystem.DirExists(nsSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-		if !nsSubDirExists {
-			continue
-		}
-
-		nsDirs, err := ctx.fileSystem.ReadDir(nsSubDir)
-		if err != nil {
-			addVeleroError(&errs, err)
-			return warnings, errs
-		}
-
-		for _, nsDir := range nsDirs {
-			if !nsDir.IsDir() {
-				continue
-			}
-			nsName := nsDir.Name()
-			nsPath := filepath.Join(nsSubDir, nsName)
-
-			if !ctx.namespaceIncludesExcludes.ShouldInclude(nsName) {
-				ctx.log.Infof("Skipping namespace %s", nsName)
+		for namespace, items := range resourceList.ItemsByNamespace {
+			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+				ctx.log.Infof("Skipping namespace %s", namespace)
 				continue
 			}
 
-			// fetch mapped NS name
-			mappedNsName := nsName
-			if target, ok := ctx.restore.Spec.NamespaceMapping[nsName]; ok {
-				mappedNsName = target
+			// get target namespace to restore into, if different
+			// from source namespace
+			targetNamespace := namespace
+			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
+				targetNamespace = target
 			}
 
 			// if we don't know whether this namespace exists yet, attempt to create
 			// it in order to ensure it exists. Try to get it from the backup tarball
 			// (in order to get any backed-up metadata), but if we don't find it there,
 			// create a blank one.
-			if !existingNamespaces.Has(mappedNsName) {
-				logger := ctx.log.WithField("namespace", nsName)
-				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", nsName), mappedNsName)
+			if namespace != "" && !existingNamespaces.Has(targetNamespace) {
+				logger := ctx.log.WithField("namespace", namespace)
+				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
 				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
 					addVeleroError(&errs, err)
 					continue
@@ -495,10 +438,10 @@ func (ctx *context) restoreFromDir() (Result, Result) {
 
 				// keep track of namespaces that we know exist so we don't
 				// have to try to create them multiple times
-				existingNamespaces.Insert(mappedNsName)
+				existingNamespaces.Insert(targetNamespace)
 			}
 
-			w, e := ctx.restoreResource(resource.String(), mappedNsName, nsPath)
+			w, e := ctx.restoreResource(resource.String(), targetNamespace, namespace, items)
 			merge(&warnings, &w)
 			merge(&errs, &e)
 		}
@@ -712,36 +655,32 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
 // empty we are restoring a cluster level resource, otherwise into the specified namespace.
-func (ctx *context) restoreResource(resource, namespace, resourcePath string) (Result, Result) {
+func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
 	warnings, errs := Result{}, Result{}
 
-	if ctx.restore.Spec.IncludeClusterResources != nil && !*ctx.restore.Spec.IncludeClusterResources && namespace == "" {
+	if targetNamespace == "" && boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 		ctx.log.Infof("Skipping resource %s because it's cluster-scoped", resource)
 		return warnings, errs
 	}
 
-	if namespace != "" {
-		ctx.log.Infof("Restoring resource '%s' into namespace '%s' from: %s", resource, namespace, resourcePath)
+	if targetNamespace != "" {
+		ctx.log.Infof("Restoring resource '%s' into namespace '%s'", resource, targetNamespace)
 	} else {
-		ctx.log.Infof("Restoring cluster level resource '%s' from: %s", resource, resourcePath)
+		ctx.log.Infof("Restoring cluster level resource '%s'", resource)
 	}
 
-	files, err := ctx.fileSystem.ReadDir(resourcePath)
-	if err != nil {
-		addToResult(&errs, namespace, fmt.Errorf("error reading %q resource directory: %v", resource, err))
-		return warnings, errs
-	}
-	if len(files) == 0 {
+	if len(items) == 0 {
 		return warnings, errs
 	}
 
 	groupResource := schema.ParseGroupResource(resource)
 
-	for _, file := range files {
-		fullPath := filepath.Join(resourcePath, file.Name())
-		obj, err := ctx.unmarshal(fullPath)
+	for _, item := range items {
+		itemPath := getItemFilePath(ctx.restoreDir, resource, originalNamespace, item)
+
+		obj, err := ctx.unmarshal(itemPath)
 		if err != nil {
-			addToResult(&errs, namespace, fmt.Errorf("error decoding %q: %v", strings.Replace(fullPath, ctx.restoreDir+"/", "", -1), err))
+			addToResult(&errs, targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
 			continue
 		}
 
@@ -749,7 +688,7 @@ func (ctx *context) restoreResource(resource, namespace, resourcePath string) (R
 			continue
 		}
 
-		w, e := ctx.restoreItem(obj, groupResource, namespace)
+		w, e := ctx.restoreItem(obj, groupResource, targetNamespace)
 		merge(&warnings, &w)
 		merge(&errs, &e)
 	}
@@ -876,15 +815,31 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
-			// Check if the PV exists in the cluster before attempting to create
-			// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
-			shouldRestoreSnapshot, err := ctx.shouldRestore(name, resourceClient)
+			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 			if err != nil {
-				addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+				addToResult(&errs, namespace, err)
 				return warnings, errs
 			}
 
+			var shouldRestoreSnapshot bool
+			if !shouldRenamePV {
+				// Check if the PV exists in the cluster before attempting to create
+				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
+				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
+				if err != nil {
+					addToResult(&errs, namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+					return warnings, errs
+				}
+			} else {
+				// if we're renaming the PV, we're going to give it a new random name,
+				// so we can assume it doesn't already exist in the cluster and therefore
+				// we should proceed with restoring from snapshot.
+				shouldRestoreSnapshot = true
+			}
+
 			if shouldRestoreSnapshot {
+				// even if we're renaming the PV, obj still has the old name here, because the pvRestorer
+				// uses the original name to look up metadata about the snapshot.
 				ctx.log.Infof("Restoring persistent volume from snapshot.")
 				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
@@ -893,18 +848,38 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				}
 				obj = updatedObj
 			}
+
+			if shouldRenamePV {
+				// give obj a new name, and record the mapping between the old and new names
+				oldName := obj.GetName()
+				newName := ctx.pvRenamer(oldName)
+
+				ctx.renamedPVs[oldName] = newName
+				obj.SetName(newName)
+
+				// add the original PV name as an annotation
+				annotations := obj.GetAnnotations()
+				if annotations == nil {
+					annotations = map[string]string{}
+				}
+				annotations["velero.io/original-pv-name"] = oldName
+				obj.SetAnnotations(annotations)
+			}
+
 		case hasResticBackup(obj, ctx):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it has a restic backup to be restored.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		case hasDeleteReclaimPolicy(obj.Object):
 			ctx.log.Infof("Dynamically re-provisioning persistent volume because it doesn't have a snapshot and its reclaim policy is Delete.")
 			ctx.pvsToProvision.Insert(name)
 
 			// return early because we don't want to restore the PV itself, we want to dynamically re-provision it.
 			return warnings, errs
+
 		default:
 			ctx.log.Infof("Restoring persistent volume as-is because it doesn't have a snapshot and its reclaim policy is not Delete.")
 
@@ -1014,6 +989,14 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			delete(annotations, "pv.kubernetes.io/bound-by-controller")
 			obj.SetAnnotations(annotations)
 		}
+
+		if newName, ok := ctx.renamedPVs[pvc.Spec.VolumeName]; ok {
+			ctx.log.Infof("Updating persistent volume claim %s/%s to reference renamed persistent volume (%s -> %s)", namespace, name, pvc.Spec.VolumeName, newName)
+			if err := unstructured.SetNestedField(obj.Object, newName, "spec", "volumeName"); err != nil {
+				addToResult(&errs, namespace, err)
+				return warnings, errs
+			}
+		}
 	}
 
 	// necessary because we may have remapped the namespace
@@ -1101,6 +1084,45 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	}
 
 	return warnings, errs
+}
+
+// shouldRenamePV returns a boolean indicating whether a persistent volume should be given a new name
+// before being restored, or an error if this cannot be determined. A persistent volume will be
+// given a new name if and only if (a) a PV with the original name already exists in-cluster, and
+// (b) in the backup, the PV is claimed by a PVC in a namespace that's being remapped during the
+// restore.
+func shouldRenamePV(ctx *context, obj *unstructured.Unstructured, client client.Dynamic) (bool, error) {
+	if len(ctx.restore.Spec.NamespaceMapping) == 0 {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because restore is not remapping any namespaces")
+		return false, nil
+	}
+
+	pv := new(v1.PersistentVolume)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.Object, pv); err != nil {
+		return false, errors.Wrapf(err, "error converting persistent volume to structured")
+	}
+
+	if pv.Spec.ClaimRef == nil {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it's not claimed")
+		return false, nil
+	}
+
+	if _, ok := ctx.restore.Spec.NamespaceMapping[pv.Spec.ClaimRef.Namespace]; !ok {
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it's not claimed by a PVC in a namespace that's being remapped")
+		return false, nil
+	}
+
+	_, err := client.Get(pv.Name, metav1.GetOptions{})
+	switch {
+	case apierrors.IsNotFound(err):
+		ctx.log.Debugf("Persistent volume does not need to be renamed because it does not exist in the cluster")
+		return false, nil
+	case err != nil:
+		return false, errors.Wrapf(err, "error checking if persistent volume exists in the cluster")
+	}
+
+	// no error returned: the PV was found in-cluster, so we need to rename it
+	return true, nil
 }
 
 // restorePodVolumeBackups restores the PodVolumeBackups for the given restored pod

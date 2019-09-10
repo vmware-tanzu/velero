@@ -91,13 +91,6 @@ func SnapshotsCommand(repoIdentifier string) *Command {
 	}
 }
 
-func CheckCommand(repoIdentifier string) *Command {
-	return &Command{
-		Command:        "check",
-		RepoIdentifier: repoIdentifier,
-	}
-}
-
 func PruneCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "prune",

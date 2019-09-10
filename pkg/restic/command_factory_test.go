@@ -103,13 +103,6 @@ func TestSnapshotsCommand(t *testing.T) {
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 }
 
-func TestCheckCommand(t *testing.T) {
-	c := CheckCommand("repo-id")
-
-	assert.Equal(t, "check", c.Command)
-	assert.Equal(t, "repo-id", c.RepoIdentifier)
-}
-
 func TestPruneCommand(t *testing.T) {
 	c := PruneCommand("repo-id")
 

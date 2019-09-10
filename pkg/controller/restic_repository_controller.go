@@ -152,9 +152,21 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 
+	repoIdentifier, err := restic.GetRepoIdentifier(loc, req.Spec.VolumeNamespace)
+	if err != nil {
+		return c.patchResticRepository(req, func(r *v1.ResticRepository) {
+			r.Status.Message = err.Error()
+			r.Status.Phase = v1.ResticRepositoryPhaseNotReady
+
+			if r.Spec.MaintenanceFrequency.Duration <= 0 {
+				r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}
+			}
+		})
+	}
+
 	// defaulting - if the patch fails, return an error so the item is returned to the queue
 	if err := c.patchResticRepository(req, func(r *v1.ResticRepository) {
-		r.Spec.ResticIdentifier = restic.GetRepoIdentifier(loc, r.Spec.VolumeNamespace)
+		r.Spec.ResticIdentifier = repoIdentifier
 
 		if r.Spec.MaintenanceFrequency.Duration <= 0 {
 			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}
@@ -204,11 +216,6 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 
 	log.Info("Running maintenance on restic repository")
 
-	log.Debug("Checking repo before prune")
-	if err := c.repositoryManager.CheckRepo(req); err != nil {
-		return c.patchResticRepository(req, repoNotReady(err.Error()))
-	}
-
 	// prune failures should be displayed in the `.status.message` field but
 	// should not cause the repo to move to `NotReady`.
 	log.Debug("Pruning repo")
@@ -221,11 +228,6 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 		}
 	}
 
-	log.Debug("Checking repo after prune")
-	if err := c.repositoryManager.CheckRepo(req); err != nil {
-		return c.patchResticRepository(req, repoNotReady(err.Error()))
-	}
-
 	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
 		req.Status.LastMaintenanceTime = metav1.Time{Time: now}
 	})
@@ -236,6 +238,11 @@ func dueForMaintenance(req *v1.ResticRepository, now time.Time) bool {
 }
 
 func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository, log logrus.FieldLogger) error {
+	// no identifier: can't possibly be ready, so just return
+	if req.Spec.ResticIdentifier == "" {
+		return nil
+	}
+
 	log.Info("Checking restic repository for readiness")
 
 	// we need to ensure it (first check, if check fails, attempt to init)

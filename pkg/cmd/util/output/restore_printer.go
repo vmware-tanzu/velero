@@ -17,35 +17,43 @@ limitations under the License.
 package output
 
 import (
-	"fmt"
-	"io"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 )
 
 var (
-	restoreColumns = []string{"NAME", "BACKUP", "STATUS", "WARNINGS", "ERRORS", "CREATED", "SELECTOR"}
+	restoreColumns = []metav1.TableColumnDefinition{
+		// name needs Type and Format defined for the decorator to identify it:
+		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
+		{Name: "Name", Type: "string", Format: "name"},
+		{Name: "Backup"},
+		{Name: "Status"},
+		{Name: "Warnings"},
+		{Name: "Errors"},
+		{Name: "Created"},
+		{Name: "Selector"},
+	}
 )
 
-func printRestoreList(list *v1.RestoreList, w io.Writer, options printers.PrintOptions) error {
+func printRestoreList(list *v1.RestoreList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+
 	for i := range list.Items {
-		if err := printRestore(&list.Items[i], w, options); err != nil {
-			return err
+		r, err := printRestore(&list.Items[i], options)
+		if err != nil {
+			return nil, err
 		}
+		rows = append(rows, r...)
 	}
-	return nil
+	return rows, nil
 }
 
-func printRestore(restore *v1.Restore, w io.Writer, options printers.PrintOptions) error {
-	name := printers.FormatResourceName(options.Kind, restore.Name, options.WithKind)
-
-	if options.WithNamespace {
-		if _, err := fmt.Fprintf(w, "%s\t", restore.Namespace); err != nil {
-			return err
-		}
+func printRestore(restore *v1.Restore, options printers.PrintOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: restore},
 	}
 
 	status := restore.Status.Phase
@@ -53,24 +61,15 @@ func printRestore(restore *v1.Restore, w io.Writer, options printers.PrintOption
 		status = v1.RestorePhaseNew
 	}
 
-	if _, err := fmt.Fprintf(
-		w,
-		"%s\t%s\t%s\t%d\t%d\t%s\t%s",
-		name,
+	row.Cells = append(row.Cells,
+		restore.Name,
 		restore.Spec.BackupName,
 		status,
 		restore.Status.Warnings,
 		restore.Status.Errors,
 		restore.CreationTimestamp.Time,
 		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
-	); err != nil {
-		return err
-	}
+	)
 
-	if _, err := fmt.Fprint(w, printers.AppendLabels(restore.Labels, options.ColumnLabels)); err != nil {
-		return err
-	}
-
-	_, err := fmt.Fprint(w, printers.AppendAllLabels(options.ShowLabels, restore.Labels))
-	return err
+	return []metav1.TableRow{row}, nil
 }

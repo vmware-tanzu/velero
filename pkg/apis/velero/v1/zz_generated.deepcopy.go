@@ -80,7 +80,7 @@ func (in *BackupHooks) DeepCopy() *BackupHooks {
 func (in *BackupList) DeepCopyInto(out *BackupList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Backup, len(*in))
@@ -299,7 +299,7 @@ func (in *BackupStorageLocation) DeepCopyObject() runtime.Object {
 func (in *BackupStorageLocationList) DeepCopyInto(out *BackupStorageLocationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]BackupStorageLocation, len(*in))
@@ -401,7 +401,7 @@ func (in *DeleteBackupRequest) DeepCopyObject() runtime.Object {
 func (in *DeleteBackupRequestList) DeepCopyInto(out *DeleteBackupRequestList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]DeleteBackupRequest, len(*in))
@@ -499,7 +499,7 @@ func (in *DownloadRequest) DeepCopyObject() runtime.Object {
 func (in *DownloadRequestList) DeepCopyInto(out *DownloadRequestList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]DownloadRequest, len(*in))
@@ -664,7 +664,7 @@ func (in *PodVolumeBackup) DeepCopyObject() runtime.Object {
 func (in *PodVolumeBackupList) DeepCopyInto(out *PodVolumeBackupList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PodVolumeBackup, len(*in))
@@ -767,7 +767,7 @@ func (in *PodVolumeRestore) DeepCopyObject() runtime.Object {
 func (in *PodVolumeRestoreList) DeepCopyInto(out *PodVolumeRestoreList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]PodVolumeRestore, len(*in))
@@ -863,7 +863,7 @@ func (in *ResticRepository) DeepCopyObject() runtime.Object {
 func (in *ResticRepositoryList) DeepCopyInto(out *ResticRepositoryList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ResticRepository, len(*in))
@@ -958,7 +958,7 @@ func (in *Restore) DeepCopyObject() runtime.Object {
 func (in *RestoreList) DeepCopyInto(out *RestoreList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Restore, len(*in))
@@ -1098,7 +1098,7 @@ func (in *Schedule) DeepCopyObject() runtime.Object {
 func (in *ScheduleList) DeepCopyInto(out *ScheduleList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]Schedule, len(*in))
@@ -1198,7 +1198,7 @@ func (in *ServerStatusRequest) DeepCopyObject() runtime.Object {
 func (in *ServerStatusRequestList) DeepCopyInto(out *ServerStatusRequestList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]ServerStatusRequest, len(*in))
@@ -1318,7 +1318,7 @@ func (in *VolumeSnapshotLocation) DeepCopyObject() runtime.Object {
 func (in *VolumeSnapshotLocationList) DeepCopyInto(out *VolumeSnapshotLocationList) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	out.ListMeta = in.ListMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]VolumeSnapshotLocation, len(*in))

@@ -181,6 +181,20 @@
   version = "v1.3.1"
 
 [[projects]]
+  digest = "1:1d1cbf539d9ac35eb3148129f96be5537f1a1330cadcc7e3a83b4e72a59672a3"
+  name = "github.com/google/go-cmp"
+  packages = [
+    "cmp",
+    "cmp/internal/diff",
+    "cmp/internal/flags",
+    "cmp/internal/function",
+    "cmp/internal/value",
+  ]
+  pruneopts = "NUT"
+  revision = "2d0692c2e9617365a95b295612ac0d4415ba4627"
+  version = "v0.3.1"
+
+[[projects]]
   branch = "master"
   digest = "1:52c5834e2bebac9030c97cc0798ac11c3aa8a39f098aeb419f142533da6cd3cc"
   name = "github.com/google/gofuzz"
@@ -678,7 +692,7 @@
   revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
 
 [[projects]]
-  digest = "1:a937ed4322409fa22924f02124fd0727c19662f73cf15406646d19bdce972df2"
+  digest = "1:760e08df99c3c3b53764ef7c41c03ea9d90e8594d9df42364d9209e99a0352e1"
   name = "k8s.io/api"
   packages = [
     "admissionregistration/v1beta1",
@@ -719,22 +733,22 @@
     "storage/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "40a48860b5abbba9aa891b02b32da429b08d96a0"
-  version = "kubernetes-1.14.0"
+  revision = "3544db3b9e4494309507e02eced5cd9dcff47e6a"
+  version = "kubernetes-1.15.3"
 
 [[projects]]
-  digest = "1:1d6160800196e00fc394f13ca8c1c0cdc360a170c1b6a9db0f0a1f9f1c4e9342"
+  digest = "1:668bafb576081b9dd26c0cac69296549ad65e3e3af789a8ad1d9b9114b2f55c1"
   name = "k8s.io/apiextensions-apiserver"
   packages = [
     "pkg/apis/apiextensions",
     "pkg/apis/apiextensions/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "53c4693659ed354d76121458fb819202dd1635fa"
-  version = "kubernetes-1.14.0"
+  revision = "0dbe462fe92dfa8b56cc9facf0658a17d0c70fc5"
+  version = "kubernetes-1.15.3"
 
 [[projects]]
-  digest = "1:f249ae79e492647bb0640d656ccf70fd272359a75a35ac5b9748bd19ac42c1f0"
+  digest = "1:b1e28ead203a2ac2c1d82980760e26bdb34dbd47428cfe76f50c81b7d761b39e"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
@@ -787,11 +801,11 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "NUT"
-  revision = "d7deff9243b165ee192f5551710ea4285dcfd615"
-  version = "kubernetes-1.14.0"
+  revision = "f2f3a405f61d6c2cdc0d00687c1b5d90de91e9f0"
+  version = "kubernetes-1.15.3"
 
 [[projects]]
-  digest = "1:c225d3ffade76b27498a24472eeaa3e7c516f0c0bbaaacfaa2a1824e1ead7952"
+  digest = "1:07c45445bd6c49a1b12cef2def45a866a440c55dda0ef62e93a012bffaff22f8"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -992,8 +1006,8 @@
     "util/workqueue",
   ]
   pruneopts = "NUT"
-  revision = "6ee68ca5fd8355d024d02f9db0b3b667e8357a0f"
-  version = "kubernetes-1.14.0"
+  revision = "e14f31a72a77f7aa82a95eaf542d1194fb027d04"
+  version = "kubernetes-1.15.3"
 
 [[projects]]
   digest = "1:2c16dda1c44c2564a7818fbacb701323c16d77c21b969987c1bec08d3ee0b050"
@@ -1012,20 +1026,21 @@
   revision = "d83b052f768a50a309c692a9c271da3f3276ff88"
 
 [[projects]]
-  digest = "1:c2ad4e18f35cf651af430e4115e9d26bdd266e61b4076cb76d23a15078c5d58e"
+  digest = "1:da84676239a79340c7ef4d8587097bf07ecde0d72cd339dd6a4d3f5fedce7cd3"
   name = "k8s.io/kubernetes"
   packages = ["pkg/printers"]
   pruneopts = "NUT"
-  revision = "b7394102d6ef778017f2ca4046abbaa23b88c290"
-  version = "v1.14.1"
+  revision = "2d3c76f9091b6bec110a5e63777c332469e0cba2"
+  version = "v1.15.3"
 
 [[projects]]
   branch = "master"
-  digest = "1:14e8a3b53e6d8cb5f44783056b71bb2ca1ac7e333939cc97f3e50b579c920845"
+  digest = "1:5011e453320ffdc30c5a06516f4de57df6e1c094b2923a1c7e699ea3f4364bc9"
   name = "k8s.io/utils"
   packages = [
     "buffer",
     "integer",
+    "pointer",
     "trace",
   ]
   pruneopts = "NUT"
@@ -1090,15 +1105,16 @@
     "google.golang.org/grpc/codes",
     "google.golang.org/grpc/status",
     "k8s.io/api/apps/v1",
-    "k8s.io/api/apps/v1beta1",
     "k8s.io/api/batch/v1",
     "k8s.io/api/core/v1",
     "k8s.io/api/rbac/v1",
     "k8s.io/api/rbac/v1beta1",
+    "k8s.io/api/storage/v1",
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
     "k8s.io/apimachinery/pkg/api/equality",
     "k8s.io/apimachinery/pkg/api/errors",
     "k8s.io/apimachinery/pkg/api/meta",
+    "k8s.io/apimachinery/pkg/api/resource",
     "k8s.io/apimachinery/pkg/apis/meta/v1",
     "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured",
     "k8s.io/apimachinery/pkg/labels",
@@ -1127,6 +1143,7 @@
     "k8s.io/client-go/kubernetes/typed/core/v1",
     "k8s.io/client-go/kubernetes/typed/rbac/v1",
     "k8s.io/client-go/kubernetes/typed/rbac/v1beta1",
+    "k8s.io/client-go/kubernetes/typed/storage/v1",
     "k8s.io/client-go/listers/core/v1",
     "k8s.io/client-go/plugin/pkg/client/auth/azure",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",

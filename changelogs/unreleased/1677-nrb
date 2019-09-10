@@ -1,1 +1,0 @@
-Add low cpu/memory limits to the restic init container. This allows for restoration into namespaces with quotas defined.

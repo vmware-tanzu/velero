@@ -107,14 +107,15 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		return nil, errors.Errorf("backup storage location's bucket name %q must not contain a '/' (if using a prefix, put it in the 'Prefix' field instead)", location.Spec.ObjectStorage.Bucket)
 	}
 
-	// add the bucket name to the config map so that object stores can use
-	// it when initializing. The AWS object store uses this to determine the
-	// bucket's region when setting up its client.
+	// add the bucket name and prefix to the config map so that object stores
+	// can use them when initializing. The AWS object store uses the bucket
+	// name to determine the bucket's region when setting up its client.
 	if location.Spec.ObjectStorage != nil {
 		if location.Spec.Config == nil {
 			location.Spec.Config = make(map[string]string)
 		}
 		location.Spec.Config["bucket"] = bucket
+		location.Spec.Config["prefix"] = prefix
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)

@@ -25,7 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	"github.com/heptio/velero/pkg/builder"
 	"github.com/heptio/velero/pkg/client"
 	"github.com/heptio/velero/pkg/cmd"
 	"github.com/heptio/velero/pkg/cmd/util/flag"
@@ -33,6 +34,8 @@ import (
 	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
 )
+
+const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
@@ -64,6 +67,7 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 
 	o.BindFlags(c.Flags())
 	o.BindWait(c.Flags())
+	o.BindFromSchedule(c.Flags())
 	output.BindFlags(c.Flags())
 	output.ClearOutputFlagDefault(c)
 
@@ -84,13 +88,14 @@ type CreateOptions struct {
 	Wait                    bool
 	StorageLocation         string
 	SnapshotLocations       []string
+	FromSchedule            string
 
 	client veleroclient.Interface
 }
 
 func NewCreateOptions() *CreateOptions {
 	return &CreateOptions{
-		TTL:                     30 * 24 * time.Hour,
+		TTL:                     DefaultBackupTTL,
 		IncludeNamespaces:       flag.NewStringArray("*"),
 		Labels:                  flag.NewMap(),
 		SnapshotVolumes:         flag.NewOptionalBool(nil),
@@ -121,6 +126,12 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 // commands that reuse CreateOptions's BindFlags method.
 func (o *CreateOptions) BindWait(flags *pflag.FlagSet) {
 	flags.BoolVarP(&o.Wait, "wait", "w", o.Wait, "wait for the operation to complete")
+}
+
+// BindFromSchedule binds the from-schedule flag separately so it is not called
+// by other create commands that reuse CreateOptions's BindFlags method.
+func (o *CreateOptions) BindFromSchedule(flags *pflag.FlagSet) {
+	flags.StringVar(&o.FromSchedule, "from-schedule", "", "create a backup from the template of an existing schedule. Cannot be used with any other filters.")
 }
 
 func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -154,44 +165,33 @@ func (o *CreateOptions) Complete(args []string, f client.Factory) error {
 }
 
 func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
-	backup := &api.Backup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: f.Namespace(),
-			Name:      o.Name,
-			Labels:    o.Labels.Data(),
-		},
-		Spec: api.BackupSpec{
-			IncludedNamespaces:      o.IncludeNamespaces,
-			ExcludedNamespaces:      o.ExcludeNamespaces,
-			IncludedResources:       o.IncludeResources,
-			ExcludedResources:       o.ExcludeResources,
-			LabelSelector:           o.Selector.LabelSelector,
-			SnapshotVolumes:         o.SnapshotVolumes.Value,
-			TTL:                     metav1.Duration{Duration: o.TTL},
-			IncludeClusterResources: o.IncludeClusterResources.Value,
-			StorageLocation:         o.StorageLocation,
-			VolumeSnapshotLocations: o.SnapshotLocations,
-		},
+	backup, err := o.BuildBackup(f.Namespace())
+	if err != nil {
+		return err
 	}
 
 	if printed, err := output.PrintWithFormat(c, backup); printed || err != nil {
 		return err
 	}
 
+	if o.FromSchedule != "" {
+		fmt.Println("Creating backup from schedule, all other filters are ignored.")
+	}
+
 	var backupInformer cache.SharedIndexInformer
-	var updates chan *api.Backup
+	var updates chan *velerov1api.Backup
 	if o.Wait {
 		stop := make(chan struct{})
 		defer close(stop)
 
-		updates = make(chan *api.Backup)
+		updates = make(chan *velerov1api.Backup)
 
 		backupInformer = v1.NewBackupInformer(o.client, f.Namespace(), 0, nil)
 
 		backupInformer.AddEventHandler(
 			cache.FilteringResourceEventHandler{
 				FilterFunc: func(obj interface{}) bool {
-					backup, ok := obj.(*api.Backup)
+					backup, ok := obj.(*velerov1api.Backup)
 					if !ok {
 						return false
 					}
@@ -199,14 +199,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 				},
 				Handler: cache.ResourceEventHandlerFuncs{
 					UpdateFunc: func(_, obj interface{}) {
-						backup, ok := obj.(*api.Backup)
+						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
 						updates <- backup
 					},
 					DeleteFunc: func(obj interface{}) {
-						backup, ok := obj.(*api.Backup)
+						backup, ok := obj.(*velerov1api.Backup)
 						if !ok {
 							return
 						}
@@ -218,7 +218,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err := o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
+	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					return nil
 				}
 
-				if backup.Status.Phase != api.BackupPhaseNew && backup.Status.Phase != api.BackupPhaseInProgress {
+				if backup.Status.Phase != velerov1api.BackupPhaseNew && backup.Status.Phase != velerov1api.BackupPhaseInProgress {
 					fmt.Printf("\nBackup completed with status: %s. You may check for more information using the commands `velero backup describe %s` and `velero backup logs %s`.\n", backup.Status.Phase, backup.Name, backup.Name)
 					return nil
 				}
@@ -252,4 +252,36 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	fmt.Printf("Run `velero backup describe %s` or `velero backup logs %s` for more details.\n", backup.Name, backup.Name)
 
 	return nil
+}
+
+func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, error) {
+	backupBuilder := builder.ForBackup(namespace, o.Name)
+
+	if o.FromSchedule != "" {
+		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(o.FromSchedule, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		backupBuilder.FromSchedule(schedule)
+	} else {
+		backupBuilder.
+			IncludedNamespaces(o.IncludeNamespaces...).
+			ExcludedNamespaces(o.ExcludeNamespaces...).
+			IncludedResources(o.IncludeResources...).
+			ExcludedResources(o.ExcludeResources...).
+			LabelSelector(o.Selector.LabelSelector).
+			TTL(o.TTL).
+			StorageLocation(o.StorageLocation).
+			VolumeSnapshotLocations(o.SnapshotLocations...)
+
+		if o.SnapshotVolumes.Value != nil {
+			backupBuilder.SnapshotVolumes(*o.SnapshotVolumes.Value)
+		}
+		if o.IncludeClusterResources.Value != nil {
+			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
+		}
+	}
+
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
+	return backup, nil
 }

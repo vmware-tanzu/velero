@@ -178,7 +178,7 @@ ifeq ($(TAG_LATEST), true)
 	docker manifest push $(MULTIARCH_IMAGE):latest
 endif
 
-container: verify test local-arch .container-$(DOTFILE_IMAGE) container-name
+container: local-arch .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
 	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output

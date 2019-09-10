@@ -49,9 +49,6 @@ type RepositoryManager interface {
 	// authenticated to.
 	ConnectToRepo(repo *velerov1api.ResticRepository) error
 
-	// CheckRepo checks the specified repo for errors.
-	CheckRepo(repo *velerov1api.ResticRepository) error
-
 	// PruneRepo deletes unused data from a repo.
 	PruneRepo(repo *velerov1api.ResticRepository) error
 
@@ -198,14 +195,6 @@ func (rm *repositoryManager) ConnectToRepo(repo *velerov1api.ResticRepository) e
 	snapshotsCmd.ExtraFlags = append(snapshotsCmd.ExtraFlags, "--last")
 
 	return rm.exec(snapshotsCmd, repo.Spec.BackupStorageLocation)
-}
-
-func (rm *repositoryManager) CheckRepo(repo *velerov1api.ResticRepository) error {
-	// restic check requires an exclusive lock
-	rm.repoLocker.LockExclusive(repo.Name)
-	defer rm.repoLocker.UnlockExclusive(repo.Name)
-
-	return rm.exec(CheckCommand(repo.Spec.ResticIdentifier), repo.Spec.BackupStorageLocation)
 }
 
 func (rm *repositoryManager) PruneRepo(repo *velerov1api.ResticRepository) error {
