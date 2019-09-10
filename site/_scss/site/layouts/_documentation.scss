@@ -1,0 +1,32 @@
+#docs {
+  .container.container-max {
+    max-width: 90%;
+  }
+  table {
+    @extend .table;
+    @extend .table-striped;
+    @extend .table-bordered;
+    thead {
+      @extend .thead-light;
+    }
+    td {
+      code {
+        word-break: keep-all;
+      }
+    }
+  }
+  .toc {
+    padding-left: 30px;
+    nav {
+      ul {
+        padding: 0;
+      }
+    }
+  }
+  .documentation-container {
+    @include media-breakpoint-down(lg) {
+      max-width: 100%;
+      overflow-x: scroll;
+    }
+  }
+}
