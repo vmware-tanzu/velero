@@ -34,7 +34,7 @@ func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]st
 		PasswordFile:   passwordFile,
 		Dir:            path,
 		Args:           []string{"."},
-		ExtraFlags:     append(backupTagFlags(tags), "--host=velero"),
+		ExtraFlags:     append(backupTagFlags(tags), "--host=velero", "--json"),
 	}
 }
 
