@@ -25,6 +25,9 @@
     font-weight: $font-weight-light;
     text-align: center;
   }
+  &.post-single-hero-short {
+    padding-bottom: 0;
+  }
 }
 
 .post-single-body {
