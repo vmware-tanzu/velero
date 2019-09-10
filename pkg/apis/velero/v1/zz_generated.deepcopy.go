@@ -835,6 +835,7 @@ func (in *PodVolumeRestoreStatus) DeepCopyInto(out *PodVolumeRestoreStatus) {
 	*out = *in
 	in.StartTimestamp.DeepCopyInto(&out.StartTimestamp)
 	in.CompletionTimestamp.DeepCopyInto(&out.CompletionTimestamp)
+	out.Progress = in.Progress
 	return
 }
 

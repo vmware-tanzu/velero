@@ -19,10 +19,10 @@ package restic
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/heptio/velero/pkg/test"
 	"github.com/heptio/velero/pkg/util/filesystem"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func Test_getSummaryLine(t *testing.T) {
