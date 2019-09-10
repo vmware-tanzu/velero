@@ -1,0 +1,1 @@
+fix excluding additional items with the velero.io/exclude-from-backup=true label
