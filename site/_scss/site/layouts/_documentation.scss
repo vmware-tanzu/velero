@@ -12,9 +12,6 @@
     td {
       code {
         word-break: keep-all;
-        @include media-breakpoint-up(md) {
-          word-break: keep-all;
-        }
       }
     }
   }
