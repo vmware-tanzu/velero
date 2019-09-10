@@ -43,8 +43,8 @@ const (
 	InitContainer = "restic-wait"
 
 	// DefaultMaintenanceFrequency is the default time interval
-	// at which restic check & prune are run.
-	DefaultMaintenanceFrequency = 24 * time.Hour
+	// at which restic prune is run.
+	DefaultMaintenanceFrequency = 7 * 24 * time.Hour
 
 	// PVCNameAnnotation is the key for the annotation added to
 	// pod volume backups when they're for a PVC.
