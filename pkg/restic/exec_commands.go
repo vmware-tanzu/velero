@@ -27,9 +27,13 @@ import (
 
 	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/util/exec"
+	"github.com/heptio/velero/pkg/util/filesystem"
 )
 
+const restoreProgressCheckInterval = 10 * time.Second
 const backupProgressCheckInterval = 10 * time.Second
+
+var fileSystem = filesystem.NewFileSystem()
 
 type backupStatusLine struct {
 	MessageType string `json:"message_type"`
@@ -170,4 +174,99 @@ func getSummaryLine(b []byte) ([]byte, error) {
 		return nil, errors.New("unable to get summary line from restic backup command output")
 	}
 	return b[summaryLineIdx : summaryLineIdx+newLineIdx], nil
+}
+
+// RunRestore runs a `restic restore` command and monitors the volume size to
+// provide progress updates to the caller.
+func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.Args[0])
+	if err != nil {
+		return "", "", err
+	}
+
+	updateFunc(velerov1api.PodVolumeOperationProgress{
+		TotalBytes: snapshotSize,
+	})
+
+	// create a channel to signal when to end the goroutine scanning for progress
+	// updates
+	quit := make(chan struct{})
+
+	go func() {
+		ticker := time.NewTicker(restoreProgressCheckInterval)
+		for {
+			select {
+			case <-ticker.C:
+				volumeSize, err := getVolumeSize(restoreCmd.Dir)
+				if err != nil {
+					log.WithError(err).Errorf("error getting restic restore progress")
+				}
+
+				updateFunc(velerov1api.PodVolumeOperationProgress{
+					TotalBytes: snapshotSize,
+					BytesDone:  volumeSize,
+				})
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+
+	stdout, stderr, err := exec.RunCommand(restoreCmd.Cmd())
+	quit <- struct{}{}
+
+	// update progress to 100%
+	updateFunc(velerov1api.PodVolumeOperationProgress{
+		TotalBytes: snapshotSize,
+		BytesDone:  snapshotSize,
+	})
+
+	return stdout, stderr, err
+}
+
+func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string) (int64, error) {
+	cmd := StatsCommand(repoIdentifier, passwordFile, snapshotID)
+
+	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
+	if err != nil {
+		return 0, errors.Wrapf(err, "error running command, stderr=%s", stderr)
+	}
+
+	var snapshotStats struct {
+		TotalSize int64 `json:"total_size"`
+	}
+
+	if err := json.Unmarshal([]byte(stdout), &snapshotStats); err != nil {
+		return 0, errors.Wrap(err, "error unmarshalling restic stats result")
+	}
+
+	if snapshotStats.TotalSize == 0 {
+		return 0, errors.Errorf("error getting snapshot size %+v", snapshotStats)
+	}
+
+	return snapshotStats.TotalSize, nil
+}
+
+func getVolumeSize(path string) (int64, error) {
+	var size int64
+
+	files, err := fileSystem.ReadDir(path)
+	if err != nil {
+		return 0, errors.Wrapf(err, "error reading directory %s", path)
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			s, err := getVolumeSize(fmt.Sprintf("%s/%s", path, file.Name()))
+			if err != nil {
+				return 0, err
+			}
+			size += s
+		} else {
+			size += file.Size()
+		}
+	}
+
+	return size, nil
 }

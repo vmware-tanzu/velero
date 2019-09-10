@@ -66,6 +66,11 @@ type PodVolumeRestoreStatus struct {
 	// Completion time is recorded even on failed restores.
 	// The server's time is used for CompletionTimestamps
 	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+
+	// Progress holds the total number of bytes of the snapshot and the current
+	// number of restored bytes. This can be used to display progress information
+	// about the restore operation.
+	Progress PodVolumeOperationProgress `json:"progress"`
 }
 
 // +genclient

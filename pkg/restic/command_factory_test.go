@@ -117,3 +117,13 @@ func TestForgetCommand(t *testing.T) {
 	assert.Equal(t, "repo-id", c.RepoIdentifier)
 	assert.Equal(t, []string{"snapshot-id"}, c.Args)
 }
+
+func TestStatsCommand(t *testing.T) {
+	c := StatsCommand("repo-id", "password-file", "snapshot-id")
+
+	assert.Equal(t, "stats", c.Command)
+	assert.Equal(t, "repo-id", c.RepoIdentifier)
+	assert.Equal(t, "password-file", c.PasswordFile)
+	assert.Equal(t, []string{"snapshot-id"}, c.Args)
+	assert.Equal(t, []string{"--json"}, c.ExtraFlags)
+}

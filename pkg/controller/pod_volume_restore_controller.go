@@ -42,7 +42,6 @@ import (
 	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
 	"github.com/heptio/velero/pkg/restic"
 	"github.com/heptio/velero/pkg/util/boolptr"
-	veleroexec "github.com/heptio/velero/pkg/util/exec"
 	"github.com/heptio/velero/pkg/util/filesystem"
 	"github.com/heptio/velero/pkg/util/kube"
 )
@@ -339,7 +338,7 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 
 	var stdout, stderr string
 
-	if stdout, stderr, err = veleroexec.RunCommand(resticCmd.Cmd()); err != nil {
+	if stdout, stderr, err = restic.RunRestore(resticCmd, log, c.updateRestoreProgressFunc(req, log)); err != nil {
 		return errors.Wrapf(err, "error running restic restore, cmd=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
 	}
 	log.Debugf("Ran command=%s, stdout=%s, stderr=%s", resticCmd.String(), stdout, stderr)
@@ -415,4 +414,16 @@ func (c *podVolumeRestoreController) failRestore(req *velerov1api.PodVolumeResto
 		return err
 	}
 	return nil
+}
+
+// updateRestoreProgressFunc returns a func that takes progress info and patches
+// the PVR with the new progress
+func (c *podVolumeRestoreController) updateRestoreProgressFunc(req *velerov1api.PodVolumeRestore, log logrus.FieldLogger) func(velerov1api.PodVolumeOperationProgress) {
+	return func(progress velerov1api.PodVolumeOperationProgress) {
+		if _, err := c.patchPodVolumeRestore(req, func(r *velerov1api.PodVolumeRestore) {
+			r.Status.Progress = progress
+		}); err != nil {
+			log.WithError(err).Error("error updating PodVolumeRestore progress")
+		}
+	}
 }

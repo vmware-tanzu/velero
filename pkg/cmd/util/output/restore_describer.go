@@ -188,8 +188,7 @@ func describePodVolumeRestores(d *Describer, restores []v1.PodVolumeRestore, det
 		restoresByPod := new(volumesByPod)
 
 		for _, restore := range restoresByPhase[phase] {
-			// TODO(adnan): replace last parameter with progress from status (#1749)
-			restoresByPod.Add(restore.Spec.Pod.Namespace, restore.Spec.Pod.Name, restore.Spec.Volume, phase, v1.PodVolumeOperationProgress{})
+			restoresByPod.Add(restore.Spec.Pod.Namespace, restore.Spec.Pod.Name, restore.Spec.Volume, phase, restore.Status.Progress)
 		}
 
 		d.Printf("\t%s:\n", phase)
