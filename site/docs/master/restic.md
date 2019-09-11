@@ -194,8 +194,9 @@ common encryption key for all restic repositories created by Velero. **This mean
 bucket can decrypt your restic backup data**. Make sure that you limit access to the restic bucket
 appropriately. We plan to implement full Velero backup encryption, including securing the restic encryption keys, in
 a future release.
-- The current Velero/restic integration relies on using pod names to associate restic backups with their parents. If a pod is restarted, such as with a Deployment,
-the next restic backup taken will be treated as a completely new backup, not an incremental one.
+- An incremental backup chain will be maintained across pod reschedules for PVCs. However, for pod volumes that are *not*
+PVCs, such as `emptyDir` volumes, when a pod is deleted/recreated (e.g. by a ReplicaSet/Deployment), the next backup of those
+volumes will be full rather than incremental, because the pod volume's lifecycle is assumed to be defined by its pod.
 - Restic scans each file in a single thread. This means that large files (such as ones storing a database) will take a long time to scan for data deduplication, even if the actual
 difference is small.
 
