@@ -1330,6 +1330,36 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 		},
 		{
+			name:   "additional items with the velero.io/exclude-from-backup label are not backed up",
+			backup: defaultBackup().IncludedNamespaces("ns-1").Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("velero.io/exclude-from-backup", "true")).Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				),
+			},
+			actions: []velero.BackupItemAction{
+				&pluggableAction{
+					executeFunc: func(item runtime.Unstructured, backup *velerov1.Backup) (runtime.Unstructured, []velero.ResourceIdentifier, error) {
+						additionalItems := []velero.ResourceIdentifier{
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-1"},
+							{GroupResource: kuberesource.PersistentVolumes, Name: "pv-2"},
+						}
+
+						return item, additionalItems, nil
+					},
+				},
+			},
+			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/persistentvolumes/cluster/pv-2.json",
+			},
+		},
+
+		{
 			name:   "if there's an error backing up additional items, the item the action was run for isn't backed up",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{

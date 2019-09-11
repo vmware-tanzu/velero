@@ -41,10 +41,11 @@ import (
 type resticRepositoryController struct {
 	*genericController
 
-	resticRepositoryClient velerov1client.ResticRepositoriesGetter
-	resticRepositoryLister listers.ResticRepositoryLister
-	backupLocationLister   listers.BackupStorageLocationLister
-	repositoryManager      restic.RepositoryManager
+	resticRepositoryClient      velerov1client.ResticRepositoriesGetter
+	resticRepositoryLister      listers.ResticRepositoryLister
+	backupLocationLister        listers.BackupStorageLocationLister
+	repositoryManager           restic.RepositoryManager
+	defaultMaintenanceFrequency time.Duration
 
 	clock clock.Clock
 }
@@ -56,14 +57,22 @@ func NewResticRepositoryController(
 	resticRepositoryClient velerov1client.ResticRepositoriesGetter,
 	backupLocationInformer informers.BackupStorageLocationInformer,
 	repositoryManager restic.RepositoryManager,
+	defaultMaintenanceFrequency time.Duration,
 ) Interface {
 	c := &resticRepositoryController{
-		genericController:      newGenericController("restic-repository", logger),
-		resticRepositoryClient: resticRepositoryClient,
-		resticRepositoryLister: resticRepositoryInformer.Lister(),
-		backupLocationLister:   backupLocationInformer.Lister(),
-		repositoryManager:      repositoryManager,
-		clock:                  &clock.RealClock{},
+		genericController:           newGenericController("restic-repository", logger),
+		resticRepositoryClient:      resticRepositoryClient,
+		resticRepositoryLister:      resticRepositoryInformer.Lister(),
+		backupLocationLister:        backupLocationInformer.Lister(),
+		repositoryManager:           repositoryManager,
+		defaultMaintenanceFrequency: defaultMaintenanceFrequency,
+
+		clock: &clock.RealClock{},
+	}
+
+	if c.defaultMaintenanceFrequency <= 0 {
+		logger.Infof("Invalid default restic maintenance frequency, setting to %v", restic.DefaultMaintenanceFrequency)
+		c.defaultMaintenanceFrequency = restic.DefaultMaintenanceFrequency
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -159,7 +168,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 			r.Status.Phase = v1.ResticRepositoryPhaseNotReady
 
 			if r.Spec.MaintenanceFrequency.Duration <= 0 {
-				r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}
+				r.Spec.MaintenanceFrequency = metav1.Duration{Duration: c.defaultMaintenanceFrequency}
 			}
 		})
 	}
@@ -169,7 +178,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 		r.Spec.ResticIdentifier = repoIdentifier
 
 		if r.Spec.MaintenanceFrequency.Duration <= 0 {
-			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: restic.DefaultMaintenanceFrequency}
+			r.Spec.MaintenanceFrequency = metav1.Duration{Duration: c.defaultMaintenanceFrequency}
 		}
 	}); err != nil {
 		return err

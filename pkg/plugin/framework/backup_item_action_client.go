@@ -62,6 +62,10 @@ func (c *BackupItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error
 		return velero.ResourceSelector{}, fromGRPCError(err)
 	}
 
+	if res.ResourceSelector == nil {
+		return velero.ResourceSelector{}, nil
+	}
+
 	return velero.ResourceSelector{
 		IncludedNamespaces: res.ResourceSelector.IncludedNamespaces,
 		ExcludedNamespaces: res.ResourceSelector.ExcludedNamespaces,

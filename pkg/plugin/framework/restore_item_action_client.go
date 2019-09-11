@@ -58,6 +58,10 @@ func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, erro
 		return velero.ResourceSelector{}, fromGRPCError(err)
 	}
 
+	if res.ResourceSelector == nil {
+		return velero.ResourceSelector{}, nil
+	}
+
 	return velero.ResourceSelector{
 		IncludedNamespaces: res.ResourceSelector.IncludedNamespaces,
 		ExcludedNamespaces: res.ResourceSelector.ExcludedNamespaces,

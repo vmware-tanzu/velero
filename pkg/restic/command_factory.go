@@ -34,7 +34,7 @@ func BackupCommand(repoIdentifier, passwordFile, path string, tags map[string]st
 		PasswordFile:   passwordFile,
 		Dir:            path,
 		Args:           []string{"."},
-		ExtraFlags:     append(backupTagFlags(tags), "--host=velero"),
+		ExtraFlags:     append(backupTagFlags(tags), "--host=velero", "--json"),
 	}
 }
 
@@ -110,5 +110,15 @@ func UnlockCommand(repoIdentifier string) *Command {
 	return &Command{
 		Command:        "unlock",
 		RepoIdentifier: repoIdentifier,
+	}
+}
+
+func StatsCommand(repoIdentifier, passwordFile, snapshotID string) *Command {
+	return &Command{
+		Command:        "stats",
+		RepoIdentifier: repoIdentifier,
+		PasswordFile:   passwordFile,
+		Args:           []string{snapshotID},
+		ExtraFlags:     []string{"--json"},
 	}
 }

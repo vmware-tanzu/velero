@@ -17,6 +17,8 @@ limitations under the License.
 package install
 
 import (
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -193,20 +195,21 @@ func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object)
 }
 
 type VeleroOptions struct {
-	Namespace          string
-	Image              string
-	ProviderName       string
-	Bucket             string
-	Prefix             string
-	PodAnnotations     map[string]string
-	VeleroPodResources corev1.ResourceRequirements
-	ResticPodResources corev1.ResourceRequirements
-	SecretData         []byte
-	RestoreOnly        bool
-	UseRestic          bool
-	UseVolumeSnapshots bool
-	BSLConfig          map[string]string
-	VSLConfig          map[string]string
+	Namespace                         string
+	Image                             string
+	ProviderName                      string
+	Bucket                            string
+	Prefix                            string
+	PodAnnotations                    map[string]string
+	VeleroPodResources                corev1.ResourceRequirements
+	ResticPodResources                corev1.ResourceRequirements
+	SecretData                        []byte
+	RestoreOnly                       bool
+	UseRestic                         bool
+	UseVolumeSnapshots                bool
+	BSLConfig                         map[string]string
+	VSLConfig                         map[string]string
+	DefaultResticMaintenanceFrequency time.Duration
 }
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
@@ -245,20 +248,20 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	secretPresent := o.SecretData != nil
 
-	deploy := Deployment(o.Namespace,
+	deployOpts := []podTemplateOption{
 		WithAnnotations(o.PodAnnotations),
 		WithImage(o.Image),
 		WithResources(o.VeleroPodResources),
 		WithSecret(secretPresent),
-	)
-	if o.RestoreOnly {
-		deploy = Deployment(o.Namespace,
-			WithAnnotations(o.PodAnnotations),
-			WithImage(o.Image),
-			WithSecret(secretPresent),
-			WithRestoreOnly(),
-		)
+		WithDefaultResticMaintenanceFrequency(o.DefaultResticMaintenanceFrequency),
 	}
+
+	if o.RestoreOnly {
+		deployOpts = append(deployOpts, WithRestoreOnly())
+	}
+
+	deploy := Deployment(o.Namespace, deployOpts...)
+
 	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {

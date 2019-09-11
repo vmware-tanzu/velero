@@ -17,7 +17,9 @@ limitations under the License.
 package install
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -27,12 +29,13 @@ import (
 type podTemplateOption func(*podTemplateConfig)
 
 type podTemplateConfig struct {
-	image       string
-	envVars     []corev1.EnvVar
-	restoreOnly bool
-	annotations map[string]string
-	resources   corev1.ResourceRequirements
-	withSecret  bool
+	image                             string
+	envVars                           []corev1.EnvVar
+	restoreOnly                       bool
+	annotations                       map[string]string
+	resources                         corev1.ResourceRequirements
+	withSecret                        bool
+	defaultResticMaintenanceFrequency time.Duration
 }
 
 func WithImage(image string) podTemplateOption {
@@ -78,6 +81,12 @@ func WithRestoreOnly() podTemplateOption {
 func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.resources = resources
+	}
+}
+
+func WithDefaultResticMaintenanceFrequency(val time.Duration) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.defaultResticMaintenanceFrequency = val
 	}
 }
 
@@ -216,6 +225,10 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.restoreOnly {
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, "--restore-only")
+	}
+
+	if c.defaultResticMaintenanceFrequency > 0 {
+		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-restic-prune-frequency=%v", c.defaultResticMaintenanceFrequency))
 	}
 
 	return deployment

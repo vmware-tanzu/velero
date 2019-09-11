@@ -377,7 +377,7 @@ func DescribePodVolumeBackups(d *Describer, backups []velerov1api.PodVolumeBacku
 		backupsByPod := new(volumesByPod)
 
 		for _, backup := range backupsByPhase[phase] {
-			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume)
+			backupsByPod.Add(backup.Spec.Pod.Namespace, backup.Spec.Pod.Name, backup.Spec.Volume, phase, backup.Status.Progress)
 		}
 
 		d.Printf("\t%s:\n", phase)
@@ -423,12 +423,17 @@ type volumesByPod struct {
 
 // Add adds a pod volume with the specified pod namespace, name
 // and volume to the appropriate group.
-func (v *volumesByPod) Add(namespace, name, volume string) {
+func (v *volumesByPod) Add(namespace, name, volume, phase string, progress velerov1api.PodVolumeOperationProgress) {
 	if v.volumesByPodMap == nil {
 		v.volumesByPodMap = make(map[string]*podVolumeGroup)
 	}
 
 	key := fmt.Sprintf("%s/%s", namespace, name)
+
+	// append backup progress percentage if backup is in progress
+	if phase == "In Progress" && progress != (velerov1api.PodVolumeOperationProgress{}) {
+		volume = fmt.Sprintf("%s (%.2f%%)", volume, float64(progress.BytesDone)/float64(progress.TotalBytes)*100)
+	}
 
 	if group, ok := v.volumesByPodMap[key]; !ok {
 		group := &podVolumeGroup{
