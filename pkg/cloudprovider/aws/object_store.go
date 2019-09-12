@@ -36,13 +36,14 @@ import (
 )
 
 const (
-	s3URLKey             = "s3Url"
-	publicURLKey         = "publicUrl"
-	kmsKeyIDKey          = "kmsKeyId"
-	s3ForcePathStyleKey  = "s3ForcePathStyle"
-	bucketKey            = "bucket"
-	signatureVersionKey  = "signatureVersion"
-	credentialProfileKey = "profile"
+	s3URLKey                = "s3Url"
+	publicURLKey            = "publicUrl"
+	kmsKeyIDKey             = "kmsKeyId"
+	s3ForcePathStyleKey     = "s3ForcePathStyle"
+	bucketKey               = "bucket"
+	signatureVersionKey     = "signatureVersion"
+	credentialProfileKey    = "profile"
+	serverSideEncryptionKey = "serverSideEncryption"
 )
 
 type s3Interface interface {
@@ -54,12 +55,13 @@ type s3Interface interface {
 }
 
 type ObjectStore struct {
-	log              logrus.FieldLogger
-	s3               s3Interface
-	preSignS3        s3Interface
-	s3Uploader       *s3manager.Uploader
-	kmsKeyID         string
-	signatureVersion string
+	log                  logrus.FieldLogger
+	s3                   s3Interface
+	preSignS3            s3Interface
+	s3Uploader           *s3manager.Uploader
+	kmsKeyID             string
+	signatureVersion     string
+	serverSideEncryption string
 }
 
 func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
@@ -83,18 +85,20 @@ func (o *ObjectStore) Init(config map[string]string) error {
 		s3ForcePathStyleKey,
 		signatureVersionKey,
 		credentialProfileKey,
+		serverSideEncryptionKey,
 	); err != nil {
 		return err
 	}
 
 	var (
-		region              = config[regionKey]
-		s3URL               = config[s3URLKey]
-		publicURL           = config[publicURLKey]
-		kmsKeyID            = config[kmsKeyIDKey]
-		s3ForcePathStyleVal = config[s3ForcePathStyleKey]
-		signatureVersion    = config[signatureVersionKey]
-		credentialProfile   = config[credentialProfileKey]
+		region               = config[regionKey]
+		s3URL                = config[s3URLKey]
+		publicURL            = config[publicURLKey]
+		kmsKeyID             = config[kmsKeyIDKey]
+		s3ForcePathStyleVal  = config[s3ForcePathStyleKey]
+		signatureVersion     = config[signatureVersionKey]
+		credentialProfile    = config[credentialProfileKey]
+		serverSideEncryption = config[serverSideEncryptionKey]
 
 		// note that bucket is automatically added to the config map
 		// by the server from the ObjectStorageProviderConfig so
@@ -135,6 +139,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	o.s3 = s3.New(serverSession)
 	o.s3Uploader = s3manager.NewUploader(serverSession)
 	o.kmsKeyID = kmsKeyID
+	o.serverSideEncryption = serverSideEncryption
 
 	if signatureVersion != "" {
 		if !isValidSignatureVersion(signatureVersion) {
@@ -193,10 +198,15 @@ func (o *ObjectStore) PutObject(bucket, key string, body io.Reader) error {
 		Body:   body,
 	}
 
-	// if kmsKeyID is not empty, enable "aws:kms" encryption
-	if o.kmsKeyID != "" {
+	switch {
+	// if kmsKeyID is not empty, assume a server-side encryption (SSE)
+	// algorithm of "aws:kms"
+	case o.kmsKeyID != "":
 		req.ServerSideEncryption = aws.String("aws:kms")
 		req.SSEKMSKeyId = &o.kmsKeyID
+	// otherwise, use the SSE algorithm specified, if any
+	case o.serverSideEncryption != "":
+		req.ServerSideEncryption = aws.String(o.serverSideEncryption)
 	}
 
 	_, err := o.s3Uploader.Upload(req)
