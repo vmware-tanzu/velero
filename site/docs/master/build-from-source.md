@@ -47,7 +47,7 @@ When using `make`, it will place all binaries under `_output/bin/$GOOS/$GOARCH` 
 make local
 ```
 
-This builds binaries for both linux and darwin. You will find the binary for darwing here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`.
+This builds binaries for both linux and darwin. You will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`.
 
 ```bash
 make build
@@ -69,7 +69,9 @@ Velero's `Makefile` has a convenience target, `all-build`, that builds the follo
 
 ## Images
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the defaul is `gcr.io/heptio-images`.
+
+Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 
 ```bash
 make container

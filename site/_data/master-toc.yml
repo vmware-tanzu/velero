@@ -59,8 +59,8 @@ toc:
         url: /build-from-source
       - page: Run locally
         url: /run-locally
-      - page: Add code
-        url: /add-code
+      - page: Development
+        url: /development
   - title: More information
     subfolderitems:
       - page: Backup file format

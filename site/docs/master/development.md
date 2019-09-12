@@ -1,14 +1,6 @@
-# Add code
+# Development 
 
 ## Update generated files
-
-The following files are automatically generated from the source code:
-
-* The clientset
-* Listers
-* Shared informers
-* Documentation
-* Protobuf/gRPC types
 
 Run `make update` to regenerate files if you make the following changes:
 
@@ -20,10 +12,19 @@ Run [generate-proto.sh][13] to regenerate files if you make the following change
 
 * Add/edit/remove protobuf message or service definitions. These changes require the [proto compiler][14] and compiler plugin `protoc-gen-go` version v1.0.0.
 
+The following files are automatically generated from the source code:
+
+* The clientset
+* Listers
+* Shared informers
+* Documentation
+* Protobuf/gRPC types
+
+You can run `make verify` to ensure that all generated files (clientset, listers, shared informers, docs) are up to date.
+
 ## Test
 
-To run unit tests, use `make test`. You can also run `make verify` to ensure that all generated
-files (clientset, listers, shared informers, docs) are up to date.
+To run unit tests, use `make test`.
 
 ## Vendor dependencies
 
