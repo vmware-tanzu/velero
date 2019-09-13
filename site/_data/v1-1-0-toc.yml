@@ -55,6 +55,8 @@ toc:
         url: /restic#troubleshooting
   - title: Contribute
     subfolderitems:
+      - page: Development
+        url: /development
       - page: Build from source
         url: /build-from-source
       - page: Run locally
