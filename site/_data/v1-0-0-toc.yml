@@ -25,26 +25,12 @@ toc:
         url: /gcp-config
       - page: Restic Setup
         url: /restic    
-      - page: Run locally
-        url: /run-locally
   - title: Use
     subfolderitems:
-      - page: Disaster recovery
+      - page: Disaster Recovery
         url: /disaster-case
       - page: Cluster migration
         url: /migration-case
-      - page: Backup reference
-        url: /backup-reference
-      - page: Restore reference
-        url: /restore-reference
-      - page: Run in any namespace
-        url: /namespace
-      - page: Extend
-        url: /extend
-      - page: Extend with plugins
-        url: /plugins
-      - page: Extend with hooks
-        url: /hooks
   - title: Troubleshoot
     subfolderitems:
       - page: Troubleshooting
@@ -55,12 +41,18 @@ toc:
         url: /debugging-restores
       - page: Troubleshoot Restic
         url: /restic#troubleshooting
-  - title: Contribute
+  - title: Customize Velero
     subfolderitems:
       - page: Build from source
         url: /build-from-source
-      - page: Run locally
-        url: /run-locally
+      - page: Run in any namespace
+        url: /namespace
+      - page: Extend
+        url: /extend
+      - page: Extend with plugins
+        url: /plugins
+      - page: Extend with hooks
+        url: /hooks
   - title: More information
     subfolderitems:
       - page: Backup file format
