@@ -31,31 +31,29 @@ Note that the Makefile targets assume building from a git repository. When build
 
 There are a number of different ways to build `velero` depending on your needs. This section outlines the main possibilities.
 
+When building by using `make`, it will place the binaries under `_output/bin/$GOOS/$GOARCH`. For example, you will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`. `make` will also splice version and git commit information in so that `velero version` displays proper output. `velero install` will also use the version information to determine which tagged image to deploy.
+
 ### Build the binary
 
-To build the `velero` binary on your local machine, compiled for your OS and architecture, run:
+To build the `velero` binary on your local machine, compiled for your OS and architecture, run one of these two commands:
 
 ```bash
 go build ./cmd/velero
 ```
 
-### Cross compiling
-
-When using `make`, it will place all binaries under `_output/bin/$GOOS/$GOARCH` and will splice version and git commit information in so that `velero version` displays proper output. `velero install` will also use the version information to determine which tagged image to deploy.
-
 ```bash
 make local
 ```
 
-This builds binaries for both linux and darwin. You will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`.
+### Cross compiling
+
+To build the velero binary targeting linux/amd64 within a build container on your local machine, run:
 
 ```bash
 make build
 ```
 
-This builds an `velero` binary for `linux-amd64`. 
-
-To build for another platform, run `make build-<GOOS>-<GOARCH>`.
+For any specific platform, run `make build-<GOOS>-<GOARCH>`.
 
 For example, to build for the Mac, run `make build-darwin-amd64`.
 
@@ -69,7 +67,7 @@ Velero's `Makefile` has a convenience target, `all-build`, that builds the follo
 
 ## Images
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the defaul is `gcr.io/heptio-images`.
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `gcr.io/heptio-images`.
 
 Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 

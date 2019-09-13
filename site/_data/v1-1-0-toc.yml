@@ -39,8 +39,6 @@ toc:
         url: /restore-reference
       - page: Run in any namespace
         url: /namespace
-      - page: Extend
-        url: /extend
       - page: Extend with plugins
         url: /plugins
       - page: Extend with hooks
