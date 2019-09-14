@@ -31,7 +31,9 @@ Note that the Makefile targets assume building from a git repository. When build
 
 There are a number of different ways to build `velero` depending on your needs. This section outlines the main possibilities.
 
-When building by using `make`, it will place the binaries under `_output/bin/$GOOS/$GOARCH`. For example, you will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`. `make` will also splice version and git commit information in so that `velero version` displays proper output. `velero install` will also use the version information to determine which tagged image to deploy.
+When building by using `make`, it will place the binaries under `_output/bin/$GOOS/$GOARCH`. For example, you will find the binary for darwin here: `_output/bin/darwin/amd64/velero`, and the binary for linux here: `_output/bin/linux/amd64/velero`. `make` will also splice version and git commit information in so that `velero version` displays proper output. 
+
+Note: `velero install` will also use the version information to determine which tagged image to deploy. If you would like to overwrite what image gets deployed, use the `image` flag (see below for instructions on how to build images).
 
 ### Build the binary
 
@@ -65,7 +67,13 @@ Velero's `Makefile` has a convenience target, `all-build`, that builds the follo
 * darwin-amd64
 * windows-amd64
 
-## Images
+## Making images and updating Velero
+
+If after installing Velero you would like to change the image used by its deployment to one that contains your code changes, you may do so by updating the image:
+
+```bash
+kubectl -n velero set image deploy/velero velero=myimagerepo/velero:$VERSION
+```
 
 To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `gcr.io/heptio-images`.
 
@@ -75,10 +83,16 @@ Optionally, set the `$VERSION` environment variable to change the image tag. The
 make container
 ```
 
-To push your image to a registry, run:
+To push your image to the registry, run:
 
 ```bash
 make push
+```
+
+Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod:
+
+```bash
+kubectl -n velero delete pods -l deploy=velero
 ```
 
 [4]: https://blog.golang.org/organizing-go-code
