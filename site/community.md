@@ -8,7 +8,7 @@ id: community
 
 If you’re a newcomer, check out the “[Good first issue](https://github.com/heptio/velero/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+first+issue%22)” and “[Help wanted](https://github.com/heptio/velero/issues?utf8=%E2%9C%93&q=is%3Aopen+is%3Aissue+label%3A%22Help+wanted%22+)” labels in the Velero repository.
 
-Read how [we're using ZenHub][https://velero.io/docs/master/zenhub] for project and roadmap planning.
+Read how [we're using ZenHub](https://velero.io/docs/master/zenhub) for project and roadmap planning.
 
 If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/master/start-contributing/) documentation for guidance on how to setup Velero for development.
 
