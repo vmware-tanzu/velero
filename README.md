@@ -44,22 +44,17 @@ See [the list of releases][6] to find out about feature changes.
 
 [1]: https://travis-ci.org/heptio/velero.svg?branch=master
 [2]: https://travis-ci.org/heptio/velero
-
 [4]: https://github.com/heptio/velero/issues
 [6]: https://github.com/heptio/velero/releases
-
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
-
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-
-[28]: install-overview.md
-[29]: https://velero.io/docs/master/
-[30]: troubleshooting.md
-
-[99]: support-matrix.md
-[100]: img/velero.png
+[28]: https://velero.io/docs/install-overview
+[29]: https://velero.io/docs/
+[30]: https://velero.io/docs/troubleshooting
+[99]: https://velero.io/docs/support-matrix
+[100]: /site/docs/master/img/velero.png
