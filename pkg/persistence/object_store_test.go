@@ -34,9 +34,8 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
-	cloudprovidermocks "github.com/vmware-tanzu/velero/pkg/cloudprovider/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -456,7 +455,7 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objectStore := new(cloudprovidermocks.ObjectStore)
+			objectStore := new(providermocks.ObjectStore)
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
