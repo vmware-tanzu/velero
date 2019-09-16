@@ -36,19 +36,7 @@ If you encounter issues, review the [troubleshooting docs][30], [file an issue][
 
 ## Contributing
 
-Thanks for taking the time to join our community and start contributing!
-
-Feedback and discussion are available on [the mailing list][24].
-
-### Before you start
-
-* Please familiarize yourself with the [Code of Conduct][8] before contributing.
-* See [CONTRIBUTING.md][5] for instructions on the developer certificate of origin that we require.
-* Read how [we're using ZenHub][26] for project and roadmap planning
-
-### Pull requests
-
-* We welcome pull requests. Feel free to dig through the [issues][4] and jump in.
+If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/master/start-contributing/) documentation for guidance on how to setup Velero for development.
 
 ## Changelog
 
@@ -58,10 +46,8 @@ See [the list of releases][6] to find out about feature changes.
 [2]: https://travis-ci.org/heptio/velero
 
 [4]: https://github.com/heptio/velero/issues
-[5]: https://github.com/heptio/velero/blob/master/CONTRIBUTING.md
 [6]: https://github.com/heptio/velero/releases
 
-[8]: https://github.com/heptio/velero/blob/master/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
@@ -70,11 +56,10 @@ See [the list of releases][6] to find out about feature changes.
 
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-[26]: https://velero.io/docs/zenhub
 
-[28]: https://velero.io/docs/install-overview
-[29]: https://velero.io/docs/
-[30]: https://velero.io/docs/troubleshooting
+[28]: install-overview.md
+[29]: https://velero.io/docs/master/
+[30]: troubleshooting.md
 
-[99]: https://velero.io/docs/support-matrix
-[100]: /site/docs/master/img/velero.png
+[99]: support-matrix.md
+[100]: img/velero.png
