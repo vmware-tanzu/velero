@@ -63,6 +63,7 @@ type InstallOptions struct {
 	Wait                              bool
 	UseVolumeSnapshots                bool
 	DefaultResticMaintenanceFrequency time.Duration
+	Plugins                           flag.StringArray
 }
 
 // BindFlags adds command line values to the options struct.
@@ -90,6 +91,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
+	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -151,6 +153,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		BSLConfig:                         o.BackupStorageConfig.Data(),
 		VSLConfig:                         o.VolumeSnapshotConfig.Data(),
 		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
+		Plugins:                           o.Plugins,
 	}, nil
 }
 

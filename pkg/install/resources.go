@@ -211,6 +211,7 @@ type VeleroOptions struct {
 	BSLConfig                         map[string]string
 	VSLConfig                         map[string]string
 	DefaultResticMaintenanceFrequency time.Duration
+	Plugins                           []string
 }
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
@@ -262,13 +263,16 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		deployOpts = append(deployOpts, WithRestoreOnly())
 	}
 
+	if len(o.Plugins) > 0 {
+		deployOpts = append(deployOpts, WithPlugins(o.Plugins))
+	}
+
 	deploy := Deployment(o.Namespace, deployOpts...)
 
 	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {
 		ds := DaemonSet(o.Namespace,
-
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
