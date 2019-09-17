@@ -8,7 +8,7 @@ You can also use Velero's integration with restic, which requires additional set
 
 ## Cloud provider
 
-The Velero client includes an `install` command to specify the settings for each supported cloud provider. You can install Velero for the included cloud providers using the following command:
+The Velero client includes an `install` command to specify the settings for each supported cloud provider. You can install Velero using the following command:
 
 ```bash
 velero install \
@@ -26,6 +26,8 @@ velero install \
 
 When using node-based IAM policies, `--secret-file` is not required, but `--no-secret` is required for confirmation.
 
+This command will configure a `BackupStorageLocation` and `VolumeSnapshotLocation` with the `provider` fields set to the value of the `--provider` flag.  The `--provider` value must match the name of the relevant plugin.
+
 For provider-specific instructions, see:
 
 * [Run Velero on AWS][0]
@@ -38,6 +40,10 @@ When using restic on a storage provider that doesn't currently have Velero suppo
 To see the YAML applied by the `velero install` command, use the `--dry-run -o yaml` arguments.
 
 For more complex installation needs, use either the generated YAML, or the Helm chart.
+
+### Installing object storage or volume snapshotter plugins
+
+`velero install` _will not_ install any object storage or volume snapshotter plugins. In order to install these, you must run `velero plugin add <URL of container here>` after running `velero install`.
 
 ## On-premises
 

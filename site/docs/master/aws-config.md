@@ -148,11 +148,12 @@ Install Velero, including all prerequisites, into the cluster and start the depl
 
 ```bash
 velero install \
-    --provider aws \
+    --provider velero.io/aws \
     --bucket $BUCKET \
     --secret-file ./credentials-velero \
     --backup-location-config region=$REGION \
     --snapshot-location-config region=$REGION
+velero plugin add gcr.io/heptio-images/velero-aws-plugin
 ```
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
