@@ -31,8 +31,8 @@ type featureFlagSet struct {
 // featureFlags will store all the flags for this process until NewFeatureFlagSet is called.
 var featureFlags featureFlagSet
 
-// Enabled returns True if a specified flag is enabled.
-func Enabled(name string) bool {
+// IsEnabled returns True if a specified flag is enabled.
+func IsEnabled(name string) bool {
 	featureFlags.mut.Lock()
 	defer featureFlags.mut.Unlock()
 
@@ -43,6 +43,11 @@ func Enabled(name string) bool {
 func Enable(names ...string) {
 	featureFlags.mut.Lock()
 	defer featureFlags.mut.Unlock()
+
+	// Initialize the flag set so that users don't have to
+	if featureFlags.set == nil {
+		NewFeatureFlagSet()
+	}
 
 	featureFlags.set.Insert(names...)
 }
@@ -65,7 +70,7 @@ func Serialize() string {
 	return strings.Join(All(), ",")
 }
 
-// NewFeaturesetet initializes and populates a new FeatureFlagSet.
+// NewFeatureFlagSet initializes and populates a new FeatureFlagSet.
 // This must be called to properly initialize the set for tracking flags.
 // It is also useful for selectively controlling flags during tests.
 func NewFeatureFlagSet(flags ...string) {

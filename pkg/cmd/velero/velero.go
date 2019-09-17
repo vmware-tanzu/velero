@@ -62,8 +62,6 @@ execute commands such as 'velero get backup' and 'velero create schedule'. The s
 operations can also be performed as 'velero backup get' and 'velero schedule create'.`,
 
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			// Initialize the map so it's not nil when we set the flags
-			features.NewFeatureFlagSet()
 			features.Enable(cmdFeatures...)
 		},
 	}
