@@ -68,7 +68,9 @@ way to back up your application state and associated data.
 If you're familiar with kubectl, Velero supports a similar model, allowing you to
 execute commands such as 'velero get backup' and 'velero create schedule'. The same
 operations can also be performed as 'velero backup get' and 'velero schedule create'.`,
-
+		// PersistentPreRun will run before all subcommands EXCEPT in the following conditions:
+		//  - a subcommand defines its own PersistentPreRun function
+		//  - the command is run without arguments or with --help and only prints the usage info
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
