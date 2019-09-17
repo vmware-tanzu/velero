@@ -67,7 +67,9 @@ The configurable parameters are as follows:
 
 #### GCP
 
-No parameters required.
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `kmsKeyName` | string | Empty | Name of the Cloud KMS key to use to encrypt backups stored in this location, in the form `projects/P/locations/L/keyRings/R/cryptoKeys/K`. See [customer-managed Cloud KMS keys](https://cloud.google.com/storage/docs/encryption/using-customer-managed-keys) for details.  |
 
 [0]: #aws
 [1]: #gcp

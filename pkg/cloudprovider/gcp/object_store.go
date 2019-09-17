@@ -33,7 +33,10 @@ import (
 	"github.com/heptio/velero/pkg/cloudprovider"
 )
 
-const credentialsEnvVar = "GOOGLE_APPLICATION_CREDENTIALS"
+const (
+	credentialsEnvVar   = "GOOGLE_APPLICATION_CREDENTIALS"
+	kmsKeyNameConfigKey = "kmsKeyName"
+)
 
 // bucketWriter wraps the GCP SDK functions for accessing object store so they can be faked for testing.
 type bucketWriter interface {
@@ -43,11 +46,15 @@ type bucketWriter interface {
 }
 
 type writer struct {
-	client *storage.Client
+	client     *storage.Client
+	kmsKeyName string
 }
 
 func (w *writer) getWriteCloser(bucket, key string) io.WriteCloser {
-	return w.client.Bucket(bucket).Object(key).NewWriter(context.Background())
+	writer := w.client.Bucket(bucket).Object(key).NewWriter(context.Background())
+	writer.KMSKeyName = w.kmsKeyName
+
+	return writer
 }
 
 func (w *writer) getAttrs(bucket, key string) (*storage.ObjectAttrs, error) {
@@ -67,7 +74,7 @@ func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config); err != nil {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, kmsKeyNameConfigKey); err != nil {
 		return err
 	}
 
@@ -101,7 +108,10 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 	o.client = client
 
-	o.bucketWriter = &writer{client: o.client}
+	o.bucketWriter = &writer{
+		client:     o.client,
+		kmsKeyName: config[kmsKeyNameConfigKey],
+	}
 
 	return nil
 }
