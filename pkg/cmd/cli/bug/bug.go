@@ -32,6 +32,7 @@ import (
 
 	"github.com/heptio/velero/pkg/buildinfo"
 	"github.com/heptio/velero/pkg/cmd"
+	"github.com/heptio/velero/pkg/features"
 )
 
 const (
@@ -72,6 +73,7 @@ about: Tell us about a problem you are experiencing
 **Environment:**
 
 - Velero version (use ` + "`velero version`" + `):{{.VeleroVersion}} {{.GitCommit}}
+- Velero features (use ` + "`velero client config get features`" + `): {{.Features}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
 {{- if .KubectlVersion}}
 ` + "```" + `
@@ -112,6 +114,7 @@ type VeleroBugInfo struct {
 	RuntimeOS      string
 	RuntimeArch    string
 	KubectlVersion string
+	Features       string
 }
 
 // cmdExistsOnPath checks to see if an executable is available on the current PATH
@@ -164,7 +167,9 @@ func newBugInfo(kubectlVersion string) *VeleroBugInfo {
 		GitCommit:      buildinfo.FormattedGitSHA(),
 		RuntimeOS:      runtime.GOOS,
 		RuntimeArch:    runtime.GOARCH,
-		KubectlVersion: kubectlVersion}
+		KubectlVersion: kubectlVersion,
+		Features:       features.Serialize(),
+	}
 }
 
 // renderToString renders IssueTemplate to a string using the

@@ -28,6 +28,7 @@ about: Tell us about a problem you are experiencing
 **Environment:**
 
 - Velero version (use `velero version`): 
+- Velero features (use `velero client config get features`): 
 - Kubernetes version (use `kubectl version`):
 - Kubernetes installer & version:
 - Cloud provider or hardware configuration:
