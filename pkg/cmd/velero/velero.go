@@ -18,6 +18,8 @@ package velero
 
 import (
 	"flag"
+	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
@@ -46,7 +48,13 @@ import (
 )
 
 func NewCommand(name string) *cobra.Command {
-	// Declrare cmdFeatures here so we can access them in the PreRun hooks
+	// Load the config here so that we can extract features from it.
+	config, err := client.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
+	}
+
+	// Declare cmdFeatures here so we can access them in the PreRun hooks
 	// without doing a chain of calls into the command's FlagSet
 	var cmdFeatures veleroflag.StringArray
 
@@ -62,11 +70,13 @@ execute commands such as 'velero get backup' and 'velero create schedule'. The s
 operations can also be performed as 'velero backup get' and 'velero schedule create'.`,
 
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
+			fmt.Printf("Features enabled: %s\n", features.All())
 		},
 	}
 
-	f := client.NewFactory(name)
+	f := client.NewFactory(name, config)
 	f.BindFlags(c.PersistentFlags())
 
 	// Bind features directly to the root command so it's available to all callers.

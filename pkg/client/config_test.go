@@ -25,10 +25,7 @@ import (
 func TestVeleroConfig(t *testing.T) {
 	c := VeleroConfig{
 		"namespace": "foo",
-		"features": []string{
-			"feature1",
-			"feature2",
-		},
+		"features":  "feature1,feature2",
 	}
 
 	assert.Equal(t, "foo", c.Namespace())
