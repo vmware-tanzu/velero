@@ -52,6 +52,7 @@ import (
 	"github.com/heptio/velero/pkg/cmd/util/signals"
 	"github.com/heptio/velero/pkg/controller"
 	velerodiscovery "github.com/heptio/velero/pkg/discovery"
+	"github.com/heptio/velero/pkg/features"
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
@@ -168,6 +169,11 @@ func NewCommand(f client.Factory) *cobra.Command {
 			logger.Infof("setting log-level to %s", strings.ToUpper(logLevel.String()))
 
 			logger.Infof("Starting Velero server %s (%s)", buildinfo.Version, buildinfo.FormattedGitSHA())
+			if len(features.All()) > 0 {
+				logger.Infof("%d feature flags enabled %s", len(features.All()), features.All())
+			} else {
+				logger.Info("No feature flags enabled")
+			}
 
 			if volumeSnapshotLocations.Data() != nil {
 				config.defaultVolumeSnapshotLocations = volumeSnapshotLocations.Data()

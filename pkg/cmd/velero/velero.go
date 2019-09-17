@@ -74,7 +74,6 @@ operations can also be performed as 'velero backup get' and 'velero schedule cre
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			features.Enable(config.Features()...)
 			features.Enable(cmdFeatures...)
-			fmt.Printf("Features enabled: %s\n", features.All())
 		},
 	}
 
