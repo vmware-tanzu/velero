@@ -1,4 +1,4 @@
-// Copyright 2014 Google Inc. All Rights Reserved.
+// Copyright 2014 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,10 +15,10 @@
 package storage
 
 import (
+	"context"
+
 	"cloud.google.com/go/internal"
-	gax "github.com/googleapis/gax-go"
-	"golang.org/x/net/context"
-	"google.golang.org/api/googleapi"
+	gax "github.com/googleapis/gax-go/v2"
 )
 
 // runWithRetry calls the function until it returns nil or a non-retryable error, or
@@ -29,13 +29,7 @@ func runWithRetry(ctx context.Context, call func() error) error {
 		if err == nil {
 			return true, nil
 		}
-		e, ok := err.(*googleapi.Error)
-		if !ok {
-			return true, err
-		}
-		// Retry on 429 and 5xx, according to
-		// https://cloud.google.com/storage/docs/exponential-backoff.
-		if e.Code == 429 || (e.Code >= 500 && e.Code < 600) {
+		if shouldRetry(err) {
 			return false, nil
 		}
 		return true, err

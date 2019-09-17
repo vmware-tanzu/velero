@@ -2,19 +2,20 @@
 
 
 [[projects]]
-  digest = "1:769af0c7dbdc19798e013900cfa855af9a7fda89912e019330a1dbd80a1e9a8c"
+  digest = "1:44d9970a8855e319dcc6f8d8bfa0d7b3a50d1a94f76bdfaac86d131892f7ba69"
   name = "cloud.google.com/go"
   packages = [
     "compute/metadata",
     "iam",
     "internal",
     "internal/optional",
+    "internal/trace",
     "internal/version",
     "storage",
   ]
   pruneopts = "NUT"
-  revision = "44bcd0b2078ba5e7fedbeb36808d1ed893534750"
-  version = "v0.11.0"
+  revision = "6e28f1c34522dae46e9c37119b78c54471b13ac8"
+  version = "v0.46.2"
 
 [[projects]]
   digest = "1:623dad7b6ddc6b93f983e9852a0785ed606f804d3541fa4b6178d7055b361306"
@@ -203,12 +204,12 @@
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:139e03a0b4ef05098c2acb7c081b2d84d9478cae11ac777f7c1f6d550efab1ca"
+  digest = "1:4b76f3e067eed897a45242383a2aa4d0a2fdbf73a8d00c03167dba80c43630b1"
   name = "github.com/googleapis/gax-go"
-  packages = ["."]
+  packages = ["v2"]
   pruneopts = "NUT"
-  revision = "84ed26760e7f6f80887a2fbfb50db3cc415d2cea"
+  revision = "bd5b16380fd03dc758d11cef74ba2e3bc8b0e8c2"
+  version = "v2.0.5"
 
 [[projects]]
   digest = "1:3d7c1446fc5c710351b246c0dc6700fae843ca27f5294d0bd9f68bab2a810c44"
@@ -583,7 +584,7 @@
   revision = "26559e0f760e39c24d730d3224364aef164ee23f"
 
 [[projects]]
-  digest = "1:cb42335b4b5606082a8e93f437a8962702e7875d157ccb03fba8cdd1ca70e8c3"
+  digest = "1:352a8b8a41fd11320b8b2327a4c2c8f6967578a2d54886b64748c0a46d4a8b5e"
   name = "google.golang.org/api"
   packages = [
     "compute/v1",
@@ -599,8 +600,8 @@
     "transport/http/internal/propagation",
   ]
   pruneopts = "NUT"
-  revision = "0cbcb99a9ea0c8023c794b2693cbe1def82ed4d7"
-  version = "v0.3.2"
+  revision = "feb0267beb8644f5088a03be4d5ec3f8c7020152"
+  version = "v0.9.0"
 
 [[projects]]
   digest = "1:7206d98ec77c90c72ec2c405181a1dcf86965803b6dbc4f98ceab7a5047c37a9"
@@ -623,11 +624,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a2059631b54cdc40db08f8c4dfb39d3c5ec442003506327df2c675a9384b7115"
+  digest = "1:56feb4ebffcd6c42edcff74f2d9cc1e36bee7a382eeb0740a31c66585ed804c0"
   name = "google.golang.org/genproto"
   packages = [
     "googleapis/api/annotations",
     "googleapis/iam/v1",
+    "googleapis/rpc/code",
     "googleapis/rpc/status",
   ]
   pruneopts = "NUT"
