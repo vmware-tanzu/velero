@@ -18,13 +18,11 @@ package features
 
 import (
 	"strings"
-	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type featureFlagSet struct {
-	mut sync.Mutex
 	set sets.String
 }
 
@@ -33,17 +31,11 @@ var featureFlags featureFlagSet
 
 // IsEnabled returns True if a specified flag is enabled.
 func IsEnabled(name string) bool {
-	featureFlags.mut.Lock()
-	defer featureFlags.mut.Unlock()
-
 	return featureFlags.set.Has(name)
 }
 
 // Enable adds a given slice of feature names to the current feature list.
 func Enable(names ...string) {
-	featureFlags.mut.Lock()
-	defer featureFlags.mut.Unlock()
-
 	// Initialize the flag set so that users don't have to
 	if featureFlags.set == nil {
 		NewFeatureFlagSet()
@@ -54,8 +46,6 @@ func Enable(names ...string) {
 
 // Disable removes all feature flags in a given slice from the current feature list.
 func Disable(names ...string) {
-	featureFlags.mut.Lock()
-	defer featureFlags.mut.Unlock()
 
 	featureFlags.set.Delete(names...)
 }
@@ -75,7 +65,6 @@ func Serialize() string {
 // It is also useful for selectively controlling flags during tests.
 func NewFeatureFlagSet(flags ...string) {
 	featureFlags = featureFlagSet{
-		mut: sync.Mutex{},
 		set: sets.NewString(flags...),
 	}
 }
