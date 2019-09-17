@@ -51,7 +51,9 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	}
 
 	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
-	b.commandArgs = append(b.commandArgs, "--features", features.Serialize())
+	if len(features.All()) > 0 {
+		b.commandArgs = append(b.commandArgs, "--features", features.Serialize())
+	}
 
 	return b
 }
