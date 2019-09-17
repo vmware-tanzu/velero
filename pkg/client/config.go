@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -82,21 +83,30 @@ func SaveConfig(config VeleroConfig) error {
 }
 
 func (c VeleroConfig) Namespace() string {
-	ns, ok := c[ConfigKeyNamespace]
+	val, ok := c[ConfigKeyNamespace]
 	if !ok {
 		return ""
 	}
+	ns, ok := val.(string)
 
-	return ns.(string)
+	if !ok {
+		return ""
+	}
+	return ns
 }
 
 func (c VeleroConfig) Features() []string {
-	features, ok := c[ConfigKeyFeatures]
+	val, ok := c[ConfigKeyFeatures]
 	if !ok {
 		return []string{}
 	}
 
-	return features.([]string)
+	features, ok := val.(string)
+	if !ok {
+		return []string{}
+	}
+
+	return strings.Split(features, ",")
 }
 
 func configFileName() string {
