@@ -55,7 +55,6 @@ import (
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
 	"github.com/heptio/velero/pkg/metrics"
-	"github.com/heptio/velero/pkg/persistence"
 	"github.com/heptio/velero/pkg/plugin/clientmgmt"
 	"github.com/heptio/velero/pkg/podexec"
 	"github.com/heptio/velero/pkg/restic"
@@ -313,10 +312,6 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.validateBackupStorageLocations(); err != nil {
-		return err
-	}
-
 	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
 		s.logger.WithError(errors.WithStack(err)).
 			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
@@ -406,36 +401,6 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	s.logger.Info("All Velero custom resource definitions exist")
-	return nil
-}
-
-// validateBackupStorageLocations checks to ensure all backup storage locations exist
-// and have a compatible layout, and returns an error if not.
-func (s *server) validateBackupStorageLocations() error {
-	s.logger.Info("Checking that all backup storage locations are valid")
-
-	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	var invalid []string
-	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, s.pluginManager, s.logger)
-		if err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
-			continue
-		}
-
-		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "backup store for location %q is invalid", location.Name).Error())
-		}
-	}
-
-	if len(invalid) > 0 {
-		return errors.Errorf("some backup storage locations are invalid: %s", strings.Join(invalid, "; "))
-	}
-
 	return nil
 }
 

@@ -192,7 +192,7 @@ func (c *backupController) processBackup(key string) error {
 	}
 
 	log.Debug("Preparing backup request")
-	request := c.prepareBackupRequest(original)
+	request := c.prepareBackupRequest(log, original)
 
 	if len(request.Status.ValidationErrors) > 0 {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
@@ -275,7 +275,7 @@ func patchBackup(original, updated *velerov1api.Backup, client velerov1client.Ba
 	return res, nil
 }
 
-func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkgbackup.Request {
+func (c *backupController) prepareBackupRequest(log logrus.FieldLogger, backup *velerov1api.Backup) *pkgbackup.Request {
 	request := &pkgbackup.Request{
 		Backup: backup.DeepCopy(), // don't modify items in the cache
 	}
@@ -312,20 +312,10 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid included/excluded namespace lists: %v", err))
 	}
 
-	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	if storageLocation, err := c.backupLocationLister.BackupStorageLocations(request.Namespace).Get(request.Spec.StorageLocation); err != nil {
-		if apierrors.IsNotFound(err) {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err))
-		} else {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("error getting backup storage location: %v", err))
-		}
-	} else {
-		request.StorageLocation = storageLocation
-
-		if request.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
-			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
-				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
-		}
+	// validate the backup's storage location and save the BackupStorageLocation
+	// API object on the request
+	if err := c.validateAndGetBackupLocation(log, request); err != nil {
+		request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("Invalid backup storage location: %v", err))
 	}
 
 	// validate and get the backup's VolumeSnapshotLocations, and store the
@@ -341,6 +331,39 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	return request
+}
+
+// validateAndGetBackupLocation validates the backup storage location, and stores the BackupStorageLocation API obj on the request
+func (c *backupController) validateAndGetBackupLocation(log logrus.FieldLogger, req *pkgbackup.Request) error {
+	storageLocation, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.StorageLocation)
+	if apierrors.IsNotFound(err) {
+		return errors.Errorf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err)
+	}
+	if err != nil {
+		return errors.Errorf("error getting backup storage location: %v", err)
+	}
+
+	// save the backup storage location obj
+	req.StorageLocation = storageLocation
+
+	if req.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		return errors.Errorf("backup can't be created because backup storage location %s is currently in read-only mode", req.StorageLocation.Name)
+	}
+
+	// ensure that the backup storage location can be connected to and its contents are valid
+	pluginManager := c.newPluginManager(log)
+	defer pluginManager.CleanupClients()
+
+	backupStore, err := c.newBackupStore(req.StorageLocation, pluginManager, log)
+	if err != nil {
+		return errors.Errorf("unable to connect to backup storage location: %v", err)
+	}
+
+	if err = backupStore.IsValid(); err != nil {
+		return errors.Errorf("backup storage location contents are not valid: %v", err)
+	}
+
+	return nil
 }
 
 // validateAndGetSnapshotLocations gets a collection of VolumeSnapshotLocation objects that

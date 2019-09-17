@@ -149,13 +149,13 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:         "non-existent backup location fails validation",
 			backup:       defaultBackup().StorageLocation("nonexistent").Result(),
-			expectedErrs: []string{"a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
+			expectedErrs: []string{"Invalid backup storage location: a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: backupstoragelocation.velero.io \"nonexistent\" not found"},
 		},
 		{
 			name:           "backup for read-only backup location fails validation",
 			backup:         defaultBackup().StorageLocation("read-only").Result(),
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
-			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
+			expectedErrs:   []string{"Invalid backup storage location: backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 	}
 
@@ -166,7 +166,12 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
+				pluginManager   = new(pluginmocks.Manager)
+				backupStore     = new(persistencemocks.BackupStore)
 			)
+
+			pluginManager.On("CleanupClients").Return()
+			backupStore.On("IsValid").Return(nil)
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
@@ -177,6 +182,10 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				clock:                  &clock.RealClock{},
 				formatFlag:             formatFlag,
+				newPluginManager:       func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
+				newBackupStore: func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+					return backupStore, nil
+				},
 			}
 
 			require.NotNil(t, test.backup)
@@ -247,7 +256,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				formatFlag:             formatFlag,
 			}
 
-			res := c.prepareBackupRequest(test.backup)
+			res := c.prepareBackupRequest(logger, test.backup)
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedBackupLocation, res.Labels[velerov1api.StorageLocationLabel])
 		})
@@ -302,7 +311,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 				formatFlag:             formatFlag,
 			}
 
-			res := c.prepareBackupRequest(test.backup)
+			res := c.prepareBackupRequest(logger, test.backup)
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedTTL, res.Spec.TTL)
 			assert.Equal(t, test.expectedExpiration, res.Status.Expiration)
@@ -566,6 +575,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			pluginManager.On("GetBackupItemActions").Return(nil, nil)
 			pluginManager.On("CleanupClients").Return(nil)
 			backupper.On("Backup", mock.Anything, mock.Anything, mock.Anything, []velero.BackupItemAction(nil), pluginManager).Return(nil)
+			backupStore.On("IsValid").Return(nil)
 			backupStore.On("BackupExists", test.backupLocation.Spec.StorageType.ObjectStorage.Bucket, test.backup.Name).Return(test.backupExists, test.existenceCheckError)
 
 			// Ensure we have a CompletionTimestamp when uploading and that the backup name matches the backup in the object store.
