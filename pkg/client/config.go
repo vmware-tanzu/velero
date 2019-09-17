@@ -87,11 +87,12 @@ func (c VeleroConfig) Namespace() string {
 	if !ok {
 		return ""
 	}
-	ns, ok := val.(string)
 
+	ns, ok := val.(string)
 	if !ok {
 		return ""
 	}
+
 	return ns
 }
 
