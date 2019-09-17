@@ -45,12 +45,12 @@ type objectBackupStoreTestHarness struct {
 	// embedded to reduce verbosity when calling methods
 	*objectBackupStore
 
-	objectStore    *cloudprovider.InMemoryObjectStore
+	objectStore    *inMemoryObjectStore
 	bucket, prefix string
 }
 
 func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
-	objectStore := cloudprovider.NewInMemoryObjectStore(bucket)
+	objectStore := newInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
