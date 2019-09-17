@@ -27,8 +27,6 @@ import (
 	"k8s.io/client-go/rest"
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cmd/util/flag"
-	"github.com/heptio/velero/pkg/features"
 	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
 )
 
@@ -77,7 +75,6 @@ func NewFactory(baseName string) Factory {
 	}
 
 	f.namespace = os.Getenv("VELERO_NAMESPACE")
-	var config VeleroConfig
 	if config, err := LoadConfig(); err == nil {
 		if config.Namespace() != "" {
 			f.namespace = config.Namespace()
@@ -96,13 +93,6 @@ func NewFactory(baseName string) Factory {
 	f.flags.StringVar(&f.kubeconfig, "kubeconfig", "", "Path to the kubeconfig file to use to talk to the Kubernetes apiserver. If unset, try the environment variable KUBECONFIG, as well as in-cluster configuration")
 	f.flags.StringVarP(&f.namespace, "namespace", "n", f.namespace, "The namespace in which Velero should operate")
 	f.flags.StringVar(&f.kubecontext, "kubecontext", "", "The context to use to talk to the Kubernetes apiserver. If unset defaults to whatever your current-context is (kubectl config current-context)")
-	// Use a separate StringArray to collect the features because we want to combine the ones in the config file with the ones from the command line, not override them.
-	var cmdFeatures flag.StringArray
-	f.flags.Var(&cmdFeatures, "features", "Comma-separated list of features to enable for this Velero process. Combines with values from $HOME/.config/velero/config.json if present")
-
-	// Enable all known features for this process.
-	features.NewFeatureFlagSet(config.Features()...)
-	features.Enable(cmdFeatures...)
 
 	return f
 }
