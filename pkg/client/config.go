@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,23 +20,29 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 )
 
 const (
 	ConfigKeyNamespace = "namespace"
+	ConfigKeyFeatures  = "features"
 )
 
-// LoadConfig loads the Velero client configuration file and returns it as a map[string]string. If the
+// VeleroConfig is a map of strings to interface{} for deserializing Velero client config options.
+// The alias is a way to attach type-asserting convenience methods.
+type VeleroConfig map[string]interface{}
+
+// LoadConfig loads the Velero client configuration file and returns it as a VeleroConfig. If the
 // file does not exist, an empty map is returned.
-func LoadConfig() (map[string]string, error) {
+func LoadConfig() (VeleroConfig, error) {
 	fileName := configFileName()
 
 	_, err := os.Stat(fileName)
 	if os.IsNotExist(err) {
 		// If the file isn't there, just return an empty map
-		return map[string]string{}, nil
+		return VeleroConfig{}, nil
 	}
 	if err != nil {
 		// For any other Stat() error, return it
@@ -49,7 +55,7 @@ func LoadConfig() (map[string]string, error) {
 	}
 	defer configFile.Close()
 
-	var config map[string]string
+	var config VeleroConfig
 	if err := json.NewDecoder(configFile).Decode(&config); err != nil {
 		return nil, errors.WithStack(err)
 	}
@@ -58,7 +64,7 @@ func LoadConfig() (map[string]string, error) {
 }
 
 // SaveConfig saves the passed in config map to the Velero client configuration file.
-func SaveConfig(config map[string]string) error {
+func SaveConfig(config VeleroConfig) error {
 	fileName := configFileName()
 
 	// Try to make the directory in case it doesn't exist
@@ -74,6 +80,34 @@ func SaveConfig(config map[string]string) error {
 	defer configFile.Close()
 
 	return json.NewEncoder(configFile).Encode(&config)
+}
+
+func (c VeleroConfig) Namespace() string {
+	val, ok := c[ConfigKeyNamespace]
+	if !ok {
+		return ""
+	}
+
+	ns, ok := val.(string)
+	if !ok {
+		return ""
+	}
+
+	return ns
+}
+
+func (c VeleroConfig) Features() []string {
+	val, ok := c[ConfigKeyFeatures]
+	if !ok {
+		return []string{}
+	}
+
+	features, ok := val.(string)
+	if !ok {
+		return []string{}
+	}
+
+	return strings.Split(features, ",")
 }
 
 func configFileName() string {

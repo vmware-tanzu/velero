@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/heptio/velero/pkg/features"
 	"github.com/heptio/velero/pkg/plugin/framework"
 	"github.com/heptio/velero/pkg/test"
 )
@@ -41,6 +42,13 @@ func TestNewClientBuilder(t *testing.T) {
 	assert.Equal(t, cb.commandName, os.Args[0])
 	assert.Equal(t, []string{"run-plugins", "--log-level", "info"}, cb.commandArgs)
 	assert.Equal(t, newLogrusAdapter(logger, logLevel), cb.pluginLogger)
+
+	features.NewFeatureFlagSet("feature1", "feature2")
+	cb = newClientBuilder(os.Args[0], logger, logLevel)
+	assert.Equal(t, []string{"run-plugins", "--log-level", "info", "--features", "feature1,feature2"}, cb.commandArgs)
+	// Clear the features list in case other tests run in the same process.
+	features.NewFeatureFlagSet()
+
 }
 
 func TestClientConfig(t *testing.T) {

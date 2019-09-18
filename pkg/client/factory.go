@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -68,21 +67,15 @@ type factory struct {
 }
 
 // NewFactory returns a Factory.
-func NewFactory(baseName string) Factory {
+func NewFactory(baseName string, config VeleroConfig) Factory {
 	f := &factory{
 		flags:    pflag.NewFlagSet("", pflag.ContinueOnError),
 		baseName: baseName,
 	}
 
 	f.namespace = os.Getenv("VELERO_NAMESPACE")
-
-	if config, err := LoadConfig(); err == nil {
-		// Only override the namespace if the config key is set
-		if _, ok := config[ConfigKeyNamespace]; ok {
-			f.namespace = config[ConfigKeyNamespace]
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "WARNING: error retrieving namespace from config file: %v\n", err)
+	if config.Namespace() != "" {
+		f.namespace = config.Namespace()
 	}
 
 	// We didn't get the namespace via env var or config file, so use the default.
