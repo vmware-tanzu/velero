@@ -14,11 +14,9 @@ For this release, we’ve focused on improving Velero’s restic integration: ma
 
 Let’s take a look at some of the highlights of this release.
 
-
 ## Improved Restic Support
 
 A big focus of our work this cycle was continuing to improve support for restic. To that end, we’ve fixed the following bugs:
-
 
 - Prior to version 1.1, restic backups could be delayed or failed due to long-lived locks on the repository. Now, Velero removes stale locks from restic repositories every 5 minutes, ensuring they do not interrupt normal operations.  
 - Previously, the PodVolumeBackup custom resources that represented a restic backup within a cluster were not synchronized between clusters, making it unclear what restic volumes were available to restore into a new cluster. In version 1.1, these resources are synced into clusters, so they are more visible to you when you are trying to restore volumes.  
@@ -69,7 +67,7 @@ The team has also been discussing different approaches to concurrent backup jobs
 
 Finally, we’re running [a survey](https://velero.io/survey) for our users. Let us know how you use Velero and what you’d like the community to address in the future. We’ll be using this feedback to guide our roadmap planning. Anonymized results will be shared back with the community shortly after the survey closes.
 
-## Join the Movement – Contribute!
+## Join the Movement – Contribute
 
 Velero is better because of our contributors and maintainers. It is because of them that we can bring great software to the community. Please join us during our [online community meetings every first Tuesday](https://github.com/heptio/velero-community) and catch up with past meetings on YouTube on the [Velero Community Meetings playlist](https://www.youtube.com/watch?v=nc48ocI-6go&list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM).
 
