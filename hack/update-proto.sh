@@ -1,6 +1,6 @@
 #!/bin/bash -e
 #
-# Copyright 2017 the Velero contributors.
+# Copyright 2017, 2019 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 HACK_DIR=$(dirname "${BASH_SOURCE}")
 
-echo "Running protoc"
+echo "Updating plugin proto"
 
 protoc pkg/plugin/proto/*.proto --go_out=plugins=grpc:pkg/plugin/generated/ -I pkg/plugin/proto/
 
-echo "Success!"
+echo "Updating plugin proto - done!"
