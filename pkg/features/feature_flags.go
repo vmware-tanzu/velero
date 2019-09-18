@@ -46,7 +46,6 @@ func Enable(names ...string) {
 
 // Disable removes all feature flags in a given slice from the current feature list.
 func Disable(names ...string) {
-
 	featureFlags.set.Delete(names...)
 }
 
