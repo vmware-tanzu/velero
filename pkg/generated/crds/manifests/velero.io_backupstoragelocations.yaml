@@ -13,89 +13,89 @@ spec:
     plural: backupstoragelocations
     singular: backupstoragelocation
   scope: ""
+  validation:
+    openAPIV3Schema:
+      description: BackupStorageLocation is a location where Velero stores backup
+        objects.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: BackupStorageLocationSpec defines the specification for a Velero
+            BackupStorageLocation.
+          properties:
+            accessMode:
+              description: AccessMode defines the permissions for the backup storage
+                location.
+              type: string
+            config:
+              additionalProperties:
+                type: string
+              description: Config is for provider-specific configuration fields.
+              type: object
+            objectStorage:
+              description: ObjectStorageLocation specifies the settings necessary
+                to connect to a provider's object storage.
+              properties:
+                bucket:
+                  description: Bucket is the bucket to use for object storage.
+                  type: string
+                prefix:
+                  description: Prefix is the path inside a bucket to use for Velero
+                    storage. Optional.
+                  type: string
+              required:
+              - bucket
+              - prefix
+              type: object
+            provider:
+              description: Provider is the provider of the backup storage.
+              type: string
+          required:
+          - config
+          - provider
+          type: object
+        status:
+          description: BackupStorageLocationStatus describes the current status of
+            a Velero BackupStorageLocation.
+          properties:
+            accessMode:
+              description: "AccessMode is an unused field. \n Deprecated: there is
+                now an AccessMode field on the Spec and this field will be removed
+                entirely as of v2.0."
+              type: string
+            lastSyncedRevision:
+              description: UID is a type that holds unique ID values, including UUIDs.  Because
+                we don't ONLY use UUIDs, this is an alias to string.  Being a type
+                captures intent and helps make sure that UIDs and names do not get
+                conflated.
+              type: string
+            lastSyncedTime:
+              format: date-time
+              type: string
+            phase:
+              description: BackupStorageLocationPhase is the lifecyle phase of a Velero
+                BackupStorageLocation.
+              type: string
+          type: object
+      required:
+      - metadata
+      - spec
+      - status
+      type: object
   version: v1
   versions:
   - name: v1
-    schema:
-      openAPIV3Schema:
-        description: BackupStorageLocation is a location where Velero stores backup
-          objects.
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: BackupStorageLocationSpec defines the specification for a
-              Velero BackupStorageLocation.
-            properties:
-              accessMode:
-                description: AccessMode defines the permissions for the backup storage
-                  location.
-                type: string
-              config:
-                additionalProperties:
-                  type: string
-                description: Config is for provider-specific configuration fields.
-                type: object
-              objectStorage:
-                description: ObjectStorageLocation specifies the settings necessary
-                  to connect to a provider's object storage.
-                properties:
-                  bucket:
-                    description: Bucket is the bucket to use for object storage.
-                    type: string
-                  prefix:
-                    description: Prefix is the path inside a bucket to use for Velero
-                      storage. Optional.
-                    type: string
-                required:
-                - bucket
-                - prefix
-                type: object
-              provider:
-                description: Provider is the provider of the backup storage.
-                type: string
-            required:
-            - config
-            - provider
-            type: object
-          status:
-            description: BackupStorageLocationStatus describes the current status
-              of a Velero BackupStorageLocation.
-            properties:
-              accessMode:
-                description: "AccessMode is an unused field. \n Deprecated: there
-                  is now an AccessMode field on the Spec and this field will be removed
-                  entirely as of v2.0."
-                type: string
-              lastSyncedRevision:
-                description: UID is a type that holds unique ID values, including
-                  UUIDs.  Because we don't ONLY use UUIDs, this is an alias to string.  Being
-                  a type captures intent and helps make sure that UIDs and names do
-                  not get conflated.
-                type: string
-              lastSyncedTime:
-                format: date-time
-                type: string
-              phase:
-                description: BackupStorageLocationPhase is the lifecyle phase of a
-                  Velero BackupStorageLocation.
-                type: string
-            type: object
-        required:
-        - metadata
-        - spec
-        - status
-        type: object
     served: true
     storage: true
 status:
