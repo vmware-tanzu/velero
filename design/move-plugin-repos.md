@@ -1,16 +1,16 @@
 # Plan to extract the provider plugins out of (the Velero) tree
 
-Currently, the Velero project contains primitive plugins for three cloud providers: AWS, Azure, and GCP. The Velero team has decided to extract each of those plugins into their own separate repository. This document details the steps necessary to create the new repositories, as well as a general design for what each plugin project will look like.
+Currently, the Velero project contains in-tree plugins for three cloud providers: AWS, Azure, and GCP. The Velero team has decided to extract each of those plugins into their own separate repository. This document details the steps necessary to create the new repositories, as well as a general design for what each plugin project will look like.
 
 ## Goals
 
 - Have 3 new repositories for each cloud provider plugin currently supported by the Velero team: AWS, Azure, and GCP
-- Have the currently primitive cloud provider plugins behave like any other plugin external to Velero
+- Have the currently in-tree cloud provider plugins behave like any other plugin external to Velero
 
 ## Non Goals
 
 - Extend the Velero plugin framework capability in any way
-- Create GH repositories for any plugin other then the currently 3 primitive plugins
+- Create GH repositories for any plugin other then the currently 3 in-tree plugins
 - Extract out any plugin that is not a cloud provider plugin (ex: item action related plugins)
 
 ## Background
@@ -33,15 +33,16 @@ With more and more providers wanting to support Velero, it gets more difficult t
 
 - [ ] Modify Velero so it can install any of the provider plugins. https://github.com/heptio/velero/issues/1740 - Who: @nrb
 - [ ] Extract each provider plugin into their own repo. https://github.com/heptio/velero/issues/1537
-- [ ] Create deployment and grc-push scripts with the new location path. Who: @carlisia
+- [ ] Create deployment and gcr-push scripts with the new location path. Who: @carlisia
 - [ ] Add documentation for how to use the plugin. Who: @carlisia
-- [ ] Update Helm chart to install Velero using any of the provider plugin. https://github.com/heptio/velero/issues/1819
+- [ ] Update Helm chart to install Velero using any of the provider plugins. https://github.com/heptio/velero/issues/1819
+- [ ] Upgrade script. https://github.com/heptio/velero/issues/1889.
 
 ### Notes/How-Tos
 
 #### Creating the GH repository
 
-[Pending] The organization owner will make all current owners in the Velero also repo owners in each of the new org plugin repos.
+[Pending] The organization owner will make all current owners in the Velero repo also owners in each of the new org plugin repos.
 
 #### Setting up Travis CI
 
@@ -67,17 +68,29 @@ Build of the project will be done the same way as with Velero, using Travis.
 
 Images for all the plugins will be pushed to the same repository as the Velero image, also using Travis.
 
-Releases of each of these plugins will happen in sync with releases of Velero. This will consist of having a tag in the repo and a tagged image build with the same release version as Velero so it makes it easy to identify what versions are compatible.
+Releases of each of these plugins will happen in sync with releases of Velero. This will consist of having a tag in the repo and a tagged image build with the same release version as Velero so it makes it easy to identify what versions are compatible, starting at v1.2.
 
 Documentation for how to install and use the plugins will be augmented in the existing Plugins section of the Velero documentation.
 
 Documentation for how to use each plugin will reside in their respective repos. The navigation on the Velero documentation will be modified for easy discovery of the docs/images for these plugins.
 
+#### Version compatibility
+
+We will keep the major and minor release points in sync, but the plugins can have multiple minor dot something releases as long as it remains compatible with the corresponding major/minor release of Velero. Ex:
+
+| Velero  | Plugin  | Compatible?   |
+|---|---|---|
+|  v1.2 |  v1.2 | ✅  |
+|  v1.2 |  v1.2.3 | ✅  |
+|  v1.2 |  v1.3 | 🚫  |
+|  v1.3 |  v1.2 | 🚫  |
+|  v1.3 |  v1.3.3 | ✅  |
+
 ### Installation
 
-As per https://github.com/heptio/velero/issues/1740, we will add a `plugins` flag to the Velero install command which will accept an array of URLs pointing to +1 images of plugins to be installed. The `velero plugin add` command should continue working as is, in specific, it should also allow the installation of any of the new 3 provider plugins. @nrb will provide specifics about how this change will be tackled, as well as what will be documented. Part of the work of adding the `plugins` flag will be removing the logic that adds `velero.io` name spacing to plugins that are added without it. 
+As per https://github.com/heptio/velero/issues/1740, we will add a `plugins` flag to the Velero install command which will accept an array of URLs pointing to +1 images of plugins to be installed. The `velero plugin add` command should continue working as is, in specific, it should also allow the installation of any of the new 3 provider plugins. @nrb will provide specifics about how this change will be tackled, as well as what will be documented. Part of the work of adding the `plugins` flag will be removing the logic that adds `velero.io` name spacing to plugins that are added without it.
 
-The Helm chart that allows the installation of Velero will be modified to accept the array of plugin images with an added `plugins` configuration item..
+The Helm chart that allows the installation of Velero will be modified to accept the array of plugin images with an added `plugins` configuration item.
 
 ### Design code changes and considerations
 
@@ -87,7 +100,7 @@ Install dep
 
 Question: are there any places outside the plugins where we depend on the cloud-provider SDKs? can we eliminate those dependencies too? x
 
-- the `restic` package uses the `aw`. SDK to get the bucket region for the AWS object store (https://github.com/carlisia/velero/blob/32d46871ccbc6b03e415d1e3d4ad9ae2268b977b/pkg/restic/config.go#L41)
+- the `restic` package uses the `aws`. SDK to get the bucket region for the AWS object store (https://github.com/carlisia/velero/blob/32d46871ccbc6b03e415d1e3d4ad9ae2268b977b/pkg/restic/config.go#L41)
 - could not find usage of the cloud provider SDKs anywhere else.
 
 Plugins such as the pod -> pvc -> pv backupitemaction ones make sense to stay in the core repo as they provide some important logic that just happens to be implemented in a plugin.
@@ -96,7 +109,10 @@ Plugins such as the pod -> pvc -> pv backupitemaction ones make sense to stay in
 
 The documentation for how to fresh install the out-of-tree plugin with Velero v1.2 will be specified together with the documentation for the install changes on issue https://github.com/heptio/velero/issues/1740.
 
-Going forward we will document how to change the tag on the Velero deployment yaml for both the main image and any of th three plugins installed. 
+For upgrades, we will provide a script that will:
+
+- change the tag on the Velero deployment yaml for both the main image and any of th three plugins installed.
+- rename existing aws, azure or gcp plugin names to have the `velero.io/` namespace preceding the name (ex: `velero.io/aws).
 
 Alternatively, we could add CLI `velero upgrade` command that would make these changes. Ex: `velero upgrade 1.3` would upgrade from `v1.2` to `v1.3`.
 
