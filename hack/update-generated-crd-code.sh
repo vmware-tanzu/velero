@@ -46,12 +46,8 @@ if [[ "$@" == "--verify-only" ]]; then
   exit
 fi
 
-# trivialVersions generates pre-1.13 compatible CRDs, and in 1.15 CRDs with a
-# single version currently require this setting to be accepted, as single
-# version CRDs must use the top-level validation field
-# (https://github.com/kubernetes-sigs/controller-tools/issues/302).
 go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
-  crd:trivialVersions=true \
+  crd \
   output:dir=pkg/generated/crds/manifests \
   paths=./pkg/apis/velero/v1/...
 
