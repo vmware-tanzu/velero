@@ -64,7 +64,7 @@ func (err *Error) Error() string {
 	if err.OrigErr != nil {
 		origErr = ":\n" + err.OrigErr.Error()
 	}
-	return fmt.Sprintf("failed to upload %q to %q%s",
+	return fmt.Sprintf("failed to perform batch operation on %q to %q%s",
 		aws.StringValue(err.Key),
 		aws.StringValue(err.Bucket),
 		origErr,
@@ -273,7 +273,7 @@ type DeleteObjectsIterator struct {
 	inc     bool
 }
 
-// Next will increment the default iterator's index and and ensure that there
+// Next will increment the default iterator's index and ensure that there
 // is another object to iterator to.
 func (iter *DeleteObjectsIterator) Next() bool {
 	if iter.inc {
@@ -338,6 +338,11 @@ func (d *BatchDelete) Delete(ctx aws.Context, iter BatchDeleteIterator) error {
 		}
 	}
 
+	// iter.Next() could return false (above) plus populate iter.Err()
+	if iter.Err() != nil {
+		errs = append(errs, newError(iter.Err(), nil, nil))
+	}
+
 	if input != nil && len(input.Delete.Objects) > 0 {
 		if err := deleteBatch(ctx, d, input, objects); err != nil {
 			errs = append(errs, err...)
@@ -359,6 +364,13 @@ func initDeleteObjectsInput(o *s3.DeleteObjectInput) *s3.DeleteObjectsInput {
 	}
 }
 
+const (
+	// ErrDeleteBatchFailCode represents an error code which will be returned
+	// only when DeleteObjects.Errors has an error that does not contain a code.
+	ErrDeleteBatchFailCode       = "DeleteBatchError"
+	errDefaultDeleteBatchMessage = "failed to delete"
+)
+
 // deleteBatch will delete a batch of items in the objects parameters.
 func deleteBatch(ctx aws.Context, d *BatchDelete, input *s3.DeleteObjectsInput, objects []BatchDeleteObject) []Error {
 	errs := []Error{}
@@ -369,7 +381,16 @@ func deleteBatch(ctx aws.Context, d *BatchDelete, input *s3.DeleteObjectsInput, 
 		}
 	} else if len(result.Errors) > 0 {
 		for i := 0; i < len(result.Errors); i++ {
-			errs = append(errs, newError(err, input.Bucket, result.Errors[i].Key))
+			code := ErrDeleteBatchFailCode
+			msg := errDefaultDeleteBatchMessage
+			if result.Errors[i].Message != nil {
+				msg = *result.Errors[i].Message
+			}
+			if result.Errors[i].Code != nil {
+				code = *result.Errors[i].Code
+			}
+
+			errs = append(errs, newError(awserr.New(code, msg, err), input.Bucket, result.Errors[i].Key))
 		}
 	}
 	for _, object := range objects {
@@ -437,7 +458,7 @@ type DownloadObjectsIterator struct {
 	inc     bool
 }
 
-// Next will increment the default iterator's index and and ensure that there
+// Next will increment the default iterator's index and ensure that there
 // is another object to iterator to.
 func (batcher *DownloadObjectsIterator) Next() bool {
 	if batcher.inc {
@@ -476,7 +497,7 @@ type UploadObjectsIterator struct {
 	inc     bool
 }
 
-// Next will increment the default iterator's index and and ensure that there
+// Next will increment the default iterator's index and ensure that there
 // is another object to iterator to.
 func (batcher *UploadObjectsIterator) Next() bool {
 	if batcher.inc {
