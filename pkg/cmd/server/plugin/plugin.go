@@ -35,12 +35,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
-				// RegisterObjectStore("velero.io/aws", newAwsObjectStore).
-				// RegisterObjectStore("velero.io/azure", newAzureObjectStore).
-				// RegisterObjectStore("velero.io/gcp", newGcpObjectStore).
-				// RegisterVolumeSnapshotter("velero.io/aws", newAwsVolumeSnapshotter).
-				// RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
-				// RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
@@ -60,30 +54,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 
 	return c
 }
-
-// func newAwsObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-// 	return aws.NewObjectStore(logger), nil
-// }
-
-// func newAzureObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-// 	return azure.NewObjectStore(logger), nil
-// }
-
-// func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-// 	return gcp.NewObjectStore(logger), nil
-// }
-
-// func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-// 	return aws.NewVolumeSnapshotter(logger), nil
-// }
-
-// func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-// 	return azure.NewVolumeSnapshotter(logger), nil
-// }
-
-// func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-// 	return gcp.NewVolumeSnapshotter(logger), nil
-// }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return backup.NewPVCAction(logger), nil
