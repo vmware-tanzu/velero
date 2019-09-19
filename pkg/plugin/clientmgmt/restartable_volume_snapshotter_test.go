@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/providermocks"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
 func TestRestartableGetVolumeSnapshotter(t *testing.T) {

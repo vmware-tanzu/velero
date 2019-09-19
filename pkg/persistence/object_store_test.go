@@ -45,12 +45,12 @@ type objectBackupStoreTestHarness struct {
 	// embedded to reduce verbosity when calling methods
 	*objectBackupStore
 
-	objectStore    *inMemoryObjectStore
+	objectStore    *InMemoryObjectStore
 	bucket, prefix string
 }
 
 func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
-	objectStore := newInMemoryObjectStore(bucket)
+	objectStore := NewInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
@@ -69,7 +69,7 @@ func TestIsValid(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectErr   bool
 	}{
 		{
@@ -162,7 +162,7 @@ func TestListBackups(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectedRes []string
 		expectedErr string
 	}{
@@ -628,7 +628,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Bucket has a leading and trailing slash, they are both stripped",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("/bucket/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": NewInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 		},
@@ -636,7 +636,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("/prefix/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": NewInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
@@ -645,7 +645,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("prefix").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": NewInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
