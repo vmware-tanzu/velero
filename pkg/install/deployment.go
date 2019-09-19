@@ -162,7 +162,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 									},
 								},
 								{
-									Name: "LD_LIBRARY_PATH",
+									Name:  "LD_LIBRARY_PATH",
 									Value: "/plugins",
 								},
 							},
