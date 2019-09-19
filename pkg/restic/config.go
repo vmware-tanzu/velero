@@ -25,7 +25,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-
 	"github.com/pkg/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
