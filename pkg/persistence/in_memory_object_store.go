@@ -27,15 +27,15 @@ import (
 
 type BucketData map[string][]byte
 
-// InMemoryObjectStore is a simple implementation of the ObjectStore interface
+// inMemoryObjectStore is a simple implementation of the ObjectStore interface
 // that stores its data in-memory/in-proc. This is mainly intended to be used
 // as a test fake.
-type InMemoryObjectStore struct {
+type inMemoryObjectStore struct {
 	Data map[string]BucketData
 }
 
-func NewInMemoryObjectStore(buckets ...string) *InMemoryObjectStore {
-	o := &InMemoryObjectStore{
+func newInMemoryObjectStore(buckets ...string) *inMemoryObjectStore {
+	o := &inMemoryObjectStore{
 		Data: make(map[string]BucketData),
 	}
 
@@ -50,11 +50,11 @@ func NewInMemoryObjectStore(buckets ...string) *InMemoryObjectStore {
 // Interface Implementation
 //
 
-func (o *InMemoryObjectStore) Init(config map[string]string) error {
+func (o *inMemoryObjectStore) Init(config map[string]string) error {
 	return nil
 }
 
-func (o *InMemoryObjectStore) PutObject(bucket, key string, body io.Reader) error {
+func (o *inMemoryObjectStore) PutObject(bucket, key string, body io.Reader) error {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return errors.New("bucket not found")
@@ -70,7 +70,7 @@ func (o *InMemoryObjectStore) PutObject(bucket, key string, body io.Reader) erro
 	return nil
 }
 
-func (o *InMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
+func (o *inMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return false, errors.New("bucket not found")
@@ -80,7 +80,7 @@ func (o *InMemoryObjectStore) ObjectExists(bucket, key string) (bool, error) {
 	return ok, nil
 }
 
-func (o *InMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
+func (o *inMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return nil, errors.New("bucket not found")
@@ -94,7 +94,7 @@ func (o *InMemoryObjectStore) GetObject(bucket, key string) (io.ReadCloser, erro
 	return ioutil.NopCloser(bytes.NewReader(obj)), nil
 }
 
-func (o *InMemoryObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
+func (o *inMemoryObjectStore) ListCommonPrefixes(bucket, prefix, delimiter string) ([]string, error) {
 	keys, err := o.ListObjects(bucket, prefix)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (o *InMemoryObjectStore) ListCommonPrefixes(bucket, prefix, delimiter strin
 	return prefixes, nil
 }
 
-func (o *InMemoryObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
+func (o *inMemoryObjectStore) ListObjects(bucket, prefix string) ([]string, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return nil, errors.New("bucket not found")
@@ -140,7 +140,7 @@ func (o *InMemoryObjectStore) ListObjects(bucket, prefix string) ([]string, erro
 	return objs, nil
 }
 
-func (o *InMemoryObjectStore) DeleteObject(bucket, key string) error {
+func (o *inMemoryObjectStore) DeleteObject(bucket, key string) error {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return errors.New("bucket not found")
@@ -151,7 +151,7 @@ func (o *InMemoryObjectStore) DeleteObject(bucket, key string) error {
 	return nil
 }
 
-func (o *InMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
+func (o *inMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
 	bucketData, ok := o.Data[bucket]
 	if !ok {
 		return "", errors.New("bucket not found")
@@ -169,7 +169,7 @@ func (o *InMemoryObjectStore) CreateSignedURL(bucket, key string, ttl time.Durat
 // Test Helper Methods
 //
 
-func (o *InMemoryObjectStore) ClearBucket(bucket string) {
+func (o *inMemoryObjectStore) ClearBucket(bucket string) {
 	if _, ok := o.Data[bucket]; !ok {
 		return
 	}
