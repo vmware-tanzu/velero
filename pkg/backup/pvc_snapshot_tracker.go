@@ -56,6 +56,28 @@ func (t *pvcSnapshotTracker) Has(namespace, name string) bool {
 	return t.pvcs.Has(key(namespace, name))
 }
 
+// HasPVCForPodVolume returns true and the PVC's name if the pod volume with the specified name uses a
+// PVC and that PVC has been tracked.
+func (t *pvcSnapshotTracker) HasPVCForPodVolume(pod *corev1api.Pod, volume string) (bool, string) {
+	for _, podVolume := range pod.Spec.Volumes {
+		if podVolume.Name != volume {
+			continue
+		}
+
+		if podVolume.PersistentVolumeClaim == nil {
+			return false, ""
+		}
+
+		if !t.pvcs.Has(key(pod.Namespace, podVolume.PersistentVolumeClaim.ClaimName)) {
+			return false, ""
+		}
+
+		return true, podVolume.PersistentVolumeClaim.ClaimName
+	}
+
+	return false, ""
+}
+
 func key(namespace, name string) string {
 	return fmt.Sprintf("%s/%s", namespace, name)
 }
