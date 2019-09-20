@@ -30,6 +30,7 @@ import (
 	"text/template"
 )
 
+// This is relative to pkg/generated/crds
 const goHeaderFile = "../../../hack/boilerplate.go.txt"
 
 const tpl = `{{.GoHeader}}
@@ -95,6 +96,7 @@ func main() {
 		GoHeader: string(headerBytes),
 	}
 
+	// This is relative to pkg/generated/crds
 	manifests, err := ioutil.ReadDir("manifests")
 	if err != nil {
 		log.Fatalln(err)
