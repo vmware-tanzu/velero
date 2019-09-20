@@ -147,7 +147,7 @@ velero install \
     --provider azure \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
+    --backup-location-config subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>
 ```
 

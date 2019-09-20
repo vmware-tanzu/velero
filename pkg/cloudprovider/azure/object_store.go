@@ -35,6 +35,7 @@ import (
 
 const (
 	storageAccountConfigKey = "storageAccount"
+	subscriptionIdConfigKey = "subscriptionId"
 )
 
 type containerGetter interface {
@@ -146,22 +147,31 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 		return "", errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. we need config["resourceGroup"], config["storageAccount"]
+	// 2. check whether a different subscription ID was set for backups in config["subscriptionId"]
+	var subscriptionId string
+	if _, err := getRequiredValues(mapLookup(config), subscriptionIdConfigKey); err != nil {
+		subscriptionId = envVars[subscriptionIDEnvVar]
+	}
+	if subscriptionId == "" {
+		subscriptionId = config[subscriptionIdConfigKey]
+	}
+
+	// 3. we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", errors.Wrap(err, "unable to get all required config values")
 	}
 
-	// 3. get SPT
+	// 4. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return "", errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 4. get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
+	// 5. get storageAccountsClient
+	storageAccountsClient := storagemgmt.NewAccountsClient(subscriptionId)
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
-	// 5. get storage key
+	// 6. get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", errors.WithStack(err)
