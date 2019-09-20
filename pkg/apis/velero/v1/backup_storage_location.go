@@ -26,11 +26,16 @@ import (
 
 // BackupStorageLocation is a location where Velero stores backup objects.
 type BackupStorageLocation struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   BackupStorageLocationSpec   `json:"spec"`
-	Status BackupStorageLocationStatus `json:"status"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec BackupStorageLocationSpec `json:"spec,omitempty"`
+
+	// +optional
+	Status BackupStorageLocationStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -38,14 +43,17 @@ type BackupStorageLocation struct {
 // BackupStorageLocationList is a list of BackupStorageLocations.
 type BackupStorageLocationList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []BackupStorageLocation `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []BackupStorageLocation `json:"items"`
 }
 
 // StorageType represents the type of storage that a backup location uses.
 // ObjectStorage must be non-nil, since it is currently the only supported StorageType.
 type StorageType struct {
-	ObjectStorage *ObjectStorageLocation `json:"objectStorage,omitempty"`
+	ObjectStorage *ObjectStorageLocation `json:"objectStorage"`
 }
 
 // ObjectStorageLocation specifies the settings necessary to connect to a provider's object storage.
@@ -54,7 +62,8 @@ type ObjectStorageLocation struct {
 	Bucket string `json:"bucket"`
 
 	// Prefix is the path inside a bucket to use for Velero storage. Optional.
-	Prefix string `json:"prefix"`
+	// +optional
+	Prefix string `json:"prefix,omitempty"`
 }
 
 // BackupStorageLocationSpec defines the specification for a Velero BackupStorageLocation.
@@ -63,11 +72,14 @@ type BackupStorageLocationSpec struct {
 	Provider string `json:"provider"`
 
 	// Config is for provider-specific configuration fields.
-	Config map[string]string `json:"config"`
+	// +optional
+	Config map[string]string `json:"config,omitempty"`
 
 	StorageType `json:",inline"`
 
 	// AccessMode defines the permissions for the backup storage location.
+	// +optional
+	// +kubebuilder:validation:Enum=ReadOnly;ReadWrite
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }
 
@@ -97,13 +109,19 @@ const (
 
 // BackupStorageLocationStatus describes the current status of a Velero BackupStorageLocation.
 type BackupStorageLocationStatus struct {
-	Phase              BackupStorageLocationPhase `json:"phase,omitempty"`
-	LastSyncedRevision types.UID                  `json:"lastSyncedRevision,omitempty"`
-	LastSyncedTime     metav1.Time                `json:"lastSyncedTime,omitempty"`
+	// +optional
+	Phase BackupStorageLocationPhase `json:"phase,omitempty"`
+
+	// +optional
+	LastSyncedRevision types.UID `json:"lastSyncedRevision,omitempty"`
+
+	// +optional
+	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty"`
 
 	// AccessMode is an unused field.
 	//
 	// Deprecated: there is now an AccessMode field on the Spec and this field
 	// will be removed entirely as of v2.0.
+	// +optional
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }

@@ -50,15 +50,18 @@ const (
 // ScheduleStatus captures the current state of a Velero schedule
 type ScheduleStatus struct {
 	// Phase is the current phase of the Schedule
-	Phase SchedulePhase `json:"phase"`
+	// +optional
+	Phase SchedulePhase `json:"phase,omitempty"`
 
 	// LastBackup is the last time a Backup was run for this
 	// Schedule schedule
-	LastBackup metav1.Time `json:"lastBackup"`
+	// +optional
+	LastBackup metav1.Time `json:"lastBackup,omitempty"`
 
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable)
-	ValidationErrors []string `json:"validationErrors"`
+	// +optional
+	ValidationErrors []string `json:"validationErrors,omitempty"`
 }
 
 // +genclient
@@ -67,10 +70,15 @@ type ScheduleStatus struct {
 // Schedule is a Velero resource that represents a pre-scheduled or
 // periodic Backup that should be run.
 type Schedule struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// +optional
 	metav1.ObjectMeta `json:"metadata"`
 
-	Spec   ScheduleSpec   `json:"spec"`
+	// +optional
+	Spec ScheduleSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status ScheduleStatus `json:"status,omitempty"`
 }
 
@@ -79,6 +87,9 @@ type Schedule struct {
 // ScheduleList is a list of Schedules.
 type ScheduleList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []Schedule `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []Schedule `json:"items"`
 }
