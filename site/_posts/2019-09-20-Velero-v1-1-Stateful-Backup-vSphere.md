@@ -2,7 +2,7 @@
 title: Velero v1.1 backing up and restoring Stateful apps on vSphere and PKS (Pivotal Container Service)
 excerpt: This post demonstrates how Velero can be used on PKS, the Pivotal Container Service which deploys Kubernetes clusters on vSphere.
 author_name: Cormac Hogan
-author_avatar: ['Cormac Hogan'](../img/contributors/cormac-pic.png)
+author_avatar: ../img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']

@@ -1,9 +1,9 @@
 ---
 title: Velero v1.1 backing up and restoring apps on Pivotal Container Service (PKS)
-image: [vSphere](../img/posts/PKS-logo.png)
+image: ../img/posts/PKS-logo.png
 excerpt: Learn how Velero can be used on PKS, the Pivotal Container Service which deploys and managages Kubernetes clusters on vSphere.
 author_name: Cormac Hogan
-author_avatar: ['Cormac Hogan'](../img/contributors/cormac-pic.png)
+author_avatar: ../img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']

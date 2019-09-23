@@ -1,9 +1,9 @@
 ---
 title: Velero v1.1 backing up and restoring apps on vSphere
-image: [vSphere](../img/posts/vsphere-logo.jpg)
+image: ../img/posts/vsphere-logo.jpg
 excerpt: A How-To guide to run Velero on vSphere.
 author_name: Cormac Hogan
-author_avatar: ['Cormac_Hogan'](../img/contributors/cormac-pic.png)
+author_avatar: ../img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
