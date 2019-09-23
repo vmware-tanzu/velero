@@ -75,6 +75,9 @@ spec:
               description: "AccessMode is an unused field. \n Deprecated: there is
                 now an AccessMode field on the Spec and this field will be removed
                 entirely as of v2.0."
+              enum:
+              - ReadOnly
+              - ReadWrite
               type: string
             lastSyncedRevision:
               description: UID is a type that holds unique ID values, including UUIDs.  Because

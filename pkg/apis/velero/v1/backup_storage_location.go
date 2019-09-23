@@ -79,7 +79,6 @@ type BackupStorageLocationSpec struct {
 
 	// AccessMode defines the permissions for the backup storage location.
 	// +optional
-	// +kubebuilder:validation:Enum=ReadOnly;ReadWrite
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }
 
@@ -95,6 +94,7 @@ const (
 )
 
 // BackupStorageLocationAccessMode represents the permissions for a BackupStorageLocation.
+// +kubebuilder:validation:Enum=ReadOnly;ReadWrite
 type BackupStorageLocationAccessMode string
 
 const (

@@ -142,7 +142,6 @@ type ExecHook struct {
 
 	// OnError specifies how Velero should behave if it encounters an error executing this hook.
 	// +optional
-	// +kubebuilder:validation:Enum=Continue;Fail
 	OnError HookErrorMode `json:"onError,omitempty"`
 
 	// Timeout defines the maximum amount of time Velero should wait for the hook to complete before
@@ -152,6 +151,7 @@ type ExecHook struct {
 }
 
 // HookErrorMode defines how Velero should treat an error from a hook.
+// +kubebuilder:validation:Enum=Continue;Fail
 type HookErrorMode string
 
 const (
