@@ -38,6 +38,29 @@ of the Velero repository is under active development and is not guaranteed to be
 
 1. Move the `velero` binary from the Velero directory to somewhere in your PATH.
 
+## (Optional) Change to the Azure subscription you want to create your backups in
+
+By default, Velero will store backups in the same Subscription as your VMs and disks and will
+not allow you to restore backups to a Resource Group in a different Subscription. To enable backups/restore
+across Subscriptions you will need to specify the Subscription ID to backup to.
+
+Use `az` to switch to the Subscription the backups should be created in.
+
+First, find the Subscription ID by name.
+
+```bash
+AZURE_BACKUP_SUBSCRIPTION_NAME=<NAME_OF_TARGET_SUBSCRIPTION>
+AZURE_BACKUP_SUBSCRIPTION_ID=$(az account list --query="[?name=='$AZURE_BACKUP_SUBSCRIPTION_NAME'].id | [0]" -o tsv)
+```
+
+Second, change the Subscription.
+
+```bash
+az account set -s $AZURE_BACKUP_SUBSCRIPTION_ID
+```
+
+Execute the next step – creating an storage account and blob container – using the active Subscription.
+
 ## Create Azure storage account and blob container
 
 Velero requires a storage account and blob container in which to store backups.
@@ -82,6 +105,9 @@ az storage container create -n $BLOB_CONTAINER --public-access off --account-nam
 
 ## Get resource group for persistent volume snapshots
 
+_(Optional) If you decided to backup to a different Subscription, make sure you change back to the Subscription
+of your cluster's resources before continuing._
+
 1. Set the name of the Resource Group that contains your Kubernetes cluster's virtual machines/disks.
 
     **WARNING**: If you're using [AKS][22], `AZURE_RESOURCE_GROUP` must be set to the name of the auto-generated resource group that is created
@@ -115,9 +141,13 @@ To integrate Velero with Azure, you must create a Velero-specific [service princ
     If you'll be using Velero to backup multiple clusters with multiple blob containers, it may be desirable to create a unique username per cluster rather than the default `velero`.
 
     Create service principal and let the CLI generate a password for you. Make sure to capture the password.
+    
+    _(Optional) If you are using a different Subscription for backups and cluster resources, make sure to specify both subscriptions
+    in the `az` command using `--scopes`._
 
     ```bash
-    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv`
+    AZURE_CLIENT_SECRET=`az ad sp create-for-rbac --name "velero" --role "Contributor" --query 'password' -o tsv \
+      [--scopes /subscriptions/$AZURE_BACKUP_SUBSCRIPTION_ID /subscriptions/$AZURE_SUBSCRIPTION_ID]`
     ```
 
     After creating the service principal, obtain the client id.
@@ -147,7 +177,7 @@ velero install \
     --provider azure \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
-    --backup-location-config subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID \
+    --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
     --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>
 ```
 
