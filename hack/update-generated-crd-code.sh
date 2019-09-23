@@ -28,12 +28,27 @@ if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
   exit 1
 fi
 
-cd ${GOPATH}/src/k8s.io/code-generator
+if [[ ! -d "${GOPATH}/src/sigs.k8s.io/controller-tools" ]]; then
+  echo "sigs.k8s.io/controller-tools missing from GOPATH"
+  exit 1
+fi
 
-./generate-groups.sh \
+${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/heptio/velero/pkg/generated \
   github.com/heptio/velero/pkg/apis \
   "velero:v1" \
   --go-header-file ${GOPATH}/src/github.com/heptio/velero/hack/boilerplate.go.txt \
   $@
+
+if [[ "$@" == "--verify-only" ]]; then
+  # skip generating CRD manifests
+  exit
+fi
+
+go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
+  crd \
+  output:dir=pkg/generated/crds/manifests \
+  paths=./pkg/apis/velero/v1/...
+
+go generate ./pkg/generated/crds
