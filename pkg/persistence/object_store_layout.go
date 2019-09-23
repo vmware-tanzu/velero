@@ -59,10 +59,6 @@ func (l *ObjectStoreLayout) isValidSubdir(name string) bool {
 	return ok
 }
 
-func (l *ObjectStoreLayout) getRevisionKey() string {
-	return path.Join(l.subdirs["metadata"], "revision")
-}
-
 func (l *ObjectStoreLayout) getBackupDir(backup string) string {
 	return path.Join(l.subdirs["backups"], backup) + "/"
 }

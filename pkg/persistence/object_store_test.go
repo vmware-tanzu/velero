@@ -23,13 +23,11 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"path"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -237,7 +235,6 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"metadata/revision",
 			},
 		},
 		{
@@ -257,7 +254,6 @@ func TestPutBackup(t *testing.T) {
 				"prefix-1/backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
-				"prefix-1/metadata/revision",
 			},
 		},
 		{
@@ -296,7 +292,6 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"metadata/revision",
 			},
 		},
 		{
@@ -480,7 +475,6 @@ func TestDeleteBackup(t *testing.T) {
 				}
 
 				objectStore.On("DeleteObject", backupStore.bucket, obj).Return(err)
-				objectStore.On("PutObject", "test-bucket", path.Join(test.prefix, "metadata", "revision"), mock.Anything).Return(nil)
 			}
 
 			err := backupStore.DeleteBackup("bak")

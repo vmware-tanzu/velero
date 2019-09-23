@@ -367,8 +367,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				backupStore, ok := backupStores[location.Name]
 				require.True(t, ok, "no mock backup store for location %s", location.Name)
 
-				backupStore.On("GetRevision").Return("foo", nil)
-
 				var backupNames []string
 				for _, bucket := range test.cloudBuckets[location.Spec.ObjectStorage.Bucket] {
 					backupNames = append(backupNames, bucket.backup.Name)

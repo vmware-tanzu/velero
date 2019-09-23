@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
@@ -49,7 +48,6 @@ type BackupInfo struct {
 // Velero backup and restore data in/from a persistent backup store.
 type BackupStore interface {
 	IsValid() error
-	GetRevision() (string, error)
 
 	ListBackups() ([]string, error)
 
@@ -249,10 +247,6 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		return kerrors.NewAggregate(errs)
 	}
 
-	if err := s.putRevision(); err != nil {
-		s.logger.WithField("backup", info.Name).WithError(err).Warn("Error updating backup store revision")
-	}
-
 	return nil
 }
 
@@ -380,10 +374,6 @@ func (s *objectBackupStore) DeleteBackup(name string) error {
 		}
 	}
 
-	if err := s.putRevision(); err != nil {
-		s.logger.WithField("backup", name).WithError(err).Warn("Error updating backup store revision")
-	}
-
 	return errors.WithStack(kerrors.NewAggregate(errs))
 }
 
@@ -401,10 +391,6 @@ func (s *objectBackupStore) DeleteRestore(name string) error {
 		if err := s.objectStore.DeleteObject(s.bucket, key); err != nil {
 			errs = append(errs, err)
 		}
-	}
-
-	if err = s.putRevision(); err != nil {
-		errs = append(errs, err)
 	}
 
 	return errors.WithStack(kerrors.NewAggregate(errs))
@@ -435,30 +421,6 @@ func (s *objectBackupStore) GetDownloadURL(target velerov1api.DownloadTarget) (s
 	default:
 		return "", errors.Errorf("unsupported download target kind %q", target.Kind)
 	}
-}
-
-func (s *objectBackupStore) GetRevision() (string, error) {
-	rdr, err := s.objectStore.GetObject(s.bucket, s.layout.getRevisionKey())
-	if err != nil {
-		return "", err
-	}
-
-	bytes, err := ioutil.ReadAll(rdr)
-	if err != nil {
-		return "", errors.Wrap(err, "error reading contents of revision file")
-	}
-
-	return string(bytes), nil
-}
-
-func (s *objectBackupStore) putRevision() error {
-	rdr := strings.NewReader(uuid.NewV4().String())
-
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getRevisionKey(), rdr); err != nil {
-		return errors.Wrap(err, "error updating revision file")
-	}
-
-	return nil
 }
 
 func seekToBeginning(r io.Reader) error {
