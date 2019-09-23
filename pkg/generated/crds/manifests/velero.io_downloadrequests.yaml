@@ -38,6 +38,13 @@ spec:
               properties:
                 kind:
                   description: Kind is the type of file to download.
+                  enum:
+                  - BackupLog
+                  - BackupContents
+                  - BackupVolumeSnapshot
+                  - BackupResourceList
+                  - RestoreLog
+                  - RestoreResults
                   type: string
                 name:
                   description: Name is the name of the kubernetes resource with which
@@ -65,14 +72,7 @@ spec:
             phase:
               description: Phase is the current state of the DownloadRequest.
               type: string
-          required:
-          - downloadURL
-          - expiration
-          - phase
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

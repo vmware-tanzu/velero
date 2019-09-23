@@ -148,6 +148,7 @@ spec:
                                     to execute.
                                   items:
                                     type: string
+                                  minItems: 1
                                   type: array
                                 container:
                                   description: Container is the container in the pod
@@ -158,6 +159,9 @@ spec:
                                   description: OnError specifies how Velero should
                                     behave if it encounters an error executing this
                                     hook.
+                                  enum:
+                                  - Continue
+                                  - Fail
                                   type: string
                                 timeout:
                                   description: Timeout defines the maximum amount
@@ -166,9 +170,6 @@ spec:
                                   type: string
                               required:
                               - command
-                              - container
-                              - onError
-                              - timeout
                               type: object
                           required:
                           - exec
@@ -190,6 +191,7 @@ spec:
                                     to execute.
                                   items:
                                     type: string
+                                  minItems: 1
                                   type: array
                                 container:
                                   description: Container is the container in the pod
@@ -200,6 +202,9 @@ spec:
                                   description: OnError specifies how Velero should
                                     behave if it encounters an error executing this
                                     hook.
+                                  enum:
+                                  - Continue
+                                  - Fail
                                   type: string
                                 timeout:
                                   description: Timeout defines the maximum amount
@@ -208,24 +213,15 @@ spec:
                                   type: string
                               required:
                               - command
-                              - container
-                              - onError
-                              - timeout
                               type: object
                           required:
                           - exec
                           type: object
                         type: array
                     required:
-                    - excludedNamespaces
-                    - excludedResources
-                    - includedNamespaces
-                    - includedResources
                     - name
                     type: object
                   type: array
-              required:
-              - resources
               type: object
             includeClusterResources:
               description: IncludeClusterResources specifies whether cluster-scoped
@@ -306,17 +302,6 @@ spec:
               items:
                 type: string
               type: array
-          required:
-          - excludedNamespaces
-          - excludedResources
-          - hooks
-          - includeClusterResources
-          - includedNamespaces
-          - includedResources
-          - labelSelector
-          - storageLocation
-          - ttl
-          - volumeSnapshotLocations
           type: object
         status:
           description: BackupStatus captures the current status of a Velero backup.
@@ -368,21 +353,7 @@ spec:
                 during execution of the backup. The actual warnings are in the backup's
                 log file in object storage.
               type: integer
-          required:
-          - completionTimestamp
-          - errors
-          - expiration
-          - phase
-          - startTimestamp
-          - validationErrors
-          - version
-          - volumeSnapshotsAttempted
-          - volumeSnapshotsCompleted
-          - warnings
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

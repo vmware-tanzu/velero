@@ -103,20 +103,24 @@ spec:
             phase:
               description: Phase is the current state of the PodVolumeRestore.
               type: string
+            progress:
+              description: Progress holds the total number of bytes of the snapshot
+                and the current number of restored bytes. This can be used to display
+                progress information about the restore operation.
+              properties:
+                bytesDone:
+                  format: int64
+                  type: integer
+                totalBytes:
+                  format: int64
+                  type: integer
+              type: object
             startTimestamp:
               description: StartTimestamp records the time a restore was started.
                 The server's time is used for StartTimestamps
               format: date-time
               type: string
-          required:
-          - completionTimestamp
-          - message
-          - phase
-          - startTimestamp
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

@@ -157,6 +157,7 @@ spec:
                                         to execute.
                                       items:
                                         type: string
+                                      minItems: 1
                                       type: array
                                     container:
                                       description: Container is the container in the
@@ -168,6 +169,9 @@ spec:
                                       description: OnError specifies how Velero should
                                         behave if it encounters an error executing
                                         this hook.
+                                      enum:
+                                      - Continue
+                                      - Fail
                                       type: string
                                     timeout:
                                       description: Timeout defines the maximum amount
@@ -177,9 +181,6 @@ spec:
                                       type: string
                                   required:
                                   - command
-                                  - container
-                                  - onError
-                                  - timeout
                                   type: object
                               required:
                               - exec
@@ -202,6 +203,7 @@ spec:
                                         to execute.
                                       items:
                                         type: string
+                                      minItems: 1
                                       type: array
                                     container:
                                       description: Container is the container in the
@@ -213,6 +215,9 @@ spec:
                                       description: OnError specifies how Velero should
                                         behave if it encounters an error executing
                                         this hook.
+                                      enum:
+                                      - Continue
+                                      - Fail
                                       type: string
                                     timeout:
                                       description: Timeout defines the maximum amount
@@ -222,24 +227,15 @@ spec:
                                       type: string
                                   required:
                                   - command
-                                  - container
-                                  - onError
-                                  - timeout
                                   type: object
                               required:
                               - exec
                               type: object
                             type: array
                         required:
-                        - excludedNamespaces
-                        - excludedResources
-                        - includedNamespaces
-                        - includedResources
                         - name
                         type: object
                       type: array
-                  required:
-                  - resources
                   type: object
                 includeClusterResources:
                   description: IncludeClusterResources specifies whether cluster-scoped
@@ -321,17 +317,6 @@ spec:
                   items:
                     type: string
                   type: array
-              required:
-              - excludedNamespaces
-              - excludedResources
-              - hooks
-              - includeClusterResources
-              - includedNamespaces
-              - includedResources
-              - labelSelector
-              - storageLocation
-              - ttl
-              - volumeSnapshotLocations
               type: object
           required:
           - schedule
@@ -354,14 +339,7 @@ spec:
               items:
                 type: string
               type: array
-          required:
-          - lastBackup
-          - phase
-          - validationErrors
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

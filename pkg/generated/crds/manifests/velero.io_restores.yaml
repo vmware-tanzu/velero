@@ -129,11 +129,6 @@ spec:
               type: string
           required:
           - backupName
-          - excludedNamespaces
-          - excludedResources
-          - includedNamespaces
-          - includedResources
-          - namespaceMapping
           type: object
         status:
           description: RestoreStatus captures the current status of a Velero restore
@@ -161,16 +156,7 @@ spec:
                 during execution of the restore. The actual warnings are stored in
                 object storage.
               type: integer
-          required:
-          - errors
-          - failureReason
-          - phase
-          - validationErrors
-          - warnings
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

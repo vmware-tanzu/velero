@@ -66,14 +66,7 @@ spec:
             phase:
               description: Phase is the current state of the ResticRepository.
               type: string
-          required:
-          - lastMaintenanceTime
-          - message
-          - phase
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:
