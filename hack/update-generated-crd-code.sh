@@ -41,11 +41,6 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   --go-header-file ${GOPATH}/src/github.com/heptio/velero/hack/boilerplate.go.txt \
   $@
 
-if [[ "$@" == "--verify-only" ]]; then
-  # skip generating CRD manifests
-  exit
-fi
-
 go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
   crd \
   output:dir=pkg/generated/crds/manifests \
