@@ -256,7 +256,6 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 
 func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, error) {
 	backupBuilder := builder.ForBackup(namespace, o.Name)
-	fmt.Printf("%+v\n", backupBuilder.Result())
 
 	if o.FromSchedule != "" {
 		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(o.FromSchedule, metav1.GetOptions{})
