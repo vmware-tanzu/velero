@@ -84,6 +84,7 @@ type RestoreSpec struct {
 
 // RestorePhase is a string representation of the lifecycle phase
 // of a Velero restore
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;Completed;PartiallyFailed;Failed
 type RestorePhase string
 
 const (

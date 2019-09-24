@@ -115,6 +115,11 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the PodVolumeBackup.
+              enum:
+              - New
+              - InProgress
+              - Completed
+              - Failed
               type: string
             progress:
               description: Progress holds the total number of bytes of the volume

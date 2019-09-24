@@ -50,6 +50,10 @@ spec:
               type: array
             phase:
               description: Phase is the current state of the DeleteBackupRequest.
+              enum:
+              - New
+              - InProgress
+              - Processed
               type: string
           type: object
       type: object

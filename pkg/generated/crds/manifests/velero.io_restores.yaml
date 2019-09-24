@@ -151,6 +151,13 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the Restore
+              enum:
+              - New
+              - FailedValidation
+              - InProgress
+              - Completed
+              - PartiallyFailed
+              - Failed
               type: string
             validationErrors:
               description: ValidationErrors is a slice of all validation errors (if

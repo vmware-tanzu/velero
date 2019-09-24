@@ -72,6 +72,9 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the DownloadRequest.
+              enum:
+              - New
+              - Processed
               type: string
           type: object
       type: object

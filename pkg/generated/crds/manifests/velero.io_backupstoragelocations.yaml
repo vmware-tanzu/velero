@@ -92,6 +92,9 @@ spec:
             phase:
               description: BackupStorageLocationPhase is the lifecyle phase of a Velero
                 BackupStorageLocation.
+              enum:
+              - Available
+              - Unavailable
               type: string
           type: object
       type: object

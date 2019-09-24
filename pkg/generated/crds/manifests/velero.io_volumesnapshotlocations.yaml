@@ -52,6 +52,9 @@ spec:
             phase:
               description: VolumeSnapshotLocationPhase is the lifecyle phase of a
                 Velero VolumeSnapshotLocation.
+              enum:
+              - Available
+              - Unavailable
               type: string
           type: object
       type: object

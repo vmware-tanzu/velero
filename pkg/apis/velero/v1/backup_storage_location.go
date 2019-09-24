@@ -83,6 +83,7 @@ type BackupStorageLocationSpec struct {
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
+// +kubebuilder:validation:Enum=Available;Unavailable
 type BackupStorageLocationPhase string
 
 const (

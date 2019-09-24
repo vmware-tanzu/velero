@@ -41,6 +41,7 @@ type PodVolumeRestoreSpec struct {
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.
+// +kubebuilder:validation:Enum=New;InProgress;Completed;Failed
 type PodVolumeRestorePhase string
 
 const (

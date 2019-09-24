@@ -346,6 +346,10 @@ spec:
               type: string
             phase:
               description: Phase is the current phase of the Schedule
+              enum:
+              - New
+              - Enabled
+              - FailedValidation
               type: string
             validationErrors:
               description: ValidationErrors is a slice of all validation errors (if

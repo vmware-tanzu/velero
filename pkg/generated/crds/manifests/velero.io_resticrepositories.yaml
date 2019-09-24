@@ -66,6 +66,10 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the ResticRepository.
+              enum:
+              - New
+              - Ready
+              - NotReady
               type: string
           type: object
       type: object

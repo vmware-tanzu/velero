@@ -339,6 +339,14 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the Backup.
+              enum:
+              - New
+              - FailedValidation
+              - InProgress
+              - Completed
+              - PartiallyFailed
+              - Failed
+              - Deleting
               type: string
             startTimestamp:
               description: StartTimestamp records the time a backup was started. Separate

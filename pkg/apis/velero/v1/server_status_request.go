@@ -43,6 +43,7 @@ type ServerStatusRequestSpec struct {
 }
 
 // ServerStatusRequestPhase represents the lifecycle phase of a ServerStatusRequest.
+// +kubebuilder:validation:Enum=New;Processed
 type ServerStatusRequestPhase string
 
 const (

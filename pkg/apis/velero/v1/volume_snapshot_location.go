@@ -58,6 +58,7 @@ type VolumeSnapshotLocationSpec struct {
 }
 
 // VolumeSnapshotLocationPhase is the lifecyle phase of a Velero VolumeSnapshotLocation.
+// +kubebuilder:validation:Enum=Available;Unavailable
 type VolumeSnapshotLocationPhase string
 
 const (

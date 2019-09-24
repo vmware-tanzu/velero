@@ -39,6 +39,7 @@ type ResticRepositorySpec struct {
 }
 
 // ResticRepositoryPhase represents the lifecycle phase of a ResticRepository.
+// +kubebuilder:validation:Enum=New;Ready;NotReady
 type ResticRepositoryPhase string
 
 const (

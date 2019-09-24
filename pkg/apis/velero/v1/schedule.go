@@ -31,6 +31,7 @@ type ScheduleSpec struct {
 
 // SchedulePhase is a string representation of the lifecycle phase
 // of a Velero schedule
+// +kubebuilder:validation:Enum=New;Enabled;FailedValidation
 type SchedulePhase string
 
 const (

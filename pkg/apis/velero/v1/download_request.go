@@ -48,6 +48,7 @@ type DownloadTarget struct {
 }
 
 // DownloadRequestPhase represents the lifecycle phase of a DownloadRequest.
+// +kubebuilder:validation:Enum=New;Processed
 type DownloadRequestPhase string
 
 const (

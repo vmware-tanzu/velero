@@ -38,6 +38,9 @@ spec:
           properties:
             phase:
               description: Phase is the current lifecycle phase of the ServerStatusRequest.
+              enum:
+              - New
+              - Processed
               type: string
             plugins:
               description: Plugins list information about the plugins running on the

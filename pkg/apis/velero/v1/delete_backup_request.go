@@ -24,6 +24,7 @@ type DeleteBackupRequestSpec struct {
 }
 
 // DeleteBackupRequestPhase represents the lifecycle phase of a DeleteBackupRequest.
+// +kubebuilder:validation:Enum=New;InProgress;Processed
 type DeleteBackupRequestPhase string
 
 const (
