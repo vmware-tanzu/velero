@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/velero/pkg/cloudprovider/mocks"
-	"github.com/heptio/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 func TestRestartableGetVolumeSnapshotter(t *testing.T) {

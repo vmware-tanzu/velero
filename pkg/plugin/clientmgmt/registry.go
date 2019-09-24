@@ -24,8 +24,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/velero/pkg/plugin/framework"
-	"github.com/heptio/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 // Registry manages information about available plugins.

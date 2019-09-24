@@ -28,8 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 
-	"github.com/heptio/velero/pkg/cmd/util/flag"
-	"github.com/heptio/velero/pkg/util/encode"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/util/encode"
 )
 
 const downloadRequestTimeout = 30 * time.Second

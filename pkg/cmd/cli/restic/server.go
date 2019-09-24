@@ -33,16 +33,16 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/signals"
-	"github.com/heptio/velero/pkg/controller"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/restic"
-	"github.com/heptio/velero/pkg/util/filesystem"
-	"github.com/heptio/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+	"github.com/vmware-tanzu/velero/pkg/controller"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 func NewServerCommand(f client.Factory) *cobra.Command {

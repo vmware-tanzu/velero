@@ -30,9 +30,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/features"
 )
 
 const (

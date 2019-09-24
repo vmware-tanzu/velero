@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const regionKey = "region"

@@ -19,12 +19,12 @@ package create
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd/cli/backup"
-	"github.com/heptio/velero/pkg/cmd/cli/backuplocation"
-	"github.com/heptio/velero/pkg/cmd/cli/restore"
-	"github.com/heptio/velero/pkg/cmd/cli/schedule"
-	"github.com/heptio/velero/pkg/cmd/cli/snapshotlocation"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/restore"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/schedule"
+	"github.com/vmware-tanzu/velero/pkg/cmd/cli/snapshotlocation"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {

@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const (

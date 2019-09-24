@@ -19,7 +19,7 @@ package repo
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/client"
 )
 
 func NewRepositoryCommand(f client.Factory) *cobra.Command {

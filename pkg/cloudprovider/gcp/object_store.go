@@ -30,7 +30,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"github.com/heptio/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const (

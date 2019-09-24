@@ -23,8 +23,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
-	"github.com/heptio/velero/pkg/plugin/velero"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // ObjectStoreGRPCServer implements the proto-generated ObjectStoreServer interface, and accepts

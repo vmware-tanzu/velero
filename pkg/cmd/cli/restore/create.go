@@ -26,13 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/flag"
-	"github.com/heptio/velero/pkg/cmd/util/output"
-	veleroclient "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	v1 "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 )
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {

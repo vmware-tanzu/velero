@@ -25,8 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
 // Factory knows how to create a VeleroClient and Kubernetes client.

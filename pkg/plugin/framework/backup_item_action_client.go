@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	proto "github.com/heptio/velero/pkg/plugin/generated"
-	"github.com/heptio/velero/pkg/plugin/velero"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // NewBackupItemActionPlugin constructs a BackupItemActionPlugin.

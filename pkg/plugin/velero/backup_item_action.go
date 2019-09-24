@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // BackupItemAction is an actor that performs an operation on an individual item being backed up.

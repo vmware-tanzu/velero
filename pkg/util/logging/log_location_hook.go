@@ -28,7 +28,7 @@ const (
 	logSourceField          = "logSource"
 	logSourceSetMarkerField = "@logSourceSetBy"
 	logrusPackage           = "github.com/sirupsen/logrus"
-	veleroPackage           = "github.com/heptio/velero/"
+	veleroPackage           = "github.com/vmware-tanzu/velero/"
 	veleroPackageLen        = len(veleroPackage)
 )
 
