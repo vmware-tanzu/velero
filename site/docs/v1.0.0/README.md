@@ -57,11 +57,11 @@ See [the list of releases][6] to find out about feature changes.
 [1]: https://travis-ci.org/heptio/velero.svg?branch=master
 [2]: https://travis-ci.org/heptio/velero
 
-[4]: https://github.com/heptio/velero/issues
-[5]: https://github.com/heptio/velero/blob/master/CONTRIBUTING.md
-[6]: https://github.com/heptio/velero/releases
+[4]: https://github.com/vmware-tanzu/velero/issues
+[5]: https://github.com/vmware-tanzu/velero/blob/master/CONTRIBUTING.md
+[6]: https://github.com/vmware-tanzu/velero/releases
 
-[8]: https://github.com/heptio/velero/blob/master/CODE_OF_CONDUCT.md
+[8]: https://github.com/vmware-tanzu/velero/blob/master/CODE_OF_CONDUCT.md
 [9]: https://kubernetes.io/docs/setup/
 [10]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#install-with-homebrew-on-macos
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
