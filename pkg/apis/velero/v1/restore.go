@@ -65,6 +65,7 @@ type RestoreSpec struct {
 	// when restoring individual objects from the backup. If empty
 	// or nil, all objects are included. Optional.
 	// +optional
+	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// RestorePVs specifies whether to restore all included

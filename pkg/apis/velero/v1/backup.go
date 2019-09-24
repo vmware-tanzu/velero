@@ -50,6 +50,7 @@ type BackupSpec struct {
 	// when adding individual objects to the backup. If empty
 	// or nil, all objects are included. Optional.
 	// +optional
+	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// SnapshotVolumes specifies whether to take cloud snapshots
@@ -121,6 +122,7 @@ type BackupResourceHookSpec struct {
 
 	// LabelSelector, if specified, filters the resources to which this hook spec applies.
 	// +optional
+	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// PreHooks is a list of BackupResourceHooks to execute prior to storing the item in the backup.
