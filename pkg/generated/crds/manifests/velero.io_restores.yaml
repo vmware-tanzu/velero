@@ -75,6 +75,7 @@ spec:
               description: LabelSelector is a metav1.LabelSelector to filter with
                 when restoring individual objects from the backup. If empty or nil,
                 all objects are included. Optional.
+              nullable: true
               properties:
                 matchExpressions:
                   description: matchExpressions is a list of label selector requirements.
