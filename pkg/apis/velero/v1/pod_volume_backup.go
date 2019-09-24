@@ -79,6 +79,7 @@ type PodVolumeBackupStatus struct {
 	// on restores.
 	// The server's time is used for StartTimestamps
 	// +optional
+	// +nullable
 	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a backup was completed.
@@ -86,6 +87,7 @@ type PodVolumeBackupStatus struct {
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
 	// +optional
+	// +nullable
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// Progress holds the total number of bytes of the volume and the current

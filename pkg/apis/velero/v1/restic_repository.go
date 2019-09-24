@@ -59,6 +59,7 @@ type ResticRepositoryStatus struct {
 
 	// LastMaintenanceTime is the last time maintenance was run.
 	// +optional
+	// +nullable
 	LastMaintenanceTime metav1.Time `json:"lastMaintenanceTime,omitempty"`
 }
 

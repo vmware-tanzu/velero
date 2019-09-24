@@ -33,21 +33,25 @@ type RestoreSpec struct {
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
 	// +optional
+	// +nullable
 	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
 
 	// ExcludedNamespaces contains a list of namespaces that are not
 	// included in the restore.
 	// +optional
+	// +nullable
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 
 	// IncludedResources is a slice of resource names to include
 	// in the restore. If empty, all resources in the backup are included.
 	// +optional
+	// +nullable
 	IncludedResources []string `json:"includedResources,omitempty"`
 
 	// ExcludedResources is a slice of resource names that are not
 	// included in the restore.
 	// +optional
+	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
 	// NamespaceMapping is a map of source namespace names
@@ -66,12 +70,14 @@ type RestoreSpec struct {
 	// RestorePVs specifies whether to restore all included
 	// PVs from snapshot (via the cloudprovider).
 	// +optional
+	// +nullable
 	RestorePVs *bool `json:"restorePVs,omitempty"`
 
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the restore. If null, defaults
 	// to true.
 	// +optional
+	// +nullable
 	IncludeClusterResources *bool `json:"includeClusterResources,omitempty"`
 }
 
@@ -113,6 +119,7 @@ type RestoreStatus struct {
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable)
 	// +optional
+	// +nullable
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 
 	// Warnings is a count of all warning messages that were generated during

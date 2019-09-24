@@ -46,6 +46,7 @@ spec:
                 the deletion process.
               items:
                 type: string
+              nullable: true
               type: array
             phase:
               description: Phase is the current state of the DeleteBackupRequest.

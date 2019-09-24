@@ -116,6 +116,7 @@ type BackupStorageLocationStatus struct {
 	LastSyncedRevision types.UID `json:"lastSyncedRevision,omitempty"`
 
 	// +optional
+	// +nullable
 	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty"`
 
 	// AccessMode is an unused field.

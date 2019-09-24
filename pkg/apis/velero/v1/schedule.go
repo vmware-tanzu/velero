@@ -56,6 +56,7 @@ type ScheduleStatus struct {
 	// LastBackup is the last time a Backup was run for this
 	// Schedule schedule
 	// +optional
+	// +nullable
 	LastBackup metav1.Time `json:"lastBackup,omitempty"`
 
 	// ValidationErrors is a slice of all validation errors (if

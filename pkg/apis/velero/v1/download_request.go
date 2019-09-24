@@ -72,6 +72,7 @@ type DownloadRequestStatus struct {
 
 	// Expiration is when this DownloadRequest expires and can be deleted by the system.
 	// +optional
+	// +nullable
 	Expiration metav1.Time `json:"expiration,omitempty"`
 }
 

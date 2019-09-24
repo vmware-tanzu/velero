@@ -25,21 +25,25 @@ type BackupSpec struct {
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
 	// +optional
+	// +nullable
 	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
 
 	// ExcludedNamespaces contains a list of namespaces that are not
 	// included in the backup.
 	// +optional
+	// +nullable
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 
 	// IncludedResources is a slice of resource names to include
 	// in the backup. If empty, all resources are included.
 	// +optional
+	// +nullable
 	IncludedResources []string `json:"includedResources,omitempty"`
 
 	// ExcludedResources is a slice of resource names that are not
 	// included in the backup.
 	// +optional
+	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
 	// LabelSelector is a metav1.LabelSelector to filter with
@@ -52,6 +56,7 @@ type BackupSpec struct {
 	// of any PV's referenced in the set of objects included
 	// in the Backup.
 	// +optional
+	// +nullable
 	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
 	// TTL is a time.Duration-parseable string describing how long
@@ -62,6 +67,7 @@ type BackupSpec struct {
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
 	// +optional
+	// +nullable
 	IncludeClusterResources *bool `json:"includeClusterResources,omitempty"`
 
 	// Hooks represent custom behaviors that should be executed at different phases of the backup.
@@ -81,6 +87,7 @@ type BackupSpec struct {
 type BackupHooks struct {
 	// Resources are hooks that should be executed when backing up individual instances of a resource.
 	// +optional
+	// +nullable
 	Resources []BackupResourceHookSpec `json:"resources,omitempty"`
 }
 
@@ -93,19 +100,23 @@ type BackupResourceHookSpec struct {
 	// IncludedNamespaces specifies the namespaces to which this hook spec applies. If empty, it applies
 	// to all namespaces.
 	// +optional
+	// +nullable
 	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
 
 	// ExcludedNamespaces specifies the namespaces to which this hook spec does not apply.
 	// +optional
+	// +nullable
 	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 
 	// IncludedResources specifies the resources to which this hook spec applies. If empty, it applies
 	// to all resources.
 	// +optional
+	// +nullable
 	IncludedResources []string `json:"includedResources,omitempty"`
 
 	// ExcludedResources specifies the resources to which this hook spec does not apply.
 	// +optional
+	// +nullable
 	ExcludedResources []string `json:"excludedResources,omitempty"`
 
 	// LabelSelector, if specified, filters the resources to which this hook spec applies.
@@ -204,6 +215,7 @@ type BackupStatus struct {
 
 	// Expiration is when this Backup is eligible for garbage-collection.
 	// +optional
+	// +nullable
 	Expiration metav1.Time `json:"expiration,omitempty"`
 
 	// Phase is the current state of the Backup.
@@ -213,6 +225,7 @@ type BackupStatus struct {
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable).
 	// +optional
+	// +nullable
 	ValidationErrors []string `json:"validationErrors,omitempty"`
 
 	// StartTimestamp records the time a backup was started.
@@ -220,6 +233,7 @@ type BackupStatus struct {
 	// on restores.
 	// The server's time is used for StartTimestamps
 	// +optional
+	// +nullable
 	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a backup was completed.
@@ -227,6 +241,7 @@ type BackupStatus struct {
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
 	// +optional
+	// +nullable
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// VolumeSnapshotsAttempted is the total number of attempted

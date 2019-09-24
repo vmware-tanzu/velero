@@ -59,6 +59,7 @@ spec:
             lastMaintenanceTime:
               description: LastMaintenanceTime is the last time maintenance was run.
               format: date-time
+              nullable: true
               type: string
             message:
               description: Message is a message about the current status of the ResticRepository.

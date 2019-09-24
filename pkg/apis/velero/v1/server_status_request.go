@@ -26,10 +26,15 @@ import (
 // ServerStatusRequest is a request to access current status information about
 // the Velero server.
 type ServerStatusRequest struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   ServerStatusRequestSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec ServerStatusRequestSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status ServerStatusRequestStatus `json:"status,omitempty"`
 }
 
@@ -56,16 +61,22 @@ type PluginInfo struct {
 // ServerStatusRequestStatus is the current status of a ServerStatusRequest.
 type ServerStatusRequestStatus struct {
 	// Phase is the current lifecycle phase of the ServerStatusRequest.
+	// +optional
 	Phase ServerStatusRequestPhase `json:"phase"`
 
 	// ProcessedTimestamp is when the ServerStatusRequest was processed
 	// by the ServerStatusRequestController.
+	// +optional
+	// +nullable
 	ProcessedTimestamp metav1.Time `json:"processedTimestamp"`
 
 	// ServerVersion is the Velero server version.
+	// +optional
 	ServerVersion string `json:"serverVersion"`
 
 	// Plugins list information about the plugins running on the Velero server
+	// +optional
+	// +nullable
 	Plugins []PluginInfo `json:"plugins"`
 }
 
@@ -74,6 +85,9 @@ type ServerStatusRequestStatus struct {
 // ServerStatusRequestList is a list of ServerStatusRequests.
 type ServerStatusRequestList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []ServerStatusRequest `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []ServerStatusRequest `json:"items"`
 }

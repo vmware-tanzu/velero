@@ -45,6 +45,7 @@ type DeleteBackupRequestStatus struct {
 
 	// Errors contains any errors that were encountered during the deletion process.
 	// +optional
+	// +nullable
 	Errors []string `json:"errors,omitempty"`
 }
 

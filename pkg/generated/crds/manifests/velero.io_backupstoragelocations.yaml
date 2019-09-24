@@ -87,6 +87,7 @@ spec:
               type: string
             lastSyncedTime:
               format: date-time
+              nullable: true
               type: string
             phase:
               description: BackupStorageLocationPhase is the lifecyle phase of a Velero

@@ -63,12 +63,14 @@ type PodVolumeRestoreStatus struct {
 	// StartTimestamp records the time a restore was started.
 	// The server's time is used for StartTimestamps
 	// +optional
+	// +nullable
 	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a restore was completed.
 	// Completion time is recorded even on failed restores.
 	// The server's time is used for CompletionTimestamps
 	// +optional
+	// +nullable
 	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// Progress holds the total number of bytes of the snapshot and the current
