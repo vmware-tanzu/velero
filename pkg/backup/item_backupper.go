@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -115,10 +116,20 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return err
 	}
 
+	typedata, err := meta.TypeAccessor(obj)
+	if err != nil {
+		return err
+	}
+
 	namespace := metadata.GetNamespace()
 	name := metadata.GetName()
+	resource := strings.ToLower(typedata.GetKind())
 
 	log := logger.WithField("name", name)
+	if resource != groupResource.Resource {
+		log = log.WithField("resource", resource)
+	}
+
 	if namespace != "" {
 		log = log.WithField("namespace", namespace)
 	}
