@@ -221,6 +221,7 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
 	for _, crd := range crds.CRDs {
+		crd.SetLabels(labels())
 		appendUnstructured(resources, crd)
 	}
 
