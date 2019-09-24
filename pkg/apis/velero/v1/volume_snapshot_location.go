@@ -23,11 +23,16 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // VolumeSnapshotLocation is a location where Velero stores volume snapshots.
 type VolumeSnapshotLocation struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   VolumeSnapshotLocationSpec   `json:"spec"`
-	Status VolumeSnapshotLocationStatus `json:"status"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec VolumeSnapshotLocationSpec `json:"spec,omitempty"`
+
+	// +optional
+	Status VolumeSnapshotLocationStatus `json:"status,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -35,8 +40,11 @@ type VolumeSnapshotLocation struct {
 // VolumeSnapshotLocationList is a list of VolumeSnapshotLocations.
 type VolumeSnapshotLocationList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []VolumeSnapshotLocation `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []VolumeSnapshotLocation `json:"items"`
 }
 
 // VolumeSnapshotLocationSpec defines the specification for a Velero VolumeSnapshotLocation.
@@ -45,10 +53,12 @@ type VolumeSnapshotLocationSpec struct {
 	Provider string `json:"provider"`
 
 	// Config is for provider-specific configuration fields.
-	Config map[string]string `json:"config"`
+	// +optional
+	Config map[string]string `json:"config,omitempty"`
 }
 
 // VolumeSnapshotLocationPhase is the lifecyle phase of a Velero VolumeSnapshotLocation.
+// +kubebuilder:validation:Enum=Available;Unavailable
 type VolumeSnapshotLocationPhase string
 
 const (
@@ -61,5 +71,6 @@ const (
 
 // VolumeSnapshotLocationStatus describes the current status of a Velero VolumeSnapshotLocation.
 type VolumeSnapshotLocationStatus struct {
+	// +optional
 	Phase VolumeSnapshotLocationPhase `json:"phase,omitempty"`
 }

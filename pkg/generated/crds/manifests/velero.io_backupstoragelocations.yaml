@@ -37,6 +37,9 @@ spec:
             accessMode:
               description: AccessMode defines the permissions for the backup storage
                 location.
+              enum:
+              - ReadOnly
+              - ReadWrite
               type: string
             config:
               additionalProperties:
@@ -56,13 +59,12 @@ spec:
                   type: string
               required:
               - bucket
-              - prefix
               type: object
             provider:
               description: Provider is the provider of the backup storage.
               type: string
           required:
-          - config
+          - objectStorage
           - provider
           type: object
         status:
@@ -73,6 +75,9 @@ spec:
               description: "AccessMode is an unused field. \n Deprecated: there is
                 now an AccessMode field on the Spec and this field will be removed
                 entirely as of v2.0."
+              enum:
+              - ReadOnly
+              - ReadWrite
               type: string
             lastSyncedRevision:
               description: UID is a type that holds unique ID values, including UUIDs.  Because
@@ -82,16 +87,16 @@ spec:
               type: string
             lastSyncedTime:
               format: date-time
+              nullable: true
               type: string
             phase:
               description: BackupStorageLocationPhase is the lifecyle phase of a Velero
                 BackupStorageLocation.
+              enum:
+              - Available
+              - Unavailable
               type: string
           type: object
-      required:
-      - metadata
-      - spec
-      - status
       type: object
   version: v1
   versions:

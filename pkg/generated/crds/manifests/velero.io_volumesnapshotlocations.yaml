@@ -43,7 +43,6 @@ spec:
               description: Provider is the provider of the volume storage.
               type: string
           required:
-          - config
           - provider
           type: object
         status:
@@ -53,12 +52,11 @@ spec:
             phase:
               description: VolumeSnapshotLocationPhase is the lifecyle phase of a
                 Velero VolumeSnapshotLocation.
+              enum:
+              - Available
+              - Unavailable
               type: string
           type: object
-      required:
-      - metadata
-      - spec
-      - status
       type: object
   version: v1
   versions:

@@ -38,6 +38,9 @@ spec:
           properties:
             phase:
               description: Phase is the current lifecycle phase of the ServerStatusRequest.
+              enum:
+              - New
+              - Processed
               type: string
             plugins:
               description: Plugins list information about the plugins running on the
@@ -53,24 +56,18 @@ spec:
                 - kind
                 - name
                 type: object
+              nullable: true
               type: array
             processedTimestamp:
               description: ProcessedTimestamp is when the ServerStatusRequest was
                 processed by the ServerStatusRequestController.
               format: date-time
+              nullable: true
               type: string
             serverVersion:
               description: ServerVersion is the Velero server version.
               type: string
-          required:
-          - phase
-          - plugins
-          - processedTimestamp
-          - serverVersion
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

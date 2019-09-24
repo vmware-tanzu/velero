@@ -24,52 +24,72 @@ import (
 type BackupSpec struct {
 	// IncludedNamespaces is a slice of namespace names to include objects
 	// from. If empty, all namespaces are included.
-	IncludedNamespaces []string `json:"includedNamespaces"`
+	// +optional
+	// +nullable
+	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
 
 	// ExcludedNamespaces contains a list of namespaces that are not
 	// included in the backup.
-	ExcludedNamespaces []string `json:"excludedNamespaces"`
+	// +optional
+	// +nullable
+	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 
 	// IncludedResources is a slice of resource names to include
 	// in the backup. If empty, all resources are included.
-	IncludedResources []string `json:"includedResources"`
+	// +optional
+	// +nullable
+	IncludedResources []string `json:"includedResources,omitempty"`
 
 	// ExcludedResources is a slice of resource names that are not
 	// included in the backup.
-	ExcludedResources []string `json:"excludedResources"`
+	// +optional
+	// +nullable
+	ExcludedResources []string `json:"excludedResources,omitempty"`
 
 	// LabelSelector is a metav1.LabelSelector to filter with
 	// when adding individual objects to the backup. If empty
 	// or nil, all objects are included. Optional.
-	LabelSelector *metav1.LabelSelector `json:"labelSelector"`
+	// +optional
+	// +nullable
+	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
 
 	// SnapshotVolumes specifies whether to take cloud snapshots
 	// of any PV's referenced in the set of objects included
 	// in the Backup.
+	// +optional
+	// +nullable
 	SnapshotVolumes *bool `json:"snapshotVolumes,omitempty"`
 
 	// TTL is a time.Duration-parseable string describing how long
 	// the Backup should be retained for.
-	TTL metav1.Duration `json:"ttl"`
+	// +optional
+	TTL metav1.Duration `json:"ttl,omitempty"`
 
 	// IncludeClusterResources specifies whether cluster-scoped resources
 	// should be included for consideration in the backup.
-	IncludeClusterResources *bool `json:"includeClusterResources"`
+	// +optional
+	// +nullable
+	IncludeClusterResources *bool `json:"includeClusterResources,omitempty"`
 
 	// Hooks represent custom behaviors that should be executed at different phases of the backup.
-	Hooks BackupHooks `json:"hooks"`
+	// +optional
+	Hooks BackupHooks `json:"hooks,omitempty"`
 
 	// StorageLocation is a string containing the name of a BackupStorageLocation where the backup should be stored.
-	StorageLocation string `json:"storageLocation"`
+	// +optional
+	StorageLocation string `json:"storageLocation,omitempty"`
 
 	// VolumeSnapshotLocations is a list containing names of VolumeSnapshotLocations associated with this backup.
-	VolumeSnapshotLocations []string `json:"volumeSnapshotLocations"`
+	// +optional
+	VolumeSnapshotLocations []string `json:"volumeSnapshotLocations,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.
 type BackupHooks struct {
 	// Resources are hooks that should be executed when backing up individual instances of a resource.
-	Resources []BackupResourceHookSpec `json:"resources"`
+	// +optional
+	// +nullable
+	Resources []BackupResourceHookSpec `json:"resources,omitempty"`
 }
 
 // BackupResourceHookSpec defines one or more BackupResourceHooks that should be executed based on
@@ -77,23 +97,42 @@ type BackupHooks struct {
 type BackupResourceHookSpec struct {
 	// Name is the name of this hook.
 	Name string `json:"name"`
+
 	// IncludedNamespaces specifies the namespaces to which this hook spec applies. If empty, it applies
 	// to all namespaces.
-	IncludedNamespaces []string `json:"includedNamespaces"`
+	// +optional
+	// +nullable
+	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
+
 	// ExcludedNamespaces specifies the namespaces to which this hook spec does not apply.
-	ExcludedNamespaces []string `json:"excludedNamespaces"`
+	// +optional
+	// +nullable
+	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
+
 	// IncludedResources specifies the resources to which this hook spec applies. If empty, it applies
 	// to all resources.
-	IncludedResources []string `json:"includedResources"`
+	// +optional
+	// +nullable
+	IncludedResources []string `json:"includedResources,omitempty"`
+
 	// ExcludedResources specifies the resources to which this hook spec does not apply.
-	ExcludedResources []string `json:"excludedResources"`
+	// +optional
+	// +nullable
+	ExcludedResources []string `json:"excludedResources,omitempty"`
+
 	// LabelSelector, if specified, filters the resources to which this hook spec applies.
+	// +optional
+	// +nullable
 	LabelSelector *metav1.LabelSelector `json:"labelSelector,omitempty"`
+
 	// PreHooks is a list of BackupResourceHooks to execute prior to storing the item in the backup.
 	// These are executed before any "additional items" from item actions are processed.
+	// +optional
 	PreHooks []BackupResourceHook `json:"pre,omitempty"`
+
 	// PostHooks is a list of BackupResourceHooks to execute after storing the item in the backup.
 	// These are executed after all "additional items" from item actions are processed.
+	// +optional
 	PostHooks []BackupResourceHook `json:"post,omitempty"`
 }
 
@@ -107,23 +146,32 @@ type BackupResourceHook struct {
 type ExecHook struct {
 	// Container is the container in the pod where the command should be executed. If not specified,
 	// the pod's first container is used.
-	Container string `json:"container"`
+	// +optional
+	Container string `json:"container,omitempty"`
+
 	// Command is the command and arguments to execute.
+	// +kubebuilder:validation:MinItems=1
 	Command []string `json:"command"`
+
 	// OnError specifies how Velero should behave if it encounters an error executing this hook.
-	OnError HookErrorMode `json:"onError"`
+	// +optional
+	OnError HookErrorMode `json:"onError,omitempty"`
+
 	// Timeout defines the maximum amount of time Velero should wait for the hook to complete before
 	// considering the execution a failure.
-	Timeout metav1.Duration `json:"timeout"`
+	// +optional
+	Timeout metav1.Duration `json:"timeout,omitempty"`
 }
 
 // HookErrorMode defines how Velero should treat an error from a hook.
+// +kubebuilder:validation:Enum=Continue;Fail
 type HookErrorMode string
 
 const (
 	// HookErrorModeContinue means that an error from a hook is acceptable, and the backup can
 	// proceed.
 	HookErrorModeContinue HookErrorMode = "Continue"
+
 	// HookErrorModeFail means that an error from a hook is problematic, and the backup should be in
 	// error.
 	HookErrorModeFail HookErrorMode = "Fail"
@@ -131,6 +179,7 @@ const (
 
 // BackupPhase is a string representation of the lifecycle phase
 // of a Velero backup.
+// +kubebuilder:validation:Enum=New;FailedValidation;InProgress;Completed;PartiallyFailed;Failed;Deleting
 type BackupPhase string
 
 const (
@@ -164,47 +213,61 @@ const (
 // BackupStatus captures the current status of a Velero backup.
 type BackupStatus struct {
 	// Version is the backup format version.
-	Version int `json:"version"`
+	// +optional
+	Version int `json:"version,omitempty"`
 
 	// Expiration is when this Backup is eligible for garbage-collection.
-	Expiration metav1.Time `json:"expiration"`
+	// +optional
+	// +nullable
+	Expiration metav1.Time `json:"expiration,omitempty"`
 
 	// Phase is the current state of the Backup.
-	Phase BackupPhase `json:"phase"`
+	// +optional
+	Phase BackupPhase `json:"phase,omitempty"`
 
 	// ValidationErrors is a slice of all validation errors (if
 	// applicable).
-	ValidationErrors []string `json:"validationErrors"`
+	// +optional
+	// +nullable
+	ValidationErrors []string `json:"validationErrors,omitempty"`
 
 	// StartTimestamp records the time a backup was started.
 	// Separate from CreationTimestamp, since that value changes
 	// on restores.
 	// The server's time is used for StartTimestamps
-	StartTimestamp metav1.Time `json:"startTimestamp"`
+	// +optional
+	// +nullable
+	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a backup was completed.
 	// Completion time is recorded even on failed backups.
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
-	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+	// +optional
+	// +nullable
+	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// VolumeSnapshotsAttempted is the total number of attempted
 	// volume snapshots for this backup.
-	VolumeSnapshotsAttempted int `json:"volumeSnapshotsAttempted"`
+	// +optional
+	VolumeSnapshotsAttempted int `json:"volumeSnapshotsAttempted,omitempty"`
 
 	// VolumeSnapshotsCompleted is the total number of successfully
 	// completed volume snapshots for this backup.
-	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted"`
+	// +optional
+	VolumeSnapshotsCompleted int `json:"volumeSnapshotsCompleted,omitempty"`
 
 	// Warnings is a count of all warning messages that were generated during
 	// execution of the backup. The actual warnings are in the backup's log
 	// file in object storage.
-	Warnings int `json:"warnings"`
+	// +optional
+	Warnings int `json:"warnings,omitempty"`
 
 	// Errors is a count of all error messages that were generated during
 	// execution of the backup.  The actual errors are in the backup's log
 	// file in object storage.
-	Errors int `json:"errors"`
+	// +optional
+	Errors int `json:"errors,omitempty"`
 }
 
 // +genclient
@@ -213,10 +276,15 @@ type BackupStatus struct {
 // Backup is a Velero resource that respresents the capture of Kubernetes
 // cluster state at a point in time (API objects and associated volume state).
 type Backup struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   BackupSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec BackupSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status BackupStatus `json:"status,omitempty"`
 }
 
@@ -225,6 +293,9 @@ type Backup struct {
 // BackupList is a list of Backups.
 type BackupList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []Backup `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []Backup `json:"items"`
 }

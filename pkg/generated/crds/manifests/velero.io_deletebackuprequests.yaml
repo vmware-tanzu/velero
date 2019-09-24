@@ -46,17 +46,16 @@ spec:
                 the deletion process.
               items:
                 type: string
+              nullable: true
               type: array
             phase:
               description: Phase is the current state of the DeleteBackupRequest.
+              enum:
+              - New
+              - InProgress
+              - Processed
               type: string
-          required:
-          - errors
-          - phase
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

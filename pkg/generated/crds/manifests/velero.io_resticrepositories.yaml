@@ -59,21 +59,19 @@ spec:
             lastMaintenanceTime:
               description: LastMaintenanceTime is the last time maintenance was run.
               format: date-time
+              nullable: true
               type: string
             message:
               description: Message is a message about the current status of the ResticRepository.
               type: string
             phase:
               description: Phase is the current state of the ResticRepository.
+              enum:
+              - New
+              - Ready
+              - NotReady
               type: string
-          required:
-          - lastMaintenanceTime
-          - message
-          - phase
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

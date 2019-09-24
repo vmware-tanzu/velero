@@ -42,34 +42,40 @@ spec:
                 not included in the restore.
               items:
                 type: string
+              nullable: true
               type: array
             excludedResources:
               description: ExcludedResources is a slice of resource names that are
                 not included in the restore.
               items:
                 type: string
+              nullable: true
               type: array
             includeClusterResources:
               description: IncludeClusterResources specifies whether cluster-scoped
                 resources should be included for consideration in the restore. If
                 null, defaults to true.
+              nullable: true
               type: boolean
             includedNamespaces:
               description: IncludedNamespaces is a slice of namespace names to include
                 objects from. If empty, all namespaces are included.
               items:
                 type: string
+              nullable: true
               type: array
             includedResources:
               description: IncludedResources is a slice of resource names to include
                 in the restore. If empty, all resources in the backup are included.
               items:
                 type: string
+              nullable: true
               type: array
             labelSelector:
               description: LabelSelector is a metav1.LabelSelector to filter with
                 when restoring individual objects from the backup. If empty or nil,
                 all objects are included. Optional.
+              nullable: true
               properties:
                 matchExpressions:
                   description: matchExpressions is a list of label selector requirements.
@@ -121,6 +127,7 @@ spec:
             restorePVs:
               description: RestorePVs specifies whether to restore all included PVs
                 from snapshot (via the cloudprovider).
+              nullable: true
               type: boolean
             scheduleName:
               description: ScheduleName is the unique name of the Velero schedule
@@ -129,11 +136,6 @@ spec:
               type: string
           required:
           - backupName
-          - excludedNamespaces
-          - excludedResources
-          - includedNamespaces
-          - includedResources
-          - namespaceMapping
           type: object
         status:
           description: RestoreStatus captures the current status of a Velero restore
@@ -149,28 +151,27 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the Restore
+              enum:
+              - New
+              - FailedValidation
+              - InProgress
+              - Completed
+              - PartiallyFailed
+              - Failed
               type: string
             validationErrors:
               description: ValidationErrors is a slice of all validation errors (if
                 applicable)
               items:
                 type: string
+              nullable: true
               type: array
             warnings:
               description: Warnings is a count of all warning messages that were generated
                 during execution of the restore. The actual warnings are stored in
                 object storage.
               type: integer
-          required:
-          - errors
-          - failureReason
-          - phase
-          - validationErrors
-          - warnings
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

@@ -39,6 +39,7 @@ type ResticRepositorySpec struct {
 }
 
 // ResticRepositoryPhase represents the lifecycle phase of a ResticRepository.
+// +kubebuilder:validation:Enum=New;Ready;NotReady
 type ResticRepositoryPhase string
 
 const (
@@ -50,23 +51,32 @@ const (
 // ResticRepositoryStatus is the current status of a ResticRepository.
 type ResticRepositoryStatus struct {
 	// Phase is the current state of the ResticRepository.
-	Phase ResticRepositoryPhase `json:"phase"`
+	// +optional
+	Phase ResticRepositoryPhase `json:"phase,omitempty"`
 
 	// Message is a message about the current status of the ResticRepository.
-	Message string `json:"message"`
+	// +optional
+	Message string `json:"message,omitempty"`
 
 	// LastMaintenanceTime is the last time maintenance was run.
-	LastMaintenanceTime metav1.Time `json:"lastMaintenanceTime"`
+	// +optional
+	// +nullable
+	LastMaintenanceTime metav1.Time `json:"lastMaintenanceTime,omitempty"`
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type ResticRepository struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   ResticRepositorySpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec ResticRepositorySpec `json:"spec,omitempty"`
+
+	// +optional
 	Status ResticRepositoryStatus `json:"status,omitempty"`
 }
 
@@ -75,6 +85,9 @@ type ResticRepository struct {
 // ResticRepositoryList is a list of ResticRepositories.
 type ResticRepositoryList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []ResticRepository `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []ResticRepository `json:"items"`
 }

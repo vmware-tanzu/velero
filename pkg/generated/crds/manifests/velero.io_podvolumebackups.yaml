@@ -93,7 +93,6 @@ spec:
           - node
           - pod
           - repoIdentifier
-          - tags
           - volume
           type: object
         status:
@@ -105,6 +104,7 @@ spec:
                 is recorded before uploading the backup object. The server's time
                 is used for CompletionTimestamps
               format: date-time
+              nullable: true
               type: string
             message:
               description: Message is a message about the pod volume backup's status.
@@ -115,6 +115,11 @@ spec:
               type: string
             phase:
               description: Phase is the current state of the PodVolumeBackup.
+              enum:
+              - New
+              - InProgress
+              - Completed
+              - Failed
               type: string
             progress:
               description: Progress holds the total number of bytes of the volume
@@ -127,9 +132,6 @@ spec:
                 totalBytes:
                   format: int64
                   type: integer
-              required:
-              - bytesDone
-              - totalBytes
               type: object
             snapshotID:
               description: SnapshotID is the identifier for the snapshot of the pod
@@ -140,19 +142,9 @@ spec:
                 from CreationTimestamp, since that value changes on restores. The
                 server's time is used for StartTimestamps
               format: date-time
+              nullable: true
               type: string
-          required:
-          - completionTimestamp
-          - message
-          - path
-          - phase
-          - progress
-          - snapshotID
-          - startTimestamp
           type: object
-      required:
-      - metadata
-      - spec
       type: object
   version: v1
   versions:

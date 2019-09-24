@@ -28,6 +28,7 @@ import (
 
 	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
 	"github.com/heptio/velero/pkg/buildinfo"
+	"github.com/heptio/velero/pkg/generated/crds"
 )
 
 // Use "latest" if the build process didn't supply a version
@@ -219,7 +220,8 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	for _, crd := range CRDs() {
+	for _, crd := range crds.CRDs {
+		crd.SetLabels(labels())
 		appendUnstructured(resources, crd)
 	}
 
