@@ -29,7 +29,7 @@ The [Velero v1.1 binary can be found here](https://github.com/heptio/velero/rele
 
 ## Deploy and Configure a Minio Object Store as a backup destination
 
-Velero sends data and metadata about the Kubernetes objects being backed up to an S3 Object Store. If you do not have an S3 Object Store available, Velero provides the manifest file to create a Minio S3 Object Store on your Kubernetes cluster. This means that all Velero backsup can be kept on-premises.
+Velero sends data and metadata about the Kubernetes objects being backed up to an S3 Object Store. If you do not have an S3 Object Store available, Velero provides the manifest file to create a Minio S3 Object Store on your Kubernetes cluster. This means that all Velero backups can be kept on-premises.
 
 * Note: Stateful backups of applications deployed in Kubernetes on vSphere that use the `restic` plugin for backing up Persistent Volumes would send the backup data to the same S3 Object Store.
 
