@@ -58,16 +58,16 @@ var nonRestorableResources = []string{
 	"events.events.k8s.io",
 
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
-	// https://github.com/heptio/velero/issues/622
+	// https://github.com/vmware-tanzu/velero/issues/622
 	"backups.velero.io",
 
 	// Restores are cluster-specific, and don't have value moving across clusters.
-	// https://github.com/heptio/velero/issues/622
+	// https://github.com/vmware-tanzu/velero/issues/622
 	"restores.velero.io",
 
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
-	// https://github.com/heptio/velero/issues/1113
+	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
 }
 

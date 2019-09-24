@@ -463,7 +463,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 		// Clear out req labels to make sure the controller adds them and does not
 		// panic when encountering a nil Labels map
-		// (https://github.com/heptio/velero/issues/1546)
+		// (https://github.com/vmware-tanzu/velero/issues/1546)
 		td.req.Labels = nil
 
 		td.client.PrependReactor("get", "backups", func(action core.Action) (bool, runtime.Object, error) {

@@ -337,7 +337,7 @@ func TestGetNextRunTime(t *testing.T) {
 }
 
 func TestParseCronSchedule(t *testing.T) {
-	// From https://github.com/heptio/velero/issues/30, where we originally were using cron.Parse(),
+	// From https://github.com/vmware-tanzu/velero/issues/30, where we originally were using cron.Parse(),
 	// which treats the first field as seconds, and not minutes. We want to use cron.ParseStandard()
 	// instead, which has the first field as minutes.
 
