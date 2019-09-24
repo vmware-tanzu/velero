@@ -24,6 +24,6 @@ if ! git diff --exit-code pkg/generated/crds/crds.go >/dev/null; then
   # with code-generator `--verify-only` option which discards generated changes
   git checkout pkg/generated/crds
 
-  echo "run 'make update' to update generated CRDs"
+  echo "CRD verification - failed! Generated CRDs are out-of-date, please run 'make update'."
   exit 1
 fi
