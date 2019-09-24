@@ -1,9 +1,9 @@
 ---
 title: Velero v1.1 backing up and restoring apps on Pivotal Container Service (PKS)
-image: ../img/posts/PKS-logo.png
+image: /img/posts/PKS-logo.png
 excerpt: Learn how Velero can be used on PKS, the Pivotal Container Service which deploys and managages Kubernetes clusters on vSphere.
 author_name: Cormac Hogan
-author_avatar: ../img/contributors/cormac-pic.png
+author_avatar: /img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
@@ -343,10 +343,8 @@ Now let’s see if we can successfully reach our `nginx` web server on that IP a
 
 Backups and Restores are now working on Kubernetes deployed by PKS on vSphere using Velero v1.1.
 
-## Join the Movement – Contribute
+## Feedback and Participation
 
-Velero is better because of our contributors and maintainers. It is because of them that we can bring great software to the community. Please join us during our [online community meetings every first Tuesday](https://github.com/heptio/velero-community) and catch up with past meetings on YouTube on the [Velero Community Meetings playlist](https://www.youtube.com/watch?v=nc48ocI-6go&list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM).
-
-You can always find the latest project information at [velero.io](https://velero.io). Look for issues on GitHub marked [“Good first issue”](https://github.com/heptio/velero/issues?q=is:open+is:issue+label:%22Good+first+issue%22) or [“Help wanted”](https://github.com/heptio/velero/issues?utf8=✓&q=is:open+is:issue+label:%22Help+wanted%22+) if you want to roll up your sleeves and write some code with us.
+As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](https://velero.io/community/)
 
 You can find us on [Kubernetes Slack in the #velero channel](https://kubernetes.slack.com/messages/C6VCGP4MT), and follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero).

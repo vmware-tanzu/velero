@@ -1,8 +1,9 @@
 ---
 title: Velero v1.1 backing up and restoring Stateful apps on vSphere and PKS (Pivotal Container Service)
-excerpt: This post demonstrates how Velero can be used on PKS, the Pivotal Container Service which deploys Kubernetes clusters on vSphere.
+image: /img/posts/cassandra.gif
+excerpt: This post demonstrates how Velero can be used on PKS, the Pivotal Container Service which deploys Kubernetes clusters on vSphere, to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
 author_name: Cormac Hogan
-author_avatar: ../img/contributors/cormac-pic.png
+author_avatar: /img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
@@ -260,7 +261,7 @@ The command `velero backup logs` can be used to get additional information about
 
 ## Destroy the Cassandra deployment
 
-Now that we have successfully take a backup, which includes the `Restic` backups of the data, we will now go ahead and destroy the Cassandra namespace, and restore it once again.
+Now that we have successfully taken a backup, which includes the `Restic` backups of the data, we will now go ahead and destroy the Cassandra namespace, and restore it once again.
 
 ```bash
 $ kubectl delete ns cassandra
@@ -451,10 +452,8 @@ cqlsh:demodb>
 
 It looks like the restore has been successful. Velero v1.1 has successfully restored the Kubenetes objects for the Cassandra application, as well as restored the database and table contents.
 
-## Join the Movement – Contribute
+## Feedback and Participation
 
-Velero is better because of our contributors and maintainers. It is because of them that we can bring great software to the community. Please join us during our [online community meetings every first Tuesday](https://github.com/heptio/velero-community) and catch up with past meetings on YouTube on the [Velero Community Meetings playlist](https://www.youtube.com/watch?v=nc48ocI-6go&list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM).
-
-You can always find the latest project information at [velero.io](https://velero.io). Look for issues on GitHub marked [“Good first issue”](https://github.com/heptio/velero/issues?q=is:open+is:issue+label:%22Good+first+issue%22) or [“Help wanted”](https://github.com/heptio/velero/issues?utf8=✓&q=is:open+is:issue+label:%22Help+wanted%22+) if you want to roll up your sleeves and write some code with us.
+As always, we welcome feedback and participation in the development of Velero. [All information on how to contact us or become active can be found here](https://velero.io/community/)
 
 You can find us on [Kubernetes Slack in the #velero channel](https://kubernetes.slack.com/messages/C6VCGP4MT), and follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero).
