@@ -1,25 +1,25 @@
 ---
-title: Velero v1.1 backing up and restoring apps on vSphere
-image: /img/posts/vsphere-logo.jpg
-excerpt: A How-To guide to run Velero on vSphere.
+title: Velero v1.1 backing up and restoring apps on Pivotal Container Service (PKS)
+image: /img/posts/PKS-logo.png
+excerpt: Learn how Velero can be used on PKS, the Pivotal Container Service which deploys and managages Kubernetes clusters on vSphere.
 author_name: Cormac Hogan
 author_avatar: /img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
-Velero version 1.1 provides support to backup Kubernetes applications deployed on vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (`nginx`) that is running in Kubernetes on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications on vSphere during a Velero backup. In this case, we rely on a third party program called `restic`. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found [here](./2019-20-09-Velero-v1-1-Stateful-Backup-vSphere.md).
+Velero version 1.1 provides support to backup Kubernetes applications orchestrated on top of PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (`nginx`) that is running in a Kubernetes cluster deployed by PKS on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic`. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found [here](velero.io/Velero-v1-1-Stateful-Backup-vSphere/).
 
 ## Overview of steps
 
 * Download and extract Velero v1.1
-* Deploy and Configure a Minio Object store
+* Deploy and Configure the Minio Object store
 * Install Velero using the `velero install` command, ensuring that both `restic` support and a Minio `publicUrl` are included
-* Run a test backup/restore of a stateless application that has been deployed on upstream Kubernetes
+* Implement steps to support PKS
+* Run a test backup/restore of a stateless application that has been deployed on Kubernetes that has itself been provisioned by PKS, the Pivotal Container Service
 
 ## What this post does not show
 
-* How to install Velero v1.1 with PKS, Pivotal Container Service, on vSphere
 * A demonstration on how to do backup/restore of a stateful application (i.e. PVs)
 * The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the Velero images. This guide does not show how to add images using a local repository
 
@@ -31,7 +31,7 @@ The [Velero v1.1 binary can be found here](https://github.com/heptio/velero/rele
 
 Velero sends data and metadata about the Kubernetes objects being backed up to an S3 Object Store. If you do not have an S3 Object Store available, Velero provides the manifest file to create a Minio S3 Object Store on your Kubernetes cluster. This means that all Velero backups can be kept on-premises.
 
-* Note: Stateful backups of applications deployed in Kubernetes on vSphere that use the `restic` plugin for backing up Persistent Volumes send the backup data to the same S3 Object Store.
+* Note: Stateful backups of applications deployed in Kubernetes on vSphere that use the `restic` plugin for backing up Persistent Volumes would send the backup data to the same S3 Object Store.
 
 There are a few different steps required to successfully deploy the Minio S3 Object Store.
 
@@ -121,9 +121,46 @@ Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n velero' to view 
 
 Yes, that is a small sailboat in the output (Velero is Spanish for sailboat).
 
+## Modify the hostPath in the Restic DaemonSet
+
+* Note: This step is a special step to be able to backup applications deployed on Enterprise PKS. This is because the path to Pods on native Kubernetes nodes is `/var/lib/kubelet/pods`, but on PKS, they are located in `/var/vcap/data/kubelet/pods`.
+
+This step is to point restic to the correct location of Pods for backup purposes, when K8s is deployed by PKS. First, identify the restic DaemonSet.
+
+```bash
+$ kubectl get ds --all-namespaces
+NAMESPACE     NAME             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+kube-system   vrops-cadvisor   3         3         3       3            3           <none>          5d3h
+pks-system    fluent-bit       3         3         3       3            3           <none>          5d3h
+pks-system    telegraf         3         3         3       3            3           <none>          5d3h
+velero        restic           3         3         0       3            0           <none>
+```
+
+Next, edit the DaemonSet and change the hostPath setting. The before and after edits are shown below.
+
+```bash
+$ kubectl edit ds restic -n velero
+
+# Before
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet/pods
+          type: ""
+        name: host-pods
+
+#After
+      volumes:
+      - hostPath:
+          path: /var/vcap/data/kubelet/pods
+          type: ""
+        name: host-pods
+
+daemonset.extensions/restic edited
+```
+
 ## Deploy a sample application to backup
 
-Velero provides a sample `nginx` application for backup testing. This nginx deployment assumes the presence of a LoadBalancer for its Service. If you do not have a Load Balancer as part of your Container Network Interface (CNI), there are some easily configuration ones available to get your started. One example is MetalLb, available [here](https://metallb.universe.tf/).
+Velero provides a sample `nginx` application for backup testing. This `nginx` deployment assumes the presence of a LoadBalancer for its Service. PKS supports NSX-T integration, so if this is configured, NSX-T will provide this service for you. If you do not have a Load Balancer as part of your Container Network Interface (CNI), there are some easily configuration ones available to get your started. One example is MetalLb, available [here](https://metallb.universe.tf/).
 
 * Note: This application is stateless. It does not create any Persistent Volumes, thus the restic driver is not utilizied as part of this example. To test whether restic is working correctly, you will need to backup a stateful application that is using Persistent Volumes.
 
@@ -146,6 +183,7 @@ default               Active   5d3h
 kube-public           Active   5d3h
 kube-system           Active   5d3h
 nginx-example         Active   4s
+pks-system            Active   5d3h
 velero                Active   9m40s
 wavefront-collector   Active   24h
 ```
@@ -179,7 +217,60 @@ Run `velero backup describe nginx-backup` or `velero backup logs nginx-backup` f
 
 $ velero backup get
 NAME           STATUS      CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
-nginx-backup   Completed   2019-08-07 16:13:44 +0100 IST   29d       default            app=nginx
+nginx-backup   Completed   2019-09-20 11:11:00 +0100 IST   29d       default            app=nginx
+```
+
+For additional details on the objects that were backed up, you can use the `--details` option.
+
+```bash
+$ velero backup describe nginx-backup --details
+Name:         nginx-backup
+Namespace:    velero
+Labels:       velero.io/storage-location=default
+Annotations:  <none>
+
+Phase:  Completed
+
+Namespaces:
+  Included:  *
+  Excluded:  <none>
+
+Resources:
+  Included:        *
+  Excluded:        <none>
+  Cluster-scoped:  auto
+
+Label selector:  app=nginx
+
+Storage Location:  default
+
+Snapshot PVs:  auto
+
+TTL:  720h0m0s
+
+Hooks:  <none>
+
+Backup Format Version:  1
+
+Started:    2019-09-20 11:11:00 +0100 IST
+Completed:  2019-09-20 11:11:12 +0100 IST
+
+Expiration:  2019-10-20 11:11:00 +0100 IST
+
+Resource List:
+  apps/v1/ReplicaSet:
+    - nginx-example/nginx-deployment-5f8798768c
+  v1/Endpoints:
+    - nginx-example/my-nginx
+  v1/Namespace:
+    - nginx-example
+  v1/Pod:
+    - nginx-example/nginx-deployment-5f8798768c-c5wg9
+    - nginx-example/nginx-deployment-5f8798768c-psf5r
+  v1/Service:
+    - nginx-example/my-nginx
+
+Persistent Volumes: <none included>
 ```
 
 You can now login to the Minio Object Storage via a browser and verify that the backup actually exists. You should see the name of the backup under the `velero/backups` folder:
@@ -204,7 +295,7 @@ Restores are also done from the command line using the `velero restore` command.
 ```bash
 $ velero backup get
 NAME           STATUS      CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
-nginx-backup   Completed   2019-08-07 16:13:44 +0100 IST   29d       default            app=nginx
+nginx-backup   Completed   2019-09-20 11:11:00 +0100 IST   29d       default            app=nginx
 ```
 
 ```bash
@@ -250,7 +341,7 @@ Now let’s see if we can successfully reach our `nginx` web server on that IP a
 
 ![nginx restored](../img/vsphere-tutorial-icons/nginx-restore-new-ip.png)
 
-Backups and Restores are now working on Kubernetes deployed on vSphere using Velero v1.1.
+Backups and Restores are now working on Kubernetes deployed by PKS on vSphere using Velero v1.1.
 
 ## Feedback and Participation
 
