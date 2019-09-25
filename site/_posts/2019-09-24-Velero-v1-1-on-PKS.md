@@ -8,7 +8,7 @@ categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
-Velero version 1.1 provides support to backup Kubernetes applications orchestrated on top of PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (`nginx`) that is running in a Kubernetes cluster deployed by PKS on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic`. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found [here](velero.io/Velero-v1-1-Stateful-Backup-vSphere/).
+Velero version 1.1 provides support to backup Kubernetes applications orchestrated on top of PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (`nginx`) that is running in a Kubernetes cluster deployed by PKS on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic`. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found [here](../Velero-v1-1-Stateful-Backup-vSphere/).
 
 ## Overview of steps
 
