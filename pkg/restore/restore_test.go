@@ -562,6 +562,24 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
 			},
 		},
+		{
+			name:    "namespace mappings are applied when IncludedNamespaces are specified",
+			restore: defaultRestore().IncludedNamespaces("ns-1", "ns-2").NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
+			backup:  defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			tarball: newTarWriter(t).
+				addItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
+				).
+				done(),
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
+			},
+		},
 	}
 
 	for _, tc := range tests {

@@ -751,9 +751,11 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	// Check if namespace/cluster-scoped resource should be restored. We need
 	// to do this here since this method may be getting called for an additional
 	// item which is in a namespace that's excluded, or which is cluster-scoped
-	// and should be excluded.
+	// and should be excluded. Note that we're checking the object's namespace (
+	// via obj.GetNamespace()) instead of the namespace parameter, because we want
+	// to check the *original* namespace, not the remapped one if it's been remapped.
 	if namespace != "" {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) {
 			ctx.log.WithFields(logrus.Fields{
 				"namespace":     obj.GetNamespace(),
 				"name":          obj.GetName(),
