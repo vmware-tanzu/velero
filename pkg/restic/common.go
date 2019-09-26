@@ -28,6 +28,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider/azure"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -220,7 +221,7 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := getResticEnvVars(loc.Spec.Config)
+	azureVars, err := azure.GetResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}
@@ -231,21 +232,4 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 	}
 
 	return env, nil
-}
-
-// getResticEnvVars gets the environment variables that restic
-// relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
-// on info in the provided object storage location config map.
-func getResticEnvVars(config map[string]string) (map[string]string, error) {
-	// storageAccountKey, err := getStorageAccountKey(config)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	return map[string]string{
-		// "AZURE_ACCOUNT_NAME": config[storageAccountConfigKey],
-		"AZURE_ACCOUNT_NAME": config[""],
-		// "AZURE_ACCOUNT_KEY":  storageAccountKey,
-		"AZURE_ACCOUNT_KEY": "",
-	}, nil
 }

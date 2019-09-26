@@ -18,7 +18,7 @@
   version = "v0.4.12"
 
 [[projects]]
-  digest = "1:c5258041b9f66f5b7ca824cd80eeee137b807a5f9474fe9a4b2806a85a97fe15"
+  digest = "1:67d04a59f2023e3b78b360c2293e05bf8722daa0234e42170a028228ad278b10"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "services/storage/mgmt/2018-02-01/storage",
@@ -26,8 +26,8 @@
     "version",
   ]
   pruneopts = "NUT"
-  revision = "b11e4e7e4bf27a4eb96af9db49de9c7509f5bb01"
-  version = "v27.3.0"
+  revision = "32916f57ad7b421f5fdaab86b73a795632fff117"
+  version = "v21.4.0"
 
 [[projects]]
   digest = "1:f76933c3aea9666267e57b5a249cd925dfe5c18be5aafe3cb9657b928a3b3355"

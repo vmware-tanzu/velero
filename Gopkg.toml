@@ -58,6 +58,10 @@
 # Cloud provider packages
 #
 
+[[constraint]]
+  name = "github.com/Azure/azure-sdk-for-go"
+  version = "~21.4.0"
+
 # k8s.io/client-go kubernetes-1.15.3 uses v11.1.2
 [[constraint]]
   name = "github.com/Azure/go-autorest"
