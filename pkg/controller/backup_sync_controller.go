@@ -134,7 +134,7 @@ func (c *backupSyncController) run() {
 
 	for _, location := range locations {
 		log := c.logger.WithField("backupLocation", location.Name)
-		log.Info("Attempting to sync contents of backup storage location into cluster")
+		log.Debug("Checking backup location for backups to sync into cluster")
 
 		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
@@ -165,6 +165,12 @@ func (c *backupSyncController) run() {
 			clusterBackupsSet.Insert(b.Name)
 		}
 		backupsToSync := backupStoreBackups.Difference(clusterBackupsSet)
+
+		if count := backupsToSync.Len(); count > 0 {
+			log.Infof("Found %v backups in the backup location that do not exist in the cluster and need to be synced", count)
+		} else {
+			log.Debug("No backups found in the backup location that need to be synced into the cluster")
+		}
 
 		// sync each backup
 		for backupName := range backupsToSync {
