@@ -148,12 +148,9 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 	}
 
 	// 2. check whether a different subscription ID was set for backups in config["subscriptionId"]
-	var subscriptionId string
-	if _, err := getRequiredValues(mapLookup(config), subscriptionIdConfigKey); err != nil {
-		subscriptionId = envVars[subscriptionIDEnvVar]
-	}
-	if subscriptionId == "" {
-		subscriptionId = config[subscriptionIdConfigKey]
+	subscriptionId := envVars[subscriptionIDEnvVar]
+	if val := config[subscriptionIdConfigKey]; val != "" {
+		subscriptionId = val
 	}
 
 	// 3. we need config["resourceGroup"], config["storageAccount"]
