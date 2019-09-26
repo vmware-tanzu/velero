@@ -216,7 +216,7 @@ func (c *backupSyncController) run() {
 			}
 
 			for _, podVolumeBackup := range podVolumeBackups {
-				log = log.WithField("podVolumeBackup", podVolumeBackup.Name)
+				log := log.WithField("podVolumeBackup", podVolumeBackup.Name)
 				log.Debug("Checking this pod volume backup to see if it needs to be synced into the cluster")
 
 				for i, ownerRef := range podVolumeBackup.OwnerReferences {
