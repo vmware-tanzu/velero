@@ -107,18 +107,27 @@ const (
 )
 
 // TODO(2.0): remove the AccessMode field from BackupStorageLocationStatus.
+// TODO(2.0): remove the LastSyncedRevision field from BackupStorageLocationStatus.
 
 // BackupStorageLocationStatus describes the current status of a Velero BackupStorageLocation.
 type BackupStorageLocationStatus struct {
+	// Phase is the current state of the BackupStorageLocation.
 	// +optional
 	Phase BackupStorageLocationPhase `json:"phase,omitempty"`
 
-	// +optional
-	LastSyncedRevision types.UID `json:"lastSyncedRevision,omitempty"`
-
+	// LastSyncedTime is the last time the contents of the location were synced into
+	// the cluster.
 	// +optional
 	// +nullable
 	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty"`
+
+	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
+	// storage location the last time the BSL's contents were synced into the cluster.
+	//
+	// Deprecated: this field is no longer updated or used for detecting changes to
+	// the location's contents and will be removed entirely in v2.0.
+	// +optional
+	LastSyncedRevision types.UID `json:"lastSyncedRevision,omitempty"`
 
 	// AccessMode is an unused field.
 	//

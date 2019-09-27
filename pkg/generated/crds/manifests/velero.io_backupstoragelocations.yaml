@@ -80,18 +80,20 @@ spec:
               - ReadWrite
               type: string
             lastSyncedRevision:
-              description: UID is a type that holds unique ID values, including UUIDs.  Because
-                we don't ONLY use UUIDs, this is an alias to string.  Being a type
-                captures intent and helps make sure that UIDs and names do not get
-                conflated.
+              description: "LastSyncedRevision is the value of the `metadata/revision`
+                file in the backup storage location the last time the BSL's contents
+                were synced into the cluster. \n Deprecated: this field is no longer
+                updated or used for detecting changes to the location's contents and
+                will be removed entirely in v2.0."
               type: string
             lastSyncedTime:
+              description: LastSyncedTime is the last time the contents of the location
+                were synced into the cluster.
               format: date-time
               nullable: true
               type: string
             phase:
-              description: BackupStorageLocationPhase is the lifecyle phase of a Velero
-                BackupStorageLocation.
+              description: Phase is the current state of the BackupStorageLocation.
               enum:
               - Available
               - Unavailable
