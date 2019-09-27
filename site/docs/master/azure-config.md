@@ -178,7 +178,7 @@ velero install \
     --bucket $BLOB_CONTAINER \
     --secret-file ./credentials-velero \
     --backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] \
-    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>
+    --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 ```
 
 Additionally, you can specify `--use-restic` to enable restic support, and `--wait` to wait for the deployment to be ready.
