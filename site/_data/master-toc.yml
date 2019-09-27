@@ -4,11 +4,9 @@ toc:
       - page: About Velero
         url: /index.html
       - page: How Velero works
-        url: /about
+        url: /how-velero-works
       - page: About locations
         url: /locations
-      - page: Supported platforms
-        url: /support-matrix
   - title: Install
     subfolderitems:
       - page: Overview
@@ -17,14 +15,18 @@ toc:
         url: /upgrade-to-1.1
       - page: Quick start with in-cluster MinIO
         url: /get-started
-      - page: Run on AWS
-        url: /aws-config
-      - page: Run on Azure
-        url: /azure-config
-      - page: Run on GCP
-        url: /gcp-config
-      - page: Restic setup
+      - page: Restic integration
         url: /restic
+  - title: Plugins
+    subfolderitems:
+      - page: Overview
+        url: /overview-plugins
+      - page: Supported plugins
+        url: /supported-plugins
+      - page: Community plugins
+        url: /community-plugins
+      - page: Custom plugins
+        url: /custom-plugins
   - title: Use
     subfolderitems:
       - page: Disaster recovery
@@ -37,8 +39,6 @@ toc:
         url: /restore-reference
       - page: Run in any namespace
         url: /namespace
-      - page: Extend with plugins
-        url: /plugins
       - page: Extend with hooks
         url: /hooks
   - title: Troubleshoot

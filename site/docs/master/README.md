@@ -17,6 +17,11 @@ Velero consists of:
 
 You can run Velero in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
 
+## Supported Kubernetes Versions
+
+- In general, Velero works on Kubernetes version 1.7 or later (when Custom Resource Definitions were introduced).
+- Restic support requires Kubernetes version 1.10 or later, or an earlier version with the mount propagation feature enabled. See [Restic Integration][17].
+
 ## Installation
 
 We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
@@ -53,7 +58,7 @@ See [the list of releases][6] to find out about feature changes.
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
-
+[17]: restic.md
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
 

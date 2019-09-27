@@ -26,12 +26,7 @@ velero install \
 
 When using node-based IAM policies, `--secret-file` is not required, but `--no-secret` is required for confirmation.
 
-For provider-specific instructions, see:
-
-* [Run Velero on AWS][0]
-* [Run Velero on GCP][1]
-* [Run Velero on Azure][2]
-* [Use IBM Cloud Object Store as Velero's storage destination][4]
+For provider-specific instructions, see the navigation on the left under `Plugins`.
 
 When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
@@ -170,7 +165,6 @@ After you set up the Velero server, try these examples:
 [1]: gcp-config.md
 [2]: azure-config.md
 [3]: namespace.md
-[4]: ibm-config.md
 [19]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 [20]: restic.md
 [99]: support-matrix.md
