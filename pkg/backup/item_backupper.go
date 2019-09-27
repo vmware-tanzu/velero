@@ -120,9 +120,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	log := logger.WithField("name", name)
 	log = log.WithField("resource", groupResource)
-	if namespace != "" {
-		log = log.WithField("namespace", namespace)
-	}
+	log = log.WithField("namespace", namespace)
 
 	if metadata.GetLabels()["velero.io/exclude-from-backup"] == "true" {
 		log.Info("Excluding item because it has label velero.io/exclude-from-backup=true")
