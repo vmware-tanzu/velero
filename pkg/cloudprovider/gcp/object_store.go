@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"io"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
@@ -80,14 +79,19 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, kmsKeyNameConfigKey, serviceAccountConfig); err != nil {
 		return err
 	}
-	/* Find default token source to extract the GoogleAccessID */
+	// Find default token source to extract the GoogleAccessID
 	ctx := context.Background()
 	creds, err := google.FindDefaultCredentials(ctx)
+
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	if creds.JSON != nil {
-		/* Using Credentials File */
+		// Using Credentials File
 		err = o.initFromKeyFile(creds)
 	} else {
-		/* Using compute engine credentials. Use this if workload identity is enabled. */
+		// Using compute engine credentials. Use this if workload identity is enabled.
 		err = o.initFromComputeEngine(config)
 	}
 
@@ -114,10 +118,10 @@ func (o *ObjectStore) initFromKeyFile(creds *google.Credentials) error {
 		return errors.Wrap(err, "error parsing credentials file; should be JSON")
 	}
 	if jwtConfig.Email == "" {
-		return errors.Errorf("credentials file pointed to by %s does not contain an email", credentialsEnvVar)
+		return errors.Errorf("credentials file pointed to by %s does not contain an email", "GOOGLE_APPLICATION_CREDENTIALS")
 	}
 	if len(jwtConfig.PrivateKey) == 0 {
-		return errors.Errorf("credentials file pointed to by %s does not contain a private key", credentialsEnvVar)
+		return errors.Errorf("credentials file pointed to by %s does not contain a private key", "GOOGLE_APPLICATION_CREDENTIALS")
 	}
 
 	o.googleAccessID = jwtConfig.Email
@@ -130,7 +134,7 @@ func (o *ObjectStore) initFromComputeEngine(config map[string]string) error {
 	var ok bool
 	o.googleAccessID, ok = config["serviceAccount"]
 	if !ok {
-		return errors.Errorf("could not find the service account name from the compute engine credentials")
+		return errors.Errorf("serviceAccount is expected to be provided as an item in BackupStorageLocation's config")
 	}
 	o.iamSvc, err = iamcredentials.NewService(context.Background())
 	return err
@@ -224,22 +228,20 @@ func (o *ObjectStore) DeleteObject(bucket, key string) error {
 	return errors.Wrapf(o.client.Bucket(bucket).Object(key).Delete(context.Background()), "error deleting object %s", key)
 }
 
+/*
+ * Use the iamSignBlob api call to sign the url if there is no credentials file to get the key from.
+ * https://cloud.google.com/iam/credentials/reference/rest/v1/projects.serviceAccounts/signBlob
+ */
 func (o *ObjectStore) SignBytes(bytes []byte) ([]byte, error) {
 	name := "projects/-/serviceAccounts/" + o.googleAccessID
-	payload := strings.Builder{}
-	if _, err := payload.Write(bytes); err != nil {
-		return nil, err
-	}
 	resp, err := o.iamSvc.Projects.ServiceAccounts.SignBlob(name, &iamcredentials.SignBlobRequest{
-		Delegates: []string{name},
-		Payload:   payload.String(),
+		Payload: base64.StdEncoding.EncodeToString(bytes),
 	}).Context(context.Background()).Do()
 
 	if err != nil {
 		return nil, err
 	}
-	data, err := base64.StdEncoding.DecodeString(resp.SignedBlob)
-	return data, err
+	return base64.StdEncoding.DecodeString(resp.SignedBlob)
 }
 
 func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (string, error) {
@@ -248,13 +250,12 @@ func (o *ObjectStore) CreateSignedURL(bucket, key string, ttl time.Duration) (st
 		Method:         "GET",
 		Expires:        time.Now().Add(ttl),
 	}
+
 	if o.privateKey == nil {
-		options.SignBytes = func(b []byte) ([]byte, error) {
-			signedBytes, err := o.SignBytes(b)
-			return signedBytes, err
-		}
+		options.SignBytes = o.SignBytes
 	} else {
 		options.PrivateKey = o.privateKey
 	}
+
 	return storage.SignedURL(bucket, key, &options)
 }

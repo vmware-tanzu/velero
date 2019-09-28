@@ -69,6 +69,7 @@ func WithEnvFromSecretKey(varName, secret, key string) podTemplateOption {
 func WithSecret(secretPresent bool) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.withSecret = secretPresent
+
 	}
 }
 

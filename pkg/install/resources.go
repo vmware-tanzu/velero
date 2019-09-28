@@ -187,6 +187,7 @@ func Secret(namespace string, data []byte) *corev1.Secret {
 
 func appendUnstructured(list *unstructured.UnstructuredList, obj runtime.Object) error {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&obj)
+
 	// Remove the status field so we're not sending blank data to the server.
 	// On CRDs, having an empty status is actually a validation error.
 	delete(u, "status")
