@@ -25,8 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
-	"github.com/heptio/velero/pkg/plugin/velero"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}

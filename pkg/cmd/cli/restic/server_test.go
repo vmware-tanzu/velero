@@ -25,8 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 
-	"github.com/heptio/velero/pkg/builder"
-	testutil "github.com/heptio/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	testutil "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func Test_validatePodVolumesHostPath(t *testing.T) {

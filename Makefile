@@ -18,7 +18,7 @@
 BIN ?= velero
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/heptio/velero
+PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
 REGISTRY ?= gcr.io/heptio-images

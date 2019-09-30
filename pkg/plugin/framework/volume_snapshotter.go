@@ -21,7 +21,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // VolumeSnapshotterPlugin is an implementation of go-plugin's Plugin

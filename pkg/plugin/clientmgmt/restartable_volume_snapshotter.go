@@ -20,8 +20,8 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/plugin/framework"
-	"github.com/heptio/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // restartableVolumeSnapshotter is a volume snapshotter for a given implementation (such as "aws"). It is associated with

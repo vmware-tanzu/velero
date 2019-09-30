@@ -19,9 +19,9 @@ limitations under the License.
 package fake
 
 import (
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	velerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	fakevelerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1/fake"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	fakevelerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"

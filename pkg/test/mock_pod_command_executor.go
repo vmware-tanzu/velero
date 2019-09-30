@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/mock"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 type MockPodCommandExecutor struct {

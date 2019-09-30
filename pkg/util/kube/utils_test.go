@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeinformers "k8s.io/client-go/informers"
 
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/test"
-	velerotest "github.com/heptio/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/test"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestNamespaceAndName(t *testing.T) {

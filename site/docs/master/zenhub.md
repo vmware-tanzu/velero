@@ -12,4 +12,4 @@ If you are a Velero user or Velero Developer, you do not _need_ to use ZenHub fo
 
 ## Using ZenHub
 
-ZenHub can be integrated within the GitHub interface using their [Chrome or FireFox extensions](https://www.zenhub.com/extension).  In addition, you can use their dedicated [web application](https://app.zenhub.com/workspace/o/heptio/velero/boards?filterLogic=all&repos=99143276).
+ZenHub can be integrated within the GitHub interface using their [Chrome or FireFox extensions](https://www.zenhub.com/extension).  In addition, you can use their dedicated [web application](https://app.zenhub.com/workspace/o/vmware-tanzu/velero/boards?filterLogic=all&repos=99143276).

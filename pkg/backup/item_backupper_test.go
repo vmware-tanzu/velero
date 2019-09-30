@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/heptio/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
 func Test_resourceKey(t *testing.T) {

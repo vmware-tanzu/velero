@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 )
 
 func TestStream(t *testing.T) {

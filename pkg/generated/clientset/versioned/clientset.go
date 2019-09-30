@@ -19,7 +19,7 @@ limitations under the License.
 package versioned
 
 import (
-	velerov1 "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"

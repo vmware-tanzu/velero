@@ -25,10 +25,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/velero/pkg/plugin/velero"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
 // ServiceAccountAction implements ItemAction.

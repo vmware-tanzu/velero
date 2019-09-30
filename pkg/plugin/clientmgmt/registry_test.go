@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/heptio/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestNewRegistry(t *testing.T) {

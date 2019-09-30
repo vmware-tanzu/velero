@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // NewVolumeSnapshotterPlugin constructs a VolumeSnapshotterPlugin.

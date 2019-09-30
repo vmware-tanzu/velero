@@ -21,10 +21,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/util/boolptr"
-	"github.com/heptio/velero/pkg/volume"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type PVRestorer interface {

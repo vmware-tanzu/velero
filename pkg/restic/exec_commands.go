@@ -25,9 +25,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/util/exec"
-	"github.com/heptio/velero/pkg/util/filesystem"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/util/exec"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const restoreProgressCheckInterval = 10 * time.Second

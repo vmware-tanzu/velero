@@ -27,5 +27,5 @@ deploy:
     skip_cleanup: true
     script: hack/gcr-push.sh
     on:
-      repo: heptio/velero
+      repo: vmware-tanzu/velero
       all_branches: true

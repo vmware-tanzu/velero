@@ -30,16 +30,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/features"
 )
 
 const (
 	// kubectlTimeout is how long we wait in seconds for `kubectl version`
 	// before killing the process
 	kubectlTimeout = 5 * time.Second
-	issueURL       = "https://github.com/heptio/velero/issues/new"
+	issueURL       = "https://github.com/vmware-tanzu/velero/issues/new"
 	// IssueTemplate is used to generate .github/ISSUE_TEMPLATE/bug_report.md
 	// as well as the initial text that's place in a new Github issue as
 	// the result of running `velero bug`.

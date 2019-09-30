@@ -50,7 +50,7 @@ fi
 
 echo "${ACTION} goimports"
 for file in ${files}; do
-  output=$(goimports "${MODE}" -local github.com/heptio/velero "${file}")
+  output=$(goimports "${MODE}" -local github.com/vmware-tanzu/velero "${file}")
   if [[ -n "${output}" ]]; then
     VERIFY_IMPORTS_FAILED=1
     echo "${output}"

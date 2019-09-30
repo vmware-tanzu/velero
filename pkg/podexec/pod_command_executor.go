@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 const defaultTimeout = 30 * time.Second

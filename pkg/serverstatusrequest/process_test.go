@@ -28,11 +28,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	"github.com/heptio/velero/pkg/plugin/framework"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 func statusRequestBuilder() *builder.ServerStatusRequestBuilder {

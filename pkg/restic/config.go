@@ -23,9 +23,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider/aws"
-	"github.com/heptio/velero/pkg/persistence"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cloudprovider/aws"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
 )
 
 type BackendType string

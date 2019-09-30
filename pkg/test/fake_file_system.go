@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/afero"
 
-	"github.com/heptio/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 type FakeFileSystem struct {

@@ -19,7 +19,7 @@ package framework
 import (
 	"google.golang.org/grpc/status"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // fromGRPCError takes a gRPC status error, extracts a stack trace

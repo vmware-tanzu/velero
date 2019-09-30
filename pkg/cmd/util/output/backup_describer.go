@@ -25,10 +25,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	"github.com/heptio/velero/pkg/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
