@@ -36,12 +36,18 @@ function highest_release() {
     # As an example, if v1.3.0 exists and we create v1.2.2, v1.3.0 should still be `latest`.
     # `git describe --tags $(git rev-list --tags --max-count=1)` would return the most recently made tag.
 
+    echo "Showing all tags."
+    git tag -l --sort=-v:refname
+
     for t in $(git tag -l --sort=-v:refname);
     do
+        echo "Checking tag $t"
         # If the tag has alpha, beta or rc in it, it's not "latest"
         if [[ "$t" == *"beta"* || "$t" == *"alpha"* || "$t" == *"rc"* ]]; then
+            echo "Skipping tag $t"
             continue
         fi
+        echo "Found highest at $t"
         HIGHEST="$t"
         break
     done
