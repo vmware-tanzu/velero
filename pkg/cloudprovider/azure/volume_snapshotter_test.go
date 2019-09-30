@@ -57,7 +57,7 @@ func TestGetVolumeID(t *testing.T) {
 func TestSetVolumeID(t *testing.T) {
 	b := &VolumeSnapshotter{
 		disksResourceGroup: "rg",
-		subscription:       "sub",
+		disksSubscription:  "sub",
 	}
 
 	pv := &unstructured.Unstructured{
