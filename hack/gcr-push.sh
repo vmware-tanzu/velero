@@ -67,8 +67,10 @@ fi
 echo "Highest tag found: $HIGHEST, BRANCH: $BRANCH, TRAVIS_TAG: $TRAVIS_TAG"
 echo "TAG_LATEST: $TAG_LATEST"
 
-openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
-gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
+# openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
+# gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
+openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in nolanb-vmware-55ce4993acec.json.enc -out nolanb-vmware-55ce4993acec.json -d
+gcloud auth activate-service-account --key-file nolanb-vmware-55ce4993acec.json
 gcloud auth configure-docker -q
 unset GIT_HTTP_USER_AGENT
 
