@@ -47,23 +47,33 @@ function highest_release() {
     done
 }
 
-if [ "$BRANCH" == "master" ]; then
+if [[ "$BRANCH" == "master" ]]; then
     VERSION="$BRANCH"
-elif [ ! -z "$TRAVIS_TAG" ]; then
+elif [[ ! -z "$TRAVIS_TAG" ]]; then
+    # Tags aren't fetched by Travis on checkout, and we don't need them for master
+    git fetch --tags
+    # Calculate the latest release if there's a tag.
+    highest_release
     VERSION="$TRAVIS_TAG"
 else
     # If we're not on master and we're not building a tag, exit early.
     exit 0
 fi
 
-# Calculate the latest release
-highest_release
 
-# Assume we're not tagging `latest` by default.
+# Assume we're not tagging `latest` by default, and never on master.
 TAG_LATEST=false
-if [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
+if [[ "$BRANCH" == "master" ]]; then
+    echo "Building master, not tagging latest."
+elif [[ "$TRAVIS_TAG" == "$HIGHEST" ]]; then
     TAG_LATEST=true
 fi
+
+# Debugging info
+echo "Highest tag found: $HIGHEST"
+echo "BRANCH: $BRANCH"
+echo "TRAVIS_TAG: $TRAVIS_TAG"
+echo "TAG_LATEST: $TAG_LATEST"
 
 openssl aes-256-cbc -K $encrypted_f58ab4413c21_key -iv $encrypted_f58ab4413c21_iv -in heptio-images-fac92d2303ac.json.enc -out heptio-images-fac92d2303ac.json -d
 gcloud auth activate-service-account --key-file heptio-images-fac92d2303ac.json
