@@ -44,7 +44,6 @@ See [the list of releases][6] to find out about feature changes.
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
-[17]: restic.md
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
 
@@ -52,5 +51,4 @@ See [the list of releases][6] to find out about feature changes.
 [29]: https://velero.io/docs/master/
 [30]: troubleshooting.md
 
-[99]: support-matrix.md
 [100]: img/velero.png
