@@ -73,5 +73,5 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [26]: https://slack.hpedev.io/
 [27]: https://github.com/hpe-storage/velero-plugin/issues
 [28]: https://kubernetes.slack.com/messages/velero
-[29]: https://github.com/heptio/velero/issues
+[29]: https://github.com/vmware-tanzu/velero/issues
 [30]: restic.md

@@ -43,7 +43,6 @@ After you use the `velero install` command to install Velero into your cluster, 
 
 [15]: https://docs.aws.amazon.com/cli/latest/topic/config-vars.html#the-shared-credentials-file
 [16]: https://cloud.google.com/docs/authentication/getting-started#setting_the_environment_variable
-[17]: https://aws.amazon.com/quickstart/architecture/heptio-kubernetes/
 [18]: https://eksctl.io/
 [20]: api-types/backupstoragelocation.md
 [21]: api-types/volumesnapshotlocation.md

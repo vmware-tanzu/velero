@@ -71,7 +71,7 @@ helm install --set-file credentials.secretContents.cloud=./credentials-velero st
 See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
 
 [0]: supported-providers.md
-[1]: https://github.com/heptio/velero/releases
+[1]: https://github.com/vmware-tanzu/velero/releases
 [3]: namespace.md
 [4]: restic.md
 [5]: contributions/minio.md
