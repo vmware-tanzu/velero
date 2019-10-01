@@ -1062,7 +1062,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
-				e := errors.Errorf("error restoring %s: not possible since it already exists in the cluster but is different from the backed up version.", restoreErr)
+				e := errors.Errorf("could not restore, %s. Warning: the in-cluster version is different than the backed-up version.", restoreErr)
 				addToResult(&warnings, namespace, e)
 			}
 			return warnings, errs
