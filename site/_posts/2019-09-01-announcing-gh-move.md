@@ -23,7 +23,7 @@ The next Velero release, version 1.2, will be built out of this new repository a
 
 With more and more providers wanting to support Velero, it gets more difficult to justify excluding new plugins from being in-tree while continuing to maintain the AWS, Microsoft Azure, and GCP plugins in-tree. At the same time, if we were to include any more plugins in-tree, it would ultimately become the responsibility of the Velero team to maintain an increasing number of plugins in an unsustainable way. As the opportunity to move to a new GitHub organization presented itself, we thought it was a good time to make structural changes.
 
-The three original native plugins and their respective documentation will each have their own repo under the new VMware Tanzu GitHub organization. You will be able to find them by looking up our list of [Velero supported providers][3].
+The three original native plugins and their respective documentation will each have their own repo under the new VMware Tanzu GitHub organization as of version 1.2. You will be able to find them by looking up our list of [Velero supported providers][3].
 
 Maintenance of these plugins will continue to be done by the Velero core team as usual, although we will gladly promote active contributors to maintainers. This change mainly aims to achieve the following goals:
 
@@ -32,7 +32,7 @@ Maintenance of these plugins will continue to be done by the Velero core team as
 - Iterate on plugins separately from the core codebase
 - Reduce the size of the Velero binaries and images by extracting these SDKs and having a separate release for each individual provider
 
-Instructions for upgrading to version 1.2 and installing Velero and its plugins will be in [our documentation][4].
+Instructions for upgrading to version 1.2 and installing Velero and its plugins will be added to [our documentation][4].
 
 ## Feedback
 
@@ -41,5 +41,5 @@ As always, we welcome feedback and participation in the development of Velero. A
 [1]: https://github.com/vmware-tanzu
 [2]: todo:addblogpos
 [3]: ../docs/master/supported-providers.md
-[4]: https://velero.io/docs
+[4]: https://velero.io/docs/master/
 [5]: https://github.com/vmware-tanzu/velero/issues#workspaces/velero-5c59c15e39d47b774b5864e3/board?milestones=v1.2%232019-10-31&filterLogic=any&repos=99143276&showPipelineDescriptions=false
