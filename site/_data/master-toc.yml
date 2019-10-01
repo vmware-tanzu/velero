@@ -13,18 +13,22 @@ toc:
         url: /install-overview
       - page: Upgrade to 1.1
         url: /upgrade-to-1.1
-      - page: Quick start with in-cluster MinIO
-        url: /get-started
+      - page: Requirements
+        url: /install-requirements
+      - page: Installing
+        url: /installing
+      - page: Supported providers
+        url: /supported-providers
       - page: Restic integration
         url: /restic
+      - page: Examples
+        url: /examples
+      - page: Uninstalling
+        url: /uninstalling
   - title: Plugins
     subfolderitems:
       - page: Overview
         url: /overview-plugins
-      - page: Supported plugins
-        url: /supported-plugins
-      - page: Community plugins
-        url: /community-plugins
       - page: Custom plugins
         url: /custom-plugins
   - title: Use

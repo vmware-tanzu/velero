@@ -11,8 +11,8 @@ To write a plugin for a new backup or volume storage platform, take a look at ou
 
 ## Adding a new plugin
 
-After you publish your plugin on your own repository, open a PR that adds a link to it under the appropriate list on the [community plugins][3] page in our documentation.
+After you publish your plugin on your own repository, open a PR that adds a link to it under the appropriate list of [supported providers][3] page in our documentation.
 
 [1]: https://github.com/heptio/velero-plugin-example/
-[2]: custom-plugins
-[3]: community-plugins
+[2]: custom-plugins.md
+[3]: supported-providers.md

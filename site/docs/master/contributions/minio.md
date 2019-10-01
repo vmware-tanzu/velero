@@ -1,4 +1,4 @@
-## Getting started
+## Getting started with Minio
 
 The following example sets up the Velero server and client, then backs up and restores a sample application.
 
@@ -202,8 +202,6 @@ When you run commands to get logs or describe a backup, the Velero server genera
 
 You can also specify a `publicUrl` config field for the pre-signed URL in your backup storage location config.
 
-For basic instructions on how to install the Velero server and client, see [the getting started example][1].
-
 ### Expose Minio with Service of type NodePort
 
 The Minio deployment by default specifies a Service of type `ClusterIP`. You can change this to `NodePort` to easily expose a cluster service externally if you can reach the node from your Velero client.
@@ -260,8 +258,6 @@ In this case:
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_AND_PORT_OF_INGRESS>` as a field under `spec.config`.
 
-
-[1]: get-started.md
 [3]: install-overview.md
 [17]: restic.md
 [18]: debugging-restores.md
