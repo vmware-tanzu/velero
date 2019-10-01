@@ -1,22 +1,6 @@
 # Providers
 
-Velero can store its backups in any S3 or S3 compatible object storage.
-
-## S3-Compatible object store providers
-
-Velero uses [Amazon's Go SDK][0] to connect to the AWS S3 API. Some third-party storage providers also support the S3 API, and users have reported the following providers work with Velero:
-
-_Note that these storage providers are not regularly tested by the Velero team._
-
- * [IBM Cloud][1]
- * [Oracle Cloud][2]
- * [Minio][3]
- * [DigitalOcean][4]
- * [NooBaa][5]
- * Ceph RADOS v12.2.7
- * Quobyte
-
-_Some storage providers, like Quobyte, may need a different [signature algorithm version][6]._
+Velero supports a variety of storage providers for different backup and snapshot operations. Velero has a plugin system which allows anyone to add compatibility for additional backup and volume storage platforms without modifying the Velero codebase.
 
 ## Velero supported providers
 
@@ -37,6 +21,22 @@ Contact: [Slack][28], [GitHub Issue][29]
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [AlibabaCloud][21]        | 🚫                           | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
+
+## S3-Compatible object store providers
+
+Velero's AWS Object Store plugin uses [Amazon's Go SDK][0] to connect to the AWS S3 API. Some third-party storage providers also support the S3 API, and users have reported the following providers work with Velero:
+
+_Note that these storage providers are not regularly tested by the Velero team._
+
+ * [IBM Cloud][1]
+ * [Oracle Cloud][2]
+ * [Minio][3]
+ * [DigitalOcean][4]
+ * [NooBaa][5]
+ * Ceph RADOS v12.2.7
+ * Quobyte
+
+_Some storage providers, like Quobyte, may need a different [signature algorithm version][6]._
 
 ## Non-supported volume snapshots
 

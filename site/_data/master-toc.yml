@@ -15,22 +15,16 @@ toc:
         url: /upgrade-to-1.1
       - page: Requirements
         url: /install-requirements
-      - page: Installing
-        url: /installing
       - page: Supported providers
         url: /supported-providers
+      - page: Evaluation install 
+        url: /contributions/minio
       - page: Restic integration
         url: /restic
       - page: Examples
         url: /examples
       - page: Uninstalling
         url: /uninstalling
-  - title: Plugins
-    subfolderitems:
-      - page: Overview
-        url: /overview-plugins
-      - page: Custom plugins
-        url: /custom-plugins
   - title: Use
     subfolderitems:
       - page: Disaster recovery
@@ -45,6 +39,12 @@ toc:
         url: /namespace
       - page: Extend with hooks
         url: /hooks
+  - title: Plugins
+    subfolderitems:
+      - page: Overview
+        url: /overview-plugins
+      - page: Custom plugins
+        url: /custom-plugins
   - title: Troubleshoot
     subfolderitems:
       - page: Troubleshooting

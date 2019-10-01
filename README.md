@@ -49,4 +49,4 @@ See [the list of releases][6] to find out about feature changes.
 [29]: https://velero.io/docs/
 [30]: https://velero.io/docs/troubleshooting
 [99]: https://velero.io/docs/support-matrix
-[100]: /site/docs/master/img/velero.png
+[100]: https://velero.io/docs/master/img/velero.png
