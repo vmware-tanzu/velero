@@ -3,7 +3,7 @@
 The following example sets up the Velero server and client, then backs up and restores a sample application.
 
 For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
-For additional functionality with this setup, see the docs on how to [expose Minio outside your cluster][31].
+For additional functionality with this setup, see the section below on how to expose Minio outside your cluster.
 
 **NOTE** The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.
 
@@ -258,9 +258,8 @@ In this case:
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_AND_PORT_OF_INGRESS>` as a field under `spec.config`.
 
-[3]: install-overview.md
-[17]: restic.md
-[18]: debugging-restores.md
+[3]: ../install-overview.md
+[17]: ../restic.md
+[18]: ../debugging-restores.md
 [26]: https://github.com/vmware-tanzu/velero/releases
 [30]: https://godoc.org/github.com/robfig/cron
-[31]: #expose-minio-outside-your-cluster

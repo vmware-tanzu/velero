@@ -1,4 +1,4 @@
-# Compatible providers
+# Providers
 
 Velero can store its backups in any S3 or S3 compatible object storage.
 
@@ -32,7 +32,7 @@ Contact: [Slack][28], [GitHub Issue][29]
 
 | Provider                  | Object Store                 | Volume Snapshotter                 | Plugin                 | Contact                         |
 |---------------------------|------------------------------|------------------------------------|------------------------|---------------------------------|
-| [Portworx][11]             | 🚫                          | Portworx Volume                    | [Portworx][12]         | [Slack][13], [GitHub Issue][14] |
+| [Portworx][31]             | 🚫                          | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
 | [DigitalOcean][15]         | DigitalOcean Object Storage | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [AlibabaCloud][21]        | 🚫                           | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
@@ -55,10 +55,6 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [10]: azure-config.md
 [11]: https://cloud.google.com/storage/
 [12]: gcp-config.md
-[11]: https://portworx.com/
-[12]: https://docs.portworx.com/scheduler/kubernetes/ark.html
-[13]: https://portworx.slack.com/messages/px-k8s
-[14]: https://github.com/portworx/ark-plugin/issues
 [15]: https://www.digitalocean.com/
 [16]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [17]: https://openebs.io/
@@ -75,3 +71,7 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [28]: https://kubernetes.slack.com/messages/velero
 [29]: https://github.com/vmware-tanzu/velero/issues
 [30]: restic.md
+[31]: https://portworx.com/
+[32]: https://docs.portworx.com/scheduler/kubernetes/ark.html
+[33]: https://portworx.slack.com/messages/px-k8s
+[34]: https://github.com/portworx/ark-plugin/issues
