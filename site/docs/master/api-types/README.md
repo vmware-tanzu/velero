@@ -6,9 +6,11 @@ Here we list the API types that have some functionality that you can only config
 (hooks)
 
 * [Backup][1]
-* [BackupStorageLocation][2]
-* [VolumeSnapshotLocation][3]
+* [Schedule][2]
+* [BackupStorageLocation][3]
+* [VolumeSnapshotLocation][4]
 
 [1]: backup.md
-[2]: backupstoragelocation.md
-[3]: volumesnapshotlocation.md
+[2]: schedule.md
+[3]: backupstoragelocation.md
+[4]: volumesnapshotlocation.md
