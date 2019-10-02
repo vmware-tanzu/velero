@@ -121,7 +121,10 @@ spec:
         post:
           # Same content as pre above.
 status:
-  phase:
+  # The current phase of the latest scheduled backup. Valid values are New, FailedValidation, InProgress, Completed, PartiallyFailed, Failed.
+  phase: ""
+  # Date/time of the last backup for a given schedule
   lastBackup:
+  # An array of any validation errors encountered.
   validationErrors:
 ```
