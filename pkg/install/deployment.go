@@ -36,6 +36,7 @@ type podTemplateConfig struct {
 	resources                         corev1.ResourceRequirements
 	withSecret                        bool
 	defaultResticMaintenanceFrequency time.Duration
+	plugins                           []string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -87,6 +88,12 @@ func WithResources(resources corev1.ResourceRequirements) podTemplateOption {
 func WithDefaultResticMaintenanceFrequency(val time.Duration) podTemplateOption {
 	return func(c *podTemplateConfig) {
 		c.defaultResticMaintenanceFrequency = val
+	}
+}
+
+func WithPlugins(plugins []string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.plugins = plugins
 	}
 }
 
@@ -233,6 +240,26 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 
 	if c.defaultResticMaintenanceFrequency > 0 {
 		deployment.Spec.Template.Spec.Containers[0].Args = append(deployment.Spec.Template.Spec.Containers[0].Args, fmt.Sprintf("--default-restic-prune-frequency=%v", c.defaultResticMaintenanceFrequency))
+	}
+
+	if len(c.plugins) > 0 {
+		for _, plugin := range c.plugins {
+			// TODO: unify this logic with cmd/cli/plugin/add.go
+			container := corev1.Container{
+				// TODO: name needs to be specified
+				Name:            plugin,
+				Image:           plugin,
+				ImagePullPolicy: pullPolicy,
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "plugins",
+						MountPath: "/target",
+					},
+				},
+			}
+			deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, container)
+		}
+
 	}
 
 	return deployment
