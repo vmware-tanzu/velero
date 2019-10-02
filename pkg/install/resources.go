@@ -216,6 +216,7 @@ type VeleroOptions struct {
 	VSLConfig                         map[string]string
 	DefaultResticMaintenanceFrequency time.Duration
 	Plugins                           []string
+	NoDefaultBackupLocation           bool
 }
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
@@ -244,8 +245,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		appendUnstructured(resources, sec)
 	}
 
-	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
-	appendUnstructured(resources, bsl)
+	if !o.NoDefaultBackupLocation {
+		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
+		appendUnstructured(resources, bsl)
+	}
 
 	// A snapshot location may not be desirable for users relying on restic
 	if o.UseVolumeSnapshots {

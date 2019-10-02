@@ -38,6 +38,8 @@ platform-agnostic backup solution for volume data.
 
 Whether you run Velero on a cloud provider or on-premises, if you have more than one volume snapshot location for a given volume provider, you can specify its default location for backups by setting a server flag in your Velero deployment YAML.
 
+If you need to install Velero without a default backup storage location (without specifying `--bucket` or `--provider`), the `--no-default-backup-location` flag is required for confirmation.
+
 For details, see the documentation topics for individual cloud providers.
 
 ## Installing with the Helm chart
