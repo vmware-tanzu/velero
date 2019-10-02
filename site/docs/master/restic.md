@@ -28,7 +28,7 @@ cross-volume-type data migrations. Stay tuned as this evolves!
 
 Ensure you've [downloaded latest release][3].
 
-To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details.
+To install restic, use the `--use-restic` flag on the `velero install` command. See the [install overview][2] for more details. When using restic on a storage provider that doesn't currently have Velero support for snapshots, the `--use-volume-snapshots=false` flag prevents an unused `VolumeSnapshotLocation` from being created on installation.
 
 Please note: For some PaaS/CaaS platforms based on Kubernetes such as RancherOS, OpenShift and Enterprise PKS, some modifications are required to the restic DaemonSet spec.
 

@@ -1,9 +1,9 @@
-## Getting started
+## Quick start evaluation install with Minio
 
 The following example sets up the Velero server and client, then backs up and restores a sample application.
 
 For simplicity, the example uses Minio, an S3-compatible storage service that runs locally on your cluster.
-For additional functionality with this setup, see the docs on how to [expose Minio outside your cluster][31].
+For additional functionality with this setup, see the section below on how to [expose Minio outside your cluster][1].
 
 **NOTE** The example lets you explore basic Velero functionality. Configuring Minio for production is out of scope.
 
@@ -202,8 +202,6 @@ When you run commands to get logs or describe a backup, the Velero server genera
 
 You can also specify a `publicUrl` config field for the pre-signed URL in your backup storage location config.
 
-For basic instructions on how to install the Velero server and client, see [the getting started example][1].
-
 ### Expose Minio with Service of type NodePort
 
 The Minio deployment by default specifies a Service of type `ClusterIP`. You can change this to `NodePort` to easily expose a cluster service externally if you can reach the node from your Velero client.
@@ -260,11 +258,9 @@ In this case:
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_AND_PORT_OF_INGRESS>` as a field under `spec.config`.
 
-
-[1]: get-started.md
-[3]: install-overview.md
-[17]: restic.md
-[18]: debugging-restores.md
+[1]: #expose-minio-with-service-of-type-nodeport
+[3]: ../install-overview.md
+[17]: ../restic.md
+[18]: ../debugging-restores.md
 [26]: https://github.com/vmware-tanzu/velero/releases
 [30]: https://godoc.org/github.com/robfig/cron
-[31]: #expose-minio-outside-your-cluster

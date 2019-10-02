@@ -22,4 +22,4 @@ velero client config set namespace=<NAMESPACE_VALUE>
 
 
 
-[0]: get-started.md#download
+[0]: installing.md 

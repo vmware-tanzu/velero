@@ -4,7 +4,7 @@
 
 ## Overview
 
-Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. Velero lets you:
+Velero (formerly Heptio Ark) gives you tools to back up and restore your Kubernetes cluster resources and persistent volumes. You can run Velero with a cloud provider or on-premises. Velero lets you:
 
 * Take backups of your cluster and restore in case of loss.
 * Migrate cluster resources to other clusters.
@@ -15,16 +15,7 @@ Velero consists of:
 * A server that runs on your cluster
 * A command-line client that runs locally
 
-You can run Velero in clusters on a cloud provider or on-premises. For detailed information, see [Compatible Storage Providers][99].
-
-## Installation
-
-We strongly recommend that you use an [official release][6] of Velero. The tarballs for each release contain the
-`velero` command-line client. Follow the [installation instructions][28] to get started.
-
-_The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
-
-## More information
+## Documentation
 
 [The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more.
 
@@ -53,7 +44,6 @@ See [the list of releases][6] to find out about feature changes.
 [11]: https://kubernetes.io/docs/tasks/tools/install-kubectl/#tabset-1
 [12]: https://github.com/kubernetes/kubernetes/blob/master/cluster/addons/dns/README.md
 [14]: https://github.com/kubernetes/kubernetes
-
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
 
@@ -61,5 +51,4 @@ See [the list of releases][6] to find out about feature changes.
 [29]: https://velero.io/docs/master/
 [30]: troubleshooting.md
 
-[99]: support-matrix.md
 [100]: img/velero.png
