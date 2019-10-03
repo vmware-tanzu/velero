@@ -51,6 +51,7 @@ The configurable parameters are as follows:
 | --- | --- | --- | --- |
 | `apiTimeout` | metav1.Duration | 2m0s | How long to wait for an Azure API request to complete before timeout. |
 | `resourceGroup` | string | Optional | The name of the resource group where volume snapshots should be stored, if different from the cluster's resource group. |
+| `subscriptionId` | string | Optional | The ID of the subscription where volume snapshots should be stored, if different from the cluster's subscription. Requires `resourceGroup`to be set.
 
 #### GCP
 

@@ -51,7 +51,8 @@ type VolumeSnapshotter struct {
 	log                logrus.FieldLogger
 	disks              *disk.DisksClient
 	snaps              *disk.SnapshotsClient
-	subscription       string
+	disksSubscription  string
+	snapsSubscription  string
 	disksResourceGroup string
 	snapsResourceGroup string
 	apiTimeout         time.Duration
@@ -72,7 +73,7 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey); err != nil {
+	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIdConfigKey); err != nil {
 		return err
 	}
 
@@ -87,7 +88,17 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
+	// 2. set a different subscriptionId for snapshots if specified
+	snapshotsSubscriptionId := envVars[subscriptionIDEnvVar]
+	if val := config[subscriptionIdConfigKey]; val != "" {
+		// if subscription was set in config, it is required to also set the resource group
+		if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey); err != nil {
+			return errors.Wrap(err, "resourceGroup not specified, but is a requirement when backing up to a different subscription")
+		}
+		snapshotsSubscriptionId = val
+	}
+
+	// 3. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
 	var apiTimeout time.Duration
 	if val := config[apiTimeoutConfigKey]; val == "" {
 		apiTimeout = 2 * time.Minute
@@ -98,15 +109,15 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// 3. get SPT
+	// 4. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 4. set up clients
+	// 5. set up clients
 	disksClient := disk.NewDisksClient(envVars[subscriptionIDEnvVar])
-	snapsClient := disk.NewSnapshotsClient(envVars[subscriptionIDEnvVar])
+	snapsClient := disk.NewSnapshotsClient(snapshotsSubscriptionId)
 
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
@@ -117,7 +128,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 
 	b.disks = &disksClient
 	b.snaps = &snapsClient
-	b.subscription = envVars[subscriptionIDEnvVar]
+	b.disksSubscription = envVars[subscriptionIDEnvVar]
+	b.snapsSubscription = snapshotsSubscriptionId
 	b.disksResourceGroup = envVars[resourceGroupEnvVar]
 	b.snapsResourceGroup = config[resourceGroupConfigKey]
 
@@ -205,7 +217,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 		return "", errors.WithStack(err)
 	}
 
-	fullDiskName := getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
+	fullDiskName := getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
 	// snapshot names must be <= 80 characters long
 	var snapshotName string
 	suffix := "-" + uuid.NewV4().String()
@@ -242,7 +254,7 @@ func (b *VolumeSnapshotter) CreateSnapshot(volumeID, volumeAZ string, tags map[s
 		return "", errors.WithStack(err)
 	}
 
-	return getComputeResourceName(b.subscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
+	return getComputeResourceName(b.snapsSubscription, b.snapsResourceGroup, snapshotsResource, snapshotName), nil
 }
 
 func getSnapshotTags(veleroTags map[string]string, diskTags map[string]*string) map[string]*string {
@@ -374,7 +386,7 @@ func (b *VolumeSnapshotter) SetVolumeID(unstructuredPV runtime.Unstructured, vol
 	}
 
 	pv.Spec.AzureDisk.DiskName = volumeID
-	pv.Spec.AzureDisk.DataDiskURI = getComputeResourceName(b.subscription, b.disksResourceGroup, disksResource, volumeID)
+	pv.Spec.AzureDisk.DataDiskURI = getComputeResourceName(b.disksSubscription, b.disksResourceGroup, disksResource, volumeID)
 
 	res, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pv)
 	if err != nil {

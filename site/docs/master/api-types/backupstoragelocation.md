@@ -64,6 +64,7 @@ The configurable parameters are as follows:
 | --- | --- | --- | --- |
 | `resourceGroup` | string | Required Field | Name of the resource group containing the storage account for this backup storage location. |
 | `storageAccount` | string | Required Field | Name of the storage account for this backup storage location. |
+| `subscriptionId` | string | Optional Field | ID of the subscription for this backup storage location. |
 
 #### GCP
 

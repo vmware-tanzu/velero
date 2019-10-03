@@ -154,7 +154,7 @@ velero backup create full-cluster-backup
 
 1. If you're using Azure's AKS, you may want to store your volume snapshots outside of the "infrastructure" resource group that is automatically created when you create your AKS cluster. This is possible using a `VolumeSnapshotLocation`, by specifying a `resourceGroup` under the `config` section of the snapshot location. See the [Azure volume snapshot location documentation][3] for details.
 
-1. If you're using Azure, you may want to store your Velero backups across multiple storage accounts and/or resource groups. This is possible using a `BackupStorageLocation`, by specifying a `storageAccount` and/or `resourceGroup`, respectively, under the `config` section of the backup location. See the [Azure backup storage location documentation][4] for details.
+1. If you're using Azure, you may want to store your Velero backups across multiple storage accounts and/or resource groups/subscriptions. This is possible using a `BackupStorageLocation`, by specifying a `storageAccount`, `resourceGroup` and/or `subscriptionId`, respectively, under the `config` section of the backup location. See the [Azure backup storage location documentation][4] for details.
 
 
 

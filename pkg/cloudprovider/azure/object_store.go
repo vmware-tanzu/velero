@@ -35,6 +35,7 @@ import (
 
 const (
 	storageAccountConfigKey = "storageAccount"
+	subscriptionIdConfigKey = "subscriptionId"
 )
 
 type containerGetter interface {
@@ -146,22 +147,28 @@ func getStorageAccountKey(config map[string]string) (string, error) {
 		return "", errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	// 2. we need config["resourceGroup"], config["storageAccount"]
+	// 2. check whether a different subscription ID was set for backups in config["subscriptionId"]
+	subscriptionId := envVars[subscriptionIDEnvVar]
+	if val := config[subscriptionIdConfigKey]; val != "" {
+		subscriptionId = val
+	}
+
+	// 3. we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", errors.Wrap(err, "unable to get all required config values")
 	}
 
-	// 3. get SPT
+	// 4. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
 	if err != nil {
 		return "", errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 4. get storageAccountsClient
-	storageAccountsClient := storagemgmt.NewAccountsClient(envVars[subscriptionIDEnvVar])
+	// 5. get storageAccountsClient
+	storageAccountsClient := storagemgmt.NewAccountsClient(subscriptionId)
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
-	// 5. get storage key
+	// 6. get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", errors.WithStack(err)
@@ -194,7 +201,11 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, resourceGroupConfigKey, storageAccountConfigKey); err != nil {
+	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
+		resourceGroupConfigKey,
+		storageAccountConfigKey,
+		subscriptionIdConfigKey,
+	); err != nil {
 		return err
 	}
 
