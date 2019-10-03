@@ -24,6 +24,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/vmware-tanzu/velero/pkg/builder"
 )
 
 type podTemplateOption func(*podTemplateConfig)
@@ -243,20 +245,8 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	}
 
 	if len(c.plugins) > 0 {
-		for _, plugin := range c.plugins {
-			// TODO: unify this logic with cmd/cli/plugin/add.go
-			container := corev1.Container{
-				// TODO: name needs to be specified
-				Name:            plugin,
-				Image:           plugin,
-				ImagePullPolicy: pullPolicy,
-				VolumeMounts: []corev1.VolumeMount{
-					{
-						Name:      "plugins",
-						MountPath: "/target",
-					},
-				},
-			}
+		for _, image := range c.plugins {
+			container := *builder.ForPluginContainer(image, pullPolicy).Result()
 			deployment.Spec.Template.Spec.InitContainers = append(deployment.Spec.Template.Spec.InitContainers, container)
 		}
 
