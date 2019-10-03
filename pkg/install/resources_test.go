@@ -45,6 +45,7 @@ func TestResources(t *testing.T) {
 	assert.Equal(t, "", crb.ObjectMeta.Namespace)
 	assert.Equal(t, "velero", crb.Subjects[0].Namespace)
 
-	sa := ServiceAccount("velero")
+	sa := ServiceAccount("velero", map[string]string{"abcd": "cbd"})
 	assert.Equal(t, "velero", sa.ObjectMeta.Namespace)
+	assert.Equal(t, "cbd", sa.ObjectMeta.Annotations["abcd"])
 }

@@ -136,6 +136,29 @@ Additionally, you can specify `--use-restic` to enable restic support, and `--wa
 
 For more complex installation needs, use either the Helm chart, or add `--dry-run -o yaml` options for generating the YAML representation for the installation.
 
+## Using Workload Identity (Optional)
+
+If you are running Velero on a GKE cluster with workload identity enabled, you may want to bind Velero's Kubernetes service account to a GCP service account with the appropriate permissions instead of providing the key file during installation.
+
+To do this, you must grant the GCP service account(the one you created in Step 3) the 'iam.serviceAccounts.signBlob' role. This is so that Velero's Kubernetes service account can create signed urls for the GCP bucket.
+
+Next, add an IAM policy binding to grant Velero's Kubernetes service account access to your created GCP service account.
+
+```bash
+gcloud iam service-accounts add-iam-policy-binding \
+    --role roles/iam.workloadIdentityUser \ 
+    --member serviceAccount:[PROJECT_ID].svc.id.goog[velero/velero] \
+    [GSA_NAME]@[PROJECT_ID].iam.gserviceaccount.com
+```
+
+For more information on configuring workload identity on GKE, look at the [official GCP documentation][24] for more details.
+
+Finally, you must add a service account annotation to the Kubernetes service account so that it will know which GCP service account to use. You can do this during installation with `--sa-annotations`. Furthermore, you must also use the flag `--no-secret` so that Velero will know not to look for a key file. You must also add the GCP service account name in `--backup-location-config`.
+
+```bash
+velero install --provider gcp --no-secret --sa-annotations iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_ID].iam.gserviceaccount.com --backup-location-config serviceAccount=[GSA_NAME]@[PROJECT_ID].iam.gserviceaccount.com
+```
+
 [0]: namespace.md
 [7]: api-types/backupstoragelocation.md#gcp
 [8]: api-types/volumesnapshotlocation.md#gcp
@@ -144,3 +167,4 @@ For more complex installation needs, use either the Helm chart, or add `--dry-ru
 [20]: faq.md
 [22]: https://cloud.google.com/kubernetes-engine/docs/how-to/role-based-access-control#iam-rolebinding-bootstrap
 [23]: install-overview.md#velero-resource-requirements
+[24]: https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity

@@ -71,6 +71,7 @@ The configurable parameters are as follows:
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `kmsKeyName` | string | Empty | Name of the Cloud KMS key to use to encrypt backups stored in this location, in the form `projects/P/locations/L/keyRings/R/cryptoKeys/K`. See [customer-managed Cloud KMS keys](https://cloud.google.com/storage/docs/encryption/using-customer-managed-keys) for details.  |
+| `serviceAccount` | string | Empty | Name of the GCP service account to use for this backup storage location. Specify the service account here if you want to use workload identity instead of providing the key file.
 
 [0]: #aws
 [1]: #gcp
