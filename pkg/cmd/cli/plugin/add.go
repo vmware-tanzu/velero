@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -104,17 +105,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			}
 
 			// add the plugin as an init container
-			plugin := v1.Container{
-				Name:            getName(args[0]),
-				Image:           args[0],
-				ImagePullPolicy: v1.PullPolicy(imagePullPolicyFlag.String()),
-				VolumeMounts: []v1.VolumeMount{
-					{
-						Name:      pluginsVolumeName,
-						MountPath: "/target",
-					},
-				},
-			}
+			plugin := *builder.ForPluginContainer(args[0], v1.PullPolicy(imagePullPolicyFlag.String())).Result()
 
 			veleroDeploy.Spec.Template.Spec.InitContainers = append(veleroDeploy.Spec.Template.Spec.InitContainers, plugin)
 
@@ -133,24 +124,4 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 	c.Flags().Var(imagePullPolicyFlag, "image-pull-policy", fmt.Sprintf("the imagePullPolicy for the plugin container. Valid values are %s.", strings.Join(imagePullPolicies, ", ")))
 
 	return c
-}
-
-// getName returns the 'name' component of a docker
-// image (i.e. everything after the last '/' and before
-// any subsequent ':')
-func getName(image string) string {
-	slashIndex := strings.LastIndex(image, "/")
-	colonIndex := strings.LastIndex(image, ":")
-
-	start := 0
-	if slashIndex > 0 {
-		start = slashIndex + 1
-	}
-
-	end := len(image)
-	if colonIndex > slashIndex {
-		end = colonIndex
-	}
-
-	return image[start:end]
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package builder
 
 import (
+	"strings"
+
 	corev1api "k8s.io/api/core/v1"
 )
 
@@ -33,6 +35,32 @@ func ForContainer(name, image string) *ContainerBuilder {
 			Image: image,
 		},
 	}
+}
+
+// ForPluginContainer is a helper builder specifically for plugin init containers
+func ForPluginContainer(image string, pullPolicy corev1api.PullPolicy) *ContainerBuilder {
+	volumeMount := ForVolumeMount("plugins", "/target").Result()
+	return ForContainer(getName(image), image).PullPolicy(pullPolicy).VolumeMounts(volumeMount)
+}
+
+// getName returns the 'name' component of a docker
+// image (i.e. everything after the last '/' and before
+// any subsequent ':')
+func getName(image string) string {
+	slashIndex := strings.LastIndex(image, "/")
+	colonIndex := strings.LastIndex(image, ":")
+
+	start := 0
+	if slashIndex > 0 {
+		start = slashIndex + 1
+	}
+
+	end := len(image)
+	if colonIndex > slashIndex {
+		end = colonIndex
+	}
+
+	return image[start:end]
 }
 
 // Result returns the built Container.
@@ -64,5 +92,10 @@ func (b *ContainerBuilder) Env(vars ...*corev1api.EnvVar) *ContainerBuilder {
 	for _, v := range vars {
 		b.object.Env = append(b.object.Env, *v)
 	}
+	return b
+}
+
+func (b *ContainerBuilder) PullPolicy(pullPolicy corev1api.PullPolicy) *ContainerBuilder {
+	b.object.ImagePullPolicy = pullPolicy
 	return b
 }
