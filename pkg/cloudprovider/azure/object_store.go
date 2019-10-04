@@ -141,39 +141,41 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_CLOUD_NAME
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
 	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, cloudNameEnvVar)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
 	}
 
-	env, err := parseAzureEnvironment(envVars[cloudNameEnvVar])
+	// 2. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil || env == nil {
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 2. check whether a different subscription ID was set for backups in config["subscriptionId"]
+	// 3. check whether a different subscription ID was set for backups in config["subscriptionId"]
 	subscriptionId := envVars[subscriptionIDEnvVar]
 	if val := config[subscriptionIdConfigKey]; val != "" {
 		subscriptionId = val
 	}
 
-	// 3. we need config["resourceGroup"], config["storageAccount"]
+	// 4. we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", env, errors.Wrap(err, "unable to get all required config values")
 	}
 
-	// 4. get SPT
+	// 5. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
 	if err != nil {
 		return "", env, errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 5. get storageAccountsClient
+	// 6. get storageAccountsClient
 	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionId)
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
-	// 6. get storage key
+	// 7. get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", env, errors.WithStack(err)

@@ -90,7 +90,7 @@ func getRequiredValues(getValue func(string) string, keys ...string) (map[string
 	results := map[string]string{}
 
 	for _, key := range keys {
-		if val := getValue(key); val == "" && key != cloudNameEnvVar {
+		if val := getValue(key); val == "" {
 			missing = append(missing, key)
 		} else {
 			results[key] = val

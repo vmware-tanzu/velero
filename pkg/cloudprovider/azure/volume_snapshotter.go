@@ -81,8 +81,8 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		return err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_CLOUD_NAME
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar, cloudNameEnvVar)
+	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, resourceGroupEnvVar)
 	if err != nil {
 		return errors.Wrap(err, "unable to get all required environment variables")
 	}
@@ -97,12 +97,14 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsSubscriptionId = val
 	}
 
-	env, err := parseAzureEnvironment(envVars[cloudNameEnvVar])
+	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil || env == nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 3. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
+	// 4. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
 	var apiTimeout time.Duration
 	if val := config[apiTimeoutConfigKey]; val == "" {
 		apiTimeout = 2 * time.Minute
@@ -113,13 +115,13 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// 4. get SPT
+	// 5. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
 	if err != nil {
 		return errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 4. set up clients
+	// 6. set up clients
 	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
 	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionId)
 
