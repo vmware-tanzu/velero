@@ -100,7 +100,7 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
-	if err != nil || env == nil {
+	if err != nil {
 		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 

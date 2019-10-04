@@ -64,16 +64,15 @@ func loadEnv() error {
 	return nil
 }
 
-// ParseAzureEnvironment returns azure environment by name
+// ParseAzureEnvironment returns an azure.Environment for the given cloud
+// name, or azure.PublicCloud if cloudName is empty.
 func parseAzureEnvironment(cloudName string) (*azure.Environment, error) {
-	var env azure.Environment
-	var err error
 	if cloudName == "" {
-		env = azure.PublicCloud
-	} else {
-		env, err = azure.EnvironmentFromName(cloudName)
+		return &azure.PublicCloud, nil
 	}
-	return &env, err
+
+	env, err := azure.EnvironmentFromName(cloudName)
+	return &env, errors.WithStack(err)
 }
 
 func newServicePrincipalToken(tenantID, clientID, clientSecret string, env *azure.Environment) (*adal.ServicePrincipalToken, error) {
