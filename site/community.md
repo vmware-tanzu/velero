@@ -18,7 +18,7 @@ You can follow the work we do, see our milestones, and our backlog on our [ZenHu
 * Follow us on Twitter at [@projectvelero](https://twitter.com/projectvelero)
 * Join our Kubernetes Slack channel and talk to over 800 other community members: [#velero](https://kubernetes.slack.com/messages/velero)
 * Join our [Google Group](https://groups.google.com/forum/#!forum/projectvelero) to get updates on the project and invites to community meetings.
-* Join the [Velero community meetings](https://github.com/vmware-tanzu/velero-community):
-  - Every 1st Tuesday - [Zoom link](https://vmware.zoom.us/j/551441444)
-  - Every 3rd Tuesday - [Zoom link](https://vmware.zoom.us/j/324372812)
-* See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
+* Join the Velero community meetings:
+  * Every Tuesday at 12PM ET / 9AM PT - [Zoom link](https://vmware.zoom.us/j/551441444)
+  * Read and comment on the [meeting notes](https://hackmd.io/Jq6F5zqZR7S80CeDWUklkA?view)
+  * See previous community meetings on our [YouTube Channel](https://www.youtube.com/playlist?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM)
