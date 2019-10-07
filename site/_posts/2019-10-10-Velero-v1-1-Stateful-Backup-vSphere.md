@@ -1,14 +1,14 @@
 ---
-title: Velero v1.1 backing up and restoring Stateful apps on vSphere and PKS (Pivotal Container Service)
+title: Velero v1.1 backing up and restoring Stateful apps on vSphere
 image: /img/posts/cassandra.gif
-excerpt: This post demonstrates how Velero can be used on PKS, the Pivotal Container Service which deploys Kubernetes clusters on vSphere, to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
+excerpt: This post demonstrates how Velero can be used on Kubernetes running on vSphere to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
 author_name: Cormac Hogan
 author_avatar: /img/contributors/cormac-pic.png
 categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
-Velero version 1.1 provides support to backup applications orchestrated on upstream Kubernetes running natively on vSphere. It also provides support for backing up applications orchestrated on Kubernetes deployed by PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to use Velero v1.1 to backup and restore a stateful application (`Cassandra`) that is running in a Kubernetes cluster deployed on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic`.
+Velero version 1.1 provides support to backup applications orchestrated on upstream Kubernetes running natively on vSphere or on Kubernetes deployed by PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to use Velero v1.1 to backup and restore a stateful application (`Cassandra`) that is running in a Kubernetes cluster deployed on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic` to copy the data contents from Persistent Volumes. The data is stored in the same S3 object store where the Kubernetes object metadata is stored.
 
 ## Overview of steps
 
@@ -18,13 +18,13 @@ Velero version 1.1 provides support to backup applications orchestrated on upstr
 * Use Velero to take a backup
 * Destroy the Cassandra deployment
 * Use Velero to restore the Cassandra application
-* Verify that the database and table of contents have been restored
+* Verify that the Cassandra database and table of contents have been restored
 
 ## What this post does not show
 
-* This tutorial does not show how to deploy Velero v1.1 on vSphere (with or without PKS). These are available in other tutorials.
+* This tutorial does not show how to deploy Velero v1.1 on vSphere. This is available in other tutorials.
 * For this backup to be successful, Velero needs to be installed with the `use-restic` flag. [More details on using Restic for stateful backups can be found in the docs here](https://velero.io/docs/v1.1.0/restic/#Setup)
-* The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the Velero images. This guide does not show how to add images using a local repository.
+* The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the necessary Velero images. This guide does not show how to pull images using a local repository.
 
 ## Download and Deploy Cassandra
 
@@ -44,7 +44,7 @@ UN  10.244.1.19  174.32 KiB  32           61.4%             83867fd7-bb6f-45dd-b
 UN  10.244.2.14  161.04 KiB  32           71.7%             8d88d0ec-2981-4c8b-a295-b36eee62693c  Rack1-K8Demo
 ```
 
-Now we will populate Cassandra with some data. Here we are connecting to the first Pod, cassandra-0 and running the `cqlsh` command.
+Now we will populate Cassandra with some data. Here we are connecting to the first Pod, cassandra-0 and running the `cqlsh` command which will allow us to create a Keyspace and a table.
 
 ```bash
 $ kubectl exec -it cassandra-0 -n cassandra -- cqlsh
@@ -74,7 +74,7 @@ Now that we have populated the application with some data, let's annotate each o
 
 ## Prepare Cassandra for a Velero stateful backup by adding Annotations
 
-The first step is to add annotations to each of the Pods in the StatefulSet to indicate that the contents of the persistent volumes, mounted on cassandra-data, needs to be backed up as well. If this is native Kubernetes on vSphere or Kubernetes deployed via PKS, both use the `restic` program at this time for capturing state/data.
+The first step is to add annotations to each of the Pods in the StatefulSet to indicate that the contents of the persistent volumes, mounted on cassandra-data, needs to be backed up as well. As mentioned previously, Velero uses the `restic` program at this time for capturing state/data from Kubernetes running on vSphere.
 
 ```bash
 $ kubectl -n cassandra describe pod/cassandra-0 | grep Annotations
@@ -279,7 +279,15 @@ No resources found.
 
 ## Restore the Cassandra application via Velero
 
-Now use Velero to restore the application and contents. The name of the backup must be specified at the command line using the `--from-backup` option.
+Now use Velero to restore the application and contents. The name of the backup must be specified at the command line using the `--from-backup` option. You can get the backup name from the following command:
+
+```bash
+$ velero backup get
+NAME                 STATUS      CREATED                         EXPIRES   STORAGE LOCATION   SELECTOR
+cassandra1            Completed   2019-10-02 15:37:34 +0100 IST   31d       default            <none>
+```
+
+Next, initiate the restore:
 
 ```bash
 $ velero restore create cassandra1 --from-backup cassandra1
