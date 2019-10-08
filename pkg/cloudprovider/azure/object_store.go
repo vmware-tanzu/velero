@@ -142,7 +142,7 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 	}
 
 	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar, cloudNameEnvVar)
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
 	}
