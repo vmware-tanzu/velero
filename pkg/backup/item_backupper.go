@@ -184,11 +184,24 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 			// nil it on error since it's not valid
 			pod = nil
 		} else {
-			// get the volumes to backup using restic, and add any of them that are PVCs to the pvc snapshot
-			// tracker, so that when we backup PVCs/PVs via an item action in the next step, we don't snapshot
-			// PVs that will have their data backed up with restic.
-			resticVolumesToBackup = restic.GetVolumesToBackup(pod)
+			// Get the list of volumes to back up using restic from the pod's annotations. Remove from this list
+			// any volumes that use a PVC that we've already backed up (this would be in a read-write-many scenario,
+			// where it's been backed up from another pod), since we don't need >1 backup per PVC.
+			for _, volume := range restic.GetVolumesToBackup(pod) {
+				if found, pvcName := ib.resticSnapshotTracker.HasPVCForPodVolume(pod, volume); found {
+					log.WithFields(map[string]interface{}{
+						"podVolume": volume,
+						"pvcName":   pvcName,
+					}).Info("Pod volume uses a persistent volume claim which has already been backed up with restic from another pod, skipping.")
+					continue
+				}
 
+				resticVolumesToBackup = append(resticVolumesToBackup, volume)
+			}
+
+			// track the volumes that are PVCs using the PVC snapshot tracker, so that when we backup PVCs/PVs
+			// via an item action in the next step, we don't snapshot PVs that will have their data backed up
+			// with restic.
 			ib.resticSnapshotTracker.Track(pod, resticVolumesToBackup)
 		}
 	}
@@ -280,7 +293,7 @@ func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *co
 		return nil, nil
 	}
 
-	return ib.resticBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, log)
+	return ib.resticBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, volumes, log)
 }
 
 func (ib *defaultItemBackupper) executeActions(
@@ -394,7 +407,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	// of this PV. If so, don't take a snapshot.
 	if pv.Spec.ClaimRef != nil {
 		if ib.resticSnapshotTracker.Has(pv.Spec.ClaimRef.Namespace, pv.Spec.ClaimRef.Name) {
-			log.Info("Skipping persistent volume snapshot because volume has already been backed up with restic.")
+			log.Info("Skipping snapshot of persistent volume because volume is being backed up with restic.")
 			return nil
 		}
 	}

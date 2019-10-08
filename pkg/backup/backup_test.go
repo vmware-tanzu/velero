@@ -22,6 +22,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"sort"
@@ -2099,22 +2100,24 @@ func TestBackupWithHooks(t *testing.T) {
 	}
 }
 
-type fakeResticBackupperFactory struct {
-	podVolumeBackups []*velerov1.PodVolumeBackup
-}
+type fakeResticBackupperFactory struct{}
 
 func (f *fakeResticBackupperFactory) NewBackupper(context.Context, *velerov1.Backup) (restic.Backupper, error) {
-	return &fakeResticBackupper{
-		podVolumeBackups: f.podVolumeBackups,
-	}, nil
+	return &fakeResticBackupper{}, nil
 }
 
-type fakeResticBackupper struct {
-	podVolumeBackups []*velerov1.PodVolumeBackup
-}
+type fakeResticBackupper struct{}
 
-func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
-	return b.podVolumeBackups, nil
+// BackupPodVolumes returns one pod volume backup per entry in volumes, with namespace "velero"
+// and name "pvb-<pod-namespace>-<pod-name>-<volume-name>".
+func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *corev1.Pod, volumes []string, _ logrus.FieldLogger) ([]*velerov1.PodVolumeBackup, []error) {
+	var res []*velerov1.PodVolumeBackup
+	for _, vol := range volumes {
+		pvb := builder.ForPodVolumeBackup("velero", fmt.Sprintf("pvb-%s-%s-%s", pod.Namespace, pod.Name, vol)).Result()
+		res = append(res, pvb)
+	}
+
+	return res, nil
 }
 
 // TestBackupWithRestic runs backups of pods that are annotated for restic backup,
@@ -2139,7 +2142,28 @@ func TestBackupWithRestic(t *testing.T) {
 				),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Result(),
+			},
+		},
+		{
+			name:   "when a PVC is used by two pods and annotated for restic backup on both, only one should be backed up",
+			backup: defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "foo")).
+						Volumes(builder.ForVolume("foo").PersistentVolumeClaimSource("pvc-1").Result()).
+						Result(),
+				),
+				test.Pods(
+					builder.ForPod("ns-1", "pod-2").
+						ObjectMeta(builder.WithAnnotations("backup.velero.io/backup-volumes", "bar")).
+						Volumes(builder.ForVolume("bar").PersistentVolumeClaimSource("pvc-1").Result()).
+						Result(),
+				),
+			},
+			want: []*velerov1.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-foo").Result(),
 			},
 		},
 		{
@@ -2174,8 +2198,8 @@ func TestBackupWithRestic(t *testing.T) {
 					WithVolume("pv-2", "vol-2", "", "type-1", 100, false),
 			},
 			want: []*velerov1.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-1").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-ns-1-pod-1-vol-2").Result(),
 			},
 		},
 	}
@@ -2188,9 +2212,7 @@ func TestBackupWithRestic(t *testing.T) {
 				backupFile = bytes.NewBuffer([]byte{})
 			)
 
-			h.backupper.resticBackupperFactory = &fakeResticBackupperFactory{
-				podVolumeBackups: tc.want,
-			}
+			h.backupper.resticBackupperFactory = new(fakeResticBackupperFactory)
 
 			for _, resource := range tc.apiResources {
 				h.addItems(t, resource)

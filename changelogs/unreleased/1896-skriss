@@ -1,0 +1,1 @@
+restic: only backup read-write-many PVCs at most once, even if they're annotated for backup from multiple pods.

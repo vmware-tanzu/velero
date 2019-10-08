@@ -35,8 +35,8 @@ import (
 
 // Backupper can execute restic backups of volumes in a pod.
 type Backupper interface {
-	// BackupPodVolumes backs up all annotated volumes in a pod.
-	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
+	// BackupPodVolumes backs up all specified volumes in a pod.
+	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
 }
 
 type backupper struct {
@@ -96,9 +96,7 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
-	// get volumes to backup from pod's annotations
-	volumesToBackup := GetVolumesToBackup(pod)
+func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumesToBackup) == 0 {
 		return nil, nil
 	}
