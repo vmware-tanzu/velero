@@ -19,7 +19,6 @@ Velero version 1.1 provides support to backup Kubernetes applications deployed o
 
 ## What this post does not show
 
-* How to install Velero v1.1 with PKS, Pivotal Container Service, on vSphere
 * A demonstration on how to do backup/restore of a stateful application (i.e. PVs)
 * The assumption is that the Kubernetes nodes in your cluster have internet access in order to pull the Velero images. This guide does not show how to add images using a local repository
 

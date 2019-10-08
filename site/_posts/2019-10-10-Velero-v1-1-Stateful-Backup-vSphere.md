@@ -8,7 +8,7 @@ categories: ['kubernetes']
 # Tag should match author to drive author pages
 tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
-Velero version 1.1 provides support to backup applications orchestrated on upstream Kubernetes running natively on vSphere or on Kubernetes deployed by PKS, the Pivotal Container Service for vSphere. This post will provide detailed information on how to use Velero v1.1 to backup and restore a stateful application (`Cassandra`) that is running in a Kubernetes cluster deployed on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic` to copy the data contents from Persistent Volumes. The data is stored in the same S3 object store where the Kubernetes object metadata is stored.
+Velero version 1.1 provides support to backup applications orchestrated on upstream Kubernetes running natively on vSphere. This post will provide detailed information on how to use Velero v1.1 to backup and restore a stateful application (`Cassandra`) that is running in a Kubernetes cluster deployed on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic` to copy the data contents from Persistent Volumes. The data is stored in the same S3 object store where the Kubernetes object metadata is stored.
 
 ## Overview of steps
 
