@@ -217,7 +217,7 @@ func (o *ObjectStore) Init(config map[string]string) error {
 	}
 
 	storageAccountKey, env, err := getStorageAccountKey(config)
-	if err != nil || env == nil {
+	if err != nil {
 		return err
 	}
 
