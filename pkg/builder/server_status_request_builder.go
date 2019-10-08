@@ -67,7 +67,8 @@ func (b *ServerStatusRequestBuilder) Phase(phase velerov1api.ServerStatusRequest
 
 // ProcessedTimestamp sets the ServerStatusRequest's processed timestamp.
 func (b *ServerStatusRequestBuilder) ProcessedTimestamp(time time.Time) *ServerStatusRequestBuilder {
-	b.object.Status.ProcessedTimestamp.Time = time
+	t := metav1.NewTime(time)
+	b.object.Status.ProcessedTimestamp = &t
 	return b
 }
 

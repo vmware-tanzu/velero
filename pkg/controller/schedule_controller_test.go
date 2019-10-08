@@ -18,6 +18,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 
@@ -174,7 +175,7 @@ func TestProcessSchedule(t *testing.T) {
 							t.Logf("error parsing status.lastBackup: %s\n", err)
 							return false, nil, err
 						}
-						res.Status.LastBackup = metav1.Time{Time: parsed}
+						res.Status.LastBackup = &metav1.Time{Time: parsed}
 					}
 
 					return true, res, nil
@@ -318,16 +319,24 @@ func TestGetNextRunTime(t *testing.T) {
 				offsetDuration, err := time.ParseDuration(test.lastRanOffset)
 				require.NoError(t, err, "unable to parse test.lastRanOffset: %v", err)
 
-				test.schedule.Status.LastBackup = metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
+				test.schedule.Status.LastBackup = &metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
 			}
 
 			nextRunTimeOffset, err := time.ParseDuration(test.expectedNextRunTimeOffset)
 			if err != nil {
 				panic(err)
 			}
-			expectedNextRunTime := test.schedule.Status.LastBackup.Add(nextRunTimeOffset)
+
+			// calculate expected next run time (if the schedule hasn't run yet, this
+			// will be the zero value which will trigger an immediate backup)
+			var baseTime time.Time
+			if test.lastRanOffset != "" {
+				baseTime = test.schedule.Status.LastBackup.Time
+			}
+			expectedNextRunTime := baseTime.Add(nextRunTimeOffset)
 
 			due, nextRunTime := getNextRunTime(test.schedule, cronSchedule, testClock.Now())
+			fmt.Println(nextRunTime)
 
 			assert.Equal(t, test.expectedDue, due)
 			// ignore diffs of under a second. the cron library does some rounding.
@@ -371,7 +380,8 @@ func TestParseCronSchedule(t *testing.T) {
 	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
 
 	// record backup time
-	s.Status.LastBackup = metav1.NewTime(now)
+	timestamp := metav1.NewTime(now)
+	s.Status.LastBackup = &timestamp
 
 	// advance clock 1 minute, make sure we're not due and next backup is tomorrow at 9am
 	now = time.Date(2017, 8, 11, 9, 2, 0, 0, time.UTC)

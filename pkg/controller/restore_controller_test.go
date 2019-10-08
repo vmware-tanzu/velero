@@ -781,7 +781,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		},
 		Status: api.BackupStatus{
 			Phase:          api.BackupPhaseCompleted,
-			StartTimestamp: metav1.Time{Time: now},
+			StartTimestamp: &metav1.Time{Time: now},
 		},
 	})
 
@@ -791,7 +791,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		},
 		Status: api.BackupStatus{
 			Phase:          api.BackupPhaseCompleted,
-			StartTimestamp: metav1.Time{Time: now.Add(time.Second)},
+			StartTimestamp: &metav1.Time{Time: now.Add(time.Second)},
 		},
 	}
 	backups = append(backups, expected)

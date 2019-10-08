@@ -80,7 +80,8 @@ func (b *ScheduleBuilder) CronSchedule(expression string) *ScheduleBuilder {
 // LastBackupTime sets the Schedule's last backup time.
 func (b *ScheduleBuilder) LastBackupTime(val string) *ScheduleBuilder {
 	t, _ := time.Parse("2006-01-02 15:04:05", val)
-	b.object.Status.LastBackup.Time = t
+	lastBackupTime := metav1.NewTime(t)
+	b.object.Status.LastBackup = &lastBackupTime
 	return b
 }
 

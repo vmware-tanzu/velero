@@ -305,7 +305,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 			res := c.prepareBackupRequest(test.backup)
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedTTL, res.Spec.TTL)
-			assert.Equal(t, test.expectedExpiration, res.Status.Expiration)
+			assert.Equal(t, test.expectedExpiration, *res.Status.Expiration)
 		})
 	}
 }
@@ -316,6 +316,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
 	now = now.Local()
+	timestamp := metav1.NewTime(now)
 
 	tests := []struct {
 		name                string
@@ -348,9 +349,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -376,9 +377,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -407,9 +408,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -436,9 +437,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					Expiration:          metav1.NewTime(now.Add(10 * time.Minute)),
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          &metav1.Time{now.Add(10 * time.Minute)},
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
 				},
 			},
 		},
@@ -465,9 +466,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -496,9 +497,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -525,9 +526,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},

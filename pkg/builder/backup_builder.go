@@ -154,13 +154,15 @@ func (b *BackupBuilder) TTL(ttl time.Duration) *BackupBuilder {
 
 // Expiration sets the Backup's expiration.
 func (b *BackupBuilder) Expiration(val time.Time) *BackupBuilder {
-	b.object.Status.Expiration.Time = val
+	expiration := metav1.NewTime(val)
+	b.object.Status.Expiration = &expiration
 	return b
 }
 
 // StartTimestamp sets the Backup's start timestamp.
 func (b *BackupBuilder) StartTimestamp(val time.Time) *BackupBuilder {
-	b.object.Status.StartTimestamp.Time = val
+	startTime := metav1.NewTime(val)
+	b.object.Status.StartTimestamp = &startTime
 	return b
 }
 

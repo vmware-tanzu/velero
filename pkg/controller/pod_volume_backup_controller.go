@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -181,7 +182,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// update status to InProgress
 	req, err = c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
 		r.Status.Phase = velerov1api.PodVolumeBackupPhaseInProgress
-		r.Status.StartTimestamp.Time = c.clock.Now()
+		startTime := metav1.NewTime(c.clock.Now())
+		r.Status.StartTimestamp = &startTime
 	})
 	if err != nil {
 		log.WithError(err).Error("Error setting PodVolumeBackup StartTimestamp and phase to InProgress")
@@ -277,7 +279,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		r.Status.Path = path
 		r.Status.Phase = velerov1api.PodVolumeBackupPhaseCompleted
 		r.Status.SnapshotID = snapshotID
-		r.Status.CompletionTimestamp.Time = c.clock.Now()
+		completionTime := metav1.NewTime(c.clock.Now())
+		r.Status.CompletionTimestamp = &completionTime
 		if emptySnapshot {
 			r.Status.Message = "volume was empty so no snapshot was taken"
 		}
@@ -376,7 +379,8 @@ func (c *podVolumeBackupController) fail(req *velerov1api.PodVolumeBackup, msg s
 	if _, err := c.patchPodVolumeBackup(req, func(r *velerov1api.PodVolumeBackup) {
 		r.Status.Phase = velerov1api.PodVolumeBackupPhaseFailed
 		r.Status.Message = msg
-		r.Status.CompletionTimestamp.Time = c.clock.Now()
+		completionTime := metav1.NewTime(c.clock.Now())
+		r.Status.CompletionTimestamp = &completionTime
 	}); err != nil {
 		log.WithError(err).Error("Error setting PodVolumeBackup phase to Failed")
 		return err

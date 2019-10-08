@@ -63,22 +63,22 @@ type PluginInfo struct {
 type ServerStatusRequestStatus struct {
 	// Phase is the current lifecycle phase of the ServerStatusRequest.
 	// +optional
-	Phase ServerStatusRequestPhase `json:"phase"`
+	Phase ServerStatusRequestPhase `json:"phase,omitempty"`
 
 	// ProcessedTimestamp is when the ServerStatusRequest was processed
 	// by the ServerStatusRequestController.
 	// +optional
 	// +nullable
-	ProcessedTimestamp metav1.Time `json:"processedTimestamp"`
+	ProcessedTimestamp *metav1.Time `json:"processedTimestamp,omitempty"`
 
 	// ServerVersion is the Velero server version.
 	// +optional
-	ServerVersion string `json:"serverVersion"`
+	ServerVersion string `json:"serverVersion,omitempty"`
 
 	// Plugins list information about the plugins running on the Velero server
 	// +optional
 	// +nullable
-	Plugins []PluginInfo `json:"plugins"`
+	Plugins []PluginInfo `json:"plugins,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

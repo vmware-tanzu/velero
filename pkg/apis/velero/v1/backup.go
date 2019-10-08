@@ -219,7 +219,7 @@ type BackupStatus struct {
 	// Expiration is when this Backup is eligible for garbage-collection.
 	// +optional
 	// +nullable
-	Expiration metav1.Time `json:"expiration,omitempty"`
+	Expiration *metav1.Time `json:"expiration,omitempty"`
 
 	// Phase is the current state of the Backup.
 	// +optional
@@ -237,7 +237,7 @@ type BackupStatus struct {
 	// The server's time is used for StartTimestamps
 	// +optional
 	// +nullable
-	StartTimestamp metav1.Time `json:"startTimestamp,omitempty"`
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a backup was completed.
 	// Completion time is recorded even on failed backups.
@@ -245,7 +245,7 @@ type BackupStatus struct {
 	// The server's time is used for CompletionTimestamps
 	// +optional
 	// +nullable
-	CompletionTimestamp metav1.Time `json:"completionTimestamp,omitempty"`
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// VolumeSnapshotsAttempted is the total number of attempted
 	// volume snapshots for this backup.
