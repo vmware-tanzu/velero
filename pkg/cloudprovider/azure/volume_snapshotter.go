@@ -27,7 +27,6 @@ import (
 
 	disk "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -98,7 +97,14 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		snapshotsSubscriptionId = val
 	}
 
-	// 3. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
+	// 3. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// exist, parseAzureEnvironment will return azure.PublicCloud.
+	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
+	if err != nil {
+		return errors.Wrap(err, "unable to parse azure cloud name environment variable")
+	}
+
+	// 4. if config["apiTimeout"] is empty, default to 2m; otherwise, parse it
 	var apiTimeout time.Duration
 	if val := config[apiTimeoutConfigKey]; val == "" {
 		apiTimeout = 2 * time.Minute
@@ -109,15 +115,15 @@ func (b *VolumeSnapshotter) Init(config map[string]string) error {
 		}
 	}
 
-	// 4. get SPT
-	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], azure.PublicCloud.ResourceManagerEndpoint)
+	// 5. get SPT
+	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
 	if err != nil {
 		return errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 5. set up clients
-	disksClient := disk.NewDisksClient(envVars[subscriptionIDEnvVar])
-	snapsClient := disk.NewSnapshotsClient(snapshotsSubscriptionId)
+	// 6. set up clients
+	disksClient := disk.NewDisksClientWithBaseURI(env.ResourceManagerEndpoint, envVars[subscriptionIDEnvVar])
+	snapsClient := disk.NewSnapshotsClientWithBaseURI(env.ResourceManagerEndpoint, snapshotsSubscriptionId)
 
 	disksClient.PollingDelay = 5 * time.Second
 	snapsClient.PollingDelay = 5 * time.Second
