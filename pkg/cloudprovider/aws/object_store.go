@@ -24,6 +24,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -33,8 +35,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const (
@@ -80,7 +80,7 @@ func isValidSignatureVersion(signatureVersion string) bool {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
+	if err := framework.ValidateObjectStoreConfigKeys(config,
 		regionKey,
 		s3URLKey,
 		publicURLKey,

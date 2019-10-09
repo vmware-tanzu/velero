@@ -22,6 +22,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -32,8 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const regionKey = "region"
@@ -68,7 +68,7 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, regionKey, credentialProfileKey); err != nil {
+	if err := framework.ValidateVolumeSnapshotterConfigKeys(config, regionKey, credentialProfileKey); err != nil {
 		return err
 	}
 

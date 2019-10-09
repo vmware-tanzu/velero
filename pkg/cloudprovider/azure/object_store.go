@@ -23,14 +23,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+
 	storagemgmt "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage"
 	"github.com/Azure/azure-sdk-for-go/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
 )
 
 const (
@@ -208,7 +208,7 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
+	if err := framework.ValidateObjectStoreConfigKeys(config,
 		resourceGroupConfigKey,
 		storageAccountConfigKey,
 		subscriptionIdConfigKey,
