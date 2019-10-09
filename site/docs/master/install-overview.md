@@ -7,6 +7,38 @@ We strongly recommend that you use an [official release][1] of Velero. The tarba
 
 _The code and sample YAML files in the master branch of the Velero repository are under active development and are not guaranteed to be stable. Use them at your own risk!_
 
+## Install Velero
+
+### With the Velero binary
+
+1. Download the [latest official release's](https://github.com/vmware-tanzu/velero/releases) tarball for your client platform.
+
+    _We strongly recommend that you use an [official release](https://github.com/vmware-tanzu/velero/releases) of
+Velero. The tarballs for each release contain the `velero` command-line client. The code in the master branch
+of the Velero repository is under active development and is not guaranteed to be stable!_
+
+2. Extract the tarball:
+
+    ```
+    tar -xvf <RELEASE-TARBALL-NAME>.tar.gz -C /dir/to/extract/to
+    ```
+
+    We'll refer to the directory you extracted to as the "Velero directory" in subsequent steps.
+
+3. Move the `velero` binary from the Velero directory to somewhere in your PATH.
+
+### With the Helm chart
+
+When installing using the Helm chart, the provider's credential information will need to be appended into your values.
+
+The easiest way to do this is with the `--set-file` argument, available in Helm 2.10 and higher.
+
+```bash
+helm install --set-file credentials.secretContents.cloud=./credentials-velero stable/velero
+```
+
+See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
+
 ## Set up your platform
 
 You can run Velero in any namespace, which requires additional customization. See [Run in custom namespace][3].
@@ -41,18 +73,6 @@ Whether you run Velero on a cloud provider or on-premises, if you have more than
 If you need to install Velero without a default backup storage location (without specifying `--bucket` or `--provider`), the `--no-default-backup-location` flag is required for confirmation.
 
 For details, see the documentation topics for individual cloud providers.
-
-## Installing with the Helm chart
-
-When installing using the Helm chart, the provider's credential information will need to be appended into your values.
-
-The easiest way to do this is with the `--set-file` argument, available in Helm 2.10 and higher.
-
-```bash
-helm install --set-file credentials.secretContents.cloud=./credentials-velero stable/velero
-```
-
-See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
 
 
 
