@@ -24,8 +24,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -35,6 +33,8 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (

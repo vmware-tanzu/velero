@@ -22,8 +22,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -34,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const regionKey = "region"

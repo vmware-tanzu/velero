@@ -21,8 +21,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
-
 	"github.com/pkg/errors"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -33,6 +31,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (
