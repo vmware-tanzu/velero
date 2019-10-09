@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (
@@ -208,7 +208,7 @@ func mapLookup(data map[string]string) func(string) string {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
+	if err := framework.ValidateObjectStoreConfigKeys(config,
 		resourceGroupConfigKey,
 		storageAccountConfigKey,
 		subscriptionIdConfigKey,

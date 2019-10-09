@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (
@@ -72,7 +72,7 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIdConfigKey); err != nil {
+	if err := framework.ValidateVolumeSnapshotterConfigKeys(config, resourceGroupConfigKey, apiTimeoutConfigKey, subscriptionIdConfigKey); err != nil {
 		return err
 	}
 

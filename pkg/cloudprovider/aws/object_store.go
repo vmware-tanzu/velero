@@ -34,7 +34,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (
@@ -80,7 +80,7 @@ func isValidSignatureVersion(signatureVersion string) bool {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config,
+	if err := framework.ValidateObjectStoreConfigKeys(config,
 		regionKey,
 		s3URLKey,
 		publicURLKey,

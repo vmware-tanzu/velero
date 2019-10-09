@@ -30,7 +30,7 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const (
@@ -76,7 +76,7 @@ func NewObjectStore(logger logrus.FieldLogger) *ObjectStore {
 }
 
 func (o *ObjectStore) Init(config map[string]string) error {
-	if err := cloudprovider.ValidateObjectStoreConfigKeys(config, kmsKeyNameConfigKey, serviceAccountConfig); err != nil {
+	if err := framework.ValidateObjectStoreConfigKeys(config, kmsKeyNameConfigKey, serviceAccountConfig); err != nil {
 		return err
 	}
 	// Find default token source to extract the GoogleAccessID
