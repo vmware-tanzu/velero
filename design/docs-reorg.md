@@ -1,28 +1,25 @@
 # Documentation Reorganization
 
-One to two sentences that describes the goal of this proposal.
-The reader should be able to tell by the title, and the opening paragraph, if this document is relevant to them.
-
-_Note_: The preferred style for design documents is one sentence per line.
-*Do not wrap lines*.
-This aids in review of the document as changes to a line are not obscured by the reflowing those changes caused and has a side effect of avoiding debate about one or two space after a period.
+This document proposes a new outline for the Velero documentation that is intended to be easier for both users and contributors to interact with.
 
 ## Goals
 
-- A short list of things which will be accomplished by implementing this proposal.
-- Two things is ok.
-- Three is pushing it.
-- More than three goals suggests that the proposal's scope is too large.
+- Agree on the desired outline (sections and pages) for Velero documentation.
 
 ## Non Goals
 
-- A short list of items which are:
-- a. out of scope
-- b. follow on items which are deliberately excluded from this proposal.
+- Write/re-write all new/revised pages (individual page writes/rewrites to be tracked as individual issues).
 
 ## Background
 
-One to two paragraphs of exposition to set the context for this proposal.
+The Velero documentation has evolved organically since the project's inception.
+While it contains a lot of useful information, it is not currently organized in a way that is easy to navigate for users or contributors.
+For example, the introductory section jumps straight into a discussion of Velero's architecture, rather than starting with a good overview of its core features.
+Also, the documentation on how to actually *use* Velero is fairly superficial, only covering the most straight-forward use cases.
+Additionally, different types of information are often mixed together (i.e. conceptual overviews along with detailed setup instructions).
+
+This design document proposes a new outline for the documentation that is intended to be more easily navigated by both users and contributors.
+The new outline both reorganizes the existing content, *and* calls for new content where relevant.
 
 ## High-Level Design
 
