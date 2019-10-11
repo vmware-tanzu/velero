@@ -48,8 +48,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 		log.Info("Processing new ServerStatusRequest")
 		return errors.WithStack(patch(client, req, func(req *velerov1api.ServerStatusRequest) {
 			req.Status.ServerVersion = buildinfo.Version
-			ts := metav1.NewTime(clock.Now())
-			req.Status.ProcessedTimestamp = &ts
+			req.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 			req.Status.Plugins = plugins(pluginLister)
 		}))

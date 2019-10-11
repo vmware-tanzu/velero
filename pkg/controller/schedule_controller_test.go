@@ -380,8 +380,7 @@ func TestParseCronSchedule(t *testing.T) {
 	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
 
 	// record backup time
-	timestamp := metav1.NewTime(now)
-	s.Status.LastBackup = &timestamp
+	s.Status.LastBackup = &metav1.Time{Time: now}
 
 	// advance clock 1 minute, make sure we're not due and next backup is tomorrow at 9am
 	now = time.Date(2017, 8, 11, 9, 2, 0, 0, time.UTC)

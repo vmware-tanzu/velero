@@ -266,8 +266,7 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 	original := item
 	schedule := item.DeepCopy()
 
-	lastBackupTime := metav1.NewTime(now)
-	schedule.Status.LastBackup = &lastBackupTime
+	schedule.Status.LastBackup = &metav1.Time{Time: now}
 
 	if _, err := patchSchedule(original, schedule, c.schedulesClient); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)

@@ -198,8 +198,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
-		startTime := metav1.NewTime(c.clock.Now())
-		request.Status.StartTimestamp = &startTime
+		request.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
 	}
 
 	// update status
@@ -290,8 +289,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// calculate expiration
-	expiration := metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
-	request.Status.Expiration = &expiration
+	request.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(request.Spec.TTL.Duration)}
 
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
@@ -487,8 +485,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
 	if exists || err != nil {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
-		completionTime := metav1.NewTime(c.clock.Now())
-		backup.Status.CompletionTimestamp = &completionTime
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 		if err != nil {
 			return errors.Wrapf(err, "error checking if backup already exists in object storage")
 		}
@@ -502,8 +499,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Mark completion timestamp before serializing and uploading.
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
-	completionTime := metav1.NewTime(c.clock.Now())
-	backup.Status.CompletionTimestamp = &completionTime
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {

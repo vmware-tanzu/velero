@@ -252,11 +252,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 			// clock time, it's easier to do this here than as part of the test case definitions.
 			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == v1.DownloadRequestPhaseProcessed {
 				if tc.expired {
-					expiration := metav1.NewTime(harness.controller.clock.Now().Add(-1 * time.Minute))
-					tc.downloadRequest.Status.Expiration = &expiration
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(-1 * time.Minute)}
 				} else {
-					expiration := metav1.NewTime(harness.controller.clock.Now().Add(time.Minute))
-					tc.downloadRequest.Status.Expiration = &expiration
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(time.Minute)}
 				}
 			}
 
