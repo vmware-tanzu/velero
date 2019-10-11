@@ -18,7 +18,6 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
@@ -336,7 +335,6 @@ func TestGetNextRunTime(t *testing.T) {
 			expectedNextRunTime := baseTime.Add(nextRunTimeOffset)
 
 			due, nextRunTime := getNextRunTime(test.schedule, cronSchedule, testClock.Now())
-			fmt.Println(nextRunTime)
 
 			assert.Equal(t, test.expectedDue, due)
 			// ignore diffs of under a second. the cron library does some rounding.
