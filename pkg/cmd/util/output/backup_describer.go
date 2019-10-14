@@ -219,19 +219,22 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 
 	d.Println()
 	// "<n/a>" output should only be applicable for backups that failed validation
-	if status.StartTimestamp.Time.IsZero() {
+	if status.StartTimestamp == nil || status.StartTimestamp.Time.IsZero() {
 		d.Printf("Started:\t%s\n", "<n/a>")
 	} else {
 		d.Printf("Started:\t%s\n", status.StartTimestamp.Time)
 	}
-	if status.CompletionTimestamp.Time.IsZero() {
+	if status.CompletionTimestamp == nil || status.CompletionTimestamp.Time.IsZero() {
 		d.Printf("Completed:\t%s\n", "<n/a>")
 	} else {
 		d.Printf("Completed:\t%s\n", status.CompletionTimestamp.Time)
 	}
 
 	d.Println()
-	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
+	// Expiration can't be 0, it is always set to a 30-day default. It can be nil
+	// if the controller hasn't processed this Backup yet, in which case this will
+	// just display `<nil>`, though this should be temporary.
+	d.Printf("Expiration:\t%s\n", status.Expiration)
 	d.Println()
 
 	if details {

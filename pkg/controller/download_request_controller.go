@@ -184,7 +184,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	}
 
 	update.Status.Phase = v1.DownloadRequestPhaseProcessed
-	update.Status.Expiration = metav1.NewTime(c.clock.Now().Add(persistence.DownloadURLTTL))
+	update.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(persistence.DownloadURLTTL)}
 
 	_, err = patchDownloadRequest(downloadRequest, update, c.downloadRequestClient)
 	return errors.WithStack(err)

@@ -123,14 +123,13 @@ func (c *gcController) processQueueItem(key string) error {
 	log = c.logger.WithFields(
 		logrus.Fields{
 			"backup":     key,
-			"expiration": backup.Status.Expiration.Time,
+			"expiration": backup.Status.Expiration,
 		},
 	)
 
 	now := c.clock.Now()
 
-	expiration := backup.Status.Expiration.Time
-	if expiration.IsZero() || expiration.After(now) {
+	if backup.Status.Expiration == nil || backup.Status.Expiration.After(now) {
 		log.Debug("Backup has not expired yet, skipping")
 		return nil
 	}

@@ -62,7 +62,7 @@ func DescribeScheduleSpec(d *Describer, spec v1.ScheduleSpec) {
 
 func DescribeScheduleStatus(d *Describer, status v1.ScheduleStatus) {
 	lastBackup := "<never>"
-	if !status.LastBackup.Time.IsZero() {
+	if status.LastBackup != nil && !status.LastBackup.Time.IsZero() {
 		lastBackup = fmt.Sprintf("%v", status.LastBackup.Time)
 	}
 	d.Printf("Last Backup:\t%s\n", lastBackup)

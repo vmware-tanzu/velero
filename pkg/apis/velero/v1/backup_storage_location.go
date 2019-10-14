@@ -119,7 +119,7 @@ type BackupStorageLocationStatus struct {
 	// the cluster.
 	// +optional
 	// +nullable
-	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty"`
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 
 	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
 	// storage location the last time the BSL's contents were synced into the cluster.

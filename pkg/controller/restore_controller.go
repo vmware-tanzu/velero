@@ -373,7 +373,15 @@ func backupXorScheduleProvided(restore *api.Restore) bool {
 func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		// Use .After() because we want descending sort.
-		return backups[i].Status.StartTimestamp.After(backups[j].Status.StartTimestamp.Time)
+
+		var iStartTime, jStartTime time.Time
+		if backups[i].Status.StartTimestamp != nil {
+			iStartTime = backups[i].Status.StartTimestamp.Time
+		}
+		if backups[j].Status.StartTimestamp != nil {
+			jStartTime = backups[j].Status.StartTimestamp.Time
+		}
+		return iStartTime.After(jStartTime)
 	})
 
 	for _, backup := range backups {

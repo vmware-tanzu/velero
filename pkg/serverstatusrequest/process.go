@@ -23,6 +23,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 
@@ -47,7 +48,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 		log.Info("Processing new ServerStatusRequest")
 		return errors.WithStack(patch(client, req, func(req *velerov1api.ServerStatusRequest) {
 			req.Status.ServerVersion = buildinfo.Version
-			req.Status.ProcessedTimestamp.Time = clock.Now()
+			req.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 			req.Status.Plugins = plugins(pluginLister)
 		}))
