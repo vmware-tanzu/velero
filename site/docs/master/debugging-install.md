@@ -52,7 +52,7 @@ This means that the secrets containing the Azure service principal credentials f
 properly into the Velero server pod. Ensure the following:
 
 * The `cloud-credentials` secret exists in the Velero server's namespace
-* The `cloud-credentials` secret has all of the expected keys and each one has the correct value (see [setup instructions](0))
+* The `cloud-credentials` secret has all of the expected keys and each one has the correct value (see [setup instructions][0])
 * The `cloud-credentials` secret is defined as a volume for the Velero deployment
 * The `cloud-credentials` secret is being mounted into the Velero server pod at `/credentials`
 
@@ -68,4 +68,4 @@ into the Velero server pod. Ensure the following:
 * The `cloud-credentials` secret is defined as a volume for the Velero deployment
 * The `cloud-credentials` secret is being mounted into the Velero server pod at `/credentials`
 
-[0]: azure-config#credentials-and-configuration
+[0]: azure-config.md#create-service-principal
