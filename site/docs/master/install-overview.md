@@ -42,6 +42,8 @@ There are two supported methods for installing the Velero server components:
 
 To install and configure the Velero server components, follow the provider-specific instructions documented by [your storage provider][0].
 
+_Note: if your object storage provider is different than your volume snapshot provider, follow the installation instructions for your object storage provider first, then return here and follow the instructions to [add your volume snapshot provider](#install-an-additional-volume-snapshot-provider)._
+
 ## Advanced installation topics
 
 The Velero installation can be customized to meet your needs. TODO
@@ -73,6 +75,30 @@ To configure additional locations after running `velero install`, use the `veler
 #### Don't configure a backup storage location during install
 
 If you need to install Velero without a default backup storage location (without specifying `--bucket` or `--provider`), the `--no-default-backup-location` flag is required for confirmation.
+
+#### Install an additional volume snapshot provider
+
+Velero supports using different providers for volume snapshots than for object storage -- for example, you can use AWS S3 for object storage, and Portworx for block volume snapshots.
+
+However, `velero install` only supports configuring a single matching provider for both object storage and volume snapshots.
+
+To use a different volume snapshot provider:
+
+1. Install the Velero server components by following the instructions for your **object storage** provider
+
+1. Add your volume snapshot provider's plugin to Velero (look in [your provider][0]'s documentation for the image name):
+
+    ```bash
+    velero plugin add <PLUGIN-IMAGE>
+    ```
+
+1. Add a volume snapshot location for your provider, following [your provider][0]'s documentation for configuration:
+
+    ```bash
+    velero snapshot-location create <NAME> \
+        --provider <PROVIDER-NAME> \
+        [--config <PROVIDER-CONFIG>]
+    ```
 
 #### Generate YAML only
 
