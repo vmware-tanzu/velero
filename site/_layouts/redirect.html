@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  {% if page.name == "survey.md" %}
+  {% if page.dir != "/docs/" %}
   <meta http-equiv="refresh" content="0; url={{ page.redirect.to }}" />
   <script type="text/javascript">
     window.location.href = "{{ page.redirect.to }}"
@@ -13,7 +13,7 @@ Redirecting to {{ page.redirect.to }}. If it doesn't load, click <a href="{{ pag
 </body>
 </html>
   {% endif %}
-  {% if page.name != "survey" %}
+  {% if page.dir == "/docs/" %}
   <meta http-equiv="refresh" content="0; url=/docs/{{ site.latest }}/{{ page.destination }}" />
   <script type="text/javascript">
     window.location.href = "/docs/{{ site.latest }}/{{ page.destination }}"

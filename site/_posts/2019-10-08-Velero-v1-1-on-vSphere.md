@@ -1,5 +1,6 @@
 ---
 title: Velero v1.1 backing up and restoring apps on vSphere
+redirect_from: /Velero-v1-1-on-vSphere/
 image: /img/posts/vsphere-logo.jpg
 excerpt: A How-To guide to run Velero on vSphere.
 author_name: Cormac Hogan
@@ -95,7 +96,7 @@ minio   NodePort   10.100.200.82   <none>        9000:32109/TCP   5s
 
 In the above outputs, the node on which the Minio Object Storage is deployed has IP address `192.168.192.5`. The NodePort that the Minio Service is exposed is `32109`. If we now direct a browser to that `Node:port` combination, we should see the Minio Object Store web interface. You can use the credentials provided in the `credentials-velero` file earlier to login.
 
-![Minio Object Store](../img/vsphere-tutorial-icons/Minio.png)
+![Minio Object Store](/img/vsphere-tutorial-icons/Minio.png)
 
 ## Install Velero
 
@@ -163,7 +164,7 @@ my-nginx   LoadBalancer   10.100.200.147   100.64.0.1,192.168.191.70   80:30942/
 
 In this example, a Load Balancer has provided the `nginx` service with an external IP address of 192.168.191.70. If I point a browser to that IP address, I get an nginx landing page identical to that shown below.
 
-![nginx landing page](../img/vsphere-tutorial-icons/nginx.png)
+![nginx landing page](/img/vsphere-tutorial-icons/nginx.png)
 
 We're now ready to do a backup and restore of the `nginx` application.
 
@@ -183,7 +184,7 @@ nginx-backup   Completed   2019-08-07 16:13:44 +0100 IST   29d       default    
 
 You can now login to the Minio Object Storage via a browser and verify that the backup actually exists. You should see the name of the backup under the `velero/backups` folder:
 
-![Minio Backup Details](../img/vsphere-tutorial-icons/minio-nginx-backup.png)
+![Minio Backup Details](/img/vsphere-tutorial-icons/minio-nginx-backup.png)
 
 ## Destroy your application
 
@@ -247,7 +248,7 @@ You can see that the restore has now completed. Check to see if the namespace, D
 
 Now let’s see if we can successfully reach our `nginx` web server on that IP address. Yes we can! Looks like the restore was successful.
 
-![nginx restored](../img/vsphere-tutorial-icons/nginx-restore-new-ip.png)
+![nginx restored](/img/vsphere-tutorial-icons/nginx-restore-new-ip.png)
 
 Backups and Restores are now working on Kubernetes deployed on vSphere using Velero v1.1.
 
