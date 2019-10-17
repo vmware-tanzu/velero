@@ -597,6 +597,164 @@ func TestBackupResourceFiltering(t *testing.T) {
 	}
 }
 
+// TestCRDInclusion tests whether related CRDs are included, based on
+// backed-up resources and "include cluster resources" flag, and
+// verifies that the set of items written to the backup tarball are
+// correct. Validation is done by looking at the names of the files in
+// the backup tarball; the contents of the files are not checked.
+func TestCRDInclusion(t *testing.T) {
+	tests := []struct {
+		name         string
+		backup       *velerov1.Backup
+		apiResources []*test.APIResource
+		want         []string
+	}{
+		{
+			name: "include cluster resources=auto includes all CRDs when backing up all namespaces",
+			backup: defaultBackup().
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+		{
+			name: "include cluster resources=false excludes all CRDs when backing up all namespaces",
+			backup: defaultBackup().
+				IncludeClusterResources(false).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+		{
+			name: "include cluster resources=true includes all CRDs when backing up all namespaces",
+			backup: defaultBackup().
+				IncludeClusterResources(true).
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+		{
+			name: "include cluster resources=auto includes CRDs with CRs when backing up selected namespaces",
+			backup: defaultBackup().
+				IncludedNamespaces("foo").
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+		{
+			name: "include cluster resources=false excludes all CRDs when backing up selected namespaces",
+			backup: defaultBackup().
+				IncludeClusterResources(false).
+				IncludedNamespaces("foo").
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+		{
+			name: "include cluster resources=true includes all CRDs when backing up selected namespaces",
+			backup: defaultBackup().
+				IncludeClusterResources(true).
+				IncludedNamespaces("foo").
+				Result(),
+			apiResources: []*test.APIResource{
+				test.CRDs(
+					builder.ForCustomResourceDefinition("backups.velero.io").Result(),
+					builder.ForCustomResourceDefinition("volumesnapshotlocations.velero.io").Result(),
+					builder.ForCustomResourceDefinition("test.velero.io").Result(),
+				),
+				test.VSLs(
+					builder.ForVolumeSnapshotLocation("foo", "vsl-1").Result(),
+				),
+			},
+			want: []string{
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var (
+				h          = newHarness(t)
+				req        = &Request{Backup: tc.backup}
+				backupFile = bytes.NewBuffer([]byte{})
+			)
+
+			for _, resource := range tc.apiResources {
+				h.addItems(t, resource)
+			}
+
+			h.backupper.Backup(h.log, req, backupFile, nil, nil)
+
+			assertTarballContents(t, backupFile, append(tc.want, "metadata/version")...)
+		})
+	}
+}
+
 // TestBackupResourceCohabitation runs backups for resources that "cohabitate",
 // meaning they exist in multiple API groups (e.g. deployments.extensions and
 // deployments.apps), and verifies that only one copy of each resource is backed
