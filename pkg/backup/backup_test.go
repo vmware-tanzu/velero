@@ -610,7 +610,7 @@ func TestCRDInclusion(t *testing.T) {
 		want         []string
 	}{
 		{
-			name: "include cluster resources=auto includes all CRDs when backing up all namespaces",
+			name: "include cluster resources=auto includes all CRDs when running a full-cluster backup",
 			backup: defaultBackup().
 				Result(),
 			apiResources: []*test.APIResource{
@@ -650,7 +650,7 @@ func TestCRDInclusion(t *testing.T) {
 			},
 		},
 		{
-			name: "include cluster resources=true includes all CRDs when backing up all namespaces",
+			name: "include cluster resources=true includes all CRDs when running a full-cluster backup",
 			backup: defaultBackup().
 				IncludeClusterResources(true).
 				Result(),
