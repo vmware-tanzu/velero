@@ -55,6 +55,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/add-pv-from-pvc", newAddPVFromPVCRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
+				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
+				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				Serve()
 		},
 	}
@@ -174,4 +176,12 @@ func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.Handl
 			client.StorageV1().StorageClasses(),
 		), nil
 	}
+}
+
+func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewRoleBindingAction(logger), nil
+}
+
+func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewClusterRoleBindingAction(logger), nil
 }
