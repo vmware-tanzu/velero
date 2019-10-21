@@ -43,6 +43,11 @@ spec:
               - ReadOnly
               - ReadWrite
               type: string
+            backupSyncPeriod:
+              description: BackupSyncPeriod defines how frequently to sync backup
+                API objects from object storage. A value of 0 disables sync.
+              nullable: true
+              type: string
             config:
               additionalProperties:
                 type: string

@@ -348,6 +348,11 @@ func (in *BackupStorageLocationSpec) DeepCopyInto(out *BackupStorageLocationSpec
 		}
 	}
 	in.StorageType.DeepCopyInto(&out.StorageType)
+	if in.BackupSyncPeriod != nil {
+		in, out := &in.BackupSyncPeriod, &out.BackupSyncPeriod
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	return
 }
 

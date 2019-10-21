@@ -15,6 +15,7 @@ metadata:
   name: default
   namespace: velero
 spec:
+  backupSyncPeriod: 2m0s
   provider: aws
   objectStorage:
     bucket: myBucket
@@ -37,7 +38,7 @@ The configurable parameters are as follows:
 | `objectStorage/prefix` | String | Optional Field | The directory inside a storage bucket where backups are to be uploaded. |
 | `config` | map[string]string<br><br>(See the corresponding [AWS][0], [GCP][1], and [Azure][2]-specific configs or your provider's documentation.) | None (Optional) | Configuration keys/values to be passed to the cloud provider for backup storage. |
 | `accessMode` | String | `ReadWrite` | How Velero can access the backup storage location. Valid values are `ReadWrite`, `ReadOnly`. |
-
+| `backupSyncPeriod` | metav1.Duration | Optional Field | How frequently Velero should synchronize backups in object storage. Default is Velero's server backup sync period. Set this to `0s` to disable sync. |
 
 #### AWS
 
