@@ -23,7 +23,9 @@ RUN git clone -b kubernetes-1.15.3 https://github.com/kubernetes/apimachinery
 WORKDIR  /go/src/k8s.io/code-generator
 # Don't use ENV here because we don't want to disable modules for subsequent commands
 RUN GO111MODULE=on go mod vendor
-RUN go get -d sigs.k8s.io/controller-tools/cmd/controller-gen
+RUN mkdir -p /go/src/sigs.k8s.io
+WORKDIR /go/src/sigs.k8s.io
+RUN git clone -b v0.2.2 https://github.com/kubernetes-sigs/controller-tools
 WORKDIR /go/src/sigs.k8s.io/controller-tools
 RUN GO111MODULE=on go mod vendor
 RUN go get golang.org/x/tools/cmd/goimports
