@@ -18,11 +18,10 @@
   version = "v0.4.12"
 
 [[projects]]
-  digest = "1:67d04a59f2023e3b78b360c2293e05bf8722daa0234e42170a028228ad278b10"
+  digest = "1:1b866710821ed87560b0eb9b41e505760d643d24b1f2244ea40d258414256082"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
     "services/storage/mgmt/2018-02-01/storage",
-    "storage",
     "version",
   ]
   pruneopts = "NUT"
@@ -47,7 +46,7 @@
   version = "v11.9.0"
 
 [[projects]]
-  digest = "1:bfbf1b6842e732a7feb1df7819f39fcdbeaa70f78a601c9f9ddcd0fd4d007cec"
+  digest = "1:fa8767ea8194cafe6b55df80c3d6937dbf9e75779a82d3daf9b24fdd2fda82f1"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -91,8 +90,8 @@
     "service/sts/stsiface",
   ]
   pruneopts = "NUT"
-  revision = "15cbab53359072d0801eb32d16d0a406207e8716"
-  version = "v1.25.14"
+  revision = "4b77f7c2f7303e8c757947ae8aff6a33dce7b8d1"
+  version = "v1.25.16"
 
 [[projects]]
   digest = "1:707ebe952a8b3d00b343c01536c79c73771d100f63ec6babeaed5c79e2b8a8dd"
@@ -306,6 +305,14 @@
   revision = "c2b33e84"
 
 [[projects]]
+  digest = "1:da62aa6632d04e080b8a8b85a59ed9ed1550842a0099a55f3ae3a20d02a3745a"
+  name = "github.com/joho/godotenv"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "23d116af351c84513e1946b527c88823e476be13"
+  version = "v1.3.0"
+
+[[projects]]
   digest = "1:0243cffa4a3410f161ee613dfdd903a636d07e838a42d341da95d81f42cd1d41"
   name = "github.com/json-iterator/go"
   packages = ["."]
@@ -328,14 +335,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "89fcab3d43de07060e4fd4c1547430ed57e87f24"
-
-[[projects]]
-  digest = "1:13ada91f079028d1b4ca88e10a16439dcfa6541d26ed2e61e770f56d06301933"
-  name = "github.com/marstr/guid"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "8bd9a64bf37eb297b492a4101fb28e80ac0b290f"
-  version = "v1.1.0"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -557,7 +556,7 @@
     "trace",
   ]
   pruneopts = "NUT"
-  revision = "da9a3fd4c5820e74b24a6cb7fb438dc9b0dd377c"
+  revision = "ec77196f6094c3492a8b61f2c11cf937f78992ae"
 
 [[projects]]
   branch = "master"
@@ -583,14 +582,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:af1a8a60d9ed69646d3c0a614c4673d1b0a621ee4718c947c712d2b931b673a2"
+  digest = "1:efed2386fd24e602936d364c0a5124d2c3a620af84579cc2a0c7162ac08a339a"
   name = "golang.org/x/sys"
   packages = [
     "unix",
     "windows",
   ]
   pruneopts = "NUT"
-  revision = "b09406accb4736d857a32bf9444cd7edae2ffa79"
+  revision = "3e7259c5e7c2076bb2728047a3df75adb1bad8e5"
 
 [[projects]]
   digest = "1:8d8faad6b12a3a4c819a3f9618cb6ee1fa1cfc33253abeeea8b55336721e3405"
@@ -1091,8 +1090,8 @@
   analyzer-version = 1
   input-imports = [
     "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage",
-    "github.com/Azure/azure-sdk-for-go/storage",
     "github.com/Azure/go-autorest/autorest",
+    "github.com/Azure/go-autorest/autorest/adal",
     "github.com/Azure/go-autorest/autorest/azure",
     "github.com/Azure/go-autorest/autorest/to",
     "github.com/aws/aws-sdk-go/aws/endpoints",
@@ -1103,6 +1102,7 @@
     "github.com/golang/protobuf/proto",
     "github.com/hashicorp/go-hclog",
     "github.com/hashicorp/go-plugin",
+    "github.com/joho/godotenv",
     "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
