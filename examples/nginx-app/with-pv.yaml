@@ -70,7 +70,7 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
-      - image: gcr.io/heptio-images/fsfreeze-pause:latest
+      - image: velero/fsfreeze-pause:latest
         name: fsfreeze
         securityContext:
           privileged: true

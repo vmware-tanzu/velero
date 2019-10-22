@@ -4,7 +4,7 @@ As of v0.11.0, Heptio Ark has become Velero. This means the following changes ha
 
 * The `ark` CLI client is now `velero`.
 * The default Kubernetes namespace and ServiceAccount are now named `velero` (formerly `heptio-ark`).
-* The container image name is now `gcr.io/heptio-images/velero` (formerly `gcr.io/heptio-images/ark`).
+* The container image name is now `velero/velero` (formerly `gcr.io/heptio-images/ark`).
 * CRDs are now under the new `velero.io` API group name (formerly `ark.heptio.com`).
 
 

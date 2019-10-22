@@ -202,7 +202,7 @@ difference is small.
 
 ## Customize Restore Helper Container
 
-Velero uses a helper init container when performing a restic restore. By default, the image for this container is `gcr.io/heptio-images/velero-restic-restore-helper:<VERSION>`,
+Velero uses a helper init container when performing a restic restore. By default, the image for this container is `velero/velero-restic-restore-helper:<VERSION>`,
 where `VERSION` matches the version/tag of the main Velero image. You can customize the image that is used for this helper by creating a ConfigMap in the Velero namespace with
 the alternate image. 
 

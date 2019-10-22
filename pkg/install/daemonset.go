@@ -26,7 +26,7 @@ import (
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/velero:latest",
+		image: "velero/velero:latest",
 	}
 
 	for _, opt := range opts {

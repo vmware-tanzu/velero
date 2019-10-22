@@ -29,7 +29,7 @@ kubectl edit deployment/velero -n velero
 ...
    containers:
      - name: velero
-       image: gcr.io/heptio-images/velero:latest
+       image: velero/velero:latest
        command:
          - /velero
        args:
