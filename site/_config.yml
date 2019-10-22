@@ -3,7 +3,7 @@ title: Velero
 email:
 author: Velero Authors
 description: Backup and migrate Kubernetes resources and persistent volumes
-url: velero.io
+#url: velero.io
 logo: Velero.svg
 twitter:
   username: projectvelero
@@ -163,7 +163,7 @@ versions:
 - v0.3.0
 
 # Build settings
-permalink: :title/
+permalink: /blog/:title/
 sass:
   sass_dir: css
   style: :compressed
