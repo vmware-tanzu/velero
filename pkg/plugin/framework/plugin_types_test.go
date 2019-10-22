@@ -19,7 +19,7 @@ package framework
 import (
 	"testing"
 
-	"github.com/hashicorp/go-plugin"
+	plugin "github.com/hashicorp/go-plugin"
 	"github.com/stretchr/testify/assert"
 )
 

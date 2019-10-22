@@ -28,7 +28,6 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider/azure"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -221,7 +220,7 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := azure.GetResticEnvVars(loc.Spec.Config)
+	azureVars, err := getResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}

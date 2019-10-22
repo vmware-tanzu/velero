@@ -114,10 +114,10 @@ func mapLookup(data map[string]string) func(string) string {
 	}
 }
 
-// GetResticEnvVars gets the environment variables that restic
+// getResticEnvVars gets the environment variables that restic
 // relies on (AZURE_ACCOUNT_NAME and AZURE_ACCOUNT_KEY) based
 // on info in the provided object storage location config map.
-func GetResticEnvVars(config map[string]string) (map[string]string, error) {
+func getResticEnvVars(config map[string]string) (map[string]string, error) {
 	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
