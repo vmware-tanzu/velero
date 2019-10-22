@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultImageBase       = "gcr.io/heptio-images/velero-restic-restore-helper"
+	defaultImageBase       = "velero/velero-restic-restore-helper"
 	defaultCPURequestLimit = "100m"
 	defaultMemRequestLimit = "128Mi"
 )
