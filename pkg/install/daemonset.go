@@ -26,7 +26,7 @@ import (
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: "velero/velero:latest",
+		image: DefaultImage,
 	}
 
 	for _, opt := range opts {
