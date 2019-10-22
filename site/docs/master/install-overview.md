@@ -6,10 +6,10 @@
 - [Advanced installation topics](#advanced-installation-topics)
 
 ## Prerequisites
-- access to a Kubernetes cluster, v1.TODO or later, with DNS and container networking enabled.
+- access to a Kubernetes cluster, v1.10 or later, with DNS and container networking enabled.
 - `kubectl` installed locally
 
-Additionally, Velero uses object storage to store backups and associated artifacts. It also optionally integrates with supported block storage systems to snapshot your persistent volumes. Before beginning the installation process, you should identify the object storage provider and optional block storage provider(s) you'll be using from the list of [compatible providers][0]. 
+Velero uses object storage to store backups and associated artifacts. It also optionally integrates with supported block storage systems to snapshot your persistent volumes. Before beginning the installation process, you should identify the object storage provider and optional block storage provider(s) you'll be using from the list of [compatible providers][0]. 
 
 There are supported storage providers for both cloud-provider environments and on-premises environments. For more details on on-premises scenarios, see the [on-premises documentation][4].
 
@@ -46,11 +46,20 @@ _Note: if your object storage provider is different than your volume snapshot pr
 
 ## Advanced installation topics
 
-The Velero installation can be customized to meet your needs. TODO
+- [Install in any namespace](#install-in-any-namespace)
+- [Use non-file-based identity mechanisms](#use-non-file-based-identity-mechanisms)
+- [Enable restic integration](#enable-restic-integration)
+- [Customize resource requests and limits](#customize-resource-requests-and-limits)
+- [Configure more than one storage location for backups or volume snapshots](#configure-more-than-one-storage-location-for-backups-or-volume-snapshots)
+- [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
+- [Install an additional volume snapshot provider](#install-an-additional-volume-snapshot-provider)
+- [Generate YAML only](#generate-yaml-only)
+- [Additional options](#additional-options)
 
-#### Run in any namespace
 
-Velero runs in the `velero` namespace by default. However, you can run Velero in any namespace. See [run in custom namespace][2] for details.
+#### Install in any namespace
+
+Velero is installed in the `velero` namespace by default. However, you can install Velero in any namespace. See [run in custom namespace][2] for details.
 
 #### Use non-file-based identity mechanisms
 
@@ -64,6 +73,31 @@ By default, `velero install` does not install Velero's [restic integration][3]. 
 
 If you've already run `velero install` without the `--use-restic` flag, you can run the same command again, including the `--use-restic` flag, to add the restic integration to your existing install. 
 
+#### Customize resource requests and limits
+
+By default, the Velero deployment requests 500m CPU, 128Mi memory and sets a limit of 1000m CPU, 256Mi.
+Default requests and limits are not set for the restic pods as CPU/Memory usage can depend heavily on the size of volumes being backed up.
+
+If you need to customize these resource requests and limits, you can set the following flags in your `velero install` command:
+
+```bash
+velero install \
+    --provider <YOUR_PROVIDER> \
+    --bucket <YOUR_BUCKET> \
+    --secret-file <PATH_TO_FILE> \
+    --velero-pod-cpu-request <CPU_REQUEST> \
+    --velero-pod-mem-request <MEMORY_REQUEST> \
+    --velero-pod-cpu-limit <CPU_LIMIT> \
+    --velero-pod-mem-limit <MEMORY_LIMIT> \
+    [--use-restic] \
+    [--restic-pod-cpu-request <CPU_REQUEST>] \
+    [--restic-pod-mem-request <MEMORY_REQUEST>] \
+    [--restic-pod-cpu-limit <CPU_LIMIT>] \
+    [--restic-pod-mem-limit <MEMORY_LIMIT>]
+```
+
+Values for these flags follow the same format as [Kubernetes resource requirements][5].
+
 #### Configure more than one storage location for backups or volume snapshots
 
 Velero supports any number of backup storage locations and volume snapshot locations. For more details, see [about locations](locations.md).
@@ -72,7 +106,7 @@ However, `velero install` only supports configuring at most one backup storage l
 
 To configure additional locations after running `velero install`, use the `velero backup-location create` and/or `velero snapshot-location create` commands along with provider-specific configuration. Use the `--help` flag on each of these commands for more details.
 
-#### Don't configure a backup storage location during install
+#### Do not configure a backup storage location during install
 
 If you need to install Velero without a default backup storage location (without specifying `--bucket` or `--provider`), the `--no-default-backup-location` flag is required for confirmation.
 
@@ -108,20 +142,6 @@ To generate the YAML without applying it to your cluster, use the `--dry-run -o 
 
 This is useful for applying bespoke customizations, integrating with a GitOps workflow, etc.
 
-#### Providing credentials when installing with the Helm chart
-
-TODO can this go in the Helm chart docs?
-
-When installing using the Helm chart, the provider's credential information will need to be appended into your values.
-
-The easiest way to do this is with the `--set-file` argument, available in Helm 2.10 and higher.
-
-```bash
-helm install --set-file credentials.secretContents.cloud=./credentials-velero stable/velero
-```
-
-See your cloud provider's documentation for the contents and creation of the `credentials-velero` file.
-
 #### Additional options
 
 Run `velero install --help` or see the [Helm chart documentation](https://github.com/helm/charts/tree/master/stable/velero) for the full set of installation options.
@@ -132,3 +152,4 @@ Run `velero install --help` or see the [Helm chart documentation](https://github
 [2]: namespace.md
 [3]: restic.md
 [4]: on-premises.md
+[5]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
