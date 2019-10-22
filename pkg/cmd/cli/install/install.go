@@ -334,6 +334,10 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		if o.ProviderName != "" {
 			return errors.New("--provider must be empty when using --no-default-backup-location and --use-volume-snapshots=false")
 		}
+	} else {
+		if len(o.Plugins) == 0 {
+			return errors.New("--plugins flag is required")
+		}
 	}
 
 	switch {
@@ -345,10 +349,6 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 
 	if o.DefaultResticMaintenanceFrequency < 0 {
 		return errors.New("--default-restic-prune-frequency must be non-negative")
-	}
-
-	if len(o.Plugins) == 0 {
-		return errors.New("--plugins flag is required")
 	}
 
 	return nil
