@@ -95,7 +95,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
-	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment. Optional.")
+	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -333,6 +333,10 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 	if o.NoDefaultBackupLocation && !o.UseVolumeSnapshots {
 		if o.ProviderName != "" {
 			return errors.New("--provider must be empty when using --no-default-backup-location and --use-volume-snapshots=false")
+		}
+	} else {
+		if len(o.Plugins) == 0 {
+			return errors.New("--plugins flag is required")
 		}
 	}
 

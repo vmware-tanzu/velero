@@ -50,11 +50,11 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [5]: http://www.noobaa.com/
 [6]: api-types/backupstoragelocation.md#aws
 [7]: https://aws.amazon.com/s3/
-[8]: aws-config.md
+[8]: https://github.com/vmware-tanzu/velero-plugin-for-aws
 [9]: https://azure.microsoft.com/en-us/services/storage/blobs
-[10]: azure-config.md
+[10]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
 [11]: https://cloud.google.com/storage/
-[12]: gcp-config.md
+[12]: https://github.com/vmware-tanzu/velero-plugin-for-gcp
 [15]: https://www.digitalocean.com/
 [16]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [17]: https://openebs.io/

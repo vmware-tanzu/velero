@@ -21,7 +21,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 

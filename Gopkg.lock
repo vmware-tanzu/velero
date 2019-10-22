@@ -2,28 +2,18 @@
 
 
 [[projects]]
-  digest = "1:44d9970a8855e319dcc6f8d8bfa0d7b3a50d1a94f76bdfaac86d131892f7ba69"
+  digest = "1:a24d4f0bfca235899423e806a033447bb840d48970ecd8e1bc409537d0289c23"
   name = "cloud.google.com/go"
-  packages = [
-    "compute/metadata",
-    "iam",
-    "internal",
-    "internal/optional",
-    "internal/trace",
-    "internal/version",
-    "storage",
-  ]
+  packages = ["compute/metadata"]
   pruneopts = "NUT"
   revision = "6e28f1c34522dae46e9c37119b78c54471b13ac8"
   version = "v0.46.2"
 
 [[projects]]
-  digest = "1:623dad7b6ddc6b93f983e9852a0785ed606f804d3541fa4b6178d7055b361306"
+  digest = "1:1b866710821ed87560b0eb9b41e505760d643d24b1f2244ea40d258414256082"
   name = "github.com/Azure/azure-sdk-for-go"
   packages = [
-    "services/compute/mgmt/2018-04-01/compute",
     "services/storage/mgmt/2018-02-01/storage",
-    "storage",
     "version",
   ]
   pruneopts = "NUT"
@@ -48,7 +38,7 @@
   version = "v11.1.2"
 
 [[projects]]
-  digest = "1:f41188abdb95b92995643a927f5bdd208389822a8e1aba00d85633ae51b85c85"
+  digest = "1:de4de597da64d415bac024b29b48eb51dfbd168100ea4acac3db793738cc8bc4"
   name = "github.com/aws/aws-sdk-go"
   packages = [
     "aws",
@@ -71,13 +61,11 @@
     "internal/sdkrand",
     "internal/shareddefaults",
     "private/protocol",
-    "private/protocol/ec2query",
     "private/protocol/query",
     "private/protocol/query/queryutil",
     "private/protocol/rest",
     "private/protocol/restxml",
     "private/protocol/xml/xmlutil",
-    "service/ec2",
     "service/s3",
     "service/s3/s3iface",
     "service/s3/s3manager",
@@ -167,11 +155,10 @@
   version = "v0.4"
 
 [[projects]]
-  digest = "1:a98a0b00720dc3149bf3d0c8d5726188899e5bab2f5072b9a7ef82958fbc98b2"
+  digest = "1:2d0636a8c490d2272dd725db26f74a537111b99b9dbdda0d8b98febe63702aa4"
   name = "github.com/golang/protobuf"
   packages = [
     "proto",
-    "protoc-gen-go/descriptor",
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
@@ -202,14 +189,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "24818f796faf91cd76ec7bddd72458fbced7a6c1"
-
-[[projects]]
-  digest = "1:4b76f3e067eed897a45242383a2aa4d0a2fdbf73a8d00c03167dba80c43630b1"
-  name = "github.com/googleapis/gax-go"
-  packages = ["v2"]
-  pruneopts = "NUT"
-  revision = "bd5b16380fd03dc758d11cef74ba2e3bc8b0e8c2"
-  version = "v2.0.5"
 
 [[projects]]
   digest = "1:3d7c1446fc5c710351b246c0dc6700fae843ca27f5294d0bd9f68bab2a810c44"
@@ -306,14 +285,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "89fcab3d43de07060e4fd4c1547430ed57e87f24"
-
-[[projects]]
-  digest = "1:13ada91f079028d1b4ca88e10a16439dcfa6541d26ed2e61e770f56d06301933"
-  name = "github.com/marstr/guid"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "8bd9a64bf37eb297b492a4101fb28e80ac0b290f"
-  version = "v1.1.0"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -486,28 +457,6 @@
   version = "v1.2.2"
 
 [[projects]]
-  digest = "1:2f977d7025e73f05091f406514f1d2cca36cc649d2af08d5f5223ebc6c475863"
-  name = "go.opencensus.io"
-  packages = [
-    ".",
-    "internal",
-    "internal/tagencoding",
-    "plugin/ochttp",
-    "plugin/ochttp/propagation/b3",
-    "stats",
-    "stats/internal",
-    "stats/view",
-    "tag",
-    "trace",
-    "trace/internal",
-    "trace/propagation",
-    "trace/tracestate",
-  ]
-  pruneopts = "NUT"
-  revision = "79993219becaa7e29e3b60cb67f5b8e82dee11d6"
-  version = "v0.17.0"
-
-[[projects]]
   branch = "master"
   digest = "1:624a05c7c6ed502bf77364cd3d54631383dafc169982fddd8ee77b53c3d9cccf"
   name = "golang.org/x/crypto"
@@ -584,27 +533,6 @@
   revision = "26559e0f760e39c24d730d3224364aef164ee23f"
 
 [[projects]]
-  digest = "1:98ef43d760c0123cf289071e1043176178c60205902a60beba99bb9f988fdcf9"
-  name = "google.golang.org/api"
-  packages = [
-    "compute/v1",
-    "gensupport",
-    "googleapi",
-    "googleapi/internal/uritemplates",
-    "googleapi/transport",
-    "iamcredentials/v1",
-    "internal",
-    "iterator",
-    "option",
-    "storage/v1",
-    "transport/http",
-    "transport/http/internal/propagation",
-  ]
-  pruneopts = "NUT"
-  revision = "feb0267beb8644f5088a03be4d5ec3f8c7020152"
-  version = "v0.9.0"
-
-[[projects]]
   digest = "1:7206d98ec77c90c72ec2c405181a1dcf86965803b6dbc4f98ceab7a5047c37a9"
   name = "google.golang.org/appengine"
   packages = [
@@ -625,14 +553,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:56feb4ebffcd6c42edcff74f2d9cc1e36bee7a382eeb0740a31c66585ed804c0"
+  digest = "1:93180612a69db36a06d801302b867d53a50a8a5f0943b34db66adc0574ea57df"
   name = "google.golang.org/genproto"
-  packages = [
-    "googleapis/api/annotations",
-    "googleapis/iam/v1",
-    "googleapis/rpc/code",
-    "googleapis/rpc/status",
-  ]
+  packages = ["googleapis/rpc/status"]
   pruneopts = "NUT"
   revision = "ee236bd376b077c7a89f260c026c4735b195e459"
 
@@ -1062,23 +985,13 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "cloud.google.com/go/storage",
-    "github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-04-01/compute",
     "github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-02-01/storage",
-    "github.com/Azure/azure-sdk-for-go/storage",
     "github.com/Azure/go-autorest/autorest",
     "github.com/Azure/go-autorest/autorest/adal",
     "github.com/Azure/go-autorest/autorest/azure",
     "github.com/Azure/go-autorest/autorest/to",
-    "github.com/aws/aws-sdk-go/aws",
-    "github.com/aws/aws-sdk-go/aws/awserr",
-    "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/endpoints",
-    "github.com/aws/aws-sdk-go/aws/request",
     "github.com/aws/aws-sdk-go/aws/session",
-    "github.com/aws/aws-sdk-go/aws/signer/v4",
-    "github.com/aws/aws-sdk-go/service/ec2",
-    "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/evanphx/json-patch",
     "github.com/gobwas/glob",
@@ -1099,13 +1012,6 @@
     "github.com/stretchr/testify/mock",
     "github.com/stretchr/testify/require",
     "golang.org/x/net/context",
-    "golang.org/x/oauth2",
-    "golang.org/x/oauth2/google",
-    "google.golang.org/api/compute/v1",
-    "google.golang.org/api/googleapi",
-    "google.golang.org/api/iamcredentials/v1",
-    "google.golang.org/api/iterator",
-    "google.golang.org/api/option",
     "google.golang.org/grpc",
     "google.golang.org/grpc/codes",
     "google.golang.org/grpc/status",

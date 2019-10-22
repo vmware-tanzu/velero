@@ -34,9 +34,8 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider"
-	cloudprovidermocks "github.com/vmware-tanzu/velero/pkg/cloudprovider/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -46,12 +45,12 @@ type objectBackupStoreTestHarness struct {
 	// embedded to reduce verbosity when calling methods
 	*objectBackupStore
 
-	objectStore    *cloudprovider.InMemoryObjectStore
+	objectStore    *inMemoryObjectStore
 	bucket, prefix string
 }
 
 func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
-	objectStore := cloudprovider.NewInMemoryObjectStore(bucket)
+	objectStore := newInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
@@ -70,7 +69,7 @@ func TestIsValid(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectErr   bool
 	}{
 		{
@@ -163,7 +162,7 @@ func TestListBackups(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectedRes []string
 		expectedErr string
 	}{
@@ -456,7 +455,7 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objectStore := new(cloudprovidermocks.ObjectStore)
+			objectStore := new(providermocks.ObjectStore)
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
@@ -629,7 +628,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Bucket has a leading and trailing slash, they are both stripped",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("/bucket/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 		},
@@ -637,7 +636,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("/prefix/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
@@ -646,7 +645,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("prefix").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
