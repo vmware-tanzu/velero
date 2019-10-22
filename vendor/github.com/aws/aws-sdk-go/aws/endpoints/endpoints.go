@@ -35,7 +35,7 @@ type Options struct {
 	//
 	// If resolving an endpoint on the partition list the provided region will
 	// be used to determine which partition's domain name pattern to the service
-	// endpoint ID with. If both the service and region are unknown and resolving
+	// endpoint ID with. If both the service and region are unkonwn and resolving
 	// the endpoint on partition list an UnknownEndpointError error will be returned.
 	//
 	// If resolving and endpoint on a partition specific resolver that partition's
@@ -170,12 +170,9 @@ func PartitionForRegion(ps []Partition, regionID string) (Partition, bool) {
 // A Partition provides the ability to enumerate the partition's regions
 // and services.
 type Partition struct {
-	id, dnsSuffix string
-	p             *partition
+	id string
+	p  *partition
 }
-
-// DNSSuffix returns the base domain name of the partition.
-func (p Partition) DNSSuffix() string { return p.dnsSuffix }
 
 // ID returns the identifier of the partition.
 func (p Partition) ID() string { return p.id }
@@ -209,11 +206,10 @@ func (p Partition) EndpointFor(service, region string, opts ...func(*Options)) (
 // enumerating over the regions in a partition.
 func (p Partition) Regions() map[string]Region {
 	rs := map[string]Region{}
-	for id, r := range p.p.Regions {
+	for id := range p.p.Regions {
 		rs[id] = Region{
-			id:   id,
-			desc: r.Description,
-			p:    p.p,
+			id: id,
+			p:  p.p,
 		}
 	}
 
@@ -243,10 +239,6 @@ type Region struct {
 
 // ID returns the region's identifier.
 func (r Region) ID() string { return r.id }
-
-// Description returns the region's description. The region description
-// is free text, it can be empty, and it may change between SDK releases.
-func (r Region) Description() string { return r.desc }
 
 // ResolveEndpoint resolves an endpoint from the context of the region given
 // a service. See Partition.EndpointFor for usage and errors that can be returned.
@@ -292,11 +284,10 @@ func (s Service) ResolveEndpoint(region string, opts ...func(*Options)) (Resolve
 func (s Service) Regions() map[string]Region {
 	rs := map[string]Region{}
 	for id := range s.p.Services[s.id].Endpoints {
-		if r, ok := s.p.Regions[id]; ok {
+		if _, ok := s.p.Regions[id]; ok {
 			rs[id] = Region{
-				id:   id,
-				desc: r.Description,
-				p:    s.p,
+				id: id,
+				p:  s.p,
 			}
 		}
 	}
@@ -355,10 +346,6 @@ type ResolvedEndpoint struct {
 
 	// The service name that should be used for signing requests.
 	SigningName string
-
-	// States that the signing name for this endpoint was derived from metadata
-	// passed in, but was not explicitly modeled.
-	SigningNameDerived bool
 
 	// The signing method that should be used for signing requests.
 	SigningMethod string

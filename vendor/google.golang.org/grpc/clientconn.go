@@ -1059,7 +1059,6 @@ func (ac *addrConn) resetTransport() {
 				continue
 			}
 
-			backoffFor = 0
 			ac.mu.Lock()
 			reqHandshake := ac.dopts.reqHandshake
 			ac.mu.Unlock()

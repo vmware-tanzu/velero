@@ -1,9 +1,7 @@
 package logrus
 
 import (
-	"context"
 	"io"
-	"time"
 )
 
 var (
@@ -17,48 +15,42 @@ func StandardLogger() *Logger {
 
 // SetOutput sets the standard logger output.
 func SetOutput(out io.Writer) {
-	std.SetOutput(out)
+	std.mu.Lock()
+	defer std.mu.Unlock()
+	std.Out = out
 }
 
 // SetFormatter sets the standard logger formatter.
 func SetFormatter(formatter Formatter) {
-	std.SetFormatter(formatter)
-}
-
-// SetReportCaller sets whether the standard logger will include the calling
-// method as a field.
-func SetReportCaller(include bool) {
-	std.SetReportCaller(include)
+	std.mu.Lock()
+	defer std.mu.Unlock()
+	std.Formatter = formatter
 }
 
 // SetLevel sets the standard logger level.
 func SetLevel(level Level) {
+	std.mu.Lock()
+	defer std.mu.Unlock()
 	std.SetLevel(level)
 }
 
 // GetLevel returns the standard logger level.
 func GetLevel() Level {
-	return std.GetLevel()
-}
-
-// IsLevelEnabled checks if the log level of the standard logger is greater than the level param
-func IsLevelEnabled(level Level) bool {
-	return std.IsLevelEnabled(level)
+	std.mu.Lock()
+	defer std.mu.Unlock()
+	return std.level()
 }
 
 // AddHook adds a hook to the standard logger hooks.
 func AddHook(hook Hook) {
-	std.AddHook(hook)
+	std.mu.Lock()
+	defer std.mu.Unlock()
+	std.Hooks.Add(hook)
 }
 
 // WithError creates an entry from the standard logger and adds an error to it, using the value defined in ErrorKey as key.
 func WithError(err error) *Entry {
 	return std.WithField(ErrorKey, err)
-}
-
-// WithContext creates an entry from the standard logger and adds a context to it.
-func WithContext(ctx context.Context) *Entry {
-	return std.WithContext(ctx)
 }
 
 // WithField creates an entry from the standard logger and adds a field to
@@ -78,20 +70,6 @@ func WithField(key string, value interface{}) *Entry {
 // or Panic on the Entry it returns.
 func WithFields(fields Fields) *Entry {
 	return std.WithFields(fields)
-}
-
-// WithTime creats an entry from the standard logger and overrides the time of
-// logs generated with it.
-//
-// Note that it doesn't log until you call Debug, Print, Info, Warn, Fatal
-// or Panic on the Entry it returns.
-func WithTime(t time.Time) *Entry {
-	return std.WithTime(t)
-}
-
-// Trace logs a message at level Trace on the standard logger.
-func Trace(args ...interface{}) {
-	std.Trace(args...)
 }
 
 // Debug logs a message at level Debug on the standard logger.
@@ -129,14 +107,9 @@ func Panic(args ...interface{}) {
 	std.Panic(args...)
 }
 
-// Fatal logs a message at level Fatal on the standard logger then the process will exit with status set to 1.
+// Fatal logs a message at level Fatal on the standard logger.
 func Fatal(args ...interface{}) {
 	std.Fatal(args...)
-}
-
-// Tracef logs a message at level Trace on the standard logger.
-func Tracef(format string, args ...interface{}) {
-	std.Tracef(format, args...)
 }
 
 // Debugf logs a message at level Debug on the standard logger.
@@ -174,14 +147,9 @@ func Panicf(format string, args ...interface{}) {
 	std.Panicf(format, args...)
 }
 
-// Fatalf logs a message at level Fatal on the standard logger then the process will exit with status set to 1.
+// Fatalf logs a message at level Fatal on the standard logger.
 func Fatalf(format string, args ...interface{}) {
 	std.Fatalf(format, args...)
-}
-
-// Traceln logs a message at level Trace on the standard logger.
-func Traceln(args ...interface{}) {
-	std.Traceln(args...)
 }
 
 // Debugln logs a message at level Debug on the standard logger.
@@ -219,7 +187,7 @@ func Panicln(args ...interface{}) {
 	std.Panicln(args...)
 }
 
-// Fatalln logs a message at level Fatal on the standard logger then the process will exit with status set to 1.
+// Fatalln logs a message at level Fatal on the standard logger.
 func Fatalln(args ...interface{}) {
 	std.Fatalln(args...)
 }

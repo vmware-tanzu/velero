@@ -57,6 +57,7 @@ import (
 var (
 	newline         = []byte("\n")
 	spaces          = []byte("                                        ")
+	gtNewline       = []byte(">\n")
 	endBraceNewline = []byte("}\n")
 	backslashN      = []byte{'\\', 'n'}
 	backslashR      = []byte{'\\', 'r'}
@@ -176,6 +177,11 @@ func writeName(w *textWriter, props *Properties) error {
 	return nil
 }
 
+// raw is the interface satisfied by RawMessage.
+type raw interface {
+	Bytes() []byte
+}
+
 func requiresQuotes(u string) bool {
 	// When type URL contains any characters except [0-9A-Za-z./\-]*, it must be quoted.
 	for _, ch := range u {
@@ -270,10 +276,6 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 		props := sprops.Prop[i]
 		name := st.Field(i).Name
 
-		if name == "XXX_NoUnkeyedLiteral" {
-			continue
-		}
-
 		if strings.HasPrefix(name, "XXX_") {
 			// There are two XXX_ fields:
 			//   XXX_unrecognized []byte
@@ -364,7 +366,7 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 						return err
 					}
 				}
-				if err := tm.writeAny(w, key, props.MapKeyProp); err != nil {
+				if err := tm.writeAny(w, key, props.mkeyprop); err != nil {
 					return err
 				}
 				if err := w.WriteByte('\n'); err != nil {
@@ -381,7 +383,7 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 							return err
 						}
 					}
-					if err := tm.writeAny(w, val, props.MapValProp); err != nil {
+					if err := tm.writeAny(w, val, props.mvalprop); err != nil {
 						return err
 					}
 					if err := w.WriteByte('\n'); err != nil {
@@ -445,6 +447,12 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 				return err
 			}
 		}
+		if b, ok := fv.Interface().(raw); ok {
+			if err := writeRaw(w, b.Bytes()); err != nil {
+				return err
+			}
+			continue
+		}
 
 		if len(props.Enum) > 0 {
 			if err := tm.writeEnum(w, fv, props); err != nil {
@@ -467,7 +475,7 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 		pv = reflect.New(sv.Type())
 		pv.Elem().Set(sv)
 	}
-	if _, err := extendable(pv.Interface()); err == nil {
+	if pv.Type().Implements(extensionRangeType) {
 		if err := tm.writeExtensions(w, pv); err != nil {
 			return err
 		}
@@ -476,7 +484,26 @@ func (tm *TextMarshaler) writeStruct(w *textWriter, sv reflect.Value) error {
 	return nil
 }
 
-var textMarshalerType = reflect.TypeOf((*encoding.TextMarshaler)(nil)).Elem()
+// writeRaw writes an uninterpreted raw message.
+func writeRaw(w *textWriter, b []byte) error {
+	if err := w.WriteByte('<'); err != nil {
+		return err
+	}
+	if !w.compact {
+		if err := w.WriteByte('\n'); err != nil {
+			return err
+		}
+	}
+	w.indent()
+	if err := writeUnknownStruct(w, b); err != nil {
+		return err
+	}
+	w.unindent()
+	if err := w.WriteByte('>'); err != nil {
+		return err
+	}
+	return nil
+}
 
 // writeAny writes an arbitrary field.
 func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Properties) error {
@@ -495,17 +522,6 @@ func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Propert
 				}
 				return nil
 			}
-		} else if len(props.CastType) > 0 {
-			if _, ok := v.Interface().(interface {
-				String() string
-			}); ok {
-				switch v.Kind() {
-				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-					reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-					_, err := fmt.Fprintf(w, "%d", v.Interface())
-					return err
-				}
-			}
 		} else if props.StdTime {
 			t, ok := v.Interface().(time.Time)
 			if !ok {
@@ -515,9 +531,9 @@ func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Propert
 			if err != nil {
 				return err
 			}
-			propsCopy := *props // Make a copy so that this is goroutine-safe
-			propsCopy.StdTime = false
-			err = tm.writeAny(w, reflect.ValueOf(tproto), &propsCopy)
+			props.StdTime = false
+			err = tm.writeAny(w, reflect.ValueOf(tproto), props)
+			props.StdTime = true
 			return err
 		} else if props.StdDuration {
 			d, ok := v.Interface().(time.Duration)
@@ -525,9 +541,9 @@ func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Propert
 				return fmt.Errorf("stdtime is not time.Duration, but %T", v.Interface())
 			}
 			dproto := durationProto(d)
-			propsCopy := *props // Make a copy so that this is goroutine-safe
-			propsCopy.StdDuration = false
-			err := tm.writeAny(w, reflect.ValueOf(dproto), &propsCopy)
+			props.StdDuration = false
+			err := tm.writeAny(w, reflect.ValueOf(dproto), props)
+			props.StdDuration = true
 			return err
 		}
 	}
@@ -578,34 +594,16 @@ func (tm *TextMarshaler) writeAny(w *textWriter, v reflect.Value, props *Propert
 			}
 		}
 		w.indent()
-		if v.CanAddr() {
-			// Calling v.Interface on a struct causes the reflect package to
-			// copy the entire struct. This is racy with the new Marshaler
-			// since we atomically update the XXX_sizecache.
-			//
-			// Thus, we retrieve a pointer to the struct if possible to avoid
-			// a race since v.Interface on the pointer doesn't copy the struct.
-			//
-			// If v is not addressable, then we are not worried about a race
-			// since it implies that the binary Marshaler cannot possibly be
-			// mutating this value.
-			v = v.Addr()
-		}
-		if v.Type().Implements(textMarshalerType) {
-			text, err := v.Interface().(encoding.TextMarshaler).MarshalText()
+		if etm, ok := v.Interface().(encoding.TextMarshaler); ok {
+			text, err := etm.MarshalText()
 			if err != nil {
 				return err
 			}
 			if _, err = w.Write(text); err != nil {
 				return err
 			}
-		} else {
-			if v.Kind() == reflect.Ptr {
-				v = v.Elem()
-			}
-			if err := tm.writeStruct(w, v); err != nil {
-				return err
-			}
+		} else if err := tm.writeStruct(w, v); err != nil {
+			return err
 		}
 		w.unindent()
 		if err := w.WriteByte(ket); err != nil {

@@ -54,9 +54,8 @@ type partition struct {
 
 func (p partition) Partition() Partition {
 	return Partition{
-		dnsSuffix: p.DNSSuffix,
-		id:        p.ID,
-		p:         &p,
+		id: p.ID,
+		p:  &p,
 	}
 }
 
@@ -227,20 +226,16 @@ func (e endpoint) resolve(service, region, dnsSuffix string, defs []endpoint, op
 	if len(signingRegion) == 0 {
 		signingRegion = region
 	}
-
 	signingName := e.CredentialScope.Service
-	var signingNameDerived bool
 	if len(signingName) == 0 {
 		signingName = service
-		signingNameDerived = true
 	}
 
 	return ResolvedEndpoint{
-		URL:                u,
-		SigningRegion:      signingRegion,
-		SigningName:        signingName,
-		SigningNameDerived: signingNameDerived,
-		SigningMethod:      getByPriority(e.SignatureVersions, signerPriority, defaultSigner),
+		URL:           u,
+		SigningRegion: signingRegion,
+		SigningName:   signingName,
+		SigningMethod: getByPriority(e.SignatureVersions, signerPriority, defaultSigner),
 	}
 }
 

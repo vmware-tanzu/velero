@@ -13,13 +13,12 @@ import (
 	"io"
 	"log"
 	"reflect"
+	"sort"
 	"strings"
 	"unicode"
 
-	"golang.org/x/text/collate"
 	"golang.org/x/text/internal/gen"
 	"golang.org/x/text/internal/ucd"
-	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/rangetable"
 )
 
@@ -31,16 +30,15 @@ To bootstrap the code generation, run:
 	go run gen.go --versions=4.1.0,5.0.0,6.0.0,6.1.0,6.2.0,6.3.0,7.0.0
 
 and ensure that the latest versions are included by checking:
-	https://www.unicode.org/Public/`
+	http://www.unicode.org/Public/`
 
 func getVersions() []string {
 	if *versionList == "" {
 		log.Fatal(bootstrapMessage)
 	}
 
-	c := collate.New(language.Und, collate.Numeric)
 	versions := strings.Split(*versionList, ",")
-	c.SortStrings(versions)
+	sort.Strings(versions)
 
 	// Ensure that at least the current version is included.
 	for _, v := range versions {
@@ -50,7 +48,7 @@ func getVersions() []string {
 	}
 
 	versions = append(versions, gen.UnicodeVersion())
-	c.SortStrings(versions)
+	sort.Strings(versions)
 	return versions
 }
 
@@ -76,7 +74,7 @@ func main() {
 	for _, v := range versions {
 		assigned := []rune{}
 
-		r := gen.Open("https://www.unicode.org/Public/", "", v+"/ucd/UnicodeData.txt")
+		r := gen.Open("http://www.unicode.org/Public/", "", v+"/ucd/UnicodeData.txt")
 		ucd.Parse(r, func(p *ucd.Parser) {
 			assigned = append(assigned, p.Rune(0))
 		})
@@ -95,7 +93,7 @@ func main() {
 
 	fmt.Fprintf(w, "// Total size %d bytes (%d KiB)\n", size, size/1024)
 
-	gen.WriteVersionedGoFile("tables.go", "rangetable", w.Bytes())
+	gen.WriteGoFile("tables.go", "rangetable", w.Bytes())
 }
 
 func print(w io.Writer, rt *unicode.RangeTable) {

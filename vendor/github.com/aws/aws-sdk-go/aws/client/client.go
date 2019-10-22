@@ -15,12 +15,6 @@ type Config struct {
 	Endpoint      string
 	SigningRegion string
 	SigningName   string
-
-	// States that the signing name did not come from a modeled source but
-	// was derived based on other data. Used by service client constructors
-	// to determine if the signin name can be overridden based on metadata the
-	// service has.
-	SigningNameDerived bool
 }
 
 // ConfigProvider provides a generic way for a service client to receive
@@ -64,7 +58,7 @@ func New(cfg aws.Config, info metadata.ClientInfo, handlers request.Handlers, op
 	default:
 		maxRetries := aws.IntValue(cfg.MaxRetries)
 		if cfg.MaxRetries == nil || maxRetries == aws.UseServiceDefaultRetries {
-			maxRetries = DefaultRetryerMaxNumRetries
+			maxRetries = 3
 		}
 		svc.Retryer = DefaultRetryer{NumMaxRetries: maxRetries}
 	}
@@ -91,6 +85,6 @@ func (c *Client) AddDebugHandlers() {
 		return
 	}
 
-	c.Handlers.Send.PushFrontNamed(LogHTTPRequestHandler)
-	c.Handlers.Send.PushBackNamed(LogHTTPResponseHandler)
+	c.Handlers.Send.PushFrontNamed(request.NamedHandler{Name: "awssdk.client.LogRequest", Fn: logRequest})
+	c.Handlers.Send.PushBackNamed(request.NamedHandler{Name: "awssdk.client.LogResponse", Fn: logResponse})
 }

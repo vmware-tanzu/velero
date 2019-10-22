@@ -1,7 +1,6 @@
 package xmlutil
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -10,27 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/private/protocol"
 )
-
-// UnmarshalXMLError unmarshals the XML error from the stream into the value
-// type specified. The value must be a pointer. If the message fails to
-// unmarshal, the message content will be included in the returned error as a
-// awserr.UnmarshalError.
-func UnmarshalXMLError(v interface{}, stream io.Reader) error {
-	var errBuf bytes.Buffer
-	body := io.TeeReader(stream, &errBuf)
-
-	err := xml.NewDecoder(body).Decode(v)
-	if err != nil && err != io.EOF {
-		return awserr.NewUnmarshalError(err,
-			"failed to unmarshal error message", errBuf.Bytes())
-	}
-
-	return nil
-}
 
 // UnmarshalXML deserializes an xml.Decoder into the container v. V
 // needs to match the shape of the XML expected to be decoded.
@@ -73,15 +52,9 @@ func parse(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 	if t == "" {
 		switch rtype.Kind() {
 		case reflect.Struct:
-			// also it can't be a time object
-			if _, ok := r.Interface().(*time.Time); !ok {
-				t = "structure"
-			}
+			t = "structure"
 		case reflect.Slice:
-			// also it can't be a byte slice
-			if _, ok := r.Interface().([]byte); !ok {
-				t = "list"
-			}
+			t = "list"
 		case reflect.Map:
 			t = "map"
 		}
@@ -274,12 +247,8 @@ func parseScalar(r reflect.Value, node *XMLNode, tag reflect.StructTag) error {
 		}
 		r.Set(reflect.ValueOf(&v))
 	case *time.Time:
-		format := tag.Get("timestampFormat")
-		if len(format) == 0 {
-			format = protocol.ISO8601TimeFormatName
-		}
-
-		t, err := protocol.ParseTime(format, node.Text)
+		const ISO8601UTC = "2006-01-02T15:04:05Z"
+		t, err := time.Parse(ISO8601UTC, node.Text)
 		if err != nil {
 			return err
 		}

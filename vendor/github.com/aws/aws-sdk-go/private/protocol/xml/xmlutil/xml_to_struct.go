@@ -29,7 +29,6 @@ func NewXMLElement(name xml.Name) *XMLNode {
 
 // AddChild adds child to the XMLNode.
 func (n *XMLNode) AddChild(child *XMLNode) {
-	child.parent = n
 	if _, ok := n.Children[child.Name.Local]; !ok {
 		n.Children[child.Name.Local] = []*XMLNode{}
 	}
@@ -119,18 +118,7 @@ func (n *XMLNode) findElem(name string) (string, bool) {
 
 // StructToXML writes an XMLNode to a xml.Encoder as tokens.
 func StructToXML(e *xml.Encoder, node *XMLNode, sorted bool) error {
-	// Sort Attributes
-	attrs := node.Attr
-	if sorted {
-		sortedAttrs := make([]xml.Attr, len(attrs))
-		for _, k := range node.Attr {
-			sortedAttrs = append(sortedAttrs, k)
-		}
-		sort.Sort(xmlAttrSlice(sortedAttrs))
-		attrs = sortedAttrs
-	}
-
-	e.EncodeToken(xml.StartElement{Name: node.Name, Attr: attrs})
+	e.EncodeToken(xml.StartElement{Name: node.Name, Attr: node.Attr})
 
 	if node.Text != "" {
 		e.EncodeToken(xml.CharData([]byte(node.Text)))

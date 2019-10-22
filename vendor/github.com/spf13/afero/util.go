@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,7 +46,7 @@ func WriteReader(fs Fs, path string, r io.Reader) (err error) {
 		err = fs.MkdirAll(ospath, 0777) // rwx, rw, r
 		if err != nil {
 			if err != os.ErrExist {
-				return err
+				log.Panicln(err)
 			}
 		}
 	}
@@ -156,7 +157,7 @@ func UnicodeSanitize(s string) string {
 	return string(target)
 }
 
-// Transform characters with accents into plain forms.
+// Transform characters with accents into plan forms
 func NeuterAccents(s string) string {
 	t := transform.Chain(norm.NFD, transform.RemoveFunc(isMn), norm.NFC)
 	result, _, _ := transform.String(t, string(s))

@@ -636,13 +636,6 @@ type SupplementalData struct {
 			Path string `xml:"path,attr"`
 		} `xml:"rgPath"`
 	} `xml:"rgScope"`
-	LanguageGroups *struct {
-		Common
-		LanguageGroup []*struct {
-			Common
-			Parent string `xml:"parent,attr"`
-		} `xml:"languageGroup"`
-	} `xml:"languageGroups"`
 }
 
 // LDML is the top-level type for locale-specific data.
@@ -1237,7 +1230,7 @@ type TimeZoneNames struct {
 	} `xml:"metazone"`
 }
 
-// LocaleDisplayNames specifies localized display names for scripts, languages,
+// LocaleDisplayNames specifies localized display names for for scripts, languages,
 // countries, currencies, and variants.
 type LocaleDisplayNames struct {
 	Common
@@ -1491,4 +1484,4 @@ type Numbers struct {
 }
 
 // Version is the version of CLDR from which the XML definitions are generated.
-const Version = "32"
+const Version = "31"

@@ -4,8 +4,6 @@ package request
 
 import (
 	"net/http"
-
-	"github.com/aws/aws-sdk-go/aws/awserr"
 )
 
 // NoBody is a http.NoBody reader instructing Go HTTP client to not include
@@ -13,7 +11,7 @@ import (
 var NoBody = http.NoBody
 
 // ResetBody rewinds the request body back to its starting position, and
-// sets the HTTP Request body reference. When the body is read prior
+// set's the HTTP Request body reference. When the body is read prior
 // to being sent in the HTTP request it will need to be rewound.
 //
 // ResetBody will automatically be called by the SDK's build handler, but if
@@ -26,8 +24,7 @@ var NoBody = http.NoBody
 func (r *Request) ResetBody() {
 	body, err := r.getNextRequestBody()
 	if err != nil {
-		r.Error = awserr.New(ErrCodeSerialization,
-			"failed to reset request body", err)
+		r.Error = err
 		return
 	}
 
