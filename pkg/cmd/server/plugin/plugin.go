@@ -36,7 +36,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
-				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
+				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction(f)).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
@@ -61,8 +61,15 @@ func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return backup.NewPVCAction(logger), nil
 }
 
-func newPodBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
-	return backup.NewPodAction(logger), nil
+func newPodBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		clientset, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return backup.NewPodAction(logger, clientset.CoreV1()), nil
+	}
 }
 
 func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerInitializer {

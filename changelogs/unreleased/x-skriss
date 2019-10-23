@@ -1,0 +1,1 @@
+don't try to back up a PVC referenced by a pod if the PVC doesn't exist
