@@ -59,7 +59,7 @@ _Note: if your object storage provider is different than your volume snapshot pr
 
 #### Plugins
 
-During install, Velero requires that at least one plugin is added (with the `-plugins` flag). Please see the documentation under [Plugins](overview-plugins) 
+During install, Velero requires that at least one plugin is added (with the `--plugins` flag). Please see the documentation under [Plugins](overview-plugins.md)
 
 #### Install in any namespace
 
