@@ -223,12 +223,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	// PartiallyFailed backup for the provided schedule, and use that specific backup
 	// to restore from.
 	if o.ScheduleName != "" && boolptr.IsSetToTrue(o.AllowPartiallyFailed.Value) {
-		client, err := f.Client()
-		if err != nil {
-			return err
-		}
-
-		backups, err := client.VeleroV1().Backups(f.Namespace()).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		backups, err := o.client.VeleroV1().Backups(f.Namespace()).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
 		if err != nil {
 			return err
 		}
