@@ -80,6 +80,11 @@ type BackupStorageLocationSpec struct {
 	// AccessMode defines the permissions for the backup storage location.
 	// +optional
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
+
+	// BackupSyncPeriod defines how frequently to sync backup API objects from object storage. A value of 0 disables sync.
+	// +optional
+	// +nullable
+	BackupSyncPeriod *metav1.Duration `json:"backupSyncPeriod,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
