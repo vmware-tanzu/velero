@@ -46,6 +46,7 @@ _Note: if your object storage provider is different than your volume snapshot pr
 
 ## Advanced installation topics
 
+- [Plugins](#plugins)
 - [Install in any namespace](#install-in-any-namespace)
 - [Use non-file-based identity mechanisms](#use-non-file-based-identity-mechanisms)
 - [Enable restic integration](#enable-restic-integration)
@@ -56,6 +57,9 @@ _Note: if your object storage provider is different than your volume snapshot pr
 - [Generate YAML only](#generate-yaml-only)
 - [Additional options](#additional-options)
 
+#### Plugins
+
+During install, Velero requires that at least one plugin is added (with the `-plugins` flag). Please see the documentation under [Plugins](overview-plugins) 
 
 #### Install in any namespace
 
@@ -123,7 +127,7 @@ To use a different volume snapshot provider:
 1. Add your volume snapshot provider's plugin to Velero (look in [your provider][0]'s documentation for the image name):
 
     ```bash
-    velero plugin add <PLUGIN-IMAGE>
+    velero plugin add <registry/image:version>
     ```
 
 1. Add a volume snapshot location for your provider, following [your provider][0]'s documentation for configuration:
