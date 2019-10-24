@@ -233,6 +233,8 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		// if we find a Completed or PartiallyFailed backup for the schedule, restore specifically from that backup. If we don't
 		// find one, proceed as-is -- the Velero server will handle validation.
 		if backup := mostRecentBackup(backups.Items, api.BackupPhaseCompleted, api.BackupPhasePartiallyFailed); backup != nil {
+			// TODO(sk): this is kind of a hack -- we should revisit this and probably
+			// move this logic to the server side or otherwise solve this problem.
 			o.BackupName = backup.Name
 			o.ScheduleName = ""
 		}
