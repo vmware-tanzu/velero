@@ -61,3 +61,4 @@ If you're upgrading from a previous version of Velero, there are several changes
   * fix error formatting due interpreting % as printf formatted strings (#1781, @s12chung)
   * when using `velero restore create --namespace-mappings ...` to create a second copy of a namespace in a cluster, create copies of the PVs used (#1779, @skriss)
   * adds --from-schedule flag to the `velero create backup` command to create a Backup from an existing Schedule (#1734, @prydonius)
+  * add `--allow-partially-failed` flag to `velero restore create` for use with `--from-schedule` to allow partially-failed backups to be restored (#1994, @skriss)
