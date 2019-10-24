@@ -14,7 +14,7 @@ https://velero.io/docs/v1.2.0-beta.1/
 
 If you're upgrading from a previous version of Velero, there are several changes you'll need to be aware of:
 
-- Container images are now published to Docker Hub. To upgrade your server, use the new image `velero/velero:v1.2.0-beta1.`.
+- Container images are now published to Docker Hub. To upgrade your server, use the new image `velero/velero:v1.2.0-beta.1`.
 - The AWS, Microsoft Azure, and GCP provider plugins that were previously part of the Velero binary have been extracted to their own standalone repositories/plugin images. If you are using one of these three providers, you will need to explicitly add the appropriate plugin to your Velero install:
   - [AWS] `velero plugin add velero/velero-plugin-for-aws:v1.0.0-beta.1`
   - [Azure] `velero plugin add velero/velero-plugin-for-microsoft-azure:v1.0.0-beta.1`
