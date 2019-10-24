@@ -179,6 +179,8 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	return nil
 }
 
+// mostRecentBackup returns the backup with the most recent start timestamp that has a phase that's
+// in the provided list of allowed phases.
 func mostRecentBackup(backups []api.Backup, allowedPhases ...api.BackupPhase) *api.Backup {
 	// sort the backups in descending order of start time (i.e. most recent to least recent)
 	sort.Slice(backups, func(i, j int) bool {
