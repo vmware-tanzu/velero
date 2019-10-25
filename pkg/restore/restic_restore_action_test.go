@@ -70,7 +70,7 @@ func TestGetImage(t *testing.T) {
 		},
 		{
 			name:      "config map with invalid data in 'image' key returns default image with buildinfo.Version as tag",
-			configMap: configMapWithData("image", "not:valid:image"),
+			configMap: configMapWithData("image", "not:valid:image:name"),
 			want:      fmt.Sprintf("%s:%s", defaultImageBase, buildinfo.Version),
 		},
 		{
