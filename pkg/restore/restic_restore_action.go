@@ -166,6 +166,10 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 		// tagged image name
 		log.Debugf("Plugin config contains image name with tag")
 		return image
+	case len(parts) == 3:
+		// tagged image name with registry port definition
+		log.Debugf("Plugin config contains image name with tag and custom registry port")
+		return image
 	default:
 		// unrecognized
 		log.Warnf("Plugin config contains unparseable image name")
