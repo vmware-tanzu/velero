@@ -1,0 +1,1 @@
+enhancement: use EC2 metadata from the node running Velero to determine the AWS region if none is specified
