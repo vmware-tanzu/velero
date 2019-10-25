@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/pkg/errors"
@@ -68,11 +69,24 @@ func NewVolumeSnapshotter(logger logrus.FieldLogger) *VolumeSnapshotter {
 }
 
 func (b *VolumeSnapshotter) Init(config map[string]string) error {
+	var region string
+
 	if err := cloudprovider.ValidateVolumeSnapshotterConfigKeys(config, regionKey, credentialProfileKey); err != nil {
 		return err
 	}
 
-	region := config[regionKey]
+	if val, ok := config[regionKey]; ok {
+		region = val
+	} else {
+		session, err := session.NewSession()
+		if err != nil {
+			return err
+		}
+
+		metadataClient := ec2metadata.New(session)
+		region, _ = metadataClient.Region()
+	}
+
 	credentialProfile := config[credentialProfileKey]
 	if region == "" {
 		return errors.Errorf("missing %s in aws configuration", regionKey)
