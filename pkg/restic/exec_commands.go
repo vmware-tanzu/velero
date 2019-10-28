@@ -242,10 +242,6 @@ func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string, env []stri
 		return 0, errors.Wrap(err, "error unmarshalling restic stats result")
 	}
 
-	if snapshotStats.TotalSize == 0 {
-		return 0, errors.Errorf("error getting snapshot size %+v", snapshotStats)
-	}
-
 	return snapshotStats.TotalSize, nil
 }
 
