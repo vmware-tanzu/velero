@@ -59,7 +59,7 @@
 #
 [[constraint]]
   name = "github.com/aws/aws-sdk-go"
-  version = "1.13.12"
+  version = "1.23.13"
 
 [[constraint]]
   name = "github.com/Azure/azure-sdk-for-go"
