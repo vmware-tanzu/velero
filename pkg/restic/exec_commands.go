@@ -179,9 +179,9 @@ func getSummaryLine(b []byte) ([]byte, error) {
 // RunRestore runs a `restic restore` command and monitors the volume size to
 // provide progress updates to the caller.
 func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(velerov1api.PodVolumeOperationProgress)) (string, string, error) {
-	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.Args[0])
+	snapshotSize, err := getSnapshotSize(restoreCmd.RepoIdentifier, restoreCmd.PasswordFile, restoreCmd.Args[0], restoreCmd.Env)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.Wrap(err, "error getting snapshot size")
 	}
 
 	updateFunc(velerov1api.PodVolumeOperationProgress{
@@ -225,8 +225,9 @@ func RunRestore(restoreCmd *Command, log logrus.FieldLogger, updateFunc func(vel
 	return stdout, stderr, err
 }
 
-func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string) (int64, error) {
+func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string, env []string) (int64, error) {
 	cmd := StatsCommand(repoIdentifier, passwordFile, snapshotID)
+	cmd.Env = env
 
 	stdout, stderr, err := exec.RunCommand(cmd.Cmd())
 	if err != nil {
@@ -239,10 +240,6 @@ func getSnapshotSize(repoIdentifier, passwordFile, snapshotID string) (int64, er
 
 	if err := json.Unmarshal([]byte(stdout), &snapshotStats); err != nil {
 		return 0, errors.Wrap(err, "error unmarshalling restic stats result")
-	}
-
-	if snapshotStats.TotalSize == 0 {
-		return 0, errors.Errorf("error getting snapshot size %+v", snapshotStats)
 	}
 
 	return snapshotStats.TotalSize, nil
