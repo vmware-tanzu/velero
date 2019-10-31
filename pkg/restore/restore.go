@@ -32,6 +32,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -672,6 +673,40 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 	return shouldRestore, err
 }
 
+// crdAvailable waits for a CRD to be available for use before letting the restore continue.
+func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, error) {
+	crdLogger := ctx.log.WithField("crdName", name)
+
+	var available bool
+	err := wait.PollImmediate(time.Second, ctx.resourceTerminatingTimeout, func() (bool, error) {
+		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
+		if err != nil {
+			return true, err
+		}
+
+		clusterCRD := new(apiextv1beta1.CustomResourceDefinition)
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredCRD.Object, clusterCRD); err != nil {
+			return true, err
+		}
+
+		available = kube.IsCRDReady(clusterCRD)
+
+		if !available {
+			crdLogger.Debug("CRD not yet ready for use")
+		}
+
+		// If the CRD is not available, keep polling (false, nil)
+		// If the CRD is available, break the poll and return back to caller (true, nil)
+		return available, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		crdLogger.Debug("timeout reached waiting for custom resource definition to be ready")
+	}
+
+	return available, err
+}
+
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
 // empty we are restoring a cluster level resource, otherwise into the specified namespace.
 func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace string, items []string) (Result, Result) {
@@ -1111,6 +1146,18 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 	if groupResource == kuberesource.Pods && len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, obj)) > 0 {
 		restorePodVolumeBackups(ctx, createdObj, originalNamespace)
+	}
+
+	// Wait for a CRD to be available for instantiating resources
+	// before continuing.
+	if groupResource == kuberesource.CustomResourceDefinitions {
+		available, err := ctx.crdAvailable(name, resourceClient)
+		if err != nil {
+			addToResult(&errs, namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
+		}
+		if !available {
+			addToResult(&errs, namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
+		}
 	}
 
 	return warnings, errs

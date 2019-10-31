@@ -22,6 +22,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -134,4 +135,19 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	}
 
 	return pvc.Spec.VolumeName, nil
+}
+
+// IsCRDReady checks a CRD to see if it's ready, so that objects may be created from it.
+func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
+	var isEstablished, namesAccepted bool
+	for _, cond := range crd.Status.Conditions {
+		if cond.Type == apiextv1beta1.Established {
+			isEstablished = true
+		}
+		if cond.Type == apiextv1beta1.NamesAccepted {
+			namesAccepted = true
+		}
+	}
+
+	return (isEstablished && namesAccepted)
 }
