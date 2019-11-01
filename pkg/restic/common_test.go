@@ -83,10 +83,21 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 		{
-			name: "no snapshot annotation, no suffix, but with PVBs",
+			name: "no snapshot annotation, but with PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+			},
+			podName:  "TestPod",
+			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "no snapshot annotation, but with PVBs, some of which have snapshot IDs and some of which don't",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestPod").Volume("pvbtest3-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-4").PodName("TestPod").Volume("pvbtest4-abc").Result(),
 			},
 			podName:  "TestPod",
 			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},

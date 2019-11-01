@@ -87,9 +87,17 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
-		if pod.GetName() == pvb.Spec.Pod.Name {
-			volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
+		if pod.GetName() != pvb.Spec.Pod.Name {
+			continue
 		}
+
+		// skip PVBs without a snapshot ID since there's nothing
+		// to restore (they could be failed, or for empty volumes).
+		if pvb.Status.SnapshotID == "" {
+			continue
+		}
+
+		volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
 	}
 
 	if len(volumes) > 0 {
