@@ -64,7 +64,7 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
 1. Update the Velero custom resource definitions (CRDs) to include the structural schemas:
 
    ```bash
-   TODO velero install crds ...
+   velero install --crds-only --dry-run -o yaml | kubectl apply -f -
    ```
 
 1. Scale back up the existing Velero deployment:
