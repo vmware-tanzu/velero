@@ -4,7 +4,15 @@
 
 When making changes to the website, please run the site locally before submitting a PR and manually verify your changes.
 
-Under the `velero/site/` directory, run:
+At the root of the project, run:
+
+```bash
+make serve-docs
+```
+
+This runs all the Ruby dependencies in a container.
+
+Alternatively, for quickly loading the website, under the `velero/site/` directory run:
 
 ```bash
 bundle exec jekyll serve --livereload --future
