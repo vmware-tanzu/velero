@@ -19,6 +19,8 @@ WORKDIR /go/src/k8s.io
 RUN git config --global advice.detachedHead false
 RUN git clone -b kubernetes-1.15.3 https://github.com/kubernetes/code-generator
 RUN git clone -b kubernetes-1.15.3 https://github.com/kubernetes/apimachinery 
+# Use a proxy for go modules to reduce the likelihood of various hosts being down and breaking the build
+ENV GOPROXY=https://proxy.golang.org
 # vendor code-generator go modules to be compatible with pre-1.15
 WORKDIR  /go/src/k8s.io/code-generator
 # Don't use ENV here because we don't want to disable modules for subsequent commands
