@@ -226,8 +226,8 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 	// since within that function we want the plugin manager to log to
 	// our per-restore log (which is instantiated within c.runValidatedRestore).
 	pluginManager := c.newPluginManager(c.logger)
+	defer pluginManager.CleanupClients()
 	info := c.validateAndComplete(restore, pluginManager)
-	pluginManager.CleanupClients()
 
 	// Register attempts after validation so we don't have to fetch the backup multiple times
 	backupScheduleName := restore.Spec.ScheduleName
