@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -66,6 +67,7 @@ type InstallOptions struct {
 	DefaultResticMaintenanceFrequency time.Duration
 	Plugins                           flag.StringArray
 	NoDefaultBackupLocation           bool
+	CRDsOnly                          bool
 }
 
 // BindFlags adds command line values to the options struct.
@@ -96,6 +98,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
+	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -118,6 +121,7 @@ func NewInstallOptions() *InstallOptions {
 		// Default to creating a VSL unless we're told otherwise
 		UseVolumeSnapshots:      true,
 		NoDefaultBackupLocation: false,
+		CRDsOnly:                false,
 	}
 }
 
@@ -222,14 +226,19 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
-	vo, err := o.AsVeleroOptions()
-	if err != nil {
-		return err
-	}
+	var resources *unstructured.UnstructuredList
+	if o.CRDsOnly {
+		resources = install.AllCRDs()
+	} else {
+		vo, err := o.AsVeleroOptions()
+		if err != nil {
+			return err
+		}
 
-	resources, err := install.AllResources(vo)
-	if err != nil {
-		return err
+		resources, err = install.AllResources(vo)
+		if err != nil {
+			return err
+		}
 	}
 
 	if _, err := output.PrintWithFormat(c, resources); err != nil {
@@ -287,6 +296,11 @@ func (o *InstallOptions) Complete(args []string, f client.Factory) error {
 func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
 	if err := output.ValidateFlags(c); err != nil {
 		return err
+	}
+
+	// If we're only installing CRDs, we can skip the rest of the validation.
+	if o.CRDsOnly {
+		return nil
 	}
 
 	// Our main 3 providers don't support bucket names starting with a dash, and a bucket name starting with one
