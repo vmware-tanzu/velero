@@ -2277,9 +2277,9 @@ func TestRestoreWithRestic(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			apiResources: []*test.APIResource{test.Pods()},
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").SnapshotID("foo").Result(),
 			},
 			podWithPVBs: []*corev1api.Pod{
 				builder.ForPod("ns-1", "pod-2").

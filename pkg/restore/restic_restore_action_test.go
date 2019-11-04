@@ -158,11 +158,13 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					PodName("my-pod").
 					Volume("vol-1").
 					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
 					Result(),
 				builder.ForPodVolumeBackup(veleroNs, "pvb-2").
 					PodName("my-pod").
 					Volume("vol-2").
 					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
 					Result(),
 			},
 			want: builder.ForPod("ns-1", "my-pod").
