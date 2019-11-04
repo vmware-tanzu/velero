@@ -40,7 +40,7 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
 
    # optional, if using the restic daemon set
    kubectl set image daemonset/restic \
-       velero=velero/velero:v1.2.0 \
+       restic=velero/velero:v1.2.0 \
        --namespace velero
    ```
 
