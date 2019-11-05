@@ -4,11 +4,11 @@ Velero supports a variety of storage providers for different backup and snapshot
 
 ## Velero supported providers
 
-| Provider                          | Object Store        | Volume Snapshotter           | Plugin Documentation      |
-|-----------------------------------|---------------------|------------------------------|---------------------------|
-| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin AWS][8]    |
-| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin GCP][12]   |
-| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin Azure][10] |
+| Provider                          | Object Store        | Volume Snapshotter           | Plugin Documentation                    |
+|-----------------------------------|---------------------|------------------------------|-----------------------------------------|
+| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin for AWS][8]              |
+| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             |
+| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] |
 
 
 Contact: [Slack][28], [GitHub Issue][29]
