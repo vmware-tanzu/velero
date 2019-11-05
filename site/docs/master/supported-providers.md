@@ -4,20 +4,21 @@ Velero supports a variety of storage providers for different backup and snapshot
 
 ## Velero supported providers
 
-| Provider                   | Object Store        | Volume Snapshotter           | Plugin                    |
-|----------------------------|---------------------|------------------------------|---------------------------|
-| [AWS S3][7]                | AWS S3              | AWS EBS                      | [Velero plugin AWS][8]    |
-| [Azure Blob Storage][9]    | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin Azure][10] |
-| [Google Cloud Storage][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin GCP][12]   |
+| Provider                          | Object Store        | Volume Snapshotter           | Plugin Documentation      |
+|-----------------------------------|---------------------|------------------------------|---------------------------|
+| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin AWS][8]    |
+| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin GCP][12]   |
+| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin Azure][10] |
+
 
 Contact: [Slack][28], [GitHub Issue][29]
 
 ## Community supported providers
 
-| Provider                  | Object Store                 | Volume Snapshotter                 | Plugin                 | Contact                         |
+| Provider                  | Object Store                 | Volume Snapshotter                 | Plugin Documentation   | Contact                         |
 |---------------------------|------------------------------|------------------------------------|------------------------|---------------------------------|
-| [Portworx][31]             | 🚫                          | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
-| [DigitalOcean][15]         | DigitalOcean Object Storage | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
+| [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
+| [DigitalOcean][15]        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [AlibabaCloud][21]        | 🚫                           | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
@@ -48,12 +49,12 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [3]: contributions/minio.md
 [4]: https://github.com/StackPointCloud/ark-plugin-digitalocean
 [5]: http://www.noobaa.com/
-[6]: api-types/backupstoragelocation.md#aws
-[7]: https://aws.amazon.com/s3/
+[6]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/master/backupstoragelocation.md
+[7]: https://aws.amazon.com
 [8]: https://github.com/vmware-tanzu/velero-plugin-for-aws
-[9]: https://azure.microsoft.com/en-us/services/storage/blobs
+[9]: https://azure.com
 [10]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure
-[11]: https://cloud.google.com/storage/
+[11]: https://cloud.google.com
 [12]: https://github.com/vmware-tanzu/velero-plugin-for-gcp
 [15]: https://www.digitalocean.com/
 [16]: https://github.com/StackPointCloud/ark-plugin-digitalocean
