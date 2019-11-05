@@ -226,7 +226,6 @@ type server struct {
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
 	pluginRegistry        clientmgmt.Registry
-	pluginManager         clientmgmt.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
@@ -262,10 +261,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := clientmgmt.NewManager(logger, logger.Level, pluginRegistry)
-	if err != nil {
-		return nil, err
-	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -288,7 +283,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		logger:                logger,
 		logLevel:              logger.Level,
 		pluginRegistry:        pluginRegistry,
-		pluginManager:         pluginManager,
 		config:                config,
 	}
 
@@ -296,8 +290,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 }
 
 func (s *server) run() error {
-	defer s.pluginManager.CleanupClients()
-
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
 	if s.config.profilerAddress != "" {
@@ -420,6 +412,9 @@ func (s *server) veleroResourcesExist() error {
 func (s *server) validateBackupStorageLocations() error {
 	s.logger.Info("Checking that all backup storage locations are valid")
 
+	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
 	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.WithStack(err)
@@ -427,7 +422,7 @@ func (s *server) validateBackupStorageLocations() error {
 
 	var invalid []string
 	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, s.pluginManager, s.logger)
+		backupStore, err := persistence.NewObjectBackupStore(&location, pluginManager, s.logger)
 		if err != nil {
 			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
 			continue
