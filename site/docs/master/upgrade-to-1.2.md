@@ -31,7 +31,7 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
        --replicas 0
    ```
 
-1. Update the container image used by the Velero deployment and optionally, the restic daemon set:
+1. Update the container image used by the Velero deployment and, optionally, the restic daemon set:
 
    ```bash
    kubectl set image deployment/velero \
