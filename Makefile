@@ -215,8 +215,27 @@ ci: all verify test
 changelog:
 	hack/changelog.sh
 
+# release builds a GitHub release using goreleaser within the build container.
+#
+# To dry-run the release, which will build the binaries/artifacts locally but
+# will *not* create a GitHub release:
+#		GITHUB_TOKEN=an-invalid-token-so-you-dont-accidentally-push-release \
+#		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
+#		PUBLISH=false \
+#		make release
+#
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero 
+# (you still need to review/publish the GitHub release manually):
+#		GITHUB_TOKEN=your-github-token \ 
+#		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
+#		PUBLISH=true \
+#		make release
 release:
-	hack/goreleaser.sh
+	$(MAKE) shell CMD="-c '\
+		GITHUB_TOKEN=$(GITHUB_TOKEN) \
+		RELEASE_NOTES_FILE=$(RELEASE_NOTES_FILE) \
+		PUBLISH=$(PUBLISH) \
+		./hack/goreleaser.sh'"
 
 serve-docs:
 	docker run \
