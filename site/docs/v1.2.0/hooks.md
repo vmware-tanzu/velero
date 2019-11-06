@@ -77,5 +77,5 @@ velero backup logs nginx-hook-test | grep hookCommand
 
 
 [1]: api-types/backup.md
-[2]: https://github.com/vmware-tanzu/velero/blob/v1.2.0-beta.1/examples/nginx-app/with-pv.yaml
+[2]: https://github.com/vmware-tanzu/velero/blob/v1.2.0/examples/nginx-app/with-pv.yaml
 [3]: cloud-common.md
