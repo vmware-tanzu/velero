@@ -1,1 +1,0 @@
-AWS: add support for SSE-S3 AES256 encryption via `serverSideEncryption` config field in BackupStorageLocation

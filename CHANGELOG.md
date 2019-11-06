@@ -1,11 +1,11 @@
 ## Current release:
-  * [CHANGELOG-1.1.md][11]
+  * [CHANGELOG-1.2.md][12]
 
 ## Development release:
-  * [v1.2.0-beta.1][12]
   * [Unreleased Changes][0]
 
 ## Older releases:
+  * [CHANGELOG-1.1.md][11]
   * [CHANGELOG-1.0.md][10]
   * [CHANGELOG-0.11.md][9]
   * [CHANGELOG-0.10.md][8]

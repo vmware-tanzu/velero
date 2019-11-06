@@ -1,1 +1,0 @@
-Add `--features` argument to all velero commands to provide feature flags that can control enablement of pre-release features.
