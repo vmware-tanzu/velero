@@ -1,1 +1,0 @@
-backup sync controller: stop using `metadata/revision` file, do a full diff of bucket contents vs. cluster contents each sync interval

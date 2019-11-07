@@ -56,10 +56,10 @@ defaults:
       gh: https://github.com/vmware-tanzu/velero/tree/master
       layout: "docs"
   - scope:
-      path: docs/v1.2.0-beta.1
+      path: docs/v1.2.0
     values:
-      version: v1.2.0-beta.1
-      gh: https://github.com/vmware-tanzu/velero/tree/v1.2.0-beta.1
+      version: v1.2.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.2.0
       layout: "docs"
   - scope:
       path: docs/v1.1.0
@@ -151,10 +151,10 @@ collections:
   - casestudies
 
 versioning: true
-latest: v1.1.0
+latest: v1.2.0
 versions:
 - master
-- v1.2.0-beta.1
+- v1.2.0
 - v1.1.0
 - v1.0.0
 - v0.11.0

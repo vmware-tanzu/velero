@@ -46,13 +46,13 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
 1. If using AWS, Azure, or GCP, add the respective plugin to your Velero deployment:
 
     For AWS:
-    
+
     ```bash
     velero plugin add velero/velero-plugin-for-aws:v1.0.0
     ```
 
     For Azure:
-    
+
     ```bash
     velero plugin add velero/velero-plugin-for-microsoft-azure:v1.0.0
     ```

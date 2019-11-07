@@ -1,1 +1,0 @@
-adds --from-schedule flag to the `velero create backup` command to create a Backup from an existing Schedule

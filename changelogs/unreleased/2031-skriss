@@ -1,1 +1,0 @@
-bug fix: don't try to restore pod volume backups that don't have a snapshot ID
