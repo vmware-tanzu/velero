@@ -1,0 +1,1 @@
+return better error message to user when cluster config can't be found via `--kubeconfig`, `$KUBECONFIG`, or in-cluster config
