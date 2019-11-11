@@ -109,6 +109,18 @@ hostPath:
   path: /var/vcap/data/kubelet/pods
 ```
 
+**Microsoft Azure**
+
+If you are using [Azure Files][8], you need to add `nouser_xattr` to your storage class's `mountOptions`. See [this restic issue][9] for more details.
+
+You can use the following command to patch the storage class:
+
+```bash
+kubectl patch storageclass/<YOUR_AZURE_FILE_STORAGE_CLASS_NAME> \
+  --type json \
+  --patch '[{"op":"add","path":"/mountOptions/-","value":"nouser_xattr"}]'
+```
+
 You're now ready to use Velero with restic.
 
 ## Back up
@@ -378,3 +390,5 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [5]: http://restic.readthedocs.io/en/latest/100_references.html#terminology
 [6]: https://kubernetes.io/docs/concepts/storage/volumes/#mount-propagation
 [7]: https://github.com/bitsbeats/velero-pvc-watcher
+[8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
+[9]: https://github.com/restic/restic/issues/1800
