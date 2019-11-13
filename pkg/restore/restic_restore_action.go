@@ -158,21 +158,21 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 
 	parts := strings.Split(image, "/")
 
-        if len(parts) == 1 {
-                // Image supplied without registry part
-                log.Debugf("Plugin config contains image name without registry name. Return defaultImageBase")
-                return initContainerImage(defaultImageBase)
-        }
+	if len(parts) == 1 {
+		// Image supplied without registry part
+		log.Debugf("Plugin config contains image name without registry name. Return defaultImageBase")
+		return initContainerImage(defaultImageBase)
+	}
 
-        if !(strings.Contains(parts[len(parts)-1], ":")) {
-                // tag-less image name: add tag
+	if !(strings.Contains(parts[len(parts)-1], ":")) {
+		// tag-less image name: add tag
 		log.Debugf("Plugin config contains image name without tag. Adding tag.")
 		return initContainerImage(image)
-        } else {
-                // tagged image name
-                log.Debugf("Plugin config contains image name with tag")
-                return image
-        }
+	} else {
+		// tagged image name
+		log.Debugf("Plugin config contains image name with tag")
+		return image
+	}
 }
 
 // getResourceRequests extracts the CPU and memory requests from a ConfigMap.
