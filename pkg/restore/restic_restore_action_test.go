@@ -69,8 +69,8 @@ func TestGetImage(t *testing.T) {
 			want:      fmt.Sprintf("%s:%s", defaultImageBase, buildinfo.Version),
 		},
 		{
-			name:      "config map with invalid data in 'image' key returns default image with buildinfo.Version as tag",
-			configMap: configMapWithData("image", "not:valid:image:name"),
+			name:      "config map without '/' in image name returns default image with buildinfo.Version as tag",
+			configMap: configMapWithData("image", "my-image"),
 			want:      fmt.Sprintf("%s:%s", defaultImageBase, buildinfo.Version),
 		},
 		{
@@ -79,9 +79,19 @@ func TestGetImage(t *testing.T) {
 			want:      fmt.Sprintf("%s:%s", "myregistry.io/my-image", buildinfo.Version),
 		},
 		{
+			name:      "config map with untagged image and custom registry port with ':' returns image with buildinfo.Version as tag",
+			configMap: configMapWithData("image", "myregistry.io:34567/my-image"),
+			want:      fmt.Sprintf("%s:%s", "myregistry.io:34567/my-image", buildinfo.Version),
+		},
+		{
 			name:      "config map with tagged image returns tagged image",
 			configMap: configMapWithData("image", "myregistry.io/my-image:my-tag"),
 			want:      "myregistry.io/my-image:my-tag",
+		},
+		{
+			name:      "config map with tagged image and custom registry port with ':' returns tagged image",
+			configMap: configMapWithData("image", "myregistry.io:34567/my-image:my-tag"),
+			want:      "myregistry.io:34567/my-image:my-tag",
 		},
 	}
 
