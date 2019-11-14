@@ -20,7 +20,7 @@ Contact: [Slack][28], [GitHub Issue][29]
 | [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
 | [DigitalOcean][15]        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
-| [AlibabaCloud][21]        | 🚫                           | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
+| [AlibabaCloud][21]        | Alibaba Cloud OSS            | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
 
 ## S3-Compatible object store providers
