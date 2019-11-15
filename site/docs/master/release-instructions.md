@@ -31,7 +31,7 @@ You also need to update `site/index.html` to have "Latest Release Information" c
 
 To run the `goreleaser` process to generate a GitHub release, you'll need to have a GitHub token. See https://goreleaser.com/environment/ for more details. 
 
-I usually regenerate them for every release since I can't be bothered to track them in LastPass.
+You may regenerate the token for every release if you prefer.
 
 #### If you don't already have a token
 1.  Go to https://github.com/settings/tokens/new.
@@ -50,7 +50,8 @@ I usually regenerate them for every release since I can't be bothered to track t
 
 This process is the same for both pre-release and GA, except for the fact that there will not be a blog post PR to merge for pre-release versions.
 
-1.  I usually merge the changelog + docs PR first, so that it's included when I create a tag for the release.
+1.  Merge the changelog + docs PR, so that it's included in the release tag.
+1.  Make sure your working directory is clean: `git status` should show `nothing to commit, working tree clean`. 
 1.  Run `git fetch upstream master && git checkout upstream/master`.
 1.  Run `git tag <VERSION>` (e.g. `git tag v1.2.0` or `git tag v1.2.0-beta.1`).
 1.  Run `git push upstream <VERSION>` (e.g. `git push upstream v1.2.0` or `git push upstream v1.2.0-beta.1`). This will trigger the Travis CI job that builds/publishes the Docker images.
@@ -63,9 +64,13 @@ This process is the same for both pre-release and GA, except for the fact that t
     make release
     ```
 
-1.  Navigate  to the draft GitHub release, at https://github.com/vmware-tanzu/velero/releases.
+1.  Navigate to the draft GitHub release, at https://github.com/vmware-tanzu/velero/releases.
 1.  If this is a patch release (e.g. `v1.2.1`), note that the full `CHANGELOG-1.2.md` contents will be included in the body of the GitHub release. You need to delete the previous releases' content (e.g. `v1.2.0`'s changelog) so that only the latest patch release's changelog shows.
 1.  Do a quick review for formatting. **Note:** the `goreleaser` process should detect if it's a pre-release version, and check that box in the GitHub release appropriately, but it's always worth double-checking.
 1.  Publish the release.
-1.  By now, the Docker images should have been published. At this point, I generally do a smoke-test by downloading the CLI from the GitHub release, using it to install Velero into a cluster (or manually updating an existing deployment to use the new images), verifying that `velero version` shows the expected output, and perhaps running a quick backup/restore.
-1.  Merge the blog post PR.
+1.  By now, the Docker images should have been published. Perform a smoke-test - for example:
+    - Download the CLI from the GitHub release
+    - Use it to install Velero into a cluster (or manually update an existing deployment to use the new images)
+    - Verify that `velero version` shows the expected output
+    - Run a backup/restore and ensure it works
+1.  (GA Only) Merge the blog post PR.
