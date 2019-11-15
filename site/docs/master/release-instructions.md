@@ -74,3 +74,7 @@ This process is the same for both pre-release and GA, except for the fact that t
     - Verify that `velero version` shows the expected output
     - Run a backup/restore and ensure it works
 1.  (GA Only) Merge the blog post PR.
+1.  Announce the release:
+    - Twitter (mention a few highlights, link to the blog post)
+    - Slack channel
+    - Google group (this doesn't get a lot of traffic, and recent releases may not have been posted here)
