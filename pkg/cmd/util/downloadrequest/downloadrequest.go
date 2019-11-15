@@ -60,9 +60,7 @@ func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string
 	defer client.DownloadRequests(namespace).Delete(req.Name, nil)
 
 	listOptions := metav1.ListOptions{
-		// TODO: once the minimum supported Kubernetes version is v1.9.0, uncomment the following line.
-		// See http://issue.k8s.io/51046 for details.
-		//FieldSelector:   "metadata.name=" + req.Name
+		FieldSelector:   "metadata.name=" + req.Name,
 		ResourceVersion: req.ResourceVersion,
 	}
 	watcher, err := client.DownloadRequests(namespace).Watch(listOptions)
@@ -83,12 +81,6 @@ Loop:
 			updated, ok := e.Object.(*v1.DownloadRequest)
 			if !ok {
 				return errors.Errorf("unexpected type %T", e.Object)
-			}
-
-			// TODO: once the minimum supported Kubernetes version is v1.9.0, remove the following check.
-			// See http://issue.k8s.io/51046 for details.
-			if updated.Name != req.Name {
-				continue
 			}
 
 			switch e.Type {
