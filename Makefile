@@ -131,26 +131,9 @@ shell: build-dirs build-image
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
-# Use a slightly customized build/push targets since we don't have a Go binary to build for the fsfreeze image
-build-fsfreeze: BIN = fsfreeze-pause
-build-fsfreeze:
-	@cp $(DOCKERFILE)  _output/.dockerfile-$(BIN).alpine
-	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
-	@docker images -q $(IMAGE):$(VERSION) > .container-$(DOTFILE_IMAGE)
-
-push-fsfreeze: BIN = fsfreeze-pause
-push-fsfreeze:
-	@docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
-	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
-
 all-containers:
 	$(MAKE) container
 	$(MAKE) container BIN=velero-restic-restore-helper
-	$(MAKE) build-fsfreeze
 
 container: .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
@@ -164,7 +147,6 @@ container-name:
 all-push:
 	$(MAKE) push
 	$(MAKE) push BIN=velero-restic-restore-helper
-	$(MAKE) push-fsfreeze
 
 
 push: .push-$(DOTFILE_IMAGE) push-name
