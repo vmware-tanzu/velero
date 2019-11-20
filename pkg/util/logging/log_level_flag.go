@@ -21,7 +21,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/velero/pkg/cmd/util/flag"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 )
 
 var sortedLogLevels = sortLogLevels()

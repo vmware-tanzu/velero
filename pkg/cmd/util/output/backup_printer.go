@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/kubernetes/pkg/printers"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
@@ -88,7 +88,10 @@ func printBackup(backup *velerov1api.Backup, options printers.PrintOptions) ([]m
 		Object: runtime.RawExtension{Object: backup},
 	}
 
-	expiration := backup.Status.Expiration.Time
+	var expiration time.Time
+	if backup.Status.Expiration != nil {
+		expiration = backup.Status.Expiration.Time
+	}
 	if expiration.IsZero() && backup.Spec.TTL.Duration > 0 {
 		expiration = backup.CreationTimestamp.Add(backup.Spec.TTL.Duration)
 	}
@@ -111,7 +114,7 @@ func printBackup(backup *velerov1api.Backup, options printers.PrintOptions) ([]m
 
 	location := backup.Spec.StorageLocation
 
-	row.Cells = append(row.Cells, backup.Name, status, backup.Status.StartTimestamp.Time, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector))
+	row.Cells = append(row.Cells, backup.Name, status, backup.Status.StartTimestamp, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector))
 
 	return []metav1.TableRow{row}, nil
 }

@@ -27,16 +27,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/persistence"
-	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
-	velerotest "github.com/heptio/velero/pkg/test"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 type downloadRequestTestHarness struct {
@@ -252,9 +252,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 			// clock time, it's easier to do this here than as part of the test case definitions.
 			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == v1.DownloadRequestPhaseProcessed {
 				if tc.expired {
-					tc.downloadRequest.Status.Expiration.Time = harness.controller.clock.Now().Add(-1 * time.Minute)
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(-1 * time.Minute)}
 				} else {
-					tc.downloadRequest.Status.Expiration.Time = harness.controller.clock.Now().Add(time.Minute)
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(time.Minute)}
 				}
 			}
 

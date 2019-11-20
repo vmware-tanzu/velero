@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 /*
@@ -154,13 +154,13 @@ func (b *BackupBuilder) TTL(ttl time.Duration) *BackupBuilder {
 
 // Expiration sets the Backup's expiration.
 func (b *BackupBuilder) Expiration(val time.Time) *BackupBuilder {
-	b.object.Status.Expiration.Time = val
+	b.object.Status.Expiration = &metav1.Time{Time: val}
 	return b
 }
 
 // StartTimestamp sets the Backup's start timestamp.
 func (b *BackupBuilder) StartTimestamp(val time.Time) *BackupBuilder {
-	b.object.Status.StartTimestamp.Time = val
+	b.object.Status.StartTimestamp = &metav1.Time{Time: val}
 	return b
 }
 

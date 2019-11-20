@@ -19,7 +19,7 @@ package output
 import (
 	"fmt"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 func DescribeSchedule(schedule *v1.Schedule) string {
@@ -62,7 +62,7 @@ func DescribeScheduleSpec(d *Describer, spec v1.ScheduleSpec) {
 
 func DescribeScheduleStatus(d *Describer, status v1.ScheduleStatus) {
 	lastBackup := "<never>"
-	if !status.LastBackup.Time.IsZero() {
+	if status.LastBackup != nil && !status.LastBackup.Time.IsZero() {
 		lastBackup = fmt.Sprintf("%v", status.LastBackup.Time)
 	}
 	d.Printf("Last Backup:\t%s\n", lastBackup)

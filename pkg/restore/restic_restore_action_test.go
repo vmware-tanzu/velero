@@ -29,13 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/buildinfo"
-	velerofake "github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	velerotest "github.com/heptio/velero/pkg/test"
-	"github.com/heptio/velero/pkg/util/kube"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	velerofake "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 func TestGetImage(t *testing.T) {
@@ -158,11 +158,13 @@ func TestResticRestoreActionExecute(t *testing.T) {
 					PodName("my-pod").
 					Volume("vol-1").
 					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
 					Result(),
 				builder.ForPodVolumeBackup(veleroNs, "pvb-2").
 					PodName("my-pod").
 					Volume("vol-2").
 					ObjectMeta(builder.WithLabels(velerov1api.BackupNameLabel, backupName)).
+					SnapshotID("foo").
 					Result(),
 			},
 			want: builder.ForPod("ns-1", "my-pod").

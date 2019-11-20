@@ -25,6 +25,7 @@ type DownloadRequestSpec struct {
 }
 
 // DownloadTargetKind represents what type of file to download.
+// +kubebuilder:validation:Enum=BackupLog;BackupContents;BackupVolumeSnapshots;BackupResourceList;RestoreLog;RestoreResults
 type DownloadTargetKind string
 
 const (
@@ -41,17 +42,20 @@ const (
 type DownloadTarget struct {
 	// Kind is the type of file to download.
 	Kind DownloadTargetKind `json:"kind"`
+
 	// Name is the name of the kubernetes resource with which the file is associated.
 	Name string `json:"name"`
 }
 
 // DownloadRequestPhase represents the lifecycle phase of a DownloadRequest.
+// +kubebuilder:validation:Enum=New;Processed
 type DownloadRequestPhase string
 
 const (
 	// DownloadRequestPhaseNew means the DownloadRequest has not been processed by the
 	// DownloadRequestController yet.
 	DownloadRequestPhaseNew DownloadRequestPhase = "New"
+
 	// DownloadRequestPhaseProcessed means the DownloadRequest has been processed by the
 	// DownloadRequestController.
 	DownloadRequestPhaseProcessed DownloadRequestPhase = "Processed"
@@ -60,11 +64,17 @@ const (
 // DownloadRequestStatus is the current status of a DownloadRequest.
 type DownloadRequestStatus struct {
 	// Phase is the current state of the DownloadRequest.
-	Phase DownloadRequestPhase `json:"phase"`
+	// +optional
+	Phase DownloadRequestPhase `json:"phase,omitempty"`
+
 	// DownloadURL contains the pre-signed URL for the target file.
-	DownloadURL string `json:"downloadURL"`
+	// +optional
+	DownloadURL string `json:"downloadURL,omitempty"`
+
 	// Expiration is when this DownloadRequest expires and can be deleted by the system.
-	Expiration metav1.Time `json:"expiration"`
+	// +optional
+	// +nullable
+	Expiration *metav1.Time `json:"expiration,omitempty"`
 }
 
 // +genclient
@@ -73,10 +83,15 @@ type DownloadRequestStatus struct {
 // DownloadRequest is a request to download an artifact from backup object storage, such as a backup
 // log file.
 type DownloadRequest struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   DownloadRequestSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec DownloadRequestSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status DownloadRequestStatus `json:"status,omitempty"`
 }
 
@@ -85,6 +100,9 @@ type DownloadRequest struct {
 // DownloadRequestList is a list of DownloadRequests.
 type DownloadRequestList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []DownloadRequest `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []DownloadRequest `json:"items"`
 }

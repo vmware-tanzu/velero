@@ -17,11 +17,13 @@ limitations under the License.
 package output
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/printers"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
@@ -61,13 +63,18 @@ func printSchedule(schedule *v1.Schedule, options printers.PrintOptions) ([]meta
 		status = v1.SchedulePhaseNew
 	}
 
+	var lastBackupTime time.Time
+	if schedule.Status.LastBackup != nil {
+		lastBackupTime = schedule.Status.LastBackup.Time
+	}
+
 	row.Cells = append(row.Cells,
 		schedule.Name,
 		status,
 		schedule.CreationTimestamp.Time,
 		schedule.Spec.Schedule,
 		schedule.Spec.Template.TTL.Duration,
-		humanReadableTimeFromNow(schedule.Status.LastBackup.Time),
+		humanReadableTimeFromNow(lastBackupTime),
 		metav1.FormatLabelSelector(schedule.Spec.Template.LabelSelector),
 	)
 

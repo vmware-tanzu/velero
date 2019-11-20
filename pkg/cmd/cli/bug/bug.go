@@ -30,15 +30,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/buildinfo"
-	"github.com/heptio/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/features"
 )
 
 const (
 	// kubectlTimeout is how long we wait in seconds for `kubectl version`
 	// before killing the process
 	kubectlTimeout = 5 * time.Second
-	issueURL       = "https://github.com/heptio/velero/issues/new"
+	issueURL       = "https://github.com/vmware-tanzu/velero/issues/new"
 	// IssueTemplate is used to generate .github/ISSUE_TEMPLATE/bug_report.md
 	// as well as the initial text that's place in a new Github issue as
 	// the result of running `velero bug`.
@@ -72,6 +73,7 @@ about: Tell us about a problem you are experiencing
 **Environment:**
 
 - Velero version (use ` + "`velero version`" + `):{{.VeleroVersion}} {{.GitCommit}}
+- Velero features (use ` + "`velero client config get features`" + `): {{.Features}}
 - Kubernetes version (use ` + "`kubectl version`" + `): 
 {{- if .KubectlVersion}}
 ` + "```" + `
@@ -112,6 +114,7 @@ type VeleroBugInfo struct {
 	RuntimeOS      string
 	RuntimeArch    string
 	KubectlVersion string
+	Features       string
 }
 
 // cmdExistsOnPath checks to see if an executable is available on the current PATH
@@ -164,7 +167,9 @@ func newBugInfo(kubectlVersion string) *VeleroBugInfo {
 		GitCommit:      buildinfo.FormattedGitSHA(),
 		RuntimeOS:      runtime.GOOS,
 		RuntimeArch:    runtime.GOARCH,
-		KubectlVersion: kubectlVersion}
+		KubectlVersion: kubectlVersion,
+		Features:       features.Serialize(),
+	}
 }
 
 // renderToString renders IssueTemplate to a string using the

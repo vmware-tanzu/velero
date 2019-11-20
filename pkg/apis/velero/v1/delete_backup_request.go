@@ -24,13 +24,16 @@ type DeleteBackupRequestSpec struct {
 }
 
 // DeleteBackupRequestPhase represents the lifecycle phase of a DeleteBackupRequest.
+// +kubebuilder:validation:Enum=New;InProgress;Processed
 type DeleteBackupRequestPhase string
 
 const (
 	// DeleteBackupRequestPhaseNew means the DeleteBackupRequest has not been processed yet.
 	DeleteBackupRequestPhaseNew DeleteBackupRequestPhase = "New"
+
 	// DeleteBackupRequestPhaseInProgress means the DeleteBackupRequest is being processed.
 	DeleteBackupRequestPhaseInProgress DeleteBackupRequestPhase = "InProgress"
+
 	// DeleteBackupRequestPhaseProcessed means the DeleteBackupRequest has been processed.
 	DeleteBackupRequestPhaseProcessed DeleteBackupRequestPhase = "Processed"
 )
@@ -38,9 +41,13 @@ const (
 // DeleteBackupRequestStatus is the current status of a DeleteBackupRequest.
 type DeleteBackupRequestStatus struct {
 	// Phase is the current state of the DeleteBackupRequest.
-	Phase DeleteBackupRequestPhase `json:"phase"`
+	// +optional
+	Phase DeleteBackupRequestPhase `json:"phase,omitempty"`
+
 	// Errors contains any errors that were encountered during the deletion process.
-	Errors []string `json:"errors"`
+	// +optional
+	// +nullable
+	Errors []string `json:"errors,omitempty"`
 }
 
 // +genclient
@@ -48,10 +55,15 @@ type DeleteBackupRequestStatus struct {
 
 // DeleteBackupRequest is a request to delete one or more backups.
 type DeleteBackupRequest struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   DeleteBackupRequestSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec DeleteBackupRequestSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status DeleteBackupRequestStatus `json:"status,omitempty"`
 }
 
@@ -60,6 +72,9 @@ type DeleteBackupRequest struct {
 // DeleteBackupRequestList is a list of DeleteBackupRequests.
 type DeleteBackupRequestList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []DeleteBackupRequest `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []DeleteBackupRequest `json:"items"`
 }

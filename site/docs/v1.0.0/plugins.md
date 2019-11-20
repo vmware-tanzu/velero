@@ -22,7 +22,7 @@ When naming your plugin, keep in mind that the name needs to conform to these ru
 - example-with-dash.io/azure
 ```
 
-You will need to give your plugin(s) a name when registering them by calling the appropriate `RegisterX` function: <https://github.com/heptio/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
+You will need to give your plugin(s) a name when registering them by calling the appropriate `RegisterX` function: <https://github.com/vmware-tanzu/velero/blob/0e0f357cef7cf15d4c1d291d3caafff2eeb69c1e/pkg/plugin/framework/server.go#L42-L60>
 
 ## Plugin Kinds
 
@@ -77,6 +77,6 @@ Then, in your plugin's implementation, you can read this ConfigMap to fetch the 
 for an example of this -- in particular, the `getPluginConfig(...)` function.
 
 
-[1]: https://github.com/heptio/velero-plugin-example
-[2]: https://github.com/heptio/velero/blob/master/pkg/plugin/logger.go
-[3]: https://github.com/heptio/velero/blob/master/pkg/restore/restic_restore_action.go
+[1]: https://github.com/vmware-tanzu/velero-plugin-example
+[2]: https://github.com/vmware-tanzu/velero/blob/master/pkg/plugin/logger.go
+[3]: https://github.com/vmware-tanzu/velero/blob/master/pkg/restore/restic_restore_action.go

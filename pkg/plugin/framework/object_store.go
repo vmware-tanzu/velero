@@ -17,11 +17,11 @@ limitations under the License.
 package framework
 
 import (
-	"github.com/hashicorp/go-plugin"
+	plugin "github.com/hashicorp/go-plugin"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
-	proto "github.com/heptio/velero/pkg/plugin/generated"
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
 )
 
 // ObjectStorePlugin is an implementation of go-plugin's Plugin

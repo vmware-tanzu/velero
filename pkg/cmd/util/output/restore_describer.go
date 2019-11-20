@@ -25,13 +25,13 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	pkgrestore "github.com/heptio/velero/pkg/restore"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -56,7 +56,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			}
 		}
 
-		describeRestoreResults(d, restore, veleroClient)
+		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify)
 
 		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)
@@ -114,7 +114,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 	})
 }
 
-func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface) {
+func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
 	if restore.Status.Warnings == 0 && restore.Status.Errors == 0 {
 		return
 	}
@@ -122,7 +122,7 @@ func describeRestoreResults(d *Describer, restore *v1.Restore, veleroClient clie
 	var buf bytes.Buffer
 	var resultMap map[string]pkgrestore.Result
 
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout); err != nil {
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), restore.Namespace, restore.Name, v1.DownloadTargetKindRestoreResults, &buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
 		d.Printf("Warnings:\t<error getting warnings: %v>\n\nErrors:\t<error getting errors: %v>\n", err, err)
 		return
 	}

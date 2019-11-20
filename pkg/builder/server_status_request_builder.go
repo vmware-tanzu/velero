@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // ServerStatusRequestBuilder builds ServerStatusRequest objects.
@@ -67,7 +67,7 @@ func (b *ServerStatusRequestBuilder) Phase(phase velerov1api.ServerStatusRequest
 
 // ProcessedTimestamp sets the ServerStatusRequest's processed timestamp.
 func (b *ServerStatusRequestBuilder) ProcessedTimestamp(time time.Time) *ServerStatusRequestBuilder {
-	b.object.Status.ProcessedTimestamp.Time = time
+	b.object.Status.ProcessedTimestamp = &metav1.Time{Time: time}
 	return b
 }
 

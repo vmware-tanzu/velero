@@ -35,19 +35,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/metrics"
-	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	"github.com/heptio/velero/pkg/restic"
-	pkgrestore "github.com/heptio/velero/pkg/restore"
-	"github.com/heptio/velero/pkg/util/collections"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
-	"github.com/heptio/velero/pkg/util/logging"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/restic"
+	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
 // nonRestorableResources is a blacklist for the restoration process. Any resources
@@ -58,16 +58,16 @@ var nonRestorableResources = []string{
 	"events.events.k8s.io",
 
 	// Don't ever restore backups - if appropriate, they'll be synced in from object storage.
-	// https://github.com/heptio/velero/issues/622
+	// https://github.com/vmware-tanzu/velero/issues/622
 	"backups.velero.io",
 
 	// Restores are cluster-specific, and don't have value moving across clusters.
-	// https://github.com/heptio/velero/issues/622
+	// https://github.com/vmware-tanzu/velero/issues/622
 	"restores.velero.io",
 
 	// Restic repositories are automatically managed by Velero and will be automatically
 	// created as needed if they don't exist.
-	// https://github.com/heptio/velero/issues/1113
+	// https://github.com/vmware-tanzu/velero/issues/1113
 	"resticrepositories.velero.io",
 }
 
@@ -226,8 +226,8 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 	// since within that function we want the plugin manager to log to
 	// our per-restore log (which is instantiated within c.runValidatedRestore).
 	pluginManager := c.newPluginManager(c.logger)
+	defer pluginManager.CleanupClients()
 	info := c.validateAndComplete(restore, pluginManager)
-	pluginManager.CleanupClients()
 
 	// Register attempts after validation so we don't have to fetch the backup multiple times
 	backupScheduleName := restore.Spec.ScheduleName
@@ -373,7 +373,15 @@ func backupXorScheduleProvided(restore *api.Restore) bool {
 func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		// Use .After() because we want descending sort.
-		return backups[i].Status.StartTimestamp.After(backups[j].Status.StartTimestamp.Time)
+
+		var iStartTime, jStartTime time.Time
+		if backups[i].Status.StartTimestamp != nil {
+			iStartTime = backups[i].Status.StartTimestamp.Time
+		}
+		if backups[j].Status.StartTimestamp != nil {
+			jStartTime = backups[j].Status.StartTimestamp.Time
+		}
+		return iStartTime.After(jStartTime)
 	})
 
 	for _, backup := range backups {

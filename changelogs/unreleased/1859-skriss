@@ -1,1 +1,0 @@
-velero install: if `--use-restic` and `--wait` are specified, wait up to a minute for restic daemonset to be ready

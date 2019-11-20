@@ -28,15 +28,15 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/label"
-	"github.com/heptio/velero/pkg/util/boolptr"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 )
 
 // Backupper can execute restic backups of volumes in a pod.
 type Backupper interface {
-	// BackupPodVolumes backs up all annotated volumes in a pod.
-	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
+	// BackupPodVolumes backs up all specified volumes in a pod.
+	BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error)
 }
 
 type backupper struct {
@@ -96,9 +96,7 @@ func resultsKey(ns, name string) string {
 	return fmt.Sprintf("%s/%s", ns, name)
 }
 
-func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
-	// get volumes to backup from pod's annotations
-	volumesToBackup := GetVolumesToBackup(pod)
+func (b *backupper) BackupPodVolumes(backup *velerov1api.Backup, pod *corev1api.Pod, volumesToBackup []string, log logrus.FieldLogger) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumesToBackup) == 0 {
 		return nil, nil
 	}

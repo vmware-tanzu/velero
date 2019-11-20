@@ -43,21 +43,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/archive"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/discovery"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/velero/pkg/label"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/restic"
-	"github.com/heptio/velero/pkg/util/boolptr"
-	"github.com/heptio/velero/pkg/util/collections"
-	"github.com/heptio/velero/pkg/util/filesystem"
-	"github.com/heptio/velero/pkg/util/kube"
-	velerosync "github.com/heptio/velero/pkg/util/sync"
-	"github.com/heptio/velero/pkg/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/archive"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
+	velerosync "github.com/vmware-tanzu/velero/pkg/util/sync"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type VolumeSnapshotterGetter interface {
@@ -751,9 +751,11 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	// Check if namespace/cluster-scoped resource should be restored. We need
 	// to do this here since this method may be getting called for an additional
 	// item which is in a namespace that's excluded, or which is cluster-scoped
-	// and should be excluded.
+	// and should be excluded. Note that we're checking the object's namespace (
+	// via obj.GetNamespace()) instead of the namespace parameter, because we want
+	// to check the *original* namespace, not the remapped one if it's been remapped.
 	if namespace != "" {
-		if !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+		if !ctx.namespaceIncludesExcludes.ShouldInclude(obj.GetNamespace()) {
 			ctx.log.WithFields(logrus.Fields{
 				"namespace":     obj.GetNamespace(),
 				"name":          obj.GetName(),
@@ -1062,13 +1064,13 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
-				e := errors.Errorf("not restored: %s and is different from backed up version.", restoreErr)
+				e := errors.Errorf("could not restore, %s. Warning: the in-cluster version is different than the backed-up version.", restoreErr)
 				addToResult(&warnings, namespace, e)
 			}
 			return warnings, errs
 		}
 
-		ctx.log.Infof("Skipping restore of %s: %v because it already exists in the cluster and is unchanged from the backed up version", obj.GroupVersionKind().Kind, name)
+		ctx.log.Infof("Restore of %s, %v skipped: it already exists in the cluster and is the same as the backed up version", obj.GroupVersionKind().Kind, name)
 		return warnings, errs
 	}
 

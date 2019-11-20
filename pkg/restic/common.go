@@ -27,11 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider/azure"
-	velerov1listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/label"
-	"github.com/heptio/velero/pkg/util/filesystem"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 )
 
 const (
@@ -88,9 +87,17 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
-		if pod.GetName() == pvb.Spec.Pod.Name {
-			volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
+		if pod.GetName() != pvb.Spec.Pod.Name {
+			continue
 		}
+
+		// skip PVBs without a snapshot ID since there's nothing
+		// to restore (they could be failed, or for empty volumes).
+		if pvb.Status.SnapshotID == "" {
+			continue
+		}
+
+		volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
 	}
 
 	if len(volumes) > 0 {
@@ -221,7 +228,7 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := azure.GetResticEnvVars(loc.Spec.Config)
+	azureVars, err := getResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}

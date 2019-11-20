@@ -26,10 +26,15 @@ import (
 // ServerStatusRequest is a request to access current status information about
 // the Velero server.
 type ServerStatusRequest struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   ServerStatusRequestSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec ServerStatusRequestSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status ServerStatusRequestStatus `json:"status,omitempty"`
 }
 
@@ -38,6 +43,7 @@ type ServerStatusRequestSpec struct {
 }
 
 // ServerStatusRequestPhase represents the lifecycle phase of a ServerStatusRequest.
+// +kubebuilder:validation:Enum=New;Processed
 type ServerStatusRequestPhase string
 
 const (
@@ -56,17 +62,23 @@ type PluginInfo struct {
 // ServerStatusRequestStatus is the current status of a ServerStatusRequest.
 type ServerStatusRequestStatus struct {
 	// Phase is the current lifecycle phase of the ServerStatusRequest.
-	Phase ServerStatusRequestPhase `json:"phase"`
+	// +optional
+	Phase ServerStatusRequestPhase `json:"phase,omitempty"`
 
 	// ProcessedTimestamp is when the ServerStatusRequest was processed
 	// by the ServerStatusRequestController.
-	ProcessedTimestamp metav1.Time `json:"processedTimestamp"`
+	// +optional
+	// +nullable
+	ProcessedTimestamp *metav1.Time `json:"processedTimestamp,omitempty"`
 
 	// ServerVersion is the Velero server version.
-	ServerVersion string `json:"serverVersion"`
+	// +optional
+	ServerVersion string `json:"serverVersion,omitempty"`
 
 	// Plugins list information about the plugins running on the Velero server
-	Plugins []PluginInfo `json:"plugins"`
+	// +optional
+	// +nullable
+	Plugins []PluginInfo `json:"plugins,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -74,6 +86,9 @@ type ServerStatusRequestStatus struct {
 // ServerStatusRequestList is a list of ServerStatusRequests.
 type ServerStatusRequestList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []ServerStatusRequest `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []ServerStatusRequest `json:"items"`
 }

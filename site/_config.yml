@@ -3,13 +3,13 @@ title: Velero
 email:
 author: Velero Authors
 description: Backup and migrate Kubernetes resources and persistent volumes
-url: velero.io
+#url: velero.io
 logo: Velero.svg
 twitter:
   username: projectvelero
   card: summary
 vm_logo: vm-logo.png
-gh_repo: https://github.com/heptio/velero
+gh_repo: https://github.com/vmware-tanzu/velero
 markdown: redcarpet
 hero:
   background-color: med-blue
@@ -36,7 +36,7 @@ footer_social_links:
     url: feed.xml
   GitHub:
     fa_icon: fab fa-github
-    url: https://github.com/heptio/velero
+    url: https://github.com/vmware-tanzu/velero
 
 defaults:
   - scope:
@@ -53,85 +53,91 @@ defaults:
       path: docs/master
     values:
       version: master
-      gh: https://github.com/heptio/velero/tree/master
+      gh: https://github.com/vmware-tanzu/velero/tree/master
+      layout: "docs"
+  - scope:
+      path: docs/v1.2.0
+    values:
+      version: v1.2.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.2.0
       layout: "docs"
   - scope:
       path: docs/v1.1.0
     values:
       version: v1.1.0
-      gh: https://github.com/heptio/velero/tree/v1.1.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.1.0
       layout: "docs"
   - scope:
       path: docs/v1.0.0
     values:
       version: v1.0.0
-      gh: https:/github.com/heptio/velero/tree/v1.0.0
+      gh: https:/github.com/vmware-tanzu/velero/tree/v1.0.0
       layout: "docs"
   - scope:
       path: docs/v0.11.0
     values:
       version: v0.11.0
-      gh: https:/github.com/heptio/velero/tree/v0.11.0
+      gh: https:/github.com/vmware-tanzu/velero/tree/v0.11.0
       layout: "docs"
   - scope:
       path: docs/v0.10.0
     values:
       version: v0.10.0
-      gh: https:/github.com/heptio/velero/tree/v0.10.0
+      gh: https:/github.com/vmware-tanzu/velero/tree/v0.10.0
       layout: "docs"
   - scope:
       path: docs/v0.9.0
     values:
       version: v0.9.0
-      gh: https:/github.com/heptio/velero/tree/v0.9.0
+      gh: https:/github.com/vmware-tanzu/velero/tree/v0.9.0
       layout: "docs"
   - scope:
       path: docs/v0.8.1
     values:
       version: v0.8.1
-      gh: https:/github.com/heptio/velero/tree/v0.8.1
+      gh: https:/github.com/vmware-tanzu/velero/tree/v0.8.1
       layout: "docs"
   - scope:
       path: docs/v0.8.0
     values:
       version: v0.8.0
-      gh: https:/github.com/heptio/velero/tree/v0.8.0
+      gh: https:/github.com/vmware-tanzu/velero/tree/v0.8.0
       layout: "docs"
   - scope:
       path: docs/v0.7.1
     values:
       version: v0.7.1
-      gh: https://github.com/heptio/velero/tree/v0.7.1
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.7.1
       layout: "docs"
   - scope:
       path: docs/v0.7.0
     values:
       version: v0.7.0
-      gh: https://github.com/heptio/velero/tree/v0.7.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.7.0
       layout: "docs"
   - scope:
       path: docs/v0.6.0
     values:
       version: v0.6.0
-      gh: https://github.com/heptio/velero/tree/v0.6.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.6.0
       layout: "docs"
   - scope:
       path: docs/v0.5.0
     values:
       version: v0.5.0
-      gh: https://github.com/heptio/velero/tree/v0.5.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.5.0
       layout: "docs"
   - scope:
       path: docs/v0.4.0
     values:
       version: v0.4.0
-      gh: https://github.com/heptio/velero/tree/v0.4.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.4.0
       layout: "docs"
   - scope:
       path: docs/v0.3.0
     values:
       version: v0.3.0
-      gh: https://github.com/heptio/velero/tree/v0.3.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v0.3.0
       layout: "docs"
 
 page_gen:
@@ -145,9 +151,10 @@ collections:
   - casestudies
 
 versioning: true
-latest: v1.1.0
+latest: v1.2.0
 versions:
 - master
+- v1.2.0
 - v1.1.0
 - v1.0.0
 - v0.11.0
@@ -163,7 +170,7 @@ versions:
 - v0.3.0
 
 # Build settings
-permalink: :title/
+permalink: /blog/:title/
 sass:
   sass_dir: css
   style: :compressed

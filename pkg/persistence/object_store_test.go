@@ -23,37 +23,34 @@ import (
 	"errors"
 	"io"
 	"io/ioutil"
-	"path"
 	"sort"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/cloudprovider"
-	cloudprovidermocks "github.com/heptio/velero/pkg/cloudprovider/mocks"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	velerotest "github.com/heptio/velero/pkg/test"
-	"github.com/heptio/velero/pkg/util/encode"
-	"github.com/heptio/velero/pkg/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/encode"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type objectBackupStoreTestHarness struct {
 	// embedded to reduce verbosity when calling methods
 	*objectBackupStore
 
-	objectStore    *cloudprovider.InMemoryObjectStore
+	objectStore    *inMemoryObjectStore
 	bucket, prefix string
 }
 
 func newObjectBackupStoreTestHarness(bucket, prefix string) *objectBackupStoreTestHarness {
-	objectStore := cloudprovider.NewInMemoryObjectStore(bucket)
+	objectStore := newInMemoryObjectStore(bucket)
 
 	return &objectBackupStoreTestHarness{
 		objectBackupStore: &objectBackupStore{
@@ -72,7 +69,7 @@ func TestIsValid(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectErr   bool
 	}{
 		{
@@ -165,7 +162,7 @@ func TestListBackups(t *testing.T) {
 	tests := []struct {
 		name        string
 		prefix      string
-		storageData cloudprovider.BucketData
+		storageData BucketData
 		expectedRes []string
 		expectedErr string
 	}{
@@ -237,7 +234,6 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"metadata/revision",
 			},
 		},
 		{
@@ -257,7 +253,6 @@ func TestPutBackup(t *testing.T) {
 				"prefix-1/backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"prefix-1/backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"prefix-1/backups/backup-1/backup-1-resource-list.json.gz",
-				"prefix-1/metadata/revision",
 			},
 		},
 		{
@@ -296,7 +291,6 @@ func TestPutBackup(t *testing.T) {
 				"backups/backup-1/backup-1-podvolumebackups.json.gz",
 				"backups/backup-1/backup-1-volumesnapshots.json.gz",
 				"backups/backup-1/backup-1-resource-list.json.gz",
-				"metadata/revision",
 			},
 		},
 		{
@@ -461,7 +455,7 @@ func TestDeleteBackup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			objectStore := new(cloudprovidermocks.ObjectStore)
+			objectStore := new(providermocks.ObjectStore)
 			backupStore := &objectBackupStore{
 				objectStore: objectStore,
 				bucket:      "test-bucket",
@@ -480,7 +474,6 @@ func TestDeleteBackup(t *testing.T) {
 				}
 
 				objectStore.On("DeleteObject", backupStore.bucket, obj).Return(err)
-				objectStore.On("PutObject", "test-bucket", path.Join(test.prefix, "metadata", "revision"), mock.Anything).Return(nil)
 			}
 
 			err := backupStore.DeleteBackup("bak")
@@ -635,7 +628,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Bucket has a leading and trailing slash, they are both stripped",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("/bucket/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 		},
@@ -643,7 +636,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has a leading and trailing slash, the leading slash is stripped and the trailing slash is left",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("/prefix/").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",
@@ -652,7 +645,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 			name:     "when Prefix has no leading or trailing slash, a trailing slash is added",
 			location: builder.ForBackupStorageLocation("", "").Provider("provider-1").Bucket("bucket").Prefix("prefix").Result(),
 			objectStoreGetter: objectStoreGetter{
-				"provider-1": cloudprovider.NewInMemoryObjectStore("bucket"),
+				"provider-1": newInMemoryObjectStore("bucket"),
 			},
 			wantBucket: "bucket",
 			wantPrefix: "prefix/",

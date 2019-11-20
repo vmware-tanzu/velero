@@ -25,10 +25,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	"github.com/heptio/velero/pkg/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
@@ -38,6 +38,7 @@ func DescribeBackup(
 	podVolumeBackups []velerov1api.PodVolumeBackup,
 	details bool,
 	veleroClient clientset.Interface,
+	insecureSkipTLSVerify bool,
 ) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
@@ -74,7 +75,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup, details, veleroClient)
+		DescribeBackupStatus(d, backup, details, veleroClient, insecureSkipTLSVerify)
 
 		if len(deleteRequests) > 0 {
 			d.Println()
@@ -211,30 +212,33 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 }
 
 // DescribeBackupStatus describes a backup status in human-readable format.
-func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface) {
+func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
 	status := backup.Status
 
 	d.Printf("Backup Format Version:\t%d\n", status.Version)
 
 	d.Println()
 	// "<n/a>" output should only be applicable for backups that failed validation
-	if status.StartTimestamp.Time.IsZero() {
+	if status.StartTimestamp == nil || status.StartTimestamp.Time.IsZero() {
 		d.Printf("Started:\t%s\n", "<n/a>")
 	} else {
 		d.Printf("Started:\t%s\n", status.StartTimestamp.Time)
 	}
-	if status.CompletionTimestamp.Time.IsZero() {
+	if status.CompletionTimestamp == nil || status.CompletionTimestamp.Time.IsZero() {
 		d.Printf("Completed:\t%s\n", "<n/a>")
 	} else {
 		d.Printf("Completed:\t%s\n", status.CompletionTimestamp.Time)
 	}
 
 	d.Println()
-	d.Printf("Expiration:\t%s\n", status.Expiration.Time)
+	// Expiration can't be 0, it is always set to a 30-day default. It can be nil
+	// if the controller hasn't processed this Backup yet, in which case this will
+	// just display `<nil>`, though this should be temporary.
+	d.Printf("Expiration:\t%s\n", status.Expiration)
 	d.Println()
 
 	if details {
-		describeBackupResourceList(d, backup, veleroClient)
+		describeBackupResourceList(d, backup, veleroClient, insecureSkipTLSVerify)
 		d.Println()
 	}
 
@@ -245,7 +249,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		}
 
 		buf := new(bytes.Buffer)
-		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout); err != nil {
+		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
 			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
 			return
 		}
@@ -266,9 +270,9 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Persistent Volumes: <none included>\n")
 }
 
-func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface) {
+func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool) {
 	buf := new(bytes.Buffer)
-	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout); err != nil {
+	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
 		if err == downloadrequest.ErrNotFound {
 			d.Println("Resource List:\t<backup resource list not found, this could be because this backup was taken prior to Velero 1.1.0>")
 		} else {

@@ -67,7 +67,7 @@ rm site/_data/$NEW_DOCS_TOC.yml && cp site/_data/master-toc.yml site/_data/$NEW_
 if [[ $(uname) == "Darwin" ]]; then
     echo "[OS X] updating version-specific links"
     find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://velero.io/docs/master|https://velero.io/docs/$NEW_DOCS_VERSION|g"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/heptio/velero/blob/master|https://github.com/heptio/velero/blob/$NEW_DOCS_VERSION|g"
+    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i '' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$NEW_DOCS_VERSION|g"
 
     echo "[OS X] Updating latest version in _config.yml"
     sed -i '' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" site/_config.yml
@@ -87,7 +87,7 @@ ${NEW_DOCS_VERSION}: ${NEW_DOCS_TOC}
 else
     echo "[Linux] updating version-specific links"
     find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://velero.io/docs/master|https://velero.io/docs/$NEW_DOCS_VERSION|g"
-    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/heptio/velero/blob/master|https://github.com/heptio/velero/blob/$NEW_DOCS_VERSION|g"
+    find site/docs/${NEW_DOCS_VERSION} -type f -name "*.md" | xargs sed -i'' "s|https://github.com/vmware-tanzu/velero/blob/master|https://github.com/vmware-tanzu/velero/blob/$NEW_DOCS_VERSION|g"
 
     echo "[Linux] Updating latest version in _config.yml"
     sed -i'' "s/latest: ${PREVIOUS_DOCS_VERSION}/latest: ${NEW_DOCS_VERSION}/" site/_config.yml

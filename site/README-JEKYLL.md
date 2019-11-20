@@ -23,7 +23,7 @@ If you are running a build on Ubuntu you will need the following packages:
 # Local Development
 1. Install Jekyll and plug-ins in one fell swoop. `gem install github-pages`
 This mirrors the plug-ins used by GitHub Pages on your local machine including Jekyll, Sass, etc.
-2. Clone down your own fork, or clone the main repo `git clone https://github.com/heptio/velero` and add your own remote.
+2. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
 3. `cd velero/site`
 4. `rbenv local 2.6.3`
 5. `bundle install`

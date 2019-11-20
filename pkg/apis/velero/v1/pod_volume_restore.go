@@ -41,6 +41,7 @@ type PodVolumeRestoreSpec struct {
 }
 
 // PodVolumeRestorePhase represents the lifecycle phase of a PodVolumeRestore.
+// +kubebuilder:validation:Enum=New;InProgress;Completed;Failed
 type PodVolumeRestorePhase string
 
 const (
@@ -53,34 +54,46 @@ const (
 // PodVolumeRestoreStatus is the current status of a PodVolumeRestore.
 type PodVolumeRestoreStatus struct {
 	// Phase is the current state of the PodVolumeRestore.
-	Phase PodVolumeRestorePhase `json:"phase"`
+	// +optional
+	Phase PodVolumeRestorePhase `json:"phase,omitempty"`
 
 	// Message is a message about the pod volume restore's status.
-	Message string `json:"message"`
+	// +optional
+	Message string `json:"message,omitempty"`
 
 	// StartTimestamp records the time a restore was started.
 	// The server's time is used for StartTimestamps
-	StartTimestamp metav1.Time `json:"startTimestamp"`
+	// +optional
+	// +nullable
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a restore was completed.
 	// Completion time is recorded even on failed restores.
 	// The server's time is used for CompletionTimestamps
-	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+	// +optional
+	// +nullable
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// Progress holds the total number of bytes of the snapshot and the current
 	// number of restored bytes. This can be used to display progress information
 	// about the restore operation.
-	Progress PodVolumeOperationProgress `json:"progress"`
+	// +optional
+	Progress PodVolumeOperationProgress `json:"progress,omitempty"`
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PodVolumeRestore struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   PodVolumeRestoreSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec PodVolumeRestoreSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status PodVolumeRestoreStatus `json:"status,omitempty"`
 }
 
@@ -89,6 +102,9 @@ type PodVolumeRestore struct {
 // PodVolumeRestoreList is a list of PodVolumeRestores.
 type PodVolumeRestoreList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []PodVolumeRestore `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []PodVolumeRestore `json:"items"`
 }

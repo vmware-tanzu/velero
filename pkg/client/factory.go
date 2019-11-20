@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/pkg/errors"
@@ -26,8 +25,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	clientset "github.com/heptio/velero/pkg/generated/clientset/versioned"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 )
 
 // Factory knows how to create a VeleroClient and Kubernetes client.
@@ -68,21 +67,15 @@ type factory struct {
 }
 
 // NewFactory returns a Factory.
-func NewFactory(baseName string) Factory {
+func NewFactory(baseName string, config VeleroConfig) Factory {
 	f := &factory{
 		flags:    pflag.NewFlagSet("", pflag.ContinueOnError),
 		baseName: baseName,
 	}
 
 	f.namespace = os.Getenv("VELERO_NAMESPACE")
-
-	if config, err := LoadConfig(); err == nil {
-		// Only override the namespace if the config key is set
-		if _, ok := config[ConfigKeyNamespace]; ok {
-			f.namespace = config[ConfigKeyNamespace]
-		}
-	} else {
-		fmt.Fprintf(os.Stderr, "WARNING: error retrieving namespace from config file: %v\n", err)
+	if config.Namespace() != "" {
+		f.namespace = config.Namespace()
 	}
 
 	// We didn't get the namespace via env var or config file, so use the default.

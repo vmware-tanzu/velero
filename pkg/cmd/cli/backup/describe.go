@@ -23,18 +23,19 @@ import (
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/output"
-	"github.com/heptio/velero/pkg/restic"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	"github.com/vmware-tanzu/velero/pkg/restic"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	var (
-		listOptions metav1.ListOptions
-		details     bool
+		listOptions           metav1.ListOptions
+		details               bool
+		insecureSkipTLSVerify bool
 	)
 
 	c := &cobra.Command{
@@ -71,7 +72,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
 				}
 
-				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, veleroClient)
+				s := output.DescribeBackup(&backup, deleteRequestList.Items, podVolumeBackupList.Items, details, veleroClient, insecureSkipTLSVerify)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -85,6 +86,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
 	c.Flags().BoolVar(&details, "details", details, "display additional detail in the command output")
+	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
 
 	return c
 }

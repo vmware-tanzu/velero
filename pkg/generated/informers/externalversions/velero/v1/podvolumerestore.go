@@ -21,10 +21,10 @@ package v1
 import (
 	time "time"
 
-	velerov1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	versioned "github.com/heptio/velero/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/heptio/velero/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/heptio/velero/pkg/generated/listers/velero/v1"
+	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	versioned "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
+	internalinterfaces "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"

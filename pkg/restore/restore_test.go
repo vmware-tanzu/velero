@@ -44,21 +44,21 @@ import (
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	kubetesting "k8s.io/client-go/testing"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/discovery"
-	velerov1informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/kuberesource"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	"github.com/heptio/velero/pkg/restic"
-	resticmocks "github.com/heptio/velero/pkg/restic/mocks"
-	"github.com/heptio/velero/pkg/test"
-	testutil "github.com/heptio/velero/pkg/test"
-	"github.com/heptio/velero/pkg/util/collections"
-	"github.com/heptio/velero/pkg/util/encode"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
-	"github.com/heptio/velero/pkg/volume"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	"github.com/vmware-tanzu/velero/pkg/restic"
+	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
+	"github.com/vmware-tanzu/velero/pkg/test"
+	testutil "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/collections"
+	"github.com/vmware-tanzu/velero/pkg/util/encode"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // TestRestoreResourceFiltering runs restores with different combinations
@@ -560,6 +560,24 @@ func TestRestoreNamespaceMapping(t *testing.T) {
 				done(),
 			want: map[*test.APIResource][]string{
 				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2", "ns-3/pod-3"},
+			},
+		},
+		{
+			name:    "namespace mappings are applied when IncludedNamespaces are specified",
+			restore: defaultRestore().IncludedNamespaces("ns-1", "ns-2").NamespaceMappings("ns-1", "mapped-ns-1", "ns-2", "mapped-ns-2").Result(),
+			backup:  defaultBackup().Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+			},
+			tarball: newTarWriter(t).
+				addItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+					builder.ForPod("ns-3", "pod-3").Result(),
+				).
+				done(),
+			want: map[*test.APIResource][]string{
+				test.Pods(): {"mapped-ns-1/pod-1", "mapped-ns-2/pod-2"},
 			},
 		},
 	}
@@ -2259,9 +2277,9 @@ func TestRestoreWithRestic(t *testing.T) {
 			backup:       defaultBackup().Result(),
 			apiResources: []*test.APIResource{test.Pods()},
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
-				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").Result(),
-				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("pod-1").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("pod-2").SnapshotID("foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("pod-4").SnapshotID("foo").Result(),
 			},
 			podWithPVBs: []*corev1api.Pod{
 				builder.ForPod("ns-1", "pod-2").

@@ -21,7 +21,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 // ScheduleBuilder builds Schedule objects.
@@ -80,7 +80,7 @@ func (b *ScheduleBuilder) CronSchedule(expression string) *ScheduleBuilder {
 // LastBackupTime sets the Schedule's last backup time.
 func (b *ScheduleBuilder) LastBackupTime(val string) *ScheduleBuilder {
 	t, _ := time.Parse("2006-01-02 15:04:05", val)
-	b.object.Status.LastBackup.Time = t
+	b.object.Status.LastBackup = &metav1.Time{Time: t}
 	return b
 }
 

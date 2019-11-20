@@ -20,14 +20,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/heptio/velero/pkg/backup"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cloudprovider/aws"
-	"github.com/heptio/velero/pkg/cloudprovider/azure"
-	"github.com/heptio/velero/pkg/cloudprovider/gcp"
-	velerodiscovery "github.com/heptio/velero/pkg/discovery"
-	veleroplugin "github.com/heptio/velero/pkg/plugin/framework"
-	"github.com/heptio/velero/pkg/restore"
+	"github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
+	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/restore"
 )
 
 func NewCommand(f client.Factory) *cobra.Command {
@@ -38,12 +35,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
-				RegisterObjectStore("velero.io/aws", newAwsObjectStore).
-				RegisterObjectStore("velero.io/azure", newAzureObjectStore).
-				RegisterObjectStore("velero.io/gcp", newGcpObjectStore).
-				RegisterVolumeSnapshotter("velero.io/aws", newAwsVolumeSnapshotter).
-				RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
-				RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
@@ -55,6 +46,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/add-pv-from-pvc", newAddPVFromPVCRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
+				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
+				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				Serve()
 		},
 	}
@@ -62,30 +55,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 	pluginServer.BindFlags(c.Flags())
 
 	return c
-}
-
-func newAwsObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewObjectStore(logger), nil
-}
-
-func newAzureObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewObjectStore(logger), nil
-}
-
-func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewObjectStore(logger), nil
-}
-
-func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewVolumeSnapshotter(logger), nil
-}
-
-func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewVolumeSnapshotter(logger), nil
-}
-
-func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewVolumeSnapshotter(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -174,4 +143,12 @@ func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.Handl
 			client.StorageV1().StorageClasses(),
 		), nil
 	}
+}
+
+func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewRoleBindingAction(logger), nil
+}
+
+func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewClusterRoleBindingAction(logger), nil
 }

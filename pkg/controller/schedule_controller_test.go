@@ -31,12 +31,12 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	"github.com/heptio/velero/pkg/metrics"
-	velerotest "github.com/heptio/velero/pkg/test"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
 func TestProcessSchedule(t *testing.T) {
@@ -174,7 +174,7 @@ func TestProcessSchedule(t *testing.T) {
 							t.Logf("error parsing status.lastBackup: %s\n", err)
 							return false, nil, err
 						}
-						res.Status.LastBackup = metav1.Time{Time: parsed}
+						res.Status.LastBackup = &metav1.Time{Time: parsed}
 					}
 
 					return true, res, nil
@@ -318,14 +318,21 @@ func TestGetNextRunTime(t *testing.T) {
 				offsetDuration, err := time.ParseDuration(test.lastRanOffset)
 				require.NoError(t, err, "unable to parse test.lastRanOffset: %v", err)
 
-				test.schedule.Status.LastBackup = metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
+				test.schedule.Status.LastBackup = &metav1.Time{Time: testClock.Now().Add(-offsetDuration)}
 			}
 
 			nextRunTimeOffset, err := time.ParseDuration(test.expectedNextRunTimeOffset)
 			if err != nil {
 				panic(err)
 			}
-			expectedNextRunTime := test.schedule.Status.LastBackup.Add(nextRunTimeOffset)
+
+			// calculate expected next run time (if the schedule hasn't run yet, this
+			// will be the zero value which will trigger an immediate backup)
+			var baseTime time.Time
+			if test.lastRanOffset != "" {
+				baseTime = test.schedule.Status.LastBackup.Time
+			}
+			expectedNextRunTime := baseTime.Add(nextRunTimeOffset)
 
 			due, nextRunTime := getNextRunTime(test.schedule, cronSchedule, testClock.Now())
 
@@ -337,7 +344,7 @@ func TestGetNextRunTime(t *testing.T) {
 }
 
 func TestParseCronSchedule(t *testing.T) {
-	// From https://github.com/heptio/velero/issues/30, where we originally were using cron.Parse(),
+	// From https://github.com/vmware-tanzu/velero/issues/30, where we originally were using cron.Parse(),
 	// which treats the first field as seconds, and not minutes. We want to use cron.ParseStandard()
 	// instead, which has the first field as minutes.
 
@@ -371,7 +378,7 @@ func TestParseCronSchedule(t *testing.T) {
 	assert.Equal(t, time.Date(2017, 8, 11, 9, 0, 0, 0, time.UTC), next)
 
 	// record backup time
-	s.Status.LastBackup = metav1.NewTime(now)
+	s.Status.LastBackup = &metav1.Time{Time: now}
 
 	// advance clock 1 minute, make sure we're not due and next backup is tomorrow at 9am
 	now = time.Date(2017, 8, 11, 9, 2, 0, 0, time.UTC)

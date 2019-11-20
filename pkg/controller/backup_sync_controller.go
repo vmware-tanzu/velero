@@ -23,19 +23,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kuberrs "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/label"
-	"github.com/heptio/velero/pkg/persistence"
-	"github.com/heptio/velero/pkg/plugin/clientmgmt"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 )
 
 type backupSyncController struct {
@@ -49,6 +48,7 @@ type backupSyncController struct {
 	podVolumeBackupLister       listers.PodVolumeBackupLister
 	namespace                   string
 	defaultBackupLocation       string
+	defaultBackupSyncPeriod     time.Duration
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
@@ -66,10 +66,10 @@ func NewBackupSyncController(
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
-	if syncPeriod < time.Minute {
-		logger.Infof("Provided backup sync period %v is too short. Setting to 1 minute", syncPeriod)
+	if syncPeriod <= 0 {
 		syncPeriod = time.Minute
 	}
+	logger.Infof("Backup sync period is %v", syncPeriod)
 
 	c := &backupSyncController{
 		genericController:           newGenericController("backup-sync", logger),
@@ -78,6 +78,7 @@ func NewBackupSyncController(
 		podVolumeBackupClient:       podVolumeBackupClient,
 		namespace:                   namespace,
 		defaultBackupLocation:       defaultBackupLocation,
+		defaultBackupSyncPeriod:     syncPeriod,
 		backupLister:                backupInformer.Lister(),
 		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
 		podVolumeBackupLister:       podVolumeBackupInformer.Lister(),
@@ -89,40 +90,13 @@ func NewBackupSyncController(
 	}
 
 	c.resyncFunc = c.run
-	c.resyncPeriod = syncPeriod
+	c.resyncPeriod = 30 * time.Second
 	c.cacheSyncWaiters = []cache.InformerSynced{
 		backupInformer.Informer().HasSynced,
 		backupStorageLocationInformer.Informer().HasSynced,
 	}
 
 	return c
-}
-
-func shouldSync(location *velerov1api.BackupStorageLocation, now time.Time, backupStore persistence.BackupStore, log logrus.FieldLogger) (bool, string) {
-	log = log.WithFields(map[string]interface{}{
-		"lastSyncedRevision": location.Status.LastSyncedRevision,
-		"lastSyncedTime":     location.Status.LastSyncedTime.Time.Format(time.RFC1123Z),
-	})
-
-	revision, err := backupStore.GetRevision()
-	if err != nil {
-		log.WithError(err).Debugf("Unable to get backup store's revision file, syncing (this is not an error if a v0.10+ backup has not yet been taken into this location)")
-		return true, ""
-	}
-	log = log.WithField("revision", revision)
-
-	if location.Status.LastSyncedTime.Add(time.Hour).Before(now) {
-		log.Debugf("Backup location hasn't been synced in more than %s, syncing", time.Hour)
-		return true, revision
-	}
-
-	if string(location.Status.LastSyncedRevision) != revision {
-		log.Debugf("Backup location hasn't been synced since its last modification, syncing")
-		return true, revision
-	}
-
-	log.Debugf("Backup location's contents haven't changed since last sync, not syncing")
-	return false, ""
 }
 
 // orderedBackupLocations returns a new slice with the default backup location first (if it exists),
@@ -163,43 +137,73 @@ func (c *backupSyncController) run() {
 	for _, location := range locations {
 		log := c.logger.WithField("backupLocation", location.Name)
 
+		syncPeriod := c.defaultBackupSyncPeriod
+		if location.Spec.BackupSyncPeriod != nil {
+			syncPeriod = location.Spec.BackupSyncPeriod.Duration
+			if syncPeriod == 0 {
+				log.Debug("Backup sync period for this location is set to 0, skipping sync")
+				continue
+			}
+
+			if syncPeriod < 0 {
+				log.Debug("Backup sync period must be non-negative")
+				syncPeriod = c.defaultBackupSyncPeriod
+			}
+		}
+
+		lastSync := location.Status.LastSyncedTime
+		if lastSync != nil {
+			log.Debug("Checking if backups need to be synced at this time for this location")
+			nextSync := lastSync.Add(syncPeriod)
+			if time.Now().UTC().Before(nextSync) {
+				continue
+			}
+		}
+
+		log.Debug("Checking backup location for backups to sync into cluster")
+
 		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
 			log.WithError(err).Error("Error getting backup store for this location")
 			continue
 		}
 
-		ok, revision := shouldSync(location, time.Now().UTC(), backupStore, log)
-		if !ok {
-			continue
-		}
-		log.Info("Syncing contents of backup store into cluster")
-
+		// get a list of all the backups that are stored in the backup storage location
 		res, err := backupStore.ListBackups()
 		if err != nil {
 			log.WithError(err).Error("Error listing backups in backup store")
 			continue
 		}
 		backupStoreBackups := sets.NewString(res...)
-		log.WithField("backupCount", len(backupStoreBackups)).Info("Got backups from backup store")
+		log.WithField("backupCount", len(backupStoreBackups)).Debug("Got backups from backup store")
 
-		for backupName := range backupStoreBackups {
+		// get a list of all the backups that exist as custom resources in the cluster
+		clusterBackups, err := c.backupLister.Backups(c.namespace).List(labels.Everything())
+		if err != nil {
+			log.WithError(errors.WithStack(err)).Error("Error getting backups from cluster, proceeding with sync into cluster")
+		} else {
+			log.WithField("backupCount", len(clusterBackups)).Debug("Got backups from cluster")
+		}
+
+		// get a list of backups that *are* in the backup storage location and *aren't* in the cluster
+		clusterBackupsSet := sets.NewString()
+		for _, b := range clusterBackups {
+			clusterBackupsSet.Insert(b.Name)
+		}
+		backupsToSync := backupStoreBackups.Difference(clusterBackupsSet)
+
+		if count := backupsToSync.Len(); count > 0 {
+			log.Infof("Found %v backups in the backup location that do not exist in the cluster and need to be synced", count)
+		} else {
+			log.Debug("No backups found in the backup location that need to be synced into the cluster")
+		}
+
+		// sync each backup
+		for backupName := range backupsToSync {
 			log = log.WithField("backup", backupName)
-			log.Debug("Checking this backup to see if it needs to be synced into the cluster")
+			log.Info("Attempting to sync backup into cluster")
 
-			// use the controller's namespace when getting the backup because that's where we
-			// are syncing backups to, regardless of the namespace of the cloud backup.
-			backup, err := c.backupClient.Backups(c.namespace).Get(backupName, metav1.GetOptions{})
-			if err == nil {
-				log.Debug("Backup already exists in cluster")
-				continue
-			}
-
-			if !kuberrs.IsNotFound(err) {
-				log.WithError(errors.WithStack(err)).Error("Error getting backup from client, proceeding with sync into cluster")
-			}
-
-			backup, err = backupStore.GetBackupMetadata(backupName)
+			backup, err := backupStore.GetBackupMetadata(backupName)
 			if err != nil {
 				log.WithError(errors.WithStack(err)).Error("Error getting backup metadata from backup store")
 				continue
@@ -216,7 +220,8 @@ func (c *backupSyncController) run() {
 				backup.Labels = make(map[string]string)
 			}
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
-			// process the regular velero backup
+
+			// attempt to create backup custom resource via API
 			backup, err = c.backupClient.Backups(backup.Namespace).Create(backup)
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
@@ -226,7 +231,7 @@ func (c *backupSyncController) run() {
 				log.WithError(errors.WithStack(err)).Error("Error syncing backup into cluster")
 				continue
 			default:
-				log.Debug("Synced backup into cluster")
+				log.Info("Successfully synced backup into cluster")
 			}
 
 			// process the pod volume backups from object store, if any
@@ -237,7 +242,7 @@ func (c *backupSyncController) run() {
 			}
 
 			for _, podVolumeBackup := range podVolumeBackups {
-				log = log.WithField("podVolumeBackup", podVolumeBackup.Name)
+				log := log.WithField("podVolumeBackup", podVolumeBackup.Name)
 				log.Debug("Checking this pod volume backup to see if it needs to be synced into the cluster")
 
 				for i, ownerRef := range podVolumeBackup.OwnerReferences {
@@ -270,11 +275,10 @@ func (c *backupSyncController) run() {
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
-		// update the location's status's last-synced fields
+		// update the location's last-synced time field
 		patch := map[string]interface{}{
 			"status": map[string]interface{}{
-				"lastSyncedTime":     time.Now().UTC(),
-				"lastSyncedRevision": revision,
+				"lastSyncedTime": time.Now().UTC(),
 			},
 		}
 
@@ -289,29 +293,10 @@ func (c *backupSyncController) run() {
 			types.MergePatchType,
 			patchBytes,
 		); err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time and revision")
+			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}
 	}
-}
-
-func patchStorageLocation(backup *velerov1api.Backup, client velerov1client.BackupInterface, location string) error {
-	patch := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"storageLocation": location,
-		},
-	}
-
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	if _, err := client.Patch(backup.Name, types.MergePatchType, patchBytes); err != nil {
-		return errors.WithStack(err)
-	}
-
-	return nil
 }
 
 // deleteOrphanedBackups deletes backup objects (CRDs) from Kubernetes that have the specified location

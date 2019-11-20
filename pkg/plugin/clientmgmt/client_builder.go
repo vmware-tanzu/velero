@@ -21,11 +21,12 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	hcplugin "github.com/hashicorp/go-plugin"
 	"github.com/sirupsen/logrus"
 
-	"github.com/heptio/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/features"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 // clientBuilder builds go-plugin Clients.
@@ -50,6 +51,9 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	}
 
 	b.commandArgs = append(b.commandArgs, "--log-level", logLevel.String())
+	if len(features.All()) > 0 {
+		b.commandArgs = append(b.commandArgs, "--features", features.Serialize())
+	}
 
 	return b
 }

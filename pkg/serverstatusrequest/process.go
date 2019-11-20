@@ -23,13 +23,14 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/buildinfo"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	"github.com/heptio/velero/pkg/plugin/framework"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 )
 
 const ttl = time.Minute
@@ -47,7 +48,7 @@ func Process(req *velerov1api.ServerStatusRequest, client velerov1client.ServerS
 		log.Info("Processing new ServerStatusRequest")
 		return errors.WithStack(patch(client, req, func(req *velerov1api.ServerStatusRequest) {
 			req.Status.ServerVersion = buildinfo.Version
-			req.Status.ProcessedTimestamp.Time = clock.Now()
+			req.Status.ProcessedTimestamp = &metav1.Time{Time: clock.Now()}
 			req.Status.Phase = velerov1api.ServerStatusRequestPhaseProcessed
 			req.Status.Plugins = plugins(pluginLister)
 		}))

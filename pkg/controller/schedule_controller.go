@@ -32,13 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	velerov1client "github.com/heptio/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/metrics"
-	kubeutil "github.com/heptio/velero/pkg/util/kube"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 const (
@@ -266,7 +266,7 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 	original := item
 	schedule := item.DeepCopy()
 
-	schedule.Status.LastBackup = metav1.NewTime(now)
+	schedule.Status.LastBackup = &metav1.Time{Time: now}
 
 	if _, err := patchSchedule(original, schedule, c.schedulesClient); err != nil {
 		return errors.Wrapf(err, "error updating Schedule's LastBackup time to %v", schedule.Status.LastBackup)
@@ -278,7 +278,10 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 func getNextRunTime(schedule *api.Schedule, cronSchedule cron.Schedule, asOf time.Time) (bool, time.Time) {
 	// get the latest run time (if the schedule hasn't run yet, this will be the zero value which will trigger
 	// an immediate backup)
-	lastBackupTime := schedule.Status.LastBackup.Time
+	var lastBackupTime time.Time
+	if schedule.Status.LastBackup != nil {
+		lastBackupTime = schedule.Status.LastBackup.Time
+	}
 
 	nextRunTime := cronSchedule.Next(lastBackupTime)
 

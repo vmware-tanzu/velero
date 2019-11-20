@@ -24,14 +24,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/client"
-	"github.com/heptio/velero/pkg/cmd"
-	"github.com/heptio/velero/pkg/cmd/util/downloadrequest"
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 )
 
 func NewLogsCommand(f client.Factory) *cobra.Command {
 	timeout := time.Minute
+	insecureSkipTLSVerify := false
 
 	c := &cobra.Command{
 		Use:   "logs BACKUP",
@@ -58,12 +59,13 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 					"until the backup has a phase of Completed or Failed and try again.", backupName)
 			}
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout)
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify)
 			cmd.CheckError(err)
 		},
 	}
 
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
+	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
 
 	return c
 }

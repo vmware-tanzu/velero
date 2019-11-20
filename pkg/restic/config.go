@@ -17,15 +17,18 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"strings"
 
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
-	velerov1api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/cloudprovider/aws"
-	"github.com/heptio/velero/pkg/persistence"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
 )
 
 type BackendType string
@@ -38,7 +41,7 @@ const (
 
 // this func is assigned to a package-level variable so it can be
 // replaced when unit-testing
-var getAWSBucketRegion = aws.GetBucketRegion
+var getAWSBucketRegion = getBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
@@ -97,4 +100,30 @@ func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string)
 	}
 
 	return fmt.Sprintf("%s/%s", strings.TrimSuffix(prefix, "/"), name), nil
+}
+
+// getBucketRegion returns the AWS region that a bucket is in, or an error
+// if the region cannot be determined.
+func getBucketRegion(bucket string) (string, error) {
+	var region string
+
+	session, err := session.NewSession()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	for _, partition := range endpoints.DefaultPartitions() {
+		for regionHint := range partition.Regions() {
+			region, _ = s3manager.GetBucketRegion(context.Background(), session, bucket, regionHint)
+
+			// we only need to try a single region hint per partition, so break after the first
+			break
+		}
+
+		if region != "" {
+			return region, nil
+		}
+	}
+
+	return "", errors.New("unable to determine bucket's region")
 }

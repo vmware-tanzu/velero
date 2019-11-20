@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/heptio/velero/pkg/cloudprovider/mocks"
-	"github.com/heptio/velero/pkg/plugin/framework"
+	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
 func TestRestartableGetVolumeSnapshotter(t *testing.T) {
@@ -48,7 +48,7 @@ func TestRestartableGetVolumeSnapshotter(t *testing.T) {
 		},
 		{
 			name:   "happy path",
-			plugin: new(mocks.VolumeSnapshotter),
+			plugin: new(providermocks.VolumeSnapshotter),
 		},
 	}
 
@@ -96,7 +96,7 @@ func TestRestartableVolumeSnapshotterReinitialize(t *testing.T) {
 	err := r.reinitialize(3)
 	assert.EqualError(t, err, "int is not a VolumeSnapshotter!")
 
-	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
 	defer volumeSnapshotter.AssertExpectations(t)
 
@@ -128,7 +128,7 @@ func TestRestartableVolumeSnapshotterGetDelegate(t *testing.T) {
 
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
-	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
 	defer volumeSnapshotter.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
@@ -159,7 +159,7 @@ func TestRestartableVolumeSnapshotterInit(t *testing.T) {
 	assert.EqualError(t, err, "getByKindAndName error")
 
 	// Delegate returns error
-	volumeSnapshotter := new(mocks.VolumeSnapshotter)
+	volumeSnapshotter := new(providermocks.VolumeSnapshotter)
 	volumeSnapshotter.Test(t)
 	defer volumeSnapshotter.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(volumeSnapshotter, nil)
@@ -205,7 +205,7 @@ func TestRestartableVolumeSnapshotterDelegatedFunctions(t *testing.T) {
 			}
 		},
 		func() mockable {
-			return new(mocks.VolumeSnapshotter)
+			return new(providermocks.VolumeSnapshotter)
 		},
 		restartableDelegateTest{
 			function:                "CreateVolumeFromSnapshot",

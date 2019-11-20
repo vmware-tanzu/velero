@@ -42,10 +42,12 @@ type PodVolumeBackupSpec struct {
 
 	// Tags are a map of key-value pairs that should be applied to the
 	// volume backup as tags.
-	Tags map[string]string `json:"tags"`
+	// +optional
+	Tags map[string]string `json:"tags,omitempty"`
 }
 
 // PodVolumeBackupPhase represents the lifecycle phase of a PodVolumeBackup.
+// +kubebuilder:validation:Enum=New;InProgress;Completed;Failed
 type PodVolumeBackupPhase string
 
 const (
@@ -58,43 +60,57 @@ const (
 // PodVolumeBackupStatus is the current status of a PodVolumeBackup.
 type PodVolumeBackupStatus struct {
 	// Phase is the current state of the PodVolumeBackup.
-	Phase PodVolumeBackupPhase `json:"phase"`
+	// +optional
+	Phase PodVolumeBackupPhase `json:"phase,omitempty"`
 
 	// Path is the full path within the controller pod being backed up.
-	Path string `json:"path"`
+	// +optional
+	Path string `json:"path,omitempty"`
 
 	// SnapshotID is the identifier for the snapshot of the pod volume.
-	SnapshotID string `json:"snapshotID"`
+	// +optional
+	SnapshotID string `json:"snapshotID,omitempty"`
 
 	// Message is a message about the pod volume backup's status.
-	Message string `json:"message"`
+	// +optional
+	Message string `json:"message,omitempty"`
 
 	// StartTimestamp records the time a backup was started.
 	// Separate from CreationTimestamp, since that value changes
 	// on restores.
 	// The server's time is used for StartTimestamps
-	StartTimestamp metav1.Time `json:"startTimestamp"`
+	// +optional
+	// +nullable
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
 
 	// CompletionTimestamp records the time a backup was completed.
 	// Completion time is recorded even on failed backups.
 	// Completion time is recorded before uploading the backup object.
 	// The server's time is used for CompletionTimestamps
-	CompletionTimestamp metav1.Time `json:"completionTimestamp"`
+	// +optional
+	// +nullable
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
 
 	// Progress holds the total number of bytes of the volume and the current
 	// number of backed up bytes. This can be used to display progress information
 	// about the backup operation.
-	Progress PodVolumeOperationProgress `json:"progress"`
+	// +optional
+	Progress PodVolumeOperationProgress `json:"progress,omitempty"`
 }
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type PodVolumeBackup struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata"`
+	metav1.TypeMeta `json:",inline"`
 
-	Spec   PodVolumeBackupSpec   `json:"spec"`
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec PodVolumeBackupSpec `json:"spec,omitempty"`
+
+	// +optional
 	Status PodVolumeBackupStatus `json:"status,omitempty"`
 }
 
@@ -103,6 +119,9 @@ type PodVolumeBackup struct {
 // PodVolumeBackupList is a list of PodVolumeBackups.
 type PodVolumeBackupList struct {
 	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-	Items           []PodVolumeBackup `json:"items"`
+
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty"`
+
+	Items []PodVolumeBackup `json:"items"`
 }

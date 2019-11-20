@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 
-	kcmdutil "github.com/heptio/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
+	kcmdutil "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
 
 // Helper exposes functions for interacting with the Kubernetes discovery

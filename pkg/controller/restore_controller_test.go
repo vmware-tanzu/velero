@@ -34,21 +34,21 @@ import (
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	api "github.com/heptio/velero/pkg/apis/velero/v1"
-	"github.com/heptio/velero/pkg/builder"
-	"github.com/heptio/velero/pkg/generated/clientset/versioned/fake"
-	informers "github.com/heptio/velero/pkg/generated/informers/externalversions"
-	listers "github.com/heptio/velero/pkg/generated/listers/velero/v1"
-	"github.com/heptio/velero/pkg/metrics"
-	"github.com/heptio/velero/pkg/persistence"
-	persistencemocks "github.com/heptio/velero/pkg/persistence/mocks"
-	"github.com/heptio/velero/pkg/plugin/clientmgmt"
-	pluginmocks "github.com/heptio/velero/pkg/plugin/mocks"
-	"github.com/heptio/velero/pkg/plugin/velero"
-	pkgrestore "github.com/heptio/velero/pkg/restore"
-	velerotest "github.com/heptio/velero/pkg/test"
-	"github.com/heptio/velero/pkg/util/logging"
-	"github.com/heptio/velero/pkg/volume"
+	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
+	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
+	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/metrics"
+	"github.com/vmware-tanzu/velero/pkg/persistence"
+	persistencemocks "github.com/vmware-tanzu/velero/pkg/persistence/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
+	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestFetchBackupInfo(t *testing.T) {
@@ -781,7 +781,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		},
 		Status: api.BackupStatus{
 			Phase:          api.BackupPhaseCompleted,
-			StartTimestamp: metav1.Time{Time: now},
+			StartTimestamp: &metav1.Time{Time: now},
 		},
 	})
 
@@ -791,7 +791,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		},
 		Status: api.BackupStatus{
 			Phase:          api.BackupPhaseCompleted,
-			StartTimestamp: metav1.Time{Time: now.Add(time.Second)},
+			StartTimestamp: &metav1.Time{Time: now.Add(time.Second)},
 		},
 	}
 	backups = append(backups, expected)

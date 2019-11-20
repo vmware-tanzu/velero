@@ -70,18 +70,6 @@
   name = "github.com/Azure/go-autorest"
   version = "11.1.2"
 
-[[constraint]]
-  name = "cloud.google.com/go"
-  version = "0.11.0"
-
-[[constraint]]
-  name = "google.golang.org/api"
-  version = "~v0.3.2"
-
-[[constraint]]
-  name = "golang.org/x/oauth2"
-  branch = "master"
-
 #
 # Third party packages
 #
