@@ -456,9 +456,10 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 
 	log = log.WithField("volumeID", volumeID)
 
-	tags := ib.backupRequest.GetLabels()
-	if tags == nil {
-		tags = map[string]string{}
+	// create tags from the backup's labels
+	tags := map[string]string{}
+	for k, v := range ib.backupRequest.GetLabels() {
+		tags[k] = v
 	}
 	tags["velero.io/backup"] = ib.backupRequest.Name
 	tags["velero.io/pv"] = pv.Name
