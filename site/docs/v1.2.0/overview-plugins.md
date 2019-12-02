@@ -19,6 +19,9 @@ Anyone can add integrations for any platform to provide additional backup and vo
 
 After you publish your plugin on your own repository, open a PR that adds a link to it under the appropriate list of [supported providers][3] page in our documentation.
 
+You can also add the [`velero-plugins` GitHub Topic][4] to your repo, and it will be shown under the aggregated list of repositories automatically.
+
 [1]: https://github.com/vmware-tanzu/velero-plugin-example/
 [2]: custom-plugins.md
 [3]: supported-providers.md
+[4]: https://github.com/topics/velero-plugin
