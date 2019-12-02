@@ -234,6 +234,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
+	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
+		if env, err = restic.S3CmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
+			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
+		}
+		resticCmd.Env = env
 	}
 
 	// If this is a PVC, look for the most recent completed pod volume backup for it and get
