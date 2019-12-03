@@ -17,7 +17,7 @@
 
 .post-single-hero {
   background-color: map-get($field-backgrounds, 'med-blue'); // default
-  padding-bottom: 105px;  
+  padding-bottom: 105px;
   h1,
   h2,
   h3 {
@@ -131,4 +131,16 @@
   img {
     max-width: 100%;
   }
+}
+
+table {
+  border-collapse: collapse;
+}
+
+table, th, td {
+  border: 1px solid black;
+}
+
+th, td {
+  padding: 10px;
 }

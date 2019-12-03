@@ -28,13 +28,13 @@
                 </ul>
             </div>
             <div class="col-12 col-md-4 text-center text-md-right">
-              <a href="/" alt="Homepage"><img src="/img/{{ site.logo }}" class="logo" /></a>
+              <a href="/" aria-label="Velero homepage"><img src="/img/{{ site.logo }}" class="logo" alt="Homepage"/></a>
             </div>
         </div>
         <div class="row align-items-center">
           <div class="col copyright text-center text-md-right mt-4">
             &copy; {{ site.time | date: '%Y' }} {{ site.author }}.
-            <a href="{{ site.footer.vm-link }}" class="vm-logo">A VMware-backed project. <img src="/img/{{ site.vm_logo }}" /></a>
+            <a href="{{ site.footer.vm-link }}" class="vm-logo">A VMware-backed project. <img src="/img/{{ site.vm_logo }}" alt="VMware logo"/></a>
           </div>
         </div>
     </div>
