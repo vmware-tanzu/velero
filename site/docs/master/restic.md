@@ -58,7 +58,9 @@ The restic containers should be running in a `privileged` mode to be able to mou
 $ oc adm policy add-scc-to-user privileged -z velero -n velero
 ```
 
-2. Modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes.
+2. Modify the DaemonSet yaml to request a privileged mode and mount the correct hostpath to pods volumes. You can edit the DaemonSet manually or with **oc** tool.
+
+2.1 Manuall edit
 
 ```diff
 @@ -35,7 +35,7 @@ spec:
@@ -76,6 +78,25 @@ $ oc adm policy add-scc-to-user privileged -z velero -n velero
                value: /scratch
 +          securityContext:
 +            privileged: true
+```
+
+2.2 oc tool
+
+2.2.1 Set the securityContext
+
+The handicap is that we can't use a json selector therefore is the '0' hard coded here.
+
+```
+oc -n velero patch ds/restic --type json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/securityContext","value": { "privileged": true}}]'
+```
+
+2.2.2 replace the hostpath
+
+The handicap is that we can't use a json selector therefore is the '0' hard coded here.
+```
+oc -n velero patch ds/restic --type json \
+  -p '[{"op":"replace","path":"/spec/template/spec/volumes/0/hostPath","value": { "path": "/var/lib/origin/openshift.local.volumes/pods"}}]'
 ```
 
 If restic is not running in a privileged mode, it will not be able to access pods volumes within the mounted hostpath directory because of the default enforced SELinux mode configured in the host system level. You can [create a custom SCC](https://docs.openshift.com/container-platform/3.11/admin_guide/manage_scc.html) in order to relax the security in your cluster so that restic pods are allowed to use the hostPath volume plug-in without granting them access to the `privileged` SCC.
