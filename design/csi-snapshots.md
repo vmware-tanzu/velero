@@ -69,10 +69,15 @@ Associated `VolumeSnapshotContent` objects will be retrieved and updated with th
 
 `VolumeSnapshot`, `VolumeSnapshotContent`, and `VolumeSnapshotClass` objects would be returned as additional items to be backed up. GitHub issue [1566][18] represents this work.
 
-The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is the link to the underlying platform's snapshot, and must be preserved for restoration.
+The `VolumeSnapshotContent.Spec.VolumeSnapshotSource.SnapshotHandle` field is the link to the underlying platform's on-disk snapshot, and must be preserved for restoration.
 
-The plugin will _not_ wait for the `VolumeSnapshot.Status.IsReady` field to be `true` before returning.
-This maintains current Velero behavior, though may not be desirable for all storage providers.
+The plugin will _not_ wait for the `VolumeSnapshot.Status.readyToUse` field to be `true` before returning.
+This field indicates that the snapshot is ready to use for restoration, and for different vendors can indicate that the snapshot has been made durable.
+However, the applications can proceed as soon as `VolumeSnapshot.Status.CreationTime` is set.
+This also maintains current Velero behavior, which allows applications to quiesce and resume quickly, with minimal interruption.
+
+Any sort of monitoring or waiting for durable snapshots, either Velero-native or CSI snapshots, are not covered by this proposal.
+
 
 #### A `RestoreItemAction` for `VolumeSnapshotContent` objects, named `velero.io/csi-vsc`
 
@@ -164,6 +169,14 @@ The edit will happen before making Kubernetes API deletion calls to ensure that 
 
 Deleting a Velero `Backup` or any associated CSI object via `kubectl` is unsupported; data will be lost or orphaned if this is done.
 
+### Other snapshots included in the backup
+
+Since `VolumeSnapshot` and `VolumeSnapshotContent` objects are contained within a Velero backup tarball, it is possible that all CRDs and on-disk provider snapshots have been deleted, yet the CRDs are still within other Velero backup tarballs.
+Thus, when a Velero backup that contains these CRDs is restored, the `VolumeSnapshot` and `VolumeSnapshotContent` objects are restored into the cluster, the CSI controllers will attempt to reconcile their state, and there are two possible states when the on-disk snapshot has been deleted:
+
+    1) If the driver _does not_ support the `ListSnapshots` gRPC method, then the CSI controllers have no way of knowing how to find it, and sets the `VolumeSnapshot.Status.readyToUse` field to `true`.
+    2) If the driver _does_ support the `ListSnapshots` gRPC method, then the CSI controllers will query the state of the on-disk snapshot, see it is missing, and set `VolumeSnapshot.Status.readyToUse` and `VolumeSnapshotContent.Status.readyToUse` fields to `false`.
+
 ## Velero client changes
 
 To use CSI features, the Velero client must use the `EnableCSI` feature flag.
@@ -187,7 +200,11 @@ Volumes with any other `PersistentVolumeSource` set will use Velero's current Vo
 * Implementing similar logic in a Velero VolumeSnapshotter plugin was considered.
 However, this is inappropriate given CSI's data model, which requires a PVC/PV's StorageClass.
 Given the arguments to the VolumeSnapshotter interface, the plugin would have to instantiate its own client and do queries against the Kubernetes API server to get the necessary information.
+
 This is unnecessary given the fact that the `BackupItemAction` and `RestoreItemAction` APIs can act directly on the appropriate objects.
+
+Additionally, the VolumeSnapshotter plugins and CSI volume snapshot drivers overlap - both produce a snapshot on backup and a PersistentVolume on restore.
+Thus, there's not a logical place to fit the creation of VolumeSnapshot creation in the VolumeSnapshotter interface.
 
 * Implement CSI logic directly in Velero core code.
 The plugins could be packaged separately, but that doesn't necessarily make sense with server and client changes being made to accomodate CSI snapshot lookup.
