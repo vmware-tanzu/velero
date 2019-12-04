@@ -156,20 +156,22 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 
 	log = log.WithField("image", image)
 
-	parts := strings.Split(image, ":")
-	switch {
-	case len(parts) == 1:
+	parts := strings.Split(image, "/")
+
+	if len(parts) == 1 {
+		// Image supplied without registry part
+		log.Debugf("Plugin config contains image name without registry name. Return defaultImageBase")
+		return initContainerImage(defaultImageBase)
+	}
+
+	if !(strings.Contains(parts[len(parts)-1], ":")) {
 		// tag-less image name: add tag
 		log.Debugf("Plugin config contains image name without tag. Adding tag.")
 		return initContainerImage(image)
-	case len(parts) == 2:
+	} else {
 		// tagged image name
 		log.Debugf("Plugin config contains image name with tag")
 		return image
-	default:
-		// unrecognized
-		log.Warnf("Plugin config contains unparseable image name")
-		return initContainerImage(defaultImageBase)
 	}
 }
 
