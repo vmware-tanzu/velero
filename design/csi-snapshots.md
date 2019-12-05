@@ -194,6 +194,17 @@ It was [introduced with dynamic provisioning support][15] in 2016, predating CSI
 In the `BackupItemAction` for PVCs, the associated PV will be queried and checked for the presence of `PersistentVolume.Spec.PersistentVolumeSource.CSI`.
 Volumes with any other `PersistentVolumeSource` set will use Velero's current VolumeSnapshotter plugin code path.
 
+### VolumeSnapshotLocations and VolumeSnapshotClasses
+
+Velero uses its own `VolumeSnapshotLocation` CRDs to specify configuration options for a given storage system.
+In Velero, this often includes topology information such as regions or availibility zones, as well as credential information.
+
+CSI volume snapshotting has a `VolumeSnapshotClass` CRD which also contains configuration options for a given storage system, but these options are not the same as those that Velero would use.
+Since CSI volume snapshotting is operating within the same storage system that manages the volumes already, it does not need the same topology or credential information that Velero does.
+
+As such, when used with CSI volumes, Velero's `VolumeSnapshotLocation` CRDs are not relevant, and could be omitted.
+
+This will create a separate path in our documentation for the time being, and should be called out explicitly.
 
 ## Alternatives Considered
 
