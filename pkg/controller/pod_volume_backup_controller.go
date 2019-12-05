@@ -227,7 +227,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		req.Spec.Tags,
 	)
 
-	// if this is azure, set resticCmd.Env appropriately
+	// Running restic command might need additional provider specific environment variables. Based on the provider, we
+	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	var env []string
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
 		if env, err = restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {

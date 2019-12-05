@@ -242,7 +242,7 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 }
 
 // S3CmdEnv returns a list of environment variables (in the format var=val) that
-// should be used when running a restic command for an Azure backend. This list is
+// should be used when running a restic command for an S3 backend. This list is
 // the current environment, plus the AWS-specific variables restic needs, namely
 // a credential profile.
 func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
