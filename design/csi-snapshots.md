@@ -3,7 +3,7 @@
 Status: Draft
 
 The Container Storage Interface (CSI) [introduced an alpha snapshot API in Kubernetes v1.12][1].
-It will reach beta support in Kubernetes v1.17.
+It will reach beta support in Kubernetes v1.17, scheduled for release in December 2019.
 This proposal documents an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
 
 ## Goals
@@ -110,7 +110,6 @@ Only `PersistentVolumeClaim` objects with the `velero.io/volume-snapshot-name` l
 Metadata (excluding labels) will be cleared, and the `velero.io/volume-snapshot-name` label will be used to find the relevant `VolumeSnapshot`.
 A reference to the `VolumeSnapshot` will be added to the `PersistentVolumeClaim.DataSource` field.
 
-
 No special logic is required to restore `VolumeSnapshotClass` objects.
 
 These plugins should be provided with Velero, as there will also be some changes to core Velero code to enable association of a `Backup` to the included `VolumeSnapshot`s.
@@ -185,7 +184,7 @@ To use CSI features, the Velero client must use the `EnableCSI` feature flag.
 
 A new `describeCSIVolumeSnapshots` function should be added to the [output][12] package that knows how to render the included `VolumeSnapshot` names referenced in the `csi-snapshots.json.gz` file.
 
-### Snapshot mechanism selection
+### Snapshot selection mechanism
 
 The most accurate, reliable way to detect if a PersistentVolume is a CSI volume is to check for a non-`nil` [`PersistentVolume.Spec.PersistentVolumeSource.CSI`][16] field.
 Using the [`volume.beta.kubernetes.io/storage-provisioner`][14] is not viable, since the usage is for any PVC that should be dynamically provisioned, and is _not_ limited to CSI implementations.
