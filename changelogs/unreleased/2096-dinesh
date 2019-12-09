@@ -1,0 +1,1 @@
+Enableing Velero to switch credentials (`AWS_PROFILE`) if multiple s3-compatible backupLocations are present

@@ -228,13 +228,36 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := getResticEnvVars(loc.Spec.Config)
+	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}
 
 	env := os.Environ()
 	for k, v := range azureVars {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return env, nil
+}
+
+// S3CmdEnv returns a list of environment variables (in the format var=val) that
+// should be used when running a restic command for an S3 backend. This list is
+// the current environment, plus the AWS-specific variables restic needs, namely
+// a credential profile.
+func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
+	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting aws restic env vars")
+	}
+
+	env := os.Environ()
+	for k, v := range awsVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 
