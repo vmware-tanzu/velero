@@ -1,7 +1,5 @@
 # CSI Snapshot Support
 
-Status: Draft
-
 The Container Storage Interface (CSI) [introduced an alpha snapshot API in Kubernetes v1.12][1].
 It will reach beta support in Kubernetes v1.17, scheduled for release in December 2019.
 This proposal documents an approach for integrating support for this snapshot API within Velero, augmenting its existing capabilities.
