@@ -70,7 +70,7 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
-      - image: velero/fsfreeze-pause:latest
+      - image: ubuntu:bionic
         name: fsfreeze
         securityContext:
           privileged: true
@@ -78,7 +78,12 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
+        command:
+          - "/bin/bash"
+          - "-c"
+          - "sleep infinity"
 
+  
 ---
 apiVersion: v1
 kind: Service

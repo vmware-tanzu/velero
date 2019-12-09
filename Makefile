@@ -85,12 +85,10 @@ build-%:
 container-%:
 	@$(MAKE) --no-print-directory ARCH=$* container
 	@$(MAKE) --no-print-directory ARCH=$* container BIN=velero-restic-restore-helper
-	@$(MAKE) --no-print-directory ARCH=$* build-fsfreeze
 
 push-%:
 	@$(MAKE) --no-print-directory ARCH=$* push
 	@$(MAKE) --no-print-directory ARCH=$* push BIN=velero-restic-restore-helper
-	@$(MAKE) --no-print-directory ARCH=$* push-fsfreeze
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
@@ -101,7 +99,6 @@ all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
 all-manifests:
 	@$(MAKE) manifest
 	@$(MAKE) manifest BIN=velero-restic-restore-helper
-	@$(MAKE) manifest-fsfreeze
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -151,32 +148,9 @@ shell: build-dirs build-image
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
-# Use a slightly customized build/push targets since we don't have a Go binary to build for the fsfreeze image
-build-fsfreeze: BIN = fsfreeze-pause
-build-fsfreeze:
-	@cp $(DOCKERFILE)  _output/.dockerfile-$(BIN).alpine
-	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
-	@docker images -q $(IMAGE):$(VERSION) > .container-$(DOTFILE_IMAGE)
-
-push-fsfreeze: BIN = fsfreeze-pause
-push-fsfreeze:
-	@docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
-	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
-
-manifest-fsfreeze: BIN = fsfreeze-pause
-manifest-fsfreeze:
-	@docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
-		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
-	@docker manifest push $(MULTIARCH_IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker manifest create $(MULTIARCH_IMAGE):latest \
-		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
-	docker manifest push $(MULTIARCH_IMAGE):latest
-endif
+all-containers:
+	$(MAKE) container
+	$(MAKE) container BIN=velero-restic-restore-helper
 
 container: local-arch .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)

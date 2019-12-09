@@ -8,7 +8,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 ## Previous community meetings
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe title="Velero Community Meetings/Open Discussions" width="560" height="315" src="https://www.youtube.com/embed/videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ## Podcast shows
 
@@ -18,7 +18,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 * Watch our recent webinar on backup and migration strategies:
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/csrSPt3HFtg" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe title="Kubernetes Backup and Migration Strategies using Project Velero" width="560" height="315" src="https://www.youtube.com/embed/csrSPt3HFtg" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 ## Blog posts
 

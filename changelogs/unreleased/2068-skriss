@@ -1,0 +1,1 @@
+remove the `fsfreeze-pause` image being published from this repo; replace it with `ubuntu:bionic` in the nginx example app

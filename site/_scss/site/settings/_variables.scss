@@ -5,9 +5,11 @@ $path-images: "img";
 // Colors
 
 $black: #000;
-$white: #fff;
+$white: #FFFFFF;
 $light: $white;
-
+$pink:    #A41458;
+$darkest-blue: #1D428A;
+$dark-grey: #717074;
 // Bootstrap overrides
 
 $body-bg: #bbb;
@@ -21,7 +23,7 @@ $card-border-color: $border-color;
 $font-family-base: "Metropolis", Helvetica, Arial, sans-serif;
 $font-size-base: 1.125rem; // 18px
 
-$link-color: #0096D9;
+$link-color: #007AB8;;
 $link-decoration: none;
 $link-hover-color: $link-color;
 $link-hover-decoration: underline;
@@ -45,13 +47,13 @@ $container-max-width: 1440px;
 // Header
 
 $header-background: $white;
-$header-foreground: #777;
-$header-foreground-selected: #777777;
+$header-foreground: $black;
+$header-foreground-selected: $black;
 
 // Footer
-$footer-foreground: #E8E8E8;
-$footer-link-color: #777777;
-$footer-copyright: #777777;
+$footer-foreground: #808080;
+$footer-link-color: #474747;
+$footer-copyright: $black;
 
 // Sections
 
@@ -100,16 +102,16 @@ $field-backgrounds: (
 // Buttons
 
 $button-primary-background: $white;
-$button-primary-background-hover: #0091DA;
-$button-primary-foreground: #0091DA;
-$button-primary-border: $button-primary-background;
-$button-primary-border-hover: $button-primary-background;
+$button-primary-background-hover: $darkest-blue;
+$button-primary-foreground: $darkest-blue;
+$button-primary-border: $white;
+$button-primary-border-hover: $white;
 
-$button-secondary-background: #0091DA;
+$button-secondary-background: $darkest-blue;
 $button-secondary-background-hover: $white;
 $button-secondary-foreground: $white;
 $button-secondary-border: $white;
-$button-secondary-border-hover: #0091DA;
+$button-secondary-border-hover: $darkest-blue;
 
 // Posts
 $post-hero-gradient-start: #fafafa;
