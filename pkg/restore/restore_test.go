@@ -1408,7 +1408,7 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			},
 		},
 		{
-			name:    "when using a restore namespace filter, additional items that are cluster-scoped are restored",
+			name:    "when using a restore namespace filter, additional items that are cluster-scoped are restored when IncludeClusterResources=nil",
 			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
@@ -1434,8 +1434,8 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			},
 		},
 		{
-			name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
-			restore: defaultRestore().IncludedResources("pods").Result(),
+			name:    "additional items that are cluster-scoped are not restored when IncludeClusterResources=false",
+			restore: defaultRestore().IncludeClusterResources(false).Result(),
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
@@ -1460,8 +1460,8 @@ func TestRestoreActionAdditionalItems(t *testing.T) {
 			},
 		},
 		{
-			name:    "when IncludeClusterResources=false, additional items that are cluster-scoped are not restored",
-			restore: defaultRestore().IncludeClusterResources(false).Result(),
+			name:    "when using a restore resource filter, additional items that are non-included resources are not restored",
+			restore: defaultRestore().IncludedResources("pods").Result(),
 			backup:  defaultBackup().Result(),
 			tarball: newTarWriter(t).
 				addItems("pods", builder.ForPod("ns-1", "pod-1").Result()).
