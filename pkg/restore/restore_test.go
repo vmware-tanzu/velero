@@ -311,6 +311,36 @@ func TestRestoreResourceFiltering(t *testing.T) {
 			want: map[*test.APIResource][]string{
 				test.Pods():        {"ns-1/pod-1"},
 				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {},
+			},
+		},
+		{
+			name:    "should not include cluster-scoped resources if restoring subset of namespaces and IncludeClusterResources=nil",
+			restore: defaultRestore().IncludedNamespaces("ns-1").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: newTarWriter(t).
+				addItems("pods",
+					builder.ForPod("ns-1", "pod-1").Result(),
+					builder.ForPod("ns-2", "pod-2").Result(),
+				).
+				addItems("deployments.apps",
+					builder.ForDeployment("ns-1", "deploy-1").Result(),
+					builder.ForDeployment("ns-2", "deploy-2").Result(),
+				).
+				addItems("persistentvolumes",
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.Pods(),
+				test.Deployments(),
+				test.PVs(),
+			},
+			want: map[*test.APIResource][]string{
+				test.Pods():        {"ns-1/pod-1"},
+				test.Deployments(): {"ns-1/deploy-1"},
+				test.PVs():         {},
 			},
 		},
 		{
