@@ -9,8 +9,10 @@ toc:
         url: /locations
   - title: Install
     subfolderitems:
-      - page: Overview
-        url: /install-overview
+      - page: Basic Install
+        url: /basic-install
+      - page: Customize Installation
+        url: /customize-installation
       - page: Upgrade to 1.2
         url: /upgrade-to-1.2
       - page: Supported providers
