@@ -1,0 +1,1 @@
+bug fix: restore both `replicasets.apps` *and* `replicasets.extensions` before `deployments`
