@@ -663,6 +663,11 @@ func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace
 		return warnings, errs
 	}
 
+	if targetNamespace == "" && !boolptr.IsSetToTrue(ctx.restore.Spec.IncludeClusterResources) && !ctx.namespaceIncludesExcludes.IncludeEverything() {
+		ctx.log.Infof("Skipping resource %s because it's cluster-scoped and only specific namespaces are included in the restore", resource)
+		return warnings, errs
+	}
+
 	if targetNamespace != "" {
 		ctx.log.Infof("Restoring resource '%s' into namespace '%s'", resource, targetNamespace)
 	} else {
