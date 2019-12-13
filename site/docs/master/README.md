@@ -17,7 +17,7 @@ Velero consists of:
 
 ## Documentation
 
-[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more.
+This site is our documentation home with installation instructions, plus information about customizing Velero for your needs, architecture, extending Velero, contributing to Velero and more.
 
 Please use the version selector at the top of the site to ensure you are using the appropriate documentation for your version of Velero.
 
@@ -47,8 +47,6 @@ See [the list of releases][6] to find out about feature changes.
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
 
-[28]: install-overview.md
-[29]: https://velero.io/docs/master/
 [30]: troubleshooting.md
 
 [100]: img/velero.png

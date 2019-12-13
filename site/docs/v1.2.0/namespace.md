@@ -20,6 +20,4 @@ To specify the namespace for all Velero client commands, run:
 velero client config set namespace=<NAMESPACE_VALUE>
 ```
 
-
-
-[0]: install-overview.md 
+[0]: basic-install.md#install-the-cli

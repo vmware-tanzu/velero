@@ -4,14 +4,13 @@ Velero supports a variety of storage providers for different backup and snapshot
 
 ## Velero supported providers
 
-| Provider                          | Object Store        | Volume Snapshotter           | Plugin Documentation                    |
-|-----------------------------------|---------------------|------------------------------|-----------------------------------------|
-| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin for AWS][8]              |
-| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             |
-| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] |
+| Provider                          | Object Store        | Volume Snapshotter           | Plugin Provider Repo                    | Setup Instructions            |
+|-----------------------------------|---------------------|------------------------------|-----------------------------------------|-------------------------------|
+| [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin for AWS][8]              | [AWS Plugin Setup][35]        |
+| [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             | [GCP Plugin Setup][36]        |
+| [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] | [Azure Plugin Setup][37]      |
 
-
-Contact: [Slack][28], [GitHub Issue][29]
+Contact: [#Velero Slack][28], [GitHub Issues][29]
 
 ## Community supported providers
 
@@ -76,3 +75,6 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [32]: https://docs.portworx.com/scheduler/kubernetes/ark.html
 [33]: https://portworx.slack.com/messages/px-k8s
 [34]: https://github.com/portworx/ark-plugin/issues
+[35]: https://github.com/vmware-tanzu/velero-plugin-for-aws#setup
+[36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
+[37]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup

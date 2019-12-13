@@ -1,11 +1,13 @@
 # Upgrading to Velero 1.2
 
 ## Prerequisites
+
 - Velero [v1.1][0] or [v1.0][1] installed.
 
 _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instructions first._
 
 ## Instructions
+
 1. Install the Velero v1.2 command-line interface (CLI) by following the [instructions here][3].
 
     Verify that you've properly installed it by running:
@@ -58,7 +60,7 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
     ```
 
     For GCP:
-    
+
     ```bash
     velero plugin add velero/velero-plugin-for-gcp:v1.0.0
     ```
@@ -78,13 +80,13 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
     ```
 
 1. Confirm that the deployment is up and running with the correct version by running:
-   
+
     ```bash
     velero version
     ```
 
     You should see the following output:
-   
+
     ```bash
     Client:
         Version: v1.2.0
@@ -94,8 +96,7 @@ _Note: if you're upgrading from v1.0, follow the [upgrading to v1.1][2] instruct
         Version: v1.2.0
     ```
 
-
 [0]: https://github.com/vmware-tanzu/velero/releases/tag/v1.1.0
 [1]: https://github.com/vmware-tanzu/velero/releases/tag/v1.0.0
 [2]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
-[3]: install-overview.md#install-the-cli
+[3]: basic-install.md#install-the-cli

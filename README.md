@@ -44,7 +44,6 @@ See [the list of releases][6] to find out about feature changes.
 [14]: https://github.com/kubernetes/kubernetes
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-[28]: https://velero.io/docs/install-overview
 [29]: https://velero.io/docs/
 [30]: https://velero.io/docs/troubleshooting
 [100]: https://velero.io/docs/master/img/velero.png

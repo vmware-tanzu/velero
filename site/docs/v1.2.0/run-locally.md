@@ -46,4 +46,4 @@ After you use the `velero install` command to install Velero into your cluster, 
 [18]: https://eksctl.io/
 [20]: api-types/backupstoragelocation.md
 [21]: api-types/volumesnapshotlocation.md
-[22]: install-overview/
+[22]: basic-install.md
