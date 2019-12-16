@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2019 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -137,14 +137,14 @@ func GetVolumeDirectory(pod *corev1api.Pod, volumeName string, pvcLister corev1l
 	return pvc.Spec.VolumeName, nil
 }
 
-// IsCRDReady checks a CRD to see if it's ready, so that objects may be created from it.
+// IsCRDReady checks a CRD to see if it's ready, with both the Established and NamesAccepted conditions.
 func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	var isEstablished, namesAccepted bool
 	for _, cond := range crd.Status.Conditions {
-		if cond.Type == apiextv1beta1.Established {
+		if cond.Type == apiextv1beta1.Established && cond.Status == apiextv1beta1.ConditionTrue {
 			isEstablished = true
 		}
-		if cond.Type == apiextv1beta1.NamesAccepted {
+		if cond.Type == apiextv1beta1.NamesAccepted && cond.Status == apiextv1beta1.ConditionTrue {
 			namesAccepted = true
 		}
 	}

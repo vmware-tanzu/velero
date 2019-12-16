@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -195,5 +196,44 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
+	}
+}
+
+func TestIsCRDReady(t *testing.T) {
+	tests := []struct {
+		name string
+		crd  *apiextv1beta1.CustomResourceDefinition
+		want bool
+	}{
+		{
+			name: "CRD is not established & not accepting names - not ready",
+			crd:  builder.ForCustomResourceDefinition("MyCRD").Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & not accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is not established & accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & accepting names - ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
+				Result(),
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		result := IsCRDReady(tc.crd)
+		assert.Equal(t, tc.want, result)
 	}
 }
