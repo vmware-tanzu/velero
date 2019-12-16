@@ -27,8 +27,8 @@ import (
 	"strings"
 	"time"
 
+	uuid "github.com/gofrs/uuid"
 	"github.com/pkg/errors"
-	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -167,6 +167,10 @@ func NewKubernetesRestorer(
 	resourceTerminatingTimeout time.Duration,
 	logger logrus.FieldLogger,
 ) (Restorer, error) {
+	veleroCloneUuid, err := uuid.NewV4()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
 		dynamicFactory:             dynamicFactory,
@@ -176,7 +180,7 @@ func NewKubernetesRestorer(
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
-		pvRenamer:                  func(string) string { return "velero-clone-" + uuid.NewV4().String() },
+		pvRenamer:                  func(string) string { return "velero-clone-" + veleroCloneUuid.String() },
 		fileSystem:                 filesystem.NewFileSystem(),
 	}, nil
 }

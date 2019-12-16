@@ -78,8 +78,8 @@
   revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
 
 [[constraint]]
-  name = "github.com/satori/go.uuid"
-  version = "~1.2.0"
+  name = "github.com/gofrs/uuid"
+  version = "~3.2.0"
 
 [[constraint]]
   name = "github.com/spf13/afero"
