@@ -2237,7 +2237,10 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.restorer.resourcePriorities = []string{"persistentvolumes", "persistentvolumeclaims"}
-			h.restorer.pvRenamer = func(oldName string) string { return "renamed-" + oldName }
+			h.restorer.pvRenamer = func(oldName string) (string, error) {
+				renamed := "renamed-" + oldName
+				return renamed, nil
+			}
 
 			// set up the VolumeSnapshotLocation informer/lister and add test data to it
 			vslInformer := velerov1informers.NewSharedInformerFactory(h.VeleroClient, 0).Velero().V1().VolumeSnapshotLocations()
