@@ -6,18 +6,18 @@ The Velero maintainers use a weekly rotation to manage community support. Each w
 
 ## Start of Week
 
-Update the public Slack channel's topic to indicate that you are the point person for the week, and what hours you'll be available.
+We will update the public Slack channel's topic to indicate that you are the point person for the week, and what hours you'll be available.
 
 ## During the Week
 
-### Where to monitor
+### Where we will monitor
 - `#velero` public Slack channel in Kubernetes org
 - [all Velero-related repos][0] in GitHub (`velero`, `velero-plugin-for-[aws|gcp|microsoft-azure|csi]`, `helm-charts`)
 - [Project Velero Google Group][1]
 
 ### GitHub issue flow
 
-Generally speaking, new GitHub issues will fall into one of several categories. Use the following process for each:
+Generally speaking, new GitHub issues will fall into one of several categories. We use the following process for each:
 
 1. **Feature request**
     - Label the issue with `Enhancement/User` or `Enhancement/Dev`
@@ -35,7 +35,7 @@ Generally speaking, new GitHub issues will fall into one of several categories. 
     
 ## End of Week
 
-Ensure all GitHub issues that you worked on are labeled with `Investigating` and `Needs Info` (if appropriate), and have updated comments so the next person can pick them up.
+We ensure all GitHub issues worked on during the week on are labeled with `Investigating` and `Needs Info` (if appropriate), and have updated comments so the next person can pick them up.
 
 [0]: https://app.zenhub.com/workspaces/velero-5c59c15e39d47b774b5864e3/board?repos=99143276,112385197,213946861,190224441,214524700,214524630
 [1]: https://groups.google.com/forum/#!forum/projectvelero
