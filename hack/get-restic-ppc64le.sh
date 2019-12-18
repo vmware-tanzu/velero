@@ -24,6 +24,10 @@ if [ -z "${RESTIC_VERSION}" ]; then
     exit 1
 fi
 
+if [ ! -d "_output/bin/linux/ppc64le/" ]; then
+    mkdir -p _output/bin/linux/ppc64le/
+fi
+
 wget --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-${RESTIC_VERSION}
 mv restic-${RESTIC_VERSION} _output/bin/linux/ppc64le/restic
 chmod +x _output/bin/linux/ppc64le/restic
