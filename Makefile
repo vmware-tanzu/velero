@@ -36,13 +36,13 @@ TAG_LATEST ?= false
 # The version of restic binary to be downloaded for power architecture
 RESTIC_VERSION ?= 0.9.5
 
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
+CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le #linux-arm linux-arm64
+MANIFEST_PLATFORMS ?= amd64 ppc64le
+
 ###
 ### These variables should not need tweaking.
 ###
-
-CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
-CONTAINER_PLATFORMS := linux-amd64 linux-ppc64le #linux-arm linux-arm64
-MANIFEST_PLATFORMS := amd64 ppc64le
 
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
