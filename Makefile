@@ -34,7 +34,7 @@ VERSION ?= master
 TAG_LATEST ?= false
 
 # The version of restic binary to be downloaded for power architecture
-RESTIC_VERSION ?= 0.9.4
+RESTIC_VERSION ?= 0.9.5
 
 ###
 ### These variables should not need tweaking.
