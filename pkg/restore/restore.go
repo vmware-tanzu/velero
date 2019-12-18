@@ -678,7 +678,8 @@ func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, e
 	crdLogger := ctx.log.WithField("crdName", name)
 
 	var available bool
-	err := wait.PollImmediate(time.Second, ctx.resourceTerminatingTimeout, func() (bool, error) {
+	// Wait 1 minute rather than the standard resource timeout, since each CRD will transition fairly quickly
+	err := wait.PollImmediate(time.Second, time.Minute*1, func() (bool, error) {
 		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			return true, err
@@ -1154,8 +1155,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		available, err := ctx.crdAvailable(name, resourceClient)
 		if err != nil {
 			addToResult(&errs, namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
-		}
-		if !available {
+		} else if !available {
 			addToResult(&errs, namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
 		}
 	}
