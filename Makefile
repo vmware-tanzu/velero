@@ -48,7 +48,6 @@ platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
 
-# TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
 		DOCKERFILE ?= Dockerfile-$(BIN)
@@ -175,13 +174,13 @@ push-name:
 
 manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
 .manifest-$(MULTIARCH_IMAGE):
-	@docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
-	@docker manifest push --purge $(MULTIARCH_IMAGE):$(VERSION)
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):$(VERSION)
 ifeq ($(TAG_LATEST), true)
-	docker manifest create $(MULTIARCH_IMAGE):latest \
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):latest \
 		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
-	docker manifest push --purge $(MULTIARCH_IMAGE):latest
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):latest
 endif
 
 manifest-name:
