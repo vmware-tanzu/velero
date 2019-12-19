@@ -1,0 +1,1 @@
+bug fix: only prioritize restoring `replicasets.apps`, not `replicasets.extensions`
