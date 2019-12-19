@@ -11,6 +11,7 @@ require (
 	github.com/docker/spdystream v0.0.0-20170912183627-bc6354cbbc29 // indirect
 	github.com/evanphx/json-patch v0.0.0-20190203023257-5858425f7550
 	github.com/gobwas/glob v0.2.3
+	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/googleapis/gnostic v0.1.0 // indirect
@@ -20,7 +21,6 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/prometheus/client_golang v0.9.2
 	github.com/robfig/cron v1.0.1-0.20170309132418-df38d32658d8
-	github.com/gofrs/uuid v3.2.0
 	github.com/sirupsen/logrus v1.2.0
 	github.com/spf13/afero v0.0.0-20170217164146-9be650865eab
 	github.com/spf13/cobra v0.0.3
