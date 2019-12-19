@@ -451,8 +451,7 @@ func (s *server) validateBackupStorageLocations() error {
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have restic restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
-//	 restored and be adopted. Restore from both the 'apps' and 'extensions' API group,
-//   in that order, since they existed in both prior to v1.16.
+//	 restored and be adopted by controllers.
 // - Custom Resource Definitions come before Custom Resource so that they can be
 //   restored with their corresponding CRD.
 var defaultRestorePriorities = []string{
@@ -465,10 +464,11 @@ var defaultRestorePriorities = []string{
 	"serviceaccounts",
 	"limitranges",
 	"pods",
+	// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
+	// existed in the extensions API group, but we back up replicasets from "apps" so we want
+	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
+	// in the backup.
 	"replicasets.apps",
-	// TODO(sk): delete the following line once we no longer support Kubernetes
-	// versions prior to v1.16.
-	"replicasets.extensions",
 	"customresourcedefinitions",
 }
 
