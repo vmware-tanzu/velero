@@ -252,3 +252,13 @@ serve-docs:
 # a new versioned docs site. The full process is documented in site/README-JEKYLL.md.
 gen-docs:
 	@hack/gen-docs.sh
+
+.PHONY: modules
+modules:
+	go mod tidy
+
+.PHONY: verify-modules
+verify-modules: modules
+	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
+		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
+	fi
