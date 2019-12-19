@@ -94,7 +94,7 @@ type kubernetesRestorer struct {
 	resourceTerminatingTimeout time.Duration
 	resourcePriorities         []string
 	fileSystem                 filesystem.Interface
-	pvRenamer                  func(string) string
+	pvRenamer                  func(string) (string, error)
 	logger                     logrus.FieldLogger
 }
 
@@ -167,10 +167,6 @@ func NewKubernetesRestorer(
 	resourceTerminatingTimeout time.Duration,
 	logger logrus.FieldLogger,
 ) (Restorer, error) {
-	veleroCloneUuid, err := uuid.NewV4()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
 	return &kubernetesRestorer{
 		discoveryHelper:            discoveryHelper,
 		dynamicFactory:             dynamicFactory,
@@ -180,8 +176,15 @@ func NewKubernetesRestorer(
 		resourceTerminatingTimeout: resourceTerminatingTimeout,
 		resourcePriorities:         resourcePriorities,
 		logger:                     logger,
-		pvRenamer:                  func(string) string { return "velero-clone-" + veleroCloneUuid.String() },
-		fileSystem:                 filesystem.NewFileSystem(),
+		pvRenamer: func(string) (string, error) {
+			veleroCloneUuid, err := uuid.NewV4()
+			if err != nil {
+				return "", errors.WithStack(err)
+			}
+			veleroCloneName := "velero-clone-" + veleroCloneUuid.String()
+			return veleroCloneName, nil
+		},
+		fileSystem: filesystem.NewFileSystem(),
 	}, nil
 }
 
@@ -371,7 +374,7 @@ type context struct {
 	resourceClients            map[resourceClientKey]client.Dynamic
 	restoredItems              map[velero.ResourceIdentifier]struct{}
 	renamedPVs                 map[string]string
-	pvRenamer                  func(string) string
+	pvRenamer                  func(string) (string, error)
 }
 
 type resourceClientKey struct {
@@ -863,7 +866,11 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			if shouldRenamePV {
 				// give obj a new name, and record the mapping between the old and new names
 				oldName := obj.GetName()
-				newName := ctx.pvRenamer(oldName)
+				newName, err := ctx.pvRenamer(oldName)
+				if err != nil {
+					addToResult(&errs, namespace, errors.Wrapf(err, "error renaming PV"))
+					return warnings, errs
+				}
 
 				ctx.renamedPVs[oldName] = newName
 				obj.SetName(newName)

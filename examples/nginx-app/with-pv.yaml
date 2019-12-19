@@ -29,6 +29,7 @@ metadata:
   labels:
     app: nginx
 spec:
+  # Optional:
   # storageClassName: <YOUR_STORAGE_CLASS_NAME>
   accessModes:
     - ReadWriteOnce
@@ -62,7 +63,7 @@ spec:
           persistentVolumeClaim:
            claimName: nginx-logs
       containers:
-      - image: nginx:1.7.9
+      - image: nginx:1.17.6
         name: nginx
         ports:
         - containerPort: 80

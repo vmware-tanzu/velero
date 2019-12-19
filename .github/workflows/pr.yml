@@ -1,0 +1,14 @@
+name: Pull Request CI Check
+on: [push, pull_request]
+jobs:
+
+  build:
+    name: Run CI
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v1
+
+    - name: Make ci
+      run: make ci
