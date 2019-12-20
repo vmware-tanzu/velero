@@ -28,12 +28,7 @@ else
   ACTION='Updating'
 fi
 
-if ! command -v goimports > /dev/null; then
-  echo 'goimports is missing - please run "go get golang.org/x/tools/cmd/goimports"'
-  exit 1
-fi
-
-files="$(find . -type f -name '*.go' -not -path './vendor/*' -not -path './site/*' -not -path './pkg/generated/*' -not -name 'zz_generated*')"
+files="$(find . -type f -name '*.go' -not -path './.go/pkg/mod/*' -not -path './site/*' -not -path './pkg/generated/*' -not -name 'zz_generated*')"
 echo "${ACTION} gofmt"
 for file in ${files}; do
   output=$(gofmt "${MODE}" -s "${file}")

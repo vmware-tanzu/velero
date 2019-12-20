@@ -30,7 +30,7 @@ const pluginNameField = "pluginName"
 // delegates all calls to a logrus logger.
 type logrusAdapter struct {
 	impl  logrus.FieldLogger
-	level logrus.Level
+	level hclog.Level
 	name  string
 }
 
@@ -98,25 +98,25 @@ func (l *logrusAdapter) IsTrace() bool {
 // IsDebug indicates if DEBUG logs would be emitted. This and the other Is* guards
 // are used to elide expensive logging code based on the current level.
 func (l *logrusAdapter) IsDebug() bool {
-	return l.level <= logrus.DebugLevel
+	return l.level <= hclog.Debug
 }
 
 // IsInfo indicates if INFO logs would be emitted. This and the other Is* guards
 // are used to elide expensive logging code based on the current level.
 func (l *logrusAdapter) IsInfo() bool {
-	return l.level <= logrus.InfoLevel
+	return l.level <= hclog.Info
 }
 
 // IsWarn indicates if WARN logs would be emitted. This and the other Is* guards
 // are used to elide expensive logging code based on the current level.
 func (l *logrusAdapter) IsWarn() bool {
-	return l.level <= logrus.WarnLevel
+	return l.level <= hclog.Warn
 }
 
 // IsError indicates if ERROR logs would be emitted. This and the other Is* guards
 // are used to elide expensive logging code based on the current level.
 func (l *logrusAdapter) IsError() bool {
-	return l.level <= logrus.ErrorLevel
+	return l.level <= hclog.Error
 }
 
 // With creates a sublogger that will always have the given key/value pairs
@@ -150,6 +150,11 @@ func (l *logrusAdapter) ResetNamed(name string) hclog.Logger {
 		level: l.level,
 		name:  name,
 	}
+}
+
+// SetLevel sets the logging level for the subloggers
+func (l *logrusAdapter) SetLevel(level hclog.Level) {
+	l.level = level
 }
 
 // StandardLogger returns a value that conforms to the stdlib log.Logger interface

@@ -43,7 +43,7 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	b := &clientBuilder{
 		commandName:  command,
 		clientLogger: logger,
-		pluginLogger: newLogrusAdapter(logger, logLevel),
+		pluginLogger: newLogrusAdapter(logger, hclog.LevelFromString(logLevel.String())),
 	}
 	if command == os.Args[0] {
 		// For plugins compiled into the velero executable, we need to run "velero run-plugins"
@@ -58,7 +58,7 @@ func newClientBuilder(command string, logger logrus.FieldLogger, logLevel logrus
 	return b
 }
 
-func newLogrusAdapter(pluginLogger logrus.FieldLogger, logLevel logrus.Level) *logrusAdapter {
+func newLogrusAdapter(pluginLogger logrus.FieldLogger, logLevel hclog.Level) *logrusAdapter {
 	return &logrusAdapter{impl: pluginLogger, level: logLevel}
 }
 

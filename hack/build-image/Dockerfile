@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.12
+FROM golang:1.13
 
 RUN mkdir -p /go/src/k8s.io
 WORKDIR /go/src/k8s.io
@@ -29,11 +29,6 @@ RUN mkdir -p /go/src/sigs.k8s.io
 WORKDIR /go/src/sigs.k8s.io
 RUN git clone -b v0.2.2 https://github.com/kubernetes-sigs/controller-tools
 WORKDIR /go/src/sigs.k8s.io/controller-tools
-RUN GO111MODULE=on go mod vendor
-RUN go get golang.org/x/tools/cmd/goimports
-WORKDIR /go/src/golang.org/x/tools
-RUN git checkout 40a48ad93fbe707101afb2099b738471f70594ec
-RUN go install ./cmd/goimports
 RUN echo chmod -R a+w /go
 WORKDIR /root
 RUN apt-get update && apt-get install -y unzip

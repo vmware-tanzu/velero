@@ -16,15 +16,15 @@ require (
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/googleapis/gnostic v0.1.0 // indirect
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
-	github.com/hashicorp/go-plugin v1.0.1-0.20190610192547-a1bc61569a26
+	github.com/hashicorp/go-plugin v1.0.1
 	github.com/joho/godotenv v1.3.0
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2
 	github.com/robfig/cron v1.0.1-0.20170309132418-df38d32658d8
-	github.com/sirupsen/logrus v1.2.0
-	github.com/spf13/afero v0.0.0-20170217164146-9be650865eab
-	github.com/spf13/cobra v0.0.3
-	github.com/spf13/pflag v1.0.2
+	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/afero v1.2.2
+	github.com/spf13/cobra v0.0.5
+	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	google.golang.org/grpc v1.21.1
@@ -32,9 +32,10 @@ require (
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
+	k8s.io/code-generator v0.17.0 // indirect
 	k8s.io/klog v0.3.1
 	k8s.io/kubernetes v1.15.3
-	k8s.io/utils v0.0.0-20190308190857-21c4ce38f2a7 // indirect
+	sigs.k8s.io/controller-tools v0.2.4 // indirect
 )
 
 replace (
