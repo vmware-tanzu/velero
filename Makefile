@@ -176,6 +176,7 @@ verify:
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
+	$(MAKE) verify-modules
 
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
