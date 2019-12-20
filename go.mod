@@ -15,11 +15,9 @@ require (
 	github.com/golang/protobuf v1.3.2
 	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/googleapis/gnostic v0.1.0 // indirect
-	github.com/hashicorp/go-hclog v0.0.0-20180402200405-69ff559dc25f
-	github.com/hashicorp/yamux v0.0.0-20180604194846-3520598351bb // indirect
+	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
+	github.com/hashicorp/go-plugin v1.0.1
 	github.com/joho/godotenv v1.3.0
-	github.com/mitchellh/go-testing-interface v0.0.0-20171004221916-a61a99592b77 // indirect
-	github.com/oklog/run v1.0.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.2
 	github.com/robfig/cron v1.0.1-0.20170309132418-df38d32658d8
