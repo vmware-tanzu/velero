@@ -61,8 +61,5 @@ if [[ "${GOOS}" = "windows" ]]; then
   OUTPUT="${OUTPUT}.exe"
 fi
 
-go build \
-    -o ${OUTPUT} \
-    -installsuffix "static" \
-    -ldflags "${LDFLAGS}" \
-    ${PKG}/cmd/${BIN}
+GO111MODULE=on go mod download
+GO111MODULE=on  go build -o ${OUTPUT} -installsuffix "static" -ldflags "${LDFLAGS}" ${PKG}/cmd/${BIN}
