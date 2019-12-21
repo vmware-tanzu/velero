@@ -19,10 +19,10 @@ limitations under the License.
 package v1
 
 import (
+	scheme "pkg/generated/clientset/versioned/scheme"
 	"time"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	scheme "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"

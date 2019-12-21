@@ -23,14 +23,24 @@ PKG := github.com/vmware-tanzu/velero
 # Where to push the docker image.
 REGISTRY ?= velero
 
+# Active module mode, as we use go modules to manage dependencies
+export GO111MODULE=on
+
+TOOLS_DIR := hack/tools
+TOOLS_BIN_DIR := ${TOOLS_DIR}/bin
+
+# Tools binaries
+CONTROLLER_GEN := ${TOOLS_BIN_DIR}/controller-gen
+CLIENT_GEN := ${TOOLS_BIN_DIR}/client-gen
+LISTER_GEN := ${TOOLS_BIN_DIR}/lister-gen
+INFORMER_GEN := ${TOOLS_BIN_DIR}/informer-gen
+
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
 # if it wasn't specified by the caller.
 local : ARCH ?= $(shell go env GOOS)-$(shell go env GOARCH)
 ARCH ?= linux-amd64
-
 VERSION ?= master
-
 TAG_LATEST ?= false
 
 ###
@@ -178,7 +188,7 @@ ifneq ($(SKIP_TESTS), 1)
 endif
 	$(MAKE) verify-modules
 
-update:
+update: tools
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 build-dirs:
@@ -192,6 +202,7 @@ clean:
 	rm -rf .container-* _output/.dockerfile-* .push-*
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
+	$(MAKE) clean-tools
 
 ci: all verify test
 
@@ -253,6 +264,28 @@ serve-docs:
 # a new versioned docs site. The full process is documented in site/README-JEKYLL.md.
 gen-docs:
 	@hack/gen-docs.sh
+
+.PHONY: tools
+tools: $(CONTROLLER_GEN) $(CLIENT_GEN) $(LISTER_GEN) $(INFORMER_GEN)
+
+$(CONTROLLER_GEN): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go build -tags=tools -o bin/controller-gen sigs.k8s.io/controller-tools/cmd/controller-gen
+
+$(CLIENT_GEN): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go build -tags=tools -o bin/client-gen k8s.io/code-generator/cmd/client-gen
+
+$(LISTER_GEN): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go build -tags=tools -o bin/lister-gen k8s.io/code-generator/cmd/lister-gen
+
+$(INFORMER_GEN): $(TOOLS_DIR)/go.mod
+	cd $(TOOLS_DIR); go build -tags=tools -o bin/informer-gen k8s.io/code-generator/cmd/informer-gen
+
+.PHONY: clean-tools
+clean-tools:
+	rm -f $(CONTROLLER_GEN)Y_GEN)
+	rm -f $(CLIENT_GEN)
+	rm -f $(LISTER_GEN)
+	rm -f $(INFORMER_GEN)
 
 .PHONY: modules
 modules:

@@ -19,31 +19,55 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-if [[ -z "${GOPATH}" ]]; then
-  GOPATH=~/go
-fi
+source "$(dirname "$0")/utils.sh"
 
-if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
-  echo "k8s.io/code-generator missing from GOPATH"
-  exit 1
-fi
+TOOLS_DIR=$(get_repo_root)/hack/tools
 
-if [[ ! -d "${GOPATH}/src/sigs.k8s.io/controller-tools" ]]; then
-  echo "sigs.k8s.io/controller-tools missing from GOPATH"
-  exit 1
-fi
 
-${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
-  all \
-  github.com/vmware-tanzu/velero/pkg/generated \
-  github.com/vmware-tanzu/velero/pkg/apis \
-  "velero:v1" \
-  --go-header-file ${GOPATH}/src/github.com/vmware-tanzu/velero/hack/boilerplate.go.txt \
-  $@
+# GO111MODULE=on ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
+#   client \
+#   github.com/vmware-tanzu/velero/pkg/generated \
+#   github.com/vmware-tanzu/velero/pkg/apis \
+#   "velero:v1" \
+#   --go-header-file $(get_repo_root)/hack/boilerplate.go.txt \
+#   $@
 
-go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
+echo "# Generate deepcopy funcs"
+${TOOLS_DIR}/bin/controller-gen \
+  object:headerFile=$(get_repo_root)/hack/boilerplate.go.txt \
+  paths=$(get_repo_root)/pkg/apis/velero/v1/...
+
+echo "# Generate client for types"
+${TOOLS_DIR}/bin/client-gen \
+ --clientset-name "versioned" \
+ --input-base '' \
+ --input github.com/vmware-tanzu/velero/pkg/apis/velero/v1 \
+ --output-base '' \
+ --output-package 'pkg/generated/clientset' \
+ --go-header-file $(get_repo_root)/hack/boilerplate.go.txt
+
+ echo "# Generate listers for types"
+ ${TOOLS_DIR}/bin/lister-gen \
+  --input-dirs github.com/vmware-tanzu/velero/pkg/apis/velero/v1 \
+  --output-base '' \
+  --output-package 'pkg/generated/listers' \
+  --go-header-file $(get_repo_root)/hack/boilerplate.go.txt
+
+ echo "# Generate informers for types"
+ ${TOOLS_DIR}/bin/informer-gen \
+  --input-dirs github.com/vmware-tanzu/velero/pkg/apis/velero/v1 \
+  --versioned-clientset-package 'pkg/generated/clientset/versioned' \
+  --listers-package "pkg/generated/listers" \
+  --output-base '' \
+  --output-package 'pkg/generated/informers' \
+  --go-header-file $(get_repo_root)/hack/boilerplate.go.txt \
+  --v 5
+
+echo "# Generate CRD manifests"
+${TOOLS_DIR}/bin/controller-gen \
   crd \
-  output:dir=pkg/generated/crds/manifests \
-  paths=./pkg/apis/velero/v1/...
+  output:dir=$(get_repo_root)/pkg/generated/crds/manifests \
+  paths=$(get_repo_root)/pkg/apis/velero/v1/...
 
-go generate ./pkg/generated/crds
+
+# go generate $(get_repo_root)/pkg/generated/crds

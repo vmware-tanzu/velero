@@ -19,12 +19,12 @@ limitations under the License.
 package v1
 
 import (
+	versioned "pkg/generated/clientset/versioned"
+	internalinterfaces "pkg/generated/informers/externalversions/internalinterfaces"
+	v1 "pkg/generated/listers/velero/v1"
 	time "time"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	versioned "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	internalinterfaces "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/internalinterfaces"
-	v1 "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
