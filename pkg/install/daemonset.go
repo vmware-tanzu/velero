@@ -172,6 +172,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 				Name:  "AZURE_CREDENTIALS_FILE",
 				Value: "/credentials/cloud",
 			},
+			{
+				Name:  "ALIBABA_CLOUD_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
 		}...)
 	}
 
