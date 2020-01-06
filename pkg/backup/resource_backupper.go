@@ -323,7 +323,7 @@ func (rb *defaultResourceBackupper) backupCRD(
 		}
 		return
 	}
-	log.Infof("Found associated CRD to add to backup %d", gr.String())
+	log.Infof("Found associated CRD to add to backup %s", gr.String())
 	_ = rb.backupItem(log, crdGr, itemBackupper, unstructured)
 }
 
