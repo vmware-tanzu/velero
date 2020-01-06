@@ -34,6 +34,6 @@ func TestDaemonSet(t *testing.T) {
 	assert.Equal(t, corev1.PullIfNotPresent, ds.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 
 	ds = DaemonSet("velero", WithSecret(true))
-	assert.Equal(t, 6, len(ds.Spec.Template.Spec.Containers[0].Env))
+	assert.Equal(t, 7, len(ds.Spec.Template.Spec.Containers[0].Env))
 	assert.Equal(t, 3, len(ds.Spec.Template.Spec.Volumes))
 }

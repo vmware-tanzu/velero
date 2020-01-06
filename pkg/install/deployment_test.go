@@ -43,7 +43,7 @@ func TestDeployment(t *testing.T) {
 	assert.Equal(t, corev1.PullIfNotPresent, deploy.Spec.Template.Spec.Containers[0].ImagePullPolicy)
 
 	deploy = Deployment("velero", WithSecret(true))
-	assert.Equal(t, 6, len(deploy.Spec.Template.Spec.Containers[0].Env))
+	assert.Equal(t, 7, len(deploy.Spec.Template.Spec.Containers[0].Env))
 	assert.Equal(t, 3, len(deploy.Spec.Template.Spec.Volumes))
 
 	deploy = Deployment("velero", WithDefaultResticMaintenanceFrequency(24*time.Hour))
