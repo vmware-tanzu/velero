@@ -37,25 +37,7 @@ If you've already run `velero install` without the `--use-restic` flag, you can 
 By default, the Velero deployment requests 500m CPU, 128Mi memory and sets a limit of 1000m CPU, 256Mi.
 Default requests and limits are not set for the restic pods as CPU/Memory usage can depend heavily on the size of volumes being backed up.
 
-If you need to customize these resource requests and limits, you can set the following flags in your `velero install` command:
-
-```bash
-velero install \
-    --provider <YOUR_PROVIDER> \
-    --bucket <YOUR_BUCKET> \
-    --secret-file <PATH_TO_FILE> \
-    --velero-pod-cpu-request <CPU_REQUEST> \
-    --velero-pod-mem-request <MEMORY_REQUEST> \
-    --velero-pod-cpu-limit <CPU_LIMIT> \
-    --velero-pod-mem-limit <MEMORY_LIMIT> \
-    [--use-restic] \
-    [--restic-pod-cpu-request <CPU_REQUEST>] \
-    [--restic-pod-mem-request <MEMORY_REQUEST>] \
-    [--restic-pod-cpu-limit <CPU_LIMIT>] \
-    [--restic-pod-mem-limit <MEMORY_LIMIT>]
-```
-
-Values for these flags follow the same format as [Kubernetes resource requirements][5].
+Customization of these resource requests and limits may be performed using the [velero install][6] CLI command.
 
 ## Configure more than one storage location for backups or volume snapshots
 
@@ -110,4 +92,4 @@ Run `velero install --help` or see the [Helm chart documentation](https://github
 [2]: namespace.md
 [3]: restic.md
 [4]: on-premises.md
-[5]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+[6]: velero-install.md#usage
