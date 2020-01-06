@@ -101,6 +101,8 @@ To generate the YAML without applying it to your cluster, use the `--dry-run -o 
 
 This is useful for applying bespoke customizations, integrating with a GitOps workflow, etc.
 
+If you are installing Velero in Kubernetes 1.13.x or earlier, you need to use `kubectl apply`'s `--validate=false` option when applying the generated configuration to your cluster. See [issue 2077][6] for more context.
+
 ## Additional options
 
 Run `velero install --help` or see the [Helm chart documentation](https://github.com/helm/charts/tree/master/stable/velero) for the full set of installation options.
@@ -111,3 +113,4 @@ Run `velero install --help` or see the [Helm chart documentation](https://github
 [3]: restic.md
 [4]: on-premises.md
 [5]: https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-cpu
+[6]: https://github.com/vmware-tanzu/velero/issues/2077
