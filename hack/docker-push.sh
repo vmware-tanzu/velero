@@ -80,4 +80,4 @@ unset GIT_HTTP_USER_AGENT
 
 echo "Building and pushing container images."
 
-VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push
+VERSION="$VERSION" TAG_LATEST="$TAG_LATEST" make all-containers all-push all-manifests

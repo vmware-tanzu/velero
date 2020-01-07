@@ -64,6 +64,7 @@ Velero's `Makefile` has a convenience target, `all-build`, that builds the follo
 * linux-amd64
 * linux-arm
 * linux-arm64
+* linux-ppc64le
 * darwin-amd64
 * windows-amd64
 
@@ -75,7 +76,7 @@ If after installing Velero you would like to change the image used by its deploy
 kubectl -n velero set image deploy/velero velero=myimagerepo/velero:$VERSION
 ```
 
-To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
+To build a Velero container image, first set the `$REGISTRY` environment variable. For example, if you want to build the `gcr.io/my-registry/velero-amd64:master` image, set `$REGISTRY` to `gcr.io/my-registry`. If this variable is not set, the default is `velero`.
 
 Optionally, set the `$VERSION` environment variable to change the image tag. Then, run:
 
@@ -83,11 +84,70 @@ Optionally, set the `$VERSION` environment variable to change the image tag. The
 make container
 ```
 
-To push your image to the registry, run:
+For any specific platform, run `ARCH=<GOOS>-<GOARCH> make container`
+
+For example, to build an image for the Power (ppc64le), run:
+
+```bash
+ARCH=linux-ppc64le make container
+```
+_Note: By default, ARCH is set to linux-amd64_
+
+To push your image to the registry. For example, if you want to push the `gcr.io/my-registry/velero-amd64:master` image, run:
 
 ```bash
 make push
 ```
+
+For any specific platform, run `ARCH=<GOOS>-<GOARCH> make push`
+
+For example, to push image for the Power (ppc64le), run:
+
+```bash
+ARCH=linux-ppc64le make push
+```
+_Note: By default, ARCH is set to linux-amd64_
+
+To create and push your manifest to the registry. For example, if you want to create and push the `gcr.io/my-registry/velero:master` manifest, run:
+
+```bash
+make manifest
+```
+
+For any specific platform, run `MANIFEST_PLATFORMS=<GOARCH> make manifest`
+
+For example, to create and push manifest only for amd64, run:
+
+```bash
+MANIFEST_PLATFORMS=amd64 make manifest
+```
+_Note: By default, MANIFEST_PLATFORMS is set to amd64, ppc64le_
+
+To run the entire workflow, run:
+
+`REGISTRY=<$REGISTRY> VERSION=<$VERSION> ARCH=<GOOS>-<GOARCH> MANIFEST_PLATFORMS=<GOARCH> make container push manifest`
+
+For example, to run the workflow only for amd64
+
+```bash
+REGISTRY=myrepo VERSION=foo MANIFEST_PLATFORMS=amd64 make container push manifest
+```
+
+_Note: By default, ARCH is set to linux-amd64_
+
+For example, to run the workflow only for ppc64le
+
+```bash
+REGISTRY=myrepo VERSION=foo ARCH=linux-ppc64le MANIFEST_PLATFORMS=ppc64le make container push manifest
+```
+
+For example, to run the workflow for all supported platforms
+
+```bash
+REGISTRY=myrepo VERSION=foo make all-containers all-push all-manifests
+```
+
+_Note: By default, MANIFEST_PLATFORMS is set to amd64, ppc64le_
 
 Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod:
 
