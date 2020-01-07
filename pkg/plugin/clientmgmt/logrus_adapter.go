@@ -156,3 +156,9 @@ func (l *logrusAdapter) ResetNamed(name string) hclog.Logger {
 func (l *logrusAdapter) StandardLogger(opts *hclog.StandardLoggerOptions) *log.Logger {
 	panic("not implemented")
 }
+
+// Updates the level. This should affect all sub-loggers as well. If an
+// implementation cannot update the level on the fly, it should no-op.
+func (l *logrusAdapter) SetLevel(_ hclog.Level) {
+	return
+}

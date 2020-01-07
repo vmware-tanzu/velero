@@ -211,12 +211,11 @@
   version = "v0.1.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:32e5a56c443b5581e4bf6e74cdc78b5826d7e4c5df43883e2dc31e4d7f4ae98a"
+  digest = "1:27d609eb0e1e84ad3be8c5214835b7728557954e87b6a1222182e3664152f6ab"
   name = "github.com/hashicorp/go-hclog"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "ca137eb4b4389c9bc6f1a6d887f056bf16c00510"
+  revision = "ff2cf002a8dd750586d91dddd4470c341f981fe1"
 
 [[projects]]
   digest = "1:980fd2c6afd6c268284d46dd66671771184a4002f6d516492cc596d2ca003543"
