@@ -26,6 +26,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
+	cliprinters "k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/printers"
 
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
@@ -141,29 +142,37 @@ func printEncoded(obj runtime.Object, format string) (bool, error) {
 }
 
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
-	// 1. generate table using k8s.io/kubernetes/pkg/printers.HumanReadableGenerator.GenerateTable(...) (already have the column definitions and the funcs to generate table rows)
-	// 2. print table using k8s.io/cli-runtime/pkg/printers/HumanReadablePrinter.PrintObj(...) passing it the metav1.Table from step 1
+	// TODO(sk): replace the use of k8s.io/kubernetes/pkg/printers.HumanReadableGenerator with our
+	// own code to generate the tables so we can drop the dependency on k/k entirely
 
-	printer, err := NewPrinter(cmd)
+	// 1. generate table
+	generator := printers.NewTableGenerator()
+	generator.TableHandler(backupColumns, printBackup)
+	generator.TableHandler(backupColumns, printBackupList)
+	generator.TableHandler(restoreColumns, printRestore)
+	generator.TableHandler(restoreColumns, printRestoreList)
+	generator.TableHandler(scheduleColumns, printSchedule)
+	generator.TableHandler(scheduleColumns, printScheduleList)
+	generator.TableHandler(resticRepoColumns, printResticRepo)
+	generator.TableHandler(resticRepoColumns, printResticRepoList)
+	generator.TableHandler(backupStorageLocationColumns, printBackupStorageLocation)
+	generator.TableHandler(backupStorageLocationColumns, printBackupStorageLocationList)
+	generator.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocation)
+	generator.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocationList)
+	generator.TableHandler(pluginColumns, printPluginList)
+
+	table, err := generator.GenerateTable(obj, printers.GenerateOptions{})
+	if err != nil {
+		return false, errors.Wrap(err, "error generating table")
+	}
+
+	// 2. print table
+	tablePrinter, err := NewPrinter(cmd)
 	if err != nil {
 		return false, err
 	}
 
-	printer.TableHandler(backupColumns, printBackup)
-	printer.TableHandler(backupColumns, printBackupList)
-	printer.TableHandler(restoreColumns, printRestore)
-	printer.TableHandler(restoreColumns, printRestoreList)
-	printer.TableHandler(scheduleColumns, printSchedule)
-	printer.TableHandler(scheduleColumns, printScheduleList)
-	printer.TableHandler(resticRepoColumns, printResticRepo)
-	printer.TableHandler(resticRepoColumns, printResticRepoList)
-	printer.TableHandler(backupStorageLocationColumns, printBackupStorageLocation)
-	printer.TableHandler(backupStorageLocationColumns, printBackupStorageLocationList)
-	printer.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocation)
-	printer.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocationList)
-	printer.TableHandler(pluginColumns, printPluginList)
-
-	err = printer.PrintObj(obj, os.Stdout)
+	err = tablePrinter.PrintObj(table, os.Stdout)
 	if err != nil {
 		return false, err
 	}
@@ -173,13 +182,13 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 
 // NewPrinter returns a printer for doing human-readable table printing of
 // Velero objects.
-func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
-	options := printers.PrintOptions{
+func NewPrinter(cmd *cobra.Command) (cliprinters.ResourcePrinter, error) {
+	options := cliprinters.PrintOptions{
 		ShowLabels:   GetShowLabelsValue(cmd),
 		ColumnLabels: GetLabelColumnsValues(cmd),
 	}
 
-	printer := printers.NewTablePrinter(options)
+	printer := cliprinters.NewTablePrinter(options)
 
 	return printer, nil
 }
