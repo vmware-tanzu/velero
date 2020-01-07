@@ -287,6 +287,14 @@
   version = "v1.1.8"
 
 [[projects]]
+  branch = "master"
+  digest = "1:e94e69261097d7067fa28052bcf209be4c47b12c665b7e88116c96f905a77364"
+  name = "github.com/liggitt/tabwriter"
+  packages = ["."]
+  pruneopts = "NUT"
+  revision = "89fcab3d43de07060e4fd4c1547430ed57e87f24"
+
+[[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
   name = "github.com/matttproud/golang_protobuf_extensions"
   packages = ["pbutil"]
@@ -729,6 +737,14 @@
   version = "v0.17.0"
 
 [[projects]]
+  digest = "1:ff42a0e8537ca86b2dfd227958477cd4c40a40b1d76838ddbcb89ba80a2b87f3"
+  name = "k8s.io/cli-runtime"
+  packages = ["pkg/printers"]
+  pruneopts = "NUT"
+  revision = "dbe977a4ce31c6d5f786c9394a3c8993095ad4fc"
+  version = "v0.17.0"
+
+[[projects]]
   digest = "1:6293fad3808cf7d6584cfeb8b9b27012aa3f7b02f9c28c3d64ac498181eedd0d"
   name = "k8s.io/client-go"
   packages = [
@@ -1058,6 +1074,7 @@
     "k8s.io/apimachinery/pkg/util/validation",
     "k8s.io/apimachinery/pkg/util/wait",
     "k8s.io/apimachinery/pkg/watch",
+    "k8s.io/cli-runtime/pkg/printers",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/discovery/fake",
     "k8s.io/client-go/dynamic",

@@ -49,6 +49,10 @@
   name = "k8s.io/apiextensions-apiserver"
   version = "~0.17"
 
+[[constraint]]
+  name = "k8s.io/cli-runtime"
+  version = "~0.17"
+
 # k8s.io/client-go v0.17 uses v1.1.8
 [[override]]
   name = "github.com/json-iterator/go"
