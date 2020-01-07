@@ -279,20 +279,12 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:0243cffa4a3410f161ee613dfdd903a636d07e838a42d341da95d81f42cd1d41"
+  digest = "1:996dd5b4e2def9c256d4aa732db9a2d16d00a5eaf264139fa4bce5a4d2dc5fde"
   name = "github.com/json-iterator/go"
   packages = ["."]
   pruneopts = "NUT"
-  revision = "ab8a2e0c74be9d3be70b3184d9acc634935ded82"
-  version = "1.1.4"
-
-[[projects]]
-  branch = "master"
-  digest = "1:e94e69261097d7067fa28052bcf209be4c47b12c665b7e88116c96f905a77364"
-  name = "github.com/liggitt/tabwriter"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "89fcab3d43de07060e4fd4c1547430ed57e87f24"
+  revision = "03217c3e97663914aec3faafde50d081f197a0a2"
+  version = "v1.1.8"
 
 [[projects]]
   digest = "1:5985ef4caf91ece5d54817c11ea25f182697534f8ae6521eadcd628c142ac4b6"
@@ -400,14 +392,6 @@
   packages = ["."]
   pruneopts = "NUT"
   revision = "df38d32658d8788cd446ba74db4bb5375c4b0cb3"
-
-[[projects]]
-  digest = "1:6bc0652ea6e39e22ccd522458b8bdd8665bf23bdc5a20eec90056e4dc7e273ca"
-  name = "github.com/satori/go.uuid"
-  packages = ["."]
-  pruneopts = "NUT"
-  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
-  version = "v1.2.0"
 
 [[projects]]
   digest = "1:31c5d934770c8b0698c28eb8576cb39b14e2fcf3c5f2a6e8449116884cd92e3f"
@@ -626,9 +610,10 @@
   revision = "eb3733d160e74a9c7e442f435eb3bea458e1d19f"
 
 [[projects]]
-  digest = "1:760e08df99c3c3b53764ef7c41c03ea9d90e8594d9df42364d9209e99a0352e1"
+  digest = "1:6ebd87b9a08afc8894de3f5d6f1dbc56494c36c5136593ddaf8997d73fc1967c"
   name = "k8s.io/api"
   packages = [
+    "admissionregistration/v1",
     "admissionregistration/v1beta1",
     "apps/v1",
     "apps/v1beta1",
@@ -648,8 +633,11 @@
     "coordination/v1",
     "coordination/v1beta1",
     "core/v1",
+    "discovery/v1alpha1",
+    "discovery/v1beta1",
     "events/v1beta1",
     "extensions/v1beta1",
+    "flowcontrol/v1alpha1",
     "networking/v1",
     "networking/v1beta1",
     "node/v1alpha1",
@@ -667,23 +655,24 @@
     "storage/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "3544db3b9e4494309507e02eced5cd9dcff47e6a"
-  version = "kubernetes-1.15.3"
+  revision = "4c9a86741a7ab3890dd9e0777e85d8eee48bf59c"
+  version = "v0.17.0"
 
 [[projects]]
-  digest = "1:d26e3d9d22801d0a4de9b20264eba64f962e637952c937b1afb745ecbe69b4cb"
+  digest = "1:6a69bcc2370321cbb36a4afbfc1dfb73e95686aff4ee30993e5728007ab4f022"
   name = "k8s.io/apiextensions-apiserver"
   packages = [
     "pkg/apis/apiextensions",
     "pkg/apis/apiextensions/install",
+    "pkg/apis/apiextensions/v1",
     "pkg/apis/apiextensions/v1beta1",
   ]
   pruneopts = "NUT"
-  revision = "0dbe462fe92dfa8b56cc9facf0658a17d0c70fc5"
-  version = "kubernetes-1.15.3"
+  revision = "ea07e0496fdfc3befebe481bd6f850febc41cdae"
+  version = "v0.17.0"
 
 [[projects]]
-  digest = "1:b1e28ead203a2ac2c1d82980760e26bdb34dbd47428cfe76f50c81b7d761b39e"
+  digest = "1:fadc182dd0445c5ddcc81710e974a1f91ad9df994934638c239f080b2df2b079"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
@@ -736,11 +725,11 @@
     "third_party/forked/golang/reflect",
   ]
   pruneopts = "NUT"
-  revision = "f2f3a405f61d6c2cdc0d00687c1b5d90de91e9f0"
-  version = "kubernetes-1.15.3"
+  revision = "79c2a76c473a20cdc4ce59cae4b72529b5d9d16b"
+  version = "v0.17.0"
 
 [[projects]]
-  digest = "1:07c45445bd6c49a1b12cef2def45a866a440c55dda0ef62e93a012bffaff22f8"
+  digest = "1:6293fad3808cf7d6584cfeb8b9b27012aa3f7b02f9c28c3d64ac498181eedd0d"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -749,6 +738,7 @@
     "dynamic/fake",
     "informers",
     "informers/admissionregistration",
+    "informers/admissionregistration/v1",
     "informers/admissionregistration/v1beta1",
     "informers/apps",
     "informers/apps/v1",
@@ -771,10 +761,15 @@
     "informers/coordination/v1beta1",
     "informers/core",
     "informers/core/v1",
+    "informers/discovery",
+    "informers/discovery/v1alpha1",
+    "informers/discovery/v1beta1",
     "informers/events",
     "informers/events/v1beta1",
     "informers/extensions",
     "informers/extensions/v1beta1",
+    "informers/flowcontrol",
+    "informers/flowcontrol/v1alpha1",
     "informers/internalinterfaces",
     "informers/networking",
     "informers/networking/v1",
@@ -801,6 +796,8 @@
     "kubernetes",
     "kubernetes/fake",
     "kubernetes/scheme",
+    "kubernetes/typed/admissionregistration/v1",
+    "kubernetes/typed/admissionregistration/v1/fake",
     "kubernetes/typed/admissionregistration/v1beta1",
     "kubernetes/typed/admissionregistration/v1beta1/fake",
     "kubernetes/typed/apps/v1",
@@ -839,10 +836,16 @@
     "kubernetes/typed/coordination/v1beta1/fake",
     "kubernetes/typed/core/v1",
     "kubernetes/typed/core/v1/fake",
+    "kubernetes/typed/discovery/v1alpha1",
+    "kubernetes/typed/discovery/v1alpha1/fake",
+    "kubernetes/typed/discovery/v1beta1",
+    "kubernetes/typed/discovery/v1beta1/fake",
     "kubernetes/typed/events/v1beta1",
     "kubernetes/typed/events/v1beta1/fake",
     "kubernetes/typed/extensions/v1beta1",
     "kubernetes/typed/extensions/v1beta1/fake",
+    "kubernetes/typed/flowcontrol/v1alpha1",
+    "kubernetes/typed/flowcontrol/v1alpha1/fake",
     "kubernetes/typed/networking/v1",
     "kubernetes/typed/networking/v1/fake",
     "kubernetes/typed/networking/v1beta1",
@@ -873,6 +876,7 @@
     "kubernetes/typed/storage/v1alpha1/fake",
     "kubernetes/typed/storage/v1beta1",
     "kubernetes/typed/storage/v1beta1/fake",
+    "listers/admissionregistration/v1",
     "listers/admissionregistration/v1beta1",
     "listers/apps/v1",
     "listers/apps/v1beta1",
@@ -888,8 +892,11 @@
     "listers/coordination/v1",
     "listers/coordination/v1beta1",
     "listers/core/v1",
+    "listers/discovery/v1alpha1",
+    "listers/discovery/v1beta1",
     "listers/events/v1beta1",
     "listers/extensions/v1beta1",
+    "listers/flowcontrol/v1alpha1",
     "listers/networking/v1",
     "listers/networking/v1beta1",
     "listers/node/v1alpha1",
@@ -941,8 +948,8 @@
     "util/workqueue",
   ]
   pruneopts = "NUT"
-  revision = "e14f31a72a77f7aa82a95eaf542d1194fb027d04"
-  version = "kubernetes-1.15.3"
+  revision = "c68b62b1efa14564a47d67c07f013dc3553937b9"
+  version = "v0.17.0"
 
 [[projects]]
   digest = "1:2c16dda1c44c2564a7818fbacb701323c16d77c21b969987c1bec08d3ee0b050"
@@ -961,12 +968,12 @@
   revision = "d83b052f768a50a309c692a9c271da3f3276ff88"
 
 [[projects]]
-  digest = "1:da84676239a79340c7ef4d8587097bf07ecde0d72cd339dd6a4d3f5fedce7cd3"
+  digest = "1:649f777ff59196566accf0658b76c782045f228440ca7921face407c1323d2a2"
   name = "k8s.io/kubernetes"
   packages = ["pkg/printers"]
   pruneopts = "NUT"
-  revision = "2d3c76f9091b6bec110a5e63777c332469e0cba2"
-  version = "v1.15.3"
+  revision = "70132b0f130acc0bed193d9ba59dd186f0e634cf"
+  version = "v1.17.0"
 
 [[projects]]
   branch = "master"

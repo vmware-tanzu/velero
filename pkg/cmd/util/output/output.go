@@ -141,6 +141,9 @@ func printEncoded(obj runtime.Object, format string) (bool, error) {
 }
 
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
+	// 1. generate table using k8s.io/kubernetes/pkg/printers.HumanReadableGenerator.GenerateTable(...) (already have the column definitions and the funcs to generate table rows)
+	// 2. print table using k8s.io/cli-runtime/pkg/printers/HumanReadablePrinter.PrintObj(...) passing it the metav1.Table from step 1
+
 	printer, err := NewPrinter(cmd)
 	if err != nil {
 		return false, err
