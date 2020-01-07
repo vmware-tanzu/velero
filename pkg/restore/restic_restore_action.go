@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -106,6 +106,18 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 
 	cpuRequest, memRequest := getResourceRequests(log, config)
 	cpuLimit, memLimit := getResourceLimits(log, config)
+	if cpuRequest == "" {
+		cpuRequest = defaultCPURequestLimit
+	}
+	if cpuLimit == "" {
+		cpuLimit = defaultCPURequestLimit
+	}
+	if memRequest == "" {
+		memRequest = defaultMemRequestLimit
+	}
+	if memLimit == "" {
+		memLimit = defaultMemRequestLimit
+	}
 
 	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
 	if err != nil {
