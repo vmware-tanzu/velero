@@ -147,8 +147,6 @@ For example, to run the workflow for all supported platforms
 REGISTRY=myrepo VERSION=foo make all-containers all-push all-manifests
 ```
 
-_Note: By default, MANIFEST_PLATFORMS is set to amd64, ppc64le_
-
 Note: if you want to update the image but not change its name, you will have to trigger Kubernetes to pick up the new image. One way of doing so is by deleting the Velero deployment pod:
 
 ```bash
