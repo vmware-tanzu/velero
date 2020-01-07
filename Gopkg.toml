@@ -30,10 +30,6 @@
 #
 
 [[constraint]]
-  name = "k8s.io/kubernetes"
-  version = "~1.17"
-
-[[constraint]]
   name = "k8s.io/client-go"
   version = "~0.17"
 

@@ -984,14 +984,6 @@
   revision = "d83b052f768a50a309c692a9c271da3f3276ff88"
 
 [[projects]]
-  digest = "1:649f777ff59196566accf0658b76c782045f228440ca7921face407c1323d2a2"
-  name = "k8s.io/kubernetes"
-  packages = ["pkg/printers"]
-  pruneopts = "NUT"
-  revision = "70132b0f130acc0bed193d9ba59dd186f0e634cf"
-  version = "v1.17.0"
-
-[[projects]]
   branch = "master"
   digest = "1:99dbf7ef753ca02399778c93a4ed4b689b28668317134ecd1fabeb07be70f354"
   name = "k8s.io/utils"
@@ -1101,7 +1093,6 @@
     "k8s.io/client-go/util/flowcontrol",
     "k8s.io/client-go/util/workqueue",
     "k8s.io/klog",
-    "k8s.io/kubernetes/pkg/printers",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
