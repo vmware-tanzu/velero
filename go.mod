@@ -4,8 +4,11 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.46.2 // indirect
-	github.com/Azure/azure-sdk-for-go v21.4.0+incompatible
-	github.com/Azure/go-autorest v11.1.2+incompatible
+	github.com/Azure/azure-sdk-for-go v35.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.9.0
+	github.com/Azure/go-autorest/autorest/adal v0.5.0
+	github.com/Azure/go-autorest/autorest/to v0.3.0
+	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.13.12
 	github.com/docker/spdystream v0.0.0-20170912183627-bc6354cbbc29 // indirect
 	github.com/evanphx/json-patch v4.2.0+incompatible
