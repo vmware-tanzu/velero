@@ -135,14 +135,11 @@ BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
-	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
-	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
 	@docker run \
 		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd)/vendor/k8s.io/api:/go/src/k8s.io/api:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd):/go/src/$(PKG):delegated" \
