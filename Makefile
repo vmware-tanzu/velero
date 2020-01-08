@@ -135,18 +135,22 @@ BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
+	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# because the Kubernetes code-generator tools require the project to
+	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
+	@# under $GOPATH).
 	@docker run \
 		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
+		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
-		-v "$$(pwd):/go/src/$(PKG):delegated" \
-		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
-		-w /go/src/$(PKG) \
+		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
