@@ -18,7 +18,7 @@ package test
 
 import (
 	"github.com/stretchr/testify/mock"
-	"k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -31,14 +31,14 @@ type FakeNamespaceClient struct {
 
 var _ corev1.NamespaceInterface = &FakeNamespaceClient{}
 
-func (c *FakeNamespaceClient) List(options metav1.ListOptions) (*v1.NamespaceList, error) {
+func (c *FakeNamespaceClient) List(options metav1.ListOptions) (*corev1api.NamespaceList, error) {
 	args := c.Called(options)
-	return args.Get(0).(*v1.NamespaceList), args.Error(1)
+	return args.Get(0).(*corev1api.NamespaceList), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Create(obj *v1.Namespace) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) Create(obj *corev1api.Namespace) (*corev1api.Namespace, error) {
 	args := c.Called(obj)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
 func (c *FakeNamespaceClient) Watch(options metav1.ListOptions) (watch.Interface, error) {
@@ -46,14 +46,14 @@ func (c *FakeNamespaceClient) Watch(options metav1.ListOptions) (watch.Interface
 	return args.Get(0).(watch.Interface), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Get(name string, opts metav1.GetOptions) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) Get(name string, opts metav1.GetOptions) (*corev1api.Namespace, error) {
 	args := c.Called(name, opts)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (*corev1api.Namespace, error) {
 	args := c.Called(name, pt, data, subresources)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
 func (c *FakeNamespaceClient) Delete(name string, opts *metav1.DeleteOptions) error {
@@ -61,17 +61,17 @@ func (c *FakeNamespaceClient) Delete(name string, opts *metav1.DeleteOptions) er
 	return args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Finalize(item *v1.Namespace) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) Finalize(item *corev1api.Namespace) (*corev1api.Namespace, error) {
 	args := c.Called(item)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Update(namespace *v1.Namespace) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) Update(namespace *corev1api.Namespace) (*corev1api.Namespace, error) {
 	args := c.Called(namespace)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) UpdateStatus(namespace *v1.Namespace) (*v1.Namespace, error) {
+func (c *FakeNamespaceClient) UpdateStatus(namespace *corev1api.Namespace) (*corev1api.Namespace, error) {
 	args := c.Called(namespace)
-	return args.Get(0).(*v1.Namespace), args.Error(1)
+	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
