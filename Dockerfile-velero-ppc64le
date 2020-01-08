@@ -27,6 +27,6 @@ RUN apt-get update && \
 
 ADD /bin/linux/ppc64le/velero /velero
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT ["/velero"]

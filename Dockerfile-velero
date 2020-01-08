@@ -28,6 +28,6 @@ RUN apt-get update && \
 
 ADD /bin/linux/amd64/velero /velero
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT ["/velero"]
