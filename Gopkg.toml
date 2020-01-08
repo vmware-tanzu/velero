@@ -131,3 +131,12 @@
 [[override]]
   name = "golang.org/x/sys"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  version = "~1.0"
+
+# needed by the prometheus golang client
+[[override]]
+  name = "github.com/prometheus/procfs"
+  version = "=0.0.2"
