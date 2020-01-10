@@ -133,7 +133,7 @@ func ServiceAccounts(items ...metav1.Object) *APIResource {
 func CRDs(items ...metav1.Object) *APIResource {
 	return &APIResource{
 		Group:      "apiextensions.k8s.io",
-		Version:    "v1beta1",
+		Version:    "v1",
 		Name:       "customresourcedefinitions",
 		ShortName:  "crd",
 		Namespaced: false,
