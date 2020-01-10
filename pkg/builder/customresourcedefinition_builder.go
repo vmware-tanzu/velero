@@ -17,21 +17,21 @@ limitations under the License.
 package builder
 
 import (
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CustomResourceDefinitionBuilder builds CustomResourceDefinition objects.
 type CustomResourceDefinitionBuilder struct {
-	object *apiextv1beta1.CustomResourceDefinition
+	object *apiextv1.CustomResourceDefinition
 }
 
 // ForCustomResourceDefinition is the constructor for a CustomResourceDefinitionBuilder.
 func ForCustomResourceDefinition(name string) *CustomResourceDefinitionBuilder {
 	return &CustomResourceDefinitionBuilder{
-		object: &apiextv1beta1.CustomResourceDefinition{
+		object: &apiextv1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: apiextv1beta1.SchemeGroupVersion.String(),
+				APIVersion: apiextv1.SchemeGroupVersion.String(),
 				Kind:       "CustomResourceDefinition",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -42,7 +42,7 @@ func ForCustomResourceDefinition(name string) *CustomResourceDefinitionBuilder {
 }
 
 // Result returns the built CustomResourceDefinition.
-func (b *CustomResourceDefinitionBuilder) Result() *apiextv1beta1.CustomResourceDefinition {
+func (b *CustomResourceDefinitionBuilder) Result() *apiextv1.CustomResourceDefinition {
 	return b.object
 }
 

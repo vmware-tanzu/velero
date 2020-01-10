@@ -44,7 +44,7 @@ import (
 	"io/ioutil"
 
 	apiextinstall "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -56,10 +56,10 @@ var rawCRDs = [][]byte{
 
 var CRDs = crds()
 
-func crds() []*apiextv1beta1.CustomResourceDefinition {
+func crds() []*apiextv1.CustomResourceDefinition {
 	apiextinstall.Install(scheme.Scheme)
 	decode := scheme.Codecs.UniversalDeserializer().Decode
-	var objs []*apiextv1beta1.CustomResourceDefinition
+	var objs []*apiextv1.CustomResourceDefinition
 	for _, crd := range rawCRDs {
 		gzr, err := gzip.NewReader(bytes.NewReader(crd))
 		if err != nil {
@@ -75,7 +75,7 @@ func crds() []*apiextv1beta1.CustomResourceDefinition {
 		if err != nil {
 			panic(err)
 		}
-		objs = append(objs, obj.(*apiextv1beta1.CustomResourceDefinition))
+		objs = append(objs, obj.(*apiextv1.CustomResourceDefinition))
 	}
 	return objs
 }
