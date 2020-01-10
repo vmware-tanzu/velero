@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/duration"
-	"k8s.io/kubernetes/pkg/printers"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -43,18 +42,14 @@ var (
 	}
 )
 
-func printBackupList(list *velerov1api.BackupList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printBackupList(list *velerov1api.BackupList) []metav1.TableRow {
 	sortBackupsByPrefixAndTimestamp(list)
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printBackup(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printBackup(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
 // sort by default alphabetically, but if backups stem from a common schedule
@@ -83,7 +78,7 @@ func sortBackupsByPrefixAndTimestamp(list *velerov1api.BackupList) {
 	})
 }
 
-func printBackup(backup *velerov1api.Backup, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printBackup(backup *velerov1api.Backup) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: backup},
 	}
@@ -116,7 +111,7 @@ func printBackup(backup *velerov1api.Backup, options printers.PrintOptions) ([]m
 
 	row.Cells = append(row.Cells, backup.Name, status, backup.Status.StartTimestamp, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector))
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }
 
 func humanReadableTimeFromNow(when time.Time) string {

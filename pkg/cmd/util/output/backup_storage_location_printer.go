@@ -19,7 +19,6 @@ package output
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -35,20 +34,16 @@ var (
 	}
 )
 
-func printBackupStorageLocationList(list *v1.BackupStorageLocationList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printBackupStorageLocationList(list *v1.BackupStorageLocationList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printBackupStorageLocation(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printBackupStorageLocation(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
-func printBackupStorageLocation(location *v1.BackupStorageLocation, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printBackupStorageLocation(location *v1.BackupStorageLocation) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: location},
 	}
@@ -70,5 +65,5 @@ func printBackupStorageLocation(location *v1.BackupStorageLocation, options prin
 		accessMode,
 	)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

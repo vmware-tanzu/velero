@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package output
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -33,20 +32,16 @@ var (
 	}
 )
 
-func printVolumeSnapshotLocationList(list *v1.VolumeSnapshotLocationList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printVolumeSnapshotLocationList(list *v1.VolumeSnapshotLocationList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printVolumeSnapshotLocation(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printVolumeSnapshotLocation(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
-func printVolumeSnapshotLocation(location *v1.VolumeSnapshotLocation, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printVolumeSnapshotLocation(location *v1.VolumeSnapshotLocation) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: location},
 	}
@@ -56,5 +51,5 @@ func printVolumeSnapshotLocation(location *v1.VolumeSnapshotLocation, options pr
 		location.Spec.Provider,
 	)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

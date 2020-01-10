@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,9 +25,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
+	"k8s.io/cli-runtime/pkg/printers"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 )
@@ -141,26 +143,90 @@ func printEncoded(obj runtime.Object, format string) (bool, error) {
 }
 
 func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
-	printer, err := NewPrinter(cmd)
+	// 1. generate table
+	var table *metav1.Table
+
+	switch obj.(type) {
+	case *velerov1api.Backup:
+		table = &metav1.Table{
+			ColumnDefinitions: backupColumns,
+			Rows:              printBackup(obj.(*velerov1api.Backup)),
+		}
+	case *velerov1api.BackupList:
+		table = &metav1.Table{
+			ColumnDefinitions: backupColumns,
+			Rows:              printBackupList(obj.(*velerov1api.BackupList)),
+		}
+	case *velerov1api.Restore:
+		table = &metav1.Table{
+			ColumnDefinitions: restoreColumns,
+			Rows:              printRestore(obj.(*velerov1api.Restore)),
+		}
+	case *velerov1api.RestoreList:
+		table = &metav1.Table{
+			ColumnDefinitions: restoreColumns,
+			Rows:              printRestoreList(obj.(*velerov1api.RestoreList)),
+		}
+	case *velerov1api.Schedule:
+		table = &metav1.Table{
+			ColumnDefinitions: scheduleColumns,
+			Rows:              printSchedule(obj.(*velerov1api.Schedule)),
+		}
+	case *velerov1api.ScheduleList:
+		table = &metav1.Table{
+			ColumnDefinitions: scheduleColumns,
+			Rows:              printScheduleList(obj.(*velerov1api.ScheduleList)),
+		}
+	case *velerov1api.ResticRepository:
+		table = &metav1.Table{
+			ColumnDefinitions: resticRepoColumns,
+			Rows:              printResticRepo(obj.(*velerov1api.ResticRepository)),
+		}
+	case *velerov1api.ResticRepositoryList:
+		table = &metav1.Table{
+			ColumnDefinitions: resticRepoColumns,
+			Rows:              printResticRepoList(obj.(*velerov1api.ResticRepositoryList)),
+		}
+	case *velerov1api.BackupStorageLocation:
+		table = &metav1.Table{
+			ColumnDefinitions: backupStorageLocationColumns,
+			Rows:              printBackupStorageLocation(obj.(*velerov1api.BackupStorageLocation)),
+		}
+	case *velerov1api.BackupStorageLocationList:
+		table = &metav1.Table{
+			ColumnDefinitions: backupStorageLocationColumns,
+			Rows:              printBackupStorageLocationList(obj.(*velerov1api.BackupStorageLocationList)),
+		}
+	case *velerov1api.VolumeSnapshotLocation:
+		table = &metav1.Table{
+			ColumnDefinitions: volumeSnapshotLocationColumns,
+			Rows:              printVolumeSnapshotLocation(obj.(*velerov1api.VolumeSnapshotLocation)),
+		}
+	case *velerov1api.VolumeSnapshotLocationList:
+		table = &metav1.Table{
+			ColumnDefinitions: volumeSnapshotLocationColumns,
+			Rows:              printVolumeSnapshotLocationList(obj.(*velerov1api.VolumeSnapshotLocationList)),
+		}
+	case *velerov1api.ServerStatusRequest:
+		table = &metav1.Table{
+			ColumnDefinitions: pluginColumns,
+			Rows:              printPluginList(obj.(*velerov1api.ServerStatusRequest)),
+		}
+	default:
+		return false, errors.Errorf("type %T is not supported", obj)
+	}
+
+	if table == nil {
+		return false, errors.Errorf("error generating table for type %T", obj)
+	}
+
+	// 2. print table
+	tablePrinter, err := NewPrinter(cmd)
 	if err != nil {
 		return false, err
 	}
 
-	printer.TableHandler(backupColumns, printBackup)
-	printer.TableHandler(backupColumns, printBackupList)
-	printer.TableHandler(restoreColumns, printRestore)
-	printer.TableHandler(restoreColumns, printRestoreList)
-	printer.TableHandler(scheduleColumns, printSchedule)
-	printer.TableHandler(scheduleColumns, printScheduleList)
-	printer.TableHandler(resticRepoColumns, printResticRepo)
-	printer.TableHandler(resticRepoColumns, printResticRepoList)
-	printer.TableHandler(backupStorageLocationColumns, printBackupStorageLocation)
-	printer.TableHandler(backupStorageLocationColumns, printBackupStorageLocationList)
-	printer.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocation)
-	printer.TableHandler(volumeSnapshotLocationColumns, printVolumeSnapshotLocationList)
-	printer.TableHandler(pluginColumns, printPluginList)
-
-	err = printer.PrintObj(obj, os.Stdout)
+	err = tablePrinter.PrintObj(table, os.Stdout)
 	if err != nil {
 		return false, err
 	}
@@ -170,7 +236,7 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 
 // NewPrinter returns a printer for doing human-readable table printing of
 // Velero objects.
-func NewPrinter(cmd *cobra.Command) (*printers.HumanReadablePrinter, error) {
+func NewPrinter(cmd *cobra.Command) (printers.ResourcePrinter, error) {
 	options := printers.PrintOptions{
 		ShowLabels:   GetShowLabelsValue(cmd),
 		ColumnLabels: GetLabelColumnsValues(cmd),
