@@ -14,7 +14,8 @@ spec:
     listKind: ServerStatusRequestList
     plural: serverstatusrequests
     singular: serverstatusrequest
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: ServerStatusRequest is a request to access current status information

@@ -14,7 +14,8 @@ spec:
     listKind: BackupStorageLocationList
     plural: backupstoragelocations
     singular: backupstoragelocation
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: BackupStorageLocation is a location where Velero stores backup

@@ -14,7 +14,8 @@ spec:
     listKind: VolumeSnapshotLocationList
     plural: volumesnapshotlocations
     singular: volumesnapshotlocation
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: VolumeSnapshotLocation is a location where Velero stores volume

@@ -14,7 +14,8 @@ spec:
     listKind: PodVolumeBackupList
     plural: podvolumebackups
     singular: podvolumebackup
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       properties:

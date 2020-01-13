@@ -14,7 +14,8 @@ spec:
     listKind: DownloadRequestList
     plural: downloadrequests
     singular: downloadrequest
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: DownloadRequest is a request to download an artifact from backup
