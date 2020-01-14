@@ -106,6 +106,12 @@
   name = "github.com/hashicorp/go-plugin"
   revision = "a1bc61569a26c0f65865932c0d55743b0567c494"
 
+# use the version specified by go.mod in the go-plugin repo
+# to make future migration to go modules easier
+[[override]]
+  name = "github.com/hashicorp/go-hclog"
+  revision = "ff2cf002a8dd750586d91dddd4470c341f981fe1"
+
 [[constraint]]
   name = "github.com/golang/protobuf"
   version = "~v1.3.1"
@@ -125,3 +131,12 @@
 [[override]]
   name = "golang.org/x/sys"
   branch = "master"
+
+[[constraint]]
+  name = "github.com/prometheus/client_golang"
+  version = "~1.0"
+
+# needed by the prometheus golang client
+[[override]]
+  name = "github.com/prometheus/procfs"
+  version = "=0.0.2"
