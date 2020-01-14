@@ -148,11 +148,35 @@ func NewBackupController(
 }
 
 func (c *backupController) resync() {
+	// recompute backup_total metric
 	backups, err := c.lister.List(labels.Everything())
 	if err != nil {
 		c.logger.Error(err, "Error computing backup_total metric")
 	} else {
 		c.metrics.SetBackupTotal(int64(len(backups)))
+	}
+
+	// recompute backup_last_successful_timestamp metric for each
+	// schedule (including the empty schedule, i.e. ad-hoc backups)
+	lastSuccessBySchedule := map[string]time.Time{}
+	for _, backup := range backups {
+		if backup.Status.Phase != velerov1api.BackupPhaseCompleted {
+			continue
+		}
+		if backup.Status.CompletionTimestamp == nil {
+			continue
+		}
+
+		schedule := backup.Labels[velerov1api.ScheduleNameLabel]
+		timestamp := backup.Status.CompletionTimestamp.Time
+
+		if timestamp.After(lastSuccessBySchedule[schedule]) {
+			lastSuccessBySchedule[schedule] = timestamp
+		}
+	}
+
+	for schedule, timestamp := range lastSuccessBySchedule {
+		c.metrics.SetBackupLastSuccessfulTimestamp(schedule, timestamp)
 	}
 }
 

@@ -297,9 +297,9 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 }
 
 // SetBackupLastSuccessfulTimestamp records the last time a backup ran successfully, Unix timestamp in seconds
-func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string) {
+func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string, time time.Time) {
 	if g, ok := m.metrics[backupLastSuccessfulTimestamp].(*prometheus.GaugeVec); ok {
-		g.WithLabelValues(backupSchedule).Set(float64(time.Now().Unix()))
+		g.WithLabelValues(backupSchedule).Set(float64(time.Unix()))
 	}
 }
 
@@ -322,7 +322,7 @@ func (m *ServerMetrics) RegisterBackupSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	m.SetBackupLastSuccessfulTimestamp(backupSchedule)
+	m.SetBackupLastSuccessfulTimestamp(backupSchedule, time.Now())
 }
 
 // RegisterBackupPartialFailure records a partially failed backup.
