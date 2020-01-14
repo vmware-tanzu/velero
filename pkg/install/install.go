@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -57,13 +57,13 @@ type ResourceGroup struct {
 }
 
 // crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
-func crdIsReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
+func crdIsReady(crd *apiextv1.CustomResourceDefinition) bool {
 	var isEstablished, namesAccepted bool
 	for _, cond := range crd.Status.Conditions {
-		if cond.Type == apiextv1beta1.Established {
+		if cond.Type == apiextv1.Established {
 			isEstablished = true
 		}
-		if cond.Type == apiextv1beta1.NamesAccepted {
+		if cond.Type == apiextv1.NamesAccepted {
 			namesAccepted = true
 		}
 	}
@@ -73,7 +73,7 @@ func crdIsReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 
 // crdsAreReady polls the API server to see if the BackupStorageLocation and VolumeSnapshotLocation CRDs are ready to create objects.
 func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(apiextv1beta1.SchemeGroupVersion.String(), "CustomResourceDefinition")
+	gvk := schema.FromAPIVersionAndKind(apiextv1.SchemeGroupVersion.String(), "CustomResourceDefinition")
 	apiResource := metav1.APIResource{
 		Name:       kindToResource["CustomResourceDefinition"],
 		Namespaced: false,
@@ -84,7 +84,7 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 	}
 	// Track all the CRDs that have been found and successfully marshalled.
 	// len should be equal to len(crdKinds) in the happy path.
-	foundCRDs := make([]*apiextv1beta1.CustomResourceDefinition, 0)
+	foundCRDs := make([]*apiextv1.CustomResourceDefinition, 0)
 	var areReady bool
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 		for _, k := range crdKinds {
@@ -95,7 +95,7 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 				return false, errors.Wrapf(err, "error waiting for %s to be ready", k)
 			}
 
-			crd := new(apiextv1beta1.CustomResourceDefinition)
+			crd := new(apiextv1.CustomResourceDefinition)
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, crd); err != nil {
 				return false, errors.Wrapf(err, "error converting %s from unstructured", k)
 			}
