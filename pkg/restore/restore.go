@@ -459,10 +459,69 @@ func (ctx *context) execute() (Result, Result) {
 			merge(&warnings, &w)
 			merge(&errs, &e)
 		}
+	}
 
-		if resource == kuberesource.CustomResourceDefinitions {
-			ctx.discoveryHelper.Refresh()
-			ctx.prioritizedResources, _ = prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
+	ctx.discoveryHelper.Refresh()
+	newResources, _ := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
+
+	addedResources := make([]schema.GroupResource, 0)
+	for _, r := range newResources {
+		var found bool
+		for _, p := range ctx.prioritizedResources {
+			if r == p {
+				found = true
+			}
+		}
+		if !found {
+			addedResources = append(addedResources, r)
+		}
+	}
+
+	for _, resource := range addedResources {
+		// we don't want to explicitly restore namespace API objs because we'll handle
+		// them as a special case prior to restoring anything into them
+		if resource == kuberesource.Namespaces {
+			continue
+		}
+
+		resourceList := backupResources[resource.String()]
+		if resourceList == nil {
+			continue
+		}
+
+		for namespace, items := range resourceList.ItemsByNamespace {
+			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+				ctx.log.Infof("Skipping namespace %s", namespace)
+				continue
+			}
+
+			// get target namespace to restore into, if different
+			// from source namespace
+			targetNamespace := namespace
+			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
+				targetNamespace = target
+			}
+
+			// if we don't know whether this namespace exists yet, attempt to create
+			// it in order to ensure it exists. Try to get it from the backup tarball
+			// (in order to get any backed-up metadata), but if we don't find it there,
+			// create a blank one.
+			if namespace != "" && !existingNamespaces.Has(targetNamespace) {
+				logger := ctx.log.WithField("namespace", namespace)
+				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
+				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+					addVeleroError(&errs, err)
+					continue
+				}
+
+				// keep track of namespaces that we know exist so we don't
+				// have to try to create them multiple times
+				existingNamespaces.Insert(targetNamespace)
+			}
+
+			w, e := ctx.restoreResource(resource.String(), targetNamespace, namespace, items)
+			merge(&warnings, &w)
+			merge(&errs, &e)
 		}
 	}
 

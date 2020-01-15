@@ -455,6 +455,7 @@ func (s *server) validateBackupStorageLocations() error {
 // - Custom Resource Definitions come before Custom Resource so that they can be
 //   restored with their corresponding CRD.
 var defaultRestorePriorities = []string{
+	"customresourcedefinitions",
 	"namespaces",
 	"storageclasses",
 	"persistentvolumes",
@@ -469,7 +470,6 @@ var defaultRestorePriorities = []string{
 	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
 	// in the backup.
 	"replicasets.apps",
-	"customresourcedefinitions",
 }
 
 func (s *server) initRestic() error {
