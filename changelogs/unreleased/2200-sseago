@@ -1,0 +1,1 @@
+Bug fix: Check for nil LastMaintenanceTime in ResticRepository dueForMaintenance
