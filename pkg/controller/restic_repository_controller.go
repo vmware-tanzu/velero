@@ -243,7 +243,7 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 }
 
 func dueForMaintenance(req *v1.ResticRepository, now time.Time) bool {
-	return req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
+	return req.Status.LastMaintenanceTime == nil || req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
 }
 
 func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository, log logrus.FieldLogger) error {
