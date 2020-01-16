@@ -27,7 +27,8 @@ import (
 )
 
 // The CRDV1PreserveUnknownFieldsAction will take a CRD and inspect it for the API version and the PreserveUnknownFields value.
-// If the API Version is 1 and the PreserveUnknownFields value is True, then the x-preserve-unknown-fields value in the OpenAPIV3 schema will be set to true in order to allow Kubernetes 1.16+ servers to accept the object.
+// If the API Version is 1 and the PreserveUnknownFields value is True, then the x-preserve-unknown-fields value in the OpenAPIV3 schema will be set to True
+// and PreserveUnknownFields set to False in order to allow Kubernetes 1.16+ servers to accept the object.
 type CRDV1PreserveUnknownFieldsAction struct {
 	logger logrus.FieldLogger
 }
@@ -62,13 +63,13 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 	var crd apiextv1.CustomResourceDefinition
 
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &crd); err != nil {
-		return nil, errors.Wrap(err, "unable to conver unstructured item to custom resource definition")
+		return nil, errors.Wrap(err, "unable to convert unstructured item to custom resource definition")
 	}
 
 	// The v1 API doesn't allow the PreserveUnknownFields value to be true, so make sure the schema flag is set instead
 	if crd.Spec.PreserveUnknownFields {
 		// First, change the top-level value since the Kubernetes API server on 1.16+ will generate errors otherwise.
-		log.Info("Set PreserveUnknowFields to False")
+		log.Info("Set PreserveUnknownFields to False")
 		crd.Spec.PreserveUnknownFields = false
 
 		// Make sure all versions are set to preserve unknown fields
