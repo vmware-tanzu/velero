@@ -18,6 +18,6 @@ LABEL maintainer="Prajyot Parab <prajyot.parab@ibm.com>"
 
 ADD /bin/linux/ppc64le/velero-restic-restore-helper .
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT [ "/velero-restic-restore-helper" ]
