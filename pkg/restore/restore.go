@@ -461,9 +461,13 @@ func (ctx *context) execute() (Result, Result) {
 		}
 	}
 
+	// TODO: Re-order this logic so that CRs can be prioritized in the main loop, rather than after.
+
+	// Refresh and resolve based on CRDs added to the API server from the above restore loop.
 	ctx.discoveryHelper.Refresh()
 	newResources, _ := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
 
+	// Filter the resources to only those added since our first restore pass.
 	addedResources := make([]schema.GroupResource, 0)
 	for _, r := range newResources {
 		var found bool
@@ -472,18 +476,14 @@ func (ctx *context) execute() (Result, Result) {
 				found = true
 			}
 		}
+		// Resource hasn't already been processed, so queue it for the next loop.
 		if !found {
 			addedResources = append(addedResources, r)
 		}
 	}
 
+	// Use the same restore logic as above, but for newly available API groups
 	for _, resource := range addedResources {
-		// we don't want to explicitly restore namespace API objs because we'll handle
-		// them as a special case prior to restoring anything into them
-		if resource == kuberesource.Namespaces {
-			continue
-		}
-
 		resourceList := backupResources[resource.String()]
 		if resourceList == nil {
 			continue
