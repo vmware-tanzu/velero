@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	uuid "github.com/gofrs/uuid"
@@ -56,7 +57,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	velerosync "github.com/vmware-tanzu/velero/pkg/util/sync"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -274,6 +274,7 @@ func (kr *kubernetesRestorer) Restore(
 		actions:                    resolvedActions,
 		volumeSnapshotterGetter:    volumeSnapshotterGetter,
 		resticRestorer:             resticRestorer,
+		resticErrs:                 make(chan error),
 		pvsToProvision:             sets.NewString(),
 		pvRestorer:                 pvRestorer,
 		volumeSnapshots:            req.VolumeSnapshots,
@@ -365,7 +366,8 @@ type context struct {
 	actions                    []resolvedAction
 	volumeSnapshotterGetter    VolumeSnapshotterGetter
 	resticRestorer             restic.Restorer
-	globalWaitGroup            velerosync.ErrorGroup
+	resticWaitGroup            sync.WaitGroup
+	resticErrs                 chan error
 	pvsToProvision             sets.String
 	pvRestorer                 PVRestorer
 	volumeSnapshots            []*volume.Snapshot
@@ -454,17 +456,27 @@ func (ctx *context) execute() (Result, Result) {
 		}
 	}
 
-	// TODO timeout?
-	ctx.log.Debug("Waiting on global wait group")
-	waitErrs := ctx.globalWaitGroup.Wait()
-	ctx.log.Debug("Done waiting on global wait group")
+	// wait for all of the restic restore goroutines to be done, which is
+	// only possible once all of their errors have been received by the loop
+	// below, then close the resticErrs channel so the loop terminates.
+	go func() {
+		ctx.log.Info("Waiting for all restic restores to complete")
 
-	for _, err := range waitErrs {
+		// TODO timeout?
+		ctx.resticWaitGroup.Wait()
+		close(ctx.resticErrs)
+	}()
+
+	// this loop will only terminate when the ctx.resticErrs channel is closed
+	// in the above goroutine, *after* all errors from the goroutines have been
+	// received by this loop.
+	for err := range ctx.resticErrs {
 		// TODO not ideal to be adding these to Velero-level errors
 		// rather than a specific namespace, but don't have a way
 		// to track the namespace right now.
 		errs.Velero = append(errs.Velero, err.Error())
 	}
+	ctx.log.Info("Done waiting for all restic restores to complete")
 
 	return warnings, errs
 }
@@ -1148,11 +1160,17 @@ func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured
 	if ctx.resticRestorer == nil {
 		ctx.log.Warn("No restic restorer, not restoring pod's volumes")
 	} else {
-		ctx.globalWaitGroup.GoErrorSlice(func() []error {
+		ctx.resticWaitGroup.Add(1)
+		go func() {
+			// Done() will only be called after all errors have been successfully sent
+			// on the ctx.resticErrs channel
+			defer ctx.resticWaitGroup.Done()
+
 			pod := new(v1.Pod)
 			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(createdObj.UnstructuredContent(), &pod); err != nil {
 				ctx.log.WithError(err).Error("error converting unstructured pod")
-				return []error{err}
+				ctx.resticErrs <- err
+				return
 			}
 
 			data := restic.RestoreData{
@@ -1164,11 +1182,12 @@ func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured
 			}
 			if errs := ctx.resticRestorer.RestorePodVolumes(data); errs != nil {
 				ctx.log.WithError(kubeerrs.NewAggregate(errs)).Error("unable to successfully complete restic restores of pod's volumes")
-				return errs
-			}
 
-			return nil
-		})
+				for _, err := range errs {
+					ctx.resticErrs <- err
+				}
+			}
+		}()
 	}
 }
 
