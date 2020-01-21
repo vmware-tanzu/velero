@@ -231,14 +231,14 @@ This is useful as a starting point for more customized installations.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	var resources *unstructured.UnstructuredList
 	if o.CRDsOnly {
-		resources = install.AllCRDs()
+		resources = install.AllCRDs(f)
 	} else {
 		vo, err := o.AsVeleroOptions()
 		if err != nil {
 			return err
 		}
 
-		resources, err = install.AllResources(vo)
+		resources, err = install.AllResources(vo, f)
 		if err != nil {
 			return err
 		}

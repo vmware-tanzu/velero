@@ -21,6 +21,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,6 +30,8 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/generated/crds"
 )
 
@@ -219,14 +223,38 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 }
 
-func AllCRDs() *unstructured.UnstructuredList {
+func AllCRDs(f client.Factory) *unstructured.UnstructuredList {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	for _, crd := range crds.CRDs {
-		crd.SetLabels(labels())
-		appendUnstructured(resources, crd)
+	clientset, err := f.KubeClient()
+	if err != nil {
+		return resources
+	}
+	discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), nil)
+	if err != nil {
+		return resources
+	}
+	// Look up the preferred CRD API version
+	var preferredAPI metav1.GroupVersionForDiscovery
+	for _, ag := range discoveryHelper.APIGroups() {
+		if ag.Name == apiextv1.GroupName {
+			preferredAPI = ag.PreferredVersion
+			break
+		}
+	}
+
+	for _, obj := range crds.CRDs(preferredAPI.Version) {
+		switch obj.GetObjectKind().GroupVersionKind().GroupVersion().Version {
+		case apiextv1.SchemeGroupVersion.Version:
+			crd := obj.(*apiextv1.CustomResourceDefinition)
+			crd.SetLabels(labels())
+		case apiextv1beta1.SchemeGroupVersion.Version:
+			crd := obj.(*apiextv1beta1.CustomResourceDefinition)
+			crd.SetLabels(labels())
+		}
+		appendUnstructured(resources, obj)
 	}
 
 	return resources
@@ -234,8 +262,8 @@ func AllCRDs() *unstructured.UnstructuredList {
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
-	resources := AllCRDs()
+func AllResources(o *VeleroOptions, f client.Factory) (*unstructured.UnstructuredList, error) {
+	resources := AllCRDs(f)
 
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)
