@@ -456,12 +456,12 @@ func (ctx *context) execute() (Result, Result) {
 		}
 	}
 
-	ctx.log.Info("Waiting for all restic restores to complete")
-
 	// wait for all of the restic restore goroutines to be done, which is
 	// only possible once all of their errors have been received by the loop
 	// below, then close the resticErrs channel so the loop terminates.
 	go func() {
+		ctx.log.Info("Waiting for all restic restores to complete")
+
 		// TODO timeout?
 		ctx.resticWaitGroup.Wait()
 		close(ctx.resticErrs)
