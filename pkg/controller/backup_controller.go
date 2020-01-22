@@ -148,12 +148,44 @@ func NewBackupController(
 }
 
 func (c *backupController) resync() {
+	// recompute backup_total metric
 	backups, err := c.lister.List(labels.Everything())
 	if err != nil {
 		c.logger.Error(err, "Error computing backup_total metric")
 	} else {
 		c.metrics.SetBackupTotal(int64(len(backups)))
 	}
+
+	// recompute backup_last_successful_timestamp metric for each
+	// schedule (including the empty schedule, i.e. ad-hoc backups)
+	for schedule, timestamp := range getLastSuccessBySchedule(backups) {
+		c.metrics.SetBackupLastSuccessfulTimestamp(schedule, timestamp)
+	}
+}
+
+// getLastSuccessBySchedule finds the most recent completed backup for each schedule
+// and returns a map of schedule name -> completion time of the most recent completed
+// backup. This map includes an entry for ad-hoc/non-scheduled backups, where the key
+// is the empty string.
+func getLastSuccessBySchedule(backups []*velerov1api.Backup) map[string]time.Time {
+	lastSuccessBySchedule := map[string]time.Time{}
+	for _, backup := range backups {
+		if backup.Status.Phase != velerov1api.BackupPhaseCompleted {
+			continue
+		}
+		if backup.Status.CompletionTimestamp == nil {
+			continue
+		}
+
+		schedule := backup.Labels[velerov1api.ScheduleNameLabel]
+		timestamp := backup.Status.CompletionTimestamp.Time
+
+		if timestamp.After(lastSuccessBySchedule[schedule]) {
+			lastSuccessBySchedule[schedule] = timestamp
+		}
+	}
+
+	return lastSuccessBySchedule
 }
 
 func (c *backupController) processBackup(key string) error {
