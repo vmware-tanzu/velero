@@ -63,17 +63,17 @@ To use a different volume snapshot provider:
 
 1. Add your volume snapshot provider's plugin to Velero (look in [your provider][0]'s documentation for the image name):
 
-   ```bash
-   velero plugin add <registry/image:version>
-   ```
+    ```bash
+    velero plugin add <registry/image:version>
+    ```
 
 1. Add a volume snapshot location for your provider, following [your provider][0]'s documentation for configuration:
 
-   ```bash
-   velero snapshot-location create <NAME> \
-       --provider <PROVIDER-NAME> \
-       [--config <PROVIDER-CONFIG>]
-   ```
+    ```bash
+    velero snapshot-location create <NAME> \
+        --provider <PROVIDER-NAME> \
+        [--config <PROVIDER-CONFIG>]
+    ```
 
 ## Generate YAML only
 
