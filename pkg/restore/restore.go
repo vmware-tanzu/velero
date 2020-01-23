@@ -829,6 +829,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumes {
 		switch {
 		case hasSnapshot(name, ctx.volumeSnapshots):
+			oldName := obj.GetName()
 			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 			if err != nil {
 				addToResult(&errs, namespace, err)
@@ -865,11 +866,18 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 			if shouldRenamePV {
 				// give obj a new name, and record the mapping between the old and new names
-				oldName := obj.GetName()
-				newName, err := ctx.pvRenamer(oldName)
-				if err != nil {
-					addToResult(&errs, namespace, errors.Wrapf(err, "error renaming PV"))
-					return warnings, errs
+				var newName string
+
+				if oldName == obj.GetName() {
+					// pvRestorer hasn't modified the PV name, we need to rename the PV
+					newName, err = ctx.pvRenamer(oldName)
+					if err != nil {
+						addToResult(&errs, namespace, errors.Wrapf(err, "error renaming PV"))
+						return warnings, errs
+					}
+				} else {
+					// pvRestorer has renamed the PV, let's use the updated name
+					newName = obj.GetName()
 				}
 
 				ctx.renamedPVs[oldName] = newName
