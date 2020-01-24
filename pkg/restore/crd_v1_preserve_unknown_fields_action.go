@@ -69,7 +69,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 	// The v1 API doesn't allow the PreserveUnknownFields value to be true, so make sure the schema flag is set instead
 	if crd.Spec.PreserveUnknownFields {
 		// First, change the top-level value since the Kubernetes API server on 1.16+ will generate errors otherwise.
-		log.Info("Set PreserveUnknownFields to False")
+		log.Debug("Set PreserveUnknownFields to False")
 		crd.Spec.PreserveUnknownFields = false
 
 		// Make sure all versions are set to preserve unknown fields
@@ -77,7 +77,7 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 			// Use the address, since the XPreserveUnknownFields value is undefined or true (false is not allowed)
 			preserve := true
 			v.Schema.OpenAPIV3Schema.XPreserveUnknownFields = &preserve
-			log.Infof("Set x-preserve-unknown-fields in Open API for schema version %s", v.Name)
+			log.Debugf("Set x-preserve-unknown-fields in Open API for schema version %s", v.Name)
 		}
 	}
 
