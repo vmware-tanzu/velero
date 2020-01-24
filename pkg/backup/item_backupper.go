@@ -385,8 +385,13 @@ func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *api.VolumeSn
 }
 
 // zoneLabel is the label that stores availability-zone info
+// on PVs this is deprecated on Kubernetes >= 1.17.0
+// zoneLabelStable is the label that stores availability-zone info
 // on PVs
-const zoneLabel = "failure-domain.beta.kubernetes.io/zone"
+const (
+	zoneLabel       = "failure-domain.beta.kubernetes.io/zone"
+	zoneLabelStable = "topology.kubernetes.io/region"
+)
 
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
@@ -415,9 +420,14 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 		}
 	}
 
-	pvFailureDomainZone := pv.Labels[zoneLabel]
-	if pvFailureDomainZone == "" {
-		log.Infof("label %q is not present on PersistentVolume", zoneLabel)
+	// TODO: prefer stable labels for region in v1.18
+	pvFailureDomainZone, labelFound := pv.Labels[zoneLabel]
+	if !labelFound {
+		log.Infof("deprecated label %q is not present on PersistentVolume, checking stable label...", zoneLabel)
+		pvFailureDomainZone, labelFound = pv.Labels[zoneLabelStable]
+		if !labelFound {
+			log.Infof("label %q is not present on PersistentVolume", zoneLabelStable)
+		}
 	}
 
 	var (
