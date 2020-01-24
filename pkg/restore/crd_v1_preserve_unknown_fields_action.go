@@ -53,8 +53,8 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 		return nil, errors.Wrap(err, "could not get CRD version")
 	}
 
-	// We don't want to "fix" anything in beta CRDS at the moment, just v1 versions with preserveunknownfields = true
-	if version == "apiextensions.k8s.io/v1beta1" {
+	// We don't want to "fix" anything in beta CRDs at the moment, just v1 versions with preserveunknownfields = true
+	if version != "apiextensions.k8s.io/v1" {
 		return &velero.RestoreItemActionExecuteOutput{
 			UpdatedItem: input.Item,
 		}, nil
