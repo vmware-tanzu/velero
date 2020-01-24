@@ -26,7 +26,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
-// The CRDV1PreserveUnknownFieldsAction will take a CRD and inspect it for the API version and the PreserveUnknownFields value.
+// CRDV1PreserveUnknownFieldsAction will take a CRD and inspect it for the API version and the PreserveUnknownFields value.
 // If the API Version is 1 and the PreserveUnknownFields value is True, then the x-preserve-unknown-fields value in the OpenAPIV3 schema will be set to True
 // and PreserveUnknownFields set to False in order to allow Kubernetes 1.16+ servers to accept the object.
 type CRDV1PreserveUnknownFieldsAction struct {
