@@ -440,7 +440,9 @@ func (s *server) validateBackupStorageLocations() error {
 	return nil
 }
 
-// - Namespaces go first because all namespaced resources depend on them.
+// - Custom Resource Definitions come before Custom Resource so that they can be
+//   restored with their corresponding CRD.
+// - Namespaces go second because all namespaced resources depend on them.
 // - Storage Classes are needed to create PVs and PVCs correctly.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
@@ -452,8 +454,6 @@ func (s *server) validateBackupStorageLocations() error {
 //	 have restic restores run before controllers adopt the pods.
 // - Replica sets go before deployments/other controllers so they can be explicitly
 //	 restored and be adopted by controllers.
-// - Custom Resource Definitions come before Custom Resource so that they can be
-//   restored with their corresponding CRD.
 var defaultRestorePriorities = []string{
 	"customresourcedefinitions",
 	"namespaces",

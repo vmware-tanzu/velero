@@ -464,8 +464,16 @@ func (ctx *context) execute() (Result, Result) {
 	// TODO: Re-order this logic so that CRs can be prioritized in the main loop, rather than after.
 
 	// Refresh and resolve based on CRDs added to the API server from the above restore loop.
-	ctx.discoveryHelper.Refresh()
-	newResources, _ := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
+	// This is because CRDs have been added to the API groups but until we refresh, Velero doesn't know about the
+	// newly-added API groups in order to create the CRs from them.
+	if err := ctx.discoveryHelper.Refresh(); err != nil {
+		addVeleroError(&errs, errors.Wrap(err, "error refreshing discovery API"))
+	}
+	newResources, err := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
+	if err != nil {
+		// Is this right?
+		addVeleroError(&errs, errors.Wrap(err, "error sorting resources"))
+	}
 
 	// Filter the resources to only those added since our first restore pass.
 	addedResources := make([]schema.GroupResource, 0)
@@ -474,15 +482,17 @@ func (ctx *context) execute() (Result, Result) {
 		for _, p := range ctx.prioritizedResources {
 			if r == p {
 				found = true
+				break
 			}
 		}
 		// Resource hasn't already been processed, so queue it for the next loop.
 		if !found {
+			ctx.log.Debugf("Discovered new resource %s", r)
 			addedResources = append(addedResources, r)
 		}
 	}
 
-	// Use the same restore logic as above, but for newly available API groups
+	// Use the same restore logic as above, but for newly available API groups (CRDs)
 	for _, resource := range addedResources {
 		resourceList := backupResources[resource.String()]
 		if resourceList == nil {
