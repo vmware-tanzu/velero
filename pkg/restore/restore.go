@@ -380,7 +380,7 @@ type context struct {
 }
 
 type resourceClientKey struct {
-	resource  schema.GroupResource
+	resource  schema.GroupVersionResource
 	namespace string
 }
 
@@ -722,7 +722,7 @@ func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace
 
 func (ctx *context) getResourceClient(groupResource schema.GroupResource, obj *unstructured.Unstructured, namespace string) (client.Dynamic, error) {
 	key := resourceClientKey{
-		resource:  groupResource,
+		resource:  groupResource.WithVersion(obj.GroupVersionKind().Version),
 		namespace: namespace,
 	}
 
