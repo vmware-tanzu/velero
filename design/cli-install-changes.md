@@ -133,7 +133,7 @@ velero config ... (run `velero plugin --list` to see what you can use to configu
 ```
 velero plugin ... Optional. (manage list of provider connectors as needed)
 velero config ... Optional. (run `velero config --get-backup-locations` to see available backup locations or `velero config --current-backup-location`; then run `velero plugin --list` to see what providers you can use if you need to configure new locations; configure locations)
-velero create/restore/schedule <BACKUP-NAME>
+velero backup/restore/schedule create/get/delete <NAME> ...
 ```
 
 The above recipe-style documentation should highlight 1) the main components of Velero, and, 2) the relationship/dependency between the main components
