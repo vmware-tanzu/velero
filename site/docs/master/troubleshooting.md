@@ -2,9 +2,24 @@
 
 These tips can help you troubleshoot known issues. If they don't help, you can [file an issue][4], or talk to us on the [#velero channel][25] on the Kubernetes Slack server.
 
-See also:
+- [Troubleshooting](#troubleshooting)
+  - [Debug installation/ setup issues](#debug-installation-setup-issues)
+  - [Debug restores](#debug-restores)
+  - [General troubleshooting information](#general-troubleshooting-information)
+    - [Getting velero debug logs](#getting-velero-debug-logs)
+  - [Known issue with restoring LoadBalancer Service](#known-issue-with-restoring-loadbalancer-service)
+  - [Miscellaneous issues](#miscellaneous-issues)
+    - [Velero reports `custom resource not found` errors when starting up.](#velero-reports-custom-resource-not-found-errors-when-starting-up)
+    - [`velero backup logs` returns a `SignatureDoesNotMatch` error](#velero-backup-logs-returns-a-signaturedoesnotmatch-error)
+  - [Velero (or a pod it was backing up) restarted during a backup and the backup is stuck InProgress](#velero-or-a-pod-it-was-backing-up-restarted-during-a-backup-and-the-backup-is-stuck-inprogress)
+  - [Velero is not publishing prometheus metrics](#velero-is-not-publishing-prometheus-metrics)
+
+## Debug installation/ setup issues
 
 - [Debug installation/setup issues][2]
+
+## Debug restores
+
 - [Debug restores][1]
 
 ## General troubleshooting information
@@ -67,9 +82,42 @@ Here are some things to verify if you receive `SignatureDoesNotMatch` errors:
 Velero cannot currently resume backups that were interrupted. Backups stuck in the `InProgress` phase can be deleted with `kubectl delete backup <name> -n <velero-namespace>`.
 Backups in the `InProgress` phase have not uploaded any files to object storage.
 
+## Velero is not publishing prometheus metrics
+
+Steps to troubleshoot:
+
+- Confirm that your velero deployment has metrics publishing enabled. The [latest Velero helm charts][6] have been setup with [metrics enabled by default][7].
+- Confirm that the Velero server pod exposes the port on which the metrics server listens on. By default, this value is 8085.
+
+```yaml
+          ports:
+          - containerPort: 8085
+            name: metrics
+            protocol: TCP
+```
+
+- Confirm that the metric server is listening for and responding to connections on this port. This can be done using [port-forwarding][9] as shown below
+
+```bash
+$ kubectl -n <YOUR_VELERO_NAMESPACE> port-forward <YOUR_VELERO_POD> 8085:8085
+Forwarding from 127.0.0.1:8085 -> 8085
+Forwarding from [::1]:8085 -> 8085
+.
+.
+.
+```
+
+Now, visiting http://localhost:8085/metrics on a browser should show the metrics that are being scraped from Velero.
+
+- Confirm that the Velero server pod has the nessary [annotations][8] for prometheus to scrape metrics.
+- Confirm, from the Prometheus UI, that the Velero pod is one of the targets being scraped from Prometheus.
 
 [1]: debugging-restores.md
 [2]: debugging-install.md
 [4]: https://github.com/vmware-tanzu/velero/issues
 [5]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
+[6]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero
+[7]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero/values.yaml#L44
+[8]: https://github.com/vmware-tanzu/helm-charts/blob/master/charts/velero/values.yaml#L49-L52
+[9]: https://kubectl.docs.kubernetes.io/pages/container_debugging/port_forward_to_pods.html
 [25]: https://kubernetes.slack.com/messages/velero
