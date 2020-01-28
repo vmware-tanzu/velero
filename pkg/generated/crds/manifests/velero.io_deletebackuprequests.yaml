@@ -14,7 +14,8 @@ spec:
     listKind: DeleteBackupRequestList
     plural: deletebackuprequests
     singular: deletebackuprequest
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: DeleteBackupRequest is a request to delete one or more backups.

@@ -27,7 +27,7 @@ WORKDIR  /go/src/k8s.io/code-generator
 RUN GO111MODULE=on go mod vendor
 RUN mkdir -p /go/src/sigs.k8s.io
 WORKDIR /go/src/sigs.k8s.io
-RUN git clone -b v0.2.2 https://github.com/kubernetes-sigs/controller-tools
+RUN git clone -b v0.2.4 https://github.com/kubernetes-sigs/controller-tools
 WORKDIR /go/src/sigs.k8s.io/controller-tools
 RUN GO111MODULE=on go mod vendor
 RUN go get golang.org/x/tools/cmd/goimports

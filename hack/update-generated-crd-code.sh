@@ -42,7 +42,7 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   $@
 
 go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
-  crd \
+  crd:crdVersions=v1beta1,preserveUnknownFields=false \
   output:dir=pkg/generated/crds/manifests \
   paths=./pkg/apis/velero/v1/...
 
