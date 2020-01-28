@@ -865,23 +865,20 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			}
 
 			if shouldRenamePV {
-				// give obj a new name, and record the mapping between the old and new names
-				var newName string
-
 				if oldName == obj.GetName() {
 					// pvRestorer hasn't modified the PV name, we need to rename the PV
-					newName, err = ctx.pvRenamer(oldName)
+					name, err = ctx.pvRenamer(oldName)
 					if err != nil {
 						addToResult(&errs, namespace, errors.Wrapf(err, "error renaming PV"))
 						return warnings, errs
 					}
 				} else {
 					// pvRestorer has renamed the PV, let's use the updated name
-					newName = obj.GetName()
+					name = obj.GetName()
 				}
 
-				ctx.renamedPVs[oldName] = newName
-				obj.SetName(newName)
+				ctx.renamedPVs[oldName] = name
+				obj.SetName(name)
 
 				// add the original PV name as an annotation
 				annotations := obj.GetAnnotations()
