@@ -25,6 +25,7 @@ import (
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -150,4 +151,58 @@ func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 	}
 
 	return (isEstablished && namesAccepted)
+}
+
+// IsUnstructuredCRDReady checks an unstructured CRD to see if it's ready, with both the Established and NamesAccepted conditions.
+// TODO: Delete this function and use IsCRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
+// Duplicated function because the velero install package uses IsCRDReady with the beta types.
+func IsUnstructuredCRDReady(crd *unstructured.Unstructured) (bool, error) {
+	var isEstablished, namesAccepted bool
+
+	conditions, ok, err := unstructured.NestedSlice(crd.UnstructuredContent(), "status", "conditions")
+	if !ok {
+		return false, nil
+	}
+	if err != nil {
+		return false, errors.Wrap(err, "unable to access CRD's conditions")
+	}
+
+	for _, c := range conditions {
+		// Unlike the typed version of this function, we need to cast the Condition since it's an interface{} here,
+		// then we fetch the type and status of the Condition before inspecting them for relevant values
+		cond, ok := c.(map[string]interface{})
+		if !ok {
+			return false, errors.New("unable to convert condition to map[string]interface{}")
+		}
+		conditionType, ok, err := unstructured.NestedString(cond, "type")
+		if !ok {
+			// This should never happen unless someone manually edits the serialized data.
+			return false, errors.New("condition missing a type")
+		}
+
+		if err != nil {
+			return false, errors.Wrap(err, "unable to access condition's type")
+		}
+
+		status, ok, err := unstructured.NestedString(cond, "status")
+		if !ok {
+			// This should never happen unless someone manually edits the serialized data.
+			return false, errors.New("condition missing a status")
+		}
+
+		if err != nil {
+			return false, errors.Wrap(err, "unable to access condition's status")
+		}
+
+		// Here is the actual logic of the function
+		// Cast the API's types into strings since we're pulling strings out of the unstructured data.
+		if conditionType == string(apiextv1beta1.Established) && status == string(apiextv1beta1.ConditionTrue) {
+			isEstablished = true
+		}
+		if conditionType == string(apiextv1beta1.NamesAccepted) && status == string(apiextv1beta1.ConditionTrue) {
+			namesAccepted = true
+		}
+	}
+
+	return (isEstablished && namesAccepted), nil
 }

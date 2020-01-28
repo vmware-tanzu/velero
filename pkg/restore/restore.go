@@ -32,7 +32,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -763,12 +762,13 @@ func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, e
 			return true, err
 		}
 
-		clusterCRD := new(apiextv1beta1.CustomResourceDefinition)
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstructuredCRD.Object, clusterCRD); err != nil {
+		// TODO: Due to upstream conversion issues in runtime.FromUnstructured, we use the unstructured object here.
+		// Once the upstream conversion functions are fixed, we should convert to the CRD types and use IsCRDReady
+		available, err = kube.IsUnstructuredCRDReady(unstructuredCRD)
+
+		if err != nil {
 			return true, err
 		}
-
-		available = kube.IsCRDReady(clusterCRD)
 
 		if !available {
 			crdLogger.Debug("CRD not yet ready for use")
