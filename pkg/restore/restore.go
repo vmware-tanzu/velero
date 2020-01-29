@@ -466,12 +466,16 @@ func (ctx *context) execute() (Result, Result) {
 	// This is because CRDs have been added to the API groups but until we refresh, Velero doesn't know about the
 	// newly-added API groups in order to create the CRs from them.
 	if err := ctx.discoveryHelper.Refresh(); err != nil {
-		addVeleroError(&errs, errors.Wrap(err, "error refreshing discovery API"))
+		// Don't break on error here, since newResources will be the same as the original prioritizedResources,
+		// and thus addedResources will end up being empty and we'll restore nothing.
+		// Since we're continuing the restore, add a warning, not an error.
+		addVeleroError(&warnings, errors.Wrap(err, "error refreshing discovery API"))
 	}
 	newResources, err := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
 	if err != nil {
-		// Is this right?
-		addVeleroError(&errs, errors.Wrap(err, "error sorting resources"))
+		// If there was an error, then newResources will be nil, so we can continue on the restore.
+		// addedResources will end up being nil, but we should still report this failure.
+		addVeleroError(&warnings, errors.Wrap(err, "error sorting resources"))
 	}
 
 	// Filter the resources to only those added since our first restore pass.
