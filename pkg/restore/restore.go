@@ -865,20 +865,21 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			}
 
 			if shouldRenamePV {
+				var pvName string
 				if oldName == obj.GetName() {
 					// pvRestorer hasn't modified the PV name, we need to rename the PV
-					name, err = ctx.pvRenamer(oldName)
+					pvName, err = ctx.pvRenamer(oldName)
 					if err != nil {
 						addToResult(&errs, namespace, errors.Wrapf(err, "error renaming PV"))
 						return warnings, errs
 					}
 				} else {
-					// pvRestorer has renamed the PV, let's use the updated name
-					name = obj.GetName()
+					// VolumeSnapshotter could have modified the PV name through function `SetVolumeID`,
+					pvName = obj.GetName()
 				}
 
-				ctx.renamedPVs[oldName] = name
-				obj.SetName(name)
+				ctx.renamedPVs[oldName] = pvName
+				obj.SetName(pvName)
 
 				// add the original PV name as an annotation
 				annotations := obj.GetAnnotations()

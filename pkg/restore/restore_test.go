@@ -1731,6 +1731,9 @@ func (vsg volumeSnapshotterGetter) GetVolumeSnapshotter(name string) (velero.Vol
 type volumeSnapshotter struct {
 	// a map from snapshotID to volumeID
 	snapshotVolumes map[string]string
+
+	// a map from volumeID to new pv name
+	pvName map[string]string
 }
 
 // Init is a no-op.
@@ -1751,8 +1754,15 @@ func (vs *volumeSnapshotter) CreateVolumeFromSnapshot(snapshotID, volumeType, vo
 
 // SetVolumeID sets the persistent volume's spec.awsElasticBlockStore.volumeID field
 // with the provided volumeID.
-func (*volumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
+func (vs *volumeSnapshotter) SetVolumeID(pv runtime.Unstructured, volumeID string) (runtime.Unstructured, error) {
 	unstructured.SetNestedField(pv.UnstructuredContent(), volumeID, "spec", "awsElasticBlockStore", "volumeID")
+
+	newPVName, ok := vs.pvName[volumeID]
+	if !ok {
+		return pv, nil
+	}
+
+	unstructured.SetNestedField(pv.UnstructuredContent(), newPVName, "metadata", "name")
 	return pv, nil
 }
 
@@ -2227,6 +2237,71 @@ func TestRestorePersistentVolumes(t *testing.T) {
 					builder.ForPersistentVolume("pv-1").
 						ReclaimPolicy(corev1api.PersistentVolumeReclaimRetain).
 						AWSEBSVolumeID("old-volume").
+						Result(),
+				),
+			},
+		},
+		{
+			name:    "when a PV with a snapshot is used by a PVC in a namespace that's being remapped, and the original PV exists in-cluster, the PV is renamed by volumesnapshotter",
+			restore: defaultRestore().NamespaceMappings("source-ns", "target-ns").Result(),
+			backup:  defaultBackup().Result(),
+			tarball: newTarWriter(t).
+				addItems(
+					"persistentvolumes",
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				).
+				addItems(
+					"persistentvolumeclaims",
+					builder.ForPersistentVolumeClaim("source-ns", "pvc-1").VolumeName("source-pv").Result(),
+				).
+				done(),
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+				),
+				test.PVCs(),
+			},
+			volumeSnapshots: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "source-pv",
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "snapshot-1",
+					},
+				},
+			},
+			volumeSnapshotLocations: []*velerov1api.VolumeSnapshotLocation{
+				builder.ForVolumeSnapshotLocation(velerov1api.DefaultNamespace, "default").Provider("provider-1").Result(),
+			},
+			volumeSnapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"provider-1": &volumeSnapshotter{
+					snapshotVolumes: map[string]string{"snapshot-1": "new-volume"},
+					pvName:          map[string]string{"new-volume": "volumesnapshotter-renamed-source-pv"},
+				},
+			},
+			want: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("source-pv").AWSEBSVolumeID("source-volume").ClaimRef("source-ns", "pvc-1").Result(),
+					// note that the renamed PV is not expected to have a claimRef in this test; that would be
+					// added after creation by the Kubernetes PV/PVC controller when it does a bind.
+					builder.ForPersistentVolume("volumesnapshotter-renamed-source-pv").
+						ObjectMeta(
+							builder.WithAnnotations("velero.io/original-pv-name", "source-pv"),
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						AWSEBSVolumeID("new-volume").
+						Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("target-ns", "pvc-1").
+						ObjectMeta(
+							builder.WithLabels("velero.io/backup-name", "backup-1", "velero.io/restore-name", "restore-1"),
+						).
+						VolumeName("volumesnapshotter-renamed-source-pv").
 						Result(),
 				),
 			},
