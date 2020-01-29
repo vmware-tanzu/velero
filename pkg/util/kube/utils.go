@@ -156,6 +156,7 @@ func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 // IsUnstructuredCRDReady checks an unstructured CRD to see if it's ready, with both the Established and NamesAccepted conditions.
 // TODO: Delete this function and use IsCRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
 // Duplicated function because the velero install package uses IsCRDReady with the beta types.
+// See https://github.com/kubernetes/kubernetes/issues/87675
 func IsUnstructuredCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	var isEstablished, namesAccepted bool
 
