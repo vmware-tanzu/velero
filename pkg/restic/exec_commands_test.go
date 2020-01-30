@@ -74,6 +74,7 @@ func Test_getLastLine(t *testing.T) {
 second line
 third line
 `, "third line"},
+		{"", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
