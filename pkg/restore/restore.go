@@ -790,7 +790,7 @@ func (ctx *context) restoreResource(resource, targetNamespace, originalNamespace
 
 		obj, err := ctx.unmarshal(itemPath)
 		if err != nil {
-			errs.AddToResult(targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
+			errs.Add(targetNamespace, fmt.Errorf("error decoding %q: %v", strings.Replace(itemPath, ctx.restoreDir+"/", "", -1), err))
 			continue
 		}
 
@@ -890,7 +890,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 	complete, err := isCompleted(obj, groupResource)
 	if err != nil {
-		errs.AddToResult(namespace, fmt.Errorf("error checking completion of %q: %v", resourceID, err))
+		errs.Add(namespace, fmt.Errorf("error checking completion of %q: %v", resourceID, err))
 		return warnings, errs
 	}
 	if complete {
@@ -929,7 +929,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		case hasSnapshot(name, ctx.volumeSnapshots):
 			shouldRenamePV, err := shouldRenamePV(ctx, obj, resourceClient)
 			if err != nil {
-				errs.AddToResult(namespace, err)
+				errs.Add(namespace, err)
 				return warnings, errs
 			}
 
@@ -939,7 +939,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				// a volume from the snapshot, in order to avoid orphaned volumes (GH #609)
 				shouldRestoreSnapshot, err = ctx.shouldRestore(name, resourceClient)
 				if err != nil {
-					errs.AddToResult(namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
+					errs.Add(namespace, errors.Wrapf(err, "error waiting on in-cluster persistentvolume %s", name))
 					return warnings, errs
 				}
 			} else {
@@ -955,7 +955,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				ctx.log.Infof("Restoring persistent volume from snapshot.")
 				updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 				if err != nil {
-					errs.AddToResult(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+					errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
 					return warnings, errs
 				}
 				obj = updatedObj
@@ -966,7 +966,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				oldName := obj.GetName()
 				newName, err := ctx.pvRenamer(oldName)
 				if err != nil {
-					errs.AddToResult(namespace, errors.Wrapf(err, "error renaming PV"))
+					errs.Add(namespace, errors.Wrapf(err, "error renaming PV"))
 					return warnings, errs
 				}
 
@@ -1003,7 +1003,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			// when its PVC is restored.
 			updatedObj, err := ctx.pvRestorer.executePVAction(obj)
 			if err != nil {
-				errs.AddToResult(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
+				errs.Add(namespace, fmt.Errorf("error executing PVAction for %s: %v", resourceID, err))
 				return warnings, errs
 			}
 			obj = updatedObj
@@ -1012,7 +1012,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 	// clear out non-core metadata fields & status
 	if obj, err = resetMetadataAndStatus(obj); err != nil {
-		errs.AddToResult(namespace, err)
+		errs.Add(namespace, err)
 		return warnings, errs
 	}
 
@@ -1029,7 +1029,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			Restore:        ctx.restore,
 		})
 		if err != nil {
-			errs.AddToResult(namespace, fmt.Errorf("error preparing %s: %v", resourceID, err))
+			errs.Add(namespace, fmt.Errorf("error preparing %s: %v", resourceID, err))
 			return warnings, errs
 		}
 
@@ -1039,7 +1039,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		}
 		unstructuredObj, ok := executeOutput.UpdatedItem.(*unstructured.Unstructured)
 		if !ok {
-			errs.AddToResult(namespace, fmt.Errorf("%s: unexpected type %T", resourceID, executeOutput.UpdatedItem))
+			errs.Add(namespace, fmt.Errorf("%s: unexpected type %T", resourceID, executeOutput.UpdatedItem))
 			return warnings, errs
 		}
 
@@ -1054,7 +1054,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 					"additionalResourceNamespace": additionalItem.Namespace,
 					"additionalResourceName":      additionalItem.Name,
 				}).Warn("unable to restore additional item")
-				warnings.AddToResult(additionalItem.Namespace, err)
+				warnings.Add(additionalItem.Namespace, err)
 
 				continue
 			}
@@ -1062,7 +1062,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			additionalResourceID := getResourceID(additionalItem.GroupResource, additionalItem.Namespace, additionalItem.Name)
 			additionalObj, err := ctx.unmarshal(itemPath)
 			if err != nil {
-				errs.AddToResult(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
+				errs.Add(namespace, errors.Wrapf(err, "error restoring additional item %s", additionalResourceID))
 			}
 
 			additionalItemNamespace := additionalItem.Namespace
@@ -1089,7 +1089,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.PersistentVolumeClaims {
 		pvc := new(v1.PersistentVolumeClaim)
 		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), pvc); err != nil {
-			errs.AddToResult(namespace, err)
+			errs.Add(namespace, err)
 			return warnings, errs
 		}
 
@@ -1109,7 +1109,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		if newName, ok := ctx.renamedPVs[pvc.Spec.VolumeName]; ok {
 			ctx.log.Infof("Updating persistent volume claim %s/%s to reference renamed persistent volume (%s -> %s)", namespace, name, pvc.Spec.VolumeName, newName)
 			if err := unstructured.SetNestedField(obj.Object, newName, "spec", "volumeName"); err != nil {
-				errs.AddToResult(namespace, err)
+				errs.Add(namespace, err)
 				return warnings, errs
 			}
 		}
@@ -1133,14 +1133,14 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		fromCluster, err := resourceClient.Get(name, metav1.GetOptions{})
 		if err != nil {
 			ctx.log.Infof("Error retrieving cluster version of %s: %v", kube.NamespaceAndName(obj), err)
-			warnings.AddToResult(namespace, err)
+			warnings.Add(namespace, err)
 			return warnings, errs
 		}
 		// Remove insubstantial metadata
 		fromCluster, err = resetMetadataAndStatus(fromCluster)
 		if err != nil {
 			ctx.log.Infof("Error trying to reset metadata for %s: %v", kube.NamespaceAndName(obj), err)
-			warnings.AddToResult(namespace, err)
+			warnings.Add(namespace, err)
 			return warnings, errs
 		}
 
@@ -1155,14 +1155,14 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 				desired, err := mergeServiceAccounts(fromCluster, obj)
 				if err != nil {
 					ctx.log.Infof("error merging secrets for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
-					warnings.AddToResult(namespace, err)
+					warnings.Add(namespace, err)
 					return warnings, errs
 				}
 
 				patchBytes, err := generatePatch(fromCluster, desired)
 				if err != nil {
 					ctx.log.Infof("error generating patch for ServiceAccount %s: %v", kube.NamespaceAndName(obj), err)
-					warnings.AddToResult(namespace, err)
+					warnings.Add(namespace, err)
 					return warnings, errs
 				}
 
@@ -1173,13 +1173,13 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 				_, err = resourceClient.Patch(name, patchBytes)
 				if err != nil {
-					warnings.AddToResult(namespace, err)
+					warnings.Add(namespace, err)
 				} else {
 					ctx.log.Infof("ServiceAccount %s successfully updated", kube.NamespaceAndName(obj))
 				}
 			default:
 				e := errors.Errorf("could not restore, %s. Warning: the in-cluster version is different than the backed-up version.", restoreErr)
-				warnings.AddToResult(namespace, e)
+				warnings.Add(namespace, e)
 			}
 			return warnings, errs
 		}
@@ -1191,7 +1191,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	// Error was something other than an AlreadyExists
 	if restoreErr != nil {
 		ctx.log.Infof("error restoring %s: %v", name, restoreErr)
-		errs.AddToResult(namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
+		errs.Add(namespace, fmt.Errorf("error restoring %s: %v", resourceID, restoreErr))
 		return warnings, errs
 	}
 
@@ -1204,9 +1204,9 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 	if groupResource == kuberesource.CustomResourceDefinitions {
 		available, err := ctx.crdAvailable(name, resourceClient)
 		if err != nil {
-			errs.AddToResult(namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
+			errs.Add(namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
 		} else if !available {
-			errs.AddToResult(namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
+			errs.Add(namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
 		}
 	}
 

@@ -52,10 +52,10 @@ func (r *Result) AddVeleroError(err error) {
 	r.Velero = append(r.Velero, err.Error())
 }
 
-// AddToResult appends an error to the provided Result, either within
+// Add appends an error to the provided Result, either within
 // the cluster-scoped list (if ns == "") or within the provided namespace's
 // entry.
-func (r *Result) AddToResult(ns string, e error) {
+func (r *Result) Add(ns string, e error) {
 	if ns == "" {
 		r.Cluster = append(r.Cluster, e.Error())
 	} else {
