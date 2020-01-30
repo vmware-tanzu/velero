@@ -81,6 +81,7 @@ third line
 			assert.Equal(t, []byte(tt.want), getLastLine([]byte(tt.output)))
 		})
 	}
+	assert.Equal(t, []byte(""), getLastLine(nil))
 }
 
 func Test_getVolumeSize(t *testing.T) {
