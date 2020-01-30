@@ -30,8 +30,6 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/client"
-	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/generated/crds"
 )
 
@@ -223,29 +221,12 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 }
 
-func AllCRDs(f client.Factory) *unstructured.UnstructuredList {
+func AllCRDs(perferredAPIVersion string) *unstructured.UnstructuredList {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	clientset, err := f.KubeClient()
-	if err != nil {
-		return resources
-	}
-	discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), nil)
-	if err != nil {
-		return resources
-	}
-	// Look up the preferred CRD API version
-	var preferredAPI metav1.GroupVersionForDiscovery
-	for _, ag := range discoveryHelper.APIGroups() {
-		if ag.Name == apiextv1.GroupName {
-			preferredAPI = ag.PreferredVersion
-			break
-		}
-	}
-
-	for _, obj := range crds.CRDs(preferredAPI.Version) {
+	for _, obj := range crds.CRDs(perferredAPIVersion) {
 		switch obj.GetObjectKind().GroupVersionKind().GroupVersion().Version {
 		case apiextv1.SchemeGroupVersion.Version:
 			crd := obj.(*apiextv1.CustomResourceDefinition)
@@ -262,8 +243,8 @@ func AllCRDs(f client.Factory) *unstructured.UnstructuredList {
 
 // AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
 // Items are unstructured, since there are different data types returned.
-func AllResources(o *VeleroOptions, f client.Factory) (*unstructured.UnstructuredList, error) {
-	resources := AllCRDs(f)
+func AllResources(o *VeleroOptions, perferredAPIVersion string) (*unstructured.UnstructuredList, error) {
+	resources := AllCRDs(perferredAPIVersion)
 
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)

@@ -19,7 +19,7 @@ package backup
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -303,8 +303,8 @@ func (rb *defaultResourceBackupper) backupCRD(
 	gr schema.GroupResource,
 	itemBackupper ItemBackupper,
 ) {
-	crdGr := schema.GroupResource{Group: apiextv1.GroupName, Resource: "customresourcedefinitions"}
-	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(apiextv1.SchemeGroupVersion,
+	crdGr := schema.GroupResource{Group: apiextv1beta1.GroupName, Resource: "customresourcedefinitions"}
+	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(apiextv1beta1.SchemeGroupVersion,
 		metav1.APIResource{
 			Name:       "customresourcedefinitions",
 			Namespaced: false,

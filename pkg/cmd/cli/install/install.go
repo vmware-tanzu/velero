@@ -28,12 +28,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/install"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 )
@@ -229,16 +231,33 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
+	clientset, err := f.KubeClient()
+	if err != nil {
+		return err
+	}
+	discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), nil)
+	if err != nil {
+		return err
+	}
+	gvr, _, err := discoveryHelper.ResourceFor(
+		schema.GroupVersionResource{
+			Group:    "apiextensions.k8s.io",
+			Resource: "customresourcedefinitions",
+		})
+	if err != nil {
+		return err
+	}
+
 	var resources *unstructured.UnstructuredList
 	if o.CRDsOnly {
-		resources = install.AllCRDs(f)
+		resources = install.AllCRDs(gvr.Version)
 	} else {
 		vo, err := o.AsVeleroOptions()
 		if err != nil {
 			return err
 		}
 
-		resources, err = install.AllResources(vo, f)
+		resources, err = install.AllResources(vo, gvr.Version)
 		if err != nil {
 			return err
 		}

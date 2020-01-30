@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -57,14 +58,28 @@ type ResourceGroup struct {
 }
 
 // crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
-func crdIsReady(crd *apiextv1.CustomResourceDefinition) bool {
+func crdIsReady(obj runtime.Object) bool {
 	var isEstablished, namesAccepted bool
-	for _, cond := range crd.Status.Conditions {
-		if cond.Type == apiextv1.Established {
-			isEstablished = true
+	switch obj.GetObjectKind().GroupVersionKind().GroupVersion().Version {
+	case apiextv1.SchemeGroupVersion.Version:
+		crd := obj.(*apiextv1.CustomResourceDefinition)
+		for _, cond := range crd.Status.Conditions {
+			if cond.Type == apiextv1.Established {
+				isEstablished = true
+			}
+			if cond.Type == apiextv1.NamesAccepted {
+				namesAccepted = true
+			}
 		}
-		if cond.Type == apiextv1.NamesAccepted {
-			namesAccepted = true
+	case apiextv1beta1.SchemeGroupVersion.Version:
+		crd := obj.(*apiextv1beta1.CustomResourceDefinition)
+		for _, cond := range crd.Status.Conditions {
+			if cond.Type == apiextv1beta1.Established {
+				isEstablished = true
+			}
+			if cond.Type == apiextv1beta1.NamesAccepted {
+				namesAccepted = true
+			}
 		}
 	}
 
@@ -84,7 +99,7 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 	}
 	// Track all the CRDs that have been found and successfully marshalled.
 	// len should be equal to len(crdKinds) in the happy path.
-	foundCRDs := make([]*apiextv1.CustomResourceDefinition, 0)
+	foundObjs := make([]runtime.Object, 0)
 	var areReady bool
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 		for _, k := range crdKinds {
@@ -95,19 +110,19 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 				return false, errors.Wrapf(err, "error waiting for %s to be ready", k)
 			}
 
-			crd := new(apiextv1.CustomResourceDefinition)
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, crd); err != nil {
+			var obj runtime.Object
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, obj); err != nil {
 				return false, errors.Wrapf(err, "error converting %s from unstructured", k)
 			}
 
-			foundCRDs = append(foundCRDs, crd)
+			foundObjs = append(foundObjs, obj)
 		}
 
-		if len(foundCRDs) != len(crdKinds) {
+		if len(foundObjs) != len(crdKinds) {
 			return false, nil
 		}
 
-		for _, crd := range foundCRDs {
+		for _, crd := range foundObjs {
 			if !crdIsReady(crd) {
 				return false, nil
 			}
