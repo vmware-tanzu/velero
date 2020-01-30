@@ -299,18 +299,20 @@ func (rb *defaultResourceBackupper) backupItem(
 // backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
 // associated with it.
 func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
-	log.Debug("Getting server preferred API version for customresourcedefinitions.apiextensions.k8s.io")
-	gvr, apiResource, err := rb.discoveryHelper.ResourceFor(schema.GroupVersionResource{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"})
+	crdGroupResource := kuberesource.CustomResourceDefinitions
+
+	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
+	gvr, apiResource, err := rb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error getting resolved resource for customresourcedefinitions.apiextensions.k8s.io")
+		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
 		return
 	}
-	log.Debugf("Got server preferred API version %s for customresourcedefinitions.apiextensions.k8s.io", gvr.Version)
+	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
 
 	log.Debugf("Getting dynamic client for %s", gvr.String())
 	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error getting dynamic client for customresourcedefinitions.apiextensions.k8s.io")
+		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
 		return
 	}
 	log.Debugf("Got dynamic client for %s", gvr.String())
