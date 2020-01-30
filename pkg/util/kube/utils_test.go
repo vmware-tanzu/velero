@@ -17,6 +17,7 @@ limitations under the License.
 package kube
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -24,8 +25,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeinformers "k8s.io/client-go/informers"
 
@@ -196,4 +200,138 @@ func TestGetVolumeDirectorySuccess(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, tc.want, dir)
 	}
+}
+
+func TestIsCRDReady(t *testing.T) {
+	tests := []struct {
+		name string
+		crd  *apiextv1beta1.CustomResourceDefinition
+		want bool
+	}{
+		{
+			name: "CRD is not established & not accepting names - not ready",
+			crd:  builder.ForCustomResourceDefinition("MyCRD").Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & not accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is not established & accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & accepting names - ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
+				Result(),
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		result := IsCRDReady(tc.crd)
+		assert.Equal(t, tc.want, result)
+	}
+}
+
+func TestIsUnstructuredCRDReady(t *testing.T) {
+	tests := []struct {
+		name string
+		crd  *apiextv1beta1.CustomResourceDefinition
+		want bool
+	}{
+		{
+			name: "CRD is not established & not accepting names - not ready",
+			crd:  builder.ForCustomResourceDefinition("MyCRD").Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & not accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is not established & accepting names - not ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).Result(),
+			want: false,
+		},
+		{
+			name: "CRD is established & accepting names - ready",
+			crd: builder.ForCustomResourceDefinition("MyCRD").
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.Established).Status(apiextv1beta1.ConditionTrue).Result()).
+				Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1beta1.NamesAccepted).Status(apiextv1beta1.ConditionTrue).Result()).
+				Result(),
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.crd)
+		require.NoError(t, err)
+		result, err := IsUnstructuredCRDReady(&unstructured.Unstructured{Object: m})
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, result)
+	}
+}
+
+// TestFromUnstructuredIntToFloatBug tests for a bug where runtime.DefaultUnstructuredConverter.FromUnstructured can't take a whole number into a float.
+// This test should fail when https://github.com/kubernetes/kubernetes/issues/87675 is fixed upstream, letting us know we can remove the IsUnstructuredCRDReady function.
+func TestFromUnstructuredIntToFloatBug(t *testing.T) {
+	b := []byte(`
+{
+	"apiVersion": "apiextensions.k8s.io/v1beta1",
+	"kind": "CustomResourceDefinition",
+	"metadata": {
+	  "name": "foos.example.foo.com"
+	},
+	"spec": {
+	  "group": "example.foo.com",
+	  "version": "v1alpha1",
+	  "scope": "Namespaced",
+	  "names": {
+		"plural": "foos",
+		"singular": "foo",
+		"kind": "Foo"
+	  },
+	  "validation": {
+		"openAPIV3Schema": {
+		  "required": [
+			"spec"
+		  ],
+		  "properties": {
+			"spec": {
+			  "required": [
+				"bar"
+			  ],
+			  "properties": {
+				"bar": {
+				  "type": "integer",
+				  "minimum": 1
+				}
+			  }
+			}
+		  }
+		}
+	  }
+	}
+  }
+`)
+
+	var obj unstructured.Unstructured
+	err := json.Unmarshal(b, &obj)
+	require.NoError(t, err)
+
+	var newCRD apiextv1beta1.CustomResourceDefinition
+	err = runtime.DefaultUnstructuredConverter.FromUnstructured(obj.UnstructuredContent(), &newCRD)
+	// If there's no error, then the upstream issue is fixed, and we need to remove our workarounds.
+	require.Error(t, err)
 }
