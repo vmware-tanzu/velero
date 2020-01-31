@@ -231,6 +231,7 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
+	// TODO: bump server-preferred API version when v1beta1 version has been deprecated
 	preferredAPIVersion := "v1beta1"
 
 	// find the server-side preferred API version
