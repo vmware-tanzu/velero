@@ -65,23 +65,23 @@ func Test_getSummaryLine(t *testing.T) {
 
 func Test_getLastLine(t *testing.T) {
 	tests := []struct {
-		output []byte
+		output string
 		want   string
 	}{
-		{[]byte(`last line
-`), "last line"},
-		{[]byte(`first line
+		{`last line
+`, "last line"},
+		{`first line
 second line
 third line
-`), "third line"},
-		{[]byte(""), ""},
-		{nil, ""},
+`, "third line"},
+		{"", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
 			assert.Equal(t, []byte(tt.want), getLastLine([]byte(tt.output)))
 		})
 	}
+	assert.Equal(t, []byte(""), getLastLine(nil))
 }
 
 func Test_getVolumeSize(t *testing.T) {
