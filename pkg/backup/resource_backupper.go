@@ -19,7 +19,6 @@ package backup
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -297,34 +296,42 @@ func (rb *defaultResourceBackupper) backupItem(
 	return backedUpItem
 }
 
-// Adds CRD to the backup if one is found corresponding to this resource
-func (rb *defaultResourceBackupper) backupCRD(
-	log logrus.FieldLogger,
-	gr schema.GroupResource,
-	itemBackupper ItemBackupper,
-) {
-	crdGr := schema.GroupResource{Group: apiextv1beta1.GroupName, Resource: "customresourcedefinitions"}
-	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(apiextv1beta1.SchemeGroupVersion,
-		metav1.APIResource{
-			Name:       "customresourcedefinitions",
-			Namespaced: false,
-		},
-		"",
-	)
-	if err != nil {
-		log.WithError(err).Error("Error getting dynamic client for CRDs")
-		return
-	}
+// backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
+// associated with it.
+func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
+	crdGroupResource := kuberesource.CustomResourceDefinitions
 
-	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
+	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
+	gvr, apiResource, err := rb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			log.WithError(errors.WithStack(err)).Error("Error getting CRD")
-		}
+		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
 		return
 	}
-	log.Infof("Found associated CRD to add to backup %s", gr.String())
-	_ = rb.backupItem(log, crdGr, itemBackupper, unstructured)
+	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
+
+	log.Debugf("Getting dynamic client for %s", gvr.String())
+	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
+		return
+	}
+	log.Debugf("Got dynamic client for %s", gvr.String())
+
+	// try to get a CRD whose name matches the provided GroupResource
+	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// not found: this means the GroupResource provided was not a
+		// custom resource, so there's no CRD to back up.
+		log.Debugf("No CRD found for GroupResource %s", gr.String())
+		return
+	}
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting CRD %s", gr.String())
+		return
+	}
+	log.Infof("Found associated CRD %s to add to backup", gr.String())
+
+	rb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured)
 }
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of
