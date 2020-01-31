@@ -153,11 +153,8 @@ func decodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
 // have a newline at the end of it, so this returns the substring between the
 // last two newlines.
 func getLastLine(b []byte) []byte {
-	if b == nil {
+	if b == nil || len(b) == 0 {
 		return []byte("")
-	}
-	if len(b) == 0 {
-		return b
 	}
 	// subslice the byte array to ignore the newline at the end of the string
 	lastNewLineIdx := bytes.LastIndex(b[:len(b)-1], []byte("\n"))
