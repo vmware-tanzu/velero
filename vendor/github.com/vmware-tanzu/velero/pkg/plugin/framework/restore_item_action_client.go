@@ -1,0 +1,126 @@
+/*
+Copyright 2017, 2019 the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package framework
+
+import (
+	"encoding/json"
+
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
+	proto "github.com/vmware-tanzu/velero/pkg/plugin/generated"
+	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+)
+
+var _ velero.RestoreItemAction = &RestoreItemActionGRPCClient{}
+
+// NewRestoreItemActionPlugin constructs a RestoreItemActionPlugin.
+func NewRestoreItemActionPlugin(options ...PluginOption) *RestoreItemActionPlugin {
+	return &RestoreItemActionPlugin{
+		pluginBase: newPluginBase(options...),
+	}
+}
+
+// RestoreItemActionGRPCClient implements the backup/ItemAction interface and uses a
+// gRPC client to make calls to the plugin server.
+type RestoreItemActionGRPCClient struct {
+	*clientBase
+	grpcClient proto.RestoreItemActionClient
+}
+
+func newRestoreItemActionGRPCClient(base *clientBase, clientConn *grpc.ClientConn) interface{} {
+	return &RestoreItemActionGRPCClient{
+		clientBase: base,
+		grpcClient: proto.NewRestoreItemActionClient(clientConn),
+	}
+}
+
+func (c *RestoreItemActionGRPCClient) AppliesTo() (velero.ResourceSelector, error) {
+	res, err := c.grpcClient.AppliesTo(context.Background(), &proto.RestoreItemActionAppliesToRequest{Plugin: c.plugin})
+	if err != nil {
+		return velero.ResourceSelector{}, fromGRPCError(err)
+	}
+
+	if res.ResourceSelector == nil {
+		return velero.ResourceSelector{}, nil
+	}
+
+	return velero.ResourceSelector{
+		IncludedNamespaces: res.ResourceSelector.IncludedNamespaces,
+		ExcludedNamespaces: res.ResourceSelector.ExcludedNamespaces,
+		IncludedResources:  res.ResourceSelector.IncludedResources,
+		ExcludedResources:  res.ResourceSelector.ExcludedResources,
+		LabelSelector:      res.ResourceSelector.Selector,
+	}, nil
+}
+
+func (c *RestoreItemActionGRPCClient) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
+	itemJSON, err := json.Marshal(input.Item.UnstructuredContent())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	itemFromBackupJSON, err := json.Marshal(input.ItemFromBackup.UnstructuredContent())
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	restoreJSON, err := json.Marshal(input.Restore)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	req := &proto.RestoreItemActionExecuteRequest{
+		Plugin:         c.plugin,
+		Item:           itemJSON,
+		ItemFromBackup: itemFromBackupJSON,
+		Restore:        restoreJSON,
+	}
+
+	res, err := c.grpcClient.Execute(context.Background(), req)
+	if err != nil {
+		return nil, fromGRPCError(err)
+	}
+
+	var updatedItem unstructured.Unstructured
+	if err := json.Unmarshal(res.Item, &updatedItem); err != nil {
+		return nil, errors.WithStack(err)
+	}
+
+	var additionalItems []velero.ResourceIdentifier
+	for _, itm := range res.AdditionalItems {
+		newItem := velero.ResourceIdentifier{
+			GroupResource: schema.GroupResource{
+				Group:    itm.Group,
+				Resource: itm.Resource,
+			},
+			Namespace: itm.Namespace,
+			Name:      itm.Name,
+		}
+
+		additionalItems = append(additionalItems, newItem)
+	}
+
+	return &velero.RestoreItemActionExecuteOutput{
+		UpdatedItem:     &updatedItem,
+		AdditionalItems: additionalItems,
+		SkipRestore:     res.SkipRestore,
+	}, nil
+}

@@ -1,0 +1,124 @@
+/*
+Copyright 2017 the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package backup
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/cmd"
+	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+)
+
+func NewDownloadCommand(f client.Factory) *cobra.Command {
+	o := NewDownloadOptions()
+	c := &cobra.Command{
+		Use:   "download NAME",
+		Short: "Download a backup",
+		Args:  cobra.ExactArgs(1),
+		Run: func(c *cobra.Command, args []string) {
+			cmd.CheckError(o.Complete(args))
+			cmd.CheckError(o.Validate(c, args, f))
+			cmd.CheckError(o.Run(c, f))
+		},
+	}
+
+	o.BindFlags(c.Flags())
+
+	return c
+}
+
+type DownloadOptions struct {
+	Name                  string
+	Output                string
+	Force                 bool
+	Timeout               time.Duration
+	InsecureSkipTLSVerify bool
+	writeOptions          int
+}
+
+func NewDownloadOptions() *DownloadOptions {
+	return &DownloadOptions{
+		Timeout: time.Minute,
+	}
+}
+
+func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
+	flags.StringVarP(&o.Output, "output", "o", o.Output, "path to output file. Defaults to <NAME>-data.tar.gz in the current directory")
+	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
+	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
+	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
+}
+
+func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
+	veleroClient, err := f.Client()
+	cmd.CheckError(err)
+
+	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *DownloadOptions) Complete(args []string) error {
+	o.Name = args[0]
+
+	o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_EXCL
+	if o.Force {
+		o.writeOptions = os.O_RDWR | os.O_CREATE | os.O_TRUNC
+	}
+
+	if o.Output == "" {
+		path, err := os.Getwd()
+		if err != nil {
+			return errors.Wrapf(err, "error getting current directory")
+		}
+		o.Output = filepath.Join(path, fmt.Sprintf("%s-data.tar.gz", o.Name))
+	}
+
+	return nil
+}
+
+func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
+	veleroClient, err := f.Client()
+	cmd.CheckError(err)
+
+	backupDest, err := os.OpenFile(o.Output, o.writeOptions, 0600)
+	if err != nil {
+		return err
+	}
+	defer backupDest.Close()
+
+	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify)
+	if err != nil {
+		os.Remove(o.Output)
+		cmd.CheckError(err)
+	}
+
+	fmt.Printf("Backup %s has been successfully downloaded to %s\n", o.Name, backupDest.Name())
+	return nil
+}
