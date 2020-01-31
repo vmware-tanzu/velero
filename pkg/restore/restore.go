@@ -284,6 +284,8 @@ func (kr *kubernetesRestorer) Restore(
 		restoredItems:              make(map[velero.ResourceIdentifier]struct{}),
 		renamedPVs:                 make(map[string]string),
 		pvRenamer:                  kr.pvRenamer,
+		discoveryHelper:            kr.discoveryHelper,
+		resourcePriorities:         kr.resourcePriorities,
 	}
 
 	return restoreCtx.execute()
@@ -377,6 +379,8 @@ type context struct {
 	restoredItems              map[velero.ResourceIdentifier]struct{}
 	renamedPVs                 map[string]string
 	pvRenamer                  func(string) (string, error)
+	discoveryHelper            discovery.Helper
+	resourcePriorities         []string
 }
 
 type resourceClientKey struct {
@@ -415,6 +419,84 @@ func (ctx *context) execute() (Result, Result) {
 			continue
 		}
 
+		resourceList := backupResources[resource.String()]
+		if resourceList == nil {
+			continue
+		}
+
+		for namespace, items := range resourceList.ItemsByNamespace {
+			if namespace != "" && !ctx.namespaceIncludesExcludes.ShouldInclude(namespace) {
+				ctx.log.Infof("Skipping namespace %s", namespace)
+				continue
+			}
+
+			// get target namespace to restore into, if different
+			// from source namespace
+			targetNamespace := namespace
+			if target, ok := ctx.restore.Spec.NamespaceMapping[namespace]; ok {
+				targetNamespace = target
+			}
+
+			// if we don't know whether this namespace exists yet, attempt to create
+			// it in order to ensure it exists. Try to get it from the backup tarball
+			// (in order to get any backed-up metadata), but if we don't find it there,
+			// create a blank one.
+			if namespace != "" && !existingNamespaces.Has(targetNamespace) {
+				logger := ctx.log.WithField("namespace", namespace)
+				ns := getNamespace(logger, getItemFilePath(ctx.restoreDir, "namespaces", "", namespace), targetNamespace)
+				if _, err := kube.EnsureNamespaceExistsAndIsReady(ns, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+					addVeleroError(&errs, err)
+					continue
+				}
+
+				// keep track of namespaces that we know exist so we don't
+				// have to try to create them multiple times
+				existingNamespaces.Insert(targetNamespace)
+			}
+
+			w, e := ctx.restoreResource(resource.String(), targetNamespace, namespace, items)
+			merge(&warnings, &w)
+			merge(&errs, &e)
+		}
+	}
+
+	// TODO: Re-order this logic so that CRs can be prioritized in the main loop, rather than after.
+
+	// Refresh and resolve based on CRDs added to the API server from the above restore loop.
+	// This is because CRDs have been added to the API groups but until we refresh, Velero doesn't know about the
+	// newly-added API groups in order to create the CRs from them.
+	if err := ctx.discoveryHelper.Refresh(); err != nil {
+		// Don't break on error here, since newResources will be the same as the original prioritizedResources,
+		// and thus addedResources will end up being empty and we'll restore nothing.
+		// Since we're continuing the restore, add a warning, not an error.
+		addVeleroError(&warnings, errors.Wrap(err, "error refreshing discovery API"))
+	}
+	newResources, err := prioritizeResources(ctx.discoveryHelper, ctx.resourcePriorities, ctx.resourceIncludesExcludes, ctx.log)
+	if err != nil {
+		// If there was an error, then newResources will be nil, so we can continue on the restore.
+		// addedResources will end up being nil, but we should still report this failure.
+		addVeleroError(&warnings, errors.Wrap(err, "error sorting resources"))
+	}
+
+	// Filter the resources to only those added since our first restore pass.
+	addedResources := make([]schema.GroupResource, 0)
+	for _, r := range newResources {
+		var found bool
+		for _, p := range ctx.prioritizedResources {
+			if r == p {
+				found = true
+				break
+			}
+		}
+		// Resource hasn't already been processed, so queue it for the next loop.
+		if !found {
+			ctx.log.Debugf("Discovered new resource %s", r)
+			addedResources = append(addedResources, r)
+		}
+	}
+
+	// Use the same restore logic as above, but for newly available API groups (CRDs)
+	for _, resource := range addedResources {
 		resourceList := backupResources[resource.String()]
 		if resourceList == nil {
 			continue
@@ -670,6 +752,42 @@ func (ctx *context) shouldRestore(name string, pvClient client.Dynamic) (bool, e
 	}
 
 	return shouldRestore, err
+}
+
+// crdAvailable waits for a CRD to be available for use before letting the restore continue.
+func (ctx *context) crdAvailable(name string, crdClient client.Dynamic) (bool, error) {
+	crdLogger := ctx.log.WithField("crdName", name)
+
+	var available bool
+	// Wait 1 minute rather than the standard resource timeout, since each CRD will transition fairly quickly
+	err := wait.PollImmediate(time.Second, time.Minute*1, func() (bool, error) {
+		unstructuredCRD, err := crdClient.Get(name, metav1.GetOptions{})
+		if err != nil {
+			return true, err
+		}
+
+		// TODO: Due to upstream conversion issues in runtime.FromUnstructured, we use the unstructured object here.
+		// Once the upstream conversion functions are fixed, we should convert to the CRD types and use IsCRDReady
+		available, err = kube.IsUnstructuredCRDReady(unstructuredCRD)
+
+		if err != nil {
+			return true, err
+		}
+
+		if !available {
+			crdLogger.Debug("CRD not yet ready for use")
+		}
+
+		// If the CRD is not available, keep polling (false, nil)
+		// If the CRD is available, break the poll and return back to caller (true, nil)
+		return available, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		crdLogger.Debug("timeout reached waiting for custom resource definition to be ready")
+	}
+
+	return available, err
 }
 
 // restoreResource restores the specified cluster or namespace scoped resource. If namespace is
@@ -1111,6 +1229,17 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 
 	if groupResource == kuberesource.Pods && len(restic.GetVolumeBackupsForPod(ctx.podVolumeBackups, obj)) > 0 {
 		restorePodVolumeBackups(ctx, createdObj, originalNamespace)
+	}
+
+	// Wait for a CRD to be available for instantiating resources
+	// before continuing.
+	if groupResource == kuberesource.CustomResourceDefinitions {
+		available, err := ctx.crdAvailable(name, resourceClient)
+		if err != nil {
+			addToResult(&errs, namespace, errors.Wrapf(err, "error verifying custom resource definition is ready to use"))
+		} else if !available {
+			addToResult(&errs, namespace, fmt.Errorf("CRD %s is not available to use for custom resources.", name))
+		}
 	}
 
 	return warnings, errs

@@ -25,7 +25,6 @@ import (
 	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // kindToResource translates a Kind (mixed case, singular) to a Resource (lowercase, plural) string.
@@ -57,38 +57,9 @@ type ResourceGroup struct {
 	OtherResources []*unstructured.Unstructured
 }
 
-// crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
-func crdIsReady(obj runtime.Object) bool {
-	var isEstablished, namesAccepted bool
-	switch obj.GetObjectKind().GroupVersionKind().GroupVersion().Version {
-	case apiextv1.SchemeGroupVersion.Version:
-		crd := obj.(*apiextv1.CustomResourceDefinition)
-		for _, cond := range crd.Status.Conditions {
-			if cond.Type == apiextv1.Established {
-				isEstablished = true
-			}
-			if cond.Type == apiextv1.NamesAccepted {
-				namesAccepted = true
-			}
-		}
-	case apiextv1beta1.SchemeGroupVersion.Version:
-		crd := obj.(*apiextv1beta1.CustomResourceDefinition)
-		for _, cond := range crd.Status.Conditions {
-			if cond.Type == apiextv1beta1.Established {
-				isEstablished = true
-			}
-			if cond.Type == apiextv1beta1.NamesAccepted {
-				namesAccepted = true
-			}
-		}
-	}
-
-	return (isEstablished && namesAccepted)
-}
-
 // crdsAreReady polls the API server to see if the BackupStorageLocation and VolumeSnapshotLocation CRDs are ready to create objects.
 func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error) {
-	gvk := schema.FromAPIVersionAndKind(apiextv1.SchemeGroupVersion.String(), "CustomResourceDefinition")
+	gvk := schema.FromAPIVersionAndKind(apiextv1beta1.SchemeGroupVersion.String(), "CustomResourceDefinition")
 	apiResource := metav1.APIResource{
 		Name:       kindToResource["CustomResourceDefinition"],
 		Namespaced: false,
@@ -99,7 +70,7 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 	}
 	// Track all the CRDs that have been found and successfully marshalled.
 	// len should be equal to len(crdKinds) in the happy path.
-	foundObjs := make([]runtime.Object, 0)
+	foundCRDs := make([]*apiextv1beta1.CustomResourceDefinition, 0)
 	var areReady bool
 	err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
 		for _, k := range crdKinds {
@@ -110,20 +81,20 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 				return false, errors.Wrapf(err, "error waiting for %s to be ready", k)
 			}
 
-			var obj runtime.Object
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, obj); err != nil {
+			crd := new(apiextv1beta1.CustomResourceDefinition)
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(unstruct.Object, crd); err != nil {
 				return false, errors.Wrapf(err, "error converting %s from unstructured", k)
 			}
 
-			foundObjs = append(foundObjs, obj)
+			foundCRDs = append(foundCRDs, crd)
 		}
 
-		if len(foundObjs) != len(crdKinds) {
+		if len(foundCRDs) != len(crdKinds) {
 			return false, nil
 		}
 
-		for _, crd := range foundObjs {
-			if !crdIsReady(crd) {
+		for _, crd := range foundCRDs {
+			if !kube.IsCRDReady(crd) {
 				return false, nil
 			}
 
