@@ -8,7 +8,7 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 ## All community meetings
 
-<iframe title="Velero Community Meetings/Open Discussions" width="560" height="315" src="https://www.youtube.com/embed/videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+{% youtube videoseries?list=PL7bmigfV0EqQRysvqvqOtRNk4L5S7uqwM %}
 
 ## Podcast shows
 
@@ -20,33 +20,37 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
 * Kubecon NA 2019 - How to Backup and Restore Your Kubernetes Cluster - Annette Clewett & Dylan Murray, Red Hat:
 
-    <iframe title="How to Backup and Restore Your Kubernetes Cluster - Annette Clewett & Dylan Murray, Red Hat" width="560" height="315" src="https://www.youtube.com/embed/JyzgS-KKuoo" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    {% youtube JyzgS-KKuoo %}
+
 </br>
 
 * Kubernetes Back Up, Restore and Migration with Velero - A NewStack interview, with guests: Carlisia Campos, Tom Spoonemore, and Efri Nattel-Shayo:
 
-    <iframe title="Kubernetes Back Up, Restore and Migration with Velero - NewStack, with guests: Carlisia Campos, Tom Spoonemore, and Efri Nattel-Shayo" width="560" height="315" src="https://www.youtube.com/embed/71NoY5CIcQ8" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    {% youtube 71NoY5CIcQ8 %}
+
 </br>
 
 * How to migrate applications between Kubernetes clusters using Velero:
 
-    <iframe title="How to migrate applications between Kubernetes clusters using Velero" width="560" height="315" src="https://www.youtube.com/embed/IZlwKMoqBqE" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    {% youtube IZlwKMoqBqE %}
+
 </br>
 
 * TGIK 080: Velero 1.0:
 
-    <iframe title="TGIK 080: Velero 1.0" width="560" height="315" src="https://www.youtube.com/embed/tj5Ey2bHsfM" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    {% youtube tj5Ey2bHsfM %}
+
 </br>
 
 * Watch our recent webinar on backup and migration strategies:
 
-    <iframe title="Kubernetes Backup and Migration Strategies using Project Velero" width="560" height="315" src="https://www.youtube.com/embed/csrSPt3HFtg" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    {% youtube csrSPt3HFtg %}
+
 </br>
 
 * Velero demo by Just me and Opensource - [ Kube 45 ] Velero - Backup & Restore Kubernetes Cluster:
 
-    <iframe title="[ Kube 45 ] Velero - Backup & Restore Kubernetes Cluster" width="560" height="315" src="https://www.youtube.com/embed/C9hzrexaIDA" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
-
+    {% youtube C9hzrexaIDA %}
 
 ## Blog posts
 
