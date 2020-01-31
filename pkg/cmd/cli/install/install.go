@@ -231,33 +231,39 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
+	preferredAPIVersion := "v1beta1"
+
+	// find the server-side preferred API version
 	clientset, err := f.KubeClient()
-	if err != nil {
-		return err
-	}
-	discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), nil)
-	if err != nil {
-		return err
-	}
-	gvr, _, err := discoveryHelper.ResourceFor(
-		schema.GroupVersionResource{
-			Group:    "apiextensions.k8s.io",
-			Resource: "customresourcedefinitions",
-		})
-	if err != nil {
-		return err
+	if err == nil {
+		// kubeconfig available
+		discoveryHelper, err := velerodiscovery.NewHelper(clientset.Discovery(), nil)
+		if err == nil {
+			// kubernetes apiserver available
+			gvr, _, err := discoveryHelper.ResourceFor(
+				schema.GroupVersionResource{
+					Group:    "apiextensions.k8s.io",
+					Resource: "customresourcedefinitions",
+				})
+			if err != nil {
+				return err
+			}
+
+			// update the preferred API version
+			preferredAPIVersion = gvr.Version
+		}
 	}
 
 	var resources *unstructured.UnstructuredList
 	if o.CRDsOnly {
-		resources = install.AllCRDs(gvr.Version)
+		resources = install.AllCRDs(preferredAPIVersion)
 	} else {
 		vo, err := o.AsVeleroOptions()
 		if err != nil {
 			return err
 		}
 
-		resources, err = install.AllResources(vo, gvr.Version)
+		resources, err = install.AllResources(vo, preferredAPIVersion)
 		if err != nil {
 			return err
 		}
