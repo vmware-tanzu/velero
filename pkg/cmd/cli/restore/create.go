@@ -171,8 +171,12 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 			return err
 		}
 	case o.ScheduleName != "":
-		if _, err := o.client.VeleroV1().Schedules(f.Namespace()).Get(o.ScheduleName, metav1.GetOptions{}); err != nil {
+		backupItems, err := o.client.VeleroV1().Backups(f.Namespace()).List(metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", api.ScheduleNameLabel, o.ScheduleName)})
+		if err != nil {
 			return err
+		}
+		if len(backupItems.Items) == 0 {
+			return errors.Errorf("No backups found for the schedule %s", o.ScheduleName)
 		}
 	}
 
