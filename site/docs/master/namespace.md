@@ -4,11 +4,7 @@ The Velero installation and backups by default are run in the `velero` namespace
 
 ### 1) Customize the namespace on the cluster 
 
-During [the Velero installation][0], use the `--namespace` flag to inform Velero where to run.
-
-```bash
-velero install --bucket <YOUR_BUCKET> --provider <YOUR_PROVIDER> --namespace <YOUR_NAMESPACE>
-```
+Use the `--namespace` flag, in conjunction with the other flags in the `velero install` command (as shown in the [the Velero install instructions][0]). This will inform Velero where to run.
 
 ### 2) Customize the namespace for operational commands
 
