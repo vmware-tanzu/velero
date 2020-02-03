@@ -1,4 +1,4 @@
-# Customize namespaces in Velero
+# Run in a custom namespace
 
 The Velero installation and backups by default are run in the `velero` namespace. However, it is possible to customize it.
 
