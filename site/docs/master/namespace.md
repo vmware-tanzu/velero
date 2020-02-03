@@ -18,6 +18,6 @@ To have namespace consistency, specify the namespace for all Velero operational 
 velero client config set namespace=<NAMESPACE_VALUE>
 ```
 
-Alternatively, you may use the glogal `--namespace` flag with any operational command to tell Velero where to run.
+Alternatively, you may use the global `--namespace` flag with any operational command to tell Velero where to run.
 
 [0]: basic-install.md#install-the-cli
