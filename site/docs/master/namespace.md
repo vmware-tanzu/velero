@@ -1,23 +1,23 @@
-# Run in custom namespace
+# Customize namespaces in Velero
 
-You can run Velero in any namespace.
+The Velero installation and backups by default are run in the `velero` namespace. However, it is possible to customize it.
 
-First, ensure you've [downloaded & extracted the latest release][0].
+### 1) Customize the namespace on the cluster 
 
-Then, install Velero using the `--namespace` flag:
+During [the Velero installation][0], use the `--namespace` flag to inform Velero where to run.
 
 ```bash
 velero install --bucket <YOUR_BUCKET> --provider <YOUR_PROVIDER> --namespace <YOUR_NAMESPACE>
 ```
 
+### 2) Customize the namespace for operational commands
 
-
-## Specify the namespace in client commands
-
-To specify the namespace for all Velero client commands, run:
+To have namespace consistency, specify the namespace for all Velero operational commands same as the namespace used to install Velero:
 
 ```bash
 velero client config set namespace=<NAMESPACE_VALUE>
 ```
+
+Alternatively, you may use the glogal `--namespace` flag with any operational command to tell Velero where to run.
 
 [0]: basic-install.md#install-the-cli
