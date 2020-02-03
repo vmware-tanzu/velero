@@ -97,18 +97,20 @@ func RunBackup(backupCmd *Command, log logrus.FieldLogger, updateFunc func(veler
 			select {
 			case <-ticker.C:
 				lastLine := getLastLine(stdoutBuf.Bytes())
-				stat, err := decodeBackupStatusLine(lastLine)
-				if err != nil {
-					log.WithError(err).Errorf("error getting restic backup progress")
-				}
+				if len(lastLine) > 0 {
+					stat, err := decodeBackupStatusLine(lastLine)
+					if err != nil {
+						log.WithError(err).Errorf("error getting restic backup progress")
+					}
 
-				// if the line contains a non-empty bytes_done field, we can update the
-				// caller with the progress
-				if stat.BytesDone != 0 {
-					updateFunc(velerov1api.PodVolumeOperationProgress{
-						TotalBytes: stat.TotalBytes,
-						BytesDone:  stat.BytesDone,
-					})
+					// if the line contains a non-empty bytes_done field, we can update the
+					// caller with the progress
+					if stat.BytesDone != 0 {
+						updateFunc(velerov1api.PodVolumeOperationProgress{
+							TotalBytes: stat.TotalBytes,
+							BytesDone:  stat.BytesDone,
+						})
+					}
 				}
 			case <-quit:
 				ticker.Stop()
@@ -153,6 +155,9 @@ func decodeBackupStatusLine(lastLine []byte) (backupStatusLine, error) {
 // have a newline at the end of it, so this returns the substring between the
 // last two newlines.
 func getLastLine(b []byte) []byte {
+	if b == nil || len(b) == 0 {
+		return []byte("")
+	}
 	// subslice the byte array to ignore the newline at the end of the string
 	lastNewLineIdx := bytes.LastIndex(b[:len(b)-1], []byte("\n"))
 	return b[lastNewLineIdx+1 : len(b)-1]
