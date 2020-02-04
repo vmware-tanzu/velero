@@ -1741,7 +1741,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 		},
 		{
-			name: "persistent volume with zone annotation creates a snapshot",
+			name: "persistent volume with deprecated zone annotation creates a snapshot",
 			req: &Request{
 				Backup: defaultBackup().Result(),
 				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
@@ -1764,6 +1764,74 @@ func TestBackupWithSnapshots(t *testing.T) {
 						PersistentVolumeName: "pv-1",
 						ProviderVolumeID:     "vol-1",
 						VolumeAZ:             "zone-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-1-snapshot",
+					},
+				},
+			},
+		},
+		{
+			name: "persistent volume with GA zone annotation creates a snapshot",
+			req: &Request{
+				Backup: defaultBackup().Result(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabels("topology.kubernetes.io/zone", "zone-1")).Result(),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1", "type-1", 100, false),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeAZ:             "zone-1",
+						VolumeType:           "type-1",
+						VolumeIOPS:           int64Ptr(100),
+					},
+					Status: volume.SnapshotStatus{
+						Phase:              volume.SnapshotPhaseCompleted,
+						ProviderSnapshotID: "vol-1-snapshot",
+					},
+				},
+			},
+		},
+		{
+			name: "persistent volume with both GA and deprecated zone annotation creates a snapshot and should use the GA",
+			req: &Request{
+				Backup: defaultBackup().Result(),
+				SnapshotLocations: []*velerov1.VolumeSnapshotLocation{
+					newSnapshotLocation("velero", "default", "default"),
+				},
+			},
+			apiResources: []*test.APIResource{
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabelsMap(map[string]string{"failure-domain.beta.kubernetes.io/zone": "zone-1-deprecated", "topology.kubernetes.io/zone": "zone-1-ga"})).Result(),
+				),
+			},
+			snapshotterGetter: map[string]velero.VolumeSnapshotter{
+				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1-ga", "type-1", 100, false),
+			},
+			want: []*volume.Snapshot{
+				{
+					Spec: volume.SnapshotSpec{
+						BackupName:           "backup-1",
+						Location:             "default",
+						PersistentVolumeName: "pv-1",
+						ProviderVolumeID:     "vol-1",
+						VolumeAZ:             "zone-1-ga",
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},

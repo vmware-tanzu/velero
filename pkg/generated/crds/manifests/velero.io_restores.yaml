@@ -14,7 +14,8 @@ spec:
     listKind: RestoreList
     plural: restores
     singular: restore
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: Restore is a Velero resource that represents the application of

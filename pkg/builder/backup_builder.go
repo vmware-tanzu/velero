@@ -164,6 +164,12 @@ func (b *BackupBuilder) StartTimestamp(val time.Time) *BackupBuilder {
 	return b
 }
 
+// CompletionTimestamp sets the Backup's completion timestamp.
+func (b *BackupBuilder) CompletionTimestamp(val time.Time) *BackupBuilder {
+	b.object.Status.CompletionTimestamp = &metav1.Time{Time: val}
+	return b
+}
+
 // Hooks sets the Backup's hooks.
 func (b *BackupBuilder) Hooks(hooks velerov1api.BackupHooks) *BackupBuilder {
 	b.object.Spec.Hooks = hooks

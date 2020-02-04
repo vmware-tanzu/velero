@@ -1,0 +1,1 @@
+bump restic to 0.9.6 to fix some issues with non AWS standard regions

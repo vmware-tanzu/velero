@@ -1,4 +1,4 @@
-# Copyright 2017, 2019 the Velero contributors.
+# Copyright 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:bionic
+FROM arm32v7/ubuntu:bionic
 
-LABEL maintainer="Steve Kriss <krisss@vmware.com>"
+ADD /bin/linux/arm/restic /usr/bin/restic
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates wget bzip2 && \
-    wget --quiet https://github.com/restic/restic/releases/download/v0.9.6/restic_0.9.6_linux_amd64.bz2 && \
-    bunzip2 restic_0.9.6_linux_amd64.bz2 && \
-    mv restic_0.9.6_linux_amd64 /usr/bin/restic && \
-    chmod +x /usr/bin/restic && \
-    apt-get remove -y wget bzip2 && \
-    rm -rf /var/lib/apt/lists/*
-
-
-ADD /bin/linux/amd64/velero /velero
+ADD /bin/linux/arm/velero /velero
 
 USER nobody:nogroup
 

@@ -738,3 +738,119 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 		})
 	}
 }
+
+// Test_getLastSuccessBySchedule verifies that the getLastSuccessBySchedule helper function correctly returns
+// the completion timestamp of the most recent completed backup for each schedule, including an entry for ad-hoc
+// or non-scheduled backups.
+func Test_getLastSuccessBySchedule(t *testing.T) {
+	buildBackup := func(phase velerov1api.BackupPhase, completion time.Time, schedule string) *velerov1api.Backup {
+		b := builder.ForBackup("", "").
+			ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, schedule)).
+			Phase(phase)
+
+		if !completion.IsZero() {
+			b.CompletionTimestamp(completion)
+		}
+
+		return b.Result()
+	}
+
+	// create a static "base time" that can be used to easily construct completion timestamps
+	// by using the .Add(...) method.
+	baseTime, err := time.Parse(time.RFC1123, time.RFC1123)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		backups []*velerov1api.Backup
+		want    map[string]time.Time
+	}{
+		{
+			name:    "when backups is nil, an empty map is returned",
+			backups: nil,
+			want:    map[string]time.Time{},
+		},
+		{
+			name:    "when backups is empty, an empty map is returned",
+			backups: []*velerov1api.Backup{},
+			want:    map[string]time.Time{},
+		},
+		{
+			name: "when multiple completed backups for a schedule exist, the latest one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{
+				"schedule-1": baseTime.Add(time.Second),
+			},
+		},
+		{
+			name: "when the most recent backup for a schedule is Failed, the timestamp of the most recent Completed one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{
+				"schedule-1": baseTime,
+			},
+		},
+		{
+			name: "when there are no Completed backups for a schedule, it's not returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseInProgress, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhasePartiallyFailed, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{},
+		},
+		{
+			name: "when backups exist without a schedule, the most recent Completed one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, ""),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), ""),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), ""),
+			},
+			want: map[string]time.Time{
+				"": baseTime,
+			},
+		},
+		{
+			name: "when backups exist for multiple schedules, the most recent Completed timestamp for each schedule is returned",
+			backups: []*velerov1api.Backup{
+				// ad-hoc backups (no schedule)
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(30*time.Minute), ""),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Hour), ""),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), ""),
+
+				// schedule-1
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+
+				// schedule-2
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(24*time.Hour), "schedule-2"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(48*time.Hour), "schedule-2"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(72*time.Hour), "schedule-2"),
+
+				// schedule-3
+				buildBackup(velerov1api.BackupPhaseNew, baseTime, "schedule-3"),
+				buildBackup(velerov1api.BackupPhaseInProgress, baseTime.Add(time.Minute), "schedule-3"),
+				buildBackup(velerov1api.BackupPhasePartiallyFailed, baseTime.Add(2*time.Minute), "schedule-3"),
+			},
+			want: map[string]time.Time{
+				"":           baseTime.Add(30 * time.Minute),
+				"schedule-1": baseTime,
+				"schedule-2": baseTime.Add(72 * time.Hour),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, getLastSuccessBySchedule(tc.backups))
+		})
+	}
+}

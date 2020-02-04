@@ -14,7 +14,8 @@ spec:
     listKind: PodVolumeRestoreList
     plural: podvolumerestores
     singular: podvolumerestore
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       properties:

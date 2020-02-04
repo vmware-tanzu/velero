@@ -34,7 +34,12 @@ type ResourceShortcuts struct {
 	LongForm  schema.GroupResource
 }
 
-// shortcutExpander is a RESTMapper that can be used for Kubernetes resources.   It expands the resource first, then invokes the wrapped
+// shortcutExpander is a RESTMapper that can be used for Kubernetes resources. It expands the
+// resource first, then invokes the wrapped RESTMapper.
+//
+// This shortcutExpander differs from the upstream one in that it takes a []*metav1.APIResourceList
+// in its constructor, rather than a discovery interface. This allows the discovery information to
+// be cached externally so it doesn't have to be re-queried every time the shortcutExpander is invoked.
 type shortcutExpander struct {
 	RESTMapper meta.RESTMapper
 
@@ -81,10 +86,6 @@ func (e shortcutExpander) RESTMappings(gk schema.GroupKind, versions ...string) 
 // Next we will append the hardcoded list of resources - to be backward compatible with old servers.
 // NOTE that the list is ordered by group priority.
 func (e shortcutExpander) getShortcutMappings() ([]ResourceShortcuts, error) {
-	// TODO delete this once discovery is working for svc and netpol
-	haveSvc := false
-	haveNetpol := false
-
 	res := []ResourceShortcuts{}
 	for _, apiResources := range e.resources {
 		for _, apiRes := range apiResources.APIResources {
@@ -99,34 +100,8 @@ func (e shortcutExpander) getShortcutMappings() ([]ResourceShortcuts, error) {
 					LongForm:  schema.GroupResource{Group: gv.Group, Resource: apiRes.Name},
 				}
 				res = append(res, rs)
-				if shortName == "svc" {
-					haveSvc = true
-				}
-				if shortName == "netpol" {
-					haveNetpol = true
-				}
 			}
 		}
-	}
-
-	// 'svc' is not exposed due to the way the services rest storage handler is installed.
-	// 'netpol' is not currently in discovery.
-	// add these 2 shortcuts until they're actually in discovery.
-	if !haveSvc {
-		res = append(res,
-			ResourceShortcuts{
-				ShortForm: schema.GroupResource{Group: "", Resource: "svc"},
-				LongForm:  schema.GroupResource{Group: "", Resource: "services"},
-			},
-		)
-	}
-	if !haveNetpol {
-		res = append(res,
-			ResourceShortcuts{
-				ShortForm: schema.GroupResource{Group: "extensions", Resource: "netpol"},
-				LongForm:  schema.GroupResource{Group: "extensions", Resource: "networkpolicies"},
-			},
-		)
 	}
 
 	return res, nil

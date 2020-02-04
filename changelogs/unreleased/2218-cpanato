@@ -1,0 +1,1 @@
+remove the schedule validation and instead of checking the schedule because we might be in another cluster we check if a backup exist with the schedule name.

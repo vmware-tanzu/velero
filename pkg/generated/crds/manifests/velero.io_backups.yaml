@@ -14,7 +14,8 @@ spec:
     listKind: BackupList
     plural: backups
     singular: backup
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: Backup is a Velero resource that respresents the capture of Kubernetes

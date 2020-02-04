@@ -14,7 +14,8 @@ spec:
     listKind: ResticRepositoryList
     plural: resticrepositories
     singular: resticrepository
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       properties:

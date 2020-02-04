@@ -14,7 +14,8 @@ spec:
     listKind: ScheduleList
     plural: schedules
     singular: schedule
-  scope: ""
+  preserveUnknownFields: false
+  scope: Namespaced
   validation:
     openAPIV3Schema:
       description: Schedule is a Velero resource that represents a pre-scheduled or
