@@ -12,6 +12,14 @@
   - [Generate YAML only](#generate-yaml-only)
   - [Additional options](#additional-options)
   - [Optional Velero CLI configurations](#optional-velero-cli-configurations)
+    - [Enabling shell autocompletion](#enabling-shell-autocompletion)
+  - [Bash on Linux](#bash-on-linux)
+    - [Install bash-completion](#install-bash-completion)
+    - [Enable Velero CLI autocompletion for Bash on Linux](#enable-velero-cli-autocompletion-for-bash-on-linux)
+  - [Bash on macOS](#bash-on-macos)
+    - [Install bash-completion](#install-bash-completion-1)
+    - [Enable Velero CLI autocompletion for Bash on macOS](#enable-velero-cli-autocompletion-for-bash-on-macos)
+  - [Autocompletion on Zsh](#autocompletion-on-zsh)
 
 ## Plugins
 
@@ -88,7 +96,7 @@ If you are installing Velero in Kubernetes 1.13.x or earlier, you need to use `k
 
 ## Additional options
 
-Run `velero install --help` or see the [Helm chart documentation](https://github.com/vmware-tanzu/helm-charts) for the full set of installation options.
+Run `velero install --help` or see the [Helm chart documentation](https://vmware-tanzu.github.io/helm-charts/) for the full set of installation options.
 
 ## Optional Velero CLI configurations
 
