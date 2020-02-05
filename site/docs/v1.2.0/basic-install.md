@@ -45,7 +45,7 @@ brew install velero
 There are two supported methods for installing the Velero server components:
 
 - the `velero install` CLI command
-- the [Helm chart](https://github.com/helm/charts/tree/master/stable/velero)
+- the [Helm chart](https://github.com/vmware-tanzu/helm-charts)
 
 Velero uses storage provider plugins to integrate with a variety of storage systems to support backup and snapshot operations. The steps to install and configure the Velero server components along with the appropriate plugins are specific to your chosen storage provider. To find installation instructions for your chosen storage provider, follow the documentation link for your provider at our [supported storage providers][0] page
 

@@ -30,9 +30,9 @@ If you are using an alternate identity mechanism, such as kube2iam/kiam on AWS, 
 
 ## Enable restic integration
 
-By default, `velero install` does not install Velero's [restic integration][3]. To enable it, specify the `--use-restic` flag. 
+By default, `velero install` does not install Velero's [restic integration][3]. To enable it, specify the `--use-restic` flag.
 
-If you've already run `velero install` without the `--use-restic` flag, you can run the same command again, including the `--use-restic` flag, to add the restic integration to your existing install. 
+If you've already run `velero install` without the `--use-restic` flag, you can run the same command again, including the `--use-restic` flag, to add the restic integration to your existing install.
 
 ## Customize resource requests and limits
 
@@ -89,7 +89,7 @@ If you are installing Velero in Kubernetes 1.13.x or earlier, you need to use `k
 
 ## Additional options
 
-Run `velero install --help` or see the [Helm chart documentation](https://github.com/helm/charts/tree/master/stable/velero) for the full set of installation options.
+Run `velero install --help` or see the [Helm chart documentation](https://github.com/vmware-tanzu/helm-charts) for the full set of installation options.
 
 ## Optional Velero CLI configurations
 
