@@ -248,7 +248,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// changed since the PVC's last backup, restic will not be able to identify a suitable
 	// parent snapshot to use, and will have to do a full rescan of the contents of the PVC.
 	if pvcUID, ok := req.Labels[velerov1api.PVCUIDLabel]; ok {
-		parentSnapshotID := getParentSnapshot(log, pvcUID, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
+		parentSnapshotID := getParentSnapshot(log, pvcUID, req.Spec.BackupStorageLocation, c.podVolumeBackupLister.PodVolumeBackups(req.Namespace))
 		if parentSnapshotID == "" {
 			log.Info("No parent snapshot found for PVC, not using --parent flag for this backup")
 		} else {
@@ -302,7 +302,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 // getParentSnapshot finds the most recent completed pod volume backup for the specified PVC and returns its
 // restic snapshot ID. Any errors encountered are logged but not returned since they do not prevent a backup
 // from proceeding.
-func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
+func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation string, podVolumeBackupLister listers.PodVolumeBackupNamespaceLister) string {
 	log = log.WithField("pvcUID", pvcUID)
 	log.Infof("Looking for most recent completed pod volume backup for this PVC")
 
@@ -320,7 +320,12 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID string, podVolumeBackupLis
 			continue
 		}
 
-		if mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time) {
+		if (mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time)) &&
+			// Check the backup storage location is the same as spec in order to support backup to multiple backup-locations.
+			// Otherwise, there exist a case that backup volume snapshot to the second location would failed, since the founded
+			// parent ID is valid for the first backup location, not the second backup location.
+			// Also, the second backup should not use first backup parent ID since eachthe parent ID is for the first backup location only.
+			(backupStorageLocation == backup.Spec.BackupStorageLocation) {
 			mostRecentBackup = backup
 		}
 	}
