@@ -12,6 +12,14 @@
   - [Generate YAML only](#generate-yaml-only)
   - [Additional options](#additional-options)
   - [Optional Velero CLI configurations](#optional-velero-cli-configurations)
+    - [Enabling shell autocompletion](#enabling-shell-autocompletion)
+      - [Bash on Linux](#bash-on-linux)
+        - [Install bash-completion](#install-bash-completion)
+        - [Enable Velero CLI autocompletion for Bash on Linux](#enable-velero-cli-autocompletion-for-bash-on-linux)
+      - [Bash on macOS](#bash-on-macos)
+        - [Install bash-completion](#install-bash-completion-1)
+        - [Enable Velero CLI autocompletion for Bash on macOS](#enable-velero-cli-autocompletion-for-bash-on-macos)
+      - [Autocompletion on Zsh](#autocompletion-on-zsh)
 
 ## Plugins
 
@@ -88,7 +96,7 @@ If you are installing Velero in Kubernetes 1.13.x or earlier, you need to use `k
 
 ## Additional options
 
-Run `velero install --help` or see the [Helm chart documentation](https://github.com/vmware-tanzu/helm-charts) for the full set of installation options.
+Run `velero install --help` or see the [Helm chart documentation](https://vmware-tanzu.github.io/helm-charts/) for the full set of installation options.
 
 ## Optional Velero CLI configurations
 
@@ -98,13 +106,13 @@ Run `velero install --help` or see the [Helm chart documentation](https://github
 
 Below are the procedures to set up autocompletion for `Bash` (including the difference between `Linux` and `macOS`) and `Zsh`.
 
-## Bash on Linux
+#### Bash on Linux
 
 The **Velero CLI** completion script for `Bash` can be generated with the command `velero completion bash`. Sourcing the completion script in your shell enables velero autocompletion.
 
 However, the completion script depends on [**bash-completion**](https://github.com/scop/bash-completion), which means that you have to install this software first (you can test if you have bash-completion already installed by running `type _init_completion`).
 
-### Install bash-completion
+##### Install bash-completion
 
 `bash-completion` is provided by many package managers (see [here](https://github.com/scop/bash-completion#installation)). You can install it with `apt-get install bash-completion` or `yum install bash-completion`, etc.
 
@@ -118,7 +126,7 @@ source /usr/share/bash-completion/bash_completion
 
 Reload your shell and verify that bash-completion is correctly installed by typing `type _init_completion`.
 
-### Enable Velero CLI autocompletion for Bash on Linux
+##### Enable Velero CLI autocompletion for Bash on Linux
 
 You now need to ensure that the **Velero CLI** completion script gets sourced in all your shell sessions. There are two ways in which you can do this:
 
@@ -145,7 +153,7 @@ You now need to ensure that the **Velero CLI** completion script gets sourced in
 
 Both approaches are equivalent. After reloading your shell, velero autocompletion should be working.
 
-## Bash on macOS
+#### Bash on macOS
 
 The **Velero CLI** completion script for Bash can be generated with `velero completion bash`. Sourcing this script in your shell enables velero completion.
 
@@ -155,7 +163,7 @@ However, the velero completion script depends on [**bash-completion**](https://g
 > There are two versions of bash-completion, v1 and v2. V1 is for Bash 3.2 (which is the default on macOS), and v2 is for Bash 4.1+. The velero completion script **doesn't work** correctly with bash-completion v1 and Bash 3.2. It requires **bash-completion v2** and **Bash 4.1+**. Thus, to be able to correctly use velero completion on macOS, you have to install and use Bash 4.1+ ([*instructions*](https://itnext.io/upgrading-bash-on-macos-7138bd1066ba)). The following instructions assume that you use Bash 4.1+ (that is, any Bash version of 4.1 or newer).
 
 
-### Install bash-completion
+##### Install bash-completion
 
 > As mentioned, these instructions assume you use Bash 4.1+, which means you will install bash-completion v2 (in contrast to Bash 3.2 and bash-completion v1, in which case kubectl completion won't work).
 
@@ -174,7 +182,7 @@ As stated in the output of this command, add the following to your `~/.bashrc` f
 
 Reload your shell and verify that bash-completion v2 is correctly installed with `type _init_completion`.
 
-### Enable Velero CLI autocompletion for Bash on macOS
+##### Enable Velero CLI autocompletion for Bash on macOS
 
 You now have to ensure that the velero completion script gets sourced in all your shell sessions. There are multiple ways to achieve this:
 
@@ -204,8 +212,7 @@ You now have to ensure that the velero completion script gets sourced in all you
 
 In any case, after reloading your shell, velero completion should be working.
 
-
-## Autocompletion on Zsh
+#### Autocompletion on Zsh
 
 The velero completion script for Zsh can be generated with the command `velero completion zsh`. Sourcing the completion script in your shell enables velero autocompletion.
 
@@ -230,7 +237,6 @@ If you get an error like `complete:13: command not found: compdef`, then add the
   autoload -Uz compinit
   compinit
   ```
-
 
 [1]: https://github.com/vmware-tanzu/velero/releases/latest
 [2]: namespace.md
