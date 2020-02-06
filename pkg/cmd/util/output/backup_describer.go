@@ -274,7 +274,12 @@ func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, velero
 	buf := new(bytes.Buffer)
 	if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupResourceList, buf, downloadRequestTimeout, insecureSkipTLSVerify); err != nil {
 		if err == downloadrequest.ErrNotFound {
-			d.Println("Resource List:\t<backup resource list not found, this could be because this backup was taken prior to Velero 1.1.0>")
+			// the backup resource list could be missing if (other reasons may exist as well):
+			//	- the backup was taken prior to v1.1; or
+			//	- the backup hasn't completed yet; or
+			//	- there was an error uploading the file; or
+			//	- the file was manually deleted after upload
+			d.Println("Resource List:\t<backup resource list not found>")
 		} else {
 			d.Printf("Resource List:\t<error getting backup resource list: %v>\n", err)
 		}
