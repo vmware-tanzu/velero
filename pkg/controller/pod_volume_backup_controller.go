@@ -320,12 +320,11 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation str
 			continue
 		}
 
-		if (mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time)) &&
-			// Check the backup storage location is the same as spec in order to support backup to multiple backup-locations.
-			// Otherwise, there exist a case that backup volume snapshot to the second location would failed, since the founded
-			// parent ID is valid for the first backup location, not the second backup location.
-			// Also, the second backup should not use first backup parent ID since eachthe parent ID is for the first backup location only.
-			(backupStorageLocation == backup.Spec.BackupStorageLocation) {
+		if backupStorageLocation != backup.Spec.BackupStorageLocation {
+			continue
+		}
+
+		if mostRecentBackup == nil || backup.Status.StartTimestamp.After(mostRecentBackup.Status.StartTimestamp.Time) {
 			mostRecentBackup = backup
 		}
 	}
