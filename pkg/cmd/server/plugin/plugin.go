@@ -38,6 +38,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
+				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
@@ -89,6 +90,10 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 
 		return action, nil
 	}
+}
+
+func newRemapCRDVersionAction(logger logrus.FieldLogger) (interface{}, error) {
+	return backup.NewRemapCRDVersionAction(logger), nil
 }
 
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {

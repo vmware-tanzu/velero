@@ -46,7 +46,12 @@ func (c *CRDV1PreserveUnknownFieldsAction) AppliesTo() (velero.ResourceSelector,
 func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActionExecuteInput) (*velero.RestoreItemActionExecuteOutput, error) {
 	c.logger.Info("Executing CRDV1PreserveUnknownFieldsAction")
 
-	log := c.logger.WithField("plugin", "CRDV1PreserveUnknownFieldsAction")
+	name, _, err := unstructured.NestedString(input.Item.UnstructuredContent(), "name")
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get CRD name")
+	}
+
+	log := c.logger.WithField("plugin", "CRDV1PreserveUnknownFieldsAction").WithField("CRD", name)
 
 	version, _, err := unstructured.NestedString(input.Item.UnstructuredContent(), "apiVersion")
 	if err != nil {
@@ -74,6 +79,11 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 
 		// Make sure all versions are set to preserve unknown fields
 		for _, v := range crd.Spec.Versions {
+			// If the Schema is nil, there are no nested fields to set, so skip over it for this version.
+			if v.Schema == nil {
+				continue
+			}
+
 			// Use the address, since the XPreserveUnknownFields value is undefined or true (false is not allowed)
 			preserve := true
 			v.Schema.OpenAPIV3Schema.XPreserveUnknownFields = &preserve
