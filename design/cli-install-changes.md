@@ -217,6 +217,7 @@ Flags moved to...
       --backup-location-config mapStringString     configuration to use for the backup storage location. Format is key1=value1,key2=value2
       --bucket string                              name of the object storage bucket where backups should be stored
       --prefix string                              prefix under which all Velero data should be stored within the bucket. Optional.
+      --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
 ```
 
 ...`snapshot-location create`
@@ -229,6 +230,7 @@ Flags moved to...
       --provider string                            provider name for backup and volume storage 
       --no-secret                                  flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.
       --secret-file string                         file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.
+      --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
 ```
 
 ...`restic`
