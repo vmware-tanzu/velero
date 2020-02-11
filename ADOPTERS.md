@@ -43,7 +43,7 @@ For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Conta
 
 ## Adding your organization to the list of Velero Adopters
 
-If you are using Velero and would like to be included in the `Velero Adopters`, add an SVG version of your logo to the `site/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
+If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
 
 ### Adding a logo to velero.io
 
