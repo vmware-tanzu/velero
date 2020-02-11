@@ -47,7 +47,7 @@ If you are using Velero and would like to be included in the `Velero Adopters`, 
 
 ### Adding a logo to velero.io
 
-If you would like to add your logo to a future `Adopters of Velero` section on [velero.io][2], follow the steps above to add your organization to the list of Velero Adopters. Our community will follow up and publish it to [velero.io][2] website.
+If you would like to add your logo to a future `Adopters of Velero` section on [velero.io][2], follow the steps above to add your organization to the list of Velero Adopters. Our community will follow up and publish it to the [velero.io][2] website.
 
 [1]: #adding-a-logo-to-veleroio
 [2]: https://velero.io
