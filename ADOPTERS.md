@@ -19,7 +19,7 @@ publicly shared the details of how they use it.
 **[BitGo][20]**  
 BitGo uses Velero backup and restore capabilities to seamlessly provision and scale fullnode statefulsets on the fly as well as having it serve an integral piece for our kubernetes disaster-recovery story.
 
-**[BugSnag][30]**  
+**[Bugsnag][30]**  
 We use Velero for managing backups of an internal instance of our on-premise clustered solution. We also recommend our users of [on-premise Bugsnag installations][31] use Velero for [managing their own backups][32].
 
 **[Banzai Cloud][60]**  
