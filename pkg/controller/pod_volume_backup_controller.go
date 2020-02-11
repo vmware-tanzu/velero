@@ -321,6 +321,10 @@ func getParentSnapshot(log logrus.FieldLogger, pvcUID, backupStorageLocation str
 		}
 
 		if backupStorageLocation != backup.Spec.BackupStorageLocation {
+			// Check the backup storage location is the same as spec in order to support backup to multiple backup-locations.
+			// Otherwise, there exists a case that backup volume snapshot to the second location would failed, since the founded
+			// parent ID is only valid for the first backup location, not the second backup location.
+			// Also, the second backup should not use the first backup parent ID since its for the first backup location only.
 			continue
 		}
 
