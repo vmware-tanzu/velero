@@ -11,6 +11,7 @@ If you're using Velero and want to add your organization to this list, feel free
 <a href="https://bugsnag.com/" border="0" target="_blank"><img alt="bugsnag.com" src="site/img/adopters/bugsnag.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 
 ## Success Stories
 
@@ -45,6 +46,10 @@ For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Conta
 **[SIGHUP][80]**  
 SIGHUP integrates Velero in its [Fury Kubernetes Distribution][81] providing predefined schedules and configurations to ensure an optimized disaster recovery experience.
 [Fury Kubernetes Disaster Recovery Module][82] is ready to be deployed into any Kubernetes cluster running anywhere.
+
+**[MayaData][90]**  
+MayaData is a large user of Velero as well as a contributor. MayaData offers a Data Agility platform called [OpenEBS Director][91], that helps customers confidently and easily manage stateful workloads in Kubernetes. Velero is one of the core software building block of the OpenEBS Director's [DMaaS or data migration as a service offering][92] used to enable data protection strategies.
+
 
 ## Adding a logo to velero.io
 
@@ -85,3 +90,8 @@ We will follow up and make the change in the [velero.io][2] website.
 [80]: https://sighup.io
 [81]: https://github.com/sighupio/fury-distribution
 [82]: https://github.com/sighupio/fury-kubernetes-dr
+
+[90]: https://mayadata.io
+[91]: https://director.mayadata.io/
+[92]: https://help.mayadata.io/hc/en-us/articles/360033401591-DMaaS
+
