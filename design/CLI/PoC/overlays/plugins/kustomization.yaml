@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+bases:
+  - ../../base
+
+resources:
+  - secret.yaml
+patchesStrategicMerge:
+  - aws-plugin.yaml # this patches the Velero deployment
+  - gcp-plugin.yaml # this patches the Velero deployment
+
+
+
+
+
