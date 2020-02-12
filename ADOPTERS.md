@@ -10,6 +10,7 @@ If you're using Velero and want to add your organization to this list, feel free
 <a href="https://dellemc.com/" border="0" target="_blank"><img alt="dellemc.com" src="site/img/adopters/DellEMC.png" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://bugsnag.com/" border="0" target="_blank"><img alt="bugsnag.com" src="site/img/adopters/bugsnag.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 
 ## Success Stories
 
@@ -40,6 +41,10 @@ Red Hat has developed the [Cluster Application Migration Tool][51] which uses [V
 
 **[Dell EMC][70]**  
 For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to back up the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
+
+**[SIGHUP][80]**  
+SIGHUP integrates Velero in its [Fury Kubernetes Distribution][81] providing predefined schedules and configurations to ensure an optimized disaster recovery experience.
+[Fury Kubernetes Disaster Recovery Module][82] is ready to be deployed into any Kubernetes cluster running anywhere.
 
 ## Adding a logo to velero.io
 
@@ -76,3 +81,7 @@ We will follow up and make the change in the [velero.io][2] website.
 [70]: https://dellemc.com
 [71]: https://dellemc.com/dataprotection
 [72]: https://www.dellemc.com/resources/en-us/asset/briefs-handouts/solutions/h18141-dellemc-dpd-kubernetes.pdf
+
+[80]: https://sighup.io
+[81]: https://github.com/sighupio/fury-distribution
+[82]: https://github.com/sighupio/fury-kubernetes-dr
