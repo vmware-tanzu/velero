@@ -1,9 +1,9 @@
 - title: Troubleshooting
   key: troubleshooting
   destination: troubleshooting
-- title: Support Matrix
-  key: support-matrix
-  destination: support-matrix
+- title: Supported Providers
+  key: supported-providers
+  destination: supported-providers
 - title: ZenHub
   key: zenhub
   destination: zenhub
