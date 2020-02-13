@@ -10,3 +10,12 @@
 - title: Install Overview
   key: install-overview
   destination: basic-install
+- title: Start Contributing
+  key: start-contributing
+  destination: start-contributing
+- title: Customize Installation
+  key: customize-installation
+  destination: customize-installation
+- title: Frequently Asked Questions
+  key: faq
+  destination: faq

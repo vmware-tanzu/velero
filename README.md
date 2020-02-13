@@ -27,7 +27,7 @@ If you encounter issues, review the [troubleshooting docs][30], [file an issue][
 
 ## Contributing
 
-If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/master/start-contributing/) documentation for guidance on how to setup Velero for development.
+If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing][31] documentation for guidance on how to setup Velero for development.
 
 ## Changelog
 
@@ -46,4 +46,5 @@ See [the list of releases][6] to find out about feature changes.
 [25]: https://kubernetes.slack.com/messages/velero
 [29]: https://velero.io/docs/
 [30]: https://velero.io/docs/troubleshooting
+[31]: https://velero.io/docs/start-contributing
 [100]: https://velero.io/docs/master/img/velero.png
