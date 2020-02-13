@@ -1,7 +1,7 @@
 ---
 title: OpenShift 
 link: https://github.com/fusor/openshift-velero-plugin
-object-storage: true
-volumesnapshotter: false
+BackupItemAction: true
+RestoreItemAction: true
 ---
 General Velero plugin for backup and restore of OpenShift workloads.

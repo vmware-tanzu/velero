@@ -13,16 +13,21 @@
                     <p>{{ plugin.content }}</p>
                     {% if plugin.object-storage %}
                       <img src="https://img.shields.io/badge/Object Storage-supported-green">
-                      {% else %}
-                      <img src="https://img.shields.io/badge/Object Storage-not supported-red">
                     {% endif %}
                     {% if plugin.volumesnapshotter %}
                       <img src="https://img.shields.io/badge/VolumeSnapshotter-supported-green">
-                      {% else %}
-                      <img src="https://img.shields.io/badge/VolumeSnapshotter-not supported-red">
                     {% endif %}
                     {% if plugin.local-storage %}
                       <img src="https://img.shields.io/badge/Local Storage-supported-green">
+                    {% endif %}
+                    {% if plugin.supported-by-velero-team %}
+                      <img src="https://img.shields.io/badge/Supported%20By-Velero%20team-blue">
+                    {% endif %}
+                    {% if plugin.BackupItemAction %}
+                      <img src="https://img.shields.io/badge/BackupItemAction-supported-green">
+                    {% endif %}
+                    {% if plugin.RestoreItemAction %}
+                      <img src="https://img.shields.io/badge/RestoreItemAction-supported-green">
                     {% endif %}
                   </div>
                 </div>
