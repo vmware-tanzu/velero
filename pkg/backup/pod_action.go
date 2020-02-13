@@ -61,6 +61,11 @@ func (a *PodAction) Execute(item runtime.Unstructured, backup *v1.Backup) (runti
 		return item, nil, nil
 	}
 
+	if pod.Status.Phase == corev1api.PodPending {
+		a.log.Info("pod is pending")
+		return item, nil, nil
+	}
+
 	var additionalItems []velero.ResourceIdentifier
 	for _, volume := range pod.Spec.Volumes {
 		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName != "" {

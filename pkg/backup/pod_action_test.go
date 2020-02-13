@@ -80,6 +80,29 @@ func TestPodActionExecute(t *testing.T) {
 			`),
 		},
 		{
+			name: "pod is pending",
+			pod: velerotest.UnstructuredOrDie(`
+			{
+				"apiVersion": "v1",
+				"kind": "Pod",
+				"metadata": {
+					"namespace": "foo",
+					"name": "bar"
+				},
+				"status": {
+					"phase": "Pending"
+				},
+				"spec": {
+					"volumes": [
+						{
+							"persistentVolumeClaim": {"claimName": "claim1"}
+						}
+					]
+				}
+			}
+			`),
+		},
+		{
 			name: "full test, mix of volume types",
 			pod: velerotest.UnstructuredOrDie(`
 			{
