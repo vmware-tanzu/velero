@@ -10,6 +10,8 @@ If you're using Velero and want to add your organization to this list,
 <a href="https://dellemc.com/" border="0" target="_blank"><img alt="dellemc.com" src="site/img/adopters/DellEMC.png" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://bugsnag.com/" border="0" target="_blank"><img alt="bugsnag.com" src="site/img/adopters/bugsnag.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://banzaicloud.com/" border="0" target="_blank"><img alt="banzaicloud.com" src="site/img/adopters/banzaicloud.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://sighup.io/" border="0" target="_blank"><img alt="sighup.io" src="site/img/adopters/sighup.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
+<a href="https://mayadata.io/" border="0" target="_blank"><img alt="mayadata.io" src="site/img/adopters/mayadata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 
 ## Success Stories
 
@@ -19,7 +21,7 @@ publicly shared the details of how they use it.
 **[BitGo][20]**  
 BitGo uses Velero backup and restore capabilities to seamlessly provision and scale fullnode statefulsets on the fly as well as having it serve an integral piece for our kubernetes disaster-recovery story.
 
-**[BugSnag][30]**  
+**[Bugsnag][30]**  
 We use Velero for managing backups of an internal instance of our on-premise clustered solution. We also recommend our users of [on-premise Bugsnag installations][31] use Velero for [managing their own backups][32].
 
 **[Banzai Cloud][60]**  
@@ -40,6 +42,13 @@ Red Hat has developed the [Cluster Application Migration Tool][51] which uses [V
 
 **[Dell EMC][70]**  
 For Kubernetes environments, [PowerProtect Data Manager][71] leverages the Container Storage Interface (CSI) framework to take snapshots to back up the persistent data or the data that the application creates e.g. databases. [Dell EMC leverages Velero][72] to backup the namespace configuration files (also known as Namespace meta data) for enterprise grade data protection.
+
+**[SIGHUP][80]**  
+SIGHUP integrates Velero in its [Fury Kubernetes Distribution][81] providing predefined schedules and configurations to ensure an optimized disaster recovery experience.
+[Fury Kubernetes Disaster Recovery Module][82] is ready to be deployed into any Kubernetes cluster running anywhere.
+
+**[MayaData][90]**  
+MayaData is a large user of Velero as well as a contributor. MayaData offers a Data Agility platform called [OpenEBS Director][91], that helps customers confidently and easily manage stateful workloads in Kubernetes. Velero is one of the core software building block of the OpenEBS Director's [DMaaS or data migration as a service offering][92] used to enable data protection strategies.
 
 ## Adding your organization to the list of Velero Adopters
 
@@ -77,3 +86,12 @@ If you would like to add your logo to a future `Adopters of Velero` section on [
 [70]: https://dellemc.com
 [71]: https://dellemc.com/dataprotection
 [72]: https://www.dellemc.com/resources/en-us/asset/briefs-handouts/solutions/h18141-dellemc-dpd-kubernetes.pdf
+
+[80]: https://sighup.io
+[81]: https://github.com/sighupio/fury-distribution
+[82]: https://github.com/sighupio/fury-kubernetes-dr
+
+[90]: https://mayadata.io
+[91]: https://director.mayadata.io/
+[92]: https://help.mayadata.io/hc/en-us/articles/360033401591-DMaaS
+

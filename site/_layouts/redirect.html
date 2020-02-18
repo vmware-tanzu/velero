@@ -1,28 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  {% if page.dir != "/docs/" %}
-  <meta http-equiv="refresh" content="0; url={{ page.redirect.to }}" />
-  <script type="text/javascript">
-    window.location.href = "{{ page.redirect.to }}"
-  </script>
-  <title>Redirecting...</title>
-</head>
-<body>
-Redirecting to {{ page.redirect.to }}. If it doesn't load, click <a href="{{ page.redirect.to }}" />here</a>.
-</body>
-</html>
-  {% endif %}
-  {% if page.dir == "/docs/" %}
+  {% if page.dir contains "/docs/" %}
   <meta http-equiv="refresh" content="0; url=/docs/{{ site.latest }}/{{ page.destination }}" />
   <script type="text/javascript">
     window.location.href = "/docs/{{ site.latest }}/{{ page.destination }}"
   </script>
-  <title>Redirecting...</title>
+  <title>Redirecting to docs...</title>
 </head>
 <body>
 Redirecting to {{ page.destination }}. If it doesn't load, click <a href="/docs/{{ site.latest }}/{{ page.destination }}" />here</a>.
 </body>
 </html>
-{% endif %}
-
+  {% endif %}
