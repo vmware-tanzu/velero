@@ -1,7 +1,7 @@
 # Velero Adopters
 
-If you're using Velero and want to add your organization to this list, feel free to
-[submit a pull request][1]!
+If you're using Velero and want to add your organization to this list, 
+[follow these directions][1]!
 
 <a href="https://www.bitgo.com" border="0" target="_blank"><img alt="bitgo.com" src="site/img/adopters/BitGo.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
 <a href="https://www.nirmata.com" border="0" target="_blank"><img alt="nirmata.com" src="site/img/adopters/nirmata.svg" height="50"></a>&nbsp; &nbsp; &nbsp;
@@ -50,18 +50,18 @@ SIGHUP integrates Velero in its [Fury Kubernetes Distribution][81] providing pre
 **[MayaData][90]**  
 MayaData is a large user of Velero as well as a contributor. MayaData offers a Data Agility platform called [OpenEBS Director][91], that helps customers confidently and easily manage stateful workloads in Kubernetes. Velero is one of the core software building block of the OpenEBS Director's [DMaaS or data migration as a service offering][92] used to enable data protection strategies.
 
+## Adding your organization to the list of Velero Adopters
 
-## Adding a logo to velero.io
+If you are using Velero and would like to be included in the list of `Velero Adopters`, add an SVG version of your logo to the `site/img/adopters` directory in this repo and submit a [pull request][3] with your change. Name the image file something that reflects your company (e.g., if your company is called Acme, name the image acme.png). See this for an example [PR][4].
 
-If you would like to add your logo to a future `Adopters of Velero` section
-of [velero.io][2], add an SVG version of your logo to the site/img/adopters
-directory in this repo and submit a pull request with your change.
-Name the image file something that reflects your company
-(e.g., if your company is called Acme, name the image acme.png).
-We will follow up and make the change in the [velero.io][2] website.
+### Adding a logo to velero.io
 
-[1]: https://github.com/vmware-tanzu/velero/pulls
+If you would like to add your logo to a future `Adopters of Velero` section on [velero.io][2], follow the steps above to add your organization to the list of Velero Adopters. Our community will follow up and publish it to the [velero.io][2] website.
+
+[1]: #adding-a-logo-to-veleroio
 [2]: https://velero.io
+[3]: https://github.com/vmware-tanzu/velero/pulls
+[4]: https://github.com/vmware-tanzu/velero/pull/2242
 
 [10]: https://www.nirmata.com/2019/08/14/kubernetes-disaster-recovery-using-velero-and-nirmata/
 [11]: https://nirmata.com
