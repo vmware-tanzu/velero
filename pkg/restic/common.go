@@ -49,12 +49,14 @@ const (
 	// pod volume backups when they're for a PVC.
 	PVCNameAnnotation = "velero.io/pvc-name"
 
+	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
+	// need to be backed up using restic.
+	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
 	// Deprecated.
 	//
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
-
-	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 )
 
 // getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
@@ -115,7 +117,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue := annotations[volumesToBackupAnnotation]
+	backupsValue := annotations[VolumesToBackupAnnotation]
 	if backupsValue == "" {
 		return nil
 	}
