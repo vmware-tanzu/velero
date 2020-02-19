@@ -145,12 +145,12 @@ func TestGetVolumesToBackup(t *testing.T) {
 		},
 		{
 			name:        "one volume to backup",
-			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1"},
+			annotations: map[string]string{"foo": "bar", VolumesToBackupAnnotation: "volume-1"},
 			expected:    []string{"volume-1"},
 		},
 		{
 			name:        "multiple volumes to backup",
-			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
+			annotations: map[string]string{"foo": "bar", VolumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
 			expected:    []string{"volume-1", "volume-2", "volume-3"},
 		},
 	}
