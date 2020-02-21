@@ -79,12 +79,13 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 
 		// Make sure all versions are set to preserve unknown fields
 		for _, v := range crd.Spec.Versions {
-			// If the Schema is nil, there are no nested fields to set, so skip over it for this version.
-			if v.Schema == nil {
+			// If the schema fields are nil, there are no nested fields to set, so skip over it for this version.
+			if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
 				continue
 			}
 
-			// Use the address, since the XPreserveUnknownFields value is undefined or true (false is not allowed)
+			// Use the address, since the XPreserveUnknownFields value is nil or
+			// a pointer to true (false is not allowed)
 			preserve := true
 			v.Schema.OpenAPIV3Schema.XPreserveUnknownFields = &preserve
 			log.Debugf("Set x-preserve-unknown-fields in Open API for schema version %s", v.Name)
