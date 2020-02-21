@@ -1,0 +1,1 @@
+Back up schema-less CustomResourceDefinitions as v1beta1, even if they are retrieved via the v1 endpoint.
