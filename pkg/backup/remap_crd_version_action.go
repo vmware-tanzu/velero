@@ -60,8 +60,6 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		return item, nil, nil
 	}
 
-	a.logger.Infof("Unstructured looked like: %#v", item.UnstructuredContent())
-
 	// We've got a v1 CRD, so proceed.
 	var crd apiextv1.CustomResourceDefinition
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &crd); err != nil {
