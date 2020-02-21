@@ -55,10 +55,12 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "unable to read apiVersion from CRD")
 	}
-	if ok && apiVersion != "v1" {
+	if ok && apiVersion != "apiextensions.k8s.io/v1" {
 		a.logger.Info("Exiting RemapCRDVersionAction, CRD is not v1")
 		return item, nil, nil
 	}
+
+	a.logger.Infof("Unstructured looked like: %#v", item.UnstructuredContent())
 
 	// We've got a v1 CRD, so proceed.
 	var crd apiextv1.CustomResourceDefinition

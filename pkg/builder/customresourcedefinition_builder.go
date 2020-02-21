@@ -17,21 +17,21 @@ limitations under the License.
 package builder
 
 import (
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // CustomResourceDefinitionBuilder builds CustomResourceDefinition objects.
 type CustomResourceDefinitionBuilder struct {
-	object *apiextv1beta1.CustomResourceDefinition
+	object *apiextv1.CustomResourceDefinition
 }
 
 // ForCustomResourceDefinition is the constructor for a CustomResourceDefinitionBuilder.
 func ForCustomResourceDefinition(name string) *CustomResourceDefinitionBuilder {
 	return &CustomResourceDefinitionBuilder{
-		object: &apiextv1beta1.CustomResourceDefinition{
+		object: &apiextv1.CustomResourceDefinition{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: apiextv1beta1.SchemeGroupVersion.String(),
+				APIVersion: apiextv1.SchemeGroupVersion.String(),
 				Kind:       "CustomResourceDefinition",
 			},
 			ObjectMeta: metav1.ObjectMeta{
@@ -42,13 +42,25 @@ func ForCustomResourceDefinition(name string) *CustomResourceDefinitionBuilder {
 }
 
 // Condition adds a CustomResourceDefinitionCondition objects to a CustomResourceDefinitionBuilder.
-func (c *CustomResourceDefinitionBuilder) Condition(cond apiextv1beta1.CustomResourceDefinitionCondition) *CustomResourceDefinitionBuilder {
-	c.object.Status.Conditions = append(c.object.Status.Conditions, cond)
-	return c
+func (b *CustomResourceDefinitionBuilder) Condition(cond apiextv1.CustomResourceDefinitionCondition) *CustomResourceDefinitionBuilder {
+	b.object.Status.Conditions = append(b.object.Status.Conditions, cond)
+	return b
+}
+
+// Version adds a CustomResourceDefinitionVersion object to a CustomResourceDefinitionBuilder.
+func (b *CustomResourceDefinitionBuilder) Version(ver apiextv1.CustomResourceDefinitionVersion) *CustomResourceDefinitionBuilder {
+	b.object.Spec.Versions = append(b.object.Spec.Versions, ver)
+	return b
+}
+
+// PreserveUnknownFields sets PreserveUnknownFields on a CustomResourceDefinition.
+func (b *CustomResourceDefinitionBuilder) PreserveUnknownFields(preserve bool) *CustomResourceDefinitionBuilder {
+	b.object.Spec.PreserveUnknownFields = preserve
+	return b
 }
 
 // Result returns the built CustomResourceDefinition.
-func (b *CustomResourceDefinitionBuilder) Result() *apiextv1beta1.CustomResourceDefinition {
+func (b *CustomResourceDefinitionBuilder) Result() *apiextv1.CustomResourceDefinition {
 	return b.object
 }
 
@@ -63,29 +75,58 @@ func (b *CustomResourceDefinitionBuilder) ObjectMeta(opts ...ObjectMetaOpt) *Cus
 
 // CustomResourceDefinitionConditionBuilder builds CustomResourceDefinitionCondition objects.
 type CustomResourceDefinitionConditionBuilder struct {
-	object apiextv1beta1.CustomResourceDefinitionCondition
+	object apiextv1.CustomResourceDefinitionCondition
 }
 
-// ForCustomResourceDefinitionConditionBuilder is the construction for a CustomResourceDefinitionConditionBuilder.
+// ForCustomResourceDefinitionConditionBuilder is the constructor for a CustomResourceDefinitionConditionBuilder.
 func ForCustomResourceDefinitionCondition() *CustomResourceDefinitionConditionBuilder {
 	return &CustomResourceDefinitionConditionBuilder{
-		object: apiextv1beta1.CustomResourceDefinitionCondition{},
+		object: apiextv1.CustomResourceDefinitionCondition{},
 	}
 }
 
 // Type sets the Condition's type.
-func (c *CustomResourceDefinitionConditionBuilder) Type(t apiextv1beta1.CustomResourceDefinitionConditionType) *CustomResourceDefinitionConditionBuilder {
+func (c *CustomResourceDefinitionConditionBuilder) Type(t apiextv1.CustomResourceDefinitionConditionType) *CustomResourceDefinitionConditionBuilder {
 	c.object.Type = t
 	return c
 }
 
 // Status sets the Condition's status.
-func (c *CustomResourceDefinitionConditionBuilder) Status(cs apiextv1beta1.ConditionStatus) *CustomResourceDefinitionConditionBuilder {
+func (c *CustomResourceDefinitionConditionBuilder) Status(cs apiextv1.ConditionStatus) *CustomResourceDefinitionConditionBuilder {
 	c.object.Status = cs
 	return c
 }
 
-// Results returns the built CustomResourceDefinitionCondition.
-func (b *CustomResourceDefinitionConditionBuilder) Result() apiextv1beta1.CustomResourceDefinitionCondition {
+// Result returns the built CustomResourceDefinitionCondition.
+func (b *CustomResourceDefinitionConditionBuilder) Result() apiextv1.CustomResourceDefinitionCondition {
+	return b.object
+}
+
+// CustomResourceDefinitionVersionBuilder builds CustomResourceDefinitionVersion objects.
+type CustomResourceDefinitionVersionBuilder struct {
+	object apiextv1.CustomResourceDefinitionVersion
+}
+
+// ForCustomResourceDefinitionVersion is the constructor for a CustomResourceDefinitionVersionBuilder.
+func ForCustomResourceDefinitionVersion(name string) *CustomResourceDefinitionVersionBuilder {
+	return &CustomResourceDefinitionVersionBuilder{
+		object: apiextv1.CustomResourceDefinitionVersion{Name: name},
+	}
+}
+
+// Served sets the Served field on a CustomResourceDefinitionVersion.
+func (b *CustomResourceDefinitionVersionBuilder) Served(s bool) *CustomResourceDefinitionVersionBuilder {
+	b.object.Served = s
+	return b
+}
+
+// Storage sets the Storage field on a CustomResourceDefinitionVersion.
+func (b *CustomResourceDefinitionVersionBuilder) Storage(s bool) *CustomResourceDefinitionVersionBuilder {
+	b.object.Storage = s
+	return b
+}
+
+// Result returns the built CustomResourceDefinitionVersion.
+func (b *CustomResourceDefinitionVersionBuilder) Result() apiextv1.CustomResourceDefinitionVersion {
 	return b.object
 }
