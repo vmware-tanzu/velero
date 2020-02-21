@@ -35,9 +35,9 @@ func TestRemapCRDVersionAction(t *testing.T) {
 	a := NewRemapCRDVersionAction(velerotest.NewLogger())
 
 	t.Run("Test a v1 CRD without any Schema information", func(t *testing.T) {
-		b := builder.ForCustomResourceDefinition("test.velero.io")
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
 		// Set a version that does not include and schema information.
-		b.Version(builder.ForCustomResourceDefinitionVersion("v1").Served(true).Storage(true).Result())
+		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Result())
 		c := b.Result()
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
 		require.NoError(t, err)
@@ -48,8 +48,8 @@ func TestRemapCRDVersionAction(t *testing.T) {
 	})
 
 	t.Run("Test a v1 CRD with a NonStructuralSchema Condition", func(t *testing.T) {
-		b := builder.ForCustomResourceDefinition("test.velero.io")
-		b.Condition(builder.ForCustomResourceDefinitionCondition().Type(apiextv1.NonStructuralSchema).Result())
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		b.Condition(builder.ForV1CustomResourceDefinitionCondition().Type(apiextv1.NonStructuralSchema).Result())
 		c := b.Result()
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
 		require.NoError(t, err)
