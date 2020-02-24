@@ -17,6 +17,7 @@
   * [CHANGELOG-0.5.md][3]
   * [CHANGELOG-0.4.md][2]
   * [CHANGELOG-0.3.md][1]
+  * [CHANGELOG-0.34.md][1]
 
 
 [13]: https://github.com/vmware-tanzu/velero/blob/master/changelogs/CHANGELOG-1.3.md
