@@ -1,7 +1,5 @@
 # Worker Pods for Backup, Restore
 
-Status: Draft
-
 This document proposes a new approach to executing backups and restores where each operation is run in its own "worker pod" rather than in the main Velero server pod. This approach has significant benefits for concurrency, scalability, and observability.
 
 ## Goals
@@ -12,6 +10,7 @@ This document proposes a new approach to executing backups and restores where ea
 
 ## Non Goals
 
+- Adding concurrency *within* a single backup or restore (including restic).
 - Creating CronJobs for scheduled backups.
 
 ## Background
@@ -141,9 +140,12 @@ The Velero server keeps a record of current in-progress backups and disallows th
 
 ### Open items
 
+- Given that multiple backups/restores could be running concurrently, we need to consider possible areas of contention/conflict between jobs, including (but not limited to):
+  - exec hooks (i.e. don't want to run `fsfreeze` twice on the same pod)
+  - restic backups and restores on the same volume
 - It probably makes sense to use Kubernetes Jobs to control worker pods, rather than directly creating "bare pods". The Job will ensure that a worker pod successfully runs to completion.
-- Currently, restic repository lock management is handled by an in-process lock manager in the Velero server. In order for backups/restores to safely run concurrently, the design for restic lock management needs to change. There is an [open issue](https://github.com/heptio/velero/issues/1540) for this which is currently scoped for the v1.1 release.
-- There are several prometheus metrics that are emitted as part of the backup process. Since backups will no longer be running in the Velero server, we need to find a way to expose those values. One option is to store any value that would feed a metric as a field on the backup's `status`, and to have the Velero server scrape values from there for completed backups.
+- Currently, restic repository lock management is handled by an in-process lock manager in the Velero server. In order for backups/restores to safely run concurrently, the design for restic lock management needs to change. There is an [open issue](https://github.com/heptio/velero/issues/1540) for this which is currently not prioritized.
+- There are several prometheus metrics that are emitted as part of the backup process. Since backups will no longer be running in the Velero server, we need to find a way to expose those values. One option is to store any value that would feed a metric as a field on the backup's `status`, and to have the Velero server scrape values from there for completed backups. Another option is to use the [Prometheus push gateway](https://prometheus.io/docs/practices/pushing/).
 - Over time, many completed worker pods will exist in the `velero` namespace. We need to consider whether this poses any issue and whether we should garbage-collect them more aggressively.
 
 ## Alternatives Considered
