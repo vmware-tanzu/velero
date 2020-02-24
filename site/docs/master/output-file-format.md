@@ -22,7 +22,7 @@ rootBucket/
   "metadata": {
     "name": "test-backup",
     "namespace": "velero",
-    "selfLink": "/apis/velero.io/v1/namespaces/velero/backups/testtest",
+    "selfLink": "/apis/velero.io/v1/namespaces/velero/backups/test-backup",
     "uid": "a12345cb-75f5-11e7-b4c2-abcdef123456",
     "resourceVersion": "337075",
     "creationTimestamp": "2017-07-31T13:39:15Z"
