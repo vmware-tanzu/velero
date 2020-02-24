@@ -1,3 +1,33 @@
+## v1.3.0-beta.2
+#### 2020-02-24
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.3.0-beta.2
+
+### Container Image
+`velero/velero:v1.3.0-beta.2`
+
+### Documentation
+https://velero.io/docs/v1.3.0-beta.2/
+
+### Upgrading
+```bash
+kubectl set image \
+  --namespace velero \
+  deployment/velero velero=velero/velero:v1.3.0-beta.2
+
+# if using restic:
+kubectl set image \
+  --namespace velero \
+  daemonset/restic restic=velero/velero:v1.3.0-beta.2
+```
+
+### All Changes
+  * Back up schema-less CustomResourceDefinitions as v1beta1, even if they are retrieved via the v1 endpoint. (#2264, @nrb)
+  * Bug fix: restic backup volume snapshot to the second location failed (#2244, @jenting)
+  * Added support of using PV name from volumesnapshotter('SetVolumeID') in case of PV renaming during the restore (#2216, @mynktl)
+  * Replaced deprecated helm repo url at all it appearance at docs. (#2209, @markrity)
+
 ## v1.3.0-beta.1
 #### 2020-02-04
 
