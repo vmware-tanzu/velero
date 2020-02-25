@@ -229,6 +229,14 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	name = metadata.GetName()
 	namespace = metadata.GetNamespace()
 
+	// add BackupNameLabel to the resource being backed up
+	labels := metadata.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+	labels[velerov1api.BackupNameLabel] = ib.backupRequest.Backup.Name
+	metadata.SetLabels(labels)
+
 	if groupResource == kuberesource.PersistentVolumes {
 		if err := ib.takePVSnapshot(obj, log); err != nil {
 			backupErrs = append(backupErrs, err)

@@ -1,0 +1,1 @@
+Apply `velero.io/backup-name` label on all backed up resources.

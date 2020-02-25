@@ -1254,7 +1254,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("updated", "true")).Result()),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("updated", "true", "velero.io/backup-name", "backup-1")).Result()),
 			},
 		},
 		{
@@ -1271,7 +1271,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").Result()),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1")).Result()),
 			},
 		},
 		{
@@ -1288,7 +1288,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").NodeName("foo").Result()),
+				"resources/pods/namespaces/ns-1/pod-1.json": toUnstructuredOrFail(t, builder.ForPod("ns-1", "pod-1").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1")).NodeName("foo").Result()),
 			},
 		},
 		{
@@ -1307,7 +1307,7 @@ func TestBackupActionModifications(t *testing.T) {
 				}),
 			},
 			want: map[string]unstructuredObject{
-				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, builder.ForPod("ns-1-updated", "pod-1-updated").Result()),
+				"resources/pods/namespaces/ns-1-updated/pod-1-updated.json": toUnstructuredOrFail(t, builder.ForPod("ns-1-updated", "pod-1-updated").ObjectMeta(builder.WithLabels("velero.io/backup-name", "backup-1")).Result()),
 			},
 		},
 	}
