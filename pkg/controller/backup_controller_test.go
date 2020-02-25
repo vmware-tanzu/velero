@@ -553,7 +553,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
-				backupTracker:          NewBackupTracker(),
+				backupTracker:          pkgbackup.NewTracker(),
 				metrics:                metrics.NewServerMetrics(),
 				clock:                  clock.NewFakeClock(now),
 				newPluginManager:       func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },

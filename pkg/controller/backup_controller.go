@@ -62,7 +62,7 @@ type backupController struct {
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
 	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker            BackupTracker
+	backupTracker            pkgbackup.Tracker
 	backupLocationLister     velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation    string
 	defaultBackupTTL         time.Duration
@@ -80,7 +80,7 @@ func NewBackupController(
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
-	backupTracker BackupTracker,
+	backupTracker pkgbackup.Tracker,
 	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	defaultBackupLocation string,
 	defaultBackupTTL time.Duration,

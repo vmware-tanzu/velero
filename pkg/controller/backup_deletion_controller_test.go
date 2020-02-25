@@ -57,7 +57,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		client.VeleroV1(), // backupClient
 		sharedInformers.Velero().V1().Restores().Lister(),
 		client.VeleroV1(), // restoreClient
-		NewBackupTracker(),
+		pkgbackup.NewTracker(),
 		nil, // restic repository manager
 		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -147,7 +147,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			client.VeleroV1(), // backupClient
 			sharedInformers.Velero().V1().Restores().Lister(),
 			client.VeleroV1(), // restoreClient
-			NewBackupTracker(),
+			pkgbackup.NewTracker(),
 			nil, // restic repository manager
 			sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -845,7 +845,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				client.VeleroV1(), // backupClient
 				sharedInformers.Velero().V1().Restores().Lister(),
 				client.VeleroV1(), // restoreClient
-				NewBackupTracker(),
+				pkgbackup.NewTracker(),
 				nil,
 				sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),

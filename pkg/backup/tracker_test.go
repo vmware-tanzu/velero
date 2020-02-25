@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package backup
 
 import (
 	"testing"
@@ -22,8 +22,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestBackupTracker(t *testing.T) {
-	bt := NewBackupTracker()
+func TestTracker(t *testing.T) {
+	bt := NewTracker()
 
 	assert.False(t, bt.Contains("ns", "name"))
 

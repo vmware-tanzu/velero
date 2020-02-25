@@ -57,7 +57,7 @@ type backupDeletionController struct {
 	backupClient              velerov1client.BackupsGetter
 	restoreLister             velerov1listers.RestoreLister
 	restoreClient             velerov1client.RestoresGetter
-	backupTracker             BackupTracker
+	backupTracker             pkgbackup.Tracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
 	backupLocationLister      velerov1listers.BackupStorageLocationLister
@@ -77,7 +77,7 @@ func NewBackupDeletionController(
 	backupClient velerov1client.BackupsGetter,
 	restoreLister velerov1listers.RestoreLister,
 	restoreClient velerov1client.RestoresGetter,
-	backupTracker BackupTracker,
+	backupTracker pkgbackup.Tracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
 	backupLocationLister velerov1listers.BackupStorageLocationLister,

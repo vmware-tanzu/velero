@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package backup
 
 import (
 	"fmt"
@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-// BackupTracker keeps track of in-progress backups.
-type BackupTracker interface {
+// Tracker keeps track of in-progress backups.
+type Tracker interface {
 	// Add informs the tracker that a backup is in progress.
 	Add(ns, name string)
 	// Delete informs the tracker that a backup is no longer in progress.
@@ -38,8 +38,8 @@ type backupTracker struct {
 	backups sets.String
 }
 
-// NewBackupTracker returns a new BackupTracker.
-func NewBackupTracker() BackupTracker {
+// NewTracker returns a new Tracker.
+func NewTracker() Tracker {
 	return &backupTracker{
 		backups: sets.NewString(),
 	}
