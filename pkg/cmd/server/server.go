@@ -584,21 +584,27 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		cmd.CheckError(err)
 
-		backupController := controller.NewBackupController(
-			s.sharedInformerFactory.Velero().V1().Backups(),
+		backupProcessor := backup.NewProcessor(
 			s.veleroClient.VeleroV1(),
 			backupper,
-			s.logger,
-			s.logLevel,
-			newPluginManager,
 			backupTracker,
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
-			s.config.defaultBackupLocation,
-			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			defaultVolumeSnapshotLocations,
+			s.logger,
 			s.metrics,
+			newPluginManager,
+			s.config.defaultBackupLocation,
+			s.config.defaultVolumeSnapshotLocations,
+			s.config.defaultBackupTTL,
+			s.logLevel,
 			s.config.formatFlag.Parse(),
+		)
+
+		backupController := controller.NewBackupController(
+			backupProcessor,
+			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.logger,
+			s.metrics,
 		)
 
 		return controllerRunInfo{
