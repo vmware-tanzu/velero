@@ -32,8 +32,8 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -43,11 +43,11 @@ type downloadRequestController struct {
 	*genericController
 
 	downloadRequestClient velerov1client.DownloadRequestsGetter
-	downloadRequestLister listers.DownloadRequestLister
-	restoreLister         listers.RestoreLister
+	downloadRequestLister velerov1listers.DownloadRequestLister
+	restoreLister         velerov1listers.RestoreLister
 	clock                 clock.Clock
-	backupLocationLister  listers.BackupStorageLocationLister
-	backupLister          listers.BackupLister
+	backupLocationLister  velerov1listers.BackupStorageLocationLister
+	backupLister          velerov1listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
@@ -55,10 +55,10 @@ type downloadRequestController struct {
 // NewDownloadRequestController creates a new DownloadRequestController.
 func NewDownloadRequestController(
 	downloadRequestClient velerov1client.DownloadRequestsGetter,
-	downloadRequestInformer informers.DownloadRequestInformer,
-	restoreInformer informers.RestoreInformer,
-	backupLocationInformer informers.BackupStorageLocationInformer,
-	backupInformer informers.BackupInformer,
+	downloadRequestInformer velerov1informers.DownloadRequestInformer,
+	restoreLister velerov1listers.RestoreLister,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
@@ -66,9 +66,9 @@ func NewDownloadRequestController(
 		genericController:     newGenericController("downloadrequest", logger),
 		downloadRequestClient: downloadRequestClient,
 		downloadRequestLister: downloadRequestInformer.Lister(),
-		restoreLister:         restoreInformer.Lister(),
-		backupLocationLister:  backupLocationInformer.Lister(),
-		backupLister:          backupInformer.Lister(),
+		restoreLister:         restoreLister,
+		backupLocationLister:  backupLocationLister,
+		backupLister:          backupLister,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -79,13 +79,6 @@ func NewDownloadRequestController(
 	}
 
 	c.syncHandler = c.processDownloadRequest
-	c.cacheSyncWaiters = append(
-		c.cacheSyncWaiters,
-		downloadRequestInformer.Informer().HasSynced,
-		restoreInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-		backupInformer.Informer().HasSynced,
-	)
 
 	downloadRequestInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{

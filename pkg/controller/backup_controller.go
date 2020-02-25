@@ -40,8 +40,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -57,16 +57,16 @@ type backupController struct {
 	*genericController
 
 	backupper                pkgbackup.Backupper
-	lister                   listers.BackupLister
+	lister                   velerov1listers.BackupLister
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
 	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker            BackupTracker
-	backupLocationLister     listers.BackupStorageLocationLister
+	backupLocationLister     velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation    string
 	defaultBackupTTL         time.Duration
-	snapshotLocationLister   listers.VolumeSnapshotLocationLister
+	snapshotLocationLister   velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
 	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -74,17 +74,17 @@ type backupController struct {
 }
 
 func NewBackupController(
-	backupInformer informers.BackupInformer,
+	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	defaultBackupLocation string,
 	defaultBackupTTL time.Duration,
-	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
+	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
@@ -98,10 +98,10 @@ func NewBackupController(
 		backupLogLevel:           backupLogLevel,
 		newPluginManager:         newPluginManager,
 		backupTracker:            backupTracker,
-		backupLocationLister:     backupLocationInformer.Lister(),
+		backupLocationLister:     backupLocationLister,
 		defaultBackupLocation:    defaultBackupLocation,
 		defaultBackupTTL:         defaultBackupTTL,
-		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
+		snapshotLocationLister:   volumeSnapshotLocationLister,
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
 		formatFlag:               formatFlag,
@@ -110,11 +110,6 @@ func NewBackupController(
 	}
 
 	c.syncHandler = c.processBackup
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
-		backupInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-		volumeSnapshotLocationInformer.Informer().HasSynced,
-	)
 	c.resyncFunc = c.resync
 	c.resyncPeriod = time.Minute
 

@@ -76,11 +76,14 @@ func (c *genericController) Run(ctx context.Context, numWorkers int) error {
 	c.logger.Info("Starting controller")
 	defer c.logger.Info("Shutting down controller")
 
-	c.logger.Info("Waiting for caches to sync")
-	if !cache.WaitForCacheSync(ctx.Done(), c.cacheSyncWaiters...) {
-		return errors.New("timed out waiting for caches to sync")
+	// only want to log about cache sync waiters if there are any
+	if len(c.cacheSyncWaiters) > 0 {
+		c.logger.Info("Waiting for caches to sync")
+		if !cache.WaitForCacheSync(ctx.Done(), c.cacheSyncWaiters...) {
+			return errors.New("timed out waiting for caches to sync")
+		}
+		c.logger.Info("Caches are synced")
 	}
-	c.logger.Info("Caches are synced")
 
 	if c.syncHandler != nil {
 		wg.Add(numWorkers)

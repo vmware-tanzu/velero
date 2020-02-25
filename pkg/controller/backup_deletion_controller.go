@@ -36,8 +36,8 @@ import (
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -53,15 +53,15 @@ type backupDeletionController struct {
 	*genericController
 
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
-	deleteBackupRequestLister listers.DeleteBackupRequestLister
+	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
 	backupClient              velerov1client.BackupsGetter
-	restoreLister             listers.RestoreLister
+	restoreLister             velerov1listers.RestoreLister
 	restoreClient             velerov1client.RestoresGetter
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
-	podvolumeBackupLister     listers.PodVolumeBackupLister
-	backupLocationLister      listers.BackupStorageLocationLister
-	snapshotLocationLister    listers.VolumeSnapshotLocationLister
+	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
+	backupLocationLister      velerov1listers.BackupStorageLocationLister
+	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
 	processRequestFunc        func(*v1.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
@@ -72,16 +72,16 @@ type backupDeletionController struct {
 // NewBackupDeletionController creates a new backup deletion controller.
 func NewBackupDeletionController(
 	logger logrus.FieldLogger,
-	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
+	deleteBackupRequestInformer velerov1informers.DeleteBackupRequestInformer,
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
 	backupClient velerov1client.BackupsGetter,
-	restoreInformer informers.RestoreInformer,
+	restoreLister velerov1listers.RestoreLister,
 	restoreClient velerov1client.RestoresGetter,
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
-	podvolumeBackupInformer informers.PodVolumeBackupInformer,
-	backupLocationInformer informers.BackupStorageLocationInformer,
-	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
+	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
 ) Interface {
@@ -90,13 +90,13 @@ func NewBackupDeletionController(
 		deleteBackupRequestClient: deleteBackupRequestClient,
 		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
 		backupClient:              backupClient,
-		restoreLister:             restoreInformer.Lister(),
+		restoreLister:             restoreLister,
 		restoreClient:             restoreClient,
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
-		podvolumeBackupLister:     podvolumeBackupInformer.Lister(),
-		backupLocationLister:      backupLocationInformer.Lister(),
-		snapshotLocationLister:    snapshotLocationInformer.Lister(),
+		podvolumeBackupLister:     podvolumeBackupLister,
+		backupLocationLister:      backupLocationLister,
+		snapshotLocationLister:    snapshotLocationLister,
 		metrics:                   metrics,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -107,14 +107,6 @@ func NewBackupDeletionController(
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(
-		c.cacheSyncWaiters,
-		deleteBackupRequestInformer.Informer().HasSynced,
-		restoreInformer.Informer().HasSynced,
-		podvolumeBackupInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-		snapshotLocationInformer.Informer().HasSynced,
-	)
 	c.processRequestFunc = c.processRequest
 
 	deleteBackupRequestInformer.Informer().AddEventHandler(
@@ -383,7 +375,7 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 func volumeSnapshotterForSnapshotLocation(
 	namespace, snapshotLocationName string,
-	snapshotLocationLister listers.VolumeSnapshotLocationLister,
+	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	pluginManager clientmgmt.Manager,
 ) (velero.VolumeSnapshotter, error) {
 	snapshotLocation, err := snapshotLocationLister.VolumeSnapshotLocations(namespace).Get(snapshotLocationName)

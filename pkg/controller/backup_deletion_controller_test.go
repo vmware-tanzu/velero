@@ -55,13 +55,13 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Velero().V1().DeleteBackupRequests(),
 		client.VeleroV1(), // deleteBackupRequestClient
 		client.VeleroV1(), // backupClient
-		sharedInformers.Velero().V1().Restores(),
+		sharedInformers.Velero().V1().Restores().Lister(),
 		client.VeleroV1(), // restoreClient
 		NewBackupTracker(),
 		nil, // restic repository manager
-		sharedInformers.Velero().V1().PodVolumeBackups(),
-		sharedInformers.Velero().V1().BackupStorageLocations(),
-		sharedInformers.Velero().V1().VolumeSnapshotLocations(),
+		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
+		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 		nil, // new plugin manager func
 		metrics.NewServerMetrics(),
 	).(*backupDeletionController)
@@ -145,13 +145,13 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Velero().V1().DeleteBackupRequests(),
 			client.VeleroV1(), // deleteBackupRequestClient
 			client.VeleroV1(), // backupClient
-			sharedInformers.Velero().V1().Restores(),
+			sharedInformers.Velero().V1().Restores().Lister(),
 			client.VeleroV1(), // restoreClient
 			NewBackupTracker(),
 			nil, // restic repository manager
-			sharedInformers.Velero().V1().PodVolumeBackups(),
-			sharedInformers.Velero().V1().BackupStorageLocations(),
-			sharedInformers.Velero().V1().VolumeSnapshotLocations(),
+			sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
+			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+			sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			metrics.NewServerMetrics(),
 		).(*backupDeletionController),
@@ -843,13 +843,13 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Velero().V1().DeleteBackupRequests(),
 				client.VeleroV1(), // deleteBackupRequestClient
 				client.VeleroV1(), // backupClient
-				sharedInformers.Velero().V1().Restores(),
+				sharedInformers.Velero().V1().Restores().Lister(),
 				client.VeleroV1(), // restoreClient
 				NewBackupTracker(),
 				nil,
-				sharedInformers.Velero().V1().PodVolumeBackups(),
-				sharedInformers.Velero().V1().BackupStorageLocations(),
-				sharedInformers.Velero().V1().VolumeSnapshotLocations(),
+				sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
+				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				nil, // new plugin manager func
 				metrics.NewServerMetrics(),
 			).(*backupDeletionController)
