@@ -28,7 +28,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // DescribeBackup describes a backup in human-readable format.
@@ -254,7 +253,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 			return
 		}
 
-		var snapshots []*volume.Snapshot
+		var snapshots []*velerov1api.Snapshot
 		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
 			d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
 			return

@@ -50,7 +50,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type backupController struct {
@@ -535,7 +534,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {
-		if snap.Status.Phase == volume.SnapshotPhaseCompleted {
+		if snap.Status.Phase == velerov1api.SnapshotPhaseCompleted {
 			backup.Status.VolumeSnapshotsCompleted++
 		}
 	}

@@ -22,7 +22,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type itemKey struct {
@@ -43,7 +42,7 @@ type Request struct {
 	ResourceHooks             []resourceHook
 	ResolvedActions           []resolvedAction
 
-	VolumeSnapshots  []*volume.Snapshot
+	VolumeSnapshots  []*velerov1api.Snapshot
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
 	BackedUpItems    map[itemKey]struct{}
 }

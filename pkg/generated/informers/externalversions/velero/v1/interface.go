@@ -44,6 +44,8 @@ type Interface interface {
 	Schedules() ScheduleInformer
 	// ServerStatusRequests returns a ServerStatusRequestInformer.
 	ServerStatusRequests() ServerStatusRequestInformer
+	// Snapshots returns a SnapshotInformer.
+	Snapshots() SnapshotInformer
 	// VolumeSnapshotLocations returns a VolumeSnapshotLocationInformer.
 	VolumeSnapshotLocations() VolumeSnapshotLocationInformer
 }
@@ -107,6 +109,11 @@ func (v *version) Schedules() ScheduleInformer {
 // ServerStatusRequests returns a ServerStatusRequestInformer.
 func (v *version) ServerStatusRequests() ServerStatusRequestInformer {
 	return &serverStatusRequestInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// Snapshots returns a SnapshotInformer.
+func (v *version) Snapshots() SnapshotInformer {
+	return &snapshotInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
 // VolumeSnapshotLocations returns a VolumeSnapshotLocationInformer.

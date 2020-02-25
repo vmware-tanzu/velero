@@ -24,7 +24,6 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type PVRestorer interface {
@@ -36,7 +35,7 @@ type pvRestorer struct {
 	backup                  *api.Backup
 	snapshotVolumes         *bool
 	restorePVs              *bool
-	volumeSnapshots         []*volume.Snapshot
+	volumeSnapshots         []*api.Snapshot
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 	snapshotLocationLister  listers.VolumeSnapshotLocationLister
 }
@@ -117,8 +116,8 @@ type snapshotInfo struct {
 	location           *api.VolumeSnapshotLocation
 }
 
-func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*volume.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister) (*snapshotInfo, error) {
-	var pvSnapshot *volume.Snapshot
+func getSnapshotInfo(pvName string, backup *api.Backup, volumeSnapshots []*api.Snapshot, snapshotLocationLister listers.VolumeSnapshotLocationLister) (*snapshotInfo, error) {
+	var pvSnapshot *api.Snapshot
 	for _, snapshot := range volumeSnapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {
 			pvSnapshot = snapshot

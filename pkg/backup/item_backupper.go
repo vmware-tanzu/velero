@@ -41,7 +41,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type itemBackupperFactory interface {
@@ -488,9 +487,9 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	snapshotID, err := volumeSnapshotter.CreateSnapshot(snapshot.Spec.ProviderVolumeID, snapshot.Spec.VolumeAZ, tags)
 	if err != nil {
 		errs = append(errs, errors.Wrap(err, "error taking snapshot of volume"))
-		snapshot.Status.Phase = volume.SnapshotPhaseFailed
+		snapshot.Status.Phase = velerov1api.SnapshotPhaseFailed
 	} else {
-		snapshot.Status.Phase = volume.SnapshotPhaseCompleted
+		snapshot.Status.Phase = velerov1api.SnapshotPhaseCompleted
 		snapshot.Status.ProviderSnapshotID = snapshotID
 	}
 	ib.backupRequest.VolumeSnapshots = append(ib.backupRequest.VolumeSnapshots, snapshot)
@@ -499,9 +498,9 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	return kubeerrs.NewAggregate(errs)
 }
 
-func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
-	return &volume.Snapshot{
-		Spec: volume.SnapshotSpec{
+func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *velerov1api.Snapshot {
+	return &velerov1api.Snapshot{
+		Spec: velerov1api.SnapshotSpec{
 			BackupName:           backup.Name,
 			BackupUID:            string(backup.UID),
 			Location:             location,
@@ -511,8 +510,8 @@ func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, lo
 			VolumeAZ:             az,
 			VolumeIOPS:           iops,
 		},
-		Status: volume.SnapshotStatus{
-			Phase: volume.SnapshotPhaseNew,
+		Status: velerov1api.SnapshotStatus{
+			Phase: velerov1api.SnapshotPhaseNew,
 		},
 	}
 }

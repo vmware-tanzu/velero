@@ -57,7 +57,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type VolumeSnapshotterGetter interface {
@@ -70,7 +69,7 @@ type Request struct {
 	Log              logrus.FieldLogger
 	Backup           *velerov1api.Backup
 	PodVolumeBackups []*velerov1api.PodVolumeBackup
-	VolumeSnapshots  []*volume.Snapshot
+	VolumeSnapshots  []*velerov1api.Snapshot
 	BackupReader     io.Reader
 }
 
@@ -372,7 +371,7 @@ type context struct {
 	resticErrs                 chan error
 	pvsToProvision             sets.String
 	pvRestorer                 PVRestorer
-	volumeSnapshots            []*volume.Snapshot
+	volumeSnapshots            []*velerov1api.Snapshot
 	podVolumeBackups           []*velerov1api.PodVolumeBackup
 	resourceTerminatingTimeout time.Duration
 	resourceClients            map[resourceClientKey]client.Dynamic
@@ -1294,7 +1293,7 @@ func restorePodVolumeBackups(ctx *context, createdObj *unstructured.Unstructured
 	}
 }
 
-func hasSnapshot(pvName string, snapshots []*volume.Snapshot) bool {
+func hasSnapshot(pvName string, snapshots []*velerov1api.Snapshot) bool {
 	for _, snapshot := range snapshots {
 		if snapshot.Spec.PersistentVolumeName == pvName {
 			return true

@@ -31,7 +31,6 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type BackupInfo struct {
@@ -53,7 +52,7 @@ type BackupStore interface {
 
 	PutBackup(info BackupInfo) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
-	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
+	GetBackupVolumeSnapshots(name string) ([]*velerov1api.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
 
@@ -278,7 +277,7 @@ func (s *objectBackupStore) GetBackupMetadata(name string) (*velerov1api.Backup,
 	return backupObj, nil
 }
 
-func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error) {
+func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*velerov1api.Snapshot, error) {
 	// if the volumesnapshots file doesn't exist, we don't want to return an error, since
 	// a legacy backup or a backup with no snapshots would not have this file, so check for
 	// its existence before attempting to get its contents.
@@ -291,7 +290,7 @@ func (s *objectBackupStore) GetBackupVolumeSnapshots(name string) ([]*volume.Sna
 	}
 	defer res.Close()
 
-	var volumeSnapshots []*volume.Snapshot
+	var volumeSnapshots []*velerov1api.Snapshot
 	if err := decode(res, &volumeSnapshots); err != nil {
 		return nil, err
 	}

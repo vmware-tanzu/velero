@@ -1,0 +1,93 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: (unknown)
+  creationTimestamp: null
+  name: snapshots.velero.io
+spec:
+  group: velero.io
+  names:
+    kind: Snapshot
+    listKind: SnapshotList
+    plural: snapshots
+    singular: snapshot
+  preserveUnknownFields: false
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      description: Snapshot stores information about a persistent volume snapshot
+        taken as part of a Velero backup.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            backupName:
+              description: BackupName is the name of the Velero backup this snapshot
+                is associated with.
+              type: string
+            backupUID:
+              description: BackupUID is the UID of the Velero backup this snapshot
+                is associated with.
+              type: string
+            location:
+              description: Location is the name of the VolumeSnapshotLocation where
+                this snapshot is stored.
+              type: string
+            persistentVolumeName:
+              description: PersistentVolumeName is the Kubernetes name for the volume.
+              type: string
+            providerVolumeID:
+              description: ProviderVolumeID is the provider's ID for the volume.
+              type: string
+            volumeAZ:
+              description: VolumeAZ is the where the volume is provisioned in the
+                cloud provider.
+              type: string
+            volumeIOPS:
+              description: VolumeIOPS is the optional value of provisioned IOPS for
+                the disk/volume in the cloud provider API.
+              format: int64
+              type: integer
+            volumeType:
+              description: VolumeType is the type of the disk/volume in the cloud
+                provider API.
+              type: string
+          required:
+          - backupName
+          type: object
+        status:
+          properties:
+            phase:
+              description: Phase is the current state of the VolumeSnapshot.
+              type: string
+            providerSnapshotID:
+              description: ProviderSnapshotID is the ID of the snapshot taken in the
+                cloud provider API of this volume.
+              type: string
+          type: object
+      type: object
+  version: v1
+  versions:
+  - name: v1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
