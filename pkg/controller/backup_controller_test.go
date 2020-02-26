@@ -17,32 +17,19 @@ limitations under the License.
 package controller
 
 import (
-	"io"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
-	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
-
-type fakeBackupper struct {
-	mock.Mock
-}
-
-func (b *fakeBackupper) Backup(logger logrus.FieldLogger, backup *pkgbackup.Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter pkgbackup.VolumeSnapshotterGetter) error {
-	args := b.Called(logger, backup, backupFile, actions, volumeSnapshotterGetter)
-	return args.Error(0)
-}
 
 func defaultBackup() *builder.BackupBuilder {
 	return builder.ForBackup(velerov1api.DefaultNamespace, "backup-1")

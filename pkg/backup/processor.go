@@ -113,18 +113,8 @@ func NewProcessor(
 
 // Process validates, defaults, runs and persists a backup.
 func (p *Processor) Process(backup *velerov1api.Backup) error {
-	// Double-check we have the correct phase. In the unlikely event that multiple controller
-	// instances are running, it's possible for controller A to succeed in changing the phase to
-	// InProgress, while controller B's attempt to patch the phase fails. When controller B
-	// reprocesses the same backup, it will either show up as New (informer hasn't seen the update
-	// yet) or as InProgress. In the former case, the patch attempt will fail again, until the
-	// informer sees the update. In the latter case, after the informer has seen the update to
-	// InProgress, we still need this check so we can return nil to indicate we've finished processing
-	// this key (even though it was a no-op).
-	switch backup.Status.Phase {
-	case "", velerov1api.BackupPhaseNew:
-		// only process new backups
-	default:
+	// only process new backups
+	if backup.Status.Phase != "" && backup.Status.Phase != velerov1api.BackupPhaseNew {
 		return nil
 	}
 
@@ -143,7 +133,7 @@ func (p *Processor) Process(backup *velerov1api.Backup) error {
 	// update status
 	updatedBackup, err := patchBackup(backup, request.Backup, p.client)
 	if err != nil {
-		return errors.Wrapf(err, "error updating Backup status to %s", request.Status.Phase)
+		return errors.Wrapf(err, "error updating backup status to %s", request.Status.Phase)
 	}
 	// store ref to just-updated item for creating patch
 	backup = updatedBackup
@@ -158,7 +148,7 @@ func (p *Processor) Process(backup *velerov1api.Backup) error {
 
 	log.Debug("Running backup")
 
-	backupScheduleName := request.GetLabels()[velerov1api.ScheduleNameLabel]
+	backupScheduleName := request.Labels[velerov1api.ScheduleNameLabel]
 	p.metrics.RegisterBackupAttempt(backupScheduleName)
 
 	// execution & upload of backup
@@ -169,7 +159,7 @@ func (p *Processor) Process(backup *velerov1api.Backup) error {
 		// one is found, because there could've been an error
 		// while uploading artifacts to object storage, which would
 		// result in the backup being Failed.
-		log.WithError(err).Error("backup failed")
+		log.WithError(err).Error("Backup failed")
 		request.Status.Phase = velerov1api.BackupPhaseFailed
 	}
 
@@ -184,7 +174,7 @@ func (p *Processor) Process(backup *velerov1api.Backup) error {
 
 	log.Debug("Updating backup's final status")
 	if _, err := patchBackup(backup, request.Backup, p.client); err != nil {
-		log.WithError(err).Error("error updating backup's final status")
+		log.WithError(err).Error("Error updating backup's final status")
 	}
 
 	return nil
