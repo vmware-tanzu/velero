@@ -1,3 +1,19 @@
+/*
+Copyright 2017, 2019, 2020 the Velero contributors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package backup
 
 import (
@@ -57,6 +73,7 @@ type Processor struct {
 	clock clock.Clock
 }
 
+// NewProcessor constructs a Processor.
 func NewProcessor(
 	client velerov1client.BackupsGetter,
 	backupper Backupper,
@@ -94,6 +111,7 @@ func NewProcessor(
 	}
 }
 
+// Process validates, defaults, runs and persists a backup.
 func (p *Processor) Process(backup *velerov1api.Backup) error {
 	// Double-check we have the correct phase. In the unlikely event that multiple controller
 	// instances are running, it's possible for controller A to succeed in changing the phase to
