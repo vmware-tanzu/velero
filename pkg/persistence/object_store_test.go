@@ -38,7 +38,6 @@ import (
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 type objectBackupStoreTestHarness struct {
@@ -390,15 +389,15 @@ func TestGetBackupVolumeSnapshots(t *testing.T) {
 	assert.NotNil(t, err)
 
 	// volumesnapshots file containing gzipped json data should return correctly
-	snapshots := []*volume.Snapshot{
+	snapshots := []*velerov1api.Snapshot{
 		{
-			Spec: volume.SnapshotSpec{
+			Spec: velerov1api.SnapshotSpec{
 				BackupName:           "test-backup",
 				PersistentVolumeName: "pv-1",
 			},
 		},
 		{
-			Spec: volume.SnapshotSpec{
+			Spec: velerov1api.SnapshotSpec{
 				BackupName:           "test-backup",
 				PersistentVolumeName: "pv-2",
 			},

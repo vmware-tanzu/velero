@@ -32,7 +32,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func defaultBackup() *builder.BackupBuilder {
@@ -45,7 +44,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 		obj             *unstructured.Unstructured
 		restore         *api.Restore
 		backup          *api.Backup
-		volumeSnapshots []*volume.Snapshot
+		volumeSnapshots []*api.Snapshot
 		locations       []*api.VolumeSnapshotLocation
 		expectedErr     bool
 		expectedRes     *unstructured.Unstructured
@@ -88,7 +87,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 			obj:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 			restore: builder.ForRestore(api.DefaultNamespace, "").RestorePVs(false).Result(),
 			backup:  defaultBackup().Phase(api.BackupPhaseInProgress).Result(),
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*api.Snapshot{
 				newSnapshot("pv-1", "loc-1", "gp", "az-1", "snap-1", 1000),
 			},
 			locations: []*api.VolumeSnapshotLocation{
@@ -106,7 +105,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
-			volumeSnapshots: []*volume.Snapshot{},
+			volumeSnapshots: []*api.Snapshot{},
 			expectedRes:     NewTestUnstructured().WithName("pv-1").WithSpec().Unstructured,
 		},
 		{
@@ -118,7 +117,7 @@ func TestExecutePVAction_NoSnapshotRestores(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Result(),
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Result(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*api.Snapshot{
 				newSnapshot("non-matching-pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
 				newSnapshot("non-matching-pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
 			},
@@ -166,14 +165,14 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 		obj                *unstructured.Unstructured
 		restore            *api.Restore
 		backup             *api.Backup
-		volumeSnapshots    []*volume.Snapshot
+		volumeSnapshots    []*api.Snapshot
 		locations          []*api.VolumeSnapshotLocation
 		expectedProvider   string
 		expectedSnapshotID string
 		expectedVolumeType string
 		expectedVolumeAZ   string
 		expectedVolumeIOPS *int64
-		expectedSnapshot   *volume.Snapshot
+		expectedSnapshot   *api.Snapshot
 	}{
 		{
 			name:    "backup with a matching volume.Snapshot for PV executes restore",
@@ -184,7 +183,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-1").Provider("provider-1").Result(),
 				builder.ForVolumeSnapshotLocation(api.DefaultNamespace, "loc-2").Provider("provider-2").Result(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*api.Snapshot{
 				newSnapshot("pv-1", "loc-1", "type-1", "az-1", "snap-1", 1),
 				newSnapshot("pv-2", "loc-2", "type-2", "az-2", "snap-2", 2),
 			},
@@ -240,16 +239,16 @@ func (g providerToVolumeSnapshotterMap) GetVolumeSnapshotter(provider string) (v
 	}
 }
 
-func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volumeIOPS int64) *volume.Snapshot {
-	return &volume.Snapshot{
-		Spec: volume.SnapshotSpec{
+func newSnapshot(pvName, location, volumeType, volumeAZ, snapshotID string, volumeIOPS int64) *api.Snapshot {
+	return &api.Snapshot{
+		Spec: api.SnapshotSpec{
 			PersistentVolumeName: pvName,
 			Location:             location,
 			VolumeType:           volumeType,
 			VolumeAZ:             volumeAZ,
 			VolumeIOPS:           &volumeIOPS,
 		},
-		Status: volume.SnapshotStatus{
+		Status: api.SnapshotStatus{
 			ProviderSnapshotID: snapshotID,
 		},
 	}

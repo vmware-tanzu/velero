@@ -51,7 +51,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
@@ -1705,7 +1704,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 		vsls              []*velerov1.VolumeSnapshotLocation
 		apiResources      []*test.APIResource
 		snapshotterGetter volumeSnapshotterGetter
-		want              []*volume.Snapshot
+		want              []*velerov1.Snapshot
 	}{
 		{
 			name: "persistent volume with no zone annotation creates a snapshot",
@@ -1723,9 +1722,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1733,8 +1732,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-1-snapshot",
 					},
 				},
@@ -1756,9 +1755,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1", "type-1", 100, false),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1767,8 +1766,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-1-snapshot",
 					},
 				},
@@ -1790,9 +1789,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1", "type-1", 100, false),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1801,8 +1800,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-1-snapshot",
 					},
 				},
@@ -1824,9 +1823,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "zone-1-ga", "type-1", 100, false),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1835,8 +1834,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-1-snapshot",
 					},
 				},
@@ -1858,9 +1857,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, true),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1868,8 +1867,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase: volume.SnapshotPhaseFailed,
+					Status: velerov1.SnapshotStatus{
+						Phase: velerov1.SnapshotPhaseFailed,
 					},
 				},
 			},
@@ -1960,9 +1959,9 @@ func TestBackupWithSnapshots(t *testing.T) {
 				"default": new(fakeVolumeSnapshotter).WithVolume("pv-1", "vol-1", "", "type-1", 100, false),
 				"another": new(fakeVolumeSnapshotter).WithVolume("pv-2", "vol-2", "", "type-2", 100, false),
 			},
-			want: []*volume.Snapshot{
+			want: []*velerov1.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
@@ -1970,13 +1969,13 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-1",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-1-snapshot",
 					},
 				},
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "another",
 						PersistentVolumeName: "pv-2",
@@ -1984,8 +1983,8 @@ func TestBackupWithSnapshots(t *testing.T) {
 						VolumeType:           "type-2",
 						VolumeIOPS:           int64Ptr(100),
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1.SnapshotStatus{
+						Phase:              velerov1.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "vol-2-snapshot",
 					},
 				},

@@ -48,7 +48,6 @@ import (
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestFetchBackupInfo(t *testing.T) {
@@ -493,9 +492,9 @@ func TestProcessQueueItem(t *testing.T) {
 
 				backupStore.On("PutRestoreResults", test.backup.Name, test.restore.Name, mock.Anything).Return(nil)
 
-				volumeSnapshots := []*volume.Snapshot{
+				volumeSnapshots := []*api.Snapshot{
 					{
-						Spec: volume.SnapshotSpec{
+						Spec: api.SnapshotSpec{
 							PersistentVolumeName: "test-pv",
 							BackupName:           test.backup.Name,
 						},

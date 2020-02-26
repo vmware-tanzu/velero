@@ -43,7 +43,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
@@ -479,12 +478,12 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
-		snapshots := []*volume.Snapshot{
+		snapshots := []*v1.Snapshot{
 			{
-				Spec: volume.SnapshotSpec{
+				Spec: v1.SnapshotSpec{
 					Location: "vsl-1",
 				},
-				Status: volume.SnapshotStatus{
+				Status: v1.SnapshotStatus{
 					ProviderSnapshotID: "snap-1",
 				},
 			},
@@ -638,12 +637,12 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			return true, backup, nil
 		})
 
-		snapshots := []*volume.Snapshot{
+		snapshots := []*v1.Snapshot{
 			{
-				Spec: volume.SnapshotSpec{
+				Spec: v1.SnapshotSpec{
 					Location: "vsl-1",
 				},
-				Status: volume.SnapshotStatus{
+				Status: v1.SnapshotStatus{
 					ProviderSnapshotID: "snap-1",
 				},
 			},

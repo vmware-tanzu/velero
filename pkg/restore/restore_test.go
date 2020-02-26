@@ -58,7 +58,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
-	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
 // TestRestoreResourceFiltering runs restores with different combinations
@@ -1797,7 +1796,7 @@ func TestRestorePersistentVolumes(t *testing.T) {
 		backup                  *velerov1api.Backup
 		tarball                 io.Reader
 		apiResources            []*test.APIResource
-		volumeSnapshots         []*volume.Snapshot
+		volumeSnapshots         []*velerov1api.Snapshot
 		volumeSnapshotLocations []*velerov1api.VolumeSnapshotLocation
 		volumeSnapshotterGetter volumeSnapshotterGetter
 		want                    []*test.APIResource
@@ -1872,15 +1871,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				test.PVs(),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -1921,15 +1920,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				test.PVs(),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -1975,15 +1974,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -2027,15 +2026,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -2078,15 +2077,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "source-pv",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -2140,15 +2139,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				test.PVs(),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "source-pv",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -2201,15 +2200,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "pv-1",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
@@ -2261,15 +2260,15 @@ func TestRestorePersistentVolumes(t *testing.T) {
 				),
 				test.PVCs(),
 			},
-			volumeSnapshots: []*volume.Snapshot{
+			volumeSnapshots: []*velerov1api.Snapshot{
 				{
-					Spec: volume.SnapshotSpec{
+					Spec: velerov1api.SnapshotSpec{
 						BackupName:           "backup-1",
 						Location:             "default",
 						PersistentVolumeName: "source-pv",
 					},
-					Status: volume.SnapshotStatus{
-						Phase:              volume.SnapshotPhaseCompleted,
+					Status: velerov1api.SnapshotStatus{
+						Phase:              velerov1api.SnapshotPhaseCompleted,
 						ProviderSnapshotID: "snapshot-1",
 					},
 				},
