@@ -120,7 +120,11 @@ the secret at a well defined path.
 Since the Velero client is responsible for gathering logs and information about
 the Object Storage, this implementation should include a new flag `--cacert`
 which can be used when communicating with the Object Storage. Additionally, the
-user should be able to set this in their client configuration.
+user should be able to set this in their client configuration. The command
+would look like:
+```
+$ velero client config set cacert PATH
+```
 
 [1]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/master/velero-plugin-for-aws/object_store.go#L135
 [2]: https://github.com/vmware-tanzu/velero/blob/master/pkg/restic/command.go#L47
