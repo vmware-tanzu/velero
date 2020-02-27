@@ -39,6 +39,8 @@ toc:
         url: /namespace
       - page: Extend with hooks
         url: /hooks
+      - page: CSI Support (beta)
+        url: /csi
   - title: Plugins
     subfolderitems:
       - page: Overview
