@@ -226,7 +226,17 @@ clean:
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
-ci: all verify test
+.PHONY: modules
+modules:
+	go mod tidy
+
+.PHONY: verify-modules
+verify-modules: modules
+	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
+		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
+	fi
+
+ci: verify-modules verify all test
 
 changelog:
 	hack/changelog.sh
