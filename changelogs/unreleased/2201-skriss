@@ -1,1 +1,0 @@
-bug fix: fix race condition resulting in restores sometimes succeeding despite restic restore failures

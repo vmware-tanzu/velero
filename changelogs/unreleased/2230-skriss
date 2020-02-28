@@ -1,1 +1,0 @@
-bug fix: back up server-preferred version of CRDs rather than always the `v1beta1` version

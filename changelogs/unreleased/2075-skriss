@@ -1,1 +1,0 @@
-bug fix: deep-copy backup's labels when constructing snapshot tags, so the PV name isn't added as a label to the backup

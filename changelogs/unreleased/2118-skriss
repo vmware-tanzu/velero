@@ -1,1 +1,0 @@
-bug fix: don't restore cluster-scoped resources when restoring specific namespaces and IncludeClusterResources is nil
