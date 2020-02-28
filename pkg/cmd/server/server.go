@@ -444,6 +444,10 @@ func (s *server) validateBackupStorageLocations() error {
 //   restored with their corresponding CRD.
 // - Namespaces go second because all namespaced resources depend on them.
 // - Storage Classes are needed to create PVs and PVCs correctly.
+// - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
+// - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
+//	 storage provider
+// - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
 // - Secrets and config maps go before pods or controllers so they can be mounted
@@ -458,6 +462,9 @@ var defaultRestorePriorities = []string{
 	"customresourcedefinitions",
 	"namespaces",
 	"storageclasses",
+	"volumesnapshotclass.snapshot.storage.k8s.io",
+	"volumesnapshotcontents.snapshot.storage.k8s.io",
+	"volumesnapshots.snapshot.storage.k8s.io",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"secrets",
