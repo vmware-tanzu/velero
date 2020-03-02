@@ -1,1 +1,0 @@
-Added support of using PV name from volumesnapshotter('SetVolumeID') in case of PV renaming during the restore

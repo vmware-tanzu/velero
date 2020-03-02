@@ -18,7 +18,7 @@ Alternatively, for quickly loading the website, under the `velero/site/` directo
 bundle exec jekyll serve --livereload --future
 ```
 
-For more information on how to run the website locally, please see our [jekyll documentation](https://github.com/vmware-tanzu/velero/blob/v1.3.0-beta.2/site/README-JEKYLL.md).
+For more information on how to run the website locally, please see our [jekyll documentation](https://github.com/vmware-tanzu/velero/blob/v1.3.0/site/README-JEKYLL.md).
 
 ## Adding a blog post
 

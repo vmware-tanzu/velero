@@ -1,1 +1,0 @@
-When restoring a v1 CRD with PreserveUnknownFields = True, make sure that the preservation behavior is maintained by copying the flag into the Open API V3 schema, but update the flag so as to allow the Kubernetes API server to accept the CRD without error.

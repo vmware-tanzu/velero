@@ -52,7 +52,7 @@ Example:
 
 We use a package to generate mocks for our interfaces.
 
-Example: if you want to change this mock: https://github.com/vmware-tanzu/velero/blob/v1.3.0-beta.2/pkg/restic/mocks/restorer.go
+Example: if you want to change this mock: https://github.com/vmware-tanzu/velero/blob/v1.3.0/pkg/restic/mocks/restorer.go
 
 Run:
 

@@ -17,5 +17,5 @@ Please browse our list of resources, including a playlist of past online communi
 
 If you are ready to jump in and test, add code, or help with documentation, please use the navigation on the left under `Contribute`.
 
-[1]: https://github.com/vmware-tanzu/velero/blob/v1.3.0-beta.2/CODE_OF_CONDUCT.md
-[2]: https://github.com/vmware-tanzu/velero/blob/v1.3.0-beta.2/CONTRIBUTING.md
+[1]: https://github.com/vmware-tanzu/velero/blob/v1.3.0/CODE_OF_CONDUCT.md
+[2]: https://github.com/vmware-tanzu/velero/blob/v1.3.0/CONTRIBUTING.md
