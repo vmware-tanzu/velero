@@ -35,6 +35,7 @@ _Note that these storage providers are not regularly tested by the Velero team._
  * [NooBaa][5]
  * Ceph RADOS v12.2.7
  * Quobyte
+ * [Cloudian HyperStore][38]
 
 _Some storage providers, like Quobyte, may need a different [signature algorithm version][6]._
 
@@ -78,3 +79,4 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [35]: https://github.com/vmware-tanzu/velero-plugin-for-aws#setup
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
 [37]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup
+[38]: https://www.cloudian.com/
