@@ -19,6 +19,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+# this script expects to be run from the root of the Velero repo.
+
 if [[ -z "${GOPATH}" ]]; then
   GOPATH=~/go
 fi
@@ -28,8 +30,8 @@ if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
   exit 1
 fi
 
-if [[ ! -d "${GOPATH}/src/sigs.k8s.io/controller-tools" ]]; then
-  echo "sigs.k8s.io/controller-tools missing from GOPATH"
+if ! command -v controller-gen > /dev/null; then
+  echo "controller-gen is missing"
   exit 1
 fi
 
@@ -38,12 +40,13 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   github.com/vmware-tanzu/velero/pkg/generated \
   github.com/vmware-tanzu/velero/pkg/apis \
   "velero:v1" \
-  --go-header-file ${GOPATH}/src/github.com/vmware-tanzu/velero/hack/boilerplate.go.txt \
+  --go-header-file ./hack/boilerplate.go.txt \
+  --output-base ../../.. \
   $@
 
-go run ${GOPATH}/src/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go \
+controller-gen \
   crd:crdVersions=v1beta1,preserveUnknownFields=false \
-  output:dir=pkg/generated/crds/manifests \
+  output:dir=./pkg/generated/crds/manifests \
   paths=./pkg/apis/velero/v1/...
 
 go generate ./pkg/generated/crds

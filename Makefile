@@ -135,21 +135,22 @@ BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
-	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
-	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
+	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# because the Kubernetes code-generator tools require the project to
+	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
+	@# under $GOPATH).
 	@docker run \
 		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd)/vendor/k8s.io/api:/go/src/k8s.io/api:delegated" \
+		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
-		-v "$$(pwd):/go/src/$(PKG):delegated" \
-		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
-		-w /go/src/$(PKG) \
+		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
@@ -225,7 +226,17 @@ clean:
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
-ci: all verify test
+.PHONY: modules
+modules:
+	go mod tidy
+
+.PHONY: verify-modules
+verify-modules: modules
+	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
+		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
+	fi
+
+ci: verify-modules verify all test
 
 changelog:
 	hack/changelog.sh

@@ -24,7 +24,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/api/core/v1"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -42,8 +42,8 @@ const (
 
 func NewAddCommand(f client.Factory) *cobra.Command {
 	var (
-		imagePullPolicies   = []string{string(v1.PullAlways), string(v1.PullIfNotPresent), string(v1.PullNever)}
-		imagePullPolicyFlag = flag.NewEnum(string(v1.PullIfNotPresent), imagePullPolicies...)
+		imagePullPolicies   = []string{string(corev1api.PullAlways), string(corev1api.PullIfNotPresent), string(corev1api.PullNever)}
+		imagePullPolicyFlag = flag.NewEnum(string(corev1api.PullIfNotPresent), imagePullPolicies...)
 	)
 
 	c := &cobra.Command{
@@ -74,14 +74,14 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			}
 
 			if !volumeExists {
-				volume := v1.Volume{
+				volume := corev1api.Volume{
 					Name: pluginsVolumeName,
-					VolumeSource: v1.VolumeSource{
-						EmptyDir: &v1.EmptyDirVolumeSource{},
+					VolumeSource: corev1api.VolumeSource{
+						EmptyDir: &corev1api.EmptyDirVolumeSource{},
 					},
 				}
 
-				volumeMount := v1.VolumeMount{
+				volumeMount := corev1api.VolumeMount{
 					Name:      pluginsVolumeName,
 					MountPath: "/plugins",
 				}
@@ -105,7 +105,7 @@ func NewAddCommand(f client.Factory) *cobra.Command {
 			}
 
 			// add the plugin as an init container
-			plugin := *builder.ForPluginContainer(args[0], v1.PullPolicy(imagePullPolicyFlag.String())).Result()
+			plugin := *builder.ForPluginContainer(args[0], corev1api.PullPolicy(imagePullPolicyFlag.String())).Result()
 
 			veleroDeploy.Spec.Template.Spec.InitContainers = append(veleroDeploy.Spec.Template.Spec.InitContainers, plugin)
 
