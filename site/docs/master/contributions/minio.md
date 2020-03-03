@@ -249,6 +249,20 @@ kubectl edit backupstoragelocation default -n velero
 
 Add `publicUrl: http://localhost:9000` under the `spec.config` section.
 
+## Accessing logs with an HTTPS endpoint
+
+If you're using Minio with HTTPS, you may see unintelligible text in the output of `velero describe`, or `velero logs` commands.
+
+In order to fix this, you can add a public, non-HTTPS URL to the `BackupStorageLocation`.
+
+In a terminal, run the following:
+
+```shell
+kubectl edit backupstoragelocation default -n velero
+```
+
+Add `publicUrl: http://<a public IP for your Minio instance>:9000` under the `spec.config` section.
+
 ### Work with Ingress
 
 Configuring Ingress for your cluster is out of scope for the Velero documentation. If you have already set up Ingress, however, it makes sense to continue with it while you run the example Velero configuration with Minio.
