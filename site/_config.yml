@@ -155,6 +155,7 @@ page_gen:
 collections:
   - contributors
   - casestudies
+  - plugin-list
 
 versioning: true
 latest: v1.3.0
