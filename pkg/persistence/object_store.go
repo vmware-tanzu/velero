@@ -42,6 +42,7 @@ type BackupInfo struct {
 	PodVolumeBackups,
 	VolumeSnapshots,
 	BackupResourceList io.Reader
+	// Add io.Readers here for VS and VSContents lists?
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -51,7 +52,7 @@ type BackupStore interface {
 
 	ListBackups() ([]string, error)
 
-	PutBackup(info BackupInfo) error
+	PutBackup(info BackupInfo) error // Extend this method for a VS/VSContent parameter, or create a new one for the beta period?
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)

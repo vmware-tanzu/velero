@@ -99,3 +99,5 @@ func (l *ObjectStoreLayout) getRestoreLogKey(restore string) string {
 func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
 	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz", restore))
 }
+
+// TODO: Add keys for VS & VSContents json.gz files

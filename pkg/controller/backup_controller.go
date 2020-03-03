@@ -40,6 +40,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -74,6 +75,8 @@ type backupController struct {
 	formatFlag               logging.Format
 }
 
+// TODO (nrb): Add clients for the VS/VSContent here.
+// How about creating them in the server iff EnableCSI, and if they're nil in the backup controller, don't worry about it?
 func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
@@ -599,6 +602,11 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 }
 
 func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File, backupStore persistence.BackupStore, log logrus.FieldLogger) []error {
+	if features.IsEnabled("EnableCSI") {
+		// Get the list of VolumeSnapshots & VolumeSnapshotContents associated with the backup and serialize them as JSON
+		// Probably shouldn't fetch them here as there's no client, but they should be passed in somehow.
+	}
+
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
 
