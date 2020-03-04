@@ -43,6 +43,9 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
+
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
@@ -217,6 +220,7 @@ type server struct {
 	kubeClientConfig      *rest.Config
 	kubeClient            kubernetes.Interface
 	veleroClient          clientset.Interface
+	csiSnapClient         snapshotter.Interface
 	discoveryClient       discovery.DiscoveryInterface
 	discoveryHelper       velerodiscovery.Helper
 	dynamicClient         dynamic.Interface
@@ -588,6 +592,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
+			s.csiSnapClient.SnapshotV1beta1(),
 			backupper,
 			s.logger,
 			s.logLevel,
@@ -831,4 +836,19 @@ func (s *server) runProfiler() {
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
+}
+
+// Helper methods that only return clients if the user has turned on CSI.
+func volumeSnapshotClientIfCSIEnabled(i snapshotter.Interface) snapshotv1beta1.VolumeSnapshotInterface {
+	if features.IsEnabled("EnableCSI") {
+		return i.SnapshotV1beta1().VolumeSnapshots("") // is this correct? we need the namespace? Could we get this lazily later, via the backup?
+	}
+	return nil
+}
+
+func voluemSnapshotContentClientIfCSIEnabled(i snapshotter.Interface) snapshotv1beta1.VolumeSnapshotContentInterface {
+	if features.IsEnabled("EnableCSI") {
+		return i.SnapshotV1beta1().VolumeSnapshotContents()
+	}
+	return nil
 }

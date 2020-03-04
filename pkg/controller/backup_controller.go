@@ -37,6 +37,8 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
+	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -61,6 +63,7 @@ type backupController struct {
 	backupper                pkgbackup.Backupper
 	lister                   velerov1listers.BackupLister
 	client                   velerov1client.BackupsGetter
+	csiClient                snapshotv1beta1.SnapshotV1beta1Interface
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
 	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
@@ -75,12 +78,13 @@ type backupController struct {
 	formatFlag               logging.Format
 }
 
-// TODO (nrb): Add clients for the VS/VSContent here.
+// TODO(nrb-csi): Add clients for the VS/VSContent here.
 // How about creating them in the server iff EnableCSI, and if they're nil in the backup controller, don't worry about it?
 func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
 	discoveryHelper discovery.Helper,
+	csiClient snapshotv1beta1.SnapshotV1beta1Interface,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
@@ -100,6 +104,7 @@ func NewBackupController(
 		backupper:                backupper,
 		lister:                   backupInformer.Lister(),
 		client:                   client,
+		csiClient:                csiClient,
 		clock:                    &clock.RealClock{},
 		backupLogLevel:           backupLogLevel,
 		newPluginManager:         newPluginManager,
@@ -569,6 +574,17 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
 	default:
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
+	}
+
+	// TODO(nrb-csi): Fetch VS(C)s here, based on includes/exludes?
+	if features.IsEnabled("EnableCSI") {
+		selector := metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"velero.io/backup-name": backup.Name,
+			},
+		}
+		// Need to iterate through included namespaces to get all VSs made by the backup
+		c.csiClient.VolumeSnapshots("").List(metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(&selector)})
 	}
 
 	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger); len(errs) > 0 {
