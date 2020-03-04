@@ -26,12 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -43,9 +41,8 @@ type backupSyncController struct {
 	backupClient                velerov1client.BackupsGetter
 	backupLocationClient        velerov1client.BackupStorageLocationsGetter
 	podVolumeBackupClient       velerov1client.PodVolumeBackupsGetter
-	backupLister                listers.BackupLister
-	backupStorageLocationLister listers.BackupStorageLocationLister
-	podVolumeBackupLister       listers.PodVolumeBackupLister
+	backupLister                velerov1listers.BackupLister
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
 	defaultBackupSyncPeriod     time.Duration
@@ -57,9 +54,8 @@ func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
-	backupInformer informers.BackupInformer,
-	backupStorageLocationInformer informers.BackupStorageLocationInformer,
-	podVolumeBackupInformer informers.PodVolumeBackupInformer,
+	backupLister velerov1listers.BackupLister,
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	syncPeriod time.Duration,
 	namespace string,
 	defaultBackupLocation string,
@@ -79,9 +75,8 @@ func NewBackupSyncController(
 		namespace:                   namespace,
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultBackupSyncPeriod:     syncPeriod,
-		backupLister:                backupInformer.Lister(),
-		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
-		podVolumeBackupLister:       podVolumeBackupInformer.Lister(),
+		backupLister:                backupLister,
+		backupStorageLocationLister: backupStorageLocationLister,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -91,10 +86,6 @@ func NewBackupSyncController(
 
 	c.resyncFunc = c.run
 	c.resyncPeriod = 30 * time.Second
-	c.cacheSyncWaiters = []cache.InformerSynced{
-		backupInformer.Informer().HasSynced,
-		backupStorageLocationInformer.Informer().HasSynced,
-	}
 
 	return c
 }

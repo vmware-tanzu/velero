@@ -57,9 +57,9 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 		controller      = NewDownloadRequestController(
 			client.VeleroV1(),
 			informerFactory.Velero().V1().DownloadRequests(),
-			informerFactory.Velero().V1().Restores(),
-			informerFactory.Velero().V1().BackupStorageLocations(),
-			informerFactory.Velero().V1().Backups(),
+			informerFactory.Velero().V1().Restores().Lister(),
+			informerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			informerFactory.Velero().V1().Backups().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			velerotest.NewLogger(),
 		).(*downloadRequestController)

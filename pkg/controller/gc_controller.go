@@ -29,8 +29,8 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
@@ -42,10 +42,10 @@ const (
 type gcController struct {
 	*genericController
 
-	backupLister              listers.BackupLister
-	deleteBackupRequestLister listers.DeleteBackupRequestLister
+	backupLister              velerov1listers.BackupLister
+	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
-	backupLocationLister      listers.BackupStorageLocationLister
+	backupLocationLister      velerov1listers.BackupStorageLocationLister
 
 	clock clock.Clock
 }
@@ -53,27 +53,21 @@ type gcController struct {
 // NewGCController constructs a new gcController.
 func NewGCController(
 	logger logrus.FieldLogger,
-	backupInformer informers.BackupInformer,
-	deleteBackupRequestInformer informers.DeleteBackupRequestInformer,
+	backupInformer velerov1informers.BackupInformer,
+	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister,
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
 ) Interface {
 	c := &gcController{
 		genericController:         newGenericController("gc-controller", logger),
 		clock:                     clock.RealClock{},
 		backupLister:              backupInformer.Lister(),
-		deleteBackupRequestLister: deleteBackupRequestInformer.Lister(),
+		deleteBackupRequestLister: deleteBackupRequestLister,
 		deleteBackupRequestClient: deleteBackupRequestClient,
-		backupLocationLister:      backupLocationInformer.Lister(),
+		backupLocationLister:      backupLocationLister,
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
-		backupInformer.Informer().HasSynced,
-		deleteBackupRequestInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-	)
-
 	c.resyncPeriod = GCSyncPeriod
 	c.resyncFunc = c.enqueueAllBackups
 

@@ -62,8 +62,6 @@ func NewServerStatusRequestController(
 	}
 
 	c.syncHandler = c.processItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, informer.Informer().HasSynced)
-
 	c.resyncFunc = c.enqueueAllItems
 	c.resyncPeriod = statusRequestResyncPeriod
 
