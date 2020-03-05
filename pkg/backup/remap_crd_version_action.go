@@ -61,6 +61,7 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	}
 
 	// We've got a v1 CRD, so proceed.
+	// TODO: why is this causing int/float errors?
 	var crd apiextv1.CustomResourceDefinition
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &crd); err != nil {
 		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to a v1 CRD")

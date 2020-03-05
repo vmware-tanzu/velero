@@ -58,4 +58,19 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
 	})
+
+	t.Run("Test a v1 CRD with a Schema that includes a maximum field", func(t *testing.T) {
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		schema := builder.ForJSONSchemaPropsBuilder().Maximum(5).Result()
+		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Schema(schema).Result())
+		c := b.Result()
+		// Something about ToUnstructured makes it safe to use FromUnstructured, but if the object
+		// came from the Kubernetes API server or was marshalled in from JSON, it won't work.
+		// This probably needs to be put into JSON in memory, then into Unstructure from that JSON
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
+		require.NoError(t, err)
+
+		_, _, err = a.Execute(&unstructured.Unstructured{Object: obj}, backup)
+		require.NoError(t, err)
+	})
 }
