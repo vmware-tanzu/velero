@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -63,9 +65,17 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	// We've got a v1 CRD, so proceed.
 	// TODO: why is this causing int/float errors?
 	var crd apiextv1.CustomResourceDefinition
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &crd); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to a v1 CRD")
+	js, err := json.Marshal(item.UnstructuredContent())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to JSON")
 	}
+
+	if err = json.Unmarshal(js, &crd); err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert JSON to CRD")
+	}
+	//if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &crd); err != nil {
+	//	return nil, nil, errors.Wrap(err, "unable to convert unstructured item to a v1 CRD")
+	//}
 
 	log := a.logger.WithField("plugin", "RemapCRDVersionAction").WithField("CRD", crd.Name)
 
@@ -77,8 +87,8 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	//     served:  true
 	//     storage: true
 	// This is acceptable when re-submitted to a v1beta1 endpoint on restore.
-	if len(crd.Spec.Versions) > 0 {
-		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil {
+	if len(crd.Spec.Versions) > 0 { // NestedSlice
+		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil { // NestedMap, NestedMap
 			log.Debug("CRD is a candidate for v1beta1 backup")
 
 			if err := setV1beta1Version(item); err != nil {
@@ -88,8 +98,8 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 	}
 
 	// If the NonStructuralSchema condition was applied, be sure to back it up as v1beta1.
-	for _, c := range crd.Status.Conditions {
-		if c.Type == apiextv1.NonStructuralSchema {
+	for _, c := range crd.Status.Conditions { // NestedMap
+		if c.Type == apiextv1.NonStructuralSchema { // NestedString
 			log.Debug("CRD is a non-structural schema")
 
 			if err := setV1beta1Version(item); err != nil {
