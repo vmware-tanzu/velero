@@ -1,0 +1,1 @@
+allow ignoring label in Schedule when copying to Backup via `--ignore-schedule-labels`

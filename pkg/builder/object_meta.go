@@ -44,16 +44,24 @@ func WithLabels(vals ...string) func(obj metav1.Object) {
 
 // WithLabelsMap is a functional option that applies the specified labels map to
 // an object.
-func WithLabelsMap(labels map[string]string) func(obj metav1.Object) {
+func WithLabelsMap(labels map[string]string, ignoreLabels []string) func(obj metav1.Object) {
 	return func(obj metav1.Object) {
 		objLabels := obj.GetLabels()
 		if objLabels == nil {
 			objLabels = make(map[string]string)
 		}
 
+		// a map of ignored labels for simpler lookup
+		ignored := make(map[string]bool, len(ignoreLabels))
+		for _, name := range ignoreLabels {
+			ignored[name] = true
+		}
+
 		// If the label already exists in the object, it will be overwritten
 		for k, v := range labels {
-			objLabels[k] = v
+			if !ignored[k] {
+				objLabels[k] = v
+			}
 		}
 
 		obj.SetLabels(objLabels)

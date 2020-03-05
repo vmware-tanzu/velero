@@ -54,6 +54,7 @@ type scheduleController struct {
 	schedulesLister velerov1listers.ScheduleLister
 	clock           clock.Clock
 	metrics         *metrics.ServerMetrics
+	ignoredLabels   []string
 }
 
 func NewScheduleController(
@@ -63,6 +64,7 @@ func NewScheduleController(
 	schedulesInformer velerov1informers.ScheduleInformer,
 	logger logrus.FieldLogger,
 	metrics *metrics.ServerMetrics,
+	ignoredLabels []string,
 ) *scheduleController {
 	c := &scheduleController{
 		genericController: newGenericController("schedule", logger),
@@ -72,6 +74,7 @@ func NewScheduleController(
 		schedulesLister:   schedulesInformer.Lister(),
 		clock:             clock.RealClock{},
 		metrics:           metrics,
+		ignoredLabels:     ignoredLabels,
 	}
 
 	c.syncHandler = c.processSchedule
@@ -257,7 +260,7 @@ func (c *scheduleController) submitBackupIfDue(item *api.Schedule, cronSchedule 
 	// backups so that we don't overlap runs (for disk snapshots in particular, this can
 	// lead to performance issues).
 	log.WithField("nextRunTime", nextRunTime).Info("Schedule is due, submitting Backup")
-	backup := getBackup(item, now)
+	backup := c.getBackup(item, now)
 	if _, err := c.backupsClient.Backups(backup.Namespace).Create(backup); err != nil {
 		return errors.Wrap(err, "error creating Backup")
 	}
@@ -287,11 +290,11 @@ func getNextRunTime(schedule *api.Schedule, cronSchedule cron.Schedule, asOf tim
 	return asOf.After(nextRunTime), nextRunTime
 }
 
-func getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
+func (c *scheduleController) getBackup(item *api.Schedule, timestamp time.Time) *api.Backup {
 	name := item.TimestampedName(timestamp)
 	backup := builder.
 		ForBackup(item.Namespace, name).
-		FromSchedule(item).
+		FromSchedule(item, c.ignoredLabels).
 		Result()
 
 	return backup

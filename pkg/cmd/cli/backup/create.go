@@ -96,6 +96,7 @@ type CreateOptions struct {
 	StorageLocation         string
 	SnapshotLocations       []string
 	FromSchedule            string
+	IgnoredScheduleLabels   []string
 
 	client veleroclient.Interface
 }
@@ -120,6 +121,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.StorageLocation, "storage-location", "", "location in which to store the backup")
 	flags.StringSliceVar(&o.SnapshotLocations, "volume-snapshot-locations", o.SnapshotLocations, "list of locations (at most one per provider) where volume snapshots should be stored")
 	flags.VarP(&o.Selector, "selector", "l", "only back up resources matching this label selector")
+	flags.StringSliceVar(&o.IgnoredScheduleLabels, "ignore-schedule-labels", o.IgnoredScheduleLabels, "labels in Schedule resource to not copy to the Backup resources")
 	f := flags.VarPF(&o.SnapshotVolumes, "snapshot-volumes", "", "take snapshots of PersistentVolumes as part of the backup")
 	// this allows the user to just specify "--snapshot-volumes" as shorthand for "--snapshot-volumes=true"
 	// like a normal bool flag
@@ -293,7 +295,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 			o.Name = schedule.TimestampedName(time.Now())
 		}
 		backupBuilder = builder.ForBackup(namespace, o.Name).
-			FromSchedule(schedule)
+			FromSchedule(schedule, o.IgnoredScheduleLabels)
 	} else {
 		backupBuilder = builder.ForBackup(namespace, o.Name).
 			IncludedNamespaces(o.IncludeNamespaces...).
@@ -316,6 +318,6 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 	}
 
-	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data())).Result()
+	backup := backupBuilder.ObjectMeta(builder.WithLabelsMap(o.Labels.Data(), nil)).Result()
 	return backup, nil
 }

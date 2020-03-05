@@ -2026,7 +2026,7 @@ func TestBackupWithSnapshots(t *testing.T) {
 			},
 			apiResources: []*test.APIResource{
 				test.PVs(
-					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabelsMap(map[string]string{"failure-domain.beta.kubernetes.io/zone": "zone-1-deprecated", "topology.kubernetes.io/zone": "zone-1-ga"})).Result(),
+					builder.ForPersistentVolume("pv-1").ObjectMeta(builder.WithLabelsMap(map[string]string{"failure-domain.beta.kubernetes.io/zone": "zone-1-deprecated", "topology.kubernetes.io/zone": "zone-1-ga"}, []string{})).Result(),
 				),
 			},
 			snapshotterGetter: map[string]velero.VolumeSnapshotter{
