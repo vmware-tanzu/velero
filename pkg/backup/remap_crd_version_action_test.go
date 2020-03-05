@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,18 +60,22 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
 	})
 
-	t.Run("Test a v1 CRD with a Schema that includes a maximum field", func(t *testing.T) {
+	t.Run("Having an integer on a float64 field should work (issue 2319)", func(t *testing.T) {
 		b := builder.ForV1CustomResourceDefinition("test.velero.io")
 		schema := builder.ForJSONSchemaPropsBuilder().Maximum(5).Result()
 		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Schema(schema).Result())
 		c := b.Result()
-		// Something about ToUnstructured makes it safe to use FromUnstructured, but if the object
-		// came from the Kubernetes API server or was marshalled in from JSON, it won't work.
-		// This probably needs to be put into JSON in memory, then into Unstructure from that JSON
-		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
+
+		// Marshall in and out of JSON because the problem doesn't manifest when we use ToUnstructured directly
+		// This should simulate the JSON passing over the wire in an HTTP request/response with a dynamic client
+		js, err := json.Marshal(c)
 		require.NoError(t, err)
 
-		_, _, err = a.Execute(&unstructured.Unstructured{Object: obj}, backup)
+		var u unstructured.Unstructured
+		err = json.Unmarshal(js, &u)
+		require.NoError(t, err)
+
+		_, _, err = a.Execute(&u, backup)
 		require.NoError(t, err)
 	})
 }
