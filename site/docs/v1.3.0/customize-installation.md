@@ -92,7 +92,7 @@ To generate the YAML without applying it to your cluster, use the `--dry-run -o 
 
 This is useful for applying bespoke customizations, integrating with a GitOps workflow, etc.
 
-If you are installing Velero in Kubernetes 1.13.x or earlier, you need to use `kubectl apply`'s `--validate=false` option when applying the generated configuration to your cluster. See [issue 2077][7] for more context.
+If you are installing Velero in Kubernetes 1.14.x or earlier, you need to use `kubectl apply`'s `--validate=false` option when applying the generated configuration to your cluster. See [issue 2077][7] and [issue 2311][8] for more context.
 
 ## Additional options
 
@@ -244,3 +244,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [4]: on-premises.md
 [6]: velero-install.md#usage
 [7]: https://github.com/vmware-tanzu/velero/issues/2077
+[8]: https://github.com/vmware-tanzu/velero/issues/2311
