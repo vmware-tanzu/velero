@@ -16,8 +16,6 @@ limitations under the License.
 package builder
 
 import (
-	"fmt"
-
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
@@ -35,9 +33,7 @@ func ForJSONSchemaPropsBuilder() *JSONSchemaPropsBuilder {
 
 // Maximum sets the Maximum field on a JSONSchemaPropsBuilder object.
 func (b *JSONSchemaPropsBuilder) Maximum(f float64) *JSONSchemaPropsBuilder {
-	fmt.Printf("%#v\n", b.object)
-	h := new(float64)
-	b.object.Maximum = h
+	b.object.Maximum = &f
 	return b
 }
 
