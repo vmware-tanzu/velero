@@ -1,0 +1,1 @@
+bug fix: don't panic in `velero restic repo get` when last maintenance time is `nil`
