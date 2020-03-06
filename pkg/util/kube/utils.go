@@ -157,6 +157,9 @@ func IsCRDReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
 // TODO: Delete this function and use IsCRDReady when the upstream runtime.FromUnstructured function properly handles int64 field conversions.
 // Duplicated function because the velero install package uses IsCRDReady with the beta types.
 // See https://github.com/kubernetes/kubernetes/issues/87675
+// This is different from the fix for https://github.com/vmware-tanzu/velero/issues/2319 because here,
+// we need to account for *both* v1beta1 and v1 CRDs, so doing marshalling into JSON to convert to a Go type may not be as useful here, unless we do
+// type switching.
 func IsUnstructuredCRDReady(crd *unstructured.Unstructured) (bool, error) {
 	var isEstablished, namesAccepted bool
 
