@@ -62,6 +62,7 @@ func TestRemapCRDVersionAction(t *testing.T) {
 
 	t.Run("Having an integer on a float64 field should work (issue 2319)", func(t *testing.T) {
 		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		// 5 here is just an int value, it could be any other whole number.
 		schema := builder.ForJSONSchemaPropsBuilder().Maximum(5).Result()
 		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Schema(schema).Result())
 		c := b.Result()
