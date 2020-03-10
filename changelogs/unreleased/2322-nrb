@@ -1,1 +1,0 @@
-Fix CRD backup failures when fields contained a whole number.
