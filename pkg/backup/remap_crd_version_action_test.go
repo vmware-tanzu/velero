@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,5 +58,25 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		item, _, err := a.Execute(&unstructured.Unstructured{Object: obj}, backup)
 		require.NoError(t, err)
 		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
+	})
+
+	t.Run("Having an integer on a float64 field should work (issue 2319)", func(t *testing.T) {
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		// 5 here is just an int value, it could be any other whole number.
+		schema := builder.ForJSONSchemaPropsBuilder().Maximum(5).Result()
+		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Schema(schema).Result())
+		c := b.Result()
+
+		// Marshall in and out of JSON because the problem doesn't manifest when we use ToUnstructured directly
+		// This should simulate the JSON passing over the wire in an HTTP request/response with a dynamic client
+		js, err := json.Marshal(c)
+		require.NoError(t, err)
+
+		var u unstructured.Unstructured
+		err = json.Unmarshal(js, &u)
+		require.NoError(t, err)
+
+		_, _, err = a.Execute(&u, backup)
+		require.NoError(t, err)
 	})
 }

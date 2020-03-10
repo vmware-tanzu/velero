@@ -126,6 +126,14 @@ func (b *V1CustomResourceDefinitionVersionBuilder) Storage(s bool) *V1CustomReso
 	return b
 }
 
+func (b *V1CustomResourceDefinitionVersionBuilder) Schema(s *apiextv1.JSONSchemaProps) *V1CustomResourceDefinitionVersionBuilder {
+	if b.object.Schema == nil {
+		b.object.Schema = new(apiextv1.CustomResourceValidation)
+	}
+	b.object.Schema.OpenAPIV3Schema = s
+	return b
+}
+
 // Result returns the built CustomResourceDefinitionVersion.
 func (b *V1CustomResourceDefinitionVersionBuilder) Result() apiextv1.CustomResourceDefinitionVersion {
 	return b.object
