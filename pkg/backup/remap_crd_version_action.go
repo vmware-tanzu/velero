@@ -17,6 +17,8 @@ limitations under the License.
 package backup
 
 import (
+	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -62,8 +64,18 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 
 	// We've got a v1 CRD, so proceed.
 	var crd apiextv1.CustomResourceDefinition
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(item.UnstructuredContent(), &crd); err != nil {
-		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to a v1 CRD")
+
+	// Do not use runtime.DefaultUnstructuredConverter.FromUnstructured here because it has a bug when converting integers/whole
+	// numbers in float fields (https://github.com/kubernetes/kubernetes/issues/87675).
+	// Using JSON as a go-between avoids this issue, without adding a bunch of type conversion by using unstructured helper functions
+	// to inspect the fields we want to look at.
+	js, err := json.Marshal(item.UnstructuredContent())
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert unstructured item to JSON")
+	}
+
+	if err = json.Unmarshal(js, &crd); err != nil {
+		return nil, nil, errors.Wrap(err, "unable to convert JSON to CRD Go type")
 	}
 
 	log := a.logger.WithField("plugin", "RemapCRDVersionAction").WithField("CRD", crd.Name)
