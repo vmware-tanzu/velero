@@ -1,3 +1,26 @@
+## v1.3.1
+### 2020-03-10
+
+### Download
+https://github.com/vmware-tanzu/velero/releases/tag/v1.3.1
+
+### Container Image
+`velero/velero:v1.3.1`
+
+### Documentation
+https://velero.io/docs/v1.3.1/
+
+### Upgrading
+https://velero.io/docs/v1.3.1/upgrade-to-1.3/
+
+### Highlights
+
+Fixed a bug that caused failures when backing up CustomResourceDefinitions with whole numbers in numeric fields.
+
+### All Changes
+ * Fix CRD backup failures when fields contained a whole number. (#2322, @nrb)
+
+
 ## v1.3.0
 #### 2020-03-02
 
