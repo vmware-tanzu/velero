@@ -4,11 +4,19 @@ kind: Kustomization
 bases:
   - ../../base
 
-resources:
-  - secret.yaml
 patchesStrategicMerge:
   - aws-plugin.yaml # this patches the Velero deployment
-  - gcp-plugin.yaml # this patches the Velero deployment
+  - azure-plugin.yaml # this patches the Velero deployment
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels: 
+    component: velero
+
+secretGenerator:
+- name: cloud-credentials
+  files:
+  - "cloud"
 
 
 
