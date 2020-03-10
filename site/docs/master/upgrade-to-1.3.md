@@ -2,9 +2,9 @@
 
 ## Prerequisites
 
-- Velero [v1.2][3] installed.
+- Velero [v1.3.0][4] or [v1.2][3] installed.
 
-If you're not yet running Velero v1.2, see the following:
+If you're not yet running at least Velero v1.2, see the following:
 
 - [Upgrading to v1.1][1]
 - [Upgrading to v1.2][2]
@@ -23,7 +23,7 @@ If you're not yet running Velero v1.2, see the following:
 
     ```bash
     Client:
-        Version: v1.3.0
+        Version: v1.3.1
         Git commit: <git SHA>
     ```
 
@@ -31,12 +31,12 @@ If you're not yet running Velero v1.2, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.3.0 \
+        velero=velero/velero:v1.3.1 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.3.0 \
+        restic=velero/velero:v1.3.1 \
         --namespace velero
     ```
 
@@ -50,14 +50,15 @@ If you're not yet running Velero v1.2, see the following:
 
     ```bash
     Client:
-        Version: v1.3.0
+        Version: v1.3.1
         Git commit: <git SHA>
 
     Server:
-        Version: v1.3.0
+        Version: v1.3.1
     ```
 
 [0]: basic-install.md#install-the-cli
 [1]: https://velero.io/docs/v1.1.0/upgrade-to-1.1/
 [2]: https://velero.io/docs/v1.2.0/upgrade-to-1.2/
 [3]: https://github.com/vmware-tanzu/velero/releases/tag/v1.2.0
+[4]: https://github.com/vmware-tanzu/velero/releases/tag/v1.3.0
