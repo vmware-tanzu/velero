@@ -39,12 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
-	discoveryfake "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/dynamic"
-	kubefake "k8s.io/client-go/kubernetes/fake"
 	kubetesting "k8s.io/client-go/testing"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/archive"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -55,7 +54,6 @@ import (
 	resticmocks "github.com/vmware-tanzu/velero/pkg/restic/mocks"
 	"github.com/vmware-tanzu/velero/pkg/test"
 	testutil "github.com/vmware-tanzu/velero/pkg/test"
-	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -2485,88 +2483,6 @@ func TestRestoreWithRestic(t *testing.T) {
 	}
 }
 
-func TestPrioritizeResources(t *testing.T) {
-	tests := []struct {
-		name         string
-		apiResources map[string][]string
-		priorities   []string
-		includes     []string
-		excludes     []string
-		expected     []string
-	}{
-		{
-			name: "priorities & ordering are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"*"},
-			expected:   []string{"namespaces", "configmaps", "pods", "aaa", "bbb", "ddd", "ooo", "sss"},
-		},
-		{
-			name: "includes are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"namespaces", "aaa", "sss"},
-			expected:   []string{"namespaces", "aaa", "sss"},
-		},
-		{
-			name: "excludes are correctly applied",
-			apiResources: map[string][]string{
-				"v1": {"aaa", "bbb", "configmaps", "ddd", "namespaces", "ooo", "pods", "sss"},
-			},
-			priorities: []string{"namespaces", "configmaps", "pods"},
-			includes:   []string{"*"},
-			excludes:   []string{"ooo", "pods"},
-			expected:   []string{"namespaces", "configmaps", "aaa", "bbb", "ddd", "sss"},
-		},
-	}
-
-	logger := testutil.NewLogger()
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			discoveryClient := &test.DiscoveryClient{
-				FakeDiscovery: kubefake.NewSimpleClientset().Discovery().(*discoveryfake.FakeDiscovery),
-			}
-
-			helper, err := discovery.NewHelper(discoveryClient, logger)
-			require.NoError(t, err)
-
-			// add all the test case's API resources to the discovery client
-			for gvString, resources := range tc.apiResources {
-				gv, err := schema.ParseGroupVersion(gvString)
-				require.NoError(t, err)
-
-				for _, resource := range resources {
-					discoveryClient.WithAPIResource(&test.APIResource{
-						Group:   gv.Group,
-						Version: gv.Version,
-						Name:    resource,
-					})
-				}
-			}
-
-			require.NoError(t, helper.Refresh())
-
-			includesExcludes := collections.NewIncludesExcludes().Includes(tc.includes...).Excludes(tc.excludes...)
-
-			result, err := prioritizeResources(helper, tc.priorities, includesExcludes, logger)
-			require.NoError(t, err)
-
-			require.Equal(t, len(tc.expected), len(result))
-
-			for i := range result {
-				if e, a := tc.expected[i], result[i].Resource; e != a {
-					t.Errorf("index %d, expected %s, got %s", i, e, a)
-				}
-			}
-		})
-	}
-}
-
 func TestResetMetadataAndStatus(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -2679,6 +2595,49 @@ func TestGetItemFilePath(t *testing.T) {
 
 	res = getItemFilePath("root", "resource", "namespace", "item")
 	assert.Equal(t, "root/resources/resource/namespaces/namespace/item.json", res)
+}
+
+func Test_getOrderedResources(t *testing.T) {
+	tests := []struct {
+		name               string
+		resourcePriorities []string
+		backupResources    map[string]*archive.ResourceItems
+		want               []string
+	}{
+		{
+			name:               "when only priorities are specified, they're returned in order",
+			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			backupResources:    nil,
+			want:               []string{"prio-3", "prio-2", "prio-1"},
+		},
+		{
+			name:               "when only backup resources are specified, they're returned in alphabetical order",
+			resourcePriorities: nil,
+			backupResources: map[string]*archive.ResourceItems{
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"backup-resource-1", "backup-resource-2", "backup-resource-3"},
+		},
+		{
+			name:               "when priorities and backup resources are specified, they're returned in the correct order",
+			resourcePriorities: []string{"prio-3", "prio-2", "prio-1"},
+			backupResources: map[string]*archive.ResourceItems{
+				"prio-3":            nil,
+				"backup-resource-3": nil,
+				"backup-resource-2": nil,
+				"backup-resource-1": nil,
+			},
+			want: []string{"prio-3", "prio-2", "prio-1", "backup-resource-1", "backup-resource-2", "backup-resource-3", "prio-3"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, getOrderedResources(tc.resourcePriorities, tc.backupResources))
+		})
+	}
 }
 
 // assertResourceCreationOrder ensures that resources were created in the expected
