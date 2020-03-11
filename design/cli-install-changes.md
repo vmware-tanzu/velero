@@ -2,7 +2,7 @@
 
 Currently, the Velero CLI tool has a `install` command that configures numerous major and minor aspects of Velero. As a result, the combined set of flags for this `install` command makes it hard to intuit and reason about the different Velero components. This document proposes changes to improve the UX for installation and configuration in a way that would make it easier for the user to discover what needs to be configured by looking at what is available in the CLI rather then having to rely heavily on our documentation for the usage. At the same time, it is expected that the documentation update to reflect these changes will also make the documentation flow easier to follow.
 
-This proposal prioritizes discoverability and self-documentation over minimalizing length or number of commands and flags.
+This proposal prioritizes discoverability and self-documentation over minimizing length or number of commands and flags.
 
 ## Goals
 
@@ -20,7 +20,7 @@ This proposal prioritizes discoverability and self-documentation over minimalizi
 
 This document proposes users could benefit from a more intuitive and self-documenting CLI setup as compared to our existing CLI UX. Ultimately, it is proposed that a recipe-style CLI flow for installation, configuration and use would greatly contribute to this purpose.
 
-Also, the `install` command currently can be reused to update Velero configurations, a behavior more appropriate for a commands named something other than`install`.
+Also, the `install` command currently can be reused to update Velero deployment configurations. For server and restic related install and configurations, settings will be moved to under `velero config`.
 
 ## High-Level Design
 
@@ -38,13 +38,18 @@ To conform with Velero's current practice:
 - commands will also work by swapping the operation/resource.
 - the "object" of a command is an argument, and flags are strictly for modifiers (example: `backup get my-backup` and not `backup get --name my-backup`)
 
+All commands will include the `--dry-run` flag, which can be used to output yaml files containing the commands' configuration for resource creation or patching.
+
+`--dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.`
+
+The `--help` and `--output` flags will also be included for all commands, omitted below for brevity.
+
 Below is the proposed set of new commands to setup and configure Velero. 
 
-1) `velero`
+1) `velero config`
 
 ```
-      init                                           Configure up the namespace, RBAC, deployment, etc., but does not add any external plugins, BSL/VSL definitions. This would be the minimum set of commands to get the Velero server up and running and ready to accept other configurations.
-        --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
+      server                                         Configure up the namespace, RBAC, deployment, etc., but does not add any external plugins, BSL/VSL definitions. This would be the minimum set of commands to get the Velero server up and running and ready to accept other configurations.
         --label-columns stringArray                  a comma-separated list of labels to be displayed as columns
         --show-labels                                show labels in the last column
         --image string                               image to use for the Velero and restic server pods. Optional. (default "velero/velero:latest")
@@ -66,6 +71,18 @@ Below is the proposed set of new commands to setup and configure Velero.
         --restore-only                               run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled. DEPRECATED: this flag will be removed in v2.0. Use read-only backup storage locations instead.
         --restore-resource-priorities strings        desired order of resource restores; any resource not in the list will be restored alphabetically after the prioritized resources (default [namespaces,storageclasses,persistentvolumes,persistentvolumeclaims,secrets,configmaps,serviceaccounts,limitranges,pods,replicaset,customresourcedefinitions])
         --terminating-resource-timeout duration      how long to wait on persistent volumes and namespaces to terminate during a restore before timing out (default 10m0s)
+
+      restic                                        Configuration for restic operations.
+        --default-prune-frequency duration          how often 'restic prune' is run for restic repositories by default. Optional.
+        --pod-annotations mapStringString           annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2
+        --pod-cpu-limit string                      CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+        --pod-cpu-request string                    CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+        --pod-mem-limit string                      memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+        --pod-mem-request string                    memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+        --deployment                                create restic deployment. Default is false. Optional. Other flags will only work if set to true. (NEW, was `velero install use-restic`)
+        --timeout duration                          how long backups/restores of pod volumes should be allowed to run before timing out (default 1h0m0s)
+        repo  
+          get                                         Get restic repositories
 ```
 
 2) `velero backup-location`
@@ -76,7 +93,6 @@ Commands/flags for backup locations.
         --default string                                  sets the default backup storage location (default "default") (NEW, -- was `server --default-backup-storage-location; could be set as an annotation on the BSL)
 
       create                                              NAME [flags]
-        --dry-run                                         generate resources, but don't send them to the cluster. Use with -o. Optional. (NEW)
         --default                                         Sets this new location to be the new default backup location. Default is false. (NEW) 
         --access-mode                                     access mode for the backup storage location. Valid values are ReadWrite,ReadOnly (default ReadWrite)
         --backup-sync-period 0s                           how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to 0s to disable sync
@@ -105,7 +121,6 @@ Commands/flags for snapshot locations.
         --default mapStringString                         sets the list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...) (NEW, -- was `server --efault-volume-snapshot-locations; could be set as an annotation on the VSL)  
 
       create                                              NAME [flags]
-        --dry-run                                         generate resources, but don't send them to the cluster. Use with -o. Optional. (NEW)
         --default                                         Sets these new locations to be the new default snapshot locations. Default is false. (NEW) 
         --config  mapStringString                         configuration to use for creating a volume snapshot location. Format is key1=value1,key2=value2 (was also in `velero install --`snapshot-location-config`). Required.
         --provider string                                 provider name for volume storage. Required.
@@ -135,35 +150,17 @@ Configuration for plugins.
         --sa-annotations mapStringString        annotations to add to the Velero ServiceAccount for GKE. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2
 ```
 
-5) `velero restic`
-Configuration for restic operations.
-
-```
-    set
-      --default-prune-frequency duration          how often 'restic prune' is run for restic repositories by default. Optional.
-      --pod-annotations mapStringString           annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2
-      --pod-cpu-limit string                      CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --pod-cpu-request string                    CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --pod-mem-limit string                      memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --pod-mem-request string                    memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --deployment                                create restic deployment. Default is false. Optional. Other flags will only work if set to true. (NEW, was `velero install use-restic`)
-      --timeout duration                          how long backups/restores of pod volumes should be allowed to run before timing out (default 1h0m0s)
-
-    repo  
-      get                                         Get restic repositories
-```
-
 #### Example
 
 Considering this proposal, let's consider what a high-level documentation for getting Velero ready to do backups could look like for Velero users:
 
 After installing the Velero CLI:
 ```
-velero init [flags] (required)
+velero config server [flags] (required)
 velero plugin add IMAGES [flags] (add/config provider plugins)
 velero backup-location/snapshot-location create NAME [flags] (run `velero plugin --get` to see what kind of plugins are available; create locations)
 velero backup/restore/schedule create/get/delete NAME [flags]
-velero restic
+velero config restic [flags]
 ```
 
 The above recipe-style documentation should highlight 1) the main components of Velero, and, 2) the relationship/dependency between the main components
@@ -179,9 +176,8 @@ In order to maintain compatibility with the current Velero version for a suffici
 ##### Velero Install 
 `velero install (DEPRECATED)`
 
-Flags moved to `velero init`:
+Flags moved to `velero config server`:
 ```
-      --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
       --image string                               image to use for the Velero and restic server pods. Optional. (default "velero/velero:latest")
       --label-columns stringArray                  a comma-separated list of labels to be displayed as columns
       --pod-annotations mapStringString            annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2
@@ -207,7 +203,6 @@ Flags moved to...
       --backup-location-config mapStringString     configuration to use for the backup storage location. Format is key1=value1,key2=value2
       --bucket string                              name of the object storage bucket where backups should be stored
       --prefix string                              prefix under which all Velero data should be stored within the bucket. Optional.
-      --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
 ```
 
 ...`snapshot-location create`
@@ -218,10 +213,9 @@ Flags moved to...
 ...both `backup-location create` and `snapshot-location create`
 ```
       --provider string                            provider name for backup and volume storage 
-      --dry-run                                    generate resources, but don't send them to the cluster. Use with -o. Optional.
 ```
 
-...`restic`
+...`velero config restic`
 ```
       --default-restic-prune-frequency duration    how often 'restic prune' is run for restic repositories by default. Optional.
       --restic-pod-cpu-limit string                CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
@@ -239,19 +233,19 @@ Flags moved to...
 ```
 
 ##### Velero Server
-`velero server (RENAMED init)` 
+`velero server (RENAMED velero config server)` 
  
 `velero server --default-backup-storage-location (DEPRECATED)` moved to `velero backup-location set --default` 
 
 `velero server --default-volume-snapshot-locations (DEPRECATED)` moved to `velero snapshot-location set --default`
 
-`velero server --default-restic-prune-frequency (DEPRECATED)` moved to `velero restic set --default-prune-frequency` 
+`velero server --default-restic-prune-frequency (DEPRECATED)` moved to `velero config restic set --default-prune-frequency` 
 
-`velero server --restic-timeout  (DEPRECATED)` moved to `velero restic set timeout`
+`velero server --restic-timeout  (DEPRECATED)` moved to `velero config restic set timeout`
 
-`velero server --use-restic  (DEPRECATED)` see `velero init restic`
+`velero server --use-restic  (DEPRECATED)` see `velero config restic`
 
-All other `velero server` flags moved to under `velero init`.
+All other `velero server` flags moved to under `velero config server`.
 
 ## General CLI improvements
 
