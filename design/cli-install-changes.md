@@ -91,6 +91,7 @@ Commands/flags for backup locations.
 ```
       set 
         --default string                                  sets the default backup storage location (default "default") (NEW, -- was `server --default-backup-storage-location; could be set as an annotation on the BSL)
+        --cacert string                                   sets the name of the corresponding CA cert secret for the object storage
 
       create                                              NAME [flags]
         --default                                         Sets this new location to be the new default backup location. Default is false. (NEW) 
@@ -104,6 +105,7 @@ Commands/flags for backup locations.
         --prefix string                                   prefix under which all Velero data should be stored within the bucket. Optional.
         --provider string                                 name of the backup storage provider (e.g. aws, azure, gcp)
         --show-labels                                     show labels in the last column
+        --cacert string                                   sets the name of the corresponding CA cert secret for the object storage
 
       get                                                 Display backup storage locations
         --default                                         displays the current default backup storage location (NEW)
@@ -118,7 +120,7 @@ Commands/flags for snapshot locations.
 
 ```
      set 
-        --default mapStringString                         sets the list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...) (NEW, -- was `server --efault-volume-snapshot-locations; could be set as an annotation on the VSL)  
+        --default mapStringString                         sets the list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...) (NEW, -- was `server --default-volume-snapshot-locations; could be set as an annotation on the VSL)  
 
       create                                              NAME [flags]
         --default                                         Sets these new locations to be the new default snapshot locations. Default is false. (NEW) 
@@ -145,9 +147,10 @@ Configuration for plugins.
       remove                                    Remove a plugin [NAME | IMAGE] 
 
       set 
-        --secret-file string                    file containing credentials for plugin provider. If not specified, set --no-secret must be used for confirmation. Optional (MOVED FROM install). [NOTE]: we currently only support a single secret per provider 
+        --secret-file string                    PATH file containing credentials for plugin provider. If not specified, set --no-secret must be used for confirmation. Optional (MOVED FROM install). [NOTE]: we currently only support a single secret per provider 
         --no-secret                             flag indicating if a secret should be created. Must be used as confirmation if create --secret-file is not provided. Optional. (MOVED FROM install)
         --sa-annotations mapStringString        annotations to add to the Velero ServiceAccount for GKE. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2
+        --cacert-file string                    PATH file containing the certificate for the S3 location
 ```
 
 #### Example
