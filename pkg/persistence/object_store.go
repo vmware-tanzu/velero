@@ -41,8 +41,9 @@ type BackupInfo struct {
 	Log,
 	PodVolumeBackups,
 	VolumeSnapshots,
-	BackupResourceList io.Reader
-	// Add io.Readers here for VS and VSContents lists?
+	BackupResourceList,
+	CSIVolumeSnapshots,
+	VolumeSnapshotContents io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -52,11 +53,12 @@ type BackupStore interface {
 
 	ListBackups() ([]string, error)
 
-	PutBackup(info BackupInfo) error // Extend this method for a VS/VSContent parameter, or create a new one for the beta period?
+	PutBackup(info BackupInfo) error
 	GetBackupMetadata(name string) (*velerov1api.Backup, error)
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
+	// TODO(nrb-csi): Do we need Get methods for the CSI types?
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -249,6 +251,31 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
 		errs = append(errs, deleteErr)
 
+		return kerrors.NewAggregate(errs)
+	}
+
+	// TODO(nrb-csi): only upload these if they're non-nil and/or if EnableCSI is on
+	// TODO(nrb-csi): Add tests?
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(info.Name), info.CSIVolumeSnapshots); err != nil {
+		errs := []error{err}
+
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(info.Name))
+		errs = append(errs, deleteErr)
+
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+		errs = append(errs, deleteErr)
+
+		return kerrors.NewAggregate(errs)
+	}
+
+	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getVolumeSnapshotContentsKey(info.Name), info.VolumeSnapshotContents); err != nil {
+		errs := []error{err}
+
+		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getVolumeSnapshotContentsKey(info.Name))
+		errs = append(errs, deleteErr)
+
+		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
+		errs = append(errs, deleteErr)
 		return kerrors.NewAggregate(errs)
 	}
 

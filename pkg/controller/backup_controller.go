@@ -37,6 +37,7 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
@@ -550,6 +551,27 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		fatalErrs = append(fatalErrs, err)
 	}
 
+	// Empty slices here so that they can be passed in to the persistBackup call later, regardless of whether or not CSI's enabled.
+	// This way, we only make the Lister call if the feature flag's on.
+	var volumeSnapshots []*snapshotv1beta1api.VolumeSnapshot
+	var volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent
+	if features.IsEnabled("EnableCSI") {
+		selector := labels.SelectorFromSet(map[string]string{v1.BackupNameLabel: backup.Name})
+
+		// TODO(nrb-csi): Only run listers methods if the listers aren't nil, just in case
+		volumeSnapshots, err = c.volumeSnapshotLister.List(selector)
+		if err != nil {
+			//TODO: Is this right?
+			backupLog.Error(err)
+		}
+		volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
+		if err != nil {
+			//TODO: Is this right?
+			backupLog.Error(err)
+
+		}
+	}
+
 	// Mark completion timestamp before serializing and uploading.
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
 	backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
@@ -561,6 +583,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
+	// TODO(nrb-csi): How do we handle backup metrics with CSI snapshots?  Log an issue for this
 	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
 	if err := gzippedLogFile.Close(); err != nil {
@@ -583,17 +606,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
 	}
 
-	// TODO(nrb-csi): Only run listers methods if the listers aren't nil, just in case
-	if features.IsEnabled("EnableCSI") {
-		selector := labels.SelectorFromSet(map[string]string{v1.BackupNameLabel: backup.Name})
-
-		// TODO: (nrb-csi): assign return values, handle errors
-		c.volumeSnapshotLister.List(selector)
-		c.volumeSnapshotContentLister.List(selector)
-	}
-
-	// TODO(nrb-csi): pass VS(C) in to persistBackup here
-	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger); len(errs) > 0 {
+	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger, volumeSnapshots, volumeSnapshotContents); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
 
@@ -623,11 +636,13 @@ func recordBackupMetrics(log logrus.FieldLogger, backup *velerov1api.Backup, bac
 	serverMetrics.RegisterVolumeSnapshotFailures(backupScheduleName, backup.Status.VolumeSnapshotsAttempted-backup.Status.VolumeSnapshotsCompleted)
 }
 
-func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File, backupStore persistence.BackupStore, log logrus.FieldLogger) []error {
-	if features.IsEnabled("EnableCSI") {
-		// Get the list of VolumeSnapshots & VolumeSnapshotContents associated with the backup and serialize them as JSON
-		// Probably shouldn't fetch them here as there's no client, but they should be passed in somehow.
-	}
+func persistBackup(backup *pkgbackup.Request,
+	backupContents, backupLog *os.File,
+	backupStore persistence.BackupStore,
+	log logrus.FieldLogger,
+	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
+	volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
+) []error {
 
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
@@ -636,11 +651,12 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		errs = append(errs, errors.Wrap(err, "error encoding backup"))
 	}
 
-	volumeSnapshots := new(bytes.Buffer)
-	gzw := gzip.NewWriter(volumeSnapshots)
+	// Velero-native volume snapshots
+	nativeVolumeSnapshots := new(bytes.Buffer)
+	gzw := gzip.NewWriter(nativeVolumeSnapshots)
 
 	if err := json.NewEncoder(gzw).Encode(backup.VolumeSnapshots); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding list of volume snapshots"))
+		errs = append(errs, errors.Wrap(err, "error encoding list of velero volume snapshots"))
 	}
 	if err := gzw.Close(); err != nil {
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
@@ -651,6 +667,26 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 
 	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackups); err != nil {
 		errs = append(errs, errors.Wrap(err, "error encoding pod volume backups"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
+	csiSnapshotJSON := new(bytes.Buffer)
+	gzw = gzip.NewWriter(csiSnapshotJSON)
+
+	if err := json.NewEncoder(gzw).Encode(csiVolumeSnapshots); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding list of csi volume snapshots"))
+	}
+	if err := gzw.Close(); err != nil {
+		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	}
+
+	snapshotContentsJSON := new(bytes.Buffer)
+	gzw = gzip.NewWriter(snapshotContentsJSON)
+
+	if err := json.NewEncoder(gzw).Encode(volumeSnapshotContents); err != nil {
+		errs = append(errs, errors.Wrap(err, "error encoding list of csi volume snapshots"))
 	}
 	if err := gzw.Close(); err != nil {
 		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
@@ -670,18 +706,22 @@ func persistBackup(backup *pkgbackup.Request, backupContents, backupLog *os.File
 		// Don't upload the JSON files or backup tarball if encoding to json fails.
 		backupJSON = nil
 		backupContents = nil
-		volumeSnapshots = nil
+		nativeVolumeSnapshots = nil
 		backupResourceList = nil
+		csiSnapshotJSON = nil
+		snapshotContentsJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
-		Name:               backup.Name,
-		Metadata:           backupJSON,
-		Contents:           backupContents,
-		Log:                backupLog,
-		PodVolumeBackups:   podVolumeBackups,
-		VolumeSnapshots:    volumeSnapshots,
-		BackupResourceList: backupResourceList,
+		Name:                   backup.Name,
+		Metadata:               backupJSON,
+		Contents:               backupContents,
+		Log:                    backupLog,
+		PodVolumeBackups:       podVolumeBackups,
+		VolumeSnapshots:        nativeVolumeSnapshots,
+		BackupResourceList:     backupResourceList,
+		CSIVolumeSnapshots:     csiSnapshotJSON,
+		VolumeSnapshotContents: snapshotContentsJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)
