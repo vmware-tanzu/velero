@@ -38,7 +38,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
+	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
+	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -59,23 +61,25 @@ import (
 
 type backupController struct {
 	*genericController
-	discoveryHelper          discovery.Helper
-	backupper                pkgbackup.Backupper
-	lister                   velerov1listers.BackupLister
-	client                   velerov1client.BackupsGetter
-	csiClient                snapshotv1beta1.SnapshotV1beta1Interface
-	clock                    clock.Clock
-	backupLogLevel           logrus.Level
-	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
-	backupTracker            BackupTracker
-	backupLocationLister     velerov1listers.BackupStorageLocationLister
-	defaultBackupLocation    string
-	defaultBackupTTL         time.Duration
-	snapshotLocationLister   velerov1listers.VolumeSnapshotLocationLister
-	defaultSnapshotLocations map[string]string
-	metrics                  *metrics.ServerMetrics
-	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
-	formatFlag               logging.Format
+	discoveryHelper             discovery.Helper
+	backupper                   pkgbackup.Backupper
+	lister                      velerov1listers.BackupLister
+	client                      velerov1client.BackupsGetter
+	csiClient                   snapshotv1beta1.SnapshotV1beta1Interface
+	clock                       clock.Clock
+	backupLogLevel              logrus.Level
+	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
+	backupTracker               BackupTracker
+	backupLocationLister        velerov1listers.BackupStorageLocationLister
+	defaultBackupLocation       string
+	defaultBackupTTL            time.Duration
+	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
+	defaultSnapshotLocations    map[string]string
+	metrics                     *metrics.ServerMetrics
+	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	formatFlag                  logging.Format
+	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
+	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
 }
 
 // TODO(nrb-csi): Add clients for the VS/VSContent here.
@@ -97,27 +101,30 @@ func NewBackupController(
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
+	volumeSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
+	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
 ) Interface {
 	c := &backupController{
-		genericController:        newGenericController("backup", logger),
-		discoveryHelper:          discoveryHelper,
-		backupper:                backupper,
-		lister:                   backupInformer.Lister(),
-		client:                   client,
-		csiClient:                csiClient,
-		clock:                    &clock.RealClock{},
-		backupLogLevel:           backupLogLevel,
-		newPluginManager:         newPluginManager,
-		backupTracker:            backupTracker,
-		backupLocationLister:     backupLocationLister,
-		defaultBackupLocation:    defaultBackupLocation,
-		defaultBackupTTL:         defaultBackupTTL,
-		snapshotLocationLister:   volumeSnapshotLocationLister,
-		defaultSnapshotLocations: defaultSnapshotLocations,
-		metrics:                  metrics,
-		formatFlag:               formatFlag,
-
-		newBackupStore: persistence.NewObjectBackupStore,
+		genericController:           newGenericController("backup", logger),
+		discoveryHelper:             discoveryHelper,
+		backupper:                   backupper,
+		lister:                      backupInformer.Lister(),
+		client:                      client,
+		csiClient:                   csiClient,
+		clock:                       &clock.RealClock{},
+		backupLogLevel:              backupLogLevel,
+		newPluginManager:            newPluginManager,
+		backupTracker:               backupTracker,
+		backupLocationLister:        backupLocationLister,
+		defaultBackupLocation:       defaultBackupLocation,
+		defaultBackupTTL:            defaultBackupTTL,
+		snapshotLocationLister:      volumeSnapshotLocationLister,
+		defaultSnapshotLocations:    defaultSnapshotLocations,
+		metrics:                     metrics,
+		formatFlag:                  formatFlag,
+		volumeSnapshotLister:        volumeSnapshotLister,
+		volumeSnapshotContentLister: volumeSnapshotContentLister,
+		newBackupStore:              persistence.NewObjectBackupStore,
 	}
 
 	c.syncHandler = c.processBackup
@@ -576,17 +583,16 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
 	}
 
-	// TODO(nrb-csi): Fetch VS(C)s here, based on includes/exludes?
+	// TODO(nrb-csi): Only run listers methods if the listers aren't nil, just in case
 	if features.IsEnabled("EnableCSI") {
-		selector := metav1.LabelSelector{
-			MatchLabels: map[string]string{
-				"velero.io/backup-name": backup.Name,
-			},
-		}
-		// Need to iterate through included namespaces to get all VSs made by the backup
-		c.csiClient.VolumeSnapshots("").List(metav1.ListOptions{LabelSelector: metav1.FormatLabelSelector(&selector)})
+		selector := labels.SelectorFromSet(map[string]string{v1.BackupNameLabel: backup.Name})
+
+		// TODO: (nrb-csi): assign return values, handle errors
+		c.volumeSnapshotLister.List(selector)
+		c.volumeSnapshotContentLister.List(selector)
 	}
 
+	// TODO(nrb-csi): pass VS(C) in to persistBackup here
 	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger); len(errs) > 0 {
 		fatalErrs = append(fatalErrs, errs...)
 	}
