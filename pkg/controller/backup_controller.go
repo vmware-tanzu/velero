@@ -51,12 +51,12 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
-	// "github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 )
 
 type backupController struct {
 	*genericController
-
+	discoveryHelper          discovery.Helper
 	backupper                pkgbackup.Backupper
 	lister                   velerov1listers.BackupLister
 	client                   velerov1client.BackupsGetter
@@ -77,6 +77,7 @@ type backupController struct {
 func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
+	discoveryHelper discovery.Helper, 
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
@@ -92,6 +93,7 @@ func NewBackupController(
 ) Interface {
 	c := &backupController{
 		genericController:        newGenericController("backup", logger),
+		discoveryHelper:	  discoveryHelper,
 		backupper:                backupper,
 		lister:                   backupInformer.Lister(),
 		client:                   client,
@@ -329,7 +331,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Labels = make(map[string]string)
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
-	request.Labels[velerov1api.SourceClusterK8sVersionLabel] = label.GetValidName("placeholder-for-version")
+
+	// Getting all information of cluster version - useful for future skip-level migration
+	request.Labels[velerov1api.SourceClusterK8sVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().String())
+	request.Labels[velerov1api.SourceClusterK8sMajorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Major)
+	request.Labels[velerov1api.SourceClusterK8sMinorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Minor)
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
