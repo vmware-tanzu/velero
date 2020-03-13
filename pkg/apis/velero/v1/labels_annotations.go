@@ -50,4 +50,8 @@ const (
 	// ResticVolumeNamespaceLabel is the label key used to identify which
 	// namespace a restic repository stores pod volume backups for.
 	ResticVolumeNamespaceLabel = "velero.io/volume-namespace"
+
+	// SourceClusterK8sVersionLabel is the label key used to identify the k8s
+	// major version of the backup 
+	SourceClusterK8sVersionLabel = "velero.io/source-cluster-k8s-version"
 )
