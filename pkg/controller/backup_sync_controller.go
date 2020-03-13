@@ -211,6 +211,7 @@ func (c *backupSyncController) run() {
 				backup.Labels = make(map[string]string)
 			}
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
+			backup.Labels[velerov1api.SourceClusterK8sVersionLabel] = label.GetValidName("placeholder-for-version")
 
 			// attempt to create backup custom resource via API
 			backup, err = c.backupClient.Backups(backup.Namespace).Create(backup)

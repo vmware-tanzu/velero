@@ -51,6 +51,7 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+	// "github.com/vmware-tanzu/velero/pkg/discovery"
 )
 
 type backupController struct {
@@ -328,6 +329,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Labels = make(map[string]string)
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
+	request.Labels[velerov1api.SourceClusterK8sVersionLabel] = label.GetValidName("placeholder-for-version")
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
