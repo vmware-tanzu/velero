@@ -52,6 +52,14 @@ const (
 	ResticVolumeNamespaceLabel = "velero.io/volume-namespace"
 
 	// SourceClusterK8sVersionLabel is the label key used to identify the k8s
-	// major version of the backup 
+	// git version of the backup , i.e. v1.16.4
 	SourceClusterK8sVersionLabel = "velero.io/source-cluster-k8s-version"
+
+	// SourceClusterK8sMajorVersionLabel is the label key used to identify the k8s
+	// major version of the backup , i.e. 1
+	SourceClusterK8sMajorVersionLabel = "velero.io/source-cluster-k8s-major-version"
+
+	// SourceClusterK8sMajorVersionLabel is the label key used to identify the k8s
+	// minor version of the backup , i.e. 16
+	SourceClusterK8sMinorVersionLabel = "velero.io/source-cluster-k8s-minor-version"
 )

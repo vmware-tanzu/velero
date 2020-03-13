@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
-	"k8s.io/apimachinery/pkg/version"
 
 	kcmdutil "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
@@ -65,11 +65,11 @@ type helper struct {
 	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
-	lock         sync.RWMutex
-	mapper       meta.RESTMapper
-	resources    []*metav1.APIResourceList
-	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
-	apiGroups    []metav1.APIGroup
+	lock          sync.RWMutex
+	mapper        meta.RESTMapper
+	resources     []*metav1.APIResourceList
+	resourcesMap  map[schema.GroupVersionResource]metav1.APIResource
+	apiGroups     []metav1.APIGroup
 	serverVersion *version.Info
 }
 
