@@ -343,11 +343,29 @@ WIP
 
 #### GitOps Compatibility
 
-WIP
+To maintain compatibility with gitops practices, each of the new commands will generate `yaml` output that can be stored in source control.
 
-#### CRDs
+For content examples, please refer to the files here:
 
-WIP
+https://github.com/carlisia/velero/tree/c-cli-design/design/CLI/PoC
+
+Note: actual `yaml` file names are defined by the user.
+
+`velero config server` - base/deployment.yaml
+
+`velero config restic` - overlays/plugins/restic.yaml
+
+`velero backup-location create` - base/backupstoragelocations.yaml
+
+`velero snapshot-location create` - base/volumasnapshotlocations.yaml
+
+`velero plugin add velero/velero-plugin-for-aws:v1.0.1` - overlays/plugins/aws-plugin.yaml
+
+`velero plugin add velero/velero-plugin-for-microsoft-azure:v1.0.1` - overlay/plugins/azure-plugin.yaml
+
+These files can be deployed using the included kustomize setup by running `k apply -k design/CLI/PoC/overlays/plugins/`.
+
+Note: All CRDs, including the `ResticRepository`, may continue to be deployed at startup as it is now, or together with their respective instantiation.
 
 ## Alternatives Considered
 
