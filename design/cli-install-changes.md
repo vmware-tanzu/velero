@@ -339,7 +339,9 @@ Azure
 
 #### Renaming "provider" to "plugin"
 
-WIP
+As part of this change, we should change to use the term `plugin` instead of `provider`. The reasoning: in practice, we usually have 1 plugin per provider, and if there is an implementation for both object store and volume snapshotter for that provider, it will all be contained in the same plugin. When we handle plugins, we follow this logic. In other words, there's a plugin name (ex: `velero.io/aws`) and it can contain implementations of kind `ObjectStore` and/or `VolumeSnapshotter`.
+
+But when we handle BSL ir VSL (and the CLI commands/flags that configure them), we use the term `provider`, which can cause ambiguity as if that is a kind of thing different from a plugin. If the plugin is the "thing" that contains the implementation for the desired provider, we should make it easier for the user to guess that and change BackupStorageLocation/VolumeSnapshotLocation `Spec.Provider` field to be called `Spec.Plugin` and all related CLI command flags to `plugin`, and update the docs accordingly.
 
 #### GitOps Compatibility
 
