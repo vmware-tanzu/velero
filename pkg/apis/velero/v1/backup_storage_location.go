@@ -64,6 +64,10 @@ type ObjectStorageLocation struct {
 	// Prefix is the path inside a bucket to use for Velero storage. Optional.
 	// +optional
 	Prefix string `json:"prefix,omitempty"`
+
+	// CACert defines a CA bundle to use when verifying TLS connections to the provider.
+	// +optional
+	CACert []byte `json:"caCert,omitempty"`
 }
 
 // BackupStorageLocationSpec defines the specification for a Velero BackupStorageLocation.

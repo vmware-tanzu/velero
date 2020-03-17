@@ -29,6 +29,7 @@ type Command struct {
 	Command        string
 	RepoIdentifier string
 	PasswordFile   string
+	CACertFile     string
 	Dir            string
 	Args           []string
 	ExtraFlags     []string
@@ -50,6 +51,9 @@ func (c *Command) StringSlice() []string {
 	res = append(res, c.Command, repoFlag(c.RepoIdentifier))
 	if c.PasswordFile != "" {
 		res = append(res, passwordFlag(c.PasswordFile))
+	}
+	if c.CACertFile != "" {
+		res = append(res, cacertFlag(c.CACertFile))
 	}
 
 	// If VELERO_SCRATCH_DIR is defined, put the restic cache within it. If not,
@@ -93,4 +97,8 @@ func passwordFlag(file string) string {
 
 func cacheDirFlag(dir string) string {
 	return fmt.Sprintf("--cache-dir=%s", dir)
+}
+
+func cacertFlag(path string) string {
+	return fmt.Sprintf("--cacert=%s", path)
 }

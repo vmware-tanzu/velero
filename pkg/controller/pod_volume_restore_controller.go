@@ -293,8 +293,23 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	// ignore error since there's nothing we can do and it's a temp file.
 	defer os.Remove(credsFile)
 
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	caCert, err := restic.GetCACert(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+	if err != nil {
+		log.WithError(err).Error("Error getting caCert")
+	}
+	var caCertFile string
+	if caCert != nil {
+		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
+		if err != nil {
+			log.WithError(err).Error("Error creating temp cacert file")
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
+
 	// execute the restore process
-	if err := c.restorePodVolume(req, credsFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, credsFile, caCertFile, volumeDir, log); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -313,7 +328,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -327,6 +342,7 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 		req.Spec.SnapshotID,
 		volumePath,
 	)
+	resticCmd.CACertFile = caCertFile
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)

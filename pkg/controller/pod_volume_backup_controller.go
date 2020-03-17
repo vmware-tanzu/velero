@@ -212,20 +212,36 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	log.WithField("path", path).Debugf("Found path matching glob")
 
 	// temp creds
-	file, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
+	credentialsFile, err := restic.TempCredentialsFile(c.secretLister, req.Namespace, req.Spec.Pod.Namespace, c.fileSystem)
 	if err != nil {
 		log.WithError(err).Error("Error creating temp restic credentials file")
 		return c.fail(req, errors.Wrap(err, "error creating temp restic credentials file").Error(), log)
 	}
 	// ignore error since there's nothing we can do and it's a temp file.
-	defer os.Remove(file)
+	defer os.Remove(credentialsFile)
 
 	resticCmd := restic.BackupCommand(
 		req.Spec.RepoIdentifier,
-		file,
+		credentialsFile,
 		path,
 		req.Spec.Tags,
 	)
+
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	caCert, err := restic.GetCACert(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+	if err != nil {
+		log.WithError(err).Error("Error getting caCert")
+	}
+	var caCertFile string
+	if caCert != nil {
+		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
+		if err != nil {
+			log.WithError(err).Error("Error creating temp cacert file")
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
+	resticCmd.CACertFile = caCertFile
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
@@ -272,7 +288,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 
 	var snapshotID string
 	if !emptySnapshot {
-		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, file, req.Spec.Tags, env)
+		snapshotID, err = restic.GetSnapshotID(req.Spec.RepoIdentifier, credentialsFile, req.Spec.Tags, env, caCertFile)
 		if err != nil {
 			log.WithError(err).Error("Error getting SnapshotID")
 			return c.fail(req, errors.Wrap(err, "error getting snapshot id").Error(), log)
