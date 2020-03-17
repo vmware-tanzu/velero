@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 )
 
@@ -31,6 +32,7 @@ type FakeDiscoveryHelper struct {
 	Mapper             meta.RESTMapper
 	AutoReturnResource bool
 	APIGroupsList      []metav1.APIGroup
+	ServerVersionData  *version.Info
 }
 
 func NewFakeDiscoveryHelper(autoReturnResource bool, resources map[schema.GroupVersionResource]schema.GroupVersionResource) *FakeDiscoveryHelper {
@@ -69,6 +71,22 @@ func NewFakeDiscoveryHelper(autoReturnResource bool, resources map[schema.GroupV
 	for group, resources := range apiResourceMap {
 		helper.ResourceList = append(helper.ResourceList, &metav1.APIResourceList{GroupVersion: group, APIResources: resources})
 	}
+
+	// FakeTest of version.Info
+
+	serverVersion := &version.Info{
+		Major:        "1",
+		Minor:        "16",
+		GitVersion:   "v1.16.4",
+		GitCommit:    "FakeTest",
+		GitTreeState: "",
+		BuildDate:    "",
+		GoVersion:    "",
+		Compiler:     "",
+		Platform:     "",
+	}
+
+	helper.ServerVersionData = serverVersion
 
 	return helper
 }
@@ -148,4 +166,8 @@ func NewFakeServerResourcesInterface(resourceList []*metav1.APIResourceList, fai
 		ReturnError:  returnError,
 	}
 	return helper
+}
+
+func (dh *FakeDiscoveryHelper) ServerVersion() *version.Info {
+	return dh.ServerVersionData
 }

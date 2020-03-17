@@ -36,6 +36,7 @@ import (
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -44,6 +45,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -159,6 +161,15 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		},
 	}
 
+	// Set up all of our fakes outside the test loop
+	// Required now for the backup controller
+	// discoveryHelper := velerotest.FakeDiscoveryHelper{}
+	t.Helper()
+	apiServer := velerotest.NewAPIServer(t)
+	log := logrus.StandardLogger()
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
+	require.NoError(t, err)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
@@ -170,6 +181,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -226,6 +238,15 @@ func TestBackupLocationLabel(t *testing.T) {
 		},
 	}
 
+	// Set up all of our fakes outside the test loop
+	// Required now for the backup controller
+	//discoveryHelper := velerotest.FakeDiscoveryHelper{}
+	t.Helper()
+	apiServer := velerotest.NewAPIServer(t)
+	log := logrus.StandardLogger()
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
+	require.NoError(t, err)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
@@ -238,6 +259,7 @@ func TestBackupLocationLabel(t *testing.T) {
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -284,6 +306,15 @@ func TestDefaultBackupTTL(t *testing.T) {
 		},
 	}
 
+	// Set up all of our fakes outside the test loop
+	// Required now for the backup controller
+	//discoveryHelper := velerotest.FakeDiscoveryHelper{}
+	t.Helper()
+	apiServer := velerotest.NewAPIServer(t)
+	log := logrus.StandardLogger()
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
+	require.NoError(t, err)
+
 	for _, test := range tests {
 		formatFlag := logging.FormatText
 		var (
@@ -295,6 +326,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
@@ -340,7 +372,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -368,7 +403,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "alt-loc",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "alt-loc",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -399,7 +437,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "read-write",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "read-write",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -427,7 +468,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -457,7 +501,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -488,7 +535,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -517,7 +567,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "",
+						"velero.io/source-cluster-k8s-minor-version": "",
+						"velero.io/source-cluster-k8s-version":       "v0.0.0-master+$Format:%h$",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -534,6 +587,15 @@ func TestProcessBackupCompletions(t *testing.T) {
 		},
 	}
 
+	// Set up all of our fakes outside the test loop
+	// Required now for the backup controller
+	//discoveryHelper := velerotest.FakeDiscoveryHelper{}
+	t.Helper()
+	apiServer := velerotest.NewAPIServer(t)
+	log := logrus.StandardLogger()
+	discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, log)
+	require.NoError(t, err)
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			formatFlag := logging.FormatText
@@ -548,6 +610,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
