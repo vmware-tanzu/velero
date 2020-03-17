@@ -18,13 +18,13 @@ spec:
           - server
           name: velero
           env:
-            - name: AWS_SHARED_CREDENTIALS_FILE
+            - name: AZURE_SHARED_CREDENTIALS_FILE
               value: /credentials/cloud
           volumeMounts:
             - mountPath: /plugins
               name: plugins
             - mountPath: /credentials
-              name: cloud-credentials
+              name: cloud-credential-azure
       initContainers:
         - image: velero/velero-plugin-for-microsoft-azure:v1.0.1
           imagePullPolicy: Always
@@ -35,6 +35,6 @@ spec:
       volumes:
         - emptyDir: {}
           name: plugins
-        - name: cloud-credentials
+        - name: cloud-credential-azure
           secret:
-            secretName: cloud-credentials
+            secretName: cloud-credential-azure

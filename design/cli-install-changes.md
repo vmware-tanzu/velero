@@ -26,6 +26,12 @@ Also, the `install` command currently can be reused to update Velero deployment 
 
 The naming and organization of the proposed new CLI commands below have been inspired on the `kubectl` commands, particularly `kubectl set` and `kubectl config`.
 
+#### General CLI improvements
+
+These are improvements that are part of this proposal:
+- Go over all flags and document what is optional, what is required, and default values.
+- Capitalize all help messages
+
 #### Commands
 
 The organization of the commands follows this format:
@@ -44,7 +50,7 @@ All commands will include the `--dry-run` flag, which can be used to output yaml
 
 The `--help` and `--output` flags will also be included for all commands, omitted below for brevity.
 
-Below is the proposed set of new commands to setup and configure Velero. 
+Below is the proposed set of new commands to setup and configure Velero.
 
 1) `velero config`
 
@@ -85,13 +91,16 @@ Below is the proposed set of new commands to setup and configure Velero.
           get                                         Get restic repositories
 ```
 
+Note: Velero will maintain the `velero server` command run by the Velero pod, which starts the Velero server deployment.
+
 2) `velero backup-location`
 Commands/flags for backup locations.
 
 ```
-      set 
+      set
         --default string                                  sets the default backup storage location (default "default") (NEW, -- was `server --default-backup-storage-location; could be set as an annotation on the BSL)
-        --cacert string                                   sets the name of the corresponding CA cert secret for the object storage
+        --cacert mapStringString                          sets the name of the corresponding CA cert secret for the object storage. Format is provider:cacert-secret-name. (NEW)
+        --credentials mapStringString                     sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name. (NEW)
 
       create                                              NAME [flags]
         --default                                         Sets this new location to be the new default backup location. Default is false. (NEW) 
@@ -105,7 +114,8 @@ Commands/flags for backup locations.
         --prefix string                                   prefix under which all Velero data should be stored within the bucket. Optional.
         --provider string                                 name of the backup storage provider (e.g. aws, azure, gcp)
         --show-labels                                     show labels in the last column
-        --cacert string                                   sets the name of the corresponding CA cert secret for the object storage
+        --cacert mapStringString                          sets the name of the corresponding CA cert secret for the object storage. Format is provider-name=cacert-secret-name. (NEW)
+        --credentials mapStringString                     sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name. (NEW)
 
       get                                                 Display backup storage locations
         --default                                         displays the current default backup storage location (NEW)
@@ -116,20 +126,22 @@ Commands/flags for backup locations.
 ```
 
 3) `velero snapshot-location`
-Commands/flags for snapshot locations. 
+Commands/flags for snapshot locations.
 
 ```
-     set 
+     set
         --default mapStringString                         sets the list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...) (NEW, -- was `server --default-volume-snapshot-locations; could be set as an annotation on the VSL)  
+        --credentials mapStringString                     sets the list of name of the corresponding credentials secret for providers. Format is (provider1:credentials-secret-name1,provider2:credentials-secret-name2,...) (NEW)
 
       create                                              NAME [flags]
-        --default                                         Sets these new locations to be the new default snapshot locations. Default is false. (NEW) 
+        --default                                         Sets these new locations to be the new default snapshot locations. Default is false. (NEW)
         --config  mapStringString                         configuration to use for creating a volume snapshot location. Format is key1=value1,key2=value2 (was also in `velero install --`snapshot-location-config`). Required.
         --provider string                                 provider name for volume storage. Required.
         --label-columns stringArray                       a comma-separated list of labels to be displayed as columns
         --labels mapStringString                          labels to apply to the volume snapshot location
         --provider string                                 name of the volume snapshot provider (e.g. aws, azure, gcp)
         --show-labels                                     show labels in the last column
+        --credentials mapStringString                     sets the list of name of the corresponding credentials secret for providers. Format is (provider1:credentials-secret-name1,provider2:credentials-secret-name2,...) (NEW)
 
       get                                                 Display snapshot locations
         --default                                         list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...) (NEW -- was `server --default-volume-snapshot-locations`))
@@ -146,11 +158,11 @@ Configuration for plugins.
 
       remove                                    Remove a plugin [NAME | IMAGE] 
 
-      set 
-        --secret-file string                    PATH file containing credentials for plugin provider. If not specified, set --no-secret must be used for confirmation. Optional (MOVED FROM install). [NOTE]: we currently only support a single secret per provider 
-        --no-secret                             flag indicating if a secret should be created. Must be used as confirmation if create --secret-file is not provided. Optional. (MOVED FROM install)
+      set
+        --credentials-file mapStringString      configuration to use for creating a secret containing the AIM credentials for a plugin provider. Format is provider:path-to-file. (was `secret-file`)
+        --no-secret                             flag indicating if a secret should be created. Must be used as confirmation if create --secret-file is not provided. Optional. (MOVED FROM install -- not sure we need it?)
         --sa-annotations mapStringString        annotations to add to the Velero ServiceAccount for GKE. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2
-        --cacert-file string                    PATH file containing the certificate for the S3 location
+        --cacert-file mapStringString           configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file. (NEW)
 ```
 
 #### Example
@@ -192,14 +204,14 @@ Flags moved to `velero config server`:
       --velero-pod-mem-request string              memory request for Velero pod. A value of "0" is treated as unbounded. Optional. (default "128Mi")
 ```
 
-Flags to delete:
+...`velero config restic`
 ```
-      --no-default-backup-location                 flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.
-      --use-volume-snapshots                       whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider. (default true)
-      --wait                                       wait for Velero deployment to be ready. Optional.
+      --default-restic-prune-frequency duration    how often 'restic prune' is run for restic repositories by default. Optional.
+      --restic-pod-cpu-limit string                CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --restic-pod-cpu-request string              CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --restic-pod-mem-limit string                memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --restic-pod-mem-request string              memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
 ```
-
-Flags moved to...
 
 ...`backup-location create`
 ```
@@ -218,57 +230,129 @@ Flags moved to...
       --provider string                            provider name for backup and volume storage 
 ```
 
-...`velero config restic`
-```
-      --default-restic-prune-frequency duration    how often 'restic prune' is run for restic repositories by default. Optional.
-      --restic-pod-cpu-limit string                CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-cpu-request string              CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-mem-limit string                memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-mem-request string              memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-```
-
 ...`plugin`
 ```
       --plugins stringArray                        Plugin container images to install into the Velero Deployment
       --sa-annotations mapStringString             annotations to add to the Velero ServiceAccount. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2
       --no-secret                                  flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.
-      --secret-file string                         file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.
+      --secret-file string  (renamed `credentials-file`)   file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.
+```
+
+Flags to delete:
+```
+      --no-default-backup-location                 flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.
+      --use-volume-snapshots                       whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider. (default true)
+      --wait                                       wait for Velero deployment to be ready. Optional.
 ```
 
 ##### Velero Server
 `velero server (RENAMED velero config server)` 
  
-`velero server --default-backup-storage-location (DEPRECATED)` moved to `velero backup-location set --default` 
+`velero server --default-backup-storage-location (DEPRECATED)` changed to `velero backup-location set --default` 
 
-`velero server --default-volume-snapshot-locations (DEPRECATED)` moved to `velero snapshot-location set --default`
+`velero server --default-volume-snapshot-locations (DEPRECATED)` changed to `velero snapshot-location set --default`
 
-`velero server --default-restic-prune-frequency (DEPRECATED)` moved to `velero config restic set --default-prune-frequency` 
+`velero server --default-restic-prune-frequency (DEPRECATED)` changed to `velero config restic set --default-prune-frequency` 
 
-`velero server --restic-timeout  (DEPRECATED)` moved to `velero config restic set timeout`
+`velero server --restic-timeout  (DEPRECATED)` changed to `velero config restic set timeout`
 
 `velero server --use-restic  (DEPRECATED)` see `velero config restic`
 
-All other `velero server` flags moved to under `velero config server`.
-
-## General CLI improvements
-
-These are improvements that are part of this proposal:
-- Go over all flags and document what is optional, what is required, and default values.å
-- Capitalize all help messages
+All other `velero server` flags changed to under `velero config server`.
 
 ## Detailed Design
 
-A detailed design describing how the changes to the product should be made.
+#### Changes to startup behavior
 
-The names of types, fields, interfaces, and methods should be agreed on here, not debated in code review.
-The same applies to changes in CRDs, YAML examples, and so on.
+WIP
 
-Ideally the changes should be made in sequence so that the work required to implement this design can be done incrementally, possibly in parallel.
+#### Handling CA certs
+
+In anticipating of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/master/design/custom-ca-support.md), a new flag `velero plugin set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
+
+A `velero backup-location (create|set) --cacert mapStringString` flag is also being proposed. It sets the name of the corresponding CA cert secret for the object storage. Format is provider:cacert-secret-name.
+
+See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for more clarification.
+
+#### Credentials and secrets
+
+Currently, Velero only supports a single AIM access credential secret per provider. But, given that a set of object store and/or volume snapshot for the same provider usually resides in the same plugin, it is also accurate to say Velero only supports a single credential secret per plugin.
+
+Velero creates and stores the plugin credential secret under the hard-coded key `secret.cloud-credentials.data.cloud`. This makes it so switching from one plugin to another necessitates overriding the existing credential secret with the appropriate one for the new provider. This is made more evident with the new CLI command organization.
+
+To improve the UX for configuring the velero deployment with multiple plugins/providers, and corresponding IAM secrets, the following changes will be made:
+
+- the name of the flag changes from `secret-file` to `velero plugin set --credentials-file`. This is to be consistent with the name of the new flag `velero plugin set --cacert-file`.
+
+- The `velero plugin (create|set) --credentials-file` will be a map of provider name as a key, and the path to the file as a value. This way, we can have multiple credential secrets and each secret per provider/plugin will be unique.
+
+See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for the two items below.
+
+- The `velero backup-location (create|set)` will have a new `--credentials mapStringString` flag which sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name.
+
+- The `velero snapshot-location (create|set)` will have a new `--credentials mapStringString` flag which sets the list of name of the corresponding credentials secret for providers. Format is (provider1:credentials-secret-name1,provider2:credentials-secret-name2,...).
+
+Note that for this logic to work, either the plugin for which the secret corresponds to must have been installed in the system, or we must have a loop checking for when both are present before marking the BSL/VSL as ready.
+
+#### Examples of mounting secrets and environment variables
+
+With the changes proposed in the previous section (Credentials and secrets), the resulting deployment `yaml` would look like below:
+
+AWS
+```
+   spec:
+     containers:
+        volumeMounts:
+        - mountPath: /credentials
+          name: cloud-credentials-aws
+      - args:
+        - server
+        name: velero
+        env:
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /credentials/cloud
+     volumes:
+      - name: cloud-credentials
+        secret:
+          secretName: cloud-credentials
+```
+
+Azure
+```
+   spec:
+     containers:
+        volumeMounts:
+        - mountPath: /credentials
+          name: cloud-credentials-azure
+      - args:
+        - server
+        name: velero
+        env:
+        - name: AZURE_SHARED_CREDENTIALS_FILE
+          value: /credentials/cloud
+     volumes:
+      - name: cloud-credentials-azure
+        secret:
+          secretName: cloud-credentials-azure
+```
+
+
+#### Renaming "provider" to "plugin"
+
+WIP
+
+#### GitOps Compatibility
+
+WIP
+
+#### CRDs
+
+WIP
 
 ## Alternatives Considered
 
-If there are alternative high level or detailed designs that were not pursued they should be called out here with a brief explanation of why they were not pursued.
+WIP
 
 ## Security Considerations
 
-If this proposal has an impact to the security of the product, its users, or data stored or transmitted via the product, they must be addressed here.
+N/A

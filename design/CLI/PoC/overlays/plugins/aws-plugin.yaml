@@ -24,7 +24,7 @@ spec:
             - mountPath: /plugins
               name: plugins
             - mountPath: /credentials
-              name: cloud-credentials
+              name: cloud-credential-aws
       initContainers:
         - image: velero/velero-plugin-for-aws:v1.0.1
           imagePullPolicy: Always
@@ -35,6 +35,6 @@ spec:
       volumes:
         - emptyDir: {}
           name: plugins
-        - name: cloud-credentials
+        - name: cloud-credential-aws
           secret:
-            secretName: cloud-credentials
+            secretName: cloud-credential-aws
