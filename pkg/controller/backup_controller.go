@@ -39,6 +39,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -55,7 +56,7 @@ import (
 
 type backupController struct {
 	*genericController
-
+	discoveryHelper          discovery.Helper
 	backupper                pkgbackup.Backupper
 	lister                   velerov1listers.BackupLister
 	client                   velerov1client.BackupsGetter
@@ -76,6 +77,7 @@ type backupController struct {
 func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
+	discoveryHelper discovery.Helper,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
@@ -91,6 +93,7 @@ func NewBackupController(
 ) Interface {
 	c := &backupController{
 		genericController:        newGenericController("backup", logger),
+		discoveryHelper:          discoveryHelper,
 		backupper:                backupper,
 		lister:                   backupInformer.Lister(),
 		client:                   client,
@@ -328,6 +331,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Labels = make(map[string]string)
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
+
+	// Getting all information of cluster version - useful for future skip-level migration
+	request.Labels[velerov1api.SourceClusterK8sGitVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().String())
+	request.Labels[velerov1api.SourceClusterK8sMajorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Major)
+	request.Labels[velerov1api.SourceClusterK8sMinorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Minor)
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {

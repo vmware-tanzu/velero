@@ -33,9 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
+	"k8s.io/apimachinery/pkg/version"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -44,6 +47,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -168,8 +172,13 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -236,8 +245,13 @@ func TestBackupLocationLabel(t *testing.T) {
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -293,8 +307,14 @@ func TestDefaultBackupTTL(t *testing.T) {
 		)
 
 		t.Run(test.name, func(t *testing.T) {
+
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
@@ -340,7 +360,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -368,7 +391,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "alt-loc",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "alt-loc",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -399,7 +425,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "read-write",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "read-write",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -427,7 +456,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -457,7 +489,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -488,7 +523,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -517,7 +555,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -546,8 +587,26 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper       = new(fakeBackupper)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+
+			apiServer.DiscoveryClient.FakedServerVersion = &version.Info{
+				Major:        "1",
+				Minor:        "16",
+				GitVersion:   "v1.16.4",
+				GitCommit:    "FakeTest",
+				GitTreeState: "",
+				BuildDate:    "",
+				GoVersion:    "",
+				Compiler:     "",
+				Platform:     "",
+			}
+
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -584,7 +643,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
-			_, err := clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
+			_, err = clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
 			require.NoError(t, err)
 
 			require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(defaultBackupLocation))
