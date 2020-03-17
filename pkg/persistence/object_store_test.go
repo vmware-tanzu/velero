@@ -138,6 +138,13 @@ func TestIsValid(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		{
+			name: "backup store with plugins directory is valid",
+			storageData: map[string][]byte{
+				"plugins/vsphere/foo": {},
+			},
+			expectErr: false,
+		},
 	}
 
 	for _, tc := range tests {
