@@ -39,6 +39,7 @@ func NewObjectStoreLayout(prefix string) *ObjectStoreLayout {
 		"restores": path.Join(prefix, "restores") + "/",
 		"restic":   path.Join(prefix, "restic") + "/",
 		"metadata": path.Join(prefix, "metadata") + "/",
+		"plugins":  path.Join(prefix, "plugins") + "/",
 	}
 
 	return &ObjectStoreLayout{
