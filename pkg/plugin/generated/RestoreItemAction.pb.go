@@ -24,10 +24,12 @@ type RestoreItemActionExecuteRequest struct {
 	ItemFromBackup []byte `protobuf:"bytes,4,opt,name=itemFromBackup,proto3" json:"itemFromBackup,omitempty"`
 }
 
-func (m *RestoreItemActionExecuteRequest) Reset()                    { *m = RestoreItemActionExecuteRequest{} }
-func (m *RestoreItemActionExecuteRequest) String() string            { return proto.CompactTextString(m) }
-func (*RestoreItemActionExecuteRequest) ProtoMessage()               {}
-func (*RestoreItemActionExecuteRequest) Descriptor() ([]byte, []int) { return fileDescriptor3, []int{0} }
+func (m *RestoreItemActionExecuteRequest) Reset()         { *m = RestoreItemActionExecuteRequest{} }
+func (m *RestoreItemActionExecuteRequest) String() string { return proto.CompactTextString(m) }
+func (*RestoreItemActionExecuteRequest) ProtoMessage()    {}
+func (*RestoreItemActionExecuteRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor3, []int{0}
+}
 
 func (m *RestoreItemActionExecuteRequest) GetPlugin() string {
 	if m != nil {

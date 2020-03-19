@@ -17,9 +17,10 @@ limitations under the License.
 package restic
 
 import (
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"sort"
 	"testing"
+
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
