@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 
@@ -49,6 +50,10 @@ type Helper interface {
 	// APIGroups gets the current set of supported APIGroups
 	// in the cluster.
 	APIGroups() []metav1.APIGroup
+
+	// ServerVersion retrieves and parses the server's k8s version (git version)
+	// in the cluster.
+	ServerVersion() *version.Info
 }
 
 type serverResourcesInterface interface {
@@ -60,11 +65,12 @@ type helper struct {
 	logger          logrus.FieldLogger
 
 	// lock guards mapper, resources and resourcesMap
-	lock         sync.RWMutex
-	mapper       meta.RESTMapper
-	resources    []*metav1.APIResourceList
-	resourcesMap map[schema.GroupVersionResource]metav1.APIResource
-	apiGroups    []metav1.APIGroup
+	lock          sync.RWMutex
+	mapper        meta.RESTMapper
+	resources     []*metav1.APIResourceList
+	resourcesMap  map[schema.GroupVersionResource]metav1.APIResource
+	apiGroups     []metav1.APIGroup
+	serverVersion *version.Info
 }
 
 var _ Helper = &helper{}
@@ -143,6 +149,13 @@ func (h *helper) Refresh() error {
 	}
 	h.apiGroups = apiGroupList.Groups
 
+	serverVersion, err := h.discoveryClient.ServerVersion()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	h.serverVersion = serverVersion
+
 	return nil
 }
 
@@ -199,4 +212,10 @@ func (h *helper) APIGroups() []metav1.APIGroup {
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	return h.apiGroups
+}
+
+func (h *helper) ServerVersion() *version.Info {
+	h.lock.RLock()
+	defer h.lock.RUnlock()
+	return h.serverVersion
 }
