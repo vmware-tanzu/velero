@@ -57,7 +57,12 @@ type Helper interface {
 }
 
 type serverResourcesInterface interface {
+	// ServerPreferredResources() is no longer used to populate Resources() see ServerGroupsAndResources below
+	// Keeping for future use to compare preferred resources during restore (might not be needed. If so, will remove)
 	ServerPreferredResources() ([]*metav1.APIResourceList, error)
+	// ServerGroupsAndResources returns supported groups and resources for *all* groups and versions (not only preferred)
+	// Used to populate Resources()
+	ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)
 }
 
 type helper struct {
@@ -112,14 +117,20 @@ func (h *helper) Refresh() error {
 		return errors.WithStack(err)
 	}
 
-	preferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
+	// ServerGroupsAndResources returns all APIGroup and APIResouceList - not only preferred
+	_, serverResources, err := refreshServerGroupsAndResources(h.discoveryClient, h.logger)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
+	// will populate resources with all versions, not only from preferred API group versions
 	h.resources = discovery.FilteredBy(
 		discovery.ResourcePredicateFunc(filterByVerbs),
-		preferredResources,
+		serverResources,
 	)
 
 	sortResources(h.resources)
@@ -170,6 +181,19 @@ func refreshServerPreferredResources(discoveryClient serverResourcesInterface, l
 		}
 	}
 	return preferredResources, err
+}
+
+func refreshServerGroupsAndResources(discoveryClient serverResourcesInterface, logger logrus.FieldLogger) ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	serverGroups, serverResources, err := discoveryClient.ServerGroupsAndResources()
+	if err != nil {
+		if discoveryErr, ok := err.(*discovery.ErrGroupDiscoveryFailed); ok {
+			for groupVersion, err := range discoveryErr.Groups {
+				logger.WithError(err).Warnf("Failed to discover group: %v", groupVersion)
+			}
+			return serverGroups, serverResources, nil
+		}
+	}
+	return serverGroups, serverResources, err
 }
 
 func filterByVerbs(groupVersion string, r *metav1.APIResource) bool {

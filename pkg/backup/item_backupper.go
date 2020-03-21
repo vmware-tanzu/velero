@@ -90,7 +90,7 @@ func (f *defaultItemBackupperFactory) newItemBackupper(
 }
 
 type ItemBackupper interface {
-	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error)
+	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error)
 }
 
 type defaultItemBackupper struct {
@@ -111,7 +111,7 @@ type defaultItemBackupper struct {
 // namespaces IncludesExcludes list.
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource) (bool, error) {
+func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
@@ -253,11 +253,27 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		return false, kubeerrs.NewAggregate(backupErrs)
 	}
 
+	// group version of this object
+	// Used on filepath to backup up all groups and versions
+	version := resourceVersion(obj)
+
+	// Getting the preferred group version of this resource
+	preferredVersion := preferredGVR.Version
+
 	var filePath string
+
+	// API Group version is now part of path of backup as a subdirectory
+	// it will add a prefix to subdirectory name for the preferred version
+	versionPath := version
+
+	if version == preferredVersion {
+		versionPath = version + api.PreferredVersionDir
+	}
+
 	if namespace != "" {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), versionPath, api.NamespaceScopedDir, namespace, name+".json")
 	} else {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
+		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), versionPath, api.ClusterScopedDir, name+".json")
 	}
 
 	itemBytes, err := json.Marshal(obj.UnstructuredContent())
@@ -279,6 +295,33 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	if _, err := ib.tarWriter.Write(itemBytes); err != nil {
 		return false, errors.WithStack(err)
+	}
+
+	// backing up the preferred version backup without API Group version on path -  this is for backward compability
+
+	if version == preferredVersion {
+		if namespace != "" {
+			filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
+		} else {
+			filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
+		}
+
+		hdr = &tar.Header{
+			Name:     filePath,
+			Size:     int64(len(itemBytes)),
+			Typeflag: tar.TypeReg,
+			Mode:     0755,
+			ModTime:  time.Now(),
+		}
+
+		if err := ib.tarWriter.WriteHeader(hdr); err != nil {
+			return false, errors.WithStack(err)
+		}
+
+		if _, err := ib.tarWriter.Write(itemBytes); err != nil {
+			return false, errors.WithStack(err)
+		}
+
 	}
 
 	return true, nil
@@ -351,7 +394,7 @@ func (ib *defaultItemBackupper) executeActions(
 				return nil, errors.WithStack(err)
 			}
 
-			if _, err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource()); err != nil {
+			if _, err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource(), gvr); err != nil {
 				return nil, err
 			}
 		}
@@ -522,4 +565,11 @@ func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, lo
 func resourceKey(obj runtime.Unstructured) string {
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	return fmt.Sprintf("%s/%s", gvk.GroupVersion().String(), gvk.Kind)
+}
+
+// resourceVersion returns a string representing the object's API Version (e.g.
+// v1 if item belongs to apps/v1
+func resourceVersion(obj runtime.Unstructured) string {
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	return gvk.Version
 }

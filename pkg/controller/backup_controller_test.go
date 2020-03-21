@@ -374,6 +374,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,
@@ -407,6 +408,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,
@@ -443,6 +445,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,
@@ -477,6 +480,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					Expiration:          &metav1.Time{now.Add(10 * time.Minute)},
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
@@ -511,6 +515,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,
@@ -547,6 +552,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,
@@ -581,6 +587,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
+					FormatVersion:       "1.1.0",
 					StartTimestamp:      &timestamp,
 					CompletionTimestamp: &timestamp,
 					Expiration:          &timestamp,

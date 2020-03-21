@@ -99,6 +99,16 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 		}
 		file = file + "/" + item.name + ".json"
 		expectedFiles = append(expectedFiles, file)
+
+		fileWithVersion := "resources/" + gvkToResource[item.resource]
+		if item.namespace != "" {
+			fileWithVersion = fileWithVersion + "/v1-preferredversion/" + "namespaces/" + item.namespace
+		} else {
+			file = file + "/cluster"
+			fileWithVersion = fileWithVersion + "/v1-preferredversion" + "/cluster"
+		}
+		fileWithVersion = fileWithVersion + "/" + item.name + ".json"
+		expectedFiles = append(expectedFiles, fileWithVersion)
 	}
 
 	assertTarballContents(t, backupFile, append(expectedFiles, "metadata/version")...)
@@ -135,6 +145,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -155,6 +169,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -175,6 +191,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -195,6 +213,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
 			},
 		},
 		{
@@ -215,6 +235,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
 			},
 		},
 		{
@@ -241,6 +263,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -266,6 +292,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
 				"resources/persistentvolumes/cluster/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
 			},
 		},
 		{
@@ -290,6 +319,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/persistentvolumes/cluster/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
 			},
 		},
 		{
@@ -314,6 +346,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/persistentvolumes/cluster/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
 			},
 		},
 		{
@@ -341,6 +375,12 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/deployments.apps/namespaces/zoo/raz.json",
 				"resources/persistentvolumes/cluster/bar.json",
 				"resources/persistentvolumes/cluster/baz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/bar.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/baz.json",
 			},
 		},
 		{
@@ -365,6 +405,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/ns-2/pod-1.json",
 				"resources/persistentvolumes/cluster/pv-1.json",
 				"resources/persistentvolumes/cluster/pv-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-2.json",
 			},
 		},
 		{
@@ -387,6 +431,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
 			},
 		},
 		{
@@ -408,6 +454,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
 			},
 		},
 		{
@@ -432,6 +480,11 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/ns-3/pod-1.json",
 				"resources/persistentvolumes/cluster/pv-1.json",
 				"resources/persistentvolumes/cluster/pv-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-2.json",
 			},
 		},
 		{
@@ -454,6 +507,9 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-1.json",
 				"resources/pods/namespaces/ns-3/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-1.json",
 			},
 		},
 		{
@@ -477,6 +533,11 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/ns-3/pod-1.json",
 				"resources/persistentvolumes/cluster/pv-1.json",
 				"resources/persistentvolumes/cluster/pv-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-2.json",
 			},
 		},
 		{
@@ -499,6 +560,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -521,6 +586,10 @@ func TestBackupResourceFiltering(t *testing.T) {
 				"resources/pods/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -541,6 +610,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -561,6 +632,8 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -574,6 +647,7 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 			},
 		},
 	}
@@ -628,6 +702,10 @@ func TestCRDInclusion(t *testing.T) {
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 		{
@@ -647,6 +725,7 @@ func TestCRDInclusion(t *testing.T) {
 			},
 			want: []string{
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 		{
@@ -669,6 +748,10 @@ func TestCRDInclusion(t *testing.T) {
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 		{
@@ -689,6 +772,8 @@ func TestCRDInclusion(t *testing.T) {
 			want: []string{
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 		{
@@ -709,6 +794,7 @@ func TestCRDInclusion(t *testing.T) {
 			},
 			want: []string{
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 		{
@@ -732,6 +818,10 @@ func TestCRDInclusion(t *testing.T) {
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/volumesnapshotlocations.velero.io.json",
 				"resources/customresourcedefinitions.apiextensions.k8s.io/cluster/test.velero.io.json",
 				"resources/volumesnapshotlocations.velero.io/namespaces/foo/vsl-1.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/backups.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/volumesnapshotlocations.velero.io.json",
+				"resources/customresourcedefinitions.apiextensions.k8s.io/v1beta1-preferredversion/cluster/test.velero.io.json",
+				"resources/volumesnapshotlocations.velero.io/v1-preferredversion/namespaces/foo/vsl-1.json",
 			},
 		},
 	}
@@ -778,6 +868,8 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			want: []string{
 				"resources/deployments.extensions/namespaces/foo/bar.json",
 				"resources/deployments.extensions/namespaces/zoo/raz.json",
+				"resources/deployments.extensions/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.extensions/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -796,6 +888,8 @@ func TestBackupResourceCohabitation(t *testing.T) {
 			want: []string{
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 	}
@@ -837,7 +931,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	h.backupper.Backup(h.log, backup1, backup1File, nil, nil)
 
-	assertTarballContents(t, backup1File, "metadata/version", "resources/deployments.apps/namespaces/ns-1/deploy-1.json")
+	assertTarballContents(t, backup1File, "metadata/version", "resources/deployments.apps/namespaces/ns-1/deploy-1.json", "resources/deployments.apps/v1-preferredversion/namespaces/ns-1/deploy-1.json")
 
 	// run and verify backup 2
 	backup2 := &Request{
@@ -847,7 +941,7 @@ func TestBackupUsesNewCohabitatingResourcesForEachBackup(t *testing.T) {
 
 	h.backupper.Backup(h.log, backup2, backup2File, nil, nil)
 
-	assertTarballContents(t, backup2File, "metadata/version", "resources/deployments.apps/namespaces/ns-1/deploy-1.json")
+	assertTarballContents(t, backup2File, "metadata/version", "resources/deployments.apps/namespaces/ns-1/deploy-1.json", "resources/deployments.apps/v1-preferredversion/namespaces/ns-1/deploy-1.json")
 }
 
 // TestBackupResourceOrdering runs backups of the core API group and ensures that items are backed
@@ -1371,6 +1465,9 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
 				"resources/pods/namespaces/ns-3/pod-3.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-3.json",
 			},
 		},
 		{
@@ -1397,6 +1494,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 			},
 		},
 		{
@@ -1428,6 +1526,9 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/persistentvolumes/cluster/pv-1.json",
 				"resources/persistentvolumes/cluster/pv-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-2.json",
 			},
 		},
 		{
@@ -1456,6 +1557,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			},
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 			},
 		},
 		{
@@ -1486,6 +1588,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
 			},
 		},
 		{
@@ -1515,6 +1619,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/persistentvolumes/cluster/pv-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/persistentvolumes/v1-preferredversion/cluster/pv-2.json",
 			},
 		},
 
@@ -1544,6 +1650,8 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/ns-2/pod-2.json",
 				"resources/pods/namespaces/ns-3/pod-3.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-3.json",
 			},
 		},
 	}
@@ -2134,6 +2242,8 @@ func TestBackupWithHooks(t *testing.T) {
 			wantBackedUp: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
 			},
 		},
 		{
@@ -2183,6 +2293,8 @@ func TestBackupWithHooks(t *testing.T) {
 			wantBackedUp: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
 			},
 		},
 		{
@@ -2237,6 +2349,7 @@ func TestBackupWithHooks(t *testing.T) {
 			},
 			wantBackedUp: []string{
 				"resources/pods/namespaces/ns-1/pod-1.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 			},
 		},
 		{
@@ -2288,6 +2401,7 @@ func TestBackupWithHooks(t *testing.T) {
 			},
 			wantBackedUp: []string{
 				"resources/pods/namespaces/ns-2/pod-2.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
 			},
 		},
 	}

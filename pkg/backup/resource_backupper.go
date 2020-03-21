@@ -110,6 +110,12 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 	}
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
 
+	// Getting the preferred group version of this resource
+	preferredGVR, _, err := rb.discoveryHelper.ResourceFor(gr.WithVersion(""))
+	if err != nil {
+		return errors.WithStack(err)
+	}
+
 	clusterScoped := !resource.Namespaced
 
 	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
@@ -194,7 +200,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 					continue
 				}
 
-				if _, err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
+				if _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR); err != nil {
 					log.WithError(errors.WithStack(err)).Error("Error backing up namespace")
 				}
 			}
@@ -233,7 +239,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 
 		// do the backup
 		for _, item := range unstructuredList.Items {
-			if rb.backupItem(log, gr, itemBackupper, &item) {
+			if rb.backupItem(log, gr, itemBackupper, &item, preferredGVR) {
 				backedUpItem = true
 			}
 		}
@@ -254,6 +260,7 @@ func (rb *defaultResourceBackupper) backupItem(
 	gr schema.GroupResource,
 	itemBackupper ItemBackupper,
 	unstructured runtime.Unstructured,
+	preferredGVR schema.GroupVersionResource,
 ) bool {
 	metadata, err := meta.Accessor(unstructured)
 	if err != nil {
@@ -271,7 +278,7 @@ func (rb *defaultResourceBackupper) backupItem(
 		return false
 	}
 
-	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr)
+	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
 		log.Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
@@ -324,7 +331,7 @@ func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.
 	}
 	log.Infof("Found associated CRD %s to add to backup", gr.String())
 
-	rb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured)
+	rb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)
 }
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of

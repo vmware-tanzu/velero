@@ -151,6 +151,7 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 	tests := []struct {
 		name         string
 		resourceList []*metav1.APIResourceList
+		apiGroup     []*metav1.APIGroup
 		failedGroups map[schema.GroupVersion]error
 		returnError  error
 	}{
@@ -183,7 +184,7 @@ func TestRefreshServerPreferredResources(t *testing.T) {
 	formatFlag := logging.FormatText
 
 	for _, test := range tests {
-		fakeServer := velerotest.NewFakeServerResourcesInterface(test.resourceList, test.failedGroups, test.returnError)
+		fakeServer := velerotest.NewFakeServerResourcesInterface(test.resourceList, test.apiGroup, test.failedGroups, test.returnError)
 		t.Run(test.name, func(t *testing.T) {
 			resources, err := refreshServerPreferredResources(fakeServer, logging.DefaultLogger(logrus.DebugLevel, formatFlag))
 			if test.returnError != nil {

@@ -212,9 +212,14 @@ const (
 
 // BackupStatus captures the current status of a Velero backup.
 type BackupStatus struct {
-	// Version is the backup format version.
+	// Version is the backup format major version.
+	// Deprecated: Please see FormatVersion
 	// +optional
 	Version int `json:"version,omitempty"`
+
+	// FormatVersion is the backup format version, including major, minor version.
+	// +optional
+	FormatVersion string `json:"formatversion,omitempty"`
 
 	// Expiration is when this Backup is eligible for garbage-collection.
 	// +optional
