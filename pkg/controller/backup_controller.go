@@ -320,8 +320,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		Backup: backup.DeepCopy(), // don't modify items in the cache
 	}
 
-	// set backup version
+	// set backup major version - deprecated, use Status.FormatVersion
 	request.Status.Version = pkgbackup.BackupVersion
+
+	// set backup major and minor version
+	request.Status.FormatVersion = pkgbackup.BackupFormatVersion
 
 	if request.Spec.TTL.Duration == 0 {
 		// set default backup TTL

@@ -39,4 +39,8 @@ const (
 
 	// CSIFeatureFlag is the feature flag string that defines whether or not CSI features are being used.
 	CSIFeatureFlag = "EnableCSI"
+
+	// PreferredVersionDir is the sufix name of the directory containing the preferred version of the API group
+	// resource within a Velero backup.
+	PreferredVersionDir = "-preferredversion"
 )
