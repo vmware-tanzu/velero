@@ -419,6 +419,8 @@ https://github.com/jpeach/contour/tree/1c575c772e9fd747fba72ae41ab99bdae7a01864/
 
 Question: how should velero install be aware of env vars that different provider plugins require? (right now we just hardcode the AWS/Azure/GCP ones).
 
+There's currently a special case for Azure + restic, where a set of restic-specific env vars need to be set with storage account name and key, which is likely going to remain hardcoded in upstream Velero - how do we deal with situations like this?
+
 ## Security Considerations
 
 N/A
