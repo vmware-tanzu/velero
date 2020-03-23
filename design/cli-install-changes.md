@@ -262,10 +262,6 @@ All other `velero server` flags changed to under `velero config server`.
 
 ## Detailed Design
 
-#### Changes to startup behavior
-
-WIP
-
 #### Handling CA certs
 
 In anticipating of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/master/design/custom-ca-support.md), a new flag `velero plugin set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
@@ -369,9 +365,41 @@ These files can be deployed using the included kustomize setup by running `k app
 
 Note: All CRDs, including the `ResticRepository`, may continue to be deployed at startup as it is now, or together with their respective instantiation.
 
+
+#### Changes to startup behavior
+
+To recap, this proposal redesigns the Velero CLI to make `velero install` obsolete, and instead breaks down the installation and configuration into separate commands. These are the major highlights:
+
+- Plugins will only be installed separately via `velero plugin add`
+- BSL/VSL will be continue to be configured separately, and now each will have an associated secret
+
+Since each BSL/VSL will have its own association with a secret, the user will no longer need to upload a new secret whenever changing to, or adding, a BSL/VSL for a provider that is different from the one in use. This will be done at setup time. This will make it easier to support any number of BSL/VSL combinations, with different providers each.
+
+The user will start up the Velero server on a cluster by using the command `velero config server`. This will create the Velero deployment resource with default values or values overwritten with flags, create the Velero CRDs, and anything else that is not specific to plugins or BSL/VSL.
+
+The Velero server will start up, verify that the deployment is running, that all CRDs were found, and log a message that it is waiting for a BSL to be configured. at this point, other operations, such as configuring restic, will be allowed. Velero should keep track of its status, ie, if it is ready to create backups or not. This could be a field `ServerStatus` added to `ServerStatusRequest`. Possible values could be [ready|waiting]. "ready" would mean there is at least 1 valid BSL, and "waiting" would be anything but that.
+
+When adding/configuring a BSL or VSL, we can approach it in one of two ways:
+1) at the time of creating a location, verify if there is a valid, corresponding plugin. If there isn't, don't allow creation.
+2) allow creating locations, and continuously verify if there is a corresponding, valid plugin. When a valid match is found, mark the BSL/VSL as "ready". This would require adding a field to the BSL/VSL to keep track of its status, possibly: [ready|waiting].
+
+With the first approach: the server would transition into "ready" (to create backups) as soon as there is one BSL. It would require a set sequence of actions, ie, first install the plugin, only then the user can successfully configure a BSL.
+
+With the second approach, the Velero server would continue looping and checking all existing BSLs for at least 1 with a "ready" status. Once it found that, it would set itself to "ready" also.
+
+Another new behavior that must be added: the server needs to identify when there no longer exists a valid BSL. At this point, it should change its status from "ready" to one that indicates it is not ready, maybe "waiting". With the first approach above, this would mean checking if there is still at least one BSL. With the second approach, it would require checking the status of all BSLs to find at least one with the status of "ready".
+
+As it is today, a valid VSL would not be required to create backups, unless the backup included a PV.
+
+To make it easier for the user to identify if their Velero server is ready to create backups or not, a `velero status` command should be added. This issue has been created some time ago for this purpose: https://github.com/vmware-tanzu/velero/issues/1094.
+
 ## Alternatives Considered
 
 WIP
+
+## TBD
+
+Question: how should velero install be aware of env vars that different provider plugins require? (right now we just hardcode the AWS/Azure/GCP ones).
 
 ## Security Considerations
 
