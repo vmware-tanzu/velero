@@ -8,7 +8,7 @@ jobs:
     steps:
 
     - name: Check out the code
-      uses: actions/checkout@v1
+      uses: actions/checkout@v2
 
     - name: Make ci
       run: make ci
