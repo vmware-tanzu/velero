@@ -395,7 +395,25 @@ To make it easier for the user to identify if their Velero server is ready to cr
 
 ## Alternatives Considered
 
-WIP
+It seems that the vast majority of tools document their usage with `kubectl` and `yaml` files to install and configure their Kubernetes resources. Many of them also make use of Helm, and to a lesser extent some of them have their own CLI tools. 
+
+Amongst the tools that have their own CLI, not enough examples were found to establish a clear pattern of usage. It seems the most relevant priority should be to have output in `yaml` format.
+
+Any set of `yaml` files can also be arranged to use with Kustomize by creating/updating resources, and patching them using Kustomize functionalities.
+
+The way the Velero commands were arranged in this proposal with the ability to output corresponding `yaml` files, and the included Kustomize examples, makes it in line with the widely used practices for installation and configuration.
+
+Some CLI tools do not document their usage with Kustomize, one could assume it is because anyone with knowledge of Kustomize and `yaml` files would know how to use it.
+
+Here are some examples:
+
+https://github.com/jetstack/kustomize-cert-manager-demo
+
+https://github.com/istio/installer/tree/master/kustomize
+
+https://github.com/weaveworks/flagger/tree/master/kustomize
+
+https://github.com/jpeach/contour/tree/1c575c772e9fd747fba72ae41ab99bdae7a01864/kustomize (RFC)
 
 ## TBD
 
