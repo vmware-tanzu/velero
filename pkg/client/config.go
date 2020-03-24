@@ -28,6 +28,7 @@ import (
 const (
 	ConfigKeyNamespace = "namespace"
 	ConfigKeyFeatures  = "features"
+	ConfigKeyCACert    = "cacert"
 )
 
 // VeleroConfig is a map of strings to interface{} for deserializing Velero client config options.
@@ -108,6 +109,19 @@ func (c VeleroConfig) Features() []string {
 	}
 
 	return strings.Split(features, ",")
+}
+
+func (c VeleroConfig) CACertPath() string {
+	val, ok := c[ConfigKeyCACert]
+	if !ok {
+		return ""
+	}
+	caCertPath, ok := val.(string)
+	if !ok {
+		return ""
+	}
+
+	return caCertPath
 }
 
 func configFileName() string {
