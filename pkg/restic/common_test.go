@@ -17,8 +17,11 @@ limitations under the License.
 package restic
 
 import (
+	"os"
 	"sort"
 	"testing"
+
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -374,4 +377,45 @@ func TestTempCredentialsFile(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "passw0rd", string(contents))
+}
+
+func TestTempCACertFile(t *testing.T) {
+	var (
+		bslInformer = cache.NewSharedIndexInformer(nil, new(velerov1api.BackupStorageLocation), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		bslLister   = velerov1listers.NewBackupStorageLocationLister(bslInformer.GetIndexer())
+		fs          = velerotest.NewFakeFileSystem()
+		bsl         = &velerov1api.BackupStorageLocation{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "velero",
+				Name:      "default",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{CACert: []byte("cacert")},
+				},
+			},
+		}
+	)
+
+	// bsl not in lister: expect an error
+	caCert, err := GetCACert(bslLister, "velero", "default")
+	assert.Error(t, err)
+
+	// now add bsl to lister
+	require.NoError(t, bslInformer.GetStore().Add(bsl))
+
+	// bsl in lister: expect temp file to be created with cacert value
+	caCert, err = GetCACert(bslLister, "velero", "default")
+	require.NoError(t, err)
+
+	fileName, err := TempCACertFile(caCert, "default", fs)
+	require.NoError(t, err)
+
+	contents, err := fs.ReadFile(fileName)
+	require.NoError(t, err)
+
+	assert.Equal(t, "cacert", string(contents))
+
+	os.Remove(fileName)
 }

@@ -27,7 +27,7 @@ import (
 func ValidateObjectStoreConfigKeys(config map[string]string, validKeys ...string) error {
 	// `bucket` and `prefix` are automatically added to all object
 	// store config by velero, so add them as valid keys.
-	return validateConfigKeys(config, append(validKeys, "bucket", "prefix")...)
+	return validateConfigKeys(config, append(validKeys, "bucket", "prefix", "caCert")...)
 }
 
 // ValidateVolumeSnapshotterConfigKeys ensures that a volume snapshotter's

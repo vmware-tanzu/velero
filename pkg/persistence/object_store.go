@@ -114,6 +114,7 @@ func NewObjectBackupStore(location *velerov1api.BackupStorageLocation, objectSto
 		}
 		location.Spec.Config["bucket"] = bucket
 		location.Spec.Config["prefix"] = prefix
+		location.Spec.Config["caCert"] = string(location.Spec.ObjectStorage.CACert)
 	}
 
 	objectStore, err := objectStoreGetter.GetObjectStore(location.Spec.Provider)

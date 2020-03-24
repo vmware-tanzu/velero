@@ -204,6 +204,44 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespac
 	return name, nil
 }
 
+// TempCACertFile creates a temp file containing a CA bundle
+// and returns its path. The caller should generally call os.Remove()
+// to remove the file when done with it.
+func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+	file, err := fs.TempFile("", fmt.Sprintf("cacert-%s", bsl))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if _, err := file.Write(caCert); err != nil {
+		// nothing we can do about an error closing the file here, and we're
+		// already returning an error about the write failing.
+		file.Close()
+		return "", errors.WithStack(err)
+	}
+
+	name := file.Name()
+
+	if err := file.Close(); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	return name, nil
+}
+
+func GetCACert(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, bsl string) ([]byte, error) {
+	location, err := backupLocationLister.BackupStorageLocations(namespace).Get(bsl)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	if location.Spec.ObjectStorage != nil {
+		return location.Spec.ObjectStorage.CACert, nil
+	}
+
+	return nil, nil
+}
+
 // NewPodVolumeBackupListOptions creates a ListOptions with a label selector configured to
 // find PodVolumeBackups for the backup identified by name.
 func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {

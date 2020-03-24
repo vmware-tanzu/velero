@@ -244,6 +244,22 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
+	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	caCert, err := GetCACert(rm.backupLocationLister, rm.namespace, backupLocation)
+	if err != nil {
+		return err
+	}
+	var caCertFile string
+	if caCert != nil {
+		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
+		if err != nil {
+			return err
+		}
+		// ignore error since there's nothing we can do and it's a temp file.
+		defer os.Remove(caCertFile)
+	}
+	cmd.CACertFile = caCertFile
+
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
 		if !cache.WaitForCacheSync(rm.ctx.Done(), rm.backupLocationInformerSynced) {
 			return errors.New("timed out waiting for cache to sync")

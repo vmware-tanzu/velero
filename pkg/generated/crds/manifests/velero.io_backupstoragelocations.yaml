@@ -61,6 +61,11 @@ spec:
                 bucket:
                   description: Bucket is the bucket to use for object storage.
                   type: string
+                caCert:
+                  description: CACert defines a CA bundle to use when verifying TLS
+                    connections to the provider.
+                  format: byte
+                  type: string
                 prefix:
                   description: Prefix is the path inside a bucket to use for Velero
                     storage. Optional.

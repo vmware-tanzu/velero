@@ -1,0 +1,1 @@
+support setting a custom CA certificate on a BSL to use when verifying TLS connections
