@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"os"
 	"sort"
 	"testing"
 
@@ -415,4 +416,6 @@ func TestTempCACertFile(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "cacert", string(contents))
+
+	os.Remove(fileName)
 }
