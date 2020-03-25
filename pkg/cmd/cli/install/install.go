@@ -68,6 +68,7 @@ type InstallOptions struct {
 	Plugins                           flag.StringArray
 	NoDefaultBackupLocation           bool
 	CRDsOnly                          bool
+	CACertFile                        string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -99,6 +100,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
 	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
 	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -138,6 +140,17 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 			return nil, err
 		}
 	}
+	var caCertData []byte
+	if o.CACertFile != "" {
+		realPath, err := filepath.Abs(o.CACertFile)
+		if err != nil {
+			return nil, err
+		}
+		caCertData, err = ioutil.ReadFile(realPath)
+		if err != nil {
+			return nil, err
+		}
+	}
 	veleroPodResources, err := kubeutil.ParseResourceRequirements(o.VeleroPodCPURequest, o.VeleroPodMemRequest, o.VeleroPodCPULimit, o.VeleroPodMemLimit)
 	if err != nil {
 		return nil, err
@@ -166,6 +179,7 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
 		Plugins:                           o.Plugins,
 		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
+		CACertData:                        caCertData,
 	}, nil
 }
 
