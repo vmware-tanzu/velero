@@ -1,0 +1,94 @@
+// Docsearch theming from getbootstrap.com, modified
+
+.algolia-autocomplete {
+  width: 100%;
+}
+
+.algolia-autocomplete .ds-dropdown-menu {
+  width: 100%;
+  padding: $dropdown-padding-y 0;
+  margin: $dropdown-spacer 0 0;
+  background-color: $white;
+  border: $dropdown-border-width solid $dropdown-border-color;
+  @include border-radius($dropdown-border-radius);
+  @include box-shadow($dropdown-box-shadow);
+
+  @include media-breakpoint-up(md) {
+    width: 400px;
+  }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--category-header {
+  padding: .125rem 1rem;
+  font-weight: 600;
+  color: #0091DA;
+
+  // stylelint-disable-next-line selector-class-pattern
+  :not(.algolia-docsearch-suggestion__main) > & {
+    display: none;
+  }
+
+  .algolia-autocomplete .ds-suggestion:not(:first-child) & {
+    padding-top: .75rem;
+    margin-top: .75rem;
+    border-top: 1px solid rgba(0, 0, 0, .1);
+  }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--content {
+  padding: .25rem 1rem;
+
+  .ds-cursor & {
+    background-color: rgba(#0091DA, .2);
+  }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion {
+  display: block;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--subcategory-column {
+  display: none;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--subcategory-inline {
+  display: inline;
+  color: $gray-700;
+
+  &::after {
+    padding: 0 .25rem;
+    content: "/";
+  }
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--title {
+  display: inline;
+  font-weight: 500;
+  color: $gray-800;
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--text {
+  color: $gray-800;
+  //@include font-size(.75rem);
+}
+
+.algolia-autocomplete .algolia-docsearch-suggestion--highlight {
+  color: $darkest-blue;
+  background-color: rgba(#0091DA, .1);
+}
+
+.algolia-autocomplete .algolia-docsearch-footer {
+  padding: .5rem 1rem 0;
+  margin-top: .625rem;
+  //@include font-size(.75rem);
+  color: $gray-600;
+  border-top: 1px solid rgba(0, 0, 0, .1);
+}
+
+.algolia-autocomplete .algolia-docsearch-footer--logo {
+  color: inherit;
+}
