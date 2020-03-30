@@ -30,6 +30,7 @@ var (
 	PersistentVolumes         = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
 	Pods                      = schema.GroupResource{Group: "", Resource: "pods"}
 	ServiceAccounts           = schema.GroupResource{Group: "", Resource: "serviceaccounts"}
+	Secrets                   = schema.GroupResource{Group: "", Resource: "secrets"}
 	VolumeSnapshotClasses     = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshotclasses"}
 	VolumeSnapshots           = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshots"}
 	VolumeSnapshotContents    = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshotcontents"}
