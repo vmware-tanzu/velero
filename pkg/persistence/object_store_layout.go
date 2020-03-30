@@ -100,9 +100,8 @@ func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
 	return path.Join(l.subdirs["restores"], restore, fmt.Sprintf("restore-%s-results.gz", restore))
 }
 
-// TODO: Add keys for VS & VSContents json.gz files
-func (l *ObjectStoreLayout) getCSIVolumeSnapshotContentsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csivolumesnapshotcontents.json.gz", backup))
+func (l *ObjectStoreLayout) getCSIVolumeSnapshotKey(backup string) string {
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csivolumesnapshot.json.gz", backup))
 }
 
 func (l *ObjectStoreLayout) getVolumeSnapshotContentsKey(backup string) string {
