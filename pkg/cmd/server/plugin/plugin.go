@@ -50,6 +50,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
 				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
+				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				Serve()
 		},
 	}
@@ -161,4 +162,19 @@ func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 
 func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
 	return restore.NewClusterRoleBindingAction(logger), nil
+}
+
+func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangePVCNodeSelectorAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.CoreV1().Nodes(),
+		), nil
+	}
 }
