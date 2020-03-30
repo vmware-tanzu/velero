@@ -270,10 +270,10 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
-		cancelFunc()
 		return nil, err
 	}
 
@@ -281,7 +281,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	if features.IsEnabled("EnableCSI") {
 		csiSnapClient, err = snapshotvebeta1client.NewForConfig(clientConfig)
 		if err != nil {
-			cancelFunc()
 			return nil, err
 		}
 	}
@@ -608,21 +607,23 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		var vsLister snapshotv1beta1listers.VolumeSnapshotLister
 		var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
 
-		// We don't care about the returned types, just whether or not there's a 404 error.
-		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
-		switch {
-		case apierrors.IsNotFound(err) && !features.IsEnabled("EnableCSI"):
-			// Normal operating mode - CSI isn't enabled, so don't actually error
-		case apierrors.IsNotFound(err) && features.IsEnabled("EnableCSI"):
-			// CSI is enabled, but the required CRDs aren't installed, so halt.
-			s.logger.Fatalf("The 'EnableCSI' feature flag was specified, but CSI API group [%s] was not found.", snapshotv1beta1api.SchemeGroupVersion.String())
-		case err == nil && features.IsEnabled("EnableCSI"):
-			// CSI is enabled, and the resources were found.
-			// Instantiate the listers fully
-			vsLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-			vscLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
-		case err != nil:
-			cmd.CheckError(err)
+		// If CSI is enabled, check for the CSI groups and generate the listers
+		// If CSI isn't enabled, proceed normally.
+		if features.IsEnabled("EnableCSI") {
+			_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
+			switch {
+			case apierrors.IsNotFound(err):
+				// CSI is enabled, but the required CRDs aren't installed, so halt.
+				s.logger.Fatalf("The 'EnableCSI' feature flag was specified, but CSI API group [%s] was not found.", snapshotv1beta1api.SchemeGroupVersion.String())
+			case err == nil:
+				// CSI is enabled, and the resources were found.
+				// Instantiate the listers fully
+				s.logger.Debug("Creating CSI listers")
+				vsLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshots().Lister()
+				vscLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+			case err != nil:
+				cmd.CheckError(err)
+			}
 		}
 
 		backupController := controller.NewBackupController(
