@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -227,7 +228,7 @@ type server struct {
 	discoveryHelper                  velerodiscovery.Helper
 	dynamicClient                    dynamic.Interface
 	sharedInformerFactory            informers.SharedInformerFactory
-	snapshotterSharedInformerFactory snapshotvebeta1informers.SharedInformerFactory
+	snapshotterSharedInformerFactory *CSIInformerFactoryWrapper
 	ctx                              context.Context
 	cancelFunc                       context.CancelFunc
 	logger                           logrus.FieldLogger
@@ -286,17 +287,15 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	s := &server{
-		namespace:             f.Namespace(),
-		metricsAddress:        config.metricsAddress,
-		kubeClientConfig:      clientConfig,
-		kubeClient:            kubeClient,
-		veleroClient:          veleroClient,
-		discoveryClient:       veleroClient.Discovery(),
-		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
-		// If no namespace is specified, all namespaces are watched.
-		// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
-		snapshotterSharedInformerFactory: snapshotvebeta1informers.NewSharedInformerFactoryWithOptions(csiSnapClient, 0),
+		namespace:                        f.Namespace(),
+		metricsAddress:                   config.metricsAddress,
+		kubeClientConfig:                 clientConfig,
+		kubeClient:                       kubeClient,
+		veleroClient:                     veleroClient,
+		discoveryClient:                  veleroClient.Discovery(),
+		dynamicClient:                    dynamicClient,
+		sharedInformerFactory:            informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
+		snapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
 		ctx:                              ctx,
 		cancelFunc:                       cancelFunc,
 		logger:                           logger,
@@ -619,8 +618,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 				// CSI is enabled, and the resources were found.
 				// Instantiate the listers fully
 				s.logger.Debug("Creating CSI listers")
-				vsLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-				vscLister = s.snapshotterSharedInformerFactory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+				// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
+				vsLister = s.snapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
+				vscLister = s.snapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
 			case err != nil:
 				cmd.CheckError(err)
 			}
@@ -883,4 +883,35 @@ func (s *server) runProfiler() {
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
+}
+
+// CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
+type CSIInformerFactoryWrapper struct {
+	factory snapshotvebeta1informers.SharedInformerFactory
+}
+
+func NewCSIInformerFactoryWrapper(c snapshotvebeta1client.Interface) *CSIInformerFactoryWrapper {
+	// If no namespace is specified, all namespaces are watched.
+	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
+	w := &CSIInformerFactoryWrapper{}
+
+	if features.IsEnabled("EnableCSI") {
+		w.factory = snapshotvebeta1informers.NewSharedInformerFactoryWithOptions(c, 0)
+	}
+	return w
+}
+
+// Start proxies the Start call to the CSI SharedInformerFactory.
+func (w *CSIInformerFactoryWrapper) Start(stopCh <-chan struct{}) {
+	if features.IsEnabled("EnableCSI") {
+		w.factory.Start(stopCh)
+	}
+}
+
+// WaitForCacheSync proxies the WaitForCacheSync call to the CSI SharedInformerFactory.
+func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+	if features.IsEnabled("EnableCSI") {
+		return w.factory.WaitForCacheSync(stopCh)
+	}
+	return make(map[reflect.Type]bool, 0)
 }
