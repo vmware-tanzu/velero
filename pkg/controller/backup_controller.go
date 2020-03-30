@@ -41,7 +41,6 @@ import (
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -556,7 +555,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	var volumeSnapshots []*snapshotv1beta1api.VolumeSnapshot
 	var volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent
 	if features.IsEnabled("EnableCSI") {
-		selector := labels.SelectorFromSet(map[string]string{v1.BackupNameLabel: backup.Name})
+		selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
 
 		// TODO(nrb-csi): Only run listers methods if the listers aren't nil, just in case
 		volumeSnapshots, err = c.volumeSnapshotLister.List(selector)
@@ -643,7 +642,7 @@ func persistBackup(backup *pkgbackup.Request,
 	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
 	volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
 ) []error {
-
+	// TODO(nrb-csi): Reduce duplication in this function
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
 

@@ -16,11 +16,12 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.3.2
+	github.com/google/go-cmp v0.3.1 // indirect
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
 	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8 // indirect
 	github.com/joho/godotenv v1.3.0
-	github.com/kubernetes-csi/external-snapshotter/v2 v2.0.1
+	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
