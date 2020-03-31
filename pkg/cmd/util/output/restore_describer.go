@@ -31,7 +31,7 @@ import (
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 )
 
-func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) string {
+func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestore, details bool, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertFile string) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(restore.ObjectMeta)
 
@@ -56,7 +56,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 			}
 		}
 
-		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify, caCertPath)
+		describeRestoreResults(d, restore, veleroClient, insecureSkipTLSVerify, caCertFile)
 
 		d.Println()
 		d.Printf("Backup:\t%s\n", restore.Spec.BackupName)

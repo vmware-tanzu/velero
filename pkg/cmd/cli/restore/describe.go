@@ -41,7 +41,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
 	}
-	caCertPath := config.CACertPath()
+	caCertFile := config.CACertFile()
 
 	c := &cobra.Command{
 		Use:   use + " [NAME1] [NAME2] [NAME...]",
@@ -71,7 +71,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}
 
-				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertPath)
+				s := output.DescribeRestore(&restore, podvolumeRestoreList.Items, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 				if first {
 					first = false
 					fmt.Print(s)
@@ -86,7 +86,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 	c.Flags().StringVarP(&listOptions.LabelSelector, "selector", "l", listOptions.LabelSelector, "only show items matching this label selector")
 	c.Flags().BoolVar(&details, "details", details, "display additional detail in the command output")
 	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	c.Flags().StringVar(&caCertPath, "cacert", caCertPath, "path to a certificate bundle to use when verifying TLS connections")
+	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "path to a certificate bundle to use when verifying TLS connections")
 
 	return c
 }

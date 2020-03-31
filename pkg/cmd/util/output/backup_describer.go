@@ -39,7 +39,7 @@ func DescribeBackup(
 	details bool,
 	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
-	caCertPath string,
+	caCertFile string,
 ) string {
 	return Describe(func(d *Describer) {
 		d.DescribeMetadata(backup.ObjectMeta)
@@ -76,7 +76,7 @@ func DescribeBackup(
 		DescribeBackupSpec(d, backup.Spec)
 
 		d.Println()
-		DescribeBackupStatus(d, backup, details, veleroClient, insecureSkipTLSVerify, caCertPath)
+		DescribeBackupStatus(d, backup, details, veleroClient, insecureSkipTLSVerify, caCertFile)
 
 		if len(deleteRequests) > 0 {
 			d.Println()

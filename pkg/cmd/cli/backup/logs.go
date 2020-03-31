@@ -39,7 +39,7 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 
 	timeout := time.Minute
 	insecureSkipTLSVerify := false
-	caCertPath := config.CACertPath()
+	caCertFile := config.CACertFile()
 
 	c := &cobra.Command{
 		Use:   "logs BACKUP",
@@ -66,13 +66,13 @@ func NewLogsCommand(f client.Factory) *cobra.Command {
 					"until the backup has a phase of Completed or Failed and try again.", backupName)
 			}
 
-			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertPath)
+			err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), backupName, v1.DownloadTargetKindBackupLog, os.Stdout, timeout, insecureSkipTLSVerify, caCertFile)
 			cmd.CheckError(err)
 		},
 	}
 
 	c.Flags().DurationVar(&timeout, "timeout", timeout, "how long to wait to receive logs")
 	c.Flags().BoolVar(&insecureSkipTLSVerify, "insecure-skip-tls-verify", insecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
-	c.Flags().StringVar(&caCertPath, "cacert", caCertPath, "path to a certificate bundle to use when verifying TLS connections")
+	c.Flags().StringVar(&caCertFile, "cacert", caCertFile, "path to a certificate bundle to use when verifying TLS connections")
 	return c
 }

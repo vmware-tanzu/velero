@@ -111,17 +111,17 @@ func (c VeleroConfig) Features() []string {
 	return strings.Split(features, ",")
 }
 
-func (c VeleroConfig) CACertPath() string {
+func (c VeleroConfig) CACertFile() string {
 	val, ok := c[ConfigKeyCACert]
 	if !ok {
 		return ""
 	}
-	caCertPath, ok := val.(string)
+	caCertFile, ok := val.(string)
 	if !ok {
 		return ""
 	}
 
-	return caCertPath
+	return caCertFile
 }
 
 func configFileName() string {
