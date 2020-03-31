@@ -117,6 +117,8 @@ type serverConfig struct {
 	disabledControllers                                                     []string
 	clientQPS                                                               float32
 	clientBurst                                                             int
+	backUpControllerWorkerCount                                             int
+	restoreControllerWorkerCount                                            int
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
@@ -146,6 +148,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 			resourceTerminatingTimeout:        defaultResourceTerminatingTimeout,
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
+			backUpControllerWorkerCount:       defaultControllerWorkers,
+			restoreControllerWorkerCount:      defaultControllerWorkers,
 		}
 	)
 
@@ -203,6 +207,8 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().Var(&volumeSnapshotLocations, "default-volume-snapshot-locations", "list of unique volume providers and default volume snapshot location (provider1:location-01,provider2:location-02,...)")
 	command.Flags().Float32Var(&config.clientQPS, "client-qps", config.clientQPS, "maximum number of requests per second by the server to the Kubernetes API once the burst limit has been reached")
 	command.Flags().IntVar(&config.clientBurst, "client-burst", config.clientBurst, "maximum number of requests by the server to the Kubernetes API in a short period of time")
+	command.Flags().IntVar(&config.backUpControllerWorkerCount, "concurrent-backup-syncs", config.backUpControllerWorkerCount, "number of backup controller workers that are allowed to sync concurrently.")
+	command.Flags().IntVar(&config.restoreControllerWorkerCount, "concurrent-restore-syncs", config.restoreControllerWorkerCount, "number of restore controller workers that are allowed to sync concurrently.")
 	command.Flags().StringVar(&config.profilerAddress, "profiler-address", config.profilerAddress, "the address to expose the pprof profiler")
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "how long to wait by default before backups can be garbage collected")
@@ -604,7 +610,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: backupController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.backUpControllerWorkerCount,
 		}
 	}
 
@@ -694,7 +700,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		return controllerRunInfo{
 			controller: restoreController,
-			numWorkers: defaultControllerWorkers,
+			numWorkers: s.config.restoreControllerWorkerCount,
 		}
 	}
 
