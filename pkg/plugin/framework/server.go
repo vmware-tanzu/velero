@@ -25,6 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
+	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -75,6 +76,7 @@ type server struct {
 	log               *logrus.Logger
 	logLevelFlag      *logging.LevelFlag
 	flagSet           *pflag.FlagSet
+	featureSet        *veleroflag.StringArray
 	backupItemAction  *BackupItemActionPlugin
 	volumeSnapshotter *VolumeSnapshotterPlugin
 	objectStore       *ObjectStorePlugin
@@ -84,10 +86,12 @@ type server struct {
 // NewServer returns a new Server
 func NewServer() Server {
 	log := newLogger()
+	features := veleroflag.NewStringArray()
 
 	return &server{
 		log:               log,
 		logLevelFlag:      logging.LogLevelFlag(log.Level),
+		featureSet:        &features,
 		backupItemAction:  NewBackupItemActionPlugin(serverLogger(log)),
 		volumeSnapshotter: NewVolumeSnapshotterPlugin(serverLogger(log)),
 		objectStore:       NewObjectStorePlugin(serverLogger(log)),
@@ -97,6 +101,7 @@ func NewServer() Server {
 
 func (s *server) BindFlags(flags *pflag.FlagSet) Server {
 	flags.Var(s.logLevelFlag, "log-level", fmt.Sprintf("the level at which to log. Valid values are %s.", strings.Join(s.logLevelFlag.AllowedValues(), ", ")))
+	flags.Var(s.featureSet, "features", "list of feature flags for this plugin")
 	s.flagSet = flags
 
 	return s
