@@ -270,11 +270,15 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	// cancelFunc is not deferred here because if it was, then ctx would immediately
+	// be cancelled once this function exited, making it useless to any informers using later.
+	// That, in turn, causes the velero server to halt when the first informer tries to use it (probably restic's).
+	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 
@@ -282,6 +286,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	if features.IsEnabled("EnableCSI") {
 		csiSnapClient, err = snapshotvebeta1client.NewForConfig(clientConfig)
 		if err != nil {
+			cancelFunc()
 			return nil, err
 		}
 	}
