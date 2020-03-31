@@ -39,7 +39,7 @@ import (
 // not found
 var ErrNotFound = errors.New("file not found")
 
-func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertPath string) error {
+func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string, kind v1.DownloadTargetKind, w io.Writer, timeout time.Duration, insecureSkipTLSVerify bool, caCertFile string) error {
 	req := &v1.DownloadRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -100,8 +100,8 @@ Loop:
 	}
 
 	var caPool *x509.CertPool
-	if len(caCertPath) > 0 {
-		caCert, err := ioutil.ReadFile(caCertPath)
+	if len(caCertFile) > 0 {
+		caCert, err := ioutil.ReadFile(caCertFile)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't open cacert")
 		}
@@ -114,12 +114,23 @@ Loop:
 		}
 		caPool.AppendCertsFromPEM(caCert)
 	}
+
+	defaultTransport := http.DefaultTransport.(*http.Transport)
+	// same settings as the default transport
+	// aside from timeout and TLSClientConfig
 	httpClient := new(http.Client)
 	httpClient.Transport = &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: insecureSkipTLSVerify,
 			RootCAs:            caPool,
 		},
+		IdleConnTimeout:       timeout,
+		DialContext:           defaultTransport.DialContext,
+		ForceAttemptHTTP2:     defaultTransport.ForceAttemptHTTP2,
+		MaxIdleConns:          defaultTransport.MaxIdleConns,
+		Proxy:                 defaultTransport.Proxy,
+		TLSHandshakeTimeout:   defaultTransport.TLSHandshakeTimeout,
+		ExpectContinueTimeout: defaultTransport.ExpectContinueTimeout,
 	}
 
 	httpReq, err := http.NewRequest("GET", req.Status.DownloadURL, nil)
