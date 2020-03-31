@@ -38,7 +38,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -65,7 +64,6 @@ type backupController struct {
 	backupper                   pkgbackup.Backupper
 	lister                      velerov1listers.BackupLister
 	client                      velerov1client.BackupsGetter
-	csiClient                   snapshotv1beta1.SnapshotV1beta1Interface
 	clock                       clock.Clock
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
@@ -88,7 +86,6 @@ func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
 	discoveryHelper discovery.Helper,
-	csiClient snapshotv1beta1.SnapshotV1beta1Interface,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
@@ -110,7 +107,6 @@ func NewBackupController(
 		backupper:                   backupper,
 		lister:                      backupInformer.Lister(),
 		client:                      client,
-		csiClient:                   csiClient,
 		clock:                       &clock.RealClock{},
 		backupLogLevel:              backupLogLevel,
 		newPluginManager:            newPluginManager,

@@ -635,7 +635,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.veleroClient.VeleroV1(),
 			s.discoveryHelper,
-			s.csiSnapClient.SnapshotV1beta1(),
 			backupper,
 			s.logger,
 			s.logLevel,
