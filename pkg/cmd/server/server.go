@@ -307,18 +307,12 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.veleroResourcesExist(); err != nil {
-		return err
-	}
-
-	if err := s.validateBackupStorageLocations(); err != nil {
-		return err
-	}
-
-	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).
-			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	}
+	// Anything that could be created after Velero has started will be
+	// queried as part of the liveness check
+	go func() {
+		s.logger.Info("Starting liveness server at port 2000")
+		s.runLiveness()
+	}()
 
 	if err := s.initRestic(); err != nil {
 		return err
@@ -380,7 +374,7 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	if veleroGroupVersion == nil {
-		return errors.Errorf("Velero API group %s not found. Apply examples/common/00-prereqs.yaml to create it.", api.SchemeGroupVersion)
+		return errors.Errorf("Velero API group %s not found. Create the CRDs via `velero install`, Helm, or applying YAML to proceed.", api.SchemeGroupVersion)
 	}
 
 	foundResources := sets.NewString()
@@ -399,7 +393,7 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	if len(errs) > 0 {
-		errs = append(errs, errors.New("Velero custom resources not found - apply examples/common/00-prereqs.yaml to update the custom resource definitions"))
+		errs = append(errs, errors.New("Velero custom resources not found.  Create the CRDs via `velero install`, Helm, or applying YAML to proceed."))
 		return kubeerrs.NewAggregate(errs)
 	}
 
@@ -830,5 +824,41 @@ func (s *server) runProfiler() {
 
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
+	}
+}
+
+// runLiveness starts an HTTP server to handle liveness checks for the velero server.
+// Note that liveness checks should have generous timeouts, since Velero will query
+// object storage, which is possibly a network call across the internet.
+func (s *server) runLiveness() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
+		// Refresh the discovery helper, since it may be stale if the velero API group was
+		// created after the pod.
+		s.discoveryHelper.Refresh()
+		if err := s.veleroResourcesExist(); err != nil {
+			s.logger.Warn(err)
+			http.NotFound(w, r)
+			return
+		}
+
+		if err := s.validateBackupStorageLocations(); err != nil {
+			s.logger.Warn(err)
+			http.NotFound(w, r)
+			return
+		}
+		if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
+			s.logger.WithError(errors.WithStack(err)).
+				Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
+			http.NotFound(w, r)
+			return
+		}
+
+		// Happy path, all prerequisites are present.
+		fmt.Fprintf(w, "Velero is live")
+	})
+
+	if err := http.ListenAndServe(":2000", mux); err != nil {
+		s.logger.WithError(errors.WithStack(err)).Error("error running liveness http server")
 	}
 }
