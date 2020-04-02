@@ -798,6 +798,15 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 			}).Info("Not restoring item because namespace is excluded")
 			return warnings, errs
 		}
+
+		// if the namespace scoped resource should be restored, ensure that the namespace into
+		// which the resource is being restored into exists.
+		// This is the *remapped* namespace that we are ensuring exists.
+		nsToEnsure := getNamespace(ctx.log, getItemFilePath(ctx.restoreDir, "namespaces", "", obj.GetNamespace()), namespace)
+		if _, err := kube.EnsureNamespaceExistsAndIsReady(nsToEnsure, ctx.namespaceClient, ctx.resourceTerminatingTimeout); err != nil {
+			errs.AddVeleroError(err)
+			return warnings, errs
+		}
 	} else {
 		if boolptr.IsSetToFalse(ctx.restore.Spec.IncludeClusterResources) {
 			ctx.log.WithFields(logrus.Fields{
