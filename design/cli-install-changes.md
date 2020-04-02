@@ -270,69 +270,6 @@ A `velero backup-location (create|set) --cacert mapStringString` flag is also be
 
 See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for more clarification.
 
-#### Credentials and secrets
-
-Currently, Velero only supports a single AIM access credential secret per provider. But, given that a set of object store and/or volume snapshot for the same provider usually resides in the same plugin, it is also accurate to say Velero only supports a single credential secret per plugin.
-
-Velero creates and stores the plugin credential secret under the hard-coded key `secret.cloud-credentials.data.cloud`. This makes it so switching from one plugin to another necessitates overriding the existing credential secret with the appropriate one for the new provider. This is made more evident with the new CLI command organization.
-
-To improve the UX for configuring the velero deployment with multiple plugins/providers, and corresponding IAM secrets, the following changes will be made:
-
-- the name of the flag changes from `secret-file` to `velero plugin set --credentials-file`. This is to be consistent with the name of the new flag `velero plugin set --cacert-file`.
-
-- The `velero plugin (create|set) --credentials-file` will be a map of provider name as a key, and the path to the file as a value. This way, we can have multiple credential secrets and each secret per provider/plugin will be unique.
-
-See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for the two items below.
-
-- The `velero backup-location (create|set)` will have a new `--credentials mapStringString` flag which sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name.
-
-- The `velero snapshot-location (create|set)` will have a new `--credentials mapStringString` flag which sets the list of name of the corresponding credentials secret for providers. Format is (provider1:credentials-secret-name1,provider2:credentials-secret-name2,...).
-
-Note that for this logic to work, either the plugin for which the secret corresponds to must have been installed in the system, or we must have a loop checking for when both are present before marking the BSL/VSL as ready.
-
-#### Examples of mounting secrets and environment variables
-
-With the changes proposed in the previous section (Credentials and secrets), the resulting deployment `yaml` would look like below:
-
-AWS
-```
-   spec:
-     containers:
-        volumeMounts:
-        - mountPath: /credentials
-          name: cloud-credentials-aws
-      - args:
-        - server
-        name: velero
-        env:
-        - name: AWS_SHARED_CREDENTIALS_FILE
-          value: /credentials/cloud
-     volumes:
-      - name: cloud-credentials
-        secret:
-          secretName: cloud-credentials
-```
-
-Azure
-```
-   spec:
-     containers:
-        volumeMounts:
-        - mountPath: /credentials
-          name: cloud-credentials-azure
-      - args:
-        - server
-        name: velero
-        env:
-        - name: AZURE_SHARED_CREDENTIALS_FILE
-          value: /credentials/cloud
-     volumes:
-      - name: cloud-credentials-azure
-        secret:
-          secretName: cloud-credentials-azure
-```
-
-
 #### Renaming "provider" to "plugin"
 
 As part of this change, we should change to use the term `plugin` instead of `provider`. The reasoning: in practice, we usually have 1 plugin per provider, and if there is an implementation for both object store and volume snapshotter for that provider, it will all be contained in the same plugin. When we handle plugins, we follow this logic. In other words, there's a plugin name (ex: `velero.io/aws`) and it can contain implementations of kind `ObjectStore` and/or `VolumeSnapshotter`.
