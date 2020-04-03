@@ -50,8 +50,7 @@ metadata:
   # ConfigMap.
   labels:
     # this value-less label identifies the ConfigMap as
-    # config for a plugin (i.e. the built-in change storage
-    # class restore item action plugin)
+    # config for a plugin (i.e. the built-in restore item action plugin)
     velero.io/plugin-config: ""
     # this label identifies the name and kind of plugin
     # that this ConfigMap is for.
@@ -62,3 +61,30 @@ data:
   # class name.
   <old-storage-class>: <new-storage-class>
 ```
+
+## Changing PVC selected-node
+
+Velero can update the selected-node annotation of persistent volume claim during restores, if selected-node doesn't exist in the cluster then it will remove the selected-node annotation from PersistentVolumeClaim. To configure a node mapping, create a config map in the Velero namespace like the following:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # any name can be used; Velero uses the labels (below)
+  # to identify it rather than the name
+  name: change-pvc-node-selector-config
+  # must be in the velero namespace
+  namespace: velero
+  # the below labels should be used verbatim in your
+  # ConfigMap.
+  labels:
+    # this value-less label identifies the ConfigMap as
+    # config for a plugin (i.e. the built-in restore item action plugin)
+    velero.io/plugin-config: ""
+    # this label identifies the name and kind of plugin
+    # that this ConfigMap is for.
+    velero.io/change-pvc-node-selector: RestoreItemAction
+data:
+  # add 1+ key-value pairs here, where the key is the old
+  # node name and the value is the new node name.
+  <old-node-name>: <new-node-name>

@@ -114,7 +114,7 @@ func (p *ChangePVCNodeSelectorAction) Execute(input *velero.RestoreItemActionExe
 	}
 
 	if !exists {
-		log.Infof("Resetting selected-node")
+		log.Infof("Clearing selected-node because node named %s does not exist", node)
 		delete(annotations, "volume.kubernetes.io/selected-node")
 		if len(annotations) == 0 {
 			metadata.SetAnnotations(nil)
@@ -133,14 +133,13 @@ func getNewNodeFromConfigMap(client corev1client.ConfigMapInterface, node string
 		return "", err
 	}
 
-	if config == nil || len(config.Data) == 0 {
+	if config == nil {
 		// there is no node mapping defined for change-pvc-node
 		// so we will return empty new node
 		return "", nil
 	}
 
-	newNode, _ := config.Data[node]
-	return newNode, nil
+	return config.Data[node], nil
 }
 
 // isNodeExist check if node resource exist or not
