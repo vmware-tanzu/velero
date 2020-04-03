@@ -1,0 +1,1 @@
+Added a `--cacert` flag to the velero client describe, download, and logs commands to allow passing a path to a certificate to use when verifying TLS connections to object storage. Also added a corresponding client config option called `cacert` which takes a path to a certificate bundle to use as a default when `--cacert` is not specified.
