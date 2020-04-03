@@ -52,9 +52,11 @@ func printResticRepo(repo *v1.ResticRepository) []metav1.TableRow {
 		status = v1.ResticRepositoryPhaseNew
 	}
 
-	lastMaintenance := repo.Status.LastMaintenanceTime.String()
-	if repo.Status.LastMaintenanceTime.IsZero() {
+	var lastMaintenance string
+	if repo.Status.LastMaintenanceTime == nil || repo.Status.LastMaintenanceTime.IsZero() {
 		lastMaintenance = "<never>"
+	} else {
+		lastMaintenance = repo.Status.LastMaintenanceTime.String()
 	}
 
 	row.Cells = append(row.Cells,
