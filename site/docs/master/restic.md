@@ -418,6 +418,12 @@ Velero does not currently provide a mechanism to detect persistent volume claims
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
 
+### Add backup annotation
+
+Velero hasn't provided a do-one-command or automatic way to backup all volume resources in the cluster without annotation.
+
+To solve this, [velero-volume-controller][10] helps to achieve this goal by adding backup annotation to pods with volumes automatically.
+
 [1]: https://github.com/restic/restic
 [2]: customize-installation.md#enable-restic-integration
 [3]: https://github.com/vmware-tanzu/velero/releases/
@@ -427,3 +433,4 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [7]: https://github.com/bitsbeats/velero-pvc-watcher
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
+[10]: https://github.com/duyanghao/velero-volume-controller
