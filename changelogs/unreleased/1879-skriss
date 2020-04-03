@@ -1,1 +1,0 @@
-GCP: add support for specifying a Cloud KMS key name to use for encrypting backups in a storage location.

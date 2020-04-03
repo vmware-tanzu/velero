@@ -18,9 +18,9 @@ LABEL maintainer="Steve Kriss <krisss@vmware.com>"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates wget bzip2 && \
-    wget --quiet https://github.com/restic/restic/releases/download/v0.9.5/restic_0.9.5_linux_amd64.bz2 && \
-    bunzip2 restic_0.9.5_linux_amd64.bz2 && \
-    mv restic_0.9.5_linux_amd64 /usr/bin/restic && \
+    wget --quiet https://github.com/restic/restic/releases/download/v0.9.6/restic_0.9.6_linux_amd64.bz2 && \
+    bunzip2 restic_0.9.6_linux_amd64.bz2 && \
+    mv restic_0.9.6_linux_amd64 /usr/bin/restic && \
     chmod +x /usr/bin/restic && \
     apt-get remove -y wget bzip2 && \
     rm -rf /var/lib/apt/lists/*
@@ -28,6 +28,6 @@ RUN apt-get update && \
 
 ADD /bin/linux/amd64/velero /velero
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT ["/velero"]

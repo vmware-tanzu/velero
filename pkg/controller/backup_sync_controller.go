@@ -26,12 +26,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -43,11 +41,11 @@ type backupSyncController struct {
 	backupClient                velerov1client.BackupsGetter
 	backupLocationClient        velerov1client.BackupStorageLocationsGetter
 	podVolumeBackupClient       velerov1client.PodVolumeBackupsGetter
-	backupLister                listers.BackupLister
-	backupStorageLocationLister listers.BackupStorageLocationLister
-	podVolumeBackupLister       listers.PodVolumeBackupLister
+	backupLister                velerov1listers.BackupLister
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister
 	namespace                   string
 	defaultBackupLocation       string
+	defaultBackupSyncPeriod     time.Duration
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
@@ -56,9 +54,8 @@ func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
-	backupInformer informers.BackupInformer,
-	backupStorageLocationInformer informers.BackupStorageLocationInformer,
-	podVolumeBackupInformer informers.PodVolumeBackupInformer,
+	backupLister velerov1listers.BackupLister,
+	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	syncPeriod time.Duration,
 	namespace string,
 	defaultBackupLocation string,
@@ -77,9 +74,9 @@ func NewBackupSyncController(
 		podVolumeBackupClient:       podVolumeBackupClient,
 		namespace:                   namespace,
 		defaultBackupLocation:       defaultBackupLocation,
-		backupLister:                backupInformer.Lister(),
-		backupStorageLocationLister: backupStorageLocationInformer.Lister(),
-		podVolumeBackupLister:       podVolumeBackupInformer.Lister(),
+		defaultBackupSyncPeriod:     syncPeriod,
+		backupLister:                backupLister,
+		backupStorageLocationLister: backupStorageLocationLister,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -88,11 +85,7 @@ func NewBackupSyncController(
 	}
 
 	c.resyncFunc = c.run
-	c.resyncPeriod = syncPeriod
-	c.cacheSyncWaiters = []cache.InformerSynced{
-		backupInformer.Informer().HasSynced,
-		backupStorageLocationInformer.Informer().HasSynced,
-	}
+	c.resyncPeriod = 30 * time.Second
 
 	return c
 }
@@ -134,6 +127,30 @@ func (c *backupSyncController) run() {
 
 	for _, location := range locations {
 		log := c.logger.WithField("backupLocation", location.Name)
+
+		syncPeriod := c.defaultBackupSyncPeriod
+		if location.Spec.BackupSyncPeriod != nil {
+			syncPeriod = location.Spec.BackupSyncPeriod.Duration
+			if syncPeriod == 0 {
+				log.Debug("Backup sync period for this location is set to 0, skipping sync")
+				continue
+			}
+
+			if syncPeriod < 0 {
+				log.Debug("Backup sync period must be non-negative")
+				syncPeriod = c.defaultBackupSyncPeriod
+			}
+		}
+
+		lastSync := location.Status.LastSyncedTime
+		if lastSync != nil {
+			log.Debug("Checking if backups need to be synced at this time for this location")
+			nextSync := lastSync.Add(syncPeriod)
+			if time.Now().UTC().Before(nextSync) {
+				continue
+			}
+		}
+
 		log.Debug("Checking backup location for backups to sync into cluster")
 
 		backupStore, err := c.newBackupStore(location, pluginManager, log)

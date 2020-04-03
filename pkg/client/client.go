@@ -34,17 +34,17 @@ func Config(kubeconfig, kubecontext, baseName string, qps float32, burst int) (*
 	loadingRules.ExplicitPath = kubeconfig
 	configOverrides := &clientcmd.ConfigOverrides{CurrentContext: kubecontext}
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+
 	clientConfig, err := kubeConfig.ClientConfig()
+	if err != nil {
+		return nil, errors.Wrap(err, "error finding Kubernetes API server config in --kubeconfig, $KUBECONFIG, or in-cluster configuration")
+	}
+
 	if qps > 0.0 {
 		clientConfig.QPS = qps
 	}
-
 	if burst > 0 {
 		clientConfig.Burst = burst
-	}
-
-	if err != nil {
-		return nil, errors.WithStack(err)
 	}
 
 	clientConfig.UserAgent = buildUserAgent(

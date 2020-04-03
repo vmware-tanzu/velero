@@ -48,14 +48,11 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 		controller = NewGCController(
 			velerotest.NewLogger(),
 			sharedInformers.Velero().V1().Backups(),
-			sharedInformers.Velero().V1().DeleteBackupRequests(),
+			sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 			client.VeleroV1(),
-			sharedInformers.Velero().V1().BackupStorageLocations(),
+			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 		).(*gcController)
 	)
-
-	// Have to clear this out so the controller doesn't wait
-	controller.cacheSyncWaiters = nil
 
 	keys := make(chan string)
 
@@ -112,9 +109,9 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 	controller := NewGCController(
 		velerotest.NewLogger(),
 		sharedInformers.Velero().V1().Backups(),
-		sharedInformers.Velero().V1().DeleteBackupRequests(),
+		sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 		client.VeleroV1(),
-		sharedInformers.Velero().V1().BackupStorageLocations(),
+		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 	).(*gcController)
 
 	keys := make(chan string)
@@ -252,9 +249,9 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			controller := NewGCController(
 				velerotest.NewLogger(),
 				sharedInformers.Velero().V1().Backups(),
-				sharedInformers.Velero().V1().DeleteBackupRequests(),
+				sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 				client.VeleroV1(),
-				sharedInformers.Velero().V1().BackupStorageLocations(),
+				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 			).(*gcController)
 			controller.clock = fakeClock
 

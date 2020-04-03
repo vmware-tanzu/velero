@@ -1,1 +1,0 @@
-adds structural schema to Velero CRDs created on Velero install, enabling validation of Velero API fields

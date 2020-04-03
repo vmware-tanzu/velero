@@ -38,8 +38,8 @@ import (
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -78,10 +78,10 @@ type restoreController struct {
 	restoreClient          velerov1client.RestoresGetter
 	podVolumeBackupClient  velerov1client.PodVolumeBackupsGetter
 	restorer               pkgrestore.Restorer
-	backupLister           listers.BackupLister
-	restoreLister          listers.RestoreLister
-	backupLocationLister   listers.BackupStorageLocationLister
-	snapshotLocationLister listers.VolumeSnapshotLocationLister
+	backupLister           velerov1listers.BackupLister
+	restoreLister          velerov1listers.RestoreLister
+	backupLocationLister   velerov1listers.BackupStorageLocationLister
+	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
 	restoreLogLevel        logrus.Level
 	defaultBackupLocation  string
 	metrics                *metrics.ServerMetrics
@@ -93,13 +93,13 @@ type restoreController struct {
 
 func NewRestoreController(
 	namespace string,
-	restoreInformer informers.RestoreInformer,
+	restoreInformer velerov1informers.RestoreInformer,
 	restoreClient velerov1client.RestoresGetter,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
-	backupInformer informers.BackupInformer,
-	backupLocationInformer informers.BackupStorageLocationInformer,
-	snapshotLocationInformer informers.VolumeSnapshotLocationInformer,
+	backupLister velerov1listers.BackupLister,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -113,10 +113,10 @@ func NewRestoreController(
 		restoreClient:          restoreClient,
 		podVolumeBackupClient:  podVolumeBackupClient,
 		restorer:               restorer,
-		backupLister:           backupInformer.Lister(),
+		backupLister:           backupLister,
 		restoreLister:          restoreInformer.Lister(),
-		backupLocationLister:   backupLocationInformer.Lister(),
-		snapshotLocationLister: snapshotLocationInformer.Lister(),
+		backupLocationLister:   backupLocationLister,
+		snapshotLocationLister: snapshotLocationLister,
 		restoreLogLevel:        restoreLogLevel,
 		defaultBackupLocation:  defaultBackupLocation,
 		metrics:                metrics,
@@ -129,12 +129,6 @@ func NewRestoreController(
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
-		backupInformer.Informer().HasSynced,
-		restoreInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-		snapshotLocationInformer.Informer().HasSynced,
-	)
 	c.resyncFunc = c.resync
 	c.resyncPeriod = time.Minute
 
@@ -226,8 +220,8 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 	// since within that function we want the plugin manager to log to
 	// our per-restore log (which is instantiated within c.runValidatedRestore).
 	pluginManager := c.newPluginManager(c.logger)
+	defer pluginManager.CleanupClients()
 	info := c.validateAndComplete(restore, pluginManager)
-	pluginManager.CleanupClients()
 
 	// Register attempts after validation so we don't have to fetch the backup multiple times
 	backupScheduleName := restore.Spec.ScheduleName
@@ -373,7 +367,15 @@ func backupXorScheduleProvided(restore *api.Restore) bool {
 func mostRecentCompletedBackup(backups []*api.Backup) *api.Backup {
 	sort.Slice(backups, func(i, j int) bool {
 		// Use .After() because we want descending sort.
-		return backups[i].Status.StartTimestamp.After(backups[j].Status.StartTimestamp.Time)
+
+		var iStartTime, jStartTime time.Time
+		if backups[i].Status.StartTimestamp != nil {
+			iStartTime = backups[i].Status.StartTimestamp.Time
+		}
+		if backups[j].Status.StartTimestamp != nil {
+			jStartTime = backups[j].Status.StartTimestamp.Time
+		}
+		return iStartTime.After(jStartTime)
 	})
 
 	for _, backup := range backups {
@@ -437,6 +439,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	defer closeAndRemoveFile(backupFile, c.logger)
 
 	opts := restic.NewPodVolumeBackupListOptions(restore.Spec.BackupName)
+
 	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(opts)
 	if err != nil {
 		return errors.WithStack(err)

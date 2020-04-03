@@ -75,6 +75,14 @@ velero backup get nginx-hook-test
 velero backup logs nginx-hook-test | grep hookCommand
 ```
 
+## Using Multiple Commands
+
+To use multiple commands, wrap your target command in a shell and separate them with `;`, `&&`, or other shell conditional constructs.
+
+```shell
+    pre.hook.backup.velero.io/command='["/bin/bash", "-c", "echo hello > hello.txt && echo goodbye > goodbye.txt"]'
+```
+
 
 [1]: api-types/backup.md
 [2]: https://github.com/vmware-tanzu/velero/blob/master/examples/nginx-app/with-pv.yaml

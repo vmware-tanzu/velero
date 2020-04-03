@@ -17,7 +17,7 @@ Velero consists of:
 
 ## Documentation
 
-[The documentation][29] provides a getting started guide, plus information about building from source, architecture, extending Velero, and more.
+[The documentation][29] provides a getting started guide and information about building from source, architecture, extending Velero, and more.
 
 Please use the version selector at the top of the site to ensure you are using the appropriate documentation for your version of Velero.
 
@@ -27,7 +27,7 @@ If you encounter issues, review the [troubleshooting docs][30], [file an issue][
 
 ## Contributing
 
-If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing](https://velero.io/docs/master/start-contributing/) documentation for guidance on how to setup Velero for development.
+If you are ready to jump in and test, add code, or help with documentation, follow the instructions on our [Start contributing][31] documentation for guidance on how to setup Velero for development.
 
 ## Changelog
 
@@ -44,7 +44,7 @@ See [the list of releases][6] to find out about feature changes.
 [14]: https://github.com/kubernetes/kubernetes
 [24]: https://groups.google.com/forum/#!forum/projectvelero
 [25]: https://kubernetes.slack.com/messages/velero
-[28]: https://velero.io/docs/install-overview
 [29]: https://velero.io/docs/
 [30]: https://velero.io/docs/troubleshooting
+[31]: https://velero.io/docs/start-contributing
 [100]: https://velero.io/docs/master/img/velero.png

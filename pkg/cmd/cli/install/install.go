@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -65,6 +66,9 @@ type InstallOptions struct {
 	UseVolumeSnapshots                bool
 	DefaultResticMaintenanceFrequency time.Duration
 	Plugins                           flag.StringArray
+	NoDefaultBackupLocation           bool
+	CRDsOnly                          bool
+	CACertFile                        string
 }
 
 // BindFlags adds command line values to the options struct.
@@ -73,6 +77,7 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.BucketName, "bucket", o.BucketName, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.SecretFile, "secret-file", o.SecretFile, "file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.")
 	flags.BoolVar(&o.NoSecret, "no-secret", o.NoSecret, "flag indicating if a secret should be created. Must be used as confirmation if --secret-file is not provided. Optional.")
+	flags.BoolVar(&o.NoDefaultBackupLocation, "no-default-backup-location", o.NoDefaultBackupLocation, "flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.")
 	flags.StringVar(&o.Image, "image", o.Image, "image to use for the Velero and restic server pods. Optional.")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.Var(&o.PodAnnotations, "pod-annotations", "annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2")
@@ -93,7 +98,9 @@ func (o *InstallOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.UseRestic, "use-restic", o.UseRestic, "create restic deployment. Optional.")
 	flags.BoolVar(&o.Wait, "wait", o.Wait, "wait for Velero deployment to be ready. Optional.")
 	flags.DurationVar(&o.DefaultResticMaintenanceFrequency, "default-restic-prune-frequency", o.DefaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default. Optional.")
-	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment. Optional.")
+	flags.Var(&o.Plugins, "plugins", "Plugin container images to install into the Velero Deployment")
+	flags.BoolVar(&o.CRDsOnly, "crds-only", o.CRDsOnly, "only generate CustomResourceDefinition resources. Useful for updating CRDs for an existing Velero install.")
+	flags.StringVar(&o.CACertFile, "cacert", o.CACertFile, "file containing a certificate bundle to use when verifying TLS connections to the object store. Optional.")
 }
 
 // NewInstallOptions instantiates a new, default InstallOptions struct.
@@ -114,7 +121,9 @@ func NewInstallOptions() *InstallOptions {
 		ResticPodCPULimit:         install.DefaultResticPodCPULimit,
 		ResticPodMemLimit:         install.DefaultResticPodMemLimit,
 		// Default to creating a VSL unless we're told otherwise
-		UseVolumeSnapshots: true,
+		UseVolumeSnapshots:      true,
+		NoDefaultBackupLocation: false,
+		CRDsOnly:                false,
 	}
 }
 
@@ -127,6 +136,17 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 			return nil, err
 		}
 		secretData, err = ioutil.ReadFile(realPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var caCertData []byte
+	if o.CACertFile != "" {
+		realPath, err := filepath.Abs(o.CACertFile)
+		if err != nil {
+			return nil, err
+		}
+		caCertData, err = ioutil.ReadFile(realPath)
 		if err != nil {
 			return nil, err
 		}
@@ -158,6 +178,8 @@ func (o *InstallOptions) AsVeleroOptions() (*install.VeleroOptions, error) {
 		VSLConfig:                         o.VolumeSnapshotConfig.Data(),
 		DefaultResticMaintenanceFrequency: o.DefaultResticMaintenanceFrequency,
 		Plugins:                           o.Plugins,
+		NoDefaultBackupLocation:           o.NoDefaultBackupLocation,
+		CACertData:                        caCertData,
 	}, nil
 }
 
@@ -187,19 +209,22 @@ Use '--wait' to wait for the Velero Deployment to be ready before proceeding.
 Use '-o yaml' or '-o json'  with '--dry-run' to output all generated resources as text instead of sending the resources to the server.
 This is useful as a starting point for more customized installations.
 		`,
-		Example: `	# velero install --bucket mybucket --provider gcp --secret-file ./gcp-service-account.json
+		Example: `	# velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket mybucket --secret-file ./gcp-service-account.json
 
-	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
+	# velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2
 
-	# velero install --bucket backups --provider aws --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-restic
+	# velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --secret-file ./aws-iam-creds --backup-location-config region=us-east-2 --snapshot-location-config region=us-east-2 --use-restic
 
-	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --wait
+	# velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --wait
 
-	# velero install --bucket backups --provider aws --backup-location-config region=us-west-2 --snapshot-location-config region=us-west-2 --no-secret --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
+	# velero install --provider aws --plugins velero/velero-plugin-for-aws:v1.0.0 --bucket backups --backup-location-config region=us-west-2 --snapshot-location-config region=us-west-2 --no-secret --pod-annotations iam.amazonaws.com/role=arn:aws:iam::<AWS_ACCOUNT_ID>:role/<VELERO_ROLE_NAME>
 
-	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
+	# velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --velero-pod-cpu-request=1000m --velero-pod-cpu-limit=5000m --velero-pod-mem-request=512Mi --velero-pod-mem-limit=1024Mi
 
-	# velero install --bucket gcp-backups --provider gcp --secret-file ./gcp-creds.json --restic-pod-cpu-request=1000m --restic-pod-cpu-limit=5000m --restic-pod-mem-request=512Mi --restic-pod-mem-limit=1024Mi
+	# velero install --provider gcp --plugins velero/velero-plugin-for-gcp:v1.0.0 --bucket gcp-backups --secret-file ./gcp-creds.json --restic-pod-cpu-request=1000m --restic-pod-cpu-limit=5000m --restic-pod-mem-request=512Mi --restic-pod-mem-limit=1024Mi
+
+	# velero install --provider azure --plugins velero/velero-plugin-for-microsoft-azure:v1.0.0 --bucket $BLOB_CONTAINER --secret-file ./credentials-velero \
+	--backup-location-config resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,storageAccount=$AZURE_STORAGE_ACCOUNT_ID[,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID] --snapshot-location-config apiTimeout=<YOUR_TIMEOUT>[,resourceGroup=$AZURE_BACKUP_RESOURCE_GROUP,subscriptionId=$AZURE_BACKUP_SUBSCRIPTION_ID]
 
 		`,
 		Run: func(c *cobra.Command, args []string) {
@@ -218,14 +243,19 @@ This is useful as a starting point for more customized installations.
 
 // Run executes a command in the context of the provided arguments.
 func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
-	vo, err := o.AsVeleroOptions()
-	if err != nil {
-		return err
-	}
+	var resources *unstructured.UnstructuredList
+	if o.CRDsOnly {
+		resources = install.AllCRDs()
+	} else {
+		vo, err := o.AsVeleroOptions()
+		if err != nil {
+			return err
+		}
 
-	resources, err := install.AllResources(vo)
-	if err != nil {
-		return err
+		resources, err = install.AllResources(vo)
+		if err != nil {
+			return err
+		}
 	}
 
 	if _, err := output.PrintWithFormat(c, resources); err != nil {
@@ -264,6 +294,11 @@ func (o *InstallOptions) Run(c *cobra.Command, f client.Factory) error {
 	if o.SecretFile == "" {
 		fmt.Printf("\nNo secret file was specified, no Secret created.\n\n")
 	}
+
+	if o.NoDefaultBackupLocation {
+		fmt.Printf("\nNo bucket and provider were specified, no default backup storage location created.\n\n")
+	}
+
 	fmt.Printf("Velero is installed! ⛵ Use 'kubectl logs deployment/velero -n %s' to view the status.\n", o.Namespace)
 	return nil
 }
@@ -280,8 +315,9 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		return err
 	}
 
-	if o.BucketName == "" {
-		return errors.New("--bucket is required")
+	// If we're only installing CRDs, we can skip the rest of the validation.
+	if o.CRDsOnly {
+		return nil
 	}
 
 	// Our main 3 providers don't support bucket names starting with a dash, and a bucket name starting with one
@@ -291,8 +327,48 @@ func (o *InstallOptions) Validate(c *cobra.Command, args []string, f client.Fact
 		return errors.Errorf("Bucket names cannot begin with a dash. Bucket name was: %s", o.BucketName)
 	}
 
-	if o.ProviderName == "" {
-		return errors.New("--provider is required")
+	if o.NoDefaultBackupLocation {
+
+		if o.BucketName != "" {
+			return errors.New("Cannot use both --bucket and --no-default-backup-location at the same time")
+		}
+
+		if o.Prefix != "" {
+			return errors.New("Cannot use both --prefix and --no-default-backup-location at the same time")
+		}
+
+		if o.BackupStorageConfig.String() != "" {
+			return errors.New("Cannot use both --backup-location-config and --no-default-backup-location at the same time")
+		}
+	} else {
+		if o.ProviderName == "" {
+			return errors.New("--provider is required")
+		}
+
+		if o.BucketName == "" {
+			return errors.New("--bucket is required")
+		}
+
+	}
+
+	if o.UseVolumeSnapshots {
+		if o.ProviderName == "" {
+			return errors.New("--provider is required when --use-volume-snapshots is set to true")
+		}
+	} else {
+		if o.VolumeSnapshotConfig.String() != "" {
+			return errors.New("--snapshot-location-config must be empty when --use-volume-snapshots=false")
+		}
+	}
+
+	if o.NoDefaultBackupLocation && !o.UseVolumeSnapshots {
+		if o.ProviderName != "" {
+			return errors.New("--provider must be empty when using --no-default-backup-location and --use-volume-snapshots=false")
+		}
+	} else {
+		if len(o.Plugins) == 0 {
+			return errors.New("--plugins flag is required")
+		}
 	}
 
 	switch {

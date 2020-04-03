@@ -28,7 +28,6 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider/azure"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
@@ -50,12 +49,14 @@ const (
 	// pod volume backups when they're for a PVC.
 	PVCNameAnnotation = "velero.io/pvc-name"
 
+	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
+	// need to be backed up using restic.
+	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
 	// Deprecated.
 	//
 	// TODO(2.0): remove
 	podAnnotationPrefix = "snapshot.velero.io/"
-
-	volumesToBackupAnnotation = "backup.velero.io/backup-volumes"
 )
 
 // getPodSnapshotAnnotations returns a map, of volume name -> snapshot id,
@@ -88,9 +89,17 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 	volumes := make(map[string]string)
 
 	for _, pvb := range podVolumeBackups {
-		if pod.GetName() == pvb.Spec.Pod.Name {
-			volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
+		if pod.GetName() != pvb.Spec.Pod.Name {
+			continue
 		}
+
+		// skip PVBs without a snapshot ID since there's nothing
+		// to restore (they could be failed, or for empty volumes).
+		if pvb.Status.SnapshotID == "" {
+			continue
+		}
+
+		volumes[pvb.Spec.Volume] = pvb.Status.SnapshotID
 	}
 
 	if len(volumes) > 0 {
@@ -108,7 +117,7 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 		return nil
 	}
 
-	backupsValue := annotations[volumesToBackupAnnotation]
+	backupsValue := annotations[VolumesToBackupAnnotation]
 	if backupsValue == "" {
 		return nil
 	}
@@ -195,6 +204,44 @@ func TempCredentialsFile(secretLister corev1listers.SecretLister, veleroNamespac
 	return name, nil
 }
 
+// TempCACertFile creates a temp file containing a CA bundle
+// and returns its path. The caller should generally call os.Remove()
+// to remove the file when done with it.
+func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string, error) {
+	file, err := fs.TempFile("", fmt.Sprintf("cacert-%s", bsl))
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	if _, err := file.Write(caCert); err != nil {
+		// nothing we can do about an error closing the file here, and we're
+		// already returning an error about the write failing.
+		file.Close()
+		return "", errors.WithStack(err)
+	}
+
+	name := file.Name()
+
+	if err := file.Close(); err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	return name, nil
+}
+
+func GetCACert(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, bsl string) ([]byte, error) {
+	location, err := backupLocationLister.BackupStorageLocations(namespace).Get(bsl)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	if location.Spec.ObjectStorage != nil {
+		return location.Spec.ObjectStorage.CACert, nil
+	}
+
+	return nil, nil
+}
+
 // NewPodVolumeBackupListOptions creates a ListOptions with a label selector configured to
 // find PodVolumeBackups for the backup identified by name.
 func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
@@ -221,13 +268,36 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 		return nil, errors.Wrap(err, "error getting backup storage location")
 	}
 
-	azureVars, err := azure.GetResticEnvVars(loc.Spec.Config)
+	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
 	}
 
 	env := os.Environ()
 	for k, v := range azureVars {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	return env, nil
+}
+
+// S3CmdEnv returns a list of environment variables (in the format var=val) that
+// should be used when running a restic command for an S3 backend. This list is
+// the current environment, plus the AWS-specific variables restic needs, namely
+// a credential profile.
+func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
+	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting backup storage location")
+	}
+
+	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting aws restic env vars")
+	}
+
+	env := os.Environ()
+	for k, v := range awsVars {
 		env = append(env, fmt.Sprintf("%s=%s", k, v))
 	}
 

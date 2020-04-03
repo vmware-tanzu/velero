@@ -8,6 +8,9 @@
   &.section-grey {
     color: $body-color-darkest;
     background: $section-grey-background;
+    a {
+      color: $darkest-blue;
+    }
   }
 
   &.section-card {

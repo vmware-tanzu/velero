@@ -21,7 +21,7 @@ BIN ?= velero
 PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
-REGISTRY ?= gcr.io/heptio-images
+REGISTRY ?= velero
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -33,36 +33,53 @@ VERSION ?= master
 
 TAG_LATEST ?= false
 
+# The version of restic binary to be downloaded for power architecture
+RESTIC_VERSION ?= 0.9.6
+
+CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
+CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
+MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
+
 ###
 ### These variables should not need tweaking.
 ###
-
-CLI_PLATFORMS := linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 linux-ppc64le
-CONTAINER_PLATFORMS := linux-amd64 linux-arm linux-arm64 linux-ppc64le
 
 platform_temp = $(subst -, ,$(ARCH))
 GOOS = $(word 1, $(platform_temp))
 GOARCH = $(word 2, $(platform_temp))
 
-# TODO(ncdc): support multiple image architectures once gcr.io supports manifest lists
 # Set default base image dynamically for each arch
 ifeq ($(GOARCH),amd64)
 		DOCKERFILE ?= Dockerfile-$(BIN)
+local-arch:
+	@echo "local environment for amd64 is up-to-date"
 endif
-#ifeq ($(GOARCH),arm)
-#		DOCKERFILE ?= Dockerfile.arm #armel/busybox
-#endif
-#ifeq ($(GOARCH),arm64)
-#		DOCKERFILE ?= Dockerfile.arm64 #aarch64/busybox
-#endif
+ifeq ($(GOARCH),arm)
+		DOCKERFILE ?= Dockerfile-$(BIN)-arm
+local-arch:
+	@mkdir -p _output/bin/linux/arm/
+	@wget -q -O - https://github.com/restic/restic/releases/download/v$(RESTIC_VERSION)/restic_$(RESTIC_VERSION)_linux_arm.bz2 | bunzip2 > _output/bin/linux/arm/restic
+	@chmod a+x _output/bin/linux/arm/restic
+endif
+ifeq ($(GOARCH),arm64)
+		DOCKERFILE ?= Dockerfile-$(BIN)-arm64
+local-arch:
+	@mkdir -p _output/bin/linux/arm64/
+	@wget -q -O - https://github.com/restic/restic/releases/download/v$(RESTIC_VERSION)/restic_$(RESTIC_VERSION)_linux_arm64.bz2 | bunzip2 > _output/bin/linux/arm64/restic
+	@chmod a+x _output/bin/linux/arm64/restic
+endif
 ifeq ($(GOARCH),ppc64le)
                 DOCKERFILE ?= Dockerfile-$(BIN)-ppc64le
+local-arch:
+	RESTIC_VERSION=$(RESTIC_VERSION) \
+        ./hack/get-restic-ppc64le.sh
 endif
 
-IMAGE = $(REGISTRY)/$(BIN)
+MULTIARCH_IMAGE = $(REGISTRY)/$(BIN)
+IMAGE ?= $(REGISTRY)/$(BIN)-$(GOARCH)
 
 # If you want to build all binaries, see the 'all-build' rule.
-# If you want to build all containers, see the 'all-container' rule.
+# If you want to build all containers, see the 'all-containers' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
 all:
 	@$(MAKE) build
@@ -70,18 +87,25 @@ all:
 
 build-%:
 	@$(MAKE) --no-print-directory ARCH=$* build
+	@$(MAKE) --no-print-directory ARCH=$* build BIN=velero-restic-restore-helper
 
-#container-%:
-#	@$(MAKE) --no-print-directory ARCH=$* container
+container-%:
+	@$(MAKE) --no-print-directory ARCH=$* container
+	@$(MAKE) --no-print-directory ARCH=$* container BIN=velero-restic-restore-helper
 
-#push-%:
-#	@$(MAKE) --no-print-directory ARCH=$* push
+push-%:
+	@$(MAKE) --no-print-directory ARCH=$* push
+	@$(MAKE) --no-print-directory ARCH=$* push BIN=velero-restic-restore-helper
 
 all-build: $(addprefix build-, $(CLI_PLATFORMS))
 
-#all-container: $(addprefix container-, $(CONTAINER_PLATFORMS))
+all-containers: $(addprefix container-, $(CONTAINER_PLATFORMS))
 
-#all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+all-push: $(addprefix push-, $(CONTAINER_PLATFORMS))
+
+all-manifests:
+	@$(MAKE) manifest
+	@$(MAKE) manifest BIN=velero-restic-restore-helper
 
 local: build-dirs
 	GOOS=$(GOOS) \
@@ -111,48 +135,32 @@ BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
 shell: build-dirs build-image
-	@# the volume bind-mount of $PWD/vendor/k8s.io/api is needed for code-gen to
-	@# function correctly (ref. https://github.com/kubernetes/kubernetes/pull/64567)
+	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
+	@# because the Kubernetes code-generator tools require the project to
+	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
+	@# under $GOPATH).
 	@docker run \
 		-e GOFLAGS \
 		-i $(TTY) \
 		--rm \
 		-u $$(id -u):$$(id -g) \
-		-v "$$(pwd)/vendor/k8s.io/api:/go/src/k8s.io/api:delegated" \
+		-v "$$(pwd):/github.com/vmware-tanzu/velero:delegated" \
+		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/pkg:/go/pkg:delegated" \
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
-		-v "$$(pwd):/go/src/$(PKG):delegated" \
-		-v "$$(pwd)/_output/bin:/output:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
-		-w /go/src/$(PKG) \
+		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
 
 DOTFILE_IMAGE = $(subst :,_,$(subst /,_,$(IMAGE))-$(VERSION))
 
-# Use a slightly customized build/push targets since we don't have a Go binary to build for the fsfreeze image
-build-fsfreeze: BIN = fsfreeze-pause
-build-fsfreeze:
-	@cp $(DOCKERFILE)  _output/.dockerfile-$(BIN).alpine
-	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN).alpine _output
-	@docker images -q $(IMAGE):$(VERSION) > .container-$(DOTFILE_IMAGE)
-
-push-fsfreeze: BIN = fsfreeze-pause
-push-fsfreeze:
-	@docker push $(IMAGE):$(VERSION)
-ifeq ($(TAG_LATEST), true)
-	docker tag $(IMAGE):$(VERSION) $(IMAGE):latest
-	docker push $(IMAGE):latest
-endif
-	@docker images -q $(REGISTRY)/fsfreeze-pause:$(VERSION) > .container-$(DOTFILE_IMAGE)
-
 all-containers:
 	$(MAKE) container
 	$(MAKE) container BIN=velero-restic-restore-helper
-	$(MAKE) build-fsfreeze
 
-container: .container-$(DOTFILE_IMAGE) container-name
+container: local-arch .container-$(DOTFILE_IMAGE) container-name
 .container-$(DOTFILE_IMAGE): _output/bin/$(GOOS)/$(GOARCH)/$(BIN) $(DOCKERFILE)
 	@cp $(DOCKERFILE) _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH)
 	@docker build --pull -t $(IMAGE):$(VERSION) -f _output/.dockerfile-$(BIN)-$(GOOS)-$(GOARCH) _output
@@ -160,12 +168,6 @@ container: .container-$(DOTFILE_IMAGE) container-name
 
 container-name:
 	@echo "container: $(IMAGE):$(VERSION)"
-
-all-push:
-	$(MAKE) push
-	$(MAKE) push BIN=velero-restic-restore-helper
-	$(MAKE) push-fsfreeze
-
 
 push: .push-$(DOTFILE_IMAGE) push-name
 .push-$(DOTFILE_IMAGE): .container-$(DOTFILE_IMAGE)
@@ -178,6 +180,20 @@ endif
 
 push-name:
 	@echo "pushed: $(IMAGE):$(VERSION)"
+
+manifest: .manifest-$(MULTIARCH_IMAGE) manifest-name
+.manifest-$(MULTIARCH_IMAGE):
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):$(VERSION) \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):$(VERSION))
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):$(VERSION)
+ifeq ($(TAG_LATEST), true)
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create $(MULTIARCH_IMAGE):latest \
+		$(foreach arch, $(MANIFEST_PLATFORMS), $(MULTIARCH_IMAGE)-$(arch):latest)
+	@DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push --purge $(MULTIARCH_IMAGE):latest
+endif
+
+manifest-name:
+	@echo "pushed: $(MULTIARCH_IMAGE):$(VERSION)"
 
 SKIP_TESTS ?=
 test: build-dirs
@@ -210,13 +226,42 @@ clean:
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
-ci: all verify test
+.PHONY: modules
+modules:
+	go mod tidy
+
+.PHONY: verify-modules
+verify-modules: modules
+	@if !(git diff --quiet HEAD -- go.sum go.mod); then \
+		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
+	fi
+
+ci: verify-modules verify all test
 
 changelog:
 	hack/changelog.sh
 
+# release builds a GitHub release using goreleaser within the build container.
+#
+# To dry-run the release, which will build the binaries/artifacts locally but
+# will *not* create a GitHub release:
+#		GITHUB_TOKEN=an-invalid-token-so-you-dont-accidentally-push-release \
+#		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
+#		PUBLISH=false \
+#		make release
+#
+# To run the release, which will publish a *DRAFT* GitHub release in github.com/vmware-tanzu/velero 
+# (you still need to review/publish the GitHub release manually):
+#		GITHUB_TOKEN=your-github-token \ 
+#		RELEASE_NOTES_FILE=changelogs/CHANGELOG-1.2.md \
+#		PUBLISH=true \
+#		make release
 release:
-	hack/goreleaser.sh
+	$(MAKE) shell CMD="-c '\
+		GITHUB_TOKEN=$(GITHUB_TOKEN) \
+		RELEASE_NOTES_FILE=$(RELEASE_NOTES_FILE) \
+		PUBLISH=$(PUBLISH) \
+		./hack/goreleaser.sh'"
 
 serve-docs:
 	docker run \

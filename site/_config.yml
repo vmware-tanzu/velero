@@ -3,7 +3,7 @@ title: Velero
 email:
 author: Velero Authors
 description: Backup and migrate Kubernetes resources and persistent volumes
-url: velero.io
+#url: velero.io
 logo: Velero.svg
 twitter:
   username: projectvelero
@@ -54,6 +54,24 @@ defaults:
     values:
       version: master
       gh: https://github.com/vmware-tanzu/velero/tree/master
+      layout: "docs"
+  - scope:
+      path: docs/v1.3.1
+    values:
+      version: v1.3.1
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.3.1
+      layout: "docs"
+  - scope:
+      path: docs/v1.3.0
+    values:
+      version: v1.3.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.3.0
+      layout: "docs"
+  - scope:
+      path: docs/v1.2.0
+    values:
+      version: v1.2.0
+      gh: https://github.com/vmware-tanzu/velero/tree/v1.2.0
       layout: "docs"
   - scope:
       path: docs/v1.1.0
@@ -143,11 +161,15 @@ page_gen:
 collections:
   - contributors
   - casestudies
+  - plugin-list
 
 versioning: true
-latest: v1.1.0
+latest: v1.3.1
 versions:
 - master
+- v1.3.1
+- v1.3.0
+- v1.2.0
 - v1.1.0
 - v1.0.0
 - v0.11.0
@@ -163,7 +185,7 @@ versions:
 - v0.3.0
 
 # Build settings
-permalink: :title/
+permalink: /blog/:title/
 sass:
   sass_dir: css
   style: :compressed

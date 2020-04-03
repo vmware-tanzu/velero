@@ -1,1 +1,0 @@
-change default `restic prune` interval to 7 days, add `velero server/install` flags for specifying an alternate default value.

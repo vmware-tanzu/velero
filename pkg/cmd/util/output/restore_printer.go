@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package output
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -38,20 +37,16 @@ var (
 	}
 )
 
-func printRestoreList(list *v1.RestoreList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printRestoreList(list *v1.RestoreList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printRestore(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printRestore(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
-func printRestore(restore *v1.Restore, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printRestore(restore *v1.Restore) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: restore},
 	}
@@ -71,5 +66,5 @@ func printRestore(restore *v1.Restore, options printers.PrintOptions) ([]metav1.
 		metav1.FormatLabelSelector(restore.Spec.LabelSelector),
 	)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

@@ -26,7 +26,7 @@ import (
 
 func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	c := &podTemplateConfig{
-		image: "gcr.io/heptio-images/velero:latest",
+		image: DefaultImage,
 	}
 
 	for _, opt := range opts {
@@ -170,6 +170,10 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 			},
 			{
 				Name:  "AZURE_CREDENTIALS_FILE",
+				Value: "/credentials/cloud",
+			},
+			{
+				Name:  "ALIBABA_CLOUD_CREDENTIALS_FILE",
 				Value: "/credentials/cloud",
 			},
 		}...)

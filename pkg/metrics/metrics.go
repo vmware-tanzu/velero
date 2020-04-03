@@ -243,49 +243,49 @@ func (m *ServerMetrics) RegisterAllMetrics() {
 // InitSchedule initializes counter metrics of a schedule.
 func (m *ServerMetrics) InitSchedule(scheduleName string) {
 	if c, ok := m.metrics[backupAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupPartialFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupDeletionAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupDeletionSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[backupDeletionFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restorePartialFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[restoreValidationFailedTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotSuccessTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotAttemptTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 	if c, ok := m.metrics[volumeSnapshotFailureTotal].(*prometheus.CounterVec); ok {
-		c.WithLabelValues(scheduleName).Set(0)
+		c.WithLabelValues(scheduleName).Add(0)
 	}
 }
 
@@ -297,9 +297,9 @@ func (m *ServerMetrics) SetBackupTarballSizeBytesGauge(backupSchedule string, si
 }
 
 // SetBackupLastSuccessfulTimestamp records the last time a backup ran successfully, Unix timestamp in seconds
-func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string) {
+func (m *ServerMetrics) SetBackupLastSuccessfulTimestamp(backupSchedule string, time time.Time) {
 	if g, ok := m.metrics[backupLastSuccessfulTimestamp].(*prometheus.GaugeVec); ok {
-		g.WithLabelValues(backupSchedule).Set(float64(time.Now().Unix()))
+		g.WithLabelValues(backupSchedule).Set(float64(time.Unix()))
 	}
 }
 
@@ -322,7 +322,7 @@ func (m *ServerMetrics) RegisterBackupSuccess(backupSchedule string) {
 	if c, ok := m.metrics[backupSuccessTotal].(*prometheus.CounterVec); ok {
 		c.WithLabelValues(backupSchedule).Inc()
 	}
-	m.SetBackupLastSuccessfulTimestamp(backupSchedule)
+	m.SetBackupLastSuccessfulTimestamp(backupSchedule, time.Now())
 }
 
 // RegisterBackupPartialFailure records a partially failed backup.

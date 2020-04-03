@@ -41,7 +41,7 @@ func imageVersion() string {
 
 // DefaultImage is the default image to use for the Velero deployment and restic daemonset containers.
 var (
-	DefaultImage               = "gcr.io/heptio-images/velero:" + imageVersion()
+	DefaultImage               = "velero/velero:" + imageVersion()
 	DefaultVeleroPodCPURequest = "500m"
 	DefaultVeleroPodMemRequest = "128Mi"
 	DefaultVeleroPodCPULimit   = "1000m"
@@ -137,7 +137,7 @@ func Namespace(namespace string) *corev1.Namespace {
 	}
 }
 
-func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string) *v1.BackupStorageLocation {
+func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *v1.BackupStorageLocation {
 	return &v1.BackupStorageLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
@@ -150,6 +150,7 @@ func BackupStorageLocation(namespace, provider, bucket, prefix string, config ma
 				ObjectStorage: &v1.ObjectStorageLocation{
 					Bucket: bucket,
 					Prefix: prefix,
+					CACert: caCert,
 				},
 			},
 			Config: config,
@@ -216,11 +217,11 @@ type VeleroOptions struct {
 	VSLConfig                         map[string]string
 	DefaultResticMaintenanceFrequency time.Duration
 	Plugins                           []string
+	NoDefaultBackupLocation           bool
+	CACertData                        []byte
 }
 
-// AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
-// Items are unstructured, since there are different data types returned.
-func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
+func AllCRDs() *unstructured.UnstructuredList {
 	resources := new(unstructured.UnstructuredList)
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
@@ -229,6 +230,14 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		crd.SetLabels(labels())
 		appendUnstructured(resources, crd)
 	}
+
+	return resources
+}
+
+// AllResources returns a list of all resources necessary to install Velero, in the appropriate order, into a Kubernetes cluster.
+// Items are unstructured, since there are different data types returned.
+func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
+	resources := AllCRDs()
 
 	ns := Namespace(o.Namespace)
 	appendUnstructured(resources, ns)
@@ -244,8 +253,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		appendUnstructured(resources, sec)
 	}
 
-	bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig)
-	appendUnstructured(resources, bsl)
+	if !o.NoDefaultBackupLocation {
+		bsl := BackupStorageLocation(o.Namespace, o.ProviderName, o.Bucket, o.Prefix, o.BSLConfig, o.CACertData)
+		appendUnstructured(resources, bsl)
+	}
 
 	// A snapshot location may not be desirable for users relying on restic
 	if o.UseVolumeSnapshots {

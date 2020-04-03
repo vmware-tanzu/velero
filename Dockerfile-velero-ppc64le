@@ -12,21 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:bionic
+FROM ppc64le/ubuntu:bionic
 
-LABEL maintainer="Steve Kriss <krisss@vmware.com>"
+LABEL maintainer="Prajyot Parab <prajyot.parab@ibm.com>"
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates wget && \
-    wget --quiet https://oplab9.parqtec.unicamp.br/pub/ppc64el/restic/restic-0.9.5 && \
-    mv restic-0.9.5 /usr/bin/restic && \
-    chmod +x /usr/bin/restic && \
-    apt-get remove -y wget && \
-    rm -rf /var/lib/apt/lists/*
-
+ADD /bin/linux/ppc64le/restic /usr/bin/restic
 
 ADD /bin/linux/ppc64le/velero /velero
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT ["/velero"]

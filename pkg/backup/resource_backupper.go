@@ -19,6 +19,7 @@ package backup
 import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -193,7 +194,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 					continue
 				}
 
-				if err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
+				if _, err := itemBackupper.backupItem(log, unstructured, gr); err != nil {
 					log.WithError(errors.WithStack(err)).Error("Error backing up namespace")
 				}
 			}
@@ -207,6 +208,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 		namespacesToList = []string{""}
 	}
 
+	backedUpItem := false
 	for _, namespace := range namespacesToList {
 		log = log.WithField("namespace", namespace)
 
@@ -243,37 +245,93 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 				log.Errorf("Unexpected type %T", item)
 				continue
 			}
-
-			metadata, err := meta.Accessor(unstructured)
-			if err != nil {
-				log.WithError(errors.WithStack(err)).Error("Error getting a metadata accessor")
-				continue
-			}
-
-			if gr == kuberesource.Namespaces && !rb.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
-				log.WithField("name", metadata.GetName()).Info("Skipping namespace because it's excluded")
-				continue
-			}
-
-			err = itemBackupper.backupItem(log, unstructured, gr)
-			if aggregate, ok := err.(kubeerrs.Aggregate); ok {
-				log.WithField("name", metadata.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
-				// log each error separately so we get error location info in the log, and an
-				// accurate count of errors
-				for _, err = range aggregate.Errors() {
-					log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
-				}
-
-				continue
-			}
-			if err != nil {
-				log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
-				continue
+			if rb.backupItem(log, gr, itemBackupper, unstructured) {
+				backedUpItem = true
 			}
 		}
 	}
 
+	// back up CRD for resource if found. We should only need to do this if we've backed up at least
+	// one item and IncludeClusterResources is nil. If IncludeClusterResources is false
+	// we don't want to back it up, and if it's true it will already be included.
+	if backedUpItem && rb.backupRequest.Spec.IncludeClusterResources == nil {
+		rb.backupCRD(log, gr, itemBackupper)
+	}
+
 	return nil
+}
+
+func (rb *defaultResourceBackupper) backupItem(
+	log logrus.FieldLogger,
+	gr schema.GroupResource,
+	itemBackupper ItemBackupper,
+	unstructured runtime.Unstructured,
+) bool {
+	metadata, err := meta.Accessor(unstructured)
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Error("Error getting a metadata accessor")
+		return false
+	}
+
+	if gr == kuberesource.Namespaces && !rb.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
+		log.WithField("name", metadata.GetName()).Info("Skipping namespace because it's excluded")
+		return false
+	}
+
+	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr)
+	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+		log.WithField("name", metadata.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
+		// log each error separately so we get error location info in the log, and an
+		// accurate count of errors
+		for _, err = range aggregate.Errors() {
+			log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+		}
+
+		return false
+	}
+	if err != nil {
+		log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+		return false
+	}
+	return backedUpItem
+}
+
+// backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
+// associated with it.
+func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
+	crdGroupResource := kuberesource.CustomResourceDefinitions
+
+	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
+	gvr, apiResource, err := rb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
+		return
+	}
+	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
+
+	log.Debugf("Getting dynamic client for %s", gvr.String())
+	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
+		return
+	}
+	log.Debugf("Got dynamic client for %s", gvr.String())
+
+	// try to get a CRD whose name matches the provided GroupResource
+	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// not found: this means the GroupResource provided was not a
+		// custom resource, so there's no CRD to back up.
+		log.Debugf("No CRD found for GroupResource %s", gr.String())
+		return
+	}
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting CRD %s", gr.String())
+		return
+	}
+	log.Infof("Found associated CRD %s to add to backup", gr.String())
+
+	rb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured)
 }
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of

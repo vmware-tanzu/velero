@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package output
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -34,20 +33,16 @@ var (
 	}
 )
 
-func printResticRepoList(list *v1.ResticRepositoryList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printResticRepoList(list *v1.ResticRepositoryList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printResticRepo(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printResticRepo(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
-func printResticRepo(repo *v1.ResticRepository, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printResticRepo(repo *v1.ResticRepository) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: repo},
 	}
@@ -57,9 +52,11 @@ func printResticRepo(repo *v1.ResticRepository, options printers.PrintOptions) (
 		status = v1.ResticRepositoryPhaseNew
 	}
 
-	lastMaintenance := repo.Status.LastMaintenanceTime.String()
-	if repo.Status.LastMaintenanceTime.IsZero() {
+	var lastMaintenance string
+	if repo.Status.LastMaintenanceTime == nil || repo.Status.LastMaintenanceTime.IsZero() {
 		lastMaintenance = "<never>"
+	} else {
+		lastMaintenance = repo.Status.LastMaintenanceTime.String()
 	}
 
 	row.Cells = append(row.Cells,
@@ -68,5 +65,5 @@ func printResticRepo(repo *v1.ResticRepository, options printers.PrintOptions) (
 		lastMaintenance,
 	)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

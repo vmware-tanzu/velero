@@ -57,9 +57,9 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 		controller      = NewDownloadRequestController(
 			client.VeleroV1(),
 			informerFactory.Velero().V1().DownloadRequests(),
-			informerFactory.Velero().V1().Restores(),
-			informerFactory.Velero().V1().BackupStorageLocations(),
-			informerFactory.Velero().V1().Backups(),
+			informerFactory.Velero().V1().Restores().Lister(),
+			informerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			informerFactory.Velero().V1().Backups().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			velerotest.NewLogger(),
 		).(*downloadRequestController)
@@ -252,9 +252,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 			// clock time, it's easier to do this here than as part of the test case definitions.
 			if tc.downloadRequest != nil && tc.downloadRequest.Status.Phase == v1.DownloadRequestPhaseProcessed {
 				if tc.expired {
-					tc.downloadRequest.Status.Expiration.Time = harness.controller.clock.Now().Add(-1 * time.Minute)
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(-1 * time.Minute)}
 				} else {
-					tc.downloadRequest.Status.Expiration.Time = harness.controller.clock.Now().Add(time.Minute)
+					tc.downloadRequest.Status.Expiration = &metav1.Time{Time: harness.controller.clock.Now().Add(time.Minute)}
 				}
 			}
 

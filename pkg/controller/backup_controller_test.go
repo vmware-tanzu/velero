@@ -33,9 +33,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
+	"k8s.io/apimachinery/pkg/version"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
@@ -44,6 +47,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	pluginmocks "github.com/vmware-tanzu/velero/pkg/plugin/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 )
 
@@ -168,8 +172,13 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -236,8 +245,13 @@ func TestBackupLocationLabel(t *testing.T) {
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -293,8 +307,14 @@ func TestDefaultBackupTTL(t *testing.T) {
 		)
 
 		t.Run(test.name, func(t *testing.T) {
+
+			apiServer := velerotest.NewAPIServer(t)
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
@@ -305,7 +325,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 			res := c.prepareBackupRequest(test.backup)
 			assert.NotNil(t, res)
 			assert.Equal(t, test.expectedTTL, res.Spec.TTL)
-			assert.Equal(t, test.expectedExpiration, res.Status.Expiration)
+			assert.Equal(t, test.expectedExpiration, *res.Status.Expiration)
 		})
 	}
 }
@@ -316,6 +336,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
 	require.NoError(t, err)
 	now = now.Local()
+	timestamp := metav1.NewTime(now)
 
 	tests := []struct {
 		name                string
@@ -339,7 +360,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -348,9 +372,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -367,7 +391,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "alt-loc",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "alt-loc",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -376,9 +403,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -398,7 +425,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "read-write",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "read-write",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -407,9 +437,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -426,7 +456,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -436,9 +469,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					Expiration:          metav1.NewTime(now.Add(10 * time.Minute)),
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
+					Expiration:          &metav1.Time{now.Add(10 * time.Minute)},
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
 				},
 			},
 		},
@@ -456,7 +489,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -465,9 +501,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseCompleted,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -487,7 +523,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -496,9 +535,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -516,7 +555,10 @@ func TestProcessBackupCompletions(t *testing.T) {
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
 					Labels: map[string]string{
-						"velero.io/storage-location": "loc-1",
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+						"velero.io/storage-location":                 "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -525,9 +567,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 				Status: velerov1api.BackupStatus{
 					Phase:               velerov1api.BackupPhaseFailed,
 					Version:             1,
-					StartTimestamp:      metav1.NewTime(now),
-					CompletionTimestamp: metav1.NewTime(now),
-					Expiration:          metav1.NewTime(now),
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
 				},
 			},
 		},
@@ -545,8 +587,26 @@ func TestProcessBackupCompletions(t *testing.T) {
 				backupper       = new(fakeBackupper)
 			)
 
+			apiServer := velerotest.NewAPIServer(t)
+
+			apiServer.DiscoveryClient.FakedServerVersion = &version.Info{
+				Major:        "1",
+				Minor:        "16",
+				GitVersion:   "v1.16.4",
+				GitCommit:    "FakeTest",
+				GitTreeState: "",
+				BuildDate:    "",
+				GoVersion:    "",
+				Compiler:     "",
+				Platform:     "",
+			}
+
+			discoveryHelper, err := discovery.NewHelper(apiServer.DiscoveryClient, logger)
+			require.NoError(t, err)
+
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
+				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
 				backupLocationLister:   sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
@@ -583,7 +643,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			require.NoError(t, sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup))
 
 			// add the default backup storage location to the clientset and the informer/lister store
-			_, err := clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
+			_, err = clientset.VeleroV1().BackupStorageLocations(defaultBackupLocation.Namespace).Create(defaultBackupLocation)
 			require.NoError(t, err)
 
 			require.NoError(t, sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(defaultBackupLocation))
@@ -734,6 +794,122 @@ func TestValidateAndGetSnapshotLocations(t *testing.T) {
 				}
 				require.Contains(t, errs, test.expectedErrors)
 			}
+		})
+	}
+}
+
+// Test_getLastSuccessBySchedule verifies that the getLastSuccessBySchedule helper function correctly returns
+// the completion timestamp of the most recent completed backup for each schedule, including an entry for ad-hoc
+// or non-scheduled backups.
+func Test_getLastSuccessBySchedule(t *testing.T) {
+	buildBackup := func(phase velerov1api.BackupPhase, completion time.Time, schedule string) *velerov1api.Backup {
+		b := builder.ForBackup("", "").
+			ObjectMeta(builder.WithLabels(velerov1api.ScheduleNameLabel, schedule)).
+			Phase(phase)
+
+		if !completion.IsZero() {
+			b.CompletionTimestamp(completion)
+		}
+
+		return b.Result()
+	}
+
+	// create a static "base time" that can be used to easily construct completion timestamps
+	// by using the .Add(...) method.
+	baseTime, err := time.Parse(time.RFC1123, time.RFC1123)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		backups []*velerov1api.Backup
+		want    map[string]time.Time
+	}{
+		{
+			name:    "when backups is nil, an empty map is returned",
+			backups: nil,
+			want:    map[string]time.Time{},
+		},
+		{
+			name:    "when backups is empty, an empty map is returned",
+			backups: []*velerov1api.Backup{},
+			want:    map[string]time.Time{},
+		},
+		{
+			name: "when multiple completed backups for a schedule exist, the latest one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{
+				"schedule-1": baseTime.Add(time.Second),
+			},
+		},
+		{
+			name: "when the most recent backup for a schedule is Failed, the timestamp of the most recent Completed one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{
+				"schedule-1": baseTime,
+			},
+		},
+		{
+			name: "when there are no Completed backups for a schedule, it's not returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseInProgress, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhasePartiallyFailed, baseTime.Add(-time.Second), "schedule-1"),
+			},
+			want: map[string]time.Time{},
+		},
+		{
+			name: "when backups exist without a schedule, the most recent Completed one is returned",
+			backups: []*velerov1api.Backup{
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, ""),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), ""),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), ""),
+			},
+			want: map[string]time.Time{
+				"": baseTime,
+			},
+		},
+		{
+			name: "when backups exist for multiple schedules, the most recent Completed timestamp for each schedule is returned",
+			backups: []*velerov1api.Backup{
+				// ad-hoc backups (no schedule)
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(30*time.Minute), ""),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Hour), ""),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), ""),
+
+				// schedule-1
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime, "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseFailed, baseTime.Add(time.Second), "schedule-1"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(-time.Second), "schedule-1"),
+
+				// schedule-2
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(24*time.Hour), "schedule-2"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(48*time.Hour), "schedule-2"),
+				buildBackup(velerov1api.BackupPhaseCompleted, baseTime.Add(72*time.Hour), "schedule-2"),
+
+				// schedule-3
+				buildBackup(velerov1api.BackupPhaseNew, baseTime, "schedule-3"),
+				buildBackup(velerov1api.BackupPhaseInProgress, baseTime.Add(time.Minute), "schedule-3"),
+				buildBackup(velerov1api.BackupPhasePartiallyFailed, baseTime.Add(2*time.Minute), "schedule-3"),
+			},
+			want: map[string]time.Time{
+				"":           baseTime.Add(30 * time.Minute),
+				"schedule-1": baseTime,
+				"schedule-2": baseTime.Add(72 * time.Hour),
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, getLastSuccessBySchedule(tc.backups))
 		})
 	}
 }

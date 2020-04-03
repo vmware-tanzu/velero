@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
+	"github.com/vmware-tanzu/velero/pkg/util/kube"
 )
 
 // kindToResource translates a Kind (mixed case, singular) to a Resource (lowercase, plural) string.
@@ -54,21 +55,6 @@ var kindToResource = map[string]string{
 type ResourceGroup struct {
 	CRDResources   []*unstructured.Unstructured
 	OtherResources []*unstructured.Unstructured
-}
-
-// crdIsReady checks a CRD to see if it's ready, so that objects may be created from it.
-func crdIsReady(crd *apiextv1beta1.CustomResourceDefinition) bool {
-	var isEstablished, namesAccepted bool
-	for _, cond := range crd.Status.Conditions {
-		if cond.Type == apiextv1beta1.Established {
-			isEstablished = true
-		}
-		if cond.Type == apiextv1beta1.NamesAccepted {
-			namesAccepted = true
-		}
-	}
-
-	return (isEstablished && namesAccepted)
 }
 
 // crdsAreReady polls the API server to see if the BackupStorageLocation and VolumeSnapshotLocation CRDs are ready to create objects.
@@ -108,7 +94,7 @@ func crdsAreReady(factory client.DynamicFactory, crdKinds []string) (bool, error
 		}
 
 		for _, crd := range foundCRDs {
-			if !crdIsReady(crd) {
+			if !kube.IsCRDReady(crd) {
 				return false, nil
 			}
 

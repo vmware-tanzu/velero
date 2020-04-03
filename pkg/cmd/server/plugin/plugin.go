@@ -22,9 +22,6 @@ import (
 
 	"github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/client"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider/aws"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider/azure"
-	"github.com/vmware-tanzu/velero/pkg/cloudprovider/gcp"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	veleroplugin "github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/restore"
@@ -38,15 +35,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 		Short:  "INTERNAL COMMAND ONLY - not intended to be run directly by users",
 		Run: func(c *cobra.Command, args []string) {
 			pluginServer.
-				RegisterObjectStore("velero.io/aws", newAwsObjectStore).
-				RegisterObjectStore("velero.io/azure", newAzureObjectStore).
-				RegisterObjectStore("velero.io/gcp", newGcpObjectStore).
-				RegisterVolumeSnapshotter("velero.io/aws", newAwsVolumeSnapshotter).
-				RegisterVolumeSnapshotter("velero.io/azure", newAzureVolumeSnapshotter).
-				RegisterVolumeSnapshotter("velero.io/gcp", newGcpVolumeSnapshotter).
 				RegisterBackupItemAction("velero.io/pv", newPVBackupItemAction).
 				RegisterBackupItemAction("velero.io/pod", newPodBackupItemAction).
 				RegisterBackupItemAction("velero.io/service-account", newServiceAccountBackupItemAction(f)).
+				RegisterBackupItemAction("velero.io/crd-remap-version", newRemapCRDVersionAction).
 				RegisterRestoreItemAction("velero.io/job", newJobRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/pod", newPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/restic", newResticRestoreItemAction(f)).
@@ -55,6 +47,10 @@ func NewCommand(f client.Factory) *cobra.Command {
 				RegisterRestoreItemAction("velero.io/add-pvc-from-pod", newAddPVCFromPodRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/add-pv-from-pvc", newAddPVFromPVCRestoreItemAction).
 				RegisterRestoreItemAction("velero.io/change-storage-class", newChangeStorageClassRestoreItemAction(f)).
+				RegisterRestoreItemAction("velero.io/role-bindings", newRoleBindingItemAction).
+				RegisterRestoreItemAction("velero.io/cluster-role-bindings", newClusterRoleBindingItemAction).
+				RegisterRestoreItemAction("velero.io/crd-preserve-fields", newCRDV1PreserveUnknownFieldsItemAction).
+				RegisterRestoreItemAction("velero.io/change-pvc-node-selector", newChangePVCNodeSelectorItemAction(f)).
 				Serve()
 		},
 	}
@@ -62,30 +58,6 @@ func NewCommand(f client.Factory) *cobra.Command {
 	pluginServer.BindFlags(c.Flags())
 
 	return c
-}
-
-func newAwsObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewObjectStore(logger), nil
-}
-
-func newAzureObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewObjectStore(logger), nil
-}
-
-func newGcpObjectStore(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewObjectStore(logger), nil
-}
-
-func newAwsVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return aws.NewVolumeSnapshotter(logger), nil
-}
-
-func newAzureVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return azure.NewVolumeSnapshotter(logger), nil
-}
-
-func newGcpVolumeSnapshotter(logger logrus.FieldLogger) (interface{}, error) {
-	return gcp.NewVolumeSnapshotter(logger), nil
 }
 
 func newPVBackupItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -119,6 +91,10 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 
 		return action, nil
 	}
+}
+
+func newRemapCRDVersionAction(logger logrus.FieldLogger) (interface{}, error) {
+	return backup.NewRemapCRDVersionAction(logger), nil
 }
 
 func newJobRestoreItemAction(logger logrus.FieldLogger) (interface{}, error) {
@@ -161,6 +137,10 @@ func newAddPVFromPVCRestoreItemAction(logger logrus.FieldLogger) (interface{}, e
 	return restore.NewAddPVFromPVCAction(logger), nil
 }
 
+func newCRDV1PreserveUnknownFieldsItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewCRDV1PreserveUnknownFieldsAction(logger), nil
+}
+
 func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		client, err := f.KubeClient()
@@ -172,6 +152,29 @@ func newChangeStorageClassRestoreItemAction(f client.Factory) veleroplugin.Handl
 			logger,
 			client.CoreV1().ConfigMaps(f.Namespace()),
 			client.StorageV1().StorageClasses(),
+		), nil
+	}
+}
+
+func newRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewRoleBindingAction(logger), nil
+}
+
+func newClusterRoleBindingItemAction(logger logrus.FieldLogger) (interface{}, error) {
+	return restore.NewClusterRoleBindingAction(logger), nil
+}
+
+func newChangePVCNodeSelectorItemAction(f client.Factory) veleroplugin.HandlerInitializer {
+	return func(logger logrus.FieldLogger) (interface{}, error) {
+		client, err := f.KubeClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return restore.NewChangePVCNodeSelectorAction(
+			logger,
+			client.CoreV1().ConfigMaps(f.Namespace()),
+			client.CoreV1().Nodes(),
 		), nil
 	}
 }

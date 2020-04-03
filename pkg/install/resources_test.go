@@ -23,12 +23,13 @@ import (
 )
 
 func TestResources(t *testing.T) {
-	bsl := BackupStorageLocation("velero", "test", "test", "", make(map[string]string))
+	bsl := BackupStorageLocation("velero", "test", "test", "", make(map[string]string), []byte("test"))
 
 	assert.Equal(t, "velero", bsl.ObjectMeta.Namespace)
 	assert.Equal(t, "test", bsl.Spec.Provider)
 	assert.Equal(t, "test", bsl.Spec.StorageType.ObjectStorage.Bucket)
 	assert.Equal(t, make(map[string]string), bsl.Spec.Config)
+	assert.Equal(t, []byte("test"), bsl.Spec.ObjectStorage.CACert)
 
 	vsl := VolumeSnapshotLocation("velero", "test", make(map[string]string))
 

@@ -64,6 +64,10 @@ type ObjectStorageLocation struct {
 	// Prefix is the path inside a bucket to use for Velero storage. Optional.
 	// +optional
 	Prefix string `json:"prefix,omitempty"`
+
+	// CACert defines a CA bundle to use when verifying TLS connections to the provider.
+	// +optional
+	CACert []byte `json:"caCert,omitempty"`
 }
 
 // BackupStorageLocationSpec defines the specification for a Velero BackupStorageLocation.
@@ -80,6 +84,11 @@ type BackupStorageLocationSpec struct {
 	// AccessMode defines the permissions for the backup storage location.
 	// +optional
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
+
+	// BackupSyncPeriod defines how frequently to sync backup API objects from object storage. A value of 0 disables sync.
+	// +optional
+	// +nullable
+	BackupSyncPeriod *metav1.Duration `json:"backupSyncPeriod,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
@@ -119,7 +128,7 @@ type BackupStorageLocationStatus struct {
 	// the cluster.
 	// +optional
 	// +nullable
-	LastSyncedTime metav1.Time `json:"lastSyncedTime,omitempty"`
+	LastSyncedTime *metav1.Time `json:"lastSyncedTime,omitempty"`
 
 	// LastSyncedRevision is the value of the `metadata/revision` file in the backup
 	// storage location the last time the BSL's contents were synced into the cluster.

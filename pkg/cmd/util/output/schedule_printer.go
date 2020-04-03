@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,10 @@ limitations under the License.
 package output
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/printers"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -38,20 +39,16 @@ var (
 	}
 )
 
-func printScheduleList(list *v1.ScheduleList, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printScheduleList(list *v1.ScheduleList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
-		r, err := printSchedule(&list.Items[i], options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printSchedule(&list.Items[i])...)
 	}
-	return rows, nil
+	return rows
 }
 
-func printSchedule(schedule *v1.Schedule, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printSchedule(schedule *v1.Schedule) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: schedule},
 	}
@@ -61,15 +58,20 @@ func printSchedule(schedule *v1.Schedule, options printers.PrintOptions) ([]meta
 		status = v1.SchedulePhaseNew
 	}
 
+	var lastBackupTime time.Time
+	if schedule.Status.LastBackup != nil {
+		lastBackupTime = schedule.Status.LastBackup.Time
+	}
+
 	row.Cells = append(row.Cells,
 		schedule.Name,
 		status,
 		schedule.CreationTimestamp.Time,
 		schedule.Spec.Schedule,
 		schedule.Spec.Template.TTL.Duration,
-		humanReadableTimeFromNow(schedule.Status.LastBackup.Time),
+		humanReadableTimeFromNow(lastBackupTime),
 		metav1.FormatLabelSelector(schedule.Spec.Template.LabelSelector),
 	)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	defaultImageBase       = "gcr.io/heptio-images/velero-restic-restore-helper"
+	defaultImageBase       = "velero/velero-restic-restore-helper"
 	defaultCPURequestLimit = "100m"
 	defaultMemRequestLimit = "128Mi"
 )
@@ -106,6 +106,18 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 
 	cpuRequest, memRequest := getResourceRequests(log, config)
 	cpuLimit, memLimit := getResourceLimits(log, config)
+	if cpuRequest == "" {
+		cpuRequest = defaultCPURequestLimit
+	}
+	if cpuLimit == "" {
+		cpuLimit = defaultCPURequestLimit
+	}
+	if memRequest == "" {
+		memRequest = defaultMemRequestLimit
+	}
+	if memLimit == "" {
+		memLimit = defaultMemRequestLimit
+	}
 
 	resourceReqs, err := kube.ParseResourceRequirements(cpuRequest, memRequest, cpuLimit, memLimit)
 	if err != nil {
@@ -156,20 +168,22 @@ func getImage(log logrus.FieldLogger, config *corev1.ConfigMap) string {
 
 	log = log.WithField("image", image)
 
-	parts := strings.Split(image, ":")
-	switch {
-	case len(parts) == 1:
+	parts := strings.Split(image, "/")
+
+	if len(parts) == 1 {
+		// Image supplied without registry part
+		log.Debugf("Plugin config contains image name without registry name. Return defaultImageBase")
+		return initContainerImage(defaultImageBase)
+	}
+
+	if !(strings.Contains(parts[len(parts)-1], ":")) {
 		// tag-less image name: add tag
 		log.Debugf("Plugin config contains image name without tag. Adding tag.")
 		return initContainerImage(image)
-	case len(parts) == 2:
+	} else {
 		// tagged image name
 		log.Debugf("Plugin config contains image name with tag")
 		return image
-	default:
-		// unrecognized
-		log.Warnf("Plugin config contains unparseable image name")
-		return initContainerImage(defaultImageBase)
 	}
 }
 

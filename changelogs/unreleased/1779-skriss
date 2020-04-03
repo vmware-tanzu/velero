@@ -1,1 +1,0 @@
-when using `velero restore create --namespace-mappings ...` to create a second copy of a namespace in a cluster, create copies of the PVs used

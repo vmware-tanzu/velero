@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:bionic
+FROM ppc64le/ubuntu:bionic
 
-LABEL maintainer="Steve Kriss <krisss@vmware.com>"
+LABEL maintainer="Prajyot Parab <prajyot.parab@ibm.com>"
 
 ADD /bin/linux/ppc64le/velero-restic-restore-helper .
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT [ "/velero-restic-restore-helper" ]

@@ -1,1 +1,0 @@
-Add a new required --plugins flag for velero install command. --plugins takes a list of container images to add as initcontainers.

@@ -34,7 +34,13 @@ import (
 )
 
 func NewDownloadCommand(f client.Factory) *cobra.Command {
+	config, err := client.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: Error reading config file: %v\n", err)
+	}
 	o := NewDownloadOptions()
+	o.caCertFile = config.CACertFile()
+
 	c := &cobra.Command{
 		Use:   "download NAME",
 		Short: "Download a backup",
@@ -58,6 +64,7 @@ type DownloadOptions struct {
 	Timeout               time.Duration
 	InsecureSkipTLSVerify bool
 	writeOptions          int
+	caCertFile            string
 }
 
 func NewDownloadOptions() *DownloadOptions {
@@ -71,6 +78,8 @@ func (o *DownloadOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.Force, "force", o.Force, "forces the download and will overwrite file if it exists already")
 	flags.DurationVar(&o.Timeout, "timeout", o.Timeout, "maximum time to wait to process download request")
 	flags.BoolVar(&o.InsecureSkipTLSVerify, "insecure-skip-tls-verify", o.InsecureSkipTLSVerify, "If true, the object store's TLS certificate will not be checked for validity. This is insecure and susceptible to man-in-the-middle attacks. Not recommended for production.")
+	flags.StringVar(&o.caCertFile, "cacert", o.caCertFile, "path to a certificate bundle to use when verifying TLS connections")
+
 }
 
 func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Factory) error {
@@ -113,7 +122,7 @@ func (o *DownloadOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 	defer backupDest.Close()
 
-	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify)
+	err = downloadrequest.Stream(veleroClient.VeleroV1(), f.Namespace(), o.Name, v1.DownloadTargetKindBackupContents, backupDest, o.Timeout, o.InsecureSkipTLSVerify, o.caCertFile)
 	if err != nil {
 		os.Remove(o.Output)
 		cmd.CheckError(err)

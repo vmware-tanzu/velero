@@ -1,1 +1,0 @@
-report restore progress in PodVolumeRestores and expose progress in the velero restore describe --details command

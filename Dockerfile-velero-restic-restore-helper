@@ -18,6 +18,6 @@ LABEL maintainer="Steve Kriss <krisss@vmware.com>"
 
 ADD /bin/linux/amd64/velero-restic-restore-helper .
 
-USER nobody:nobody
+USER nobody:nogroup
 
 ENTRYPOINT [ "/velero-restic-restore-helper" ]

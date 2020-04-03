@@ -39,9 +39,10 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/discovery"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
@@ -55,18 +56,18 @@ import (
 
 type backupController struct {
 	*genericController
-
+	discoveryHelper          discovery.Helper
 	backupper                pkgbackup.Backupper
-	lister                   listers.BackupLister
+	lister                   velerov1listers.BackupLister
 	client                   velerov1client.BackupsGetter
 	clock                    clock.Clock
 	backupLogLevel           logrus.Level
 	newPluginManager         func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker            BackupTracker
-	backupLocationLister     listers.BackupStorageLocationLister
+	backupLocationLister     velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation    string
 	defaultBackupTTL         time.Duration
-	snapshotLocationLister   listers.VolumeSnapshotLocationLister
+	snapshotLocationLister   velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations map[string]string
 	metrics                  *metrics.ServerMetrics
 	newBackupStore           func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -74,23 +75,25 @@ type backupController struct {
 }
 
 func NewBackupController(
-	backupInformer informers.BackupInformer,
+	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,
+	discoveryHelper discovery.Helper,
 	backupper pkgbackup.Backupper,
 	logger logrus.FieldLogger,
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	defaultBackupLocation string,
 	defaultBackupTTL time.Duration,
-	volumeSnapshotLocationInformer informers.VolumeSnapshotLocationInformer,
+	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
 	metrics *metrics.ServerMetrics,
 	formatFlag logging.Format,
 ) Interface {
 	c := &backupController{
 		genericController:        newGenericController("backup", logger),
+		discoveryHelper:          discoveryHelper,
 		backupper:                backupper,
 		lister:                   backupInformer.Lister(),
 		client:                   client,
@@ -98,10 +101,10 @@ func NewBackupController(
 		backupLogLevel:           backupLogLevel,
 		newPluginManager:         newPluginManager,
 		backupTracker:            backupTracker,
-		backupLocationLister:     backupLocationInformer.Lister(),
+		backupLocationLister:     backupLocationLister,
 		defaultBackupLocation:    defaultBackupLocation,
 		defaultBackupTTL:         defaultBackupTTL,
-		snapshotLocationLister:   volumeSnapshotLocationInformer.Lister(),
+		snapshotLocationLister:   volumeSnapshotLocationLister,
 		defaultSnapshotLocations: defaultSnapshotLocations,
 		metrics:                  metrics,
 		formatFlag:               formatFlag,
@@ -110,11 +113,6 @@ func NewBackupController(
 	}
 
 	c.syncHandler = c.processBackup
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters,
-		backupInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
-		volumeSnapshotLocationInformer.Informer().HasSynced,
-	)
 	c.resyncFunc = c.resync
 	c.resyncPeriod = time.Minute
 
@@ -148,12 +146,44 @@ func NewBackupController(
 }
 
 func (c *backupController) resync() {
+	// recompute backup_total metric
 	backups, err := c.lister.List(labels.Everything())
 	if err != nil {
 		c.logger.Error(err, "Error computing backup_total metric")
 	} else {
 		c.metrics.SetBackupTotal(int64(len(backups)))
 	}
+
+	// recompute backup_last_successful_timestamp metric for each
+	// schedule (including the empty schedule, i.e. ad-hoc backups)
+	for schedule, timestamp := range getLastSuccessBySchedule(backups) {
+		c.metrics.SetBackupLastSuccessfulTimestamp(schedule, timestamp)
+	}
+}
+
+// getLastSuccessBySchedule finds the most recent completed backup for each schedule
+// and returns a map of schedule name -> completion time of the most recent completed
+// backup. This map includes an entry for ad-hoc/non-scheduled backups, where the key
+// is the empty string.
+func getLastSuccessBySchedule(backups []*velerov1api.Backup) map[string]time.Time {
+	lastSuccessBySchedule := map[string]time.Time{}
+	for _, backup := range backups {
+		if backup.Status.Phase != velerov1api.BackupPhaseCompleted {
+			continue
+		}
+		if backup.Status.CompletionTimestamp == nil {
+			continue
+		}
+
+		schedule := backup.Labels[velerov1api.ScheduleNameLabel]
+		timestamp := backup.Status.CompletionTimestamp.Time
+
+		if timestamp.After(lastSuccessBySchedule[schedule]) {
+			lastSuccessBySchedule[schedule] = timestamp
+		}
+	}
+
+	return lastSuccessBySchedule
 }
 
 func (c *backupController) processBackup(key string) error {
@@ -198,7 +228,7 @@ func (c *backupController) processBackup(key string) error {
 		request.Status.Phase = velerov1api.BackupPhaseFailedValidation
 	} else {
 		request.Status.Phase = velerov1api.BackupPhaseInProgress
-		request.Status.StartTimestamp.Time = c.clock.Now()
+		request.Status.StartTimestamp = &metav1.Time{Time: c.clock.Now()}
 	}
 
 	// update status
@@ -289,7 +319,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// calculate expiration
-	request.Status.Expiration = metav1.NewTime(c.clock.Now().Add(request.Spec.TTL.Duration))
+	request.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(request.Spec.TTL.Duration)}
 
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
@@ -301,6 +331,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Labels = make(map[string]string)
 	}
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
+
+	// Getting all information of cluster version - useful for future skip-level migration
+	request.Labels[velerov1api.SourceClusterK8sGitVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().String())
+	request.Labels[velerov1api.SourceClusterK8sMajorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Major)
+	request.Labels[velerov1api.SourceClusterK8sMinorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Minor)
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
@@ -485,7 +520,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	exists, err := backupStore.BackupExists(backup.StorageLocation.Spec.StorageType.ObjectStorage.Bucket, backup.Name)
 	if exists || err != nil {
 		backup.Status.Phase = velerov1api.BackupPhaseFailed
-		backup.Status.CompletionTimestamp.Time = c.clock.Now()
+		backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 		if err != nil {
 			return errors.Wrapf(err, "error checking if backup already exists in object storage")
 		}
@@ -499,7 +534,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 
 	// Mark completion timestamp before serializing and uploading.
 	// Otherwise, the JSON file in object storage has a CompletionTimestamp of 'null'.
-	backup.Status.CompletionTimestamp.Time = c.clock.Now()
+	backup.Status.CompletionTimestamp = &metav1.Time{Time: c.clock.Now()}
 
 	backup.Status.VolumeSnapshotsAttempted = len(backup.VolumeSnapshots)
 	for _, snap := range backup.VolumeSnapshots {

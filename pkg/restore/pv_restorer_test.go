@@ -27,10 +27,10 @@ import (
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
-	cloudprovidermocks "github.com/vmware-tanzu/velero/pkg/cloudprovider/mocks"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -199,7 +199,7 @@ func TestExecutePVAction_SnapshotRestores(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var (
-				volumeSnapshotter       = new(cloudprovidermocks.VolumeSnapshotter)
+				volumeSnapshotter       = new(providermocks.VolumeSnapshotter)
 				volumeSnapshotterGetter = providerToVolumeSnapshotterMap(map[string]velero.VolumeSnapshotter{
 					tc.expectedProvider: volumeSnapshotter,
 				})

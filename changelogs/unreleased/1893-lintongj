@@ -1,1 +1,0 @@
-Add LD_LIBRARY_PATH (=/plugins) to the env variables of velero deployment.

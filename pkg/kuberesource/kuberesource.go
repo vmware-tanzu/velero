@@ -21,12 +21,17 @@ import (
 )
 
 var (
-	ClusterRoleBindings    = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}
-	ClusterRoles           = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}
-	Jobs                   = schema.GroupResource{Group: "batch", Resource: "jobs"}
-	Namespaces             = schema.GroupResource{Group: "", Resource: "namespaces"}
-	PersistentVolumeClaims = schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"}
-	PersistentVolumes      = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
-	Pods                   = schema.GroupResource{Group: "", Resource: "pods"}
-	ServiceAccounts        = schema.GroupResource{Group: "", Resource: "serviceaccounts"}
+	ClusterRoleBindings       = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterrolebindings"}
+	ClusterRoles              = schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}
+	CustomResourceDefinitions = schema.GroupResource{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}
+	Jobs                      = schema.GroupResource{Group: "batch", Resource: "jobs"}
+	Namespaces                = schema.GroupResource{Group: "", Resource: "namespaces"}
+	PersistentVolumeClaims    = schema.GroupResource{Group: "", Resource: "persistentvolumeclaims"}
+	PersistentVolumes         = schema.GroupResource{Group: "", Resource: "persistentvolumes"}
+	Pods                      = schema.GroupResource{Group: "", Resource: "pods"}
+	ServiceAccounts           = schema.GroupResource{Group: "", Resource: "serviceaccounts"}
+	Secrets                   = schema.GroupResource{Group: "", Resource: "secrets"}
+	VolumeSnapshotClasses     = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshotclasses"}
+	VolumeSnapshots           = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshots"}
+	VolumeSnapshotContents    = schema.GroupResource{Group: "snapshot.storage.k8s.io", Resource: "volumesnapshotcontents"}
 )

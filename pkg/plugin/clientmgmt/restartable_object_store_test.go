@@ -26,8 +26,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cloudprovidermocks "github.com/vmware-tanzu/velero/pkg/cloudprovider/mocks"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
+	providermocks "github.com/vmware-tanzu/velero/pkg/plugin/velero/mocks"
 )
 
 func TestRestartableGetObjectStore(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRestartableGetObjectStore(t *testing.T) {
 		},
 		{
 			name:   "happy path",
-			plugin: new(cloudprovidermocks.ObjectStore),
+			plugin: new(providermocks.ObjectStore),
 		},
 	}
 
@@ -97,7 +97,7 @@ func TestRestartableObjectStoreReinitialize(t *testing.T) {
 	err := r.reinitialize(3)
 	assert.EqualError(t, err, "int is not a ObjectStore!")
 
-	objectStore := new(cloudprovidermocks.ObjectStore)
+	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 
@@ -129,7 +129,7 @@ func TestRestartableObjectStoreGetDelegate(t *testing.T) {
 
 	// Happy path
 	p.On("resetIfNeeded").Return(nil)
-	objectStore := new(cloudprovidermocks.ObjectStore)
+	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(objectStore, nil)
@@ -160,7 +160,7 @@ func TestRestartableObjectStoreInit(t *testing.T) {
 	assert.EqualError(t, err, "getByKindAndName error")
 
 	// Delegate returns error
-	objectStore := new(cloudprovidermocks.ObjectStore)
+	objectStore := new(providermocks.ObjectStore)
 	objectStore.Test(t)
 	defer objectStore.AssertExpectations(t)
 	p.On("getByKindAndName", key).Return(objectStore, nil)
@@ -194,7 +194,7 @@ func TestRestartableObjectStoreDelegatedFunctions(t *testing.T) {
 			}
 		},
 		func() mockable {
-			return new(cloudprovidermocks.ObjectStore)
+			return new(providermocks.ObjectStore)
 		},
 		restartableDelegateTest{
 			function:                "PutObject",

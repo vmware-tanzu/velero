@@ -17,8 +17,11 @@ limitations under the License.
 package restic
 
 import (
+	"os"
 	"sort"
 	"testing"
+
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,10 +86,21 @@ func TestGetVolumeBackupsForPod(t *testing.T) {
 			expected:       map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
 		},
 		{
-			name: "no snapshot annotation, no suffix, but with PVBs",
+			name: "no snapshot annotation, but with PVBs",
 			podVolumeBackups: []*velerov1api.PodVolumeBackup{
 				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
 				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+			},
+			podName:  "TestPod",
+			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
+		},
+		{
+			name: "no snapshot annotation, but with PVBs, some of which have snapshot IDs and some of which don't",
+			podVolumeBackups: []*velerov1api.PodVolumeBackup{
+				builder.ForPodVolumeBackup("velero", "pvb-1").PodName("TestPod").SnapshotID("bar").Volume("pvbtest1-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-2").PodName("TestPod").SnapshotID("123").Volume("pvbtest2-abc").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-3").PodName("TestPod").Volume("pvbtest3-foo").Result(),
+				builder.ForPodVolumeBackup("velero", "pvb-4").PodName("TestPod").Volume("pvbtest4-abc").Result(),
 			},
 			podName:  "TestPod",
 			expected: map[string]string{"pvbtest1-foo": "bar", "pvbtest2-abc": "123"},
@@ -134,12 +148,12 @@ func TestGetVolumesToBackup(t *testing.T) {
 		},
 		{
 			name:        "one volume to backup",
-			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1"},
+			annotations: map[string]string{"foo": "bar", VolumesToBackupAnnotation: "volume-1"},
 			expected:    []string{"volume-1"},
 		},
 		{
 			name:        "multiple volumes to backup",
-			annotations: map[string]string{"foo": "bar", volumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
+			annotations: map[string]string{"foo": "bar", VolumesToBackupAnnotation: "volume-1,volume-2,volume-3"},
 			expected:    []string{"volume-1", "volume-2", "volume-3"},
 		},
 	}
@@ -363,4 +377,45 @@ func TestTempCredentialsFile(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "passw0rd", string(contents))
+}
+
+func TestTempCACertFile(t *testing.T) {
+	var (
+		bslInformer = cache.NewSharedIndexInformer(nil, new(velerov1api.BackupStorageLocation), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		bslLister   = velerov1listers.NewBackupStorageLocationLister(bslInformer.GetIndexer())
+		fs          = velerotest.NewFakeFileSystem()
+		bsl         = &velerov1api.BackupStorageLocation{
+			TypeMeta: metav1.TypeMeta{},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "velero",
+				Name:      "default",
+			},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{CACert: []byte("cacert")},
+				},
+			},
+		}
+	)
+
+	// bsl not in lister: expect an error
+	caCert, err := GetCACert(bslLister, "velero", "default")
+	assert.Error(t, err)
+
+	// now add bsl to lister
+	require.NoError(t, bslInformer.GetStore().Add(bsl))
+
+	// bsl in lister: expect temp file to be created with cacert value
+	caCert, err = GetCACert(bslLister, "velero", "default")
+	require.NoError(t, err)
+
+	fileName, err := TempCACertFile(caCert, "default", fs)
+	require.NoError(t, err)
+
+	contents, err := fs.ReadFile(fileName)
+	require.NoError(t, err)
+
+	assert.Equal(t, "cacert", string(contents))
+
+	os.Remove(fileName)
 }

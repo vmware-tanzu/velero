@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/printers"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
@@ -34,20 +33,16 @@ var (
 	}
 )
 
-func printPluginList(list *velerov1api.ServerStatusRequest, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printPluginList(list *velerov1api.ServerStatusRequest) []metav1.TableRow {
 	plugins := list.Status.Plugins
 	sortByKindAndName(plugins)
 
 	rows := make([]metav1.TableRow, 0, len(plugins))
 
 	for _, plugin := range plugins {
-		r, err := printPlugin(plugin, options)
-		if err != nil {
-			return nil, err
-		}
-		rows = append(rows, r...)
+		rows = append(rows, printPlugin(plugin)...)
 	}
-	return rows, nil
+	return rows
 }
 
 func sortByKindAndName(plugins []velerov1api.PluginInfo) {
@@ -59,10 +54,10 @@ func sortByKindAndName(plugins []velerov1api.PluginInfo) {
 	})
 }
 
-func printPlugin(plugin velerov1api.PluginInfo, options printers.PrintOptions) ([]metav1.TableRow, error) {
+func printPlugin(plugin velerov1api.PluginInfo) []metav1.TableRow {
 	row := metav1.TableRow{}
 
 	row.Cells = append(row.Cells, plugin.Name, plugin.Kind)
 
-	return []metav1.TableRow{row}, nil
+	return []metav1.TableRow{row}
 }

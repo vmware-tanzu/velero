@@ -33,8 +33,8 @@ import (
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
-	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 )
 
@@ -42,8 +42,8 @@ type resticRepositoryController struct {
 	*genericController
 
 	resticRepositoryClient      velerov1client.ResticRepositoriesGetter
-	resticRepositoryLister      listers.ResticRepositoryLister
-	backupLocationLister        listers.BackupStorageLocationLister
+	resticRepositoryLister      velerov1listers.ResticRepositoryLister
+	backupLocationLister        velerov1listers.BackupStorageLocationLister
 	repositoryManager           restic.RepositoryManager
 	defaultMaintenanceFrequency time.Duration
 
@@ -53,9 +53,9 @@ type resticRepositoryController struct {
 // NewResticRepositoryController creates a new restic repository controller.
 func NewResticRepositoryController(
 	logger logrus.FieldLogger,
-	resticRepositoryInformer informers.ResticRepositoryInformer,
+	resticRepositoryInformer velerov1informers.ResticRepositoryInformer,
 	resticRepositoryClient velerov1client.ResticRepositoriesGetter,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	repositoryManager restic.RepositoryManager,
 	defaultMaintenanceFrequency time.Duration,
 ) Interface {
@@ -63,7 +63,7 @@ func NewResticRepositoryController(
 		genericController:           newGenericController("restic-repository", logger),
 		resticRepositoryClient:      resticRepositoryClient,
 		resticRepositoryLister:      resticRepositoryInformer.Lister(),
-		backupLocationLister:        backupLocationInformer.Lister(),
+		backupLocationLister:        backupLocationLister,
 		repositoryManager:           repositoryManager,
 		defaultMaintenanceFrequency: defaultMaintenanceFrequency,
 
@@ -76,7 +76,6 @@ func NewResticRepositoryController(
 	}
 
 	c.syncHandler = c.processQueueItem
-	c.cacheSyncWaiters = append(c.cacheSyncWaiters, resticRepositoryInformer.Informer().HasSynced, backupLocationInformer.Informer().HasSynced)
 
 	resticRepositoryInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
@@ -190,7 +189,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 
 	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
 		req.Status.Phase = v1.ResticRepositoryPhaseReady
-		req.Status.LastMaintenanceTime = metav1.Time{Time: time.Now()}
+		req.Status.LastMaintenanceTime = &metav1.Time{Time: time.Now()}
 	})
 }
 
@@ -238,12 +237,12 @@ func (c *resticRepositoryController) runMaintenanceIfDue(req *v1.ResticRepositor
 	}
 
 	return c.patchResticRepository(req, func(req *v1.ResticRepository) {
-		req.Status.LastMaintenanceTime = metav1.Time{Time: now}
+		req.Status.LastMaintenanceTime = &metav1.Time{Time: now}
 	})
 }
 
 func dueForMaintenance(req *v1.ResticRepository, now time.Time) bool {
-	return req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
+	return req.Status.LastMaintenanceTime == nil || req.Status.LastMaintenanceTime.Add(req.Spec.MaintenanceFrequency.Duration).Before(now)
 }
 
 func (c *resticRepositoryController) checkNotReadyRepo(req *v1.ResticRepository, log logrus.FieldLogger) error {

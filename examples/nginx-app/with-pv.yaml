@@ -29,6 +29,7 @@ metadata:
   labels:
     app: nginx
 spec:
+  # Optional:
   # storageClassName: <YOUR_STORAGE_CLASS_NAME>
   accessModes:
     - ReadWriteOnce
@@ -62,7 +63,7 @@ spec:
           persistentVolumeClaim:
            claimName: nginx-logs
       containers:
-      - image: nginx:1.7.9
+      - image: nginx:1.17.6
         name: nginx
         ports:
         - containerPort: 80
@@ -70,7 +71,7 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
-      - image: gcr.io/heptio-images/fsfreeze-pause:latest
+      - image: ubuntu:bionic
         name: fsfreeze
         securityContext:
           privileged: true
@@ -78,7 +79,12 @@ spec:
           - mountPath: "/var/log/nginx"
             name: nginx-logs
             readOnly: false
+        command:
+          - "/bin/bash"
+          - "-c"
+          - "sleep infinity"
 
+  
 ---
 apiVersion: v1
 kind: Service

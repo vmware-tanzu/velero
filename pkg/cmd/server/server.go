@@ -194,7 +194,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().Var(config.formatFlag, "log-format", fmt.Sprintf("the format for log output. Valid values are %s.", strings.Join(config.formatFlag.AllowedValues(), ", ")))
 	command.Flags().StringVar(&config.pluginDir, "plugin-dir", config.pluginDir, "directory containing Velero plugins")
 	command.Flags().StringVar(&config.metricsAddress, "metrics-address", config.metricsAddress, "the address to expose prometheus metrics")
-	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster")
+	command.Flags().DurationVar(&config.backupSyncPeriod, "backup-sync-period", config.backupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. This is the default sync period if none is explicitly specified for a backup storage location.")
 	command.Flags().DurationVar(&config.podVolumeOperationTimeout, "restic-timeout", config.podVolumeOperationTimeout, "how long backups/restores of pod volumes should be allowed to run before timing out")
 	command.Flags().BoolVar(&config.restoreOnly, "restore-only", config.restoreOnly, "run in a mode where only restores are allowed; backups, schedules, and garbage-collection are all disabled. DEPRECATED: this flag will be removed in v2.0. Use read-only backup storage locations instead.")
 	command.Flags().StringSliceVar(&config.disabledControllers, "disable-controllers", config.disabledControllers, fmt.Sprintf("list of controllers to disable on startup. Valid values are %s", strings.Join(disableControllerList, ",")))
@@ -226,7 +226,6 @@ type server struct {
 	logger                logrus.FieldLogger
 	logLevel              logrus.Level
 	pluginRegistry        clientmgmt.Registry
-	pluginManager         clientmgmt.Manager
 	resticManager         restic.RepositoryManager
 	metrics               *metrics.ServerMetrics
 	config                serverConfig
@@ -262,10 +261,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	if err := pluginRegistry.DiscoverPlugins(); err != nil {
 		return nil, err
 	}
-	pluginManager := clientmgmt.NewManager(logger, logger.Level, pluginRegistry)
-	if err != nil {
-		return nil, err
-	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
@@ -288,7 +283,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		logger:                logger,
 		logLevel:              logger.Level,
 		pluginRegistry:        pluginRegistry,
-		pluginManager:         pluginManager,
 		config:                config,
 	}
 
@@ -296,8 +290,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 }
 
 func (s *server) run() error {
-	defer s.pluginManager.CleanupClients()
-
 	signals.CancelOnShutdown(s.cancelFunc, s.logger)
 
 	if s.config.profilerAddress != "" {
@@ -420,6 +412,9 @@ func (s *server) veleroResourcesExist() error {
 func (s *server) validateBackupStorageLocations() error {
 	s.logger.Info("Checking that all backup storage locations are valid")
 
+	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
+	defer pluginManager.CleanupClients()
+
 	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return errors.WithStack(err)
@@ -427,7 +422,7 @@ func (s *server) validateBackupStorageLocations() error {
 
 	var invalid []string
 	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, s.pluginManager, s.logger)
+		backupStore, err := persistence.NewObjectBackupStore(&location, pluginManager, s.logger)
 		if err != nil {
 			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
 			continue
@@ -445,8 +440,14 @@ func (s *server) validateBackupStorageLocations() error {
 	return nil
 }
 
-// - Namespaces go first because all namespaced resources depend on them.
+// - Custom Resource Definitions come before Custom Resource so that they can be
+//   restored with their corresponding CRD.
+// - Namespaces go second because all namespaced resources depend on them.
 // - Storage Classes are needed to create PVs and PVCs correctly.
+// - VolumeSnapshotClasses  are needed to provision volumes using volumesnapshots
+// - VolumeSnapshotContents are needed as they contain the handle to the volume snapshot in the
+//	 storage provider
+// - VolumeSnapshots are needed to create PVCs using the VolumeSnapshot as their data source.
 // - PVs go before PVCs because PVCs depend on them.
 // - PVCs go before pods or controllers so they can be mounted as volumes.
 // - Secrets and config maps go before pods or controllers so they can be mounted
@@ -455,11 +456,15 @@ func (s *server) validateBackupStorageLocations() error {
 // - Limit ranges go before pods or controllers so pods can use them.
 // - Pods go before controllers so they can be explicitly restored and potentially
 //	 have restic restores run before controllers adopt the pods.
-// - Custom Resource Definitions come before Custom Resource so that they can be
-//   restored with their corresponding CRD.
+// - Replica sets go before deployments/other controllers so they can be explicitly
+//	 restored and be adopted by controllers.
 var defaultRestorePriorities = []string{
+	"customresourcedefinitions",
 	"namespaces",
 	"storageclasses",
+	"volumesnapshotclass.snapshot.storage.k8s.io",
+	"volumesnapshotcontents.snapshot.storage.k8s.io",
+	"volumesnapshots.snapshot.storage.k8s.io",
 	"persistentvolumes",
 	"persistentvolumeclaims",
 	"secrets",
@@ -467,8 +472,11 @@ var defaultRestorePriorities = []string{
 	"serviceaccounts",
 	"limitranges",
 	"pods",
-	"replicaset",
-	"customresourcedefinitions",
+	// we fully qualify replicasets.apps because prior to Kubernetes 1.16, replicasets also
+	// existed in the extensions API group, but we back up replicasets from "apps" so we want
+	// to ensure that we prioritize restoring from "apps" too, since this is how they're stored
+	// in the backup.
+	"replicasets.apps",
 }
 
 func (s *server) initRestic() error {
@@ -549,9 +557,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups(),
+			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.config.defaultBackupLocation,
@@ -580,15 +587,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.veleroClient.VeleroV1(),
+			s.discoveryHelper,
 			backupper,
 			s.logger,
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.defaultBackupLocation,
 			s.config.defaultBackupTTL,
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 			s.config.formatFlag.Parse(),
@@ -620,9 +628,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		gcController := controller.NewGCController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
+			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 		)
 
 		return controllerRunInfo{
@@ -637,13 +645,13 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
 			s.veleroClient.VeleroV1(), // deleteBackupRequestClient
 			s.veleroClient.VeleroV1(), // backupClient
-			s.sharedInformerFactory.Velero().V1().Restores(),
+			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
 			s.veleroClient.VeleroV1(), // restoreClient
 			backupTracker,
 			s.resticManager,
-			s.sharedInformerFactory.Velero().V1().PodVolumeBackups(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
+			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			newPluginManager,
 			s.metrics,
 		)
@@ -655,7 +663,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	restoreControllerRunInfo := func() controllerRunInfo {
-
 		restorer, err := restore.NewKubernetesRestorer(
 			s.discoveryHelper,
 			client.NewDynamicFactory(s.dynamicClient),
@@ -674,9 +681,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.veleroClient.VeleroV1(),
 			restorer,
-			s.sharedInformerFactory.Velero().V1().Backups(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations(),
+			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			s.logger,
 			s.logLevel,
 			newPluginManager,
@@ -696,7 +703,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.resticManager,
 			s.config.defaultResticMaintenanceFrequency,
 		)
@@ -711,9 +718,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		downloadRequestController := controller.NewDownloadRequestController(
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
-			s.sharedInformerFactory.Velero().V1().Restores(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
-			s.sharedInformerFactory.Velero().V1().Backups(),
+			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
 			s.logger,
 		)
@@ -770,17 +777,38 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	// Instantiate the enabled controllers. This needs to be done *before*
+	// the shared informer factory is started, because the controller
+	// constructors add event handlers to various informers, which should
+	// be done before the informers are running.
+	controllers := make([]controllerRunInfo, 0, len(enabledControllers))
 	for _, newController := range enabledControllers {
-		controllerRunInfo := newController()
+		controllers = append(controllers, newController())
+	}
+
+	// start the informers & and wait for the caches to sync
+	s.sharedInformerFactory.Start(ctx.Done())
+	s.logger.Info("Waiting for informer caches to sync")
+	cacheSyncResults := s.sharedInformerFactory.WaitForCacheSync(ctx.Done())
+	s.logger.Info("Done waiting for informer caches to sync")
+
+	for informer, synced := range cacheSyncResults {
+		if !synced {
+			return errors.Errorf("cache was not synced for informer %v", informer)
+		}
+		s.logger.WithField("informer", informer).Info("Informer cache synced")
+	}
+
+	// now that the informer caches have all synced, we can start running the controllers
+	for i := range controllers {
+		controllerRunInfo := controllers[i]
+
 		wg.Add(1)
 		go func() {
 			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
 			wg.Done()
 		}()
 	}
-
-	// SHARED INFORMERS HAVE TO BE STARTED AFTER ALL CONTROLLERS
-	go s.sharedInformerFactory.Start(ctx.Done())
 
 	s.logger.Info("Server started successfully")
 
