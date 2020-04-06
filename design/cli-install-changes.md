@@ -115,8 +115,8 @@ Commands/flags for backup locations.
 ```
       set
         --default string                                  sets the default backup storage location (default "default") (NEW, -- was `server --default-backup-storage-location; could be set as an annotation on the BSL)
-        --cacert mapStringString                          sets the name of the corresponding CA cert secret for the object storage. Format is provider:cacert-secret-name. (NEW)
         --credentials mapStringString                     sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name. (NEW)
+        --cacert-file mapStringString                     configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file. (NEW)
 
       create                                              NAME [flags]
         --default                                         Sets this new location to be the new default backup location. Default is false. (NEW) 
@@ -130,8 +130,8 @@ Commands/flags for backup locations.
         --prefix string                                   prefix under which all Velero data should be stored within the bucket. Optional.
         --provider string                                 name of the backup storage provider (e.g. aws, azure, gcp)
         --show-labels                                     show labels in the last column
-        --cacert mapStringString                          sets the name of the corresponding CA cert secret for the object storage. Format is provider-name=cacert-secret-name. (NEW)
         --credentials mapStringString                     sets the name of the corresponding credentials secret for a provider. Format is provider:credentials-secret-name. (NEW)
+        --cacert-file mapStringString                     configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file. (NEW)
 
       get                                                 Display backup storage locations
         --default                                         displays the current default backup storage location (NEW)
@@ -178,7 +178,6 @@ Configuration for plugins.
         --credentials-file mapStringString      configuration to use for creating a secret containing the AIM credentials for a plugin provider. Format is provider:path-to-file. (was `secret-file`)
         --no-secret                             flag indicating if a secret should be created. Must be used as confirmation if create --secret-file is not provided. Optional. (MOVED FROM install -- not sure we need it?)
         --sa-annotations mapStringString        annotations to add to the Velero ServiceAccount for GKE. Add iam.gke.io/gcp-service-account=[GSA_NAME]@[PROJECT_NAME].iam.gserviceaccount.com for workload identity. Optional. Format is key1=value1,key2=value2
-        --cacert-file mapStringString           configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file. (NEW)
 ```
 
 #### Example
@@ -188,10 +187,10 @@ Considering this proposal, let's consider what a high-level documentation for ge
 After installing the Velero CLI:
 ```
 velero config server [flags] (required)
+velero config restic [flags]
 velero plugin add IMAGES [flags] (add/config provider plugins)
 velero backup-location/snapshot-location create NAME [flags] (run `velero plugin --get` to see what kind of plugins are available; create locations)
 velero backup/restore/schedule create/get/delete NAME [flags]
-velero config restic [flags]
 ```
 
 The above recipe-style documentation should highlight 1) the main components of Velero, and, 2) the relationship/dependency between the main components
@@ -255,11 +254,12 @@ Flags moved to...
       --secret-file string  (renamed `credentials-file`)   file containing credentials for backup and volume provider. If not specified, --no-secret must be used for confirmation. Optional.
 ```
 
-Flags to delete:
+Flags to deprecate:
 ```
       --no-default-backup-location                 flag indicating if a default backup location should be created. Must be used as confirmation if --bucket or --provider are not provided. Optional.
       --use-volume-snapshots                       whether or not to create snapshot location automatically. Set to false if you do not plan to create volume snapshots via a storage provider. (default true)
       --wait                                       wait for Velero deployment to be ready. Optional.
+      --use-restic                                 (obsolete since now we have `velero config restic`)
 ```
 
 ##### Velero Server
@@ -276,17 +276,17 @@ The value for these flags will be stored as annotations.
 
 #### Handling CA certs
 
-In anticipating of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/master/design/custom-ca-support.md), a new flag `velero plugin set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
-
-A `velero backup-location (create|set) --cacert mapStringString` flag is also being proposed. It sets the name of the corresponding CA cert secret for the object storage. Format is provider:cacert-secret-name.
+In anticipation of a new configuration implementation to handle custom CA certs (as per design doc https://github.com/vmware-tanzu/velero/blob/master/design/custom-ca-support.md), a new flag `velero storage-location create/set --cacert-file mapStringString` is proposed. It sets the configuration to use for creating a secret containing a custom certificate for an S3 location of a plugin provider. Format is provider:path-to-file.
 
 See discussion https://github.com/vmware-tanzu/velero/pull/2259#discussion_r384700723 for more clarification.
 
-#### Renaming "provider" to "plugin"
+#### Renaming "provider" to "location-plugin"
 
-As part of this change, we should change to use the term `plugin` instead of `provider`. The reasoning: in practice, we usually have 1 plugin per provider, and if there is an implementation for both object store and volume snapshotter for that provider, it will all be contained in the same plugin. When we handle plugins, we follow this logic. In other words, there's a plugin name (ex: `velero.io/aws`) and it can contain implementations of kind `ObjectStore` and/or `VolumeSnapshotter`.
+As part of this change, we should change to use the term `location-plugin` instead of `provider`. The reasoning: in practice, we usually have 1 plugin per provider, and if there is an implementation for both object store and volume snapshotter for that provider, it will all be contained in the same plugin. When we handle plugins, we follow this logic. In other words, there's a plugin name (ex: `velero.io/aws`) and it can contain implementations of kind `ObjectStore` and/or `VolumeSnapshotter`.
 
-But when we handle BSL ir VSL (and the CLI commands/flags that configure them), we use the term `provider`, which can cause ambiguity as if that is a kind of thing different from a plugin. If the plugin is the "thing" that contains the implementation for the desired provider, we should make it easier for the user to guess that and change BackupStorageLocation/VolumeSnapshotLocation `Spec.Provider` field to be called `Spec.Plugin` and all related CLI command flags to `plugin`, and update the docs accordingly.
+But when we handle BSL or VSL (and the CLI commands/flags that configure them), we use the term `provider`, which can cause ambiguity as if that is a kind of thing different from a plugin. If the plugin is the "thing" that contains the implementation for the desired provider, we should make it easier for the user to guess that and change BackupStorageLocation/VolumeSnapshotLocation `Spec.Provider` field to be called `Spec.Location-Plugin` and all related CLI command flags to `location-plugin`, and update the docs accordingly.
+
+This change will require a CRD version bump and deprecation cycle.
 
 #### GitOps Compatibility
 
@@ -328,9 +328,7 @@ The user will start up the Velero server on a cluster by using the command `vele
 
 The Velero server will start up, verify that the deployment is running, that all CRDs were found, and log a message that it is waiting for a BSL to be configured. at this point, other operations, such as configuring restic, will be allowed. Velero should keep track of its status, ie, if it is ready to create backups or not. This could be a field `ServerStatus` added to `ServerStatusRequest`. Possible values could be [ready|waiting]. "ready" would mean there is at least 1 valid BSL, and "waiting" would be anything but that.
 
-When adding/configuring a BSL or VSL, we can approach it in one of two ways:
-1) at the time of creating a location, verify if there is a valid, corresponding plugin. If there isn't, don't allow creation.
-2) allow creating locations, and continuously verify if there is a corresponding, valid plugin. When a valid match is found, mark the BSL/VSL as "ready". This would require adding a field to the BSL/VSL to keep track of its status, possibly: [ready|waiting].
+When adding/configuring a BSL or VSL, we will allow creating locations, and continuously verify if there is a corresponding, valid plugin. When a valid match is found, mark the BSL/VSL as "ready". This would require adding a field to the BSL/VSL, or using the existing `Phase` field, and keep track of its status, possibly: [ready|waiting].
 
 With the first approach: the server would transition into "ready" (to create backups) as soon as there is one BSL. It would require a set sequence of actions, ie, first install the plugin, only then the user can successfully configure a BSL.
 
@@ -363,12 +361,6 @@ https://github.com/istio/installer/tree/master/kustomize
 https://github.com/weaveworks/flagger/tree/master/kustomize
 
 https://github.com/jpeach/contour/tree/1c575c772e9fd747fba72ae41ab99bdae7a01864/kustomize (RFC)
-
-## TBD
-
-Question: how should velero install be aware of env vars that different provider plugins require? (right now we just hardcode the AWS/Azure/GCP ones).
-
-There's currently a special case for Azure + restic, where a set of restic-specific env vars need to be set with storage account name and key, which is likely going to remain hardcoded in upstream Velero - how do we deal with situations like this?
 
 ## Security Considerations
 
