@@ -10,7 +10,7 @@ Velero can help you port your resources from one cluster to another, as long as 
     velero backup create <BACKUP-NAME>
     ```
 
-    The default TTL is 30 days (720 hours); you can use the `--ttl` flag to change this as necessary.
+    The default backup retention period, expressed as TTL (time to live), is 30 days (720 hours); you can use the `--ttl <DURATION>` flag to change this as necessary. See [how velero works][1] for more information about backup expiry. 
 
 1.  *(Cluster 2)* Configure `BackupStorageLocations` and `VolumeSnapshotLocations`, pointing to the locations used by *Cluster 1*, using `velero backup-location create` and `velero snapshot-location create`. Make sure to configure the `BackupStorageLocations` as read-only
     by using the `--access-mode=ReadOnly` flag for `velero backup-location create`.
@@ -46,3 +46,5 @@ Check that the second cluster is behaving as expected:
     ```
 
 If you encounter issues, make sure that Velero is running in the same namespace in both clusters.
+
+[1]: how-velero-works.md#set-a-backup-to-expire
