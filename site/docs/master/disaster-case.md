@@ -10,7 +10,7 @@ If you periodically back up your cluster's resources, you are able to return to 
     velero schedule create <SCHEDULE NAME> --schedule "0 7 * * *"
     ```
     
-    This creates a Backup object with the name `<SCHEDULE NAME>-<TIMESTAMP>`.
+    This creates a Backup object with the name `<SCHEDULE NAME>-<TIMESTAMP>`. The default backup retention period, expressed as TTL (time to live), is 30 days (720 hours); you can use the `--ttl <DURATION>` flag to change this as necessary. See [how velero works][1] for more information about backup expiry. 
 
 1.  A disaster happens and you need to recreate your resources.
 
@@ -31,9 +31,11 @@ If you periodically back up your cluster's resources, you are able to return to 
 
 1. When ready, revert your backup storage location to read-write mode:
 
-   ```bash
-   kubectl patch backupstoragelocation <STORAGE LOCATION NAME> \
+    ```bash
+    kubectl patch backupstoragelocation <STORAGE LOCATION NAME> \
        --namespace velero \
        --type merge \
        --patch '{"spec":{"accessMode":"ReadWrite"}}'
     ```
+    
+[1]: how-velero-works.md#set-a-backup-to-expire
