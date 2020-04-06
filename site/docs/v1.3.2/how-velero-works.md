@@ -57,12 +57,14 @@ For example, if the cluster being backed up has a `gizmos` resource in the `thin
 
 ## Set a backup to expire
 
-When you create a backup, you can specify a TTL by adding the flag `--ttl <DURATION>`. If Velero sees that an existing backup resource is expired, it removes:
+When you create a backup, you can specify a TTL (time to live) by adding the flag `--ttl <DURATION>`. If Velero sees that an existing backup resource is expired, it removes:
 
 * The backup resource
 * The backup file from cloud object storage
 * All PersistentVolume snapshots
 * All associated Restores
+
+The TTL flag allows the user to specify the backup retention period with the value specified in hours, minutes and seconds in the form `--ttl 24h0m0s`. If not specified, a default TTL value of 30 days will be applied. 
 
 ## Object storage sync
 
