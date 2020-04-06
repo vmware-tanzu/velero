@@ -85,10 +85,26 @@ Below is the proposed set of new commands to setup and configure Velero.
         --pod-cpu-request string                    CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
         --pod-mem-limit string                      memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
         --pod-mem-request string                    memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-        --deployment                                create restic deployment. Default is false. Optional. Other flags will only work if set to true. (NEW, was `velero install use-restic`)
         --timeout duration                          how long backups/restores of pod volumes should be allowed to run before timing out (default 1h0m0s)
         repo  
           get                                         Get restic repositories
+```
+The `velero config server` command will create the following resources:
+
+```
+Namespace
+Deployment
+backups.velero.io
+backupstoragelocations.velero.io
+deletebackuprequests.velero.io
+downloadrequests.velero.io
+podvolumebackups.velero.io
+podvolumerestores.velero.io
+resticrepositories.velero.io
+restores.velero.io
+schedules.velero.io
+serverstatusrequests.velero.io
+volumesnapshotlocations.velero.io
 ```
 
 Note: Velero will maintain the `velero server` command run by the Velero pod, which starts the Velero server deployment.
@@ -191,26 +207,27 @@ In order to maintain compatibility with the current Velero version for a suffici
 ##### Velero Install 
 `velero install (DEPRECATED)`
 
-Flags moved to `velero config server`:
+Flags moved to...
+
+...`velero config server`:
 ```
       --image string                               image to use for the Velero and restic server pods. Optional. (default "velero/velero:latest")
       --label-columns stringArray                  a comma-separated list of labels to be displayed as columns
       --pod-annotations mapStringString            annotations to add to the Velero and restic pods. Optional. Format is key1=value1,key2=value2
-      --restore-only                               run the server in restore-only mode. Optional.
       --show-labels                                show labels in the last column
-      --velero-pod-cpu-limit string                CPU limit for Velero pod. A value of "0" is treated as unbounded. Optional. (default "1000m")
-      --velero-pod-cpu-request string              CPU request for Velero pod. A value of "0" is treated as unbounded. Optional. (default "500m")
-      --velero-pod-mem-limit string                memory limit for Velero pod. A value of "0" is treated as unbounded. Optional. (default "256Mi")
-      --velero-pod-mem-request string              memory request for Velero pod. A value of "0" is treated as unbounded. Optional. (default "128Mi")
+      --pod-cpu-limit string                CPU limit for Velero pod. A value of "0" is treated as unbounded. Optional. (default "1000m")
+      --pod-cpu-request string              CPU request for Velero pod. A value of "0" is treated as unbounded. Optional. (default "500m")
+      --pod-mem-limit string                memory limit for Velero pod. A value of "0" is treated as unbounded. Optional. (default "256Mi")
+      --pod-mem-request string              memory request for Velero pod. A value of "0" is treated as unbounded. Optional. (default "128Mi")
 ```
 
 ...`velero config restic`
 ```
-      --default-restic-prune-frequency duration    how often 'restic prune' is run for restic repositories by default. Optional.
-      --restic-pod-cpu-limit string                CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-cpu-request string              CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-mem-limit string                memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
-      --restic-pod-mem-request string              memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --default-prune-frequency duration    how often 'restic prune' is run for restic repositories by default. Optional.
+      --pod-cpu-limit string                CPU limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --pod-cpu-request string              CPU request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --pod-mem-limit string                memory limit for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
+      --pod-mem-request string              memory request for restic pod. A value of "0" is treated as unbounded. Optional. (default "0")
 ```
 
 ...`backup-location create`
@@ -227,7 +244,7 @@ Flags moved to `velero config server`:
 
 ...both `backup-location create` and `snapshot-location create`
 ```
-      --provider string                            provider name for backup and volume storage 
+      --provider string                            provider name for backup and volume storage
 ```
 
 ...`plugin`
@@ -246,19 +263,14 @@ Flags to delete:
 ```
 
 ##### Velero Server
-`velero server (RENAMED velero config server)` 
- 
-`velero server --default-backup-storage-location (DEPRECATED)` changed to `velero backup-location set --default` 
+
+These flags will be moved to under `velero config server`:
+
+`velero server --default-backup-storage-location (DEPRECATED)` changed to `velero backup-location set --default`
 
 `velero server --default-volume-snapshot-locations (DEPRECATED)` changed to `velero snapshot-location set --default`
 
-`velero server --default-restic-prune-frequency (DEPRECATED)` changed to `velero config restic set --default-prune-frequency` 
-
-`velero server --restic-timeout  (DEPRECATED)` changed to `velero config restic set timeout`
-
-`velero server --use-restic  (DEPRECATED)` see `velero config restic`
-
-All other `velero server` flags changed to under `velero config server`.
+The value for these flags will be stored as annotations.
 
 ## Detailed Design
 
