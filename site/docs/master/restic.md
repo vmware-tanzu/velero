@@ -410,7 +410,7 @@ within each restored volume, under `.velero`, whose name is the UID of the Veler
 1. Once all such files are found, the init container's process terminates successfully and the pod moves
 on to running other init containers/the main containers.
 
-## 3rd party controller
+## 3rd party controllers
 
 ### Monitor backup annotation
 
@@ -420,9 +420,9 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 
 ### Add backup annotation
 
-Velero hasn't provided a do-one-command or automatic way to backup all volume resources in the cluster without annotation.
+Velero does not currently provide a single command or automatic way to backup all volume resources in the cluster without annotating pods or pod templates.
 
-To solve this, [velero-volume-controller][10] helps to achieve this goal by adding backup annotation to pods with volumes automatically.
+The [velero-volume-controller][10] written by duyanghao helps to solve this problem by adding backup annotation to pods with volumes automatically.
 
 [1]: https://github.com/restic/restic
 [2]: customize-installation.md#enable-restic-integration
