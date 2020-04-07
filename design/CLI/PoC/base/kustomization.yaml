@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - deployment.yaml
+  - CRDs.yaml
   - backupstoragelocations.yaml
   - volumesnapshotlocations.yaml # including so the velero server can run
   - resticrepository.yaml # including so the velero server can runl

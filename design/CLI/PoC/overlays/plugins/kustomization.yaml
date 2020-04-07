@@ -6,7 +6,7 @@ bases:
 
 patchesStrategicMerge:
   - aws-plugin.yaml # this patches the Velero deployment
-  - azure-plugin.yaml # this patches the Velero deployment
+  # - azure-plugin.yaml # this patches the Velero deployment
 
 generatorOptions:
   disableNameSuffixHash: true

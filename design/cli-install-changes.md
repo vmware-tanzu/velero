@@ -310,7 +310,13 @@ Note: actual `yaml` file names are defined by the user.
 
 `velero plugin add velero/velero-plugin-for-microsoft-azure:v1.0.1` - overlay/plugins/azure-plugin.yaml
 
-These files can be deployed using the included kustomize setup by running `k apply -k design/CLI/PoC/overlays/plugins/`.
+These resources can be deployed/deleted using the included kustomize setup and running:
+
+```
+kubectl apply -k design/CLI/PoC/overlays/plugins/
+
+kubectl delete -k design/CLI/PoC/overlays/plugins/
+```
 
 Note: All CRDs, including the `ResticRepository`, may continue to be deployed at startup as it is now, or together with their respective instantiation.
 
