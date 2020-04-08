@@ -1034,7 +1034,7 @@ func (ctx *context) restoreItem(obj *unstructured.Unstructured, groupResource sc
 		}
 
 		if pvc.Spec.VolumeName != "" && ctx.pvsToProvision.Has(pvc.Spec.VolumeName) {
-			ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning because its PV %v has a reclaim policy of Delete", namespace, name, pvc.Spec.VolumeName)
+			ctx.log.Infof("Resetting PersistentVolumeClaim %s/%s for dynamic provisioning", namespace, name)
 
 			// use the unstructured helpers here since we're only deleting and
 			// the unstructured converter will add back (empty) fields for metadata
