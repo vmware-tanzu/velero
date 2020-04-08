@@ -8,6 +8,7 @@ Velero supports taking Container Storage Interface (CSI) snapshots as a beta fea
  1. The cluster is running a CSI driver capable of support volume snapshots at the [v1beta1 API level](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
  1. The Velero server is running with the `--features EnableCSI` feature flag to enable CSI logic in Velero's core.
  1. The Velero [CSI plugin](https://github.com/vmware-tanzu/velero-plugin-for-csi/) is installed to integrate with the CSI volume snapshot APIs.
+ 1. When restoring CSI volumesnapshots across clusters, the name of the CSI driver in the destination cluster should be the same as that on the source cluster to ensure cross cluster portability of CSI volumesnapshots
 
 # Roadmap
 
