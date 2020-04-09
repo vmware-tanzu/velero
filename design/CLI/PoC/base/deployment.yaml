@@ -1,0 +1,89 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: velero
+  name: velero
+  namespace: velero
+spec:
+  selector:
+    matchLabels:
+      deploy: velero
+  strategy: {}
+  template:
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8085"
+        prometheus.io/scrape: "true"
+      labels:
+        component: velero
+        deploy: velero
+    spec:
+      containers:
+        - args:
+            - server 
+          command:
+            - /velero
+          env:
+            - name: VELERO_SCRATCH_DIR
+              value: /scratch
+            - name: VELERO_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: LD_LIBRARY_PATH
+              value: /plugins
+          name: velero
+          image: velero/velero:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8085
+              name: metrics
+          resources:
+            limits:
+              cpu: "1"
+              memory: 256Mi
+            requests:
+              cpu: 500m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /scratch
+              name: scratch
+      restartPolicy: Always
+      serviceAccountName: velero
+      volumes:
+        - emptyDir: {}
+          name: scratch
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    component: velero
+  name: velero
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: velero
+    namespace: velero
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    component: velero
+  name: velero
+  namespace: velero
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    component: velero
+  name: velero
+spec: {}

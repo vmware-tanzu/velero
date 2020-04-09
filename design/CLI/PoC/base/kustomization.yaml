@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - CRDs.yaml
+  - backupstoragelocations.yaml
+  - volumesnapshotlocations.yaml # including so the velero server can run
+  - resticrepository.yaml # including so the velero server can runl
+  - podvolumes.yaml # including so the velero server can runl
+  - minio.yaml
+
