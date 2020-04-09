@@ -156,6 +156,11 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 	return resources
 }
 
+// GetNamespacesInBackup returns the list of namespaces that are present in the backup
+func GetNamespacesInBackup(backup *api.Backup) []string {
+	return getNamespacesToList(getNamespaceIncludesExcludes(backup))
+}
+
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
 // include and exclude from the backup.
 func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExcludes {

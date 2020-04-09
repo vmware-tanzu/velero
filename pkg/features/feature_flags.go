@@ -22,6 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+// Feature flag constant strings
+const (
+	EnableCSI = "EnableCSI"
+)
+
 type featureFlagSet struct {
 	set sets.String
 }

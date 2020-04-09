@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -688,6 +689,14 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	deletionControllerRunInfo := func() controllerRunInfo {
+		var snapshotterClient *snapshotterClientSet.Clientset
+		var err error
+		if features.IsEnabled(features.EnableCSI) {
+			snapshotterClient, err = snapshotterClientSet.NewForConfig(s.kubeClientConfig)
+			if err != nil {
+				s.logger.Errorf("Failed to create CSI volumesnapshotclient, %v", err)
+			}
+		}
 		deletionController := controller.NewBackupDeletionController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
@@ -700,6 +709,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
+			snapshotterClient,
 			newPluginManager,
 			s.metrics,
 		)

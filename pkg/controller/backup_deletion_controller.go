@@ -23,6 +23,9 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	snapshotter "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +36,8 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/backup"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -62,10 +66,11 @@ type backupDeletionController struct {
 	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
 	backupLocationLister      velerov1listers.BackupStorageLocationLister
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
-	processRequestFunc        func(*v1.DeleteBackupRequest) error
+	csiSnapshotClient         *snapshotterClientSet.Clientset
+	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore            func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
 }
 
@@ -82,6 +87,7 @@ func NewBackupDeletionController(
 	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
 	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
+	csiSnapshotClient *snapshotterClientSet.Clientset,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
 ) Interface {
@@ -97,6 +103,7 @@ func NewBackupDeletionController(
 		podvolumeBackupLister:     podvolumeBackupLister,
 		backupLocationLister:      backupLocationLister,
 		snapshotLocationLister:    snapshotLocationLister,
+		csiSnapshotClient:         csiSnapshotClient,
 		metrics:                   metrics,
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -140,7 +147,7 @@ func (c *backupDeletionController) processQueueItem(key string) error {
 	}
 
 	switch req.Status.Phase {
-	case v1.DeleteBackupRequestPhaseProcessed:
+	case velerov1api.DeleteBackupRequestPhaseProcessed:
 		// Don't do anything because it's already been processed
 	default:
 		// Don't mutate the shared cache
@@ -151,7 +158,7 @@ func (c *backupDeletionController) processQueueItem(key string) error {
 	return nil
 }
 
-func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) error {
+func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupRequest) error {
 	log := c.logger.WithFields(logrus.Fields{
 		"namespace": req.Namespace,
 		"name":      req.Name,
@@ -162,8 +169,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// Make sure we have the backup name
 	if req.Spec.BackupName == "" {
-		_, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+		_, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = []string{"spec.backupName is required"}
 		})
 		return err
@@ -177,8 +184,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 
 	// Don't allow deleting an in-progress backup
 	if c.backupTracker.Contains(req.Namespace, req.Spec.BackupName) {
-		_, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+		_, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = []string{"backup is still in progress"}
 		})
 
@@ -189,8 +196,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	backup, err := c.backupClient.Backups(req.Namespace).Get(req.Spec.BackupName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		// Couldn't find backup - update status to Processed and record the not-found error
-		req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+		req, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = []string{"backup not found"}
 		})
 
@@ -203,8 +210,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	// Don't allow deleting backups in read-only storage locations
 	location, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
 	if apierrors.IsNotFound(err) {
-		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+		_, err := c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("backup storage location %s not found", backup.Spec.StorageLocation))
 		})
 		return err
@@ -213,9 +220,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if location.Spec.AccessMode == v1.BackupStorageLocationAccessModeReadOnly {
-		_, err := c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+	if location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		_, err := c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))
 		})
 		return err
@@ -228,11 +235,11 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	// Update status to InProgress and set backup-name label if needed
-	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-		r.Status.Phase = v1.DeleteBackupRequestPhaseInProgress
+	req, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+		r.Status.Phase = velerov1api.DeleteBackupRequestPhaseInProgress
 
-		if req.Labels[v1.BackupNameLabel] == "" {
-			req.Labels[v1.BackupNameLabel] = label.GetValidName(req.Spec.BackupName)
+		if req.Labels[velerov1api.BackupNameLabel] == "" {
+			req.Labels[velerov1api.BackupNameLabel] = label.GetValidName(req.Spec.BackupName)
 		}
 	})
 	if err != nil {
@@ -240,9 +247,9 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	// Set backup-uid label if needed
-	if req.Labels[v1.BackupUIDLabel] == "" {
-		req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-			req.Labels[v1.BackupUIDLabel] = string(backup.UID)
+	if req.Labels[velerov1api.BackupUIDLabel] == "" {
+		req, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+			req.Labels[velerov1api.BackupUIDLabel] = string(backup.UID)
 		})
 		if err != nil {
 			return err
@@ -250,15 +257,15 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	// Set backup status to Deleting
-	backup, err = c.patchBackup(backup, func(b *v1.Backup) {
-		b.Status.Phase = v1.BackupPhaseDeleting
+	backup, err = c.patchBackup(backup, func(b *velerov1api.Backup) {
+		b.Status.Phase = velerov1api.BackupPhaseDeleting
 	})
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error setting backup phase to deleting")
 		return err
 	}
 
-	backupScheduleName := backup.GetLabels()[v1.ScheduleNameLabel]
+	backupScheduleName := backup.GetLabels()[velerov1api.ScheduleNameLabel]
 	c.metrics.RegisterBackupDeletionAttempt(backupScheduleName)
 
 	var errs []string
@@ -312,6 +319,15 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 		}
 	}
 
+	if c.csiSnapshotClient != nil {
+		log.Info("Removing CSI volumesnapshots")
+		if csiErrs := c.deleteCSIVolumeSnapshots(backup, c.csiSnapshotClient.SnapshotV1beta1(), log); len(errs) > 0 {
+			for _, err := range csiErrs {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+
 	log.Info("Removing restores")
 	if restores, err := c.restoreLister.Restores(backup.Namespace).List(labels.Everything()); err != nil {
 		log.WithError(errors.WithStack(err)).Error("Error listing restore API objects")
@@ -352,8 +368,8 @@ func (c *backupDeletionController) processRequest(req *v1.DeleteBackupRequest) e
 	}
 
 	// Update status to processed and record errors
-	req, err = c.patchDeleteBackupRequest(req, func(r *v1.DeleteBackupRequest) {
-		r.Status.Phase = v1.DeleteBackupRequestPhaseProcessed
+	req, err = c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
+		r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 		r.Status.Errors = errs
 	})
 	if err != nil {
@@ -395,10 +411,10 @@ func volumeSnapshotterForSnapshotLocation(
 	return volumeSnapshotter, nil
 }
 
-func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.DeleteBackupRequest, log logrus.FieldLogger) []error {
+func (c *backupDeletionController) deleteExistingDeletionRequests(req *velerov1api.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{
-		v1.BackupNameLabel: label.GetValidName(req.Spec.BackupName),
+		velerov1api.BackupNameLabel: label.GetValidName(req.Spec.BackupName),
 	}))
 	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(req.Namespace).List(selector)
 	if err != nil {
@@ -419,7 +435,7 @@ func (c *backupDeletionController) deleteExistingDeletionRequests(req *v1.Delete
 	return errs
 }
 
-func (c *backupDeletionController) deleteResticSnapshots(backup *v1.Backup) []error {
+func (c *backupDeletionController) deleteResticSnapshots(backup *velerov1api.Backup) []error {
 	if c.resticMgr == nil {
 		return nil
 	}
@@ -442,6 +458,49 @@ func (c *backupDeletionController) deleteResticSnapshots(backup *v1.Backup) []er
 	return errs
 }
 
+func getCSIVolumeSnapshotsInBackup(b *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) ([]snapshotv1beta1api.VolumeSnapshot, []error) {
+	csiVolSnaps := []snapshotv1beta1api.VolumeSnapshot{}
+	errs := []error{}
+
+	selector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			velerov1api.BackupNameLabel: label.GetValidName(b.Name),
+		},
+	}
+	listOpts := metav1.ListOptions{
+		LabelSelector: metav1.FormatLabelSelector(&selector),
+	}
+
+	for _, ns := range backup.GetNamespacesInBackup(b) {
+		log.Debugf("Listing CSI volumesnapshots in namespace %s", ns)
+		nsvs, err := csiClient.VolumeSnapshots(ns).List(listOpts)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		if nsvs.Items != nil && len(nsvs.Items) != 0 {
+			log.Debugf("Found %d CSI volumesnapshots in namespace %s", len(nsvs.Items), ns)
+			csiVolSnaps = append(csiVolSnaps, nsvs.Items...)
+		}
+	}
+
+	log.Infof("Found %d CSI volumesnapshots in backup %s", len(csiVolSnaps), b.Name)
+	return csiVolSnaps, errs
+}
+
+func (c *backupDeletionController) deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
+	csiVolSnaps, errs := getCSIVolumeSnapshotsInBackup(backup, csiClient, log)
+
+	log.Infof("Deleting %d CSI volumesnapshots in backup %s", len(csiVolSnaps), backup.Name)
+	for _, csiVS := range csiVolSnaps {
+		log.Infof("Deleting CSI volumesnapshot %s/%s", csiVS.Namespace, csiVS.Name)
+		err := csiClient.VolumeSnapshots(csiVS.Namespace).Delete(csiVS.Name, &metav1.DeleteOptions{})
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
 const deleteBackupRequestMaxAge = 24 * time.Hour
 
 func (c *backupDeletionController) deleteExpiredRequests() {
@@ -458,7 +517,7 @@ func (c *backupDeletionController) deleteExpiredRequests() {
 	now := c.clock.Now()
 
 	for _, req := range requests {
-		if req.Status.Phase != v1.DeleteBackupRequestPhaseProcessed {
+		if req.Status.Phase != velerov1api.DeleteBackupRequestPhaseProcessed {
 			continue
 		}
 
@@ -475,7 +534,7 @@ func (c *backupDeletionController) deleteExpiredRequests() {
 	}
 }
 
-func (c *backupDeletionController) patchDeleteBackupRequest(req *v1.DeleteBackupRequest, mutate func(*v1.DeleteBackupRequest)) (*v1.DeleteBackupRequest, error) {
+func (c *backupDeletionController) patchDeleteBackupRequest(req *velerov1api.DeleteBackupRequest, mutate func(*velerov1api.DeleteBackupRequest)) (*velerov1api.DeleteBackupRequest, error) {
 	// Record original json
 	oldData, err := json.Marshal(req)
 	if err != nil {
@@ -504,7 +563,7 @@ func (c *backupDeletionController) patchDeleteBackupRequest(req *v1.DeleteBackup
 	return req, nil
 }
 
-func (c *backupDeletionController) patchBackup(backup *v1.Backup, mutate func(*v1.Backup)) (*v1.Backup, error) {
+func (c *backupDeletionController) patchBackup(backup *velerov1api.Backup, mutate func(*velerov1api.Backup)) (*velerov1api.Backup, error) {
 	// Record original json
 	oldData, err := json.Marshal(backup)
 	if err != nil {
