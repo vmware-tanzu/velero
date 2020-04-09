@@ -410,13 +410,19 @@ within each restored volume, under `.velero`, whose name is the UID of the Veler
 1. Once all such files are found, the init container's process terminates successfully and the pod moves
 on to running other init containers/the main containers.
 
-## 3rd party controller
+## 3rd party controllers
 
 ### Monitor backup annotation
 
 Velero does not currently provide a mechanism to detect persistent volume claims that are missing the restic backup annotation.
 
 To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watcher][7]
+
+### Add backup annotation
+
+Velero does not currently provide a single command or automatic way to backup all volume resources in the cluster without annotating pods or pod templates.
+
+The [velero-volume-controller][10] written by duyanghao helps to solve this problem by adding backup annotation to pods with volumes automatically.
 
 [1]: https://github.com/restic/restic
 [2]: customize-installation.md#enable-restic-integration
@@ -427,3 +433,4 @@ To solve this, a controller was written by Thomann Bits&Beats: [velero-pvc-watch
 [7]: https://github.com/bitsbeats/velero-pvc-watcher
 [8]: https://docs.microsoft.com/en-us/azure/aks/azure-files-dynamic-pv
 [9]: https://github.com/restic/restic/issues/1800
+[10]: https://github.com/duyanghao/velero-volume-controller
