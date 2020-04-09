@@ -709,6 +709,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			csiVSLister,
+			csiVSCLister,
 			s.csiSnapshotClient,
 			newPluginManager,
 			s.metrics,
