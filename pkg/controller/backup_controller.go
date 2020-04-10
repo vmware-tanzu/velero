@@ -559,6 +559,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 			//TODO: Is this right?
 			backupLog.Error(err)
 		}
+		// Currently, VSCs are not being labelled in the plugin, so none will be returned here.
 		volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
 		if err != nil {
 			//TODO: Is this right?
@@ -638,7 +639,7 @@ func persistBackup(backup *pkgbackup.Request,
 	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
 	volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
 ) []error {
-	// TODO(nrb-csi): Reduce duplication in this function
+	// TODO(nrb-csi): Reduce duplication in this function once uploads actually work
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
 
