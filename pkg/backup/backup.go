@@ -59,7 +59,6 @@ type kubernetesBackupper struct {
 	dynamicFactory         client.DynamicFactory
 	discoveryHelper        discovery.Helper
 	podCommandExecutor     podexec.PodCommandExecutor
-	groupBackupperFactory  groupBackupperFactory
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
 }
@@ -98,7 +97,6 @@ func NewKubernetesBackupper(
 		discoveryHelper:        discoveryHelper,
 		dynamicFactory:         dynamicFactory,
 		podCommandExecutor:     podCommandExecutor,
-		groupBackupperFactory:  &defaultGroupBackupperFactory{},
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
 	}, nil
@@ -264,24 +262,35 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		}
 	}
 
-	gb := kb.groupBackupperFactory.newGroupBackupper(
-		log,
-		backupRequest,
-		kb.dynamicFactory,
-		kb.discoveryHelper,
-		cohabitatingResources(),
-		kb.podCommandExecutor,
-		tw,
-		resticBackupper,
-		newPVCSnapshotTracker(),
-		volumeSnapshotterGetter,
-	)
-
-	for _, group := range kb.discoveryHelper.Resources() {
-		if err := gb.backupGroup(group); err != nil {
-			log.WithError(err).WithField("apiGroup", group.String()).Error("Error backing up API group")
+	pvcSnapshotTracker := newPVCSnapshotTracker()
+	newItemBackupper := func() ItemBackupper {
+		itemBackupper := &defaultItemBackupper{
+			backupRequest:           backupRequest,
+			tarWriter:               tw,
+			dynamicFactory:          kb.dynamicFactory,
+			discoveryHelper:         kb.discoveryHelper,
+			resticBackupper:         resticBackupper,
+			resticSnapshotTracker:   pvcSnapshotTracker,
+			volumeSnapshotterGetter: volumeSnapshotterGetter,
+			itemHookHandler: &defaultItemHookHandler{
+				podCommandExecutor: kb.podCommandExecutor,
+			},
 		}
+		itemBackupper.additionalItemBackupper = itemBackupper
+
+		return itemBackupper
 	}
+
+	resourceBackupper := &resourceBackupper{
+		log:                   log,
+		backupRequest:         backupRequest,
+		discoveryHelper:       kb.discoveryHelper,
+		dynamicFactory:        kb.dynamicFactory,
+		cohabitatingResources: cohabitatingResources(),
+		newItemBackupper:      newItemBackupper,
+	}
+
+	resourceBackupper.backupAllGroups()
 
 	return nil
 }

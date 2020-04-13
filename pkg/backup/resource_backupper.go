@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@ limitations under the License.
 package backup
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,77 +33,58 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
-type resourceBackupperFactory interface {
-	newResourceBackupper(
-		log logrus.FieldLogger,
-		backupRequest *Request,
-		dynamicFactory client.DynamicFactory,
-		discoveryHelper discovery.Helper,
-		cohabitatingResources map[string]*cohabitatingResource,
-		podCommandExecutor podexec.PodCommandExecutor,
-		tarWriter tarWriter,
-		resticBackupper restic.Backupper,
-		resticSnapshotTracker *pvcSnapshotTracker,
-		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) resourceBackupper
+// resourceBackupper collects resources from the Kubernetes API according to
+// the backup spec and passes them to an itemBackupper to be backed up.
+type resourceBackupper struct {
+	log                   logrus.FieldLogger
+	backupRequest         *Request
+	discoveryHelper       discovery.Helper
+	dynamicFactory        client.DynamicFactory
+	cohabitatingResources map[string]*cohabitatingResource
+	newItemBackupper      func() ItemBackupper
 }
 
-type defaultResourceBackupperFactory struct{}
-
-func (f *defaultResourceBackupperFactory) newResourceBackupper(
-	log logrus.FieldLogger,
-	backupRequest *Request,
-	dynamicFactory client.DynamicFactory,
-	discoveryHelper discovery.Helper,
-	cohabitatingResources map[string]*cohabitatingResource,
-	podCommandExecutor podexec.PodCommandExecutor,
-	tarWriter tarWriter,
-	resticBackupper restic.Backupper,
-	resticSnapshotTracker *pvcSnapshotTracker,
-	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) resourceBackupper {
-	return &defaultResourceBackupper{
-		log:                     log,
-		backupRequest:           backupRequest,
-		dynamicFactory:          dynamicFactory,
-		discoveryHelper:         discoveryHelper,
-		cohabitatingResources:   cohabitatingResources,
-		podCommandExecutor:      podCommandExecutor,
-		tarWriter:               tarWriter,
-		resticBackupper:         resticBackupper,
-		resticSnapshotTracker:   resticSnapshotTracker,
-		volumeSnapshotterGetter: volumeSnapshotterGetter,
-
-		itemBackupperFactory: &defaultItemBackupperFactory{},
+// collect backs up all API groups.
+func (r *resourceBackupper) backupAllGroups() {
+	for _, group := range r.discoveryHelper.Resources() {
+		if err := r.backupGroup(r.log, group); err != nil {
+			r.log.WithError(err).WithField("apiGroup", group.String()).Error("Error backing up API group")
+		}
 	}
 }
 
-type resourceBackupper interface {
-	backupResource(group *metav1.APIResourceList, resource metav1.APIResource) error
-}
+// backupGroup backs up a single API group.
+func (r *resourceBackupper) backupGroup(log logrus.FieldLogger, group *metav1.APIResourceList) error {
+	log = log.WithField("group", group.GroupVersion)
 
-type defaultResourceBackupper struct {
-	log                     logrus.FieldLogger
-	backupRequest           *Request
-	dynamicFactory          client.DynamicFactory
-	discoveryHelper         discovery.Helper
-	cohabitatingResources   map[string]*cohabitatingResource
-	podCommandExecutor      podexec.PodCommandExecutor
-	tarWriter               tarWriter
-	resticBackupper         restic.Backupper
-	resticSnapshotTracker   *pvcSnapshotTracker
-	itemBackupperFactory    itemBackupperFactory
-	volumeSnapshotterGetter VolumeSnapshotterGetter
+	log.Infof("Backing up group")
+
+	// Parse so we can check if this is the core group
+	gv, err := schema.ParseGroupVersion(group.GroupVersion)
+	if err != nil {
+		return errors.Wrapf(err, "error parsing GroupVersion %q", group.GroupVersion)
+	}
+	if gv.Group == "" {
+		// This is the core group, so make sure we process in the following order: pods, pvcs, pvs,
+		// everything else.
+		sortCoreGroup(group)
+	}
+
+	for _, resource := range group.APIResources {
+		if err := r.backupResource(log, group, resource); err != nil {
+			log.WithError(err).WithField("resource", resource.String()).Error("Error backing up API resource")
+		}
+	}
+
+	return nil
 }
 
 // backupResource backs up all the objects for a given group-version-resource.
-func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList, resource metav1.APIResource) error {
-	log := rb.log.WithField("resource", resource.Name)
+func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1.APIResourceList, resource metav1.APIResource) error {
+	log = log.WithField("resource", resource.Name)
 
 	log.Info("Backing up resource")
 
@@ -111,7 +95,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
 
 	// Getting the preferred group version of this resource
-	preferredGVR, _, err := rb.discoveryHelper.ResourceFor(gr.WithVersion(""))
+	preferredGVR, _, err := r.discoveryHelper.ResourceFor(gr.WithVersion(""))
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -121,8 +105,8 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
 	// we should include it based on the IncludeClusterResources setting.
 	if gr != kuberesource.Namespaces && clusterScoped {
-		if rb.backupRequest.Spec.IncludeClusterResources == nil {
-			if !rb.backupRequest.NamespaceIncludesExcludes.IncludeEverything() {
+		if r.backupRequest.Spec.IncludeClusterResources == nil {
+			if !r.backupRequest.NamespaceIncludesExcludes.IncludeEverything() {
 				// when IncludeClusterResources == nil (auto), only directly
 				// back up cluster-scoped resources if we're doing a full-cluster
 				// (all namespaces) backup. Note that in the case of a subset of
@@ -133,18 +117,18 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 				log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
 				return nil
 			}
-		} else if !*rb.backupRequest.Spec.IncludeClusterResources {
+		} else if !*r.backupRequest.Spec.IncludeClusterResources {
 			log.Info("Skipping resource because it's cluster-scoped")
 			return nil
 		}
 	}
 
-	if !rb.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
+	if !r.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
 		log.Infof("Skipping resource because it's excluded")
 		return nil
 	}
 
-	if cohabitator, found := rb.cohabitatingResources[resource.Name]; found {
+	if cohabitator, found := r.cohabitatingResources[resource.Name]; found {
 		if cohabitator.seen {
 			log.WithFields(
 				logrus.Fields{
@@ -157,28 +141,19 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 		cohabitator.seen = true
 	}
 
-	itemBackupper := rb.itemBackupperFactory.newItemBackupper(
-		rb.backupRequest,
-		rb.podCommandExecutor,
-		rb.tarWriter,
-		rb.dynamicFactory,
-		rb.discoveryHelper,
-		rb.resticBackupper,
-		rb.resticSnapshotTracker,
-		rb.volumeSnapshotterGetter,
-	)
+	itemBackupper := r.newItemBackupper()
 
-	namespacesToList := getNamespacesToList(rb.backupRequest.NamespaceIncludesExcludes)
+	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
 	// Check if we're backing up namespaces, and only certain ones
 	if gr == kuberesource.Namespaces && namespacesToList[0] != "" {
-		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
+		resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, "")
 		if err != nil {
 			log.WithError(err).Error("Error getting dynamic client")
 		} else {
 			var labelSelector labels.Selector
-			if rb.backupRequest.Spec.LabelSelector != nil {
-				labelSelector, err = metav1.LabelSelectorAsSelector(rb.backupRequest.Spec.LabelSelector)
+			if r.backupRequest.Spec.LabelSelector != nil {
+				labelSelector, err = metav1.LabelSelectorAsSelector(r.backupRequest.Spec.LabelSelector)
 				if err != nil {
 					// This should never happen...
 					return errors.Wrap(err, "invalid label selector")
@@ -218,14 +193,14 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 	for _, namespace := range namespacesToList {
 		log = log.WithField("namespace", namespace)
 
-		resourceClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gv, resource, namespace)
+		resourceClient, err := r.dynamicFactory.ClientForGroupVersionResource(gv, resource, namespace)
 		if err != nil {
 			log.WithError(err).Error("Error getting dynamic client")
 			continue
 		}
 
 		var labelSelector string
-		if selector := rb.backupRequest.Spec.LabelSelector; selector != nil {
+		if selector := r.backupRequest.Spec.LabelSelector; selector != nil {
 			labelSelector = metav1.FormatLabelSelector(selector)
 		}
 
@@ -239,7 +214,7 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 
 		// do the backup
 		for _, item := range unstructuredList.Items {
-			if rb.backupItem(log, gr, itemBackupper, &item, preferredGVR) {
+			if r.backupItem(log, gr, itemBackupper, &item, preferredGVR) {
 				backedUpItem = true
 			}
 		}
@@ -248,14 +223,14 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 	// back up CRD for resource if found. We should only need to do this if we've backed up at least
 	// one item and IncludeClusterResources is nil. If IncludeClusterResources is false
 	// we don't want to back it up, and if it's true it will already be included.
-	if backedUpItem && rb.backupRequest.Spec.IncludeClusterResources == nil {
-		rb.backupCRD(log, gr, itemBackupper)
+	if backedUpItem && r.backupRequest.Spec.IncludeClusterResources == nil {
+		r.backupCRD(log, gr, itemBackupper)
 	}
 
 	return nil
 }
 
-func (rb *defaultResourceBackupper) backupItem(
+func (r *resourceBackupper) backupItem(
 	log logrus.FieldLogger,
 	gr schema.GroupResource,
 	itemBackupper ItemBackupper,
@@ -273,7 +248,7 @@ func (rb *defaultResourceBackupper) backupItem(
 		"name":      metadata.GetName(),
 	})
 
-	if gr == kuberesource.Namespaces && !rb.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
+	if gr == kuberesource.Namespaces && !r.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
 		log.Info("Skipping namespace because it's excluded")
 		return false
 	}
@@ -298,11 +273,11 @@ func (rb *defaultResourceBackupper) backupItem(
 
 // backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
 // associated with it.
-func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
+func (r *resourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
 	crdGroupResource := kuberesource.CustomResourceDefinitions
 
 	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
-	gvr, apiResource, err := rb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
+	gvr, apiResource, err := r.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
 		return
@@ -310,7 +285,7 @@ func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.
 	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
 
 	log.Debugf("Getting dynamic client for %s", gvr.String())
-	crdClient, err := rb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
+	crdClient, err := r.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
 	if err != nil {
 		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
 		return
@@ -331,7 +306,40 @@ func (rb *defaultResourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.
 	}
 	log.Infof("Found associated CRD %s to add to backup", gr.String())
 
-	rb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)
+	r.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)
+}
+
+// sortCoreGroup sorts the core API group.
+func sortCoreGroup(group *metav1.APIResourceList) {
+	sort.SliceStable(group.APIResources, func(i, j int) bool {
+		return coreGroupResourcePriority(group.APIResources[i].Name) < coreGroupResourcePriority(group.APIResources[j].Name)
+	})
+}
+
+// These constants represent the relative priorities for resources in the core API group. We want to
+// ensure that we process pods, then pvcs, then pvs, then anything else. This ensures that when a
+// pod is backed up, we can perform a pre hook, then process pvcs and pvs (including taking a
+// snapshot), then perform a post hook on the pod.
+const (
+	pod = iota
+	pvc
+	pv
+	other
+)
+
+// coreGroupResourcePriority returns the relative priority of the resource, in the following order:
+// pods, pvcs, pvs, everything else.
+func coreGroupResourcePriority(resource string) int {
+	switch strings.ToLower(resource) {
+	case "pods":
+		return pod
+	case "persistentvolumeclaims":
+		return pvc
+	case "persistentvolumes":
+		return pv
+	}
+
+	return other
 }
 
 // getNamespacesToList examines ie and resolves the includes and excludes to a full list of

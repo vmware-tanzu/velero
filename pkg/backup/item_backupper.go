@@ -33,63 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
-	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
-type itemBackupperFactory interface {
-	newItemBackupper(
-		backup *Request,
-		podCommandExecutor podexec.PodCommandExecutor,
-		tarWriter tarWriter,
-		dynamicFactory client.DynamicFactory,
-		discoveryHelper discovery.Helper,
-		resticBackupper restic.Backupper,
-		resticSnapshotTracker *pvcSnapshotTracker,
-		volumeSnapshotterGetter VolumeSnapshotterGetter,
-	) ItemBackupper
-}
-
-type defaultItemBackupperFactory struct{}
-
-func (f *defaultItemBackupperFactory) newItemBackupper(
-	backupRequest *Request,
-	podCommandExecutor podexec.PodCommandExecutor,
-	tarWriter tarWriter,
-	dynamicFactory client.DynamicFactory,
-	discoveryHelper discovery.Helper,
-	resticBackupper restic.Backupper,
-	resticSnapshotTracker *pvcSnapshotTracker,
-	volumeSnapshotterGetter VolumeSnapshotterGetter,
-) ItemBackupper {
-	ib := &defaultItemBackupper{
-		backupRequest:           backupRequest,
-		tarWriter:               tarWriter,
-		dynamicFactory:          dynamicFactory,
-		discoveryHelper:         discoveryHelper,
-		resticBackupper:         resticBackupper,
-		resticSnapshotTracker:   resticSnapshotTracker,
-		volumeSnapshotterGetter: volumeSnapshotterGetter,
-
-		itemHookHandler: &defaultItemHookHandler{
-			podCommandExecutor: podCommandExecutor,
-		},
-	}
-
-	// this is for testing purposes
-	ib.additionalItemBackupper = ib
-
-	return ib
-}
-
+// ItemBackupper can back up individual items to a tar writer.
 type ItemBackupper interface {
 	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error)
 }
@@ -268,13 +222,13 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 	versionPath := version
 
 	if version == preferredVersion {
-		versionPath = version + api.PreferredVersionDir
+		versionPath = version + velerov1api.PreferredVersionDir
 	}
 
 	if namespace != "" {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), versionPath, api.NamespaceScopedDir, namespace, name+".json")
+		filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), versionPath, velerov1api.NamespaceScopedDir, namespace, name+".json")
 	} else {
-		filePath = filepath.Join(api.ResourcesDir, groupResource.String(), versionPath, api.ClusterScopedDir, name+".json")
+		filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), versionPath, velerov1api.ClusterScopedDir, name+".json")
 	}
 
 	itemBytes, err := json.Marshal(obj.UnstructuredContent())
@@ -302,9 +256,9 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 	if version == preferredVersion {
 		if namespace != "" {
-			filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.NamespaceScopedDir, namespace, name+".json")
+			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.NamespaceScopedDir, namespace, name+".json")
 		} else {
-			filePath = filepath.Join(api.ResourcesDir, groupResource.String(), api.ClusterScopedDir, name+".json")
+			filePath = filepath.Join(velerov1api.ResourcesDir, groupResource.String(), velerov1api.ClusterScopedDir, name+".json")
 		}
 
 		hdr = &tar.Header{
@@ -406,7 +360,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
 	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -543,7 +497,7 @@ func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log log
 	return kubeerrs.NewAggregate(errs)
 }
 
-func volumeSnapshot(backup *api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
+func volumeSnapshot(backup *velerov1api.Backup, volumeName, volumeID, volumeType, az, location string, iops *int64) *volume.Snapshot {
 	return &volume.Snapshot{
 		Spec: volume.SnapshotSpec{
 			BackupName:           backup.Name,
