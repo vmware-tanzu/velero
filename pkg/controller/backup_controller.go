@@ -333,9 +333,12 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	request.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(request.Spec.StorageLocation)
 
 	// Getting all information of cluster version - useful for future skip-level migration
-	request.Labels[velerov1api.SourceClusterK8sGitVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().String())
-	request.Labels[velerov1api.SourceClusterK8sMajorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Major)
-	request.Labels[velerov1api.SourceClusterK8sMinorVersionLabel] = label.GetValidName(c.discoveryHelper.ServerVersion().Minor)
+	if request.Annotations == nil {
+		request.Annotations = make(map[string]string)
+	}
+	request.Annotations[velerov1api.SourceClusterK8sGitVersionAnnotation] = c.discoveryHelper.ServerVersion().String()
+	request.Annotations[velerov1api.SourceClusterK8sMajorVersionAnnotation] = c.discoveryHelper.ServerVersion().Major
+	request.Annotations[velerov1api.SourceClusterK8sMinorVersionAnnotation] = c.discoveryHelper.ServerVersion().Minor
 
 	// validate the included/excluded resources
 	for _, err := range collections.ValidateIncludesExcludes(request.Spec.IncludedResources, request.Spec.ExcludedResources) {
