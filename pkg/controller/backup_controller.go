@@ -639,7 +639,6 @@ func persistBackup(backup *pkgbackup.Request,
 	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
 	volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
 ) []error {
-	// TODO(nrb-csi): Reduce duplication in this function once uploads actually work
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
 
@@ -647,55 +646,30 @@ func persistBackup(backup *pkgbackup.Request,
 		errs = append(errs, errors.Wrap(err, "error encoding backup"))
 	}
 
-	// Velero-native volume snapshots
-	nativeVolumeSnapshots := new(bytes.Buffer)
-	gzw := gzip.NewWriter(nativeVolumeSnapshots)
-
-	if err := json.NewEncoder(gzw).Encode(backup.VolumeSnapshots); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding list of velero volume snapshots"))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	// Velero-native volume snapshots (as opposed to CSI ones)
+	nativeVolumeSnapshots, err := encodeToJSONGzip(backup.VolumeSnapshots)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	podVolumeBackups := new(bytes.Buffer)
-	gzw = gzip.NewWriter(podVolumeBackups)
-
-	if err := json.NewEncoder(gzw).Encode(backup.PodVolumeBackups); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding pod volume backups"))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	podVolumeBackups, err := encodeToJSONGzip(backup.PodVolumeBackups)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	csiSnapshotJSON := new(bytes.Buffer)
-	gzw = gzip.NewWriter(csiSnapshotJSON)
-
-	if err := json.NewEncoder(gzw).Encode(csiVolumeSnapshots); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding list of csi volume snapshots"))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	csiSnapshotJSON, err := encodeToJSONGzip(csiVolumeSnapshots)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	snapshotContentsJSON := new(bytes.Buffer)
-	gzw = gzip.NewWriter(snapshotContentsJSON)
-
-	if err := json.NewEncoder(gzw).Encode(volumeSnapshotContents); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding list of csi volume snapshots"))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	snapshotContentsJSON, err := encodeToJSONGzip(volumeSnapshotContents)
+	if err != nil {
+		errs = append(errs, err)
 	}
 
-	backupResourceList := new(bytes.Buffer)
-	gzw = gzip.NewWriter(backupResourceList)
-
-	if err := json.NewEncoder(gzw).Encode(backup.BackupResourceList()); err != nil {
-		errs = append(errs, errors.Wrap(err, "error encoding backup resource list"))
-	}
-	if err := gzw.Close(); err != nil {
-		errs = append(errs, errors.Wrap(err, "error closing gzip writer"))
+	backupResourceList, err := encodeToJSONGzip(backup.BackupResourceList())
+	if err != nil {
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {
@@ -733,4 +707,19 @@ func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	if err := os.Remove(file.Name()); err != nil {
 		log.WithError(err).WithField("file", file.Name()).Error("error removing file")
 	}
+}
+
+// encodeToJSONGzip takes arbitrary Go data and encodes it to GZip compressed JSON in a buffer.
+func encodeToJSONGzip(data interface{}) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	gzw := gzip.NewWriter(buf)
+
+	if err := json.NewEncoder(gzw).Encode(data); err != nil {
+		return nil, errors.Wrap(err, "error encoding data")
+	}
+	if err := gzw.Close(); err != nil {
+		return nil, errors.Wrap(err, "error closing gzip writer")
+	}
+
+	return buf, nil
 }
