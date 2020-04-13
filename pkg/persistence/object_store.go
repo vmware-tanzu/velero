@@ -218,63 +218,22 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		return kerrors.NewAggregate([]error{err, deleteErr})
 	}
 
-	// TODO: How do we reduce duplication from here to the end of the function?
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getPodVolumeBackupsKey(info.Name), info.PodVolumeBackups); err != nil {
-		errs := []error{err}
-
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
+	// Since the logic for all of these files is the exact same except for the name and the contents,
+	// use a map literal to iterate through them and write them to the bucket.
+	var backupObjs = map[string]io.Reader{
+		s.layout.getPodVolumeBackupsKey(info.Name):       info.PodVolumeBackups,
+		s.layout.getBackupVolumeSnapshotsKey(info.Name):  info.VolumeSnapshots,
+		s.layout.getBackupResourceListKey(info.Name):     info.BackupResourceList,
+		s.layout.getCSIVolumeSnapshotKey(info.Name):      info.CSIVolumeSnapshots,
+		s.layout.getVolumeSnapshotContentsKey(info.Name): info.VolumeSnapshotContents,
 	}
 
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupVolumeSnapshotsKey(info.Name), info.VolumeSnapshots); err != nil {
-		errs := []error{err}
-
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
-	}
-
-	if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getBackupResourceListKey(info.Name), info.BackupResourceList); err != nil {
-		errs := []error{err}
-
-		deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-		errs = append(errs, deleteErr)
-
-		return kerrors.NewAggregate(errs)
-	}
-
-	// TODO(nrb-csi): Add tests?
-	if info.CSIVolumeSnapshots != nil {
-		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotKey(info.Name), info.CSIVolumeSnapshots); err != nil {
+	for key, reader := range backupObjs {
+		if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
 			errs := []error{err}
 
-			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getCSIVolumeSnapshotKey(info.Name))
-			errs = append(errs, deleteErr)
-
-			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
-			errs = append(errs, deleteErr)
-
-			return kerrors.NewAggregate(errs)
-		}
-	}
-
-	if info.VolumeSnapshotContents != nil {
-		if err := seekAndPutObject(s.objectStore, s.bucket, s.layout.getVolumeSnapshotContentsKey(info.Name), info.VolumeSnapshotContents); err != nil {
-			errs := []error{err}
-
-			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getVolumeSnapshotContentsKey(info.Name))
+			// attempt to clean up the object in case it was made but we couldn't write contents.
+			deleteErr := s.objectStore.DeleteObject(s.bucket, key)
 			errs = append(errs, deleteErr)
 
 			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
