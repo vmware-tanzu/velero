@@ -17,18 +17,17 @@ limitations under the License.
 package backup
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -36,36 +35,49 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
-// resourceBackupper collects resources from the Kubernetes API according to
-// the backup spec and passes them to an itemBackupper to be backed up.
-type resourceBackupper struct {
+// itemCollector collects items from the Kubernetes API according to
+// the backup spec and writes them to files inside dir.
+type itemCollector struct {
 	log                   logrus.FieldLogger
 	backupRequest         *Request
 	discoveryHelper       discovery.Helper
 	dynamicFactory        client.DynamicFactory
 	cohabitatingResources map[string]*cohabitatingResource
-	newItemBackupper      func() ItemBackupper
+	dir                   string
 }
 
-// collect backs up all API groups.
-func (r *resourceBackupper) backupAllGroups() {
+type kubernetesResource struct {
+	groupResource         schema.GroupResource
+	preferredGVR          schema.GroupVersionResource
+	namespace, name, path string
+}
+
+// getAllItems gets all relevant items from all API groups.
+func (r *itemCollector) getAllItems() []*kubernetesResource {
+	var resources []*kubernetesResource
 	for _, group := range r.discoveryHelper.Resources() {
-		if err := r.backupGroup(r.log, group); err != nil {
-			r.log.WithError(err).WithField("apiGroup", group.String()).Error("Error backing up API group")
+		groupItems, err := r.getGroupItems(r.log, group)
+		if err != nil {
+			r.log.WithError(err).WithField("apiGroup", group.String()).Error("Error collecting resources from API group")
+			continue
 		}
+
+		resources = append(resources, groupItems...)
 	}
+
+	return resources
 }
 
-// backupGroup backs up a single API group.
-func (r *resourceBackupper) backupGroup(log logrus.FieldLogger, group *metav1.APIResourceList) error {
+// getGroupItems collects all relevant items from a single API group.
+func (r *itemCollector) getGroupItems(log logrus.FieldLogger, group *metav1.APIResourceList) ([]*kubernetesResource, error) {
 	log = log.WithField("group", group.GroupVersion)
 
-	log.Infof("Backing up group")
+	log.Infof("Getting items for group")
 
 	// Parse so we can check if this is the core group
 	gv, err := schema.ParseGroupVersion(group.GroupVersion)
 	if err != nil {
-		return errors.Wrapf(err, "error parsing GroupVersion %q", group.GroupVersion)
+		return nil, errors.Wrapf(err, "error parsing GroupVersion %q", group.GroupVersion)
 	}
 	if gv.Group == "" {
 		// This is the core group, so make sure we process in the following order: pods, pvcs, pvs,
@@ -73,34 +85,37 @@ func (r *resourceBackupper) backupGroup(log logrus.FieldLogger, group *metav1.AP
 		sortCoreGroup(group)
 	}
 
+	var items []*kubernetesResource
 	for _, resource := range group.APIResources {
-		if err := r.backupResource(log, group, resource); err != nil {
-			log.WithError(err).WithField("resource", resource.String()).Error("Error backing up API resource")
+		resourceItems, err := r.getResourceItems(log, gv, resource)
+		if err != nil {
+			log.WithError(err).WithField("resource", resource.String()).Error("Error getting items for resource")
+			continue
 		}
+
+		items = append(items, resourceItems...)
 	}
 
-	return nil
+	return items, nil
 }
 
-// backupResource backs up all the objects for a given group-version-resource.
-func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1.APIResourceList, resource metav1.APIResource) error {
+// getResourceItems collects all relevant items for a given group-version-resource.
+func (r *itemCollector) getResourceItems(log logrus.FieldLogger, gv schema.GroupVersion, resource metav1.APIResource) ([]*kubernetesResource, error) {
 	log = log.WithField("resource", resource.Name)
 
-	log.Info("Backing up resource")
+	log.Info("Getting items for resource")
 
-	gv, err := schema.ParseGroupVersion(group.GroupVersion)
-	if err != nil {
-		return errors.Wrapf(err, "error parsing GroupVersion %s", group.GroupVersion)
-	}
-	gr := schema.GroupResource{Group: gv.Group, Resource: resource.Name}
+	var (
+		gvr           = gv.WithResource(resource.Name)
+		gr            = gvr.GroupResource()
+		clusterScoped = !resource.Namespaced
+	)
 
 	// Getting the preferred group version of this resource
 	preferredGVR, _, err := r.discoveryHelper.ResourceFor(gr.WithVersion(""))
 	if err != nil {
-		return errors.WithStack(err)
+		return nil, errors.WithStack(err)
 	}
-
-	clusterScoped := !resource.Namespaced
 
 	// If the resource we are backing up is NOT namespaces, and it is cluster-scoped, check to see if
 	// we should include it based on the IncludeClusterResources setting.
@@ -115,17 +130,17 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 				// If we're processing namespaces themselves, we will not skip here, they may be
 				// filtered out later.
 				log.Info("Skipping resource because it's cluster-scoped and only specific namespaces are included in the backup")
-				return nil
+				return nil, nil
 			}
 		} else if !*r.backupRequest.Spec.IncludeClusterResources {
 			log.Info("Skipping resource because it's cluster-scoped")
-			return nil
+			return nil, nil
 		}
 	}
 
 	if !r.backupRequest.ResourceIncludesExcludes.ShouldInclude(gr.String()) {
 		log.Infof("Skipping resource because it's excluded")
-		return nil
+		return nil, nil
 	}
 
 	if cohabitator, found := r.cohabitatingResources[resource.Name]; found {
@@ -136,12 +151,10 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 					"cohabitatingResource2": cohabitator.groupResource2.String(),
 				},
 			).Infof("Skipping resource because it cohabitates and we've already processed it")
-			return nil
+			return nil, nil
 		}
 		cohabitator.seen = true
 	}
-
-	itemBackupper := r.newItemBackupper()
 
 	namespacesToList := getNamespacesToList(r.backupRequest.NamespaceIncludesExcludes)
 
@@ -156,10 +169,11 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 				labelSelector, err = metav1.LabelSelectorAsSelector(r.backupRequest.Spec.LabelSelector)
 				if err != nil {
 					// This should never happen...
-					return errors.Wrap(err, "invalid label selector")
+					return nil, errors.Wrap(err, "invalid label selector")
 				}
 			}
 
+			var items []*kubernetesResource
 			for _, ns := range namespacesToList {
 				log = log.WithField("namespace", ns)
 				log.Info("Getting namespace")
@@ -175,12 +189,21 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 					continue
 				}
 
-				if _, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR); err != nil {
-					log.WithError(errors.WithStack(err)).Error("Error backing up namespace")
+				path, err := r.writeToFile(unstructured)
+				if err != nil {
+					log.WithError(err).Error("Error writing item to file")
+					continue
 				}
+
+				items = append(items, &kubernetesResource{
+					groupResource: gr,
+					preferredGVR:  preferredGVR,
+					name:          ns,
+					path:          path,
+				})
 			}
 
-			return nil
+			return items, nil
 		}
 	}
 
@@ -189,7 +212,8 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 		namespacesToList = []string{""}
 	}
 
-	backedUpItem := false
+	var items []*kubernetesResource
+
 	for _, namespace := range namespacesToList {
 		log = log.WithField("namespace", namespace)
 
@@ -212,101 +236,55 @@ func (r *resourceBackupper) backupResource(log logrus.FieldLogger, group *metav1
 		}
 		log.Infof("Retrieved %d items", len(unstructuredList.Items))
 
-		// do the backup
-		for _, item := range unstructuredList.Items {
-			if r.backupItem(log, gr, itemBackupper, &item, preferredGVR) {
-				backedUpItem = true
+		// collect the items
+		for i := range unstructuredList.Items {
+			item := &unstructuredList.Items[i]
+
+			if gr == kuberesource.Namespaces && !r.backupRequest.NamespaceIncludesExcludes.ShouldInclude(item.GetName()) {
+				log.WithField("name", item.GetName()).Info("Skipping namespace because it's excluded")
+				continue
 			}
+
+			path, err := r.writeToFile(item)
+			if err != nil {
+				log.WithError(err).Error("Error writing item to file")
+				continue
+			}
+
+			items = append(items, &kubernetesResource{
+				groupResource: gr,
+				preferredGVR:  preferredGVR,
+				namespace:     item.GetNamespace(),
+				name:          item.GetName(),
+				path:          path,
+			})
 		}
 	}
 
-	// back up CRD for resource if found. We should only need to do this if we've backed up at least
-	// one item and IncludeClusterResources is nil. If IncludeClusterResources is false
-	// we don't want to back it up, and if it's true it will already be included.
-	if backedUpItem && r.backupRequest.Spec.IncludeClusterResources == nil {
-		r.backupCRD(log, gr, itemBackupper)
-	}
-
-	return nil
+	return items, nil
 }
 
-func (r *resourceBackupper) backupItem(
-	log logrus.FieldLogger,
-	gr schema.GroupResource,
-	itemBackupper ItemBackupper,
-	unstructured runtime.Unstructured,
-	preferredGVR schema.GroupVersionResource,
-) bool {
-	metadata, err := meta.Accessor(unstructured)
+func (r *itemCollector) writeToFile(item *unstructured.Unstructured) (string, error) {
+	f, err := ioutil.TempFile(r.dir, "")
 	if err != nil {
-		log.WithError(errors.WithStack(err)).Error("Error getting a metadata accessor")
-		return false
+		return "", errors.Wrap(err, "error creating temp file")
 	}
+	defer f.Close()
 
-	log = log.WithFields(map[string]interface{}{
-		"namespace": metadata.GetNamespace(),
-		"name":      metadata.GetName(),
-	})
-
-	if gr == kuberesource.Namespaces && !r.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
-		log.Info("Skipping namespace because it's excluded")
-		return false
-	}
-
-	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR)
-	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
-		log.Infof("%d errors encountered backup up item", len(aggregate.Errors()))
-		// log each error separately so we get error location info in the log, and an
-		// accurate count of errors
-		for _, err = range aggregate.Errors() {
-			log.WithError(err).Error("Error backing up item")
-		}
-
-		return false
-	}
+	jsonBytes, err := json.Marshal(item)
 	if err != nil {
-		log.WithError(err).Error("Error backing up item")
-		return false
+		return "", errors.Wrap(err, "error converting item to JSON")
 	}
-	return backedUpItem
-}
 
-// backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
-// associated with it.
-func (r *resourceBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper ItemBackupper) {
-	crdGroupResource := kuberesource.CustomResourceDefinitions
-
-	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
-	gvr, apiResource, err := r.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
-		return
+	if _, err := f.Write(jsonBytes); err != nil {
+		return "", errors.Wrap(err, "error writing JSON to file")
 	}
-	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
 
-	log.Debugf("Getting dynamic client for %s", gvr.String())
-	crdClient, err := r.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
-		return
+	if err := f.Close(); err != nil {
+		return "", errors.Wrap(err, "error closing file")
 	}
-	log.Debugf("Got dynamic client for %s", gvr.String())
 
-	// try to get a CRD whose name matches the provided GroupResource
-	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		// not found: this means the GroupResource provided was not a
-		// custom resource, so there's no CRD to back up.
-		log.Debugf("No CRD found for GroupResource %s", gr.String())
-		return
-	}
-	if err != nil {
-		log.WithError(errors.WithStack(err)).Errorf("Error getting CRD %s", gr.String())
-		return
-	}
-	log.Infof("Found associated CRD %s to add to backup", gr.String())
-
-	r.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)
+	return f.Name(), nil
 }
 
 // sortCoreGroup sorts the core API group.

@@ -43,12 +43,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
-// ItemBackupper can back up individual items to a tar writer.
-type ItemBackupper interface {
-	backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error)
-}
-
-type defaultItemBackupper struct {
+// itemBackupper can back up individual items to a tar writer.
+type itemBackupper struct {
 	backupRequest           *Request
 	tarWriter               tarWriter
 	dynamicFactory          client.DynamicFactory
@@ -58,7 +54,6 @@ type defaultItemBackupper struct {
 	volumeSnapshotterGetter VolumeSnapshotterGetter
 
 	itemHookHandler                    itemHookHandler
-	additionalItemBackupper            ItemBackupper
 	snapshotLocationVolumeSnapshotters map[string]velero.VolumeSnapshotter
 }
 
@@ -66,7 +61,7 @@ type defaultItemBackupper struct {
 // namespaces IncludesExcludes list.
 // In addition to the error return, backupItem also returns a bool indicating whether the item
 // was actually backed up.
-func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error) {
+func (ib *itemBackupper) backupItem(logger logrus.FieldLogger, obj runtime.Unstructured, groupResource schema.GroupResource, preferredGVR schema.GroupVersionResource) (bool, error) {
 	metadata, err := meta.Accessor(obj)
 	if err != nil {
 		return false, err
@@ -284,7 +279,7 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 
 // backupPodVolumes triggers restic backups of the specified pod volumes, and returns a list of PodVolumeBackups
 // for volumes that were successfully backed up, and a slice of any errors that were encountered.
-func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) ([]*velerov1api.PodVolumeBackup, []error) {
+func (ib *itemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *corev1api.Pod, volumes []string) ([]*velerov1api.PodVolumeBackup, []error) {
 	if len(volumes) == 0 {
 		return nil, nil
 	}
@@ -297,7 +292,7 @@ func (ib *defaultItemBackupper) backupPodVolumes(log logrus.FieldLogger, pod *co
 	return ib.resticBackupper.BackupPodVolumes(ib.backupRequest.Backup, pod, volumes, log)
 }
 
-func (ib *defaultItemBackupper) executeActions(
+func (ib *itemBackupper) executeActions(
 	log logrus.FieldLogger,
 	obj runtime.Unstructured,
 	groupResource schema.GroupResource,
@@ -349,7 +344,7 @@ func (ib *defaultItemBackupper) executeActions(
 				return nil, errors.WithStack(err)
 			}
 
-			if _, err = ib.additionalItemBackupper.backupItem(log, additionalItem, gvr.GroupResource(), gvr); err != nil {
+			if _, err = ib.backupItem(log, additionalItem, gvr.GroupResource(), gvr); err != nil {
 				return nil, err
 			}
 		}
@@ -360,7 +355,7 @@ func (ib *defaultItemBackupper) executeActions(
 
 // volumeSnapshotter instantiates and initializes a VolumeSnapshotter given a VolumeSnapshotLocation,
 // or returns an existing one if one's already been initialized for the location.
-func (ib *defaultItemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
+func (ib *itemBackupper) volumeSnapshotter(snapshotLocation *velerov1api.VolumeSnapshotLocation) (velero.VolumeSnapshotter, error) {
 	if bs, ok := ib.snapshotLocationVolumeSnapshotters[snapshotLocation.Name]; ok {
 		return bs, nil
 	}
@@ -394,7 +389,7 @@ const (
 // takePVSnapshot triggers a snapshot for the volume/disk underlying a PersistentVolume if the provided
 // backup has volume snapshots enabled and the PV is of a compatible type. Also records cloud
 // disk type and IOPS (if applicable) to be able to restore to current state later.
-func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
+func (ib *itemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
 	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {

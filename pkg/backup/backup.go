@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,20 +20,27 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -49,7 +56,7 @@ const BackupFormatVersion = "1.1.0"
 
 // Backupper performs backups.
 type Backupper interface {
-	// Backup takes a backup using the specification in the api.Backup and writes backup and log data
+	// Backup takes a backup using the specification in the velerov1api.Backup and writes backup and log data
 	// to the given writers.
 	Backup(logger logrus.FieldLogger, backup *Request, backupFile io.Writer, actions []velero.BackupItemAction, volumeSnapshotterGetter VolumeSnapshotterGetter) error
 }
@@ -160,11 +167,11 @@ func getResourceIncludesExcludes(helper discovery.Helper, includes, excludes []s
 
 // getNamespaceIncludesExcludes returns an IncludesExcludes list containing which namespaces to
 // include and exclude from the backup.
-func getNamespaceIncludesExcludes(backup *api.Backup) *collections.IncludesExcludes {
+func getNamespaceIncludesExcludes(backup *velerov1api.Backup) *collections.IncludesExcludes {
 	return collections.NewIncludesExcludes().Includes(backup.Spec.IncludedNamespaces...).Excludes(backup.Spec.ExcludedNamespaces...)
 }
 
-func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]resourceHook, error) {
+func getResourceHooks(hookSpecs []velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) ([]resourceHook, error) {
 	resourceHooks := make([]resourceHook, 0, len(hookSpecs))
 
 	for _, s := range hookSpecs {
@@ -179,7 +186,7 @@ func getResourceHooks(hookSpecs []api.BackupResourceHookSpec, discoveryHelper di
 	return resourceHooks, nil
 }
 
-func getResourceHook(hookSpec api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
+func getResourceHook(hookSpec velerov1api.BackupResourceHookSpec, discoveryHelper discovery.Helper) (resourceHook, error) {
 	h := resourceHook{
 		name:       hookSpec.Name,
 		namespaces: collections.NewIncludesExcludes().Includes(hookSpec.IncludedNamespaces...).Excludes(hookSpec.ExcludedNamespaces...),
@@ -204,7 +211,7 @@ type VolumeSnapshotterGetter interface {
 }
 
 // Backup backs up the items specified in the Backup, placing them in a gzip-compressed tar file
-// written to backupFile. The finalized api.Backup is written to metadata. Any error that represents
+// written to backupFile. The finalized velerov1api.Backup is written to metadata. Any error that represents
 // a complete backup failure is returned. Errors that constitute partial failures (i.e. failures to
 // back up individual resources that don't prevent the backup from continuing to be processed) are logged
 // to the backup log.
@@ -242,7 +249,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	backupRequest.BackedUpItems = map[itemKey]struct{}{}
 
 	podVolumeTimeout := kb.resticTimeout
-	if val := backupRequest.Annotations[api.PodVolumeOperationTimeoutAnnotation]; val != "" {
+	if val := backupRequest.Annotations[velerov1api.PodVolumeOperationTimeoutAnnotation]; val != "" {
 		parsed, err := time.ParseDuration(val)
 		if err != nil {
 			log.WithError(errors.WithStack(err)).Errorf("Unable to parse pod volume timeout annotation %s, using server value.", val)
@@ -262,41 +269,146 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		}
 	}
 
-	pvcSnapshotTracker := newPVCSnapshotTracker()
-	newItemBackupper := func() ItemBackupper {
-		itemBackupper := &defaultItemBackupper{
-			backupRequest:           backupRequest,
-			tarWriter:               tw,
-			dynamicFactory:          kb.dynamicFactory,
-			discoveryHelper:         kb.discoveryHelper,
-			resticBackupper:         resticBackupper,
-			resticSnapshotTracker:   pvcSnapshotTracker,
-			volumeSnapshotterGetter: volumeSnapshotterGetter,
-			itemHookHandler: &defaultItemHookHandler{
-				podCommandExecutor: kb.podCommandExecutor,
-			},
-		}
-		itemBackupper.additionalItemBackupper = itemBackupper
-
-		return itemBackupper
+	// set up a temp dir for the itemCollector to use to temporarily
+	// store items as they're scraped from the API.
+	tempDir, err := ioutil.TempDir("", "")
+	if err != nil {
+		return errors.Wrap(err, "error creating temp dir for backup")
 	}
+	defer os.RemoveAll(tempDir)
 
-	resourceBackupper := &resourceBackupper{
+	collector := &itemCollector{
 		log:                   log,
 		backupRequest:         backupRequest,
 		discoveryHelper:       kb.discoveryHelper,
 		dynamicFactory:        kb.dynamicFactory,
 		cohabitatingResources: cohabitatingResources(),
-		newItemBackupper:      newItemBackupper,
+		dir:                   tempDir,
 	}
 
-	resourceBackupper.backupAllGroups()
+	items := collector.getAllItems()
+	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
+
+	itemBackupper := &itemBackupper{
+		backupRequest:           backupRequest,
+		tarWriter:               tw,
+		dynamicFactory:          kb.dynamicFactory,
+		discoveryHelper:         kb.discoveryHelper,
+		resticBackupper:         resticBackupper,
+		resticSnapshotTracker:   newPVCSnapshotTracker(),
+		volumeSnapshotterGetter: volumeSnapshotterGetter,
+		itemHookHandler: &defaultItemHookHandler{
+			podCommandExecutor: kb.podCommandExecutor,
+		},
+	}
+
+	backedUpGroupResources := map[schema.GroupResource]bool{}
+
+	for i, item := range items {
+		log.WithFields(map[string]interface{}{
+			"progress":  "",
+			"resource":  item.groupResource.String(),
+			"namespace": item.namespace,
+			"name":      item.name,
+		}).Infof("Processing item %d of %d", i+1, len(items))
+
+		// use an anonymous func so we can defer-close/remove the file
+		// as soon as we're done with it
+		func() {
+			var unstructured unstructured.Unstructured
+
+			f, err := os.Open(item.path)
+			if err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error opening file containing item")
+				return
+			}
+			defer f.Close()
+			defer os.Remove(f.Name())
+
+			if err := json.NewDecoder(f).Decode(&unstructured); err != nil {
+				log.WithError(errors.WithStack(err)).Error("Error decoding JSON from file")
+				return
+			}
+
+			if backedUp := kb.backupItem(log, item.groupResource, itemBackupper, &unstructured, item.preferredGVR); backedUp {
+				backedUpGroupResources[item.groupResource] = true
+			}
+		}()
+	}
+
+	// back up CRD for resource if found. We should only need to do this if we've backed up at least
+	// one item for the resource and IncludeClusterResources is nil. If IncludeClusterResources is false
+	// we don't want to back it up, and if it's true it will already be included.
+	if backupRequest.Spec.IncludeClusterResources == nil {
+		for gr := range backedUpGroupResources {
+			kb.backupCRD(log, gr, itemBackupper)
+		}
+	}
+
+	log.WithField("progress", "").Infof("Backed up a total of %d items", len(backupRequest.BackedUpItems))
 
 	return nil
 }
 
+func (kb *kubernetesBackupper) backupItem(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper, unstructured *unstructured.Unstructured, preferredGVR schema.GroupVersionResource) bool {
+	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr, preferredGVR)
+	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
+		log.WithField("name", unstructured.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
+		// log each error separately so we get error location info in the log, and an
+		// accurate count of errors
+		for _, err = range aggregate.Errors() {
+			log.WithError(err).WithField("name", unstructured.GetName()).Error("Error backing up item")
+		}
+
+		return false
+	}
+	if err != nil {
+		log.WithError(err).WithField("name", unstructured.GetName()).Error("Error backing up item")
+		return false
+	}
+	return backedUpItem
+}
+
+// backupCRD checks if the resource is a custom resource, and if so, backs up the custom resource definition
+// associated with it.
+func (kb *kubernetesBackupper) backupCRD(log logrus.FieldLogger, gr schema.GroupResource, itemBackupper *itemBackupper) {
+	crdGroupResource := kuberesource.CustomResourceDefinitions
+
+	log.Debugf("Getting server preferred API version for %s", crdGroupResource)
+	gvr, apiResource, err := kb.discoveryHelper.ResourceFor(crdGroupResource.WithVersion(""))
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting resolved resource for %s", crdGroupResource)
+		return
+	}
+	log.Debugf("Got server preferred API version %s for %s", gvr.Version, crdGroupResource)
+
+	log.Debugf("Getting dynamic client for %s", gvr.String())
+	crdClient, err := kb.dynamicFactory.ClientForGroupVersionResource(gvr.GroupVersion(), apiResource, "")
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting dynamic client for %s", crdGroupResource)
+		return
+	}
+	log.Debugf("Got dynamic client for %s", gvr.String())
+
+	// try to get a CRD whose name matches the provided GroupResource
+	unstructured, err := crdClient.Get(gr.String(), metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		// not found: this means the GroupResource provided was not a
+		// custom resource, so there's no CRD to back up.
+		log.Debugf("No CRD found for GroupResource %s", gr.String())
+		return
+	}
+	if err != nil {
+		log.WithError(errors.WithStack(err)).Errorf("Error getting CRD %s", gr.String())
+		return
+	}
+	log.Infof("Found associated CRD %s to add to backup", gr.String())
+
+	kb.backupItem(log, gvr.GroupResource(), itemBackupper, unstructured, gvr)
+}
+
 func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
-	versionFile := filepath.Join(api.MetadataDir, "version")
+	versionFile := filepath.Join(velerov1api.MetadataDir, "version")
 	versionString := fmt.Sprintf("%s\n", BackupFormatVersion)
 
 	hdr := &tar.Header{
