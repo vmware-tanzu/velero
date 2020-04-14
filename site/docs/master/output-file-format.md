@@ -106,7 +106,7 @@ In order to accommodate this, Velero follows [Semantic Versioning](http://semver
 
 Minor and patch versions will indicate backwards-compatible changes that previous versions of Velero can restore, including new directories or files.
 
-A major version would indicate that a version Velero older than the version that created the backup could restore it.
+A major version would indicate that a version Velero older than the version that created the backup could restore it, usually because of moved or renamed directories or files.
 
 Major versions of the file format are tied to major versions of Velero, though they are not necessarily in sync - Velero 3.0 may still use backup file format 2.0, as an example.
 
