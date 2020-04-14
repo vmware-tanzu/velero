@@ -102,7 +102,7 @@ resources/
 
 The Velero output file format is intended to be relatively stable, but may change over time in order to support new features.
 
-In order to accomodate this, Velero follows [Semantic Versioning](http://semver.org/) for the file format version.
+In order to accommodate this, Velero follows [Semantic Versioning](http://semver.org/) for the file format version.
 
 Minor and patch versions will indicate backwards-compatible changes that previous versions of Velero can restore, including new directories or files.
 
