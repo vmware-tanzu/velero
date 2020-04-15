@@ -19,7 +19,6 @@ package client
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -59,7 +58,7 @@ type Creator interface {
 // Lister lists objects.
 type Lister interface {
 	// List lists all the objects of a given resource.
-	List(metav1.ListOptions) (runtime.Object, error)
+	List(metav1.ListOptions) (*unstructured.UnstructuredList, error)
 }
 
 // Watcher watches objects.
@@ -101,7 +100,7 @@ func (d *dynamicResourceClient) Create(obj *unstructured.Unstructured) (*unstruc
 	return d.resourceClient.Create(obj, metav1.CreateOptions{})
 }
 
-func (d *dynamicResourceClient) List(options metav1.ListOptions) (runtime.Object, error) {
+func (d *dynamicResourceClient) List(options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	return d.resourceClient.List(options)
 }
 

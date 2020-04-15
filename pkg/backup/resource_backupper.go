@@ -229,23 +229,11 @@ func (rb *defaultResourceBackupper) backupResource(group *metav1.APIResourceList
 			log.WithError(errors.WithStack(err)).Error("Error listing items")
 			continue
 		}
+		log.Infof("Retrieved %d items", len(unstructuredList.Items))
 
 		// do the backup
-		items, err := meta.ExtractList(unstructuredList)
-		if err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error extracting list")
-			continue
-		}
-
-		log.Infof("Retrieved %d items", len(items))
-
-		for _, item := range items {
-			unstructured, ok := item.(runtime.Unstructured)
-			if !ok {
-				log.Errorf("Unexpected type %T", item)
-				continue
-			}
-			if rb.backupItem(log, gr, itemBackupper, unstructured) {
+		for _, item := range unstructuredList.Items {
+			if rb.backupItem(log, gr, itemBackupper, &item) {
 				backedUpItem = true
 			}
 		}

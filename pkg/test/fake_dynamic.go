@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 
@@ -44,9 +43,9 @@ type FakeDynamicClient struct {
 
 var _ client.Dynamic = &FakeDynamicClient{}
 
-func (c *FakeDynamicClient) List(options metav1.ListOptions) (runtime.Object, error) {
+func (c *FakeDynamicClient) List(options metav1.ListOptions) (*unstructured.UnstructuredList, error) {
 	args := c.Called(options)
-	return args.Get(0).(runtime.Object), args.Error(1)
+	return args.Get(0).(*unstructured.UnstructuredList), args.Error(1)
 }
 
 func (c *FakeDynamicClient) Create(obj *unstructured.Unstructured) (*unstructured.Unstructured, error) {
