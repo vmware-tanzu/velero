@@ -359,11 +359,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "loc-1",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -390,11 +392,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "alt-loc",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "alt-loc",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -424,11 +428,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "read-write",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "read-write",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -455,11 +461,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "loc-1",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -488,11 +496,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "loc-1",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -522,11 +532,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "loc-1",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
@@ -554,11 +566,13 @@ func TestProcessBackupCompletions(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: velerov1api.DefaultNamespace,
 					Name:      "backup-1",
-					Labels: map[string]string{
+					Annotations: map[string]string{
 						"velero.io/source-cluster-k8s-major-version": "1",
 						"velero.io/source-cluster-k8s-minor-version": "16",
 						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
-						"velero.io/storage-location":                 "loc-1",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
 					},
 				},
 				Spec: velerov1api.BackupSpec{
