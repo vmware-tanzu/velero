@@ -273,24 +273,29 @@ func (rb *defaultResourceBackupper) backupItem(
 		return false
 	}
 
+	log = log.WithFields(map[string]interface{}{
+		"namespace": metadata.GetNamespace(),
+		"name":      metadata.GetName(),
+	})
+
 	if gr == kuberesource.Namespaces && !rb.backupRequest.NamespaceIncludesExcludes.ShouldInclude(metadata.GetName()) {
-		log.WithField("name", metadata.GetName()).Info("Skipping namespace because it's excluded")
+		log.Info("Skipping namespace because it's excluded")
 		return false
 	}
 
 	backedUpItem, err := itemBackupper.backupItem(log, unstructured, gr)
 	if aggregate, ok := err.(kubeerrs.Aggregate); ok {
-		log.WithField("name", metadata.GetName()).Infof("%d errors encountered backup up item", len(aggregate.Errors()))
+		log.Infof("%d errors encountered backup up item", len(aggregate.Errors()))
 		// log each error separately so we get error location info in the log, and an
 		// accurate count of errors
 		for _, err = range aggregate.Errors() {
-			log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+			log.WithError(err).Error("Error backing up item")
 		}
 
 		return false
 	}
 	if err != nil {
-		log.WithError(err).WithField("name", metadata.GetName()).Error("Error backing up item")
+		log.WithError(err).Error("Error backing up item")
 		return false
 	}
 	return backedUpItem
