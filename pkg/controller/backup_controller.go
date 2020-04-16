@@ -548,7 +548,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	// This way, we only make the Lister call if the feature flag's on.
 	var volumeSnapshots []*snapshotv1beta1api.VolumeSnapshot
 	var volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent
-	if features.IsEnabled("EnableCSI") {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
 
 		// Listers are wrapped in a nil check out of caution, since they may not be populated based on the

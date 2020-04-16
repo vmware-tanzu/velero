@@ -282,7 +282,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	var csiSnapClient *snapshotv1beta1client.Clientset
-	if features.IsEnabled("EnableCSI") {
+	if features.IsEnabled(api.CSIFeatureFlag) {
 		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
 		if err != nil {
 			cancelFunc()
@@ -612,12 +612,12 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 		// If CSI is enabled, check for the CSI groups and generate the listers
 		// If CSI isn't enabled, proceed normally.
-		if features.IsEnabled("EnableCSI") {
+		if features.IsEnabled(api.CSIFeatureFlag) {
 			_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
 			switch {
 			case apierrors.IsNotFound(err):
 				// CSI is enabled, but the required CRDs aren't installed, so halt.
-				s.logger.Fatalf("The 'EnableCSI' feature flag was specified, but CSI API group [%s] was not found.", snapshotv1beta1api.SchemeGroupVersion.String())
+				s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
 			case err == nil:
 				// CSI is enabled, and the resources were found.
 				// Instantiate the listers fully
@@ -898,7 +898,7 @@ func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInforme
 	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
 	w := &CSIInformerFactoryWrapper{}
 
-	if features.IsEnabled("EnableCSI") {
+	if features.IsEnabled(api.CSIFeatureFlag) {
 		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
 	}
 	return w
@@ -906,14 +906,14 @@ func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInforme
 
 // Start proxies the Start call to the CSI SharedInformerFactory.
 func (w *CSIInformerFactoryWrapper) Start(stopCh <-chan struct{}) {
-	if features.IsEnabled("EnableCSI") {
+	if features.IsEnabled(api.CSIFeatureFlag) {
 		w.factory.Start(stopCh)
 	}
 }
 
 // WaitForCacheSync proxies the WaitForCacheSync call to the CSI SharedInformerFactory.
 func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
-	if features.IsEnabled("EnableCSI") {
+	if features.IsEnabled(api.CSIFeatureFlag) {
 		return w.factory.WaitForCacheSync(stopCh)
 	}
 	return nil
