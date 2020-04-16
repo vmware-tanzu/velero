@@ -45,8 +45,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
-	snapshotvebeta1client "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
-	snapshotvebeta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
+	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -223,7 +223,6 @@ type server struct {
 	kubeClientConfig                 *rest.Config
 	kubeClient                       kubernetes.Interface
 	veleroClient                     clientset.Interface
-	csiSnapClient                    snapshotvebeta1client.Interface
 	discoveryClient                  discovery.DiscoveryInterface
 	discoveryHelper                  velerodiscovery.Helper
 	dynamicClient                    dynamic.Interface
@@ -282,9 +281,9 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	var csiSnapClient *snapshotvebeta1client.Clientset
+	var csiSnapClient *snapshotv1beta1client.Clientset
 	if features.IsEnabled("EnableCSI") {
-		csiSnapClient, err = snapshotvebeta1client.NewForConfig(clientConfig)
+		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
 		if err != nil {
 			cancelFunc()
 			return nil, err
@@ -891,16 +890,16 @@ func (s *server) runProfiler() {
 
 // CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
 type CSIInformerFactoryWrapper struct {
-	factory snapshotvebeta1informers.SharedInformerFactory
+	factory snapshotv1beta1informers.SharedInformerFactory
 }
 
-func NewCSIInformerFactoryWrapper(c snapshotvebeta1client.Interface) *CSIInformerFactoryWrapper {
+func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInformerFactoryWrapper {
 	// If no namespace is specified, all namespaces are watched.
 	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
 	w := &CSIInformerFactoryWrapper{}
 
 	if features.IsEnabled("EnableCSI") {
-		w.factory = snapshotvebeta1informers.NewSharedInformerFactoryWithOptions(c, 0)
+		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
 	}
 	return w
 }

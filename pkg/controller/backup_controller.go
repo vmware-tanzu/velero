@@ -80,8 +80,6 @@ type backupController struct {
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
 }
 
-// TODO(nrb-csi): Add clients for the VS/VSContent here.
-// How about creating them in the server iff EnableCSI, and if they're nil in the backup controller, don't worry about it?
 func NewBackupController(
 	backupInformer velerov1informers.BackupInformer,
 	client velerov1client.BackupsGetter,

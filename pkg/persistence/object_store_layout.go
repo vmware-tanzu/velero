@@ -101,9 +101,9 @@ func (l *ObjectStoreLayout) getRestoreResultsKey(restore string) string {
 }
 
 func (l *ObjectStoreLayout) getCSIVolumeSnapshotKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csivolumesnapshot.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshots.json.gz", backup))
 }
 
 func (l *ObjectStoreLayout) getVolumeSnapshotContentsKey(backup string) string {
-	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-volumesnapshotcontents.json.gz", backup))
+	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotcontents.json.gz", backup))
 }
