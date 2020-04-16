@@ -551,18 +551,22 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 	if features.IsEnabled("EnableCSI") {
 		selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
 
-		// TODO(nrb-csi): Only run listers methods if the listers aren't nil, just in case
-		volumeSnapshots, err = c.volumeSnapshotLister.List(selector)
-		if err != nil {
-			//TODO: Is this right?
-			backupLog.Error(err)
+		// Listers are wrapped in a nil check out of caution, since they may not be populated based on the
+		// EnableCSI feature flag. This is more to guard against programmer error, as they shouldn't be nil
+		// when EnableCSI is on.
+		if c.volumeSnapshotLister != nil {
+			volumeSnapshots, err = c.volumeSnapshotLister.List(selector)
+			if err != nil {
+				backupLog.Error(err)
+			}
 		}
-		// Currently, VSCs are not being labelled in the plugin, so none will be returned here.
-		volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
-		if err != nil {
-			//TODO: Is this right?
-			backupLog.Error(err)
 
+		if c.volumeSnapshotContentLister != nil {
+			volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
+			if err != nil {
+				backupLog.Error(err)
+
+			}
 		}
 	}
 
