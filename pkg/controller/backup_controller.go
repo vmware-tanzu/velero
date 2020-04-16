@@ -649,27 +649,27 @@ func persistBackup(backup *pkgbackup.Request,
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
-	nativeVolumeSnapshots, err := encodeToJSONGzip(backup.VolumeSnapshots)
+	nativeVolumeSnapshots, err := encodeToJSONGzip(backup.VolumeSnapshots, "native volumesnapshots list")
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	podVolumeBackups, err := encodeToJSONGzip(backup.PodVolumeBackups)
+	podVolumeBackups, err := encodeToJSONGzip(backup.PodVolumeBackups, "pod volume backups list")
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	csiSnapshotJSON, err := encodeToJSONGzip(csiVolumeSnapshots)
+	csiSnapshotJSON, err := encodeToJSONGzip(csiVolumeSnapshots, "csi volume snapshots list")
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	snapshotContentsJSON, err := encodeToJSONGzip(volumeSnapshotContents)
+	snapshotContentsJSON, err := encodeToJSONGzip(volumeSnapshotContents, "volume snapshot contents list")
 	if err != nil {
 		errs = append(errs, err)
 	}
 
-	backupResourceList, err := encodeToJSONGzip(backup.BackupResourceList())
+	backupResourceList, err := encodeToJSONGzip(backup.BackupResourceList(), "backup resources list")
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -711,13 +711,13 @@ func closeAndRemoveFile(file *os.File, log logrus.FieldLogger) {
 	}
 }
 
-// encodeToJSONGzip takes arbitrary Go data and encodes it to GZip compressed JSON in a buffer.
-func encodeToJSONGzip(data interface{}) (*bytes.Buffer, error) {
+// encodeToJSONGzip takes arbitrary Go data and encodes it to GZip compressed JSON in a buffer, as well as a description of the data to put into an error should encoding fail.
+func encodeToJSONGzip(data interface{}, desc string) (*bytes.Buffer, error) {
 	buf := new(bytes.Buffer)
 	gzw := gzip.NewWriter(buf)
 
 	if err := json.NewEncoder(gzw).Encode(data); err != nil {
-		return nil, errors.Wrap(err, "error encoding data")
+		return nil, errors.Wrapf(err, "error encoding %s", desc)
 	}
 	if err := gzw.Close(); err != nil {
 		return nil, errors.Wrap(err, "error closing gzip writer")
