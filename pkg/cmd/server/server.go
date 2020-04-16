@@ -218,24 +218,24 @@ func NewCommand(f client.Factory) *cobra.Command {
 }
 
 type server struct {
-	namespace                        string
-	metricsAddress                   string
-	kubeClientConfig                 *rest.Config
-	kubeClient                       kubernetes.Interface
-	veleroClient                     clientset.Interface
-	discoveryClient                  discovery.DiscoveryInterface
-	discoveryHelper                  velerodiscovery.Helper
-	dynamicClient                    dynamic.Interface
-	sharedInformerFactory            informers.SharedInformerFactory
-	snapshotterSharedInformerFactory *CSIInformerFactoryWrapper
-	ctx                              context.Context
-	cancelFunc                       context.CancelFunc
-	logger                           logrus.FieldLogger
-	logLevel                         logrus.Level
-	pluginRegistry                   clientmgmt.Registry
-	resticManager                    restic.RepositoryManager
-	metrics                          *metrics.ServerMetrics
-	config                           serverConfig
+	namespace                           string
+	metricsAddress                      string
+	kubeClientConfig                    *rest.Config
+	kubeClient                          kubernetes.Interface
+	veleroClient                        clientset.Interface
+	discoveryClient                     discovery.DiscoveryInterface
+	discoveryHelper                     velerodiscovery.Helper
+	dynamicClient                       dynamic.Interface
+	sharedInformerFactory               informers.SharedInformerFactory
+	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
+	ctx                                 context.Context
+	cancelFunc                          context.CancelFunc
+	logger                              logrus.FieldLogger
+	logLevel                            logrus.Level
+	pluginRegistry                      clientmgmt.Registry
+	resticManager                       restic.RepositoryManager
+	metrics                             *metrics.ServerMetrics
+	config                              serverConfig
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -291,21 +291,21 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 	}
 
 	s := &server{
-		namespace:                        f.Namespace(),
-		metricsAddress:                   config.metricsAddress,
-		kubeClientConfig:                 clientConfig,
-		kubeClient:                       kubeClient,
-		veleroClient:                     veleroClient,
-		discoveryClient:                  veleroClient.Discovery(),
-		dynamicClient:                    dynamicClient,
-		sharedInformerFactory:            informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
-		snapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
-		ctx:                              ctx,
-		cancelFunc:                       cancelFunc,
-		logger:                           logger,
-		logLevel:                         logger.Level,
-		pluginRegistry:                   pluginRegistry,
-		config:                           config,
+		namespace:                           f.Namespace(),
+		metricsAddress:                      config.metricsAddress,
+		kubeClientConfig:                    clientConfig,
+		kubeClient:                          kubeClient,
+		veleroClient:                        veleroClient,
+		discoveryClient:                     veleroClient.Discovery(),
+		dynamicClient:                       dynamicClient,
+		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
+		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
+		ctx:                                 ctx,
+		cancelFunc:                          cancelFunc,
+		logger:                              logger,
+		logLevel:                            logger.Level,
+		pluginRegistry:                      pluginRegistry,
+		config:                              config,
 	}
 
 	return s, nil
@@ -623,8 +623,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 				// Instantiate the listers fully
 				s.logger.Debug("Creating CSI listers")
 				// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-				vsLister = s.snapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-				vscLister = s.snapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+				vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
+				vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
 			case err != nil:
 				cmd.CheckError(err)
 			}
@@ -836,10 +836,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	// start the informers & and wait for the caches to sync
 	s.sharedInformerFactory.Start(ctx.Done())
-	s.snapshotterSharedInformerFactory.Start(ctx.Done())
+	s.csiSnapshotterSharedInformerFactory.Start(ctx.Done())
 	s.logger.Info("Waiting for informer caches to sync")
 	cacheSyncResults := s.sharedInformerFactory.WaitForCacheSync(ctx.Done())
-	csiCacheSyncResults := s.snapshotterSharedInformerFactory.WaitForCacheSync(ctx.Done())
+	csiCacheSyncResults := s.csiSnapshotterSharedInformerFactory.WaitForCacheSync(ctx.Done())
 	s.logger.Info("Done waiting for informer caches to sync")
 
 	// Append our CSI informer types into the larger list of caches, so we can check them all at once
@@ -916,5 +916,5 @@ func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map
 	if features.IsEnabled("EnableCSI") {
 		return w.factory.WaitForCacheSync(stopCh)
 	}
-	return make(map[reflect.Type]bool, 0)
+	return nil
 }
