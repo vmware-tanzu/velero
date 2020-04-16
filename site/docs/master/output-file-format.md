@@ -97,3 +97,17 @@ resources/
                 ...
     ...
 ```
+
+## Output File Format Versioning
+
+The Velero output file format is intended to be relatively stable, but may change over time in order to support new features.
+
+In order to accommodate this, Velero follows [Semantic Versioning](http://semver.org/) for the file format version.
+
+Minor and patch versions will indicate backwards-compatible changes that previous versions of Velero can restore, including new directories or files.
+
+A major version would indicate that a version of Velero older than the version that created the backup could not restore it, usually because of moved or renamed directories or files.
+
+Major versions of the file format will be incremented with major version releases of Velero.
+However, a major version release of Velero does not necessarily mean that the backup format version changed - Velero 3.0 could still use backup file format 2.0, as an example.
+
