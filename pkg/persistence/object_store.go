@@ -232,8 +232,8 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 		if err := seekAndPutObject(s.objectStore, s.bucket, key, reader); err != nil {
 			errs := []error{err}
 
-			// attempt to clean up the object in case it was made but we couldn't write contents.
-			deleteErr := s.objectStore.DeleteObject(s.bucket, key)
+			// attempt to clean up the backup contents and metadata if we fail to upload and of the extra files.
+			deleteErr := s.objectStore.DeleteObject(s.bucket, s.layout.getBackupContentsKey(info.Name))
 			errs = append(errs, deleteErr)
 
 			deleteErr = s.objectStore.DeleteObject(s.bucket, s.layout.getBackupMetadataKey(info.Name))
