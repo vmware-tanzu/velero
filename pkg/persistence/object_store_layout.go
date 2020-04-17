@@ -104,6 +104,6 @@ func (l *ObjectStoreLayout) getCSIVolumeSnapshotKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshots.json.gz", backup))
 }
 
-func (l *ObjectStoreLayout) getVolumeSnapshotContentsKey(backup string) string {
+func (l *ObjectStoreLayout) getCSIVolumeSnapshotContentsKey(backup string) string {
 	return path.Join(l.subdirs["backups"], backup, fmt.Sprintf("%s-csi-volumesnapshotcontents.json.gz", backup))
 }

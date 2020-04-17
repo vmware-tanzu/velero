@@ -639,7 +639,7 @@ func persistBackup(backup *pkgbackup.Request,
 	backupStore persistence.BackupStore,
 	log logrus.FieldLogger,
 	csiVolumeSnapshots []*snapshotv1beta1api.VolumeSnapshot,
-	volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
+	csiVolumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent,
 ) []error {
 	errs := []error{}
 	backupJSON := new(bytes.Buffer)
@@ -664,7 +664,7 @@ func persistBackup(backup *pkgbackup.Request,
 		errs = append(errs, err)
 	}
 
-	snapshotContentsJSON, err := encodeToJSONGzip(volumeSnapshotContents, "volume snapshot contents list")
+	csiSnapshotContentsJSON, err := encodeToJSONGzip(csiVolumeSnapshotContents, "csi volume snapshot contents list")
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -681,19 +681,19 @@ func persistBackup(backup *pkgbackup.Request,
 		nativeVolumeSnapshots = nil
 		backupResourceList = nil
 		csiSnapshotJSON = nil
-		snapshotContentsJSON = nil
+		csiSnapshotContentsJSON = nil
 	}
 
 	backupInfo := persistence.BackupInfo{
-		Name:                   backup.Name,
-		Metadata:               backupJSON,
-		Contents:               backupContents,
-		Log:                    backupLog,
-		PodVolumeBackups:       podVolumeBackups,
-		VolumeSnapshots:        nativeVolumeSnapshots,
-		BackupResourceList:     backupResourceList,
-		CSIVolumeSnapshots:     csiSnapshotJSON,
-		VolumeSnapshotContents: snapshotContentsJSON,
+		Name:                      backup.Name,
+		Metadata:                  backupJSON,
+		Contents:                  backupContents,
+		Log:                       backupLog,
+		PodVolumeBackups:          podVolumeBackups,
+		VolumeSnapshots:           nativeVolumeSnapshots,
+		BackupResourceList:        backupResourceList,
+		CSIVolumeSnapshots:        csiSnapshotJSON,
+		CSIVolumeSnapshotContents: csiSnapshotContentsJSON,
 	}
 	if err := backupStore.PutBackup(backupInfo); err != nil {
 		errs = append(errs, err)

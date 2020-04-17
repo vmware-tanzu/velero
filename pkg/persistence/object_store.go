@@ -43,7 +43,7 @@ type BackupInfo struct {
 	VolumeSnapshots,
 	BackupResourceList,
 	CSIVolumeSnapshots,
-	VolumeSnapshotContents io.Reader
+	CSIVolumeSnapshotContents io.Reader
 }
 
 // BackupStore defines operations for creating, retrieving, and deleting
@@ -221,11 +221,11 @@ func (s *objectBackupStore) PutBackup(info BackupInfo) error {
 	// Since the logic for all of these files is the exact same except for the name and the contents,
 	// use a map literal to iterate through them and write them to the bucket.
 	var backupObjs = map[string]io.Reader{
-		s.layout.getPodVolumeBackupsKey(info.Name):       info.PodVolumeBackups,
-		s.layout.getBackupVolumeSnapshotsKey(info.Name):  info.VolumeSnapshots,
-		s.layout.getBackupResourceListKey(info.Name):     info.BackupResourceList,
-		s.layout.getCSIVolumeSnapshotKey(info.Name):      info.CSIVolumeSnapshots,
-		s.layout.getVolumeSnapshotContentsKey(info.Name): info.VolumeSnapshotContents,
+		s.layout.getPodVolumeBackupsKey(info.Name):          info.PodVolumeBackups,
+		s.layout.getBackupVolumeSnapshotsKey(info.Name):     info.VolumeSnapshots,
+		s.layout.getBackupResourceListKey(info.Name):        info.BackupResourceList,
+		s.layout.getCSIVolumeSnapshotKey(info.Name):         info.CSIVolumeSnapshots,
+		s.layout.getCSIVolumeSnapshotContentsKey(info.Name): info.CSIVolumeSnapshotContents,
 	}
 
 	for key, reader := range backupObjs {
