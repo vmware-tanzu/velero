@@ -28,6 +28,7 @@ debug
 
 /velero
 .idea/
+Tiltfile
 
 .container-*
 .vimrc
