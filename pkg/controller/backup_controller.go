@@ -562,10 +562,14 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 
 		if c.volumeSnapshotContentLister != nil {
-			volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
-			if err != nil {
-				backupLog.Error(err)
-
+			// Since VolumeSnapshotContent objects are not currently labeled, get them by using binding from the VolumeSnapshot
+			for _, vs := range volumeSnapshots {
+				vsc, err := c.volumeSnapshotContentLister.Get(*vs.Status.BoundVolumeSnapshotContentName)
+				if err != nil {
+					backupLog.Error(err)
+					continue
+				}
+				volumeSnapshotContents = append(volumeSnapshotContents, vsc)
 			}
 		}
 	}
