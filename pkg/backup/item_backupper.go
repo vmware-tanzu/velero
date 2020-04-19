@@ -159,11 +159,11 @@ func (ib *defaultItemBackupper) backupItem(logger logrus.FieldLogger, obj runtim
 		name:      name,
 	}
 
-	if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
-		log.Info("Skipping item because it's already been backed up.")
-		// returning true since this item *is* in the backup, even though we're not backing it up here
-		return true, nil
-	}
+	//if _, exists := ib.backupRequest.BackedUpItems[key]; exists {
+	//	log.Info("Skipping item because it's already been backed up.")
+	//	// returning true since this item *is* in the backup, even though we're not backing it up here
+	//	return true, nil
+	//}
 	ib.backupRequest.BackedUpItems[key] = struct{}{}
 
 	log.Info("Backing up item")
