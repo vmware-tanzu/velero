@@ -1,0 +1,4 @@
+clarify the wording for restore describe for namespaces included
+
+Instead of showing it as "*" explicitly mention that all the namespaces
+from the backup object are included.
