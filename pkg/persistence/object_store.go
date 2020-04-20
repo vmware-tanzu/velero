@@ -29,6 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -385,6 +387,48 @@ func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.Pod
 
 func (s *objectBackupStore) GetBackupContents(name string) (io.ReadCloser, error) {
 	return s.objectStore.GetObject(s.bucket, s.layout.getBackupContentsKey(name))
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
+	// TODO(nrb-csi): Check for feature flag?
+	// If the volume snapshots don't exist, then we don't want to return an error, since
+	// a legacy backup wouldn't have this file.
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, nil
+	}
+	// TODO(nrb-csi): HANDLE THIS CLOSE BETTER!
+	defer res.Close()
+
+	var volumeSnapshots []*snapshotv1beta1api.VolumeSnapshot
+	if err := decode(res, &volumeSnapshots); err != nil {
+		return nil, err
+	}
+
+	return volumeSnapshots, nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error) {
+	// TODO(nrb-csi): Handle decoding
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, nil
+	}
+	// TODO(nrb-csi): HANDLE THIS CLOSE BETTER!
+	defer res.Close()
+
+	var volumeSnapshotContents []*snapshotv1beta1api.VolumeSnapshotContent
+	if err := decode(res, &volumeSnapshotContents); err != nil {
+		return nil, err
+	}
+
+	return volumeSnapshotContents, nil
 }
 
 func (s *objectBackupStore) BackupExists(bucket, backupName string) (bool, error) {
