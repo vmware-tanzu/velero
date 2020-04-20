@@ -29,12 +29,14 @@ type DownloadRequestSpec struct {
 type DownloadTargetKind string
 
 const (
-	DownloadTargetKindBackupLog             DownloadTargetKind = "BackupLog"
-	DownloadTargetKindBackupContents        DownloadTargetKind = "BackupContents"
-	DownloadTargetKindBackupVolumeSnapshots DownloadTargetKind = "BackupVolumeSnapshots"
-	DownloadTargetKindBackupResourceList    DownloadTargetKind = "BackupResourceList"
-	DownloadTargetKindRestoreLog            DownloadTargetKind = "RestoreLog"
-	DownloadTargetKindRestoreResults        DownloadTargetKind = "RestoreResults"
+	DownloadTargetKindBackupLog                 DownloadTargetKind = "BackupLog"
+	DownloadTargetKindBackupContents            DownloadTargetKind = "BackupContents"
+	DownloadTargetKindBackupVolumeSnapshots     DownloadTargetKind = "BackupVolumeSnapshots"
+	DownloadTargetKindBackupResourceList        DownloadTargetKind = "BackupResourceList"
+	DownloadTargetKindRestoreLog                DownloadTargetKind = "RestoreLog"
+	DownloadTargetKindRestoreResults            DownloadTargetKind = "RestoreResults"
+	DownloadTargetKindCSIVolumeSnapshots        DownloadTargetKind = "CSIVolumeSnapshots"
+	DownloadTargetKindCSIVolumeSnapshotContents DownloadTargetKind = "CSIVolumeSnapshotContents"
 )
 
 // DownloadTarget is the specification for what kind of file to download, and the name of the
