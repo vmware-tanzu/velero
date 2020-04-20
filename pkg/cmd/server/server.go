@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +43,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+	snapshotv1beta1client "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
+	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
+	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/backup"
@@ -212,23 +218,24 @@ func NewCommand(f client.Factory) *cobra.Command {
 }
 
 type server struct {
-	namespace             string
-	metricsAddress        string
-	kubeClientConfig      *rest.Config
-	kubeClient            kubernetes.Interface
-	veleroClient          clientset.Interface
-	discoveryClient       discovery.DiscoveryInterface
-	discoveryHelper       velerodiscovery.Helper
-	dynamicClient         dynamic.Interface
-	sharedInformerFactory informers.SharedInformerFactory
-	ctx                   context.Context
-	cancelFunc            context.CancelFunc
-	logger                logrus.FieldLogger
-	logLevel              logrus.Level
-	pluginRegistry        clientmgmt.Registry
-	resticManager         restic.RepositoryManager
-	metrics               *metrics.ServerMetrics
-	config                serverConfig
+	namespace                           string
+	metricsAddress                      string
+	kubeClientConfig                    *rest.Config
+	kubeClient                          kubernetes.Interface
+	veleroClient                        clientset.Interface
+	discoveryClient                     discovery.DiscoveryInterface
+	discoveryHelper                     velerodiscovery.Helper
+	dynamicClient                       dynamic.Interface
+	sharedInformerFactory               informers.SharedInformerFactory
+	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
+	ctx                                 context.Context
+	cancelFunc                          context.CancelFunc
+	logger                              logrus.FieldLogger
+	logLevel                            logrus.Level
+	pluginRegistry                      clientmgmt.Registry
+	resticManager                       restic.RepositoryManager
+	metrics                             *metrics.ServerMetrics
+	config                              serverConfig
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -262,28 +269,43 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
+	// cancelFunc is not deferred here because if it was, then ctx would immediately
+	// be cancelled once this function exited, making it useless to any informers using later.
+	// That, in turn, causes the velero server to halt when the first informer tries to use it (probably restic's).
+	// Therefore, we must explicitly call it on the error paths in this function.
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	clientConfig, err := f.ClientConfig()
 	if err != nil {
+		cancelFunc()
 		return nil, err
 	}
 
+	var csiSnapClient *snapshotv1beta1client.Clientset
+	if features.IsEnabled(api.CSIFeatureFlag) {
+		csiSnapClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
+		if err != nil {
+			cancelFunc()
+			return nil, err
+		}
+	}
+
 	s := &server{
-		namespace:             f.Namespace(),
-		metricsAddress:        config.metricsAddress,
-		kubeClientConfig:      clientConfig,
-		kubeClient:            kubeClient,
-		veleroClient:          veleroClient,
-		discoveryClient:       veleroClient.Discovery(),
-		dynamicClient:         dynamicClient,
-		sharedInformerFactory: informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
-		ctx:                   ctx,
-		cancelFunc:            cancelFunc,
-		logger:                logger,
-		logLevel:              logger.Level,
-		pluginRegistry:        pluginRegistry,
-		config:                config,
+		namespace:                           f.Namespace(),
+		metricsAddress:                      config.metricsAddress,
+		kubeClientConfig:                    clientConfig,
+		kubeClient:                          kubeClient,
+		veleroClient:                        veleroClient,
+		discoveryClient:                     veleroClient.Discovery(),
+		dynamicClient:                       dynamicClient,
+		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
+		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
+		ctx:                                 ctx,
+		cancelFunc:                          cancelFunc,
+		logger:                              logger,
+		logLevel:                            logger.Level,
+		pluginRegistry:                      pluginRegistry,
+		config:                              config,
 	}
 
 	return s, nil
@@ -584,6 +606,30 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		cmd.CheckError(err)
 
+		// Make empty listers that will only be populated if CSI is properly enabled.
+		var vsLister snapshotv1beta1listers.VolumeSnapshotLister
+		var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
+
+		// If CSI is enabled, check for the CSI groups and generate the listers
+		// If CSI isn't enabled, proceed normally.
+		if features.IsEnabled(api.CSIFeatureFlag) {
+			_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
+			switch {
+			case apierrors.IsNotFound(err):
+				// CSI is enabled, but the required CRDs aren't installed, so halt.
+				s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
+			case err == nil:
+				// CSI is enabled, and the resources were found.
+				// Instantiate the listers fully
+				s.logger.Debug("Creating CSI listers")
+				// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
+				vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
+				vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+			case err != nil:
+				cmd.CheckError(err)
+			}
+		}
+
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.veleroClient.VeleroV1(),
@@ -600,6 +646,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 			s.config.formatFlag.Parse(),
+			vsLister,
+			vscLister,
 		)
 
 		return controllerRunInfo{
@@ -788,9 +836,16 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	// start the informers & and wait for the caches to sync
 	s.sharedInformerFactory.Start(ctx.Done())
+	s.csiSnapshotterSharedInformerFactory.Start(ctx.Done())
 	s.logger.Info("Waiting for informer caches to sync")
 	cacheSyncResults := s.sharedInformerFactory.WaitForCacheSync(ctx.Done())
+	csiCacheSyncResults := s.csiSnapshotterSharedInformerFactory.WaitForCacheSync(ctx.Done())
 	s.logger.Info("Done waiting for informer caches to sync")
+
+	// Append our CSI informer types into the larger list of caches, so we can check them all at once
+	for informer, synced := range csiCacheSyncResults {
+		cacheSyncResults[informer] = synced
+	}
 
 	for informer, synced := range cacheSyncResults {
 		if !synced {
@@ -831,4 +886,35 @@ func (s *server) runProfiler() {
 	if err := http.ListenAndServe(s.config.profilerAddress, mux); err != nil {
 		s.logger.WithError(errors.WithStack(err)).Error("error running profiler http server")
 	}
+}
+
+// CSIInformerFactoryWrapper is a proxy around the CSI SharedInformerFactory that checks the CSI feature flag before performing operations.
+type CSIInformerFactoryWrapper struct {
+	factory snapshotv1beta1informers.SharedInformerFactory
+}
+
+func NewCSIInformerFactoryWrapper(c snapshotv1beta1client.Interface) *CSIInformerFactoryWrapper {
+	// If no namespace is specified, all namespaces are watched.
+	// This is desirable for VolumeSnapshots, as we want to query for all VolumeSnapshots across all namespaces using this informer
+	w := &CSIInformerFactoryWrapper{}
+
+	if features.IsEnabled(api.CSIFeatureFlag) {
+		w.factory = snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(c, 0)
+	}
+	return w
+}
+
+// Start proxies the Start call to the CSI SharedInformerFactory.
+func (w *CSIInformerFactoryWrapper) Start(stopCh <-chan struct{}) {
+	if features.IsEnabled(api.CSIFeatureFlag) {
+		w.factory.Start(stopCh)
+	}
+}
+
+// WaitForCacheSync proxies the WaitForCacheSync call to the CSI SharedInformerFactory.
+func (w *CSIInformerFactoryWrapper) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+	if features.IsEnabled(api.CSIFeatureFlag) {
+		return w.factory.WaitForCacheSync(stopCh)
+	}
+	return nil
 }

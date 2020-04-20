@@ -36,4 +36,7 @@ const (
 	// NamespaceScopedDir is the name of the directory containing namespace-scoped
 	// resource within a Velero backup.
 	NamespaceScopedDir = "namespaces"
+
+	// CSIFeatureFlag is the feature flag string that defines whether or not CSI features are being used.
+	CSIFeatureFlag = "EnableCSI"
 )
