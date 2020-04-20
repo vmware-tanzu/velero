@@ -564,12 +564,15 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		if c.volumeSnapshotContentLister != nil {
 			// Since VolumeSnapshotContent objects are not currently labeled, get them by using binding from the VolumeSnapshot
 			for _, vs := range volumeSnapshots {
-				vsc, err := c.volumeSnapshotContentLister.Get(*vs.Status.BoundVolumeSnapshotContentName)
-				if err != nil {
-					backupLog.Error(err)
-					continue
+				// nil check just in case the snapshot and the content object did not get bound before returning from the plugins
+				if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
+					vsc, err := c.volumeSnapshotContentLister.Get(*vs.Status.BoundVolumeSnapshotContentName)
+					if err != nil {
+						backupLog.Error(err)
+						continue
+					}
+					volumeSnapshotContents = append(volumeSnapshotContents, vsc)
 				}
-				volumeSnapshotContents = append(volumeSnapshotContents, vsc)
 			}
 		}
 	}
@@ -648,8 +651,8 @@ func persistBackup(backup *pkgbackup.Request,
 	persistErrs := []error{}
 	backupJSON := new(bytes.Buffer)
 
-	if errs := encode.EncodeTo(backup.Backup, "json", backupJSON); errs != nil {
-		persistErrs = append(persistErrs, errors.Wrap(errs, "error encoding backup"))
+	if err := encode.EncodeTo(backup.Backup, "json", backupJSON); err != nil {
+		persistErrs = append(persistErrs, errors.Wrap(err, "error encoding backup"))
 	}
 
 	// Velero-native volume snapshots (as opposed to CSI ones)
