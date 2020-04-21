@@ -1020,3 +1020,66 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 		})
 	}
 }
+
+func TestSetVSCDeletionPolicyToDelete(t *testing.T) {
+	retainVSC := snapshotv1beta1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "retain-vsc",
+		},
+		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+		},
+	}
+	deleteVSC := snapshotv1beta1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "delete-vsc",
+		},
+		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentDelete,
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		vsc         snapshotv1beta1api.VolumeSnapshotContent
+		expectError bool
+	}{
+		{
+			name: "should fail to set deletion policy on a non-existent vsc",
+			vsc: snapshotv1beta1api.VolumeSnapshotContent{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "does-not-exist",
+				},
+				Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+					DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+				},
+			},
+			expectError: true,
+		},
+		{
+			name:        "should update deletion policy on supplied vsc",
+			vsc:         retainVSC,
+			expectError: false,
+		},
+		{
+			name:        "should leave vsc unchanged when deletion policy is already delete",
+			vsc:         deleteVSC,
+			expectError: false,
+		},
+	}
+
+	objs := []runtime.Object{&retainVSC, &deleteVSC}
+	fakeClient := snapshotFake.NewSimpleClientset(objs...)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual, err := setVSCDeletionPolicyToDelete(tc.vsc.Name, fakeClient.SnapshotV1beta1())
+			if tc.expectError {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, actual.Spec.DeletionPolicy, snapshotv1beta1api.VolumeSnapshotContentDelete)
+			}
+		})
+	}
+}

@@ -229,6 +229,7 @@ type server struct {
 	dynamicClient                       dynamic.Interface
 	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
+	csiSnapshotClient                   *snapshotterClientSet.Clientset
 	ctx                                 context.Context
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
@@ -301,6 +302,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		dynamicClient:                       dynamicClient,
 		sharedInformerFactory:               informers.NewSharedInformerFactoryWithOptions(veleroClient, 0, informers.WithNamespace(f.Namespace())),
 		csiSnapshotterSharedInformerFactory: NewCSIInformerFactoryWrapper(csiSnapClient),
+		csiSnapshotClient:                   csiSnapClient,
 		ctx:                                 ctx,
 		cancelFunc:                          cancelFunc,
 		logger:                              logger,
@@ -689,14 +691,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	}
 
 	deletionControllerRunInfo := func() controllerRunInfo {
-		var snapshotterClient *snapshotterClientSet.Clientset
-		var err error
-		if features.IsEnabled(features.EnableCSI) {
-			snapshotterClient, err = snapshotterClientSet.NewForConfig(s.kubeClientConfig)
-			if err != nil {
-				s.logger.Errorf("Failed to create CSI volumesnapshotclient, %v", err)
-			}
-		}
 		deletionController := controller.NewBackupDeletionController(
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests(),
@@ -709,7 +703,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
-			snapshotterClient,
+			s.csiSnapshotClient,
 			newPluginManager,
 			s.metrics,
 		)

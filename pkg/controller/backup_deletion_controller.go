@@ -487,12 +487,45 @@ func getCSIVolumeSnapshotsInBackup(b *velerov1api.Backup, csiClient snapshotter.
 	return csiVolSnaps, errs
 }
 
+func setVSCDeletionPolicyToDelete(vscName string, csiClient snapshotter.SnapshotV1beta1Interface) (*snapshotv1beta1api.VolumeSnapshotContent, error) {
+	snapCont, err := csiClient.VolumeSnapshotContents().Get(vscName, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to set DeletionPolicy for CSI volumesnapshotcontent %s", vscName)
+	}
+	old, err := json.Marshal(snapCont)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshall existing volumesnapshotcontent %s json", vscName)
+	}
+
+	snapCont.Spec.DeletionPolicy = snapshotv1beta1api.VolumeSnapshotContentDelete
+	new, err := json.Marshal(snapCont)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to marshall updated volumesnapshotcontent %s to json", vscName)
+	}
+
+	pb, err := jsonpatch.CreateMergePatch(old, new)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error creating json merge patch for volumesnapshotcontent %s", vscName)
+	}
+
+	upd, err := csiClient.VolumeSnapshotContents().Patch(vscName, types.MergePatchType, pb)
+	return upd, err
+}
+
 func (c *backupDeletionController) deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	csiVolSnaps, errs := getCSIVolumeSnapshotsInBackup(backup, csiClient, log)
 
 	log.Infof("Deleting %d CSI volumesnapshots in backup %s", len(csiVolSnaps), backup.Name)
 	for _, csiVS := range csiVolSnaps {
 		log.Infof("Deleting CSI volumesnapshot %s/%s", csiVS.Namespace, csiVS.Name)
+		if csiVS.Status != nil && csiVS.Status.BoundVolumeSnapshotContentName != nil {
+			log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", *csiVS.Status.BoundVolumeSnapshotContentName)
+			_, err := setVSCDeletionPolicyToDelete(*csiVS.Status.BoundVolumeSnapshotContentName, csiClient)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+		}
 		err := csiClient.VolumeSnapshots(csiVS.Namespace).Delete(csiVS.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, err)
