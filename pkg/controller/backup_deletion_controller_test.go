@@ -880,7 +880,6 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 }
 
 func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
-
 	ns1VS1InBackup := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs1",
@@ -953,7 +952,6 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 		name              string
 		backup            velerov1.Backup
 		expectedSnapshots []snapshotv1beta1api.VolumeSnapshot
-		expectError       bool
 	}{
 		{
 			name: "should find all volumesnapshots in all namespaces",
@@ -968,7 +966,6 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 					ExcludedNamespaces: nil,
 				},
 			},
-			expectError:       false,
 			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{ns1VS1InBackup, ns1VS2InBackup, ns2VS1InBackup, ns2VS2InBackup},
 		},
 		{
@@ -983,7 +980,6 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 					ExcludedNamespaces: []string{"ns2"},
 				},
 			},
-			expectError:       false,
 			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{ns1VS1InBackup, ns1VS2InBackup},
 		},
 		{
@@ -998,7 +994,6 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 					ExcludedNamespaces: []string{"ns1", "ns2"},
 				},
 			},
-			expectError:       false,
 			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{},
 		},
 	}
@@ -1011,75 +1006,231 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 				},
 			)
 			actualSnapshots, errs := getCSIVolumeSnapshotsInBackup(&tc.backup, fakeClient.SnapshotV1beta1(), log)
-			if tc.expectError {
-				assert.NotNil(t, errs)
-				assert.NotEmpty(t, errs)
-				return
-			}
+			assert.Empty(t, errs)
 			assert.Equal(t, tc.expectedSnapshots, actualSnapshots)
 		})
 	}
 }
 
-func TestSetVSCDeletionPolicyToDelete(t *testing.T) {
-	retainVSC := snapshotv1beta1api.VolumeSnapshotContent{
+func TestDeleteCSIVolumeSnapshots(t *testing.T) {
+	//Backup1
+	ns1VS1VSCName := "ns1vs1vsc"
+	ns1VS1VSC := snapshotv1beta1api.VolumeSnapshotContent{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "retain-vsc",
+			Name: ns1VS1VSCName,
 		},
 		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
 			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
 		},
 	}
-	deleteVSC := snapshotv1beta1api.VolumeSnapshotContent{
+	ns1VS1 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "delete-vsc",
+			Name:      "vs1",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup1",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &ns1VS1VSCName,
+		},
+	}
+
+	ns1VS2VSCName := "ns1vs2vsc"
+	ns1VS2VSC := snapshotv1beta1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns1VS2VSCName,
 		},
 		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
-			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentDelete,
+			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
 		},
 	}
+	ns1VS2 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs2",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup1",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &ns1VS2VSCName,
+		},
+	}
+
+	ns2VS1VSCName := "ns2vs1vsc"
+	ns2VS1VSC := snapshotv1beta1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns2VS1VSCName,
+		},
+		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+		},
+	}
+	ns2VS1 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs1",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup1",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &ns2VS1VSCName,
+		},
+	}
+
+	ns2VS2VSCName := "ns2vs2vsc"
+	ns2VS2VSC := snapshotv1beta1api.VolumeSnapshotContent{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: ns2VS2VSCName,
+		},
+		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+		},
+	}
+	ns2VS2 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs2",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup1",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &ns2VS2VSCName,
+		},
+	}
+
+	// Backup2
+	ns1NilStatusVS := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ns1NilStatusVS",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup2",
+			},
+		},
+		Status: nil,
+	}
+
+	// Backup3
+	ns1NilBoundVSCVS := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ns1NilBoundVSCVS",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup3",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: nil,
+		},
+	}
+
+	// Backup4
+	notFound := "not-found"
+	ns1NonExistentVSCVS := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "ns1NonExistentVSCVS",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup3",
+			},
+		},
+		Status: &snapshotv1beta1api.VolumeSnapshotStatus{
+			BoundVolumeSnapshotContentName: &notFound,
+		},
+	}
+
+	objs := []runtime.Object{&ns1VS1, &ns1VS1VSC, &ns1VS2, &ns1VS2VSC, &ns2VS1, &ns2VS1VSC, &ns2VS2, &ns2VS2VSC, &ns1NilStatusVS, &ns1NilBoundVSCVS, &ns1NonExistentVSCVS}
+	fakeClient := snapshotFake.NewSimpleClientset(objs...)
 
 	testCases := []struct {
-		name        string
-		vsc         snapshotv1beta1api.VolumeSnapshotContent
-		expectError bool
+		name   string
+		backup velerov1.Backup
 	}{
 		{
-			name: "should fail to set deletion policy on a non-existent vsc",
-			vsc: snapshotv1beta1api.VolumeSnapshotContent{
+			name: "should delete volumesnapshots bound to existing volumesnapshotcontent",
+			backup: velerov1.Backup{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "does-not-exist",
+					Name:      "backup1",
+					Namespace: "velero",
 				},
-				Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
-					DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+				Spec: velerov1.BackupSpec{
+					// all included namespaces
+					IncludedNamespaces: nil,
+					ExcludedNamespaces: nil,
 				},
 			},
-			expectError: true,
 		},
 		{
-			name:        "should update deletion policy on supplied vsc",
-			vsc:         retainVSC,
-			expectError: false,
+			name: "should delete volumesnapshots with nil status",
+			backup: velerov1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup2",
+					Namespace: "velero",
+				},
+				Spec: velerov1.BackupSpec{
+					// all included namespaces
+					IncludedNamespaces: nil,
+					ExcludedNamespaces: nil,
+				},
+			},
 		},
 		{
-			name:        "should leave vsc unchanged when deletion policy is already delete",
-			vsc:         deleteVSC,
-			expectError: false,
+			name: "should delete volumesnapshots with nil BoundVolumeSnapshotContentName",
+			backup: velerov1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup3",
+					Namespace: "velero",
+				},
+				Spec: velerov1.BackupSpec{
+					// all included namespaces
+					IncludedNamespaces: nil,
+					ExcludedNamespaces: nil,
+				},
+			},
+		},
+		{
+			name: "should delete volumesnapshots bound to non-existent volumesnapshotcontents",
+			backup: velerov1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup4",
+					Namespace: "velero",
+				},
+				Spec: velerov1.BackupSpec{
+					// all included namespaces
+					IncludedNamespaces: nil,
+					ExcludedNamespaces: nil,
+				},
+			},
+		},
+		{
+			name: "should be a no-op when there are no volumesnapshots to delete",
+			backup: velerov1.Backup{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "backup-no-vs",
+					Namespace: "velero",
+				},
+				Spec: velerov1.BackupSpec{
+					// all included namespaces
+					IncludedNamespaces: nil,
+					ExcludedNamespaces: nil,
+				},
+			},
 		},
 	}
-
-	objs := []runtime.Object{&retainVSC, &deleteVSC}
-	fakeClient := snapshotFake.NewSimpleClientset(objs...)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual, err := setVSCDeletionPolicyToDelete(tc.vsc.Name, fakeClient.SnapshotV1beta1())
-			if tc.expectError {
-				assert.NotNil(t, err)
-			} else {
-				assert.Nil(t, err)
-				assert.Equal(t, actual.Spec.DeletionPolicy, snapshotv1beta1api.VolumeSnapshotContentDelete)
-			}
+			log := velerotest.NewLogger().WithFields(
+				logrus.Fields{
+					"unit-test": "unit-test",
+				},
+			)
+			errs := deleteCSIVolumeSnapshots(&tc.backup, fakeClient.SnapshotV1beta1(), log)
+			assert.Empty(t, errs)
 		})
 	}
 }

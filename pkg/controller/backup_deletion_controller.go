@@ -37,7 +37,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	"github.com/vmware-tanzu/velero/pkg/backup"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -321,7 +320,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	if c.csiSnapshotClient != nil {
 		log.Info("Removing CSI volumesnapshots")
-		if csiErrs := c.deleteCSIVolumeSnapshots(backup, c.csiSnapshotClient.SnapshotV1beta1(), log); len(errs) > 0 {
+		if csiErrs := deleteCSIVolumeSnapshots(backup, c.csiSnapshotClient.SnapshotV1beta1(), log); len(errs) > 0 {
 			for _, err := range csiErrs {
 				errs = append(errs, err.Error())
 			}
@@ -458,71 +457,51 @@ func (c *backupDeletionController) deleteResticSnapshots(backup *velerov1api.Bac
 	return errs
 }
 
-func getCSIVolumeSnapshotsInBackup(b *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) ([]snapshotv1beta1api.VolumeSnapshot, []error) {
+func getCSIVolumeSnapshotsInBackup(backup *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) ([]snapshotv1beta1api.VolumeSnapshot, []error) {
 	csiVolSnaps := []snapshotv1beta1api.VolumeSnapshot{}
 	errs := []error{}
 
 	selector := metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			velerov1api.BackupNameLabel: label.GetValidName(b.Name),
+			velerov1api.BackupNameLabel: label.GetValidName(backup.Name),
 		},
 	}
 	listOpts := metav1.ListOptions{
 		LabelSelector: metav1.FormatLabelSelector(&selector),
 	}
 
-	for _, ns := range backup.GetNamespacesInBackup(b) {
+	for _, ns := range pkgbackup.GetNamespacesInBackup(backup) {
 		log.Debugf("Listing CSI volumesnapshots in namespace %s", ns)
 		nsvs, err := csiClient.VolumeSnapshots(ns).List(listOpts)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, errors.WithStack(err))
 		}
-		if nsvs.Items != nil && len(nsvs.Items) != 0 {
+		if len(nsvs.Items) > 0 {
 			log.Debugf("Found %d CSI volumesnapshots in namespace %s", len(nsvs.Items), ns)
 			csiVolSnaps = append(csiVolSnaps, nsvs.Items...)
 		}
 	}
 
-	log.Infof("Found %d CSI volumesnapshots in backup %s", len(csiVolSnaps), b.Name)
+	log.Infof("Found %d CSI volumesnapshots in backup %s", len(csiVolSnaps), backup.Name)
 	return csiVolSnaps, errs
 }
 
-func setVSCDeletionPolicyToDelete(vscName string, csiClient snapshotter.SnapshotV1beta1Interface) (*snapshotv1beta1api.VolumeSnapshotContent, error) {
-	snapCont, err := csiClient.VolumeSnapshotContents().Get(vscName, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to set DeletionPolicy for CSI volumesnapshotcontent %s", vscName)
-	}
-	old, err := json.Marshal(snapCont)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshall existing volumesnapshotcontent %s json", vscName)
-	}
-
-	snapCont.Spec.DeletionPolicy = snapshotv1beta1api.VolumeSnapshotContentDelete
-	new, err := json.Marshal(snapCont)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to marshall updated volumesnapshotcontent %s to json", vscName)
-	}
-
-	pb, err := jsonpatch.CreateMergePatch(old, new)
-	if err != nil {
-		return nil, errors.Wrapf(err, "error creating json merge patch for volumesnapshotcontent %s", vscName)
-	}
-
-	upd, err := csiClient.VolumeSnapshotContents().Patch(vscName, types.MergePatchType, pb)
-	return upd, err
-}
-
-func (c *backupDeletionController) deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
+func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	csiVolSnaps, errs := getCSIVolumeSnapshotsInBackup(backup, csiClient, log)
+	if len(errs) != 0 {
+		return errs
+	}
 
-	log.Infof("Deleting %d CSI volumesnapshots in backup %s", len(csiVolSnaps), backup.Name)
+	log.Infof("Deleting %d CSI volumesnapshots", len(csiVolSnaps))
 	for _, csiVS := range csiVolSnaps {
 		log.Infof("Deleting CSI volumesnapshot %s/%s", csiVS.Namespace, csiVS.Name)
 		if csiVS.Status != nil && csiVS.Status.BoundVolumeSnapshotContentName != nil {
 			log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", *csiVS.Status.BoundVolumeSnapshotContentName)
-			_, err := setVSCDeletionPolicyToDelete(*csiVS.Status.BoundVolumeSnapshotContentName, csiClient)
-			if err != nil {
-				errs = append(errs, err)
+			pb := []byte(`{"spec":{"deletionPolicy":"Delete"}}`)
+			_, err := csiClient.VolumeSnapshotContents().Patch(*csiVS.Status.BoundVolumeSnapshotContentName, types.MergePatchType, pb)
+			if err != nil && !apierrors.IsNotFound(err) {
+				errs = append(errs, errors.Wrapf(err, "failed to update deletion policy on volumesnapshotcontent %s skipping deletion of volumesnapshot %s/%s",
+					*csiVS.Status.BoundVolumeSnapshotContentName, csiVS.Namespace, csiVS.Name))
 				continue
 			}
 		}
