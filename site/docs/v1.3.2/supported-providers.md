@@ -16,11 +16,12 @@ Contact: [#Velero Slack][28], [GitHub Issues][29]
 
 | Provider                  | Object Store                 | Volume Snapshotter                 | Plugin Documentation   | Contact                         |
 |---------------------------|------------------------------|------------------------------------|------------------------|---------------------------------|
-| [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
-| [DigitalOcean][15]        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
-| [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [AlibabaCloud][21]        | Alibaba Cloud OSS            | Alibaba Cloud                      | [AlibabaCloud][22]     | [GitHub Issue][23]              |
+| [DigitalOcean][15]        | DigitalOcean Object Storage  | DigitalOcean Volumes Block Storage | [StackPointCloud][16]  |                                 |
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
+| [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
+| [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
+| [VMware vSphere][39]      | 🚫                           | vSphere Volumes                    | [VMware vSphere][39]   | [GitHub Issue][40]              |
 
 ## S3-Compatible object store providers
 
@@ -80,3 +81,5 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [36]: https://github.com/vmware-tanzu/velero-plugin-for-gcp#setup
 [37]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup
 [38]: https://www.cloudian.com/
+[39]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere
+[40]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere/issues/new
