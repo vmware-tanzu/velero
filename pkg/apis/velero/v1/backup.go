@@ -273,6 +273,26 @@ type BackupStatus struct {
 	// file in object storage.
 	// +optional
 	Errors int `json:"errors,omitempty"`
+
+	// Progress contains information about the backup's execution progress. Note
+	// that this information is best-effort only -- if Velero fails to update it
+	// during a backup for any reason, it may be inaccurate/stale.
+	Progress *BackupProgress `json:"progress,omitempty"`
+}
+
+// BackupProgress stores information about the progress of a Backup's execution.
+type BackupProgress struct {
+	// TotalItems is the total number of items to be backed up. This number may change
+	// throughout the execution of the backup due to plugins that return additional related
+	// items to back up, the velero.io/exclude-from-backup label, and various other
+	// filters that happen as items are processed.
+	// +optional
+	TotalItems int `json:"totalItems,omitempty"`
+
+	// ItemsBackedUp is the number of items that have actually been written to the
+	// backup tarball so far.
+	// +optional
+	ItemsBackedUp int `json:"itemsBackedUp,omitempty"`
 }
 
 // +genclient

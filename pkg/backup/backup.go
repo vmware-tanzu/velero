@@ -35,11 +35,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
+	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
@@ -63,6 +65,7 @@ type Backupper interface {
 
 // kubernetesBackupper implements Backupper.
 type kubernetesBackupper struct {
+	backupClient           velerov1client.BackupsGetter
 	dynamicFactory         client.DynamicFactory
 	discoveryHelper        discovery.Helper
 	podCommandExecutor     podexec.PodCommandExecutor
@@ -94,6 +97,7 @@ func cohabitatingResources() map[string]*cohabitatingResource {
 
 // NewKubernetesBackupper creates a new kubernetesBackupper.
 func NewKubernetesBackupper(
+	backupClient velerov1client.BackupsGetter,
 	discoveryHelper discovery.Helper,
 	dynamicFactory client.DynamicFactory,
 	podCommandExecutor podexec.PodCommandExecutor,
@@ -101,6 +105,7 @@ func NewKubernetesBackupper(
 	resticTimeout time.Duration,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
+		backupClient:           backupClient,
 		discoveryHelper:        discoveryHelper,
 		dynamicFactory:         dynamicFactory,
 		podCommandExecutor:     podCommandExecutor,
@@ -289,6 +294,11 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	items := collector.getAllItems()
 	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
+	patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d}}}`, len(items))
+	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress.totalItems")
+	}
+
 	itemBackupper := &itemBackupper{
 		backupRequest:           backupRequest,
 		tarWriter:               tw,
@@ -302,7 +312,51 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		},
 	}
 
+	// helper struct to send current progress between the main
+	// backup loop and the gouroutine that periodically patches
+	// the backup CR with progress updates
+	type progressUpdate struct {
+		totalItems, itemsBackedUp int
+	}
+
+	// the main backup process will send on this channel once
+	// for every item it processes.
+	update := make(chan progressUpdate)
+
+	// the main backup process will send on this channel when
+	// it's done sending progress updates
+	quit := make(chan struct{})
+
+	// This is the progress updater goroutine that receives
+	// progress updates on the 'update' channel. It patches
+	// the backup CR with progress updates at most every second,
+	// but it will not issue a patch if it hasn't received a new
+	// update since the previous patch. This goroutine exits
+	// when it receives on the 'quit' channel.
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		var lastUpdate *progressUpdate
+		for {
+			select {
+			case <-quit:
+				ticker.Stop()
+				return
+			case val := <-update:
+				lastUpdate = &val
+			case <-ticker.C:
+				if lastUpdate != nil {
+					patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, lastUpdate.totalItems, lastUpdate.itemsBackedUp)
+					if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+						log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
+					}
+					lastUpdate = nil
+				}
+			}
+		}
+	}()
+
 	backedUpGroupResources := map[schema.GroupResource]bool{}
+	totalItems := len(items)
 
 	for i, item := range items {
 		log.WithFields(map[string]interface{}{
@@ -310,7 +364,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 			"resource":  item.groupResource.String(),
 			"namespace": item.namespace,
 			"name":      item.name,
-		}).Infof("Processing item %d of %d", i+1, len(items))
+		}).Infof("Processing item")
 
 		// use an anonymous func so we can defer-close/remove the file
 		// as soon as we're done with it
@@ -334,7 +388,27 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 				backedUpGroupResources[item.groupResource] = true
 			}
 		}()
+
+		// updated total is computed as "how many items we've backed up so far, plus
+		// how many items we know of that are remaining"
+		totalItems = len(backupRequest.BackedUpItems) + (len(items) - (i + 1))
+
+		// send a progress update
+		update <- progressUpdate{
+			totalItems:    totalItems,
+			itemsBackedUp: len(backupRequest.BackedUpItems),
+		}
+
+		log.WithFields(map[string]interface{}{
+			"progress":  "",
+			"resource":  item.groupResource.String(),
+			"namespace": item.namespace,
+			"name":      item.name,
+		}).Infof("Backed up %d items out of an estimated total of %d (estimate will change throughout the backup)", len(backupRequest.BackedUpItems), totalItems)
 	}
+
+	// no more progress updates will be sent on the 'update' channel
+	quit <- struct{}{}
 
 	// back up CRD for resource if found. We should only need to do this if we've backed up at least
 	// one item for the resource and IncludeClusterResources is nil. If IncludeClusterResources is false
@@ -343,6 +417,13 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 		for gr := range backedUpGroupResources {
 			kb.backupCRD(log, gr, itemBackupper)
 		}
+	}
+
+	// do a final update on progress since we may have just added some CRDs and may not have updated
+	// for the last few processed items.
+	patch = fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, len(backupRequest.BackedUpItems), len(backupRequest.BackedUpItems))
+	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
 	}
 
 	log.WithField("progress", "").Infof("Backed up a total of %d items", len(backupRequest.BackedUpItems))

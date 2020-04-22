@@ -238,6 +238,18 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	d.Printf("Expiration:\t%s\n", status.Expiration)
 	d.Println()
 
+	if backup.Status.Progress != nil {
+		if backup.Status.Phase == velerov1api.BackupPhaseInProgress {
+			d.Printf("Estimated total items to be backed up:\t%d\n", backup.Status.Progress.TotalItems)
+			d.Printf("Items backed up so far:\t%d\n", backup.Status.Progress.ItemsBackedUp)
+		} else {
+			d.Printf("Total items to be backed up:\t%d\n", backup.Status.Progress.TotalItems)
+			d.Printf("Items backed up:\t%d\n", backup.Status.Progress.ItemsBackedUp)
+		}
+
+		d.Println()
+	}
+
 	if details {
 		describeBackupResourceList(d, backup, veleroClient, insecureSkipTLSVerify, caCertPath)
 		d.Println()
