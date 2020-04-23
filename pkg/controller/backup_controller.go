@@ -397,9 +397,15 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 // - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
 //   is not explicitly specified for the provider (if there's only one location for the provider,
 //   it will automatically be used)
+// if backup has snapshotVolume disabled then it returns empty VSL
 func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.Backup) (map[string]*velerov1api.VolumeSnapshotLocation, []string) {
 	errors := []string{}
 	providerLocations := make(map[string]*velerov1api.VolumeSnapshotLocation)
+
+	// if snapshotVolume is set to false then we don't need to validate volumesnapshotlocation
+	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
+		return nil, nil
+	}
 
 	for _, locationName := range backup.Spec.VolumeSnapshotLocations {
 		// validate each locationName exists as a VolumeSnapshotLocation
