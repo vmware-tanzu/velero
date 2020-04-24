@@ -41,6 +41,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
 
@@ -399,7 +400,7 @@ const (
 func (ib *defaultItemBackupper) takePVSnapshot(obj runtime.Unstructured, log logrus.FieldLogger) error {
 	log.Info("Executing takePVSnapshot")
 
-	if ib.backupRequest.Spec.SnapshotVolumes != nil && !*ib.backupRequest.Spec.SnapshotVolumes {
+	if boolptr.IsSetToFalse(ib.backupRequest.Spec.SnapshotVolumes) {
 		log.Info("Backup has volume snapshots disabled; skipping volume snapshot action.")
 		return nil
 	}

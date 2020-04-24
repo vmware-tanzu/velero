@@ -51,6 +51,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -403,7 +404,7 @@ func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.B
 	providerLocations := make(map[string]*velerov1api.VolumeSnapshotLocation)
 
 	// if snapshotVolume is set to false then we don't need to validate volumesnapshotlocation
-	if backup.Spec.SnapshotVolumes != nil && !*backup.Spec.SnapshotVolumes {
+	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
 		return nil, nil
 	}
 
