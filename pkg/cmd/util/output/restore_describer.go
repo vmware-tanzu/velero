@@ -67,7 +67,7 @@ func DescribeRestore(restore *v1.Restore, podVolumeRestores []v1.PodVolumeRestor
 		if len(restore.Spec.IncludedNamespaces) == 0 {
 			s = "all namespaces found in the backup"
 		} else if len(restore.Spec.IncludedNamespaces) == 1 && restore.Spec.IncludedNamespaces[0] == "*" {
-			s = "All namespaces found in the backup"
+			s = "all namespaces found in the backup"
 		} else {
 			s = strings.Join(restore.Spec.IncludedNamespaces, ", ")
 		}
