@@ -51,6 +51,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
+	"github.com/vmware-tanzu/velero/pkg/util/boolptr"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -397,9 +398,15 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 // - a given provider's default location name is added to .spec.volumeSnapshotLocations if one
 //   is not explicitly specified for the provider (if there's only one location for the provider,
 //   it will automatically be used)
+// if backup has snapshotVolume disabled then it returns empty VSL
 func (c *backupController) validateAndGetSnapshotLocations(backup *velerov1api.Backup) (map[string]*velerov1api.VolumeSnapshotLocation, []string) {
 	errors := []string{}
 	providerLocations := make(map[string]*velerov1api.VolumeSnapshotLocation)
+
+	// if snapshotVolume is set to false then we don't need to validate volumesnapshotlocation
+	if boolptr.IsSetToFalse(backup.Spec.SnapshotVolumes) {
+		return nil, nil
+	}
 
 	for _, locationName := range backup.Spec.VolumeSnapshotLocations {
 		// validate each locationName exists as a VolumeSnapshotLocation
