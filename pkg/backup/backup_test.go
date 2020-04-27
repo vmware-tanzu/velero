@@ -2406,62 +2406,6 @@ func (b *fakeResticBackupper) BackupPodVolumes(backup *velerov1.Backup, pod *cor
 	return res, nil
 }
 
-func TestGetNamespacesInBackup(t *testing.T) {
-	testCases := []struct {
-		name               string
-		backup             *velerov1.Backup
-		expectedNamespaces []string
-	}{
-		{
-			name: "backup with nil include and exclude namespaces",
-			backup: &velerov1.Backup{
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: nil,
-					ExcludedNamespaces: nil,
-				},
-			},
-			expectedNamespaces: []string{""}, // this signifies all namespaces
-		},
-		{
-			name: "backup with empty include and exclude namespaces",
-			backup: &velerov1.Backup{
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: []string{},
-					ExcludedNamespaces: []string{},
-				},
-			},
-			expectedNamespaces: []string{""}, // this signifies all namespaces
-		},
-		{
-			name: "backup with non-empty include and empty exclude namespaces",
-			backup: &velerov1.Backup{
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: []string{"include-1", "include-2", "include-3", "include-4", "include-5"},
-					ExcludedNamespaces: []string{},
-				},
-			},
-			expectedNamespaces: []string{"include-1", "include-2", "include-3", "include-4", "include-5"},
-		},
-		{
-			name: "backup with non-empty include and non-empty exclude namespaces",
-			backup: &velerov1.Backup{
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: []string{"include-1", "include-2", "include-3", "include-4", "include-5"},
-					ExcludedNamespaces: []string{"exclude-1", "exclude-2", "exclude-3"},
-				},
-			},
-			expectedNamespaces: []string{"include-1", "include-2", "include-3", "include-4", "include-5"},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			actualNamespaces := GetNamespacesInBackup(tc.backup)
-			assert.Equal(t, tc.expectedNamespaces, actualNamespaces)
-		})
-	}
-}
-
 // TestBackupWithRestic runs backups of pods that are annotated for restic backup,
 // and ensures that the restic backupper is called, that the returned PodVolumeBackups
 // are added to the Request object, and that when PVCs are backed up with restic, the
