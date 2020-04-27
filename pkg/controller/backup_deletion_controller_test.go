@@ -23,6 +23,7 @@ import (
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/fake"
+	snapshotv1beta1informers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/informers/externalversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -64,6 +65,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+		nil,
 		nil, // new plugin manager func
 		nil,
 		metrics.NewServerMetrics(),
@@ -155,6 +157,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 			sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
+			nil,
 			nil,
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			metrics.NewServerMetrics(),
@@ -855,6 +858,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				nil,
+				nil,
 				nil, // new plugin manager func
 				metrics.NewServerMetrics(),
 			).(*backupDeletionController)
@@ -948,6 +952,7 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 	objs := []runtime.Object{&ns1VS1InBackup, &ns1VS2InBackup, &ns2VS1InBackup, &ns2VS2InBackup, &ns1VS3NotInBackup, &ns1VS4NotInBackup,
 		&ns2VS3NotInBackup, &ns2VS4NotInBackup}
 	fakeClient := snapshotFake.NewSimpleClientset(objs...)
+	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
 	testCases := []struct {
 		name              string
 		backup            velerov1.Backup
@@ -1005,7 +1010,7 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 					"unit-test": "unit-test",
 				},
 			)
-			actualSnapshots, errs := getCSIVolumeSnapshotsInBackup(&tc.backup, fakeClient.SnapshotV1beta1(), log)
+			actualSnapshots, errs := getCSIVolumeSnapshotsInBackup(&tc.backup, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Lister(), log)
 			assert.Empty(t, errs)
 			assert.Equal(t, tc.expectedSnapshots, actualSnapshots)
 		})
@@ -1145,6 +1150,7 @@ func TestDeleteCSIVolumeSnapshots(t *testing.T) {
 
 	objs := []runtime.Object{&ns1VS1, &ns1VS1VSC, &ns1VS2, &ns1VS2VSC, &ns2VS1, &ns2VS1VSC, &ns2VS2, &ns2VS2VSC, &ns1NilStatusVS, &ns1NilBoundVSCVS, &ns1NonExistentVSCVS}
 	fakeClient := snapshotFake.NewSimpleClientset(objs...)
+	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
 
 	testCases := []struct {
 		name   string
@@ -1229,7 +1235,7 @@ func TestDeleteCSIVolumeSnapshots(t *testing.T) {
 					"unit-test": "unit-test",
 				},
 			)
-			errs := deleteCSIVolumeSnapshots(&tc.backup, fakeClient.SnapshotV1beta1(), log)
+			errs := deleteCSIVolumeSnapshots(&tc.backup, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Lister(), fakeClient.SnapshotV1beta1(), log)
 			assert.Empty(t, errs)
 		})
 	}

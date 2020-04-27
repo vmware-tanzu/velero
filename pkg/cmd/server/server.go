@@ -554,6 +554,34 @@ func (s *server) initRestic() error {
 	return nil
 }
 
+func (s *server) getCSISnapshotListers() (snapshotv1beta1listers.VolumeSnapshotLister, snapshotv1beta1listers.VolumeSnapshotContentLister) {
+	// Make empty listers that will only be populated if CSI is properly enabled.
+	var vsLister snapshotv1beta1listers.VolumeSnapshotLister
+	var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
+	var err error
+
+	// If CSI is enabled, check for the CSI groups and generate the listers
+	// If CSI isn't enabled, proceed normally.
+	if features.IsEnabled(api.CSIFeatureFlag) {
+		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
+		switch {
+		case apierrors.IsNotFound(err):
+			// CSI is enabled, but the required CRDs aren't installed, so halt.
+			s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
+		case err == nil:
+			// CSI is enabled, and the resources were found.
+			// Instantiate the listers fully
+			s.logger.Debug("Creating CSI listers")
+			// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
+			vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
+			vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
+		case err != nil:
+			cmd.CheckError(err)
+		}
+	}
+	return vsLister, vscLister
+}
+
 func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string) error {
 	s.logger.Info("Starting controllers")
 
@@ -576,6 +604,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	newPluginManager := func(logger logrus.FieldLogger) clientmgmt.Manager {
 		return clientmgmt.NewManager(logger, s.logLevel, s.pluginRegistry)
 	}
+	csiVSLister, csiVSCLister := s.getCSISnapshotListers()
 
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
@@ -609,30 +638,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		)
 		cmd.CheckError(err)
 
-		// Make empty listers that will only be populated if CSI is properly enabled.
-		var vsLister snapshotv1beta1listers.VolumeSnapshotLister
-		var vscLister snapshotv1beta1listers.VolumeSnapshotContentLister
-
-		// If CSI is enabled, check for the CSI groups and generate the listers
-		// If CSI isn't enabled, proceed normally.
-		if features.IsEnabled(api.CSIFeatureFlag) {
-			_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
-			switch {
-			case apierrors.IsNotFound(err):
-				// CSI is enabled, but the required CRDs aren't installed, so halt.
-				s.logger.Fatalf("The '%s' feature flag was specified, but CSI API group [%s] was not found.", api.CSIFeatureFlag, snapshotv1beta1api.SchemeGroupVersion.String())
-			case err == nil:
-				// CSI is enabled, and the resources were found.
-				// Instantiate the listers fully
-				s.logger.Debug("Creating CSI listers")
-				// Access the wrapped factory directly here since we've already done the feature flag check above to know it's safe.
-				vsLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshots().Lister()
-				vscLister = s.csiSnapshotterSharedInformerFactory.factory.Snapshot().V1beta1().VolumeSnapshotContents().Lister()
-			case err != nil:
-				cmd.CheckError(err)
-			}
-		}
-
 		backupController := controller.NewBackupController(
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.veleroClient.VeleroV1(),
@@ -649,8 +654,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			defaultVolumeSnapshotLocations,
 			s.metrics,
 			s.config.formatFlag.Parse(),
-			vsLister,
-			vscLister,
+			csiVSLister,
+			csiVSCLister,
 		)
 
 		return controllerRunInfo{
@@ -703,6 +708,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
+			csiVSLister,
 			s.csiSnapshotClient,
 			newPluginManager,
 			s.metrics,
