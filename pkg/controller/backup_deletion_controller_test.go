@@ -65,9 +65,9 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
 		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
-		nil,
+		nil, // csiSnapshotLister
+		nil, // csiSnapshotClient
 		nil, // new plugin manager func
-		nil,
 		metrics.NewServerMetrics(),
 	).(*backupDeletionController)
 
@@ -884,7 +884,8 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 }
 
 func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
-	ns1VS1InBackup := snapshotv1beta1api.VolumeSnapshot{
+	//Backup1 data
+	backup1NS1VS1 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs1",
 			Namespace: "ns1",
@@ -893,7 +894,7 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 			},
 		},
 	}
-	ns1VS2InBackup := snapshotv1beta1api.VolumeSnapshot{
+	backup1NS1VS2 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs2",
 			Namespace: "ns1",
@@ -902,22 +903,7 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 			},
 		},
 	}
-
-	ns1VS3NotInBackup := snapshotv1beta1api.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vs3",
-			Namespace: "ns1",
-		},
-	}
-
-	ns1VS4NotInBackup := snapshotv1beta1api.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vs4",
-			Namespace: "ns1",
-		},
-	}
-
-	ns2VS1InBackup := snapshotv1beta1api.VolumeSnapshot{
+	backup1NS2VS1 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs1",
 			Namespace: "ns2",
@@ -926,7 +912,7 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 			},
 		},
 	}
-	ns2VS2InBackup := snapshotv1beta1api.VolumeSnapshot{
+	backup1NS2VS2 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs2",
 			Namespace: "ns2",
@@ -936,70 +922,68 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 		},
 	}
 
-	ns2VS3NotInBackup := snapshotv1beta1api.VolumeSnapshot{
+	// Backup2
+	backup2NS1VS3 := snapshotv1beta1api.VolumeSnapshot{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "vs3",
-			Namespace: "ns2",
-		},
-	}
-	ns2VS4NotInBackup := snapshotv1beta1api.VolumeSnapshot{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vs4",
-			Namespace: "ns2",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup2",
+			},
 		},
 	}
 
-	objs := []runtime.Object{&ns1VS1InBackup, &ns1VS2InBackup, &ns2VS1InBackup, &ns2VS2InBackup, &ns1VS3NotInBackup, &ns1VS4NotInBackup,
-		&ns2VS3NotInBackup, &ns2VS4NotInBackup}
+	backup2NS1VS4 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs4",
+			Namespace: "ns1",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup2",
+			},
+		},
+	}
+
+	backup2NS2VS3 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs3",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup2",
+			},
+		},
+	}
+	backup2NS2VS4 := snapshotv1beta1api.VolumeSnapshot{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "vs4",
+			Namespace: "ns2",
+			Labels: map[string]string{
+				velerov1.BackupNameLabel: "backup2",
+			},
+		},
+	}
+
+	objs := []runtime.Object{&backup1NS1VS1, &backup1NS1VS2, &backup1NS2VS1, &backup1NS2VS2, &backup2NS1VS3, &backup2NS1VS4,
+		&backup2NS2VS3, &backup2NS2VS4}
 	fakeClient := snapshotFake.NewSimpleClientset(objs...)
 	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
+	for _, o := range objs {
+		fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Informer().GetStore().Add(o)
+	}
+
 	testCases := []struct {
 		name              string
-		backup            velerov1.Backup
-		expectedSnapshots []snapshotv1beta1api.VolumeSnapshot
+		backup            *velerov1.Backup
+		expectedSnapshots []*snapshotv1beta1api.VolumeSnapshot
 	}{
 		{
-			name: "should find all volumesnapshots in all namespaces",
-			backup: velerov1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "backup1",
-					Namespace: "velero",
-				},
-				Spec: velerov1.BackupSpec{
-					// all included namespaces
-					IncludedNamespaces: nil,
-					ExcludedNamespaces: nil,
-				},
-			},
-			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{ns1VS1InBackup, ns1VS2InBackup, ns2VS1InBackup, ns2VS2InBackup},
+			name:              "should find all volumesnapshots in backup1 only across namespaces",
+			backup:            builder.ForBackup("velero", "backup1").Result(),
+			expectedSnapshots: []*snapshotv1beta1api.VolumeSnapshot{&backup1NS1VS1, &backup1NS1VS2, &backup1NS2VS1, &backup1NS2VS2},
 		},
 		{
-			name: "should find volumesnapshots from all included namespaces exclude volumesnapshots in excluded namespaces",
-			backup: velerov1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "backup1",
-					Namespace: "velero",
-				},
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: []string{"ns1"},
-					ExcludedNamespaces: []string{"ns2"},
-				},
-			},
-			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{ns1VS1InBackup, ns1VS2InBackup},
-		},
-		{
-			name: "should not find any volumesnapshots",
-			backup: velerov1.Backup{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "backup1",
-					Namespace: "velero",
-				},
-				Spec: velerov1.BackupSpec{
-					IncludedNamespaces: []string{"ns3"},
-					ExcludedNamespaces: []string{"ns1", "ns2"},
-				},
-			},
-			expectedSnapshots: []snapshotv1beta1api.VolumeSnapshot{},
+			name:              "should find all volumesnapshots in backup2 only across namespaces",
+			backup:            builder.ForBackup("velero", "backup2").Result(),
+			expectedSnapshots: []*snapshotv1beta1api.VolumeSnapshot{&backup2NS1VS3, &backup2NS1VS4, &backup2NS2VS3, &backup2NS2VS4},
 		},
 	}
 
@@ -1010,9 +994,10 @@ func TestGetCSIVolumeSnapshotsInBackup(t *testing.T) {
 					"unit-test": "unit-test",
 				},
 			)
-			actualSnapshots, errs := getCSIVolumeSnapshotsInBackup(&tc.backup, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Lister(), log)
+			actualSnapshots, errs := getCSIVolumeSnapshotsInBackup(tc.backup, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Lister(), log)
 			assert.Empty(t, errs)
-			assert.Equal(t, tc.expectedSnapshots, actualSnapshots)
+			assert.Equal(t, len(tc.expectedSnapshots), len(actualSnapshots))
+			assert.ElementsMatch(t, tc.expectedSnapshots, actualSnapshots)
 		})
 	}
 }
@@ -1151,6 +1136,9 @@ func TestDeleteCSIVolumeSnapshots(t *testing.T) {
 	objs := []runtime.Object{&ns1VS1, &ns1VS1VSC, &ns1VS2, &ns1VS2VSC, &ns2VS1, &ns2VS1VSC, &ns2VS2, &ns2VS2VSC, &ns1NilStatusVS, &ns1NilBoundVSCVS, &ns1NonExistentVSCVS}
 	fakeClient := snapshotFake.NewSimpleClientset(objs...)
 	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
+	for _, o := range objs {
+		fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Informer().GetStore().Add(o)
+	}
 
 	testCases := []struct {
 		name   string
