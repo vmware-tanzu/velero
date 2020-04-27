@@ -544,6 +544,23 @@ func TestBackupResourceFiltering(t *testing.T) {
 			},
 		},
 		{
+			name: "when all included resources are unresolvable, nothing is included",
+			backup: defaultBackup().
+				IncludedResources("unresolvable-1", "unresolvable-2").
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+			},
+			want: []string{},
+		},
+		{
 			name: "unresolvable excluded resources are ignored",
 			backup: defaultBackup().
 				ExcludedResources("deployments", "unresolvable").
@@ -561,6 +578,29 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+			},
+		},
+		{
+			name: "when all excluded resources are unresolvable, nothing is excluded",
+			backup: defaultBackup().
+				IncludedResources("*").
+				ExcludedResources("unresolvable-1", "unresolvable-2").
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("foo", "bar").Result(),
+					builder.ForPod("zoo", "raz").Result(),
+				),
+				test.Deployments(
+					builder.ForDeployment("foo", "bar").Result(),
+					builder.ForDeployment("zoo", "raz").Result(),
+				),
+			},
+			want: []string{
+				"resources/pods/namespaces/foo/bar.json",
+				"resources/pods/namespaces/zoo/raz.json",
+				"resources/deployments.apps/namespaces/foo/bar.json",
+				"resources/deployments.apps/namespaces/zoo/raz.json",
 			},
 		},
 		{
@@ -1099,6 +1139,26 @@ func TestBackupActionsRunForCorrectItems(t *testing.T) {
 			actions: map[*recordResourcesAction][]string{
 				new(recordResourcesAction).ForNamespace("ns-1").ForResource("persistentvolumeclaims"): nil,
 				new(recordResourcesAction).ForNamespace("ns-2").ForResource("pods"):                   nil,
+			},
+		},
+		{
+			name: "action with a selector that has unresolvable resources doesn't run for any resources",
+			backup: defaultBackup().
+				Result(),
+			apiResources: []*test.APIResource{
+				test.Pods(
+					builder.ForPod("ns-1", "pod-1").Result(),
+				),
+				test.PVCs(
+					builder.ForPersistentVolumeClaim("ns-2", "pvc-2").Result(),
+				),
+				test.PVs(
+					builder.ForPersistentVolume("pv-1").Result(),
+					builder.ForPersistentVolume("pv-2").Result(),
+				),
+			},
+			actions: map[*recordResourcesAction][]string{
+				new(recordResourcesAction).ForResource("unresolvable"): nil,
 			},
 		},
 	}
