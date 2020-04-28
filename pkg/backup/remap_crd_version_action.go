@@ -22,6 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -32,12 +34,13 @@ import (
 // RemapCRDVersionAction inspects CustomResourceDefinition and decides if it is a v1
 // CRD that needs to be backed up as v1beta1.
 type RemapCRDVersionAction struct {
-	logger logrus.FieldLogger
+	logger        logrus.FieldLogger
+	betaCRDClient apiextv1beta1.CustomResourceDefinitionInterface
 }
 
 // NewRemapCRDVersionAction instantiates a new RemapCRDVersionAction plugin.
-func NewRemapCRDVersionAction(logger logrus.FieldLogger) *RemapCRDVersionAction {
-	return &RemapCRDVersionAction{logger: logger}
+func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
+	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient}
 }
 
 // AppliesTo selects the resources the plugin should run against. In this case, CustomResourceDefinitions.
@@ -92,9 +95,31 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil {
 			log.Debug("CRD is a candidate for v1beta1 backup")
 
-			if err := setV1beta1Version(item); err != nil {
-				return nil, nil, err
+			// TODO: wrap the  call to the client in a helper function that can be re-used.
+			betaCRD, err := a.betaCRDClient.Get(crd.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", crd.Name)
 			}
+
+			// Individual items fetched from the API don't always have the kind/API version set
+			// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
+			// probably has to do with List calls and Dynamic client vs typed client
+
+			// TODO: make these constants from the package
+			if betaCRD.Kind == "" {
+				betaCRD.Kind = "CustomResourceDefinition"
+			}
+
+			if betaCRD.APIVersion == "" {
+				betaCRD.APIVersion = "apiextensions.k8s.io/v1beta1"
+			}
+
+			// TODO make sure this is safe to do!!
+			m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "error converting v1beta1 version of %s to unstructured", crd.Name)
+			}
+			item = &unstructured.Unstructured{Object: m}
 		}
 	}
 
@@ -103,24 +128,33 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		if c.Type == apiextv1.NonStructuralSchema {
 			log.Debug("CRD is a non-structural schema")
 
-			if err := setV1beta1Version(item); err != nil {
-				return nil, nil, err
+			betaCRD, err := a.betaCRDClient.Get(crd.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", crd.Name)
 			}
 
+			// Individual items fetched from the API don't always have the kind/API version set
+			// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
+			// probably has to do with List calls and Dynamic client vs typed client
+
+			// TODO: make these constants from the package
+			if betaCRD.Kind == "" {
+				betaCRD.Kind = "CustomResourceDefinition"
+			}
+
+			if betaCRD.APIVersion == "" {
+				betaCRD.APIVersion = "apiextensions.k8s.io/v1beta1"
+			}
+
+			// TODO make sure this is safe to do!!
+			m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
+			if err != nil {
+				return nil, nil, errors.Wrapf(err, "error converting v1beta1 version of %s to unstructured", crd.Name)
+			}
+			item = &unstructured.Unstructured{Object: m}
 			break
 		}
 	}
 
 	return item, nil, nil
-}
-
-// setV1beta1Version updates the apiVersion field of an Unstructured CRD to be the v1beta1 string instead of v1.
-func setV1beta1Version(u runtime.Unstructured) error {
-	// Since we can't manipulate an Unstructured's Object map directly, get a copy to manipulate before setting it back
-	tempMap := u.UnstructuredContent()
-	if err := unstructured.SetNestedField(tempMap, "apiextensions.k8s.io/v1beta1", "apiVersion"); err != nil {
-		return errors.Wrap(err, "unable to set apiversion to v1beta1")
-	}
-	u.SetUnstructuredContent(tempMap)
-	return nil
 }
