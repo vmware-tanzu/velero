@@ -27,6 +27,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -86,6 +87,13 @@ func DescribeBackup(
 		if len(podVolumeBackups) > 0 {
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
+		}
+		// TODO(nrb-csi): Put the CSI description here? Or down with the DescribeBackupStatus?
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+			// Scenarios:
+			//  Backup exists in cluster, was just taken so the CSI objects exist
+			//	Backup imported into cluster, CSI objects do not yet exist.
+			DescribeCSIVolumeSnapshots(d, details)
 		}
 	})
 }
@@ -255,6 +263,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		d.Println()
 	}
 
+	// TODO(nrb-csi): Should CSI snapshots increment VolumeSnapshotsAttempted? If so, we'll need a way to differentiate here.
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
 			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
@@ -478,4 +487,32 @@ func (v *volumesByPod) Sorted() []*podVolumeGroup {
 	})
 
 	return v.volumesByPodSlice
+}
+
+func DescribeCSIVolumeSnapshots(d *Describer, details bool) {
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return
+	}
+
+	if !details {
+		// TODO(nrb-csi): Figure out proper formatting here. Ideally, we wouldn't reach out to object storage or anything unless we knew for a fact we had CSI snapshots included, but the velero Backup object has no pointers to the CSI objects.
+		d.Printf("CSI Volume Snapshots (specify --details for more information)\n")
+		return
+	}
+	d.Printf("CSI Volume Snapshots:\n")
+
+	buf := new(bytes.Buffer)
+	_ = buf
+	// TODO(nrb-csi): Add new DownloadTargetKind
+	// TODO(nrb-csi): Is this necessary now that the VSCs are being synced in to the cluster? We can get the VSC's info and provide some data that way. Just like with a Backup object, we can assume a VSC will always be there now. Otherwise, something else is wrong.
+	//if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
+	// 	d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
+	// 	return
+	// }
+
+	// var snapshots []*volume.Snapshot
+	// if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
+	// 	d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
+	// 	return
+	// }
 }
