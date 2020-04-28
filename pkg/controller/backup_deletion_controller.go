@@ -39,6 +39,7 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -322,7 +323,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		}
 	}
 
-	if c.csiSnapshotClient != nil && c.csiSnapshotLister != nil {
+	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		log.Info("Removing CSI volumesnapshots")
 		if csiErrs := deleteCSIVolumeSnapshots(backup, c.csiSnapshotLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(errs) > 0 {
 			for _, err := range csiErrs {
