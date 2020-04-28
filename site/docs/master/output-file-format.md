@@ -42,7 +42,7 @@ rootBucket/
   },
   "status": {
     "version": 1,
-    "formatversion": "1.1.0",
+    "formatVersion": "1.1.0",
     "expiration": "2017-08-01T13:39:15Z",
     "phase": "Completed",
     "volumeBackups": {

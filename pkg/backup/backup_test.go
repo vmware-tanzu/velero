@@ -672,8 +672,12 @@ func TestBackupResourceFiltering(t *testing.T) {
 			want: []string{
 				"resources/pods/namespaces/foo/bar.json",
 				"resources/pods/namespaces/zoo/raz.json",
+				"resources/pods/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/pods/v1-preferredversion/namespaces/zoo/raz.json",
 				"resources/deployments.apps/namespaces/foo/bar.json",
 				"resources/deployments.apps/namespaces/zoo/raz.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/foo/bar.json",
+				"resources/deployments.apps/v1-preferredversion/namespaces/zoo/raz.json",
 			},
 		},
 		{
