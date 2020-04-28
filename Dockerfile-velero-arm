@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM arm32v7/ubuntu:bionic
+FROM arm32v7/ubuntu:focal
 
 ADD /bin/linux/arm/restic /usr/bin/restic
 
