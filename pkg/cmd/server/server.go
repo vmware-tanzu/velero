@@ -561,7 +561,7 @@ func (s *server) getCSISnapshotListers() (snapshotv1beta1listers.VolumeSnapshotL
 	var err error
 
 	// If CSI is enabled, check for the CSI groups and generate the listers
-	// If CSI isn't enabled, proceed normally.
+	// If CSI isn't enabled, return empty listers.
 	if features.IsEnabled(api.CSIFeatureFlag) {
 		_, err = s.discoveryClient.ServerResourcesForGroupVersion(snapshotv1beta1api.SchemeGroupVersion.String())
 		switch {

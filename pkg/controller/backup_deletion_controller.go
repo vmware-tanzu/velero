@@ -23,7 +23,6 @@ import (
 	"time"
 
 	jsonpatch "github.com/evanphx/json-patch"
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
 	snapshotter "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/typed/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
@@ -325,7 +324,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		log.Info("Removing CSI volumesnapshots")
-		if csiErrs := deleteCSIVolumeSnapshots(backup, c.csiSnapshotLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(errs) > 0 {
+		if csiErrs := deleteCSIVolumeSnapshots(backup, c.csiSnapshotLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(csiErrs) > 0 {
 			for _, err := range csiErrs {
 				errs = append(errs, err.Error())
 			}
@@ -462,21 +461,12 @@ func (c *backupDeletionController) deleteResticSnapshots(backup *velerov1api.Bac
 	return errs
 }
 
-func getCSIVolumeSnapshotsInBackup(backup *velerov1api.Backup, csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister, log *logrus.Entry) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
-	selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
-	volSnaps, err := csiSnapshotLister.List(selector)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Infof("Found %d CSI volumesnapshots in backup %s", len(volSnaps), backup.Name)
-	return volSnaps, nil
-}
-
 func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
 	csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	errs := []error{}
-	csiVolSnaps, err := getCSIVolumeSnapshotsInBackup(backup, csiSnapshotLister, log)
+
+	selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
+	csiVolSnaps, err := csiSnapshotLister.List(selector)
 	if err != nil {
 		return []error{err}
 	}
@@ -485,6 +475,8 @@ func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiSnapshotLister snap
 	for _, csiVS := range csiVolSnaps {
 		log.Infof("Deleting CSI volumesnapshot %s/%s", csiVS.Namespace, csiVS.Name)
 		if csiVS.Status != nil && csiVS.Status.BoundVolumeSnapshotContentName != nil {
+			// we patch the DeletionPolicy of the volumesnapshotcontent to set it to Delete.
+			// This ensures that the volume snapshot in the storage provider is also deleted.
 			log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", *csiVS.Status.BoundVolumeSnapshotContentName)
 			pb := []byte(`{"spec":{"deletionPolicy":"Delete"}}`)
 			_, err := csiClient.VolumeSnapshotContents().Patch(*csiVS.Status.BoundVolumeSnapshotContentName, types.MergePatchType, pb)
