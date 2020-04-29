@@ -10,6 +10,7 @@
   - [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
   - [Install an additional volume snapshot provider](#install-an-additional-volume-snapshot-provider)
   - [Generate YAML only](#generate-yaml-only)
+  - [Use a storage provider secured by a self-signed certificate](#use-a-storage-provider-secured-by-a-self-signed-certificate)
   - [Additional options](#additional-options)
   - [Optional Velero CLI configurations](#optional-velero-cli-configurations)
     - [Enabling shell autocompletion](#enabling-shell-autocompletion)
@@ -93,6 +94,11 @@ To generate the YAML without applying it to your cluster, use the `--dry-run -o 
 This is useful for applying bespoke customizations, integrating with a GitOps workflow, etc.
 
 If you are installing Velero in Kubernetes 1.14.x or earlier, you need to use `kubectl apply`'s `--validate=false` option when applying the generated configuration to your cluster. See [issue 2077][7] and [issue 2311][8] for more context.
+
+## Use a storage provider secured by a self-signed certificate
+
+If you intend to use Velero with a storage provider that is secured by a self-signed certificate,
+you may need to instruct Velero to trust that certificate. See [use Velero with a storage provider secured by a self-signed certificate][9] for details.
 
 ## Additional options
 
@@ -245,3 +251,4 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [6]: velero-install.md#usage
 [7]: https://github.com/vmware-tanzu/velero/issues/2077
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
+[9]: self-signed-certificates.md
