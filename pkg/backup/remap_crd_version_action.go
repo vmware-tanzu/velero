@@ -22,7 +22,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+
+	apiextv1beta1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,11 +36,11 @@ import (
 // CRD that needs to be backed up as v1beta1.
 type RemapCRDVersionAction struct {
 	logger        logrus.FieldLogger
-	betaCRDClient apiextv1beta1.CustomResourceDefinitionInterface
+	betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface
 }
 
 // NewRemapCRDVersionAction instantiates a new RemapCRDVersionAction plugin.
-func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
+func NewRemapCRDVersionAction(logger logrus.FieldLogger, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) *RemapCRDVersionAction {
 	return &RemapCRDVersionAction{logger: logger, betaCRDClient: betaCRDClient}
 }
 
