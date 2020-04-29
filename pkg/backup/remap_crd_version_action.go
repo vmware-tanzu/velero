@@ -118,7 +118,16 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		}
 	}
 
-	// 3rd case - CRD had the field "preserveUnknownFields". This meant it was a v1beta1 CRD and cannot be restored as a v1 CRD
+	// CRD has the field "Spec.PreserveUnknownFields". This meant it was a v1beta1 CRD and cannot be restored as a v1 CRD - validation webhooks will fail.
+	// TODO: add a test case
+	if crd.Spec.PreserveUnknownFields {
+		log.Debug("CRD is set to preserve unknown fields, should be backed up as v1beta1")
+		item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
+		if err != nil {
+			return nil, nil, err
+		}
+
+	}
 
 	return item, nil, nil
 }
