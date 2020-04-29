@@ -323,7 +323,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// set backup major version - deprecated, use Status.FormatVersion
 	request.Status.Version = pkgbackup.BackupVersion
 
-	// set backup major and minor version
+	// set backup major, minor, and patch version
 	request.Status.FormatVersion = pkgbackup.BackupFormatVersion
 
 	if request.Spec.TTL.Duration == 0 {

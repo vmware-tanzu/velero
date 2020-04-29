@@ -340,9 +340,9 @@ spec:
               format: date-time
               nullable: true
               type: string
-            formatversion:
+            formatVersion:
               description: FormatVersion is the backup format version, including major,
-                minor version.
+                minor, and patch version.
               type: string
             phase:
               description: Phase is the current state of the Backup.

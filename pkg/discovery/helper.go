@@ -29,6 +29,8 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/restmapper"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	kcmdutil "github.com/vmware-tanzu/velero/third_party/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -57,11 +59,10 @@ type Helper interface {
 }
 
 type serverResourcesInterface interface {
-	// ServerPreferredResources() is no longer used to populate Resources() see ServerGroupsAndResources below
-	// Keeping for future use to compare preferred resources during restore (might not be needed. If so, will remove)
+	// ServerPreferredResources() is used to populate Resources() with only Preferred Versions - this is the default
 	ServerPreferredResources() ([]*metav1.APIResourceList, error)
-	// ServerGroupsAndResources returns supported groups and resources for *all* groups and versions (not only preferred)
-	// Used to populate Resources()
+	// ServerGroupsAndResources returns supported groups and resources for *all* groups and versions
+	// Used to populate Resources() if feature flag is passed
 	ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error)
 }
 
@@ -117,17 +118,25 @@ func (h *helper) Refresh() error {
 		return errors.WithStack(err)
 	}
 
-	if err != nil {
-		return errors.WithStack(err)
+	var serverResources []*metav1.APIResourceList
+
+	if features.IsEnabled(velerov1api.APIGroupVersionsFeatureFlag) {
+		// ServerGroupsAndResources returns all APIGroup and APIResouceList - not only preferred versions
+		_, serverAllResources, err := refreshServerGroupsAndResources(h.discoveryClient, h.logger)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		h.logger.Info("The '%s' feature flag was specified, using all API group versions.", velerov1api.APIGroupVersionsFeatureFlag)
+		serverResources = serverAllResources
+	} else {
+		// ServerPreferredResources() returns only preferred APIGroup - this is the default since no feature flag has been passed
+		serverPreferredResources, err := refreshServerPreferredResources(h.discoveryClient, h.logger)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		serverResources = serverPreferredResources
 	}
 
-	// ServerGroupsAndResources returns all APIGroup and APIResouceList - not only preferred
-	_, serverResources, err := refreshServerGroupsAndResources(h.discoveryClient, h.logger)
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	// will populate resources with all versions, not only from preferred API group versions
 	h.resources = discovery.FilteredBy(
 		discovery.ResourcePredicateFunc(filterByVerbs),
 		serverResources,

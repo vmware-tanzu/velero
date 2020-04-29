@@ -217,9 +217,9 @@ type BackupStatus struct {
 	// +optional
 	Version int `json:"version,omitempty"`
 
-	// FormatVersion is the backup format version, including major, minor version.
+	// FormatVersion is the backup format version, including major, minor, and patch version.
 	// +optional
-	FormatVersion string `json:"formatversion,omitempty"`
+	FormatVersion string `json:"formatVersion,omitempty"`
 
 	// Expiration is when this Backup is eligible for garbage-collection.
 	// +optional
