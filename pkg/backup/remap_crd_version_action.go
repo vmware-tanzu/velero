@@ -22,6 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 
 	apiextv1beta1client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/kuberesource"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 )
 
@@ -96,31 +98,10 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil {
 			log.Debug("CRD is a candidate for v1beta1 backup")
 
-			// TODO: wrap the  call to the client in a helper function that can be re-used.
-			betaCRD, err := a.betaCRDClient.Get(crd.Name, metav1.GetOptions{})
+			item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", crd.Name)
+				return nil, nil, err
 			}
-
-			// Individual items fetched from the API don't always have the kind/API version set
-			// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
-			// probably has to do with List calls and Dynamic client vs typed client
-
-			// TODO: make these constants from the package
-			if betaCRD.Kind == "" {
-				betaCRD.Kind = "CustomResourceDefinition"
-			}
-
-			if betaCRD.APIVersion == "" {
-				betaCRD.APIVersion = "apiextensions.k8s.io/v1beta1"
-			}
-
-			// TODO make sure this is safe to do!!
-			m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "error converting v1beta1 version of %s to unstructured", crd.Name)
-			}
-			item = &unstructured.Unstructured{Object: m}
 		}
 	}
 
@@ -129,33 +110,42 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 		if c.Type == apiextv1.NonStructuralSchema {
 			log.Debug("CRD is a non-structural schema")
 
-			betaCRD, err := a.betaCRDClient.Get(crd.Name, metav1.GetOptions{})
+			item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
 			if err != nil {
-				return nil, nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", crd.Name)
+				return nil, nil, err
 			}
-
-			// Individual items fetched from the API don't always have the kind/API version set
-			// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
-			// probably has to do with List calls and Dynamic client vs typed client
-
-			// TODO: make these constants from the package
-			if betaCRD.Kind == "" {
-				betaCRD.Kind = "CustomResourceDefinition"
-			}
-
-			if betaCRD.APIVersion == "" {
-				betaCRD.APIVersion = "apiextensions.k8s.io/v1beta1"
-			}
-
-			// TODO make sure this is safe to do!!
-			m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
-			if err != nil {
-				return nil, nil, errors.Wrapf(err, "error converting v1beta1 version of %s to unstructured", crd.Name)
-			}
-			item = &unstructured.Unstructured{Object: m}
 			break
 		}
 	}
 
+	// 3rd case - CRD had the field "preserveUnknownFields". This meant it was a v1beta1 CRD and cannot be restored as a v1 CRD
+
 	return item, nil, nil
+}
+
+func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) (*unstructured.Unstructured, error) {
+	betaCRD, err := betaCRDClient.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", name)
+	}
+
+	// Individual items fetched from the API don't always have the kind/API version set
+	// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
+	// probably has to do with List calls and Dynamic client vs typed client
+	if betaCRD.Kind == "" {
+		betaCRD.Kind = kuberesource.CustomResourceDefinitions.Resource
+	}
+
+	if betaCRD.APIVersion == "" {
+		betaCRD.APIVersion = apiextv1beta1.SchemeGroupVersion.String()
+	}
+
+	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
+	if err != nil {
+		return nil, errors.Wrapf(err, "error converting v1beta1 version of %s to unstructured", name)
+	}
+	item := &unstructured.Unstructured{Object: m}
+
+	return item, nil
+
 }
