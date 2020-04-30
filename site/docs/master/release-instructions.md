@@ -17,12 +17,15 @@ You also need to update `site/index.html` to have "Latest Release Information" c
 1.  Update the main `CHANGELOG.md` file to properly reference the release-specific changelog file:
     - (Pre-Release) List the release under "Development release"
     - (GA) List the release  under "Current release", remove any pre-releases from "Development release", and move the previous release into "Older releases".
-1.  If there is an existing set of pre-release versioned docs for the version you are releasing (i.e. `site/docs/v1.2.0-beta.1` exists, and you're releasing `v1.2.0-beta.2` or `v1.2.0`):
+1.  If there is an existing set of pre-release versioned docs for the version you are releasing (i.e. `site/docs/v1.4-pre` exists, and you're releasing `v1.4.0-beta.2` or `v1.4.0`):
     - Remove the directory containing the pre-release docs, i.e. `site/docs/<pre-release-version>`.
     - Delete the pre-release docs table of contents file, i.e. `site/_data/<pre-release-version>-toc.yml`.
     - Remove the pre-release docs table of contents mapping entry from `site/_data/toc-mapping.yml`.
     - Remove all references to the pre-release docs from `site/_config.yml`.
-1.  Run `NEW_DOCS_VERSION=<VERSION> make gen-docs` (e.g. `NEW_DOCS_VERSION=v1.2.0 make gen-docs` or `NEW_DOCS_VERSION=v1.2.0-beta.1 make gen-docs`).
+1.  Run `NEW_DOCS_VERSION=v<major.minor> VELERO_VERSION=v<full-version> make gen-docs` (e.g. `NEW_DOCS_VERSION=v1.2 VELERO_VERSION=v1.2.0 make gen-docs` or `NEW_DOCS_VERSION=v1.2-pre VELERO_VERSION=v1.2.0-beta.1 make gen-docs`).
+    - Note that:
+        - **NEW_DOCS_VERSION** defines the version that the docs will be tagged with (i.e. what's in the URL, what shows up in the version dropdown on the site). This should be formatted as either `v1.4` (for a GA release), or `v1.4-pre` (for an alpha/beta/RC).
+        - **VELERO_VERSION** defines the tag of Velero that any `https://github.com/vmware-tanzu/velero/...` links in the docs should redirect to.
 1.  Follow the additional instructions at `site/README-JEKYLL.md` to complete the docs generation process.
 1.  Do a review of the diffs, and/or run `make serve-docs` and review the site.
 1.  Submit a PR containing the changelog and the version-tagged docs.

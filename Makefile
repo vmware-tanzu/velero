@@ -290,7 +290,7 @@ serve-docs:
 # tagged version. Once the unstaged changes are ready, they can be added to the
 # staging area using 'git add' and then committed.
 #
-# To run gen-docs: "NEW_DOCS_VERSION=v1.1.0 make gen-docs"
+# To run gen-docs: "NEW_DOCS_VERSION=v1.4 VELERO_VERSION=v1.4.0 make gen-docs"
 #
 # **NOTE**: there are additional manual steps required to finalize the process of generating
 # a new versioned docs site. The full process is documented in site/README-JEKYLL.md.
