@@ -72,7 +72,7 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 		// the --features flag, we specifically handle not passing the flag if we can detect that
 		// it's not supported.
 
-		logger.Debug("Plugin process does not support --features flag, removing it and trying again")
+		logger.Debug("Plugin process does not support the --features flag, removing it and trying again")
 
 		builder.commandArgs = removeFeaturesFlag(builder.commandArgs)
 
