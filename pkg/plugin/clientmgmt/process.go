@@ -17,6 +17,8 @@ limitations under the License.
 package clientmgmt
 
 import (
+	"strings"
+
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -59,7 +61,32 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 	// This launches the plugin process.
 	protocolClient, err := client.Client()
 	if err != nil {
-		return nil, err
+		if !strings.Contains(err.Error(), "unknown flag: --features") {
+			return nil, err
+		}
+
+		// Velero started passing the --features flag to plugins in v1.2, however existing plugins
+		// may not support that flag and may not silently ignore unknown flags. The plugin server
+		// code that we make available to plugin authors has since been updated to ignore unknown
+		// flags, but to avoid breaking plugins that haven't updated to that code and don't support
+		// the --features flag, we specifically handle not passing the flag if we can detect that
+		// it's not supported.
+
+		logger.Debug("Plugin process does not support the --features flag, removing it and trying again")
+
+		builder.commandArgs = removeFeaturesFlag(builder.commandArgs)
+
+		logger.Debugf("Updated command args after removing --features flag: %v", builder.commandArgs)
+
+		// re-get the client and protocol client now that --features has been removed
+		// from the command args.
+		client = builder.client()
+		protocolClient, err = client.Client()
+		if err != nil {
+			return nil, err
+		}
+
+		logger.Debug("Plugin process successfully started without the --features flag")
 	}
 
 	p := &process{
@@ -68,6 +95,33 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 	}
 
 	return p, nil
+}
+
+// removeFeaturesFlag looks for and removes the '--features' arg
+// as well as the arg immediately following it (the flag value).
+func removeFeaturesFlag(args []string) []string {
+	var commandArgs []string
+	var featureFlag bool
+
+	for _, arg := range args {
+		// if this arg is the flag name, skip it
+		if arg == "--features" {
+			featureFlag = true
+			continue
+		}
+
+		// if the last arg we saw was the flag name, then
+		// this arg is the value for the flag, so skip it
+		if featureFlag {
+			featureFlag = false
+			continue
+		}
+
+		// otherwise, keep the arg
+		commandArgs = append(commandArgs, arg)
+	}
+
+	return commandArgs
 }
 
 func (r *process) dispense(key kindAndName) (interface{}, error) {

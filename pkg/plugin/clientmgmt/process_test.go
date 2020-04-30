@@ -121,3 +121,53 @@ func TestDispense(t *testing.T) {
 		})
 	}
 }
+
+func Test_removeFeaturesFlag(t *testing.T) {
+	tests := []struct {
+		name        string
+		commandArgs []string
+		want        []string
+	}{
+		{
+			name:        "when commandArgs is nil, a nil slice is returned",
+			commandArgs: nil,
+			want:        nil,
+		},
+		{
+			name:        "when commandArgs is empty, a nil slice is returned",
+			commandArgs: []string{},
+			want:        nil,
+		},
+		{
+			name:        "when commandArgs does not contain --features, it is returned as-is",
+			commandArgs: []string{"--log-level", "debug", "--another-flag", "foo"},
+			want:        []string{"--log-level", "debug", "--another-flag", "foo"},
+		},
+		{
+			name:        "when --features is the only flag, a nil slice is returned",
+			commandArgs: []string{"--features", "EnableCSI"},
+			want:        nil,
+		},
+		{
+			name:        "when --features is the first flag, it's properly removed",
+			commandArgs: []string{"--features", "EnableCSI", "--log-level", "debug", "--another-flag", "foo"},
+			want:        []string{"--log-level", "debug", "--another-flag", "foo"},
+		},
+		{
+			name:        "when --features is the last flag, it's properly removed",
+			commandArgs: []string{"--log-level", "debug", "--another-flag", "foo", "--features", "EnableCSI"},
+			want:        []string{"--log-level", "debug", "--another-flag", "foo"},
+		},
+		{
+			name:        "when --features is neither the first nor last flag, it's properly removed",
+			commandArgs: []string{"--log-level", "debug", "--features", "EnableCSI", "--another-flag", "foo"},
+			want:        []string{"--log-level", "debug", "--another-flag", "foo"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, removeFeaturesFlag(tc.commandArgs))
+		})
+	}
+}
