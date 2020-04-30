@@ -14,8 +14,6 @@
 
 FROM arm64v8/ubuntu:bionic
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-
 ADD /bin/linux/arm64/restic /usr/bin/restic
 
 ADD /bin/linux/arm64/velero /velero
