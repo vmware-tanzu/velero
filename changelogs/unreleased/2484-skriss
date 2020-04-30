@@ -1,0 +1,1 @@
+bug fix: in CRD restore plugin, don't use runtime.DefaultUnstructuredConverter.FromUnstructured(...) to avoid conversion issues when float64 fields contain int values
