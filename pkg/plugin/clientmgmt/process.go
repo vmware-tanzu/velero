@@ -74,28 +74,9 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 
 		logger.Debug("Plugin process does not support --features flag, removing it and trying again")
 
-		var commandArgs []string
-		var featureFlag bool
-		for _, arg := range builder.commandArgs {
-			// if this arg is the flag name, skip it
-			if arg == "--features" {
-				featureFlag = true
-				continue
-			}
+		builder.commandArgs = removeFeaturesFlag(builder.commandArgs)
 
-			// if the last arg we saw was the flag name, then
-			// this arg is the value for the flag, so skip it
-			if featureFlag {
-				featureFlag = false
-				continue
-			}
-
-			// otherwise, keep the arg
-			commandArgs = append(commandArgs, arg)
-		}
-
-		builder.commandArgs = commandArgs
-		logger.Debugf("Updated command args after removing --features flag: %v", commandArgs)
+		logger.Debugf("Updated command args after removing --features flag: %v", builder.commandArgs)
 
 		// re-get the client and protocol client now that --features has been removed
 		// from the command args.
@@ -114,6 +95,33 @@ func newProcess(command string, logger logrus.FieldLogger, logLevel logrus.Level
 	}
 
 	return p, nil
+}
+
+// removeFeaturesFlag looks for and removes the '--features' arg
+// as well as the arg immediately following it (the flag value).
+func removeFeaturesFlag(args []string) []string {
+	var commandArgs []string
+	var featureFlag bool
+
+	for _, arg := range args {
+		// if this arg is the flag name, skip it
+		if arg == "--features" {
+			featureFlag = true
+			continue
+		}
+
+		// if the last arg we saw was the flag name, then
+		// this arg is the value for the flag, so skip it
+		if featureFlag {
+			featureFlag = false
+			continue
+		}
+
+		// otherwise, keep the arg
+		commandArgs = append(commandArgs, arg)
+	}
+
+	return commandArgs
 }
 
 func (r *process) dispense(key kindAndName) (interface{}, error) {
