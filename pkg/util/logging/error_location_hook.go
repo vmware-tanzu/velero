@@ -60,7 +60,9 @@ func (h *ErrorLocationHook) Fire(entry *logrus.Entry) error {
 
 	err, ok := errObj.(error)
 	if !ok {
-		return errors.New("object logged as error does not satisfy error interface")
+		// if the value isn't an error type, skip trying to get location info,
+		// and just let it be logged as whatever it was
+		return nil
 	}
 
 	if errorLocationer, ok := err.(errorLocationer); ok {
