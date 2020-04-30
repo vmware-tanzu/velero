@@ -63,7 +63,6 @@ import (
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
-	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 	"github.com/vmware-tanzu/velero/pkg/podexec"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -86,15 +85,16 @@ const (
 	defaultProfilerAddress = "localhost:6060"
 
 	// keys used to map out available controllers with disable-controllers flag
-	BackupControllerKey              = "backup"
-	BackupSyncControllerKey          = "backup-sync"
-	ScheduleControllerKey            = "schedule"
-	GcControllerKey                  = "gc"
-	BackupDeletionControllerKey      = "backup-deletion"
-	RestoreControllerKey             = "restore"
-	DownloadRequestControllerKey     = "download-request"
-	ResticRepoControllerKey          = "restic-repo"
-	ServerStatusRequestControllerKey = "server-status-request"
+	BackupControllerKey                = "backup"
+	BackupSyncControllerKey            = "backup-sync"
+	ScheduleControllerKey              = "schedule"
+	GcControllerKey                    = "gc"
+	BackupDeletionControllerKey        = "backup-deletion"
+	RestoreControllerKey               = "restore"
+	DownloadRequestControllerKey       = "download-request"
+	ResticRepoControllerKey            = "restic-repo"
+	ServerStatusRequestControllerKey   = "server-status-request"
+	BackupStorageLocationControllerKey = "backup-storage-location"
 
 	defaultControllerWorkers = 1
 	// the default TTL for a backup
@@ -112,6 +112,7 @@ var disableControllerList = []string{
 	DownloadRequestControllerKey,
 	ResticRepoControllerKey,
 	ServerStatusRequestControllerKey,
+	BackupStorageLocationControllerKey,
 }
 
 type serverConfig struct {
@@ -336,15 +337,6 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.validateBackupStorageLocations(); err != nil {
-		return err
-	}
-
-	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).
-			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	}
-
 	if err := s.initRestic(); err != nil {
 		return err
 	}
@@ -429,39 +421,6 @@ func (s *server) veleroResourcesExist() error {
 	}
 
 	s.logger.Info("All Velero custom resource definitions exist")
-	return nil
-}
-
-// validateBackupStorageLocations checks to ensure all backup storage locations exist
-// and have a compatible layout, and returns an error if not.
-func (s *server) validateBackupStorageLocations() error {
-	s.logger.Info("Checking that all backup storage locations are valid")
-
-	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
-	defer pluginManager.CleanupClients()
-
-	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
-	var invalid []string
-	for _, location := range locations.Items {
-		backupStore, err := persistence.NewObjectBackupStore(&location, pluginManager, s.logger)
-		if err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
-			continue
-		}
-
-		if err := backupStore.IsValid(); err != nil {
-			invalid = append(invalid, errors.Wrapf(err, "backup store for location %q is invalid", location.Name).Error())
-		}
-	}
-
-	if len(invalid) > 0 {
-		return errors.Errorf("some backup storage locations are invalid: %s", strings.Join(invalid, "; "))
-	}
-
 	return nil
 }
 
@@ -803,16 +762,33 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		}
 	}
 
+	backupStorageLocationControllerRunInfo := func() controllerRunInfo {
+		backupStorageLocationController := controller.NewBackupStorageLocationController(
+			s.namespace,
+			s.config.defaultBackupLocation,
+			s.veleroClient.VeleroV1(),
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			newPluginManager,
+			s.logger,
+		)
+
+		return controllerRunInfo{
+			controller: backupStorageLocationController,
+			numWorkers: defaultControllerWorkers,
+		}
+	}
+
 	enabledControllers := map[string]func() controllerRunInfo{
-		BackupSyncControllerKey:          backupSyncControllerRunInfo,
-		BackupControllerKey:              backupControllerRunInfo,
-		ScheduleControllerKey:            scheduleControllerRunInfo,
-		GcControllerKey:                  gcControllerRunInfo,
-		BackupDeletionControllerKey:      deletionControllerRunInfo,
-		RestoreControllerKey:             restoreControllerRunInfo,
-		ResticRepoControllerKey:          resticRepoControllerRunInfo,
-		DownloadRequestControllerKey:     downloadrequestControllerRunInfo,
-		ServerStatusRequestControllerKey: serverStatusRequestControllerRunInfo,
+		BackupSyncControllerKey:            backupSyncControllerRunInfo,
+		BackupControllerKey:                backupControllerRunInfo,
+		ScheduleControllerKey:              scheduleControllerRunInfo,
+		GcControllerKey:                    gcControllerRunInfo,
+		BackupDeletionControllerKey:        deletionControllerRunInfo,
+		RestoreControllerKey:               restoreControllerRunInfo,
+		ResticRepoControllerKey:            resticRepoControllerRunInfo,
+		DownloadRequestControllerKey:       downloadrequestControllerRunInfo,
+		ServerStatusRequestControllerKey:   serverStatusRequestControllerRunInfo,
+		BackupStorageLocationControllerKey: backupStorageLocationControllerRunInfo,
 	}
 
 	if s.config.restoreOnly {
