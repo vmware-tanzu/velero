@@ -40,8 +40,12 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 )
 
-// BackupVersion is the current backup version for Velero.
+// BackupVersion is the current backup major version for Velero.
+// Deprecated, use BackupFormatVersion
 const BackupVersion = 1
+
+// BackupFormatVersion is the current backup version for Velero, including major, minor, and patch.
+const BackupFormatVersion = "1.1.0"
 
 // Backupper performs backups.
 type Backupper interface {
@@ -284,7 +288,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 
 func (kb *kubernetesBackupper) writeBackupVersion(tw *tar.Writer) error {
 	versionFile := filepath.Join(api.MetadataDir, "version")
-	versionString := fmt.Sprintf("%d\n", BackupVersion)
+	versionString := fmt.Sprintf("%s\n", BackupFormatVersion)
 
 	hdr := &tar.Header{
 		Name:     versionFile,

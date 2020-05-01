@@ -340,6 +340,10 @@ spec:
               format: date-time
               nullable: true
               type: string
+            formatVersion:
+              description: FormatVersion is the backup format version, including major,
+                minor, and patch version.
+              type: string
             phase:
               description: Phase is the current state of the Backup.
               enum:
@@ -366,7 +370,8 @@ spec:
               nullable: true
               type: array
             version:
-              description: Version is the backup format version.
+              description: 'Version is the backup format major version. Deprecated:
+                Please see FormatVersion'
               type: integer
             volumeSnapshotsAttempted:
               description: VolumeSnapshotsAttempted is the total number of attempted

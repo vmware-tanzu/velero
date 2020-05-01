@@ -42,6 +42,7 @@ rootBucket/
   },
   "status": {
     "version": 1,
+    "formatVersion": "1.1.0",
     "expiration": "2017-08-01T13:39:15Z",
     "phase": "Completed",
     "volumeBackups": {
@@ -57,7 +58,129 @@ rootBucket/
 ```
 Note that this file includes detailed info about your volume snapshots in the `status.volumeBackups` field, which can be helpful if you want to manually check them in your cloud provider GUI.
 
-## file format version: 1
+## Output File Format Versioning
+
+The Velero output file format is intended to be relatively stable, but may change over time in order to support new features.
+
+In order to accommodate this, Velero follows [Semantic Versioning](http://semver.org/) for the file format version.
+
+Minor and patch versions will indicate backwards-compatible changes that previous versions of Velero can restore, including new directories or files.
+
+A major version would indicate that a version of Velero older than the version that created the backup could not restore it, usually because of moved or renamed directories or files.
+
+Major versions of the file format will be incremented with major version releases of Velero.
+However, a major version release of Velero does not necessarily mean that the backup format version changed - Velero 3.0 could still use backup file format 2.0, as an example.
+
+## Versions
+
+### File Format Version: 1.1 (Current)
+
+In version 1.1, we have added the support of API groups versions as part of the backup (previously, only the preferred version of each API Groups was backed up). Each resource has one or more sub-directories, one sub-directory for each supported version of the API group. The preferred version API Group of each resource has the suffix "-preferredversion" as part of the sub-directory name. For backward compatibility, we kept the classic directory structure without the API Group version, which sits on the same level as the API Group sub-directory versions.
+By default, only the preferred API group of each resource is backed up. 
+In order to take a backup of all API group versions, you need to run the Velero server with `--features=EnableAPIGroupVersions` feature flag. This is an experimental flag and the restore logic to handle multiple API Group Versions will be added in the future.
+
+
+When unzipped, a typical backup directory (e.g. `backup1234.tar.gz`) taken with this file format version looks like the following (with the feature flag):
+
+```
+resources/
+    persistentvolumes/
+        cluster/
+            pv01.json
+            ...
+        v1-preferredversion/
+            cluster/
+                pv01.json
+                ...
+    configmaps/
+        namespaces/
+            namespace1/
+                myconfigmap.json
+                ...
+            namespace2/
+                ...
+        v1-preferredversion/
+            namespaces/
+                namespace1/
+                    myconfigmap.json
+                    ...
+                namespace2/
+                    ...
+    pods/
+        namespaces/
+            namespace1/
+                mypod.json
+                ...
+            namespace2/
+                ...
+        v1-preferredversion/
+            namespaces/
+                namespace1/
+                    mypod.json
+                    ...
+                namespace2/
+                    ...
+    jobs.batch/
+        namespaces/
+            namespace1/
+                awesome-job.json
+                ...
+            namespace2/
+                ...
+        v1-preferredversion/
+            namespaces/
+                namespace1/
+                    awesome-job.json
+                    ...
+                namespace2/
+                    ...
+    deployments/
+        namespaces/
+            namespace1/
+                cool-deployment.json
+                ...
+            namespace2/
+                ...
+	v1-preferredversion/
+		namespaces/
+		    namespace1/
+			cool-deployment.json
+			...
+		    namespace2/
+			...
+    horizontalpodautoscalers.autoscaling/
+        namespaces/
+            namespace1/
+                hpa-to-the-rescue.json
+                ...
+            namespace2/
+                ...
+        v1-preferredversion/
+            namespaces/
+                namespace1/
+                    hpa-to-the-rescue.json
+                    ...
+                namespace2/
+                    ...
+        v2beta1/
+            namespaces/
+                namespace1/
+                    hpa-to-the-rescue.json
+                    ...
+                namespace2/
+                    ...
+        v2beta2/
+            namespaces/
+                namespace1/
+                    hpa-to-the-rescue.json
+                    ...
+                namespace2/
+                    ...
+
+    ...
+```
+
+### File Format Version: 1
 
 When unzipped, a typical backup directory (e.g. `backup1234.tar.gz`) looks like the following:
 
@@ -97,17 +220,3 @@ resources/
                 ...
     ...
 ```
-
-## Output File Format Versioning
-
-The Velero output file format is intended to be relatively stable, but may change over time in order to support new features.
-
-In order to accommodate this, Velero follows [Semantic Versioning](http://semver.org/) for the file format version.
-
-Minor and patch versions will indicate backwards-compatible changes that previous versions of Velero can restore, including new directories or files.
-
-A major version would indicate that a version of Velero older than the version that created the backup could not restore it, usually because of moved or renamed directories or files.
-
-Major versions of the file format will be incremented with major version releases of Velero.
-However, a major version release of Velero does not necessarily mean that the backup format version changed - Velero 3.0 could still use backup file format 2.0, as an example.
-
