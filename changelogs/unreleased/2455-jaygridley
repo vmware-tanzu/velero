@@ -1,0 +1,1 @@
+Azure: add support for getting storage account key for restic directly from an environment variable
