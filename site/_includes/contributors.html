@@ -17,7 +17,7 @@
       <div class="media thumbnail-item">
         <img src="{{ person.image }}" class="rounded-circle" alt="Person" />
         <div class="media-body align-self-center">
-          <h6><a href="#">{{ person.first_name }} {{ person.last_name }}</a></h6>
+          <h6><a href="https://github.com/{{ person.github_handle }}">{{ person.first_name }} {{ person.last_name }}</a></h6>
         {{ person.content | markdownify }}    
         </div>
       </div>
