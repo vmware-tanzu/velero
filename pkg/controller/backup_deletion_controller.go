@@ -520,7 +520,11 @@ func deleteCSIVolumeSnapshotContents(backupName string, csiVSCLister snapshotv1b
 	if err != nil {
 		return []error{err}
 	}
-
+	// It is possible that by the time deleteCSIVolumeSnapshotContents is called after deleteCSIVolumeSnapshots
+	// that deletion of VSCs hasn't been completed, by the snapshot-controller (one of the CSI components).
+	// For that reason the csiVSCLister returned VSCs that are yet to be deleted. To handle this scenario,
+	// we swallow `IsNotFound` errors from the setVolumeSnapshotContentDeletionPolicy function and the
+	// csiClient.VolumeSnapshotContents().Delete(...)
 	log.Infof("Deleting %d CSI volumesnapshotcontents", len(csiVolSnapConts))
 	for _, snapCont := range csiVolSnapConts {
 		err := setVolumeSnapshotContentDeletionPolicy(snapCont.Name, csiClient, log)
@@ -535,7 +539,7 @@ func deleteCSIVolumeSnapshotContents(backupName string, csiVSCLister snapshotv1b
 		}
 		log.Infof("Deleting volumesnapshotcontent %s", snapCont.Name)
 		err = csiClient.VolumeSnapshotContents().Delete(snapCont.Name, &metav1.DeleteOptions{})
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err) {
 			errs = append(errs, err)
 		}
 	}
