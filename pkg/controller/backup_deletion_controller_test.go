@@ -887,54 +887,59 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 }
 
 func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
-	retainVSC := snapshotv1beta1api.VolumeSnapshotContent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "retainVSC",
-		},
-		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
-			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
-		},
-	}
-	deleteVSC := snapshotv1beta1api.VolumeSnapshotContent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "deleteVSC",
-		},
-		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
-			DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentDelete,
-		},
-	}
-
-	nothingVSC := snapshotv1beta1api.VolumeSnapshotContent{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "nothingVSC",
-		},
-		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{},
-	}
-	objs := []runtime.Object{&retainVSC, &deleteVSC, &nothingVSC}
-	fakeClient := snapshotFake.NewSimpleClientset(objs...)
 	testCases := []struct {
 		name         string
 		inputVSCName string
+		objs         []runtime.Object
 		expectError  bool
 	}{
 		{
 			name:         "should update DeletionPolicy of a VSC from retain to delete",
 			inputVSCName: "retainVSC",
-			expectError:  false,
+			objs: []runtime.Object{
+				&snapshotv1beta1api.VolumeSnapshotContent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "retainVSC",
+					},
+					Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+						DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentRetain,
+					},
+				},
+			},
+			expectError: false,
 		},
 		{
 			name:         "should be a no-op updating if DeletionPolicy of a VSC is already Delete",
 			inputVSCName: "deleteVSC",
-			expectError:  false,
+			objs: []runtime.Object{
+				&snapshotv1beta1api.VolumeSnapshotContent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "deleteVSC",
+					},
+					Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{
+						DeletionPolicy: snapshotv1beta1api.VolumeSnapshotContentDelete,
+					},
+				},
+			},
+			expectError: false,
 		},
 		{
 			name:         "should update DeletionPolicy of a VSC with no DeletionPolicy",
 			inputVSCName: "nothingVSC",
-			expectError:  false,
+			objs: []runtime.Object{
+				&snapshotv1beta1api.VolumeSnapshotContent{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nothingVSC",
+					},
+					Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{},
+				},
+			},
+			expectError: false,
 		},
 		{
 			name:         "should return not found error if supplied VSC does not exist",
 			inputVSCName: "does-not-exist",
+			objs:         []runtime.Object{},
 			expectError:  true,
 		},
 	}
@@ -946,6 +951,7 @@ func TestSetVolumeSnapshotContentDeletionPolicy(t *testing.T) {
 	)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := snapshotFake.NewSimpleClientset(tc.objs...)
 			err := setVolumeSnapshotContentDeletionPolicy(tc.inputVSCName, fakeClient.SnapshotV1beta1(), log)
 			if tc.expectError {
 				assert.NotNil(t, err)
@@ -1090,36 +1096,35 @@ func TestDeleteCSIVolumeSnapshots(t *testing.T) {
 		},
 	}
 
-	objs := []runtime.Object{&ns1VS1, &ns1VS1VSC, &ns1VS2, &ns1VS2VSC, &ns2VS1, &ns2VS1VSC, &ns2VS2, &ns2VS2VSC, &ns1NilStatusVS, &ns1NilBoundVSCVS, &ns1NonExistentVSCVS}
-	fakeClient := snapshotFake.NewSimpleClientset(objs...)
-	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
-	for _, o := range objs {
-		fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Informer().GetStore().Add(o)
-	}
-
 	testCases := []struct {
 		name       string
 		backupName string
+		objs       []runtime.Object
 	}{
 		{
 			name:       "should delete volumesnapshots bound to existing volumesnapshotcontent",
 			backupName: "backup1",
+			objs:       []runtime.Object{&ns1VS1VSC, &ns1VS1, &ns1VS2VSC, &ns1VS2, &ns2VS1VSC, &ns2VS1, &ns2VS2VSC, &ns2VS2},
 		},
 		{
 			name:       "should delete volumesnapshots with nil status",
 			backupName: "backup2",
+			objs:       []runtime.Object{&ns1NilStatusVS},
 		},
 		{
 			name:       "should delete volumesnapshots with nil BoundVolumeSnapshotContentName",
 			backupName: "backup3",
+			objs:       []runtime.Object{&ns1NilBoundVSCVS},
 		},
 		{
 			name:       "should delete volumesnapshots bound to non-existent volumesnapshotcontents",
 			backupName: "backup4",
+			objs:       []runtime.Object{&ns1NonExistentVSCVS},
 		},
 		{
 			name:       "should be a no-op when there are no volumesnapshots to delete",
 			backupName: "backup-no-vs",
+			objs:       []runtime.Object{},
 		},
 	}
 
@@ -1130,6 +1135,11 @@ func TestDeleteCSIVolumeSnapshots(t *testing.T) {
 	)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := snapshotFake.NewSimpleClientset(tc.objs...)
+			fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
+			for _, o := range tc.objs {
+				fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Informer().GetStore().Add(o)
+			}
 			errs := deleteCSIVolumeSnapshots(tc.backupName, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshots().Lister(), fakeClient.SnapshotV1beta1(), log)
 			assert.Empty(t, errs)
 		})
@@ -1170,31 +1180,30 @@ func TestDeleteCSIVolumeSnapshotContents(t *testing.T) {
 		Spec: snapshotv1beta1api.VolumeSnapshotContentSpec{},
 	}
 
-	objs := []runtime.Object{&retainVSC, &deleteVSC, &nothingVSC}
-	fakeClient := snapshotFake.NewSimpleClientset(objs...)
-	fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
-	for _, o := range objs {
-		fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshotContents().Informer().GetStore().Add(o)
-	}
 	testCases := []struct {
 		name       string
 		backupName string
+		objs       []runtime.Object
 	}{
 		{
 			name:       "should delete volumesnapshotcontent with DeletionPolicy Retain",
 			backupName: "backup1",
+			objs:       []runtime.Object{&retainVSC},
 		},
 		{
 			name:       "should delete volumesnapshotcontent with DeletionPolicy Delete",
 			backupName: "backup3",
+			objs:       []runtime.Object{&deleteVSC},
 		},
 		{
 			name:       "should delete volumesnapshotcontent with No DeletionPolicy",
 			backupName: "backup3",
+			objs:       []runtime.Object{&nothingVSC},
 		},
 		{
 			name:       "should return no error when backup has no volumesnapshotconents",
 			backupName: "backup-with-no-vsc",
+			objs:       []runtime.Object{},
 		},
 	}
 	log := velerotest.NewLogger().WithFields(
@@ -1204,6 +1213,12 @@ func TestDeleteCSIVolumeSnapshotContents(t *testing.T) {
 	)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := snapshotFake.NewSimpleClientset(tc.objs...)
+			fakeSharedInformer := snapshotv1beta1informers.NewSharedInformerFactoryWithOptions(fakeClient, 0)
+			for _, o := range tc.objs {
+				fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshotContents().Informer().GetStore().Add(o)
+			}
+
 			errs := deleteCSIVolumeSnapshotContents(tc.backupName, fakeSharedInformer.Snapshot().V1beta1().VolumeSnapshotContents().Lister(), fakeClient.SnapshotV1beta1(), log)
 			assert.Empty(t, errs)
 		})
