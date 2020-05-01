@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -65,10 +67,13 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 		}, nil
 	}
 
-	var crd apiextv1.CustomResourceDefinition
-
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(input.Item.UnstructuredContent(), &crd); err != nil {
-		return nil, errors.Wrap(err, "unable to convert unstructured item to custom resource definition")
+	// Do not use runtime.DefaultUnstructuredConverter.FromUnstructured here because it has a bug when converting integers/whole
+	// numbers in float fields (https://github.com/kubernetes/kubernetes/issues/87675).
+	// Using JSON as a go-between avoids this issue, without adding a bunch of type conversion by using unstructured helper functions
+	// to inspect the fields we want to look at.
+	crd, err := fromUnstructured(input.Item.UnstructuredContent())
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to convert CRD from unstructured to structured")
 	}
 
 	// The v1 API doesn't allow the PreserveUnknownFields value to be true, so make sure the schema flag is set instead
@@ -100,4 +105,19 @@ func (c *CRDV1PreserveUnknownFieldsAction) Execute(input *velero.RestoreItemActi
 	return &velero.RestoreItemActionExecuteOutput{
 		UpdatedItem: &unstructured.Unstructured{Object: res},
 	}, nil
+}
+
+func fromUnstructured(unstructured map[string]interface{}) (*apiextv1.CustomResourceDefinition, error) {
+	var crd apiextv1.CustomResourceDefinition
+
+	js, err := json.Marshal(unstructured)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to convert unstructured item to JSON")
+	}
+
+	if err = json.Unmarshal(js, &crd); err != nil {
+		return nil, errors.Wrap(err, "unable to convert JSON to CRD Go type")
+	}
+
+	return &crd, nil
 }
