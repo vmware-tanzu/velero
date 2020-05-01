@@ -1,0 +1,1 @@
+No longer block backups if there's even 1 only 1 invalid BSL: only log and set BSL status accordingly.
