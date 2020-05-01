@@ -1,0 +1,1 @@
+during backup deletion also delete CSI volumesnapshots that were created as a part of the backup

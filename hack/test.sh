@@ -35,5 +35,5 @@ if [[ -n "${GOFLAGS:-}" ]]; then
   echo "GOFLAGS: ${GOFLAGS}"
 fi
 
-go test -installsuffix "static" -timeout 60s "${TARGETS[@]}"
+go test -installsuffix "static" -timeout 60s -v "${TARGETS[@]}"
 echo "Success!"
