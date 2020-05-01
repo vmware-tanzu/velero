@@ -38,8 +38,9 @@ const (
 
 	resourceGroupConfigKey = "resourceGroup"
 
-	storageAccountConfigKey = "storageAccount"
-	subscriptionIdConfigKey = "subscriptionId"
+	storageAccountConfigKey          = "storageAccount"
+	storageAccountKeyEnvVarConfigKey = "storageAccountKeyEnvVar"
+	subscriptionIdConfigKey          = "subscriptionId"
 )
 
 func getStorageAccountKey(config map[string]string) (string, *azure.Environment, error) {
@@ -48,41 +49,52 @@ func getStorageAccountKey(config map[string]string) (string, *azure.Environment,
 		return "", nil, err
 	}
 
-	// 1. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
-	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
-	if err != nil {
-		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
-	}
-
-	// 2. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
+	// 1. Get Azure cloud from AZURE_CLOUD_NAME, if it exists. If the env var does not
 	// exist, parseAzureEnvironment will return azure.PublicCloud.
 	env, err := parseAzureEnvironment(os.Getenv(cloudNameEnvVar))
 	if err != nil {
 		return "", nil, errors.Wrap(err, "unable to parse azure cloud name environment variable")
 	}
 
-	// 3. check whether a different subscription ID was set for backups in config["subscriptionId"]
+	// 2. get storage key from secret using key config[storageAccountKeyEnvVarConfigKey]. If the config does not
+	// exist, continue obtaining it using API
+	if secretKeyEnvVar := config[storageAccountKeyEnvVarConfigKey]; secretKeyEnvVar != "" {
+		storageKey := os.Getenv(secretKeyEnvVar)
+		if storageKey == "" {
+			return "", env, errors.Errorf("no storage key secret with key %s found", secretKeyEnvVar)
+		}
+
+		return storageKey, env, nil
+	}
+
+	// 3. we need AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_SUBSCRIPTION_ID
+	envVars, err := getRequiredValues(os.Getenv, tenantIDEnvVar, clientIDEnvVar, clientSecretEnvVar, subscriptionIDEnvVar)
+	if err != nil {
+		return "", nil, errors.Wrap(err, "unable to get all required environment variables")
+	}
+
+	// 4. check whether a different subscription ID was set for backups in config["subscriptionId"]
 	subscriptionId := envVars[subscriptionIDEnvVar]
 	if val := config[subscriptionIdConfigKey]; val != "" {
 		subscriptionId = val
 	}
 
-	// 4. we need config["resourceGroup"], config["storageAccount"]
+	// 5. we need config["resourceGroup"], config["storageAccount"]
 	if _, err := getRequiredValues(mapLookup(config), resourceGroupConfigKey, storageAccountConfigKey); err != nil {
 		return "", env, errors.Wrap(err, "unable to get all required config values")
 	}
 
-	// 5. get SPT
+	// 6. get SPT
 	spt, err := newServicePrincipalToken(envVars[tenantIDEnvVar], envVars[clientIDEnvVar], envVars[clientSecretEnvVar], env)
 	if err != nil {
 		return "", env, errors.Wrap(err, "error getting service principal token")
 	}
 
-	// 6. get storageAccountsClient
+	// 7. get storageAccountsClient
 	storageAccountsClient := storagemgmt.NewAccountsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionId)
 	storageAccountsClient.Authorizer = autorest.NewBearerAuthorizer(spt)
 
-	// 7. get storage key
+	// 8. get storage key
 	res, err := storageAccountsClient.ListKeys(context.TODO(), config[resourceGroupConfigKey], config[storageAccountConfigKey])
 	if err != nil {
 		return "", env, errors.WithStack(err)
@@ -121,6 +133,10 @@ func getAzureResticEnvVars(config map[string]string) (map[string]string, error) 
 	storageAccountKey, _, err := getStorageAccountKey(config)
 	if err != nil {
 		return nil, err
+	}
+
+	if _, err := getRequiredValues(mapLookup(config), storageAccountConfigKey); err != nil {
+		return nil, errors.Wrap(err, "unable to get all required config values")
 	}
 
 	return map[string]string{
