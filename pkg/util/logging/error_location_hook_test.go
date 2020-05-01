@@ -47,7 +47,7 @@ func TestFire(t *testing.T) {
 			name:                "non-error logged in error field",
 			preEntryFields:      map[string]interface{}{logrus.ErrorKey: "not an error"},
 			expectedEntryFields: map[string]interface{}{logrus.ErrorKey: "not an error"},
-			expectedErr:         true,
+			expectedErr:         false,
 		},
 		{
 			name:           "pkg/errors error",
