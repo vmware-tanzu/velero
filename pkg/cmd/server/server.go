@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2017, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -615,6 +615,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.backupSyncPeriod,
 			s.namespace,
+			s.csiSnapshotClient,
+			s.kubeClient,
 			s.config.defaultBackupLocation,
 			newPluginManager,
 			s.logger,
