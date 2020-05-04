@@ -90,10 +90,10 @@ type BackupStorageLocationSpec struct {
 	// +nullable
 	BackupSyncPeriod *metav1.Duration `json:"backupSyncPeriod,omitempty"`
 
-	// StoreValidationPeriod defines how frequently to validate the corresponding object storage. A value of 0 disables validation.
+	// StoreValidationFrequency defines how frequently to validate the corresponding object storage. A value of 0 disables validation.
 	// +optional
 	// +nullable
-	StoreValidationPeriod *metav1.Duration `json:"storeValidationPeriod,omitempty"`
+	ValidationFrequency *metav1.Duration `json:"validationFrequency,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.

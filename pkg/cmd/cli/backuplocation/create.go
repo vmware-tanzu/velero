@@ -55,15 +55,15 @@ func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 }
 
 type CreateOptions struct {
-	Name                  string
-	Provider              string
-	Bucket                string
-	Prefix                string
-	BackupSyncPeriod      time.Duration
-	StoreValidationPeriod time.Duration
-	Config                flag.Map
-	Labels                flag.Map
-	AccessMode            *flag.Enum
+	Name                string
+	Provider            string
+	Bucket              string
+	Prefix              string
+	BackupSyncPeriod    time.Duration
+	ValidationFrequency time.Duration
+	Config              flag.Map
+	Labels              flag.Map
+	AccessMode          *flag.Enum
 }
 
 func NewCreateOptions() *CreateOptions {
@@ -82,7 +82,7 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.Bucket, "bucket", o.Bucket, "name of the object storage bucket where backups should be stored")
 	flags.StringVar(&o.Prefix, "prefix", o.Prefix, "prefix under which all Velero data should be stored within the bucket. Optional.")
 	flags.DurationVar(&o.BackupSyncPeriod, "backup-sync-period", o.BackupSyncPeriod, "how often to ensure all Velero backups in object storage exist as Backup API objects in the cluster. Optional. Set this to `0s` to disable sync")
-	flags.DurationVar(&o.StoreValidationPeriod, "storage-validation-period", o.StoreValidationPeriod, "how often to validate the backup storage location. Optional. Set this to `0s` to disable validation")
+	flags.DurationVar(&o.ValidationFrequency, "storage-validation-period", o.ValidationFrequency, "how often to validate the backup storage location. Optional. Set this to `0s` to disable validation")
 	flags.Var(&o.Config, "config", "configuration key-value pairs")
 	flags.Var(&o.Labels, "labels", "labels to apply to the backup storage location")
 	flags.Var(
@@ -109,7 +109,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return errors.New("--backup-sync-period must be non-negative")
 	}
 
-	if o.StoreValidationPeriod < 0 {
+	if o.ValidationFrequency < 0 {
 		return errors.New("--storage-validation-period must be non-negative")
 	}
 
@@ -129,7 +129,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	if c.Flags().Changed("storage-validation-period") {
-		storageValidationPeriod = &metav1.Duration{Duration: o.StoreValidationPeriod}
+		storageValidationPeriod = &metav1.Duration{Duration: o.ValidationFrequency}
 	}
 
 	backupStorageLocation := &velerov1api.BackupStorageLocation{
@@ -146,10 +146,10 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 					Prefix: o.Prefix,
 				},
 			},
-			Config:                o.Config.Data(),
-			AccessMode:            velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
-			BackupSyncPeriod:      backupSyncPeriod,
-			StoreValidationPeriod: storageValidationPeriod,
+			Config:              o.Config.Data(),
+			AccessMode:          velerov1api.BackupStorageLocationAccessMode(o.AccessMode.String()),
+			BackupSyncPeriod:    backupSyncPeriod,
+			ValidationFrequency: storageValidationPeriod,
 		},
 	}
 

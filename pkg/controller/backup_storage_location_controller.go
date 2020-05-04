@@ -39,37 +39,37 @@ import (
 type backupStorageLocationController struct {
 	*genericController
 
-	namespace                    string
-	defaultBackupLocation        string
-	defaultStoreValidationPeriod time.Duration
-	backupLocationClient         velerov1client.BackupStorageLocationsGetter
-	backupStorageLocationLister  velerov1listers.BackupStorageLocationLister
-	newPluginManager             func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore               func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	namespace                       string
+	defaultBackupLocation           string
+	defaultStoreValidationFrequency time.Duration
+	backupLocationClient            velerov1client.BackupStorageLocationsGetter
+	backupStorageLocationLister     velerov1listers.BackupStorageLocationLister
+	newPluginManager                func(logrus.FieldLogger) clientmgmt.Manager
+	newBackupStore                  func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupStorageLocationController(
 	namespace string,
 	defaultBackupLocation string,
-	defaultStoreValidationPeriod time.Duration,
+	defaultStoreValidationFrequency time.Duration,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
-	if defaultStoreValidationPeriod <= 0 {
-		defaultStoreValidationPeriod = time.Minute
+	if defaultStoreValidationFrequency <= 0 {
+		defaultStoreValidationFrequency = time.Minute
 	}
 
-	logger.Infof("Backup location store validation period is %v", defaultStoreValidationPeriod)
+	logger.Infof("Backup location validation period is %v", defaultStoreValidationFrequency)
 
 	c := backupStorageLocationController{
-		genericController:            newGenericController("backup-storage-location", logger),
-		namespace:                    namespace,
-		defaultBackupLocation:        defaultBackupLocation,
-		defaultStoreValidationPeriod: defaultStoreValidationPeriod,
-		backupLocationClient:         backupLocationClient,
-		backupStorageLocationLister:  backupStorageLocationLister,
+		genericController:               newGenericController("backup-storage-location", logger),
+		namespace:                       namespace,
+		defaultBackupLocation:           defaultBackupLocation,
+		defaultStoreValidationFrequency: defaultStoreValidationFrequency,
+		backupLocationClient:            backupLocationClient,
+		backupStorageLocationLister:     backupStorageLocationLister,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -84,99 +84,100 @@ func NewBackupStorageLocationController(
 }
 
 func (c *backupStorageLocationController) run() {
-	c.logger.Info("Checking for existing locations ready to be validated; there needs to be at least 1 location that is available")
+	c.logger.Info("Checking for existing backup locations ready to be validated; there needs to be at least 1 backup location that is available")
 
 	locations, err := c.backupStorageLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
 	if err != nil {
-		c.logger.WithError(err).Error("Error listing locations, at least one available location is required")
+		c.logger.WithError(err).Error("Error listing locations, at least one available backup location is required")
 		return
 	}
 
 	if len(locations) == 0 {
-		c.logger.Error("No locations found, at least one available location is required")
+		c.logger.Error("No locations found, at least one available backup location is required")
 		return
 	}
 
 	pluginManager := c.newPluginManager(c.logger)
 	defer pluginManager.CleanupClients()
 
-	var unavailable []string
+	var unavailableErrors []string
 	log := c.logger
+	var defaultFound bool
 	for _, location := range locations {
 		locationName := location.Name
 		log = c.logger.WithField("backupLocation", locationName)
 
-		storeValidationPeriod := c.defaultStoreValidationPeriod
-		if location.Spec.StoreValidationPeriod != nil {
-			storeValidationPeriod = location.Spec.StoreValidationPeriod.Duration
-			if storeValidationPeriod == 0 {
-				log.Debug("Validation period for this location is set to 0, skipping validation")
+		storeValidationFrequency := c.defaultStoreValidationFrequency
+		if location.Spec.ValidationFrequency != nil {
+			storeValidationFrequency = location.Spec.ValidationFrequency.Duration
+			if storeValidationFrequency == 0 {
+				log.Debug("Validation period for this backup location is set to 0, skipping validation")
 				continue
 			}
 
-			if storeValidationPeriod < 0 {
+			if storeValidationFrequency < 0 {
 				log.Debug("Validation period must be non-negative")
-				storeValidationPeriod = c.defaultStoreValidationPeriod
+				storeValidationFrequency = c.defaultStoreValidationFrequency
 			}
 		}
 
 		lastValidation := location.Status.LastValidationTime
 		if lastValidation != nil {
-			log.Debug("Checking if location needs to be validated at this time")
-			nextValidation := lastValidation.Add(storeValidationPeriod)
+			log.Debug("Checking if backup location needs to be validated at this time")
+			nextValidation := lastValidation.Add(storeValidationFrequency)
 			if time.Now().UTC().Before(nextValidation) {
 				continue
 			}
 		}
 
-		log.Debug("Location is ready to be validated")
+		log.Debug("Validation backup location")
 
 		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
-			unavailable = append(unavailable, errors.Wrapf(err, "error getting backup store for location %q", locationName).Error())
+			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error getting backup store for backup location %q", locationName).Error())
 			continue
 		}
 
 		if err := backupStore.IsValid(); err != nil {
+			if location.Name == c.defaultBackupLocation {
+				defaultFound = true
+				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", c.defaultBackupLocation)
+			}
+
 			// update status
 			err2 := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
 				r.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
 				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 			})
 			if err2 != nil {
-				unavailable = append(unavailable, errors.Wrapf(err2, "error updating location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseUnavailable).Error())
+				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error updating backup location to %s status", velerov1api.BackupStorageLocationPhaseUnavailable).Error())
 			} else {
-				unavailable = append(unavailable, errors.Wrapf(err, "location %q is unavailable", locationName).Error())
+				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "backup location %q is unavailable", locationName).Error())
 			}
-			log.Debug("Location has been updated to Unavailable")
 		} else {
+			if location.Name == c.defaultBackupLocation {
+				defaultFound = true
+			}
+
 			// update status
 			err := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
 				r.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
 				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 			})
 			if err != nil {
-				unavailable = append(unavailable, errors.Wrapf(err, "error updating location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseAvailable).Error())
+				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error updating backup location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseAvailable).Error())
 			}
-			log.Debug("Location has been updated to Available")
 		}
 	}
 
-	var defaultFound bool
-	if len(unavailable) == len(locations) { // no BSL available
-		log.Errorf("There are no locations available, at least one available location is required: %s", strings.Join(unavailable, "; "))
-	} else if len(unavailable) > 0 { // some but not all BSL unavailable
-		for _, location := range locations {
-			if location.Name == c.defaultBackupLocation && location.Status.Phase == velerov1api.BackupStorageLocationPhaseUnavailable {
-				defaultFound = true
-				log.Warnf("The specified default location named %q is unavailable; for convenience, be sure to configure it properly or make another location that is available the default", c.defaultBackupLocation)
-				break
-			}
-		}
-		if !defaultFound {
-			log.Warnf("The specified default location named %q was not found; for convenience, be sure to create one or make another location that is available the default", c.defaultBackupLocation)
-		}
-		log.Warnf("Unavailable locations detected: %s", strings.Join(unavailable, "; "))
+	if !defaultFound {
+		log.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", c.defaultBackupLocation)
+	}
+
+	if len(unavailableErrors) == len(locations) { // no BSL available
+		log.Errorf("There are no locations available, at least one available backup location is required: %s", strings.Join(unavailableErrors, "; "))
+	} else if len(unavailableErrors) > 0 { // some but not all BSL unavailable
+		log.Warnf("Unavailable backup locations detected: %s", strings.Join(unavailableErrors, "; "))
 	}
 }
 
