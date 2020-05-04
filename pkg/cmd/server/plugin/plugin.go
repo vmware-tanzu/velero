@@ -95,7 +95,6 @@ func newServiceAccountBackupItemAction(f client.Factory) veleroplugin.HandlerIni
 	}
 }
 
-// TODO: add a client factory to this function
 func newRemapCRDVersionAction(f client.Factory) veleroplugin.HandlerInitializer {
 	return func(logger logrus.FieldLogger) (interface{}, error) {
 		config, err := f.ClientConfig()

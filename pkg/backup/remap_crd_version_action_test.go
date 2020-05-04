@@ -96,6 +96,18 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		_, _, err = a.Execute(&u, backup)
 		require.NoError(t, err)
 	})
+
+	t.Run("Having Spec.PreserveUnknownFields set to true will return a v1beta1 version of the CRD", func(t *testing.T) {
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		b.PreserveUnknownFields(true)
+		c := b.Result()
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
+		require.NoError(t, err)
+
+		item, _, err := a.Execute(&unstructured.Unstructured{Object: obj}, backup)
+		require.NoError(t, err)
+		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
+	})
 }
 
 // TestRemapCRDVersionActionData tests the RemapCRDVersionAction plugin against actual CRD to confirm that the v1beta1 version is returned when the v1 version is passed in to the plugin.

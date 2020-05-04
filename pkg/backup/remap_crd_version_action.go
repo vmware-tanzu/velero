@@ -86,47 +86,15 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 
 	log := a.logger.WithField("plugin", "RemapCRDVersionAction").WithField("CRD", crd.Name)
 
-	// Looking for 1 version should be enough to tell if it's a v1beta1 CRD, as all v1beta1 CRD versions share the same schema.
-	// v1 CRDs can have different schemas per version
-	// The silently upgraded versions will often have a `versions` entry that looks like this:
-	//   versions:
-	//   - name: v1
-	//     served:  true
-	//     storage: true
-	// This is acceptable when re-submitted to a v1beta1 endpoint on restore.
-	if len(crd.Spec.Versions) > 0 {
-		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil {
-			log.Debug("CRD is a candidate for v1beta1 backup")
-
-			item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-	}
-
-	// If the NonStructuralSchema condition was applied, be sure to back it up as v1beta1.
-	for _, c := range crd.Status.Conditions {
-		if c.Type == apiextv1.NonStructuralSchema {
-			log.Debug("CRD is a non-structural schema")
-
-			item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
-			if err != nil {
-				return nil, nil, err
-			}
-			break
-		}
-	}
-
-	// CRD has the field "Spec.PreserveUnknownFields". This meant it was a v1beta1 CRD and cannot be restored as a v1 CRD - validation webhooks will fail.
-	// TODO: add a test case
-	if crd.Spec.PreserveUnknownFields {
-		log.Debug("CRD is set to preserve unknown fields, should be backed up as v1beta1")
+	switch {
+	case hasSingleVersion(crd), hasNonStructuralSchema(crd), hasPreserveUnknownFields(crd):
+		log.Infof("CustomResourceDefinition %s appears to be v1beta1, fetching the v1beta version", crd.Name)
 		item, err = fetchV1beta1CRD(crd.Name, a.betaCRDClient)
 		if err != nil {
 			return nil, nil, err
 		}
-
+	default:
+		log.Infof("CustomResourceDefinition %s does not appear to be v1beta1, backing up as v1", crd.Name)
 	}
 
 	return item, nil, nil
@@ -141,13 +109,9 @@ func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResour
 	// Individual items fetched from the API don't always have the kind/API version set
 	// See https://github.com/kubernetes/kubernetes/issues/3030. Unsure why this is happening here and not in main Velero;
 	// probably has to do with List calls and Dynamic client vs typed client
-	if betaCRD.Kind == "" {
-		betaCRD.Kind = kuberesource.CustomResourceDefinitions.Resource
-	}
-
-	if betaCRD.APIVersion == "" {
-		betaCRD.APIVersion = apiextv1beta1.SchemeGroupVersion.String()
-	}
+	// Set these all the time, since they shouldn't ever be different, anyway
+	betaCRD.Kind = kuberesource.CustomResourceDefinitions.Resource
+	betaCRD.APIVersion = apiextv1beta1.SchemeGroupVersion.String()
 
 	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&betaCRD)
 	if err != nil {
@@ -157,4 +121,40 @@ func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResour
 
 	return item, nil
 
+}
+
+// hasPreserveUnknownFields determines whether or not a CRD is set to preserve unknown fields or not.
+func hasPreserveUnknownFields(crd apiextv1.CustomResourceDefinition) bool {
+	return crd.Spec.PreserveUnknownFields
+}
+
+// hasNonStructuralSchema determines whether or not a CRD has had a nonstructural schema condition applied.
+func hasNonStructuralSchema(crd apiextv1.CustomResourceDefinition) bool {
+	var ret bool
+	for _, c := range crd.Status.Conditions {
+		if c.Type == apiextv1.NonStructuralSchema {
+			ret = true
+			break
+		}
+	}
+	return ret
+}
+
+// hasSingleVersion checks a CRD to see if it has a single version with no schema information.
+func hasSingleVersion(crd apiextv1.CustomResourceDefinition) bool {
+	// Looking for 1 version should be enough to tell if it's a v1beta1 CRD, as all v1beta1 CRD versions share the same schema.
+	// v1 CRDs can have different schemas per version
+	// The silently upgraded versions will often have a `versions` entry that looks like this:
+	//   versions:
+	//   - name: v1
+	//     served:  true
+	//     storage: true
+	// This is acceptable when re-submitted to a v1beta1 endpoint on restore.
+	var ret bool
+	if len(crd.Spec.Versions) > 0 {
+		if crd.Spec.Versions[0].Schema == nil || crd.Spec.Versions[0].Schema.OpenAPIV3Schema == nil {
+			ret = true
+		}
+	}
+	return ret
 }
