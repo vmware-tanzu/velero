@@ -89,10 +89,16 @@ type BackupStorageLocationSpec struct {
 	// +optional
 	// +nullable
 	BackupSyncPeriod *metav1.Duration `json:"backupSyncPeriod,omitempty"`
+
+	// StoreValidationPeriod defines how frequently to validate the corresponding object storage. A value of 0 disables validation.
+	// +optional
+	// +nullable
+	StoreValidationPeriod *metav1.Duration `json:"storeValidationPeriod,omitempty"`
 }
 
 // BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
-// +kubebuilder:validation:Enum=Available;Unavailable
+// +kubebuilder:validation:Enum=Available;Unavailable;Unverified
+// +kubebuilder:default=Unverified
 type BackupStorageLocationPhase string
 
 const (
@@ -101,6 +107,9 @@ const (
 
 	// BackupStorageLocationPhaseUnavailable means the location is unavailable to read and write from.
 	BackupStorageLocationPhaseUnavailable BackupStorageLocationPhase = "Unavailable"
+
+	// BackupStorageLocationPhaseUnverified means the location was unverifiable if available to read and write from.
+	BackupStorageLocationPhaseUnverified BackupStorageLocationPhase = "Unverified"
 )
 
 // BackupStorageLocationAccessMode represents the permissions for a BackupStorageLocation.
@@ -123,6 +132,12 @@ type BackupStorageLocationStatus struct {
 	// Phase is the current state of the BackupStorageLocation.
 	// +optional
 	Phase BackupStorageLocationPhase `json:"phase,omitempty"`
+
+	// LastValidationTime is the last time the backup store location was validated
+	// the cluster.
+	// +optional
+	// +nullable
+	LastValidationTime *metav1.Time `json:"lastValidationTime,omitempty"`
 
 	// LastSyncedTime is the last time the contents of the location were synced into
 	// the cluster.

@@ -76,6 +76,11 @@ spec:
             provider:
               description: Provider is the provider of the backup storage.
               type: string
+            storeValidationPeriod:
+              description: StoreValidationPeriod defines how frequently to validate
+                the corresponding object storage. A value of 0 disables validation.
+              nullable: true
+              type: string
           required:
           - objectStorage
           - provider
@@ -105,11 +110,18 @@ spec:
               format: date-time
               nullable: true
               type: string
+            lastValidationTime:
+              description: LastValidationTime is the last time the backup store location
+                was validated the cluster.
+              format: date-time
+              nullable: true
+              type: string
             phase:
               description: Phase is the current state of the BackupStorageLocation.
               enum:
               - Available
               - Unavailable
+              - Unverified
               type: string
           type: object
       type: object

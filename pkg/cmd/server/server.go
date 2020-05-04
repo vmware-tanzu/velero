@@ -75,6 +75,7 @@ const (
 	defaultMetricsAddress = ":8085"
 
 	defaultBackupSyncPeriod           = time.Minute
+	defaultStoreValidationPeriod      = time.Minute
 	defaultPodVolumeOperationTimeout  = 60 * time.Minute
 	defaultResourceTerminatingTimeout = 10 * time.Minute
 
@@ -118,7 +119,7 @@ var disableControllerList = []string{
 type serverConfig struct {
 	pluginDir, metricsAddress, defaultBackupLocation                        string
 	backupSyncPeriod, podVolumeOperationTimeout, resourceTerminatingTimeout time.Duration
-	defaultBackupTTL                                                        time.Duration
+	defaultBackupTTL, defaultStoreValidationPeriod                          time.Duration
 	restoreResourcePriorities                                               []string
 	defaultVolumeSnapshotLocations                                          map[string]string
 	restoreOnly                                                             bool
@@ -145,6 +146,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			defaultBackupLocation:             "default",
 			defaultVolumeSnapshotLocations:    make(map[string]string),
 			backupSyncPeriod:                  defaultBackupSyncPeriod,
+			defaultStoreValidationPeriod:      defaultStoreValidationPeriod,
 			defaultBackupTTL:                  defaultBackupTTL,
 			podVolumeOperationTimeout:         defaultPodVolumeOperationTimeout,
 			restoreResourcePriorities:         defaultRestorePriorities,
@@ -766,6 +768,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		backupStorageLocationController := controller.NewBackupStorageLocationController(
 			s.namespace,
 			s.config.defaultBackupLocation,
+			s.config.defaultStoreValidationPeriod,
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			newPluginManager,

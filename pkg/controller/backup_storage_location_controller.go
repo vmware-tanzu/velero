@@ -27,7 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -38,28 +39,37 @@ import (
 type backupStorageLocationController struct {
 	*genericController
 
-	namespace                   string
-	defaultBackupLocation       string
-	backupLocationClient        velerov1client.BackupStorageLocationsGetter
-	backupStorageLocationLister velerov1listers.BackupStorageLocationLister
-	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	namespace                    string
+	defaultBackupLocation        string
+	defaultStoreValidationPeriod time.Duration
+	backupLocationClient         velerov1client.BackupStorageLocationsGetter
+	backupStorageLocationLister  velerov1listers.BackupStorageLocationLister
+	newPluginManager             func(logrus.FieldLogger) clientmgmt.Manager
+	newBackupStore               func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupStorageLocationController(
 	namespace string,
 	defaultBackupLocation string,
+	defaultStoreValidationPeriod time.Duration,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
 ) Interface {
+	if defaultStoreValidationPeriod <= 0 {
+		defaultStoreValidationPeriod = time.Minute
+	}
+
+	logger.Infof("Backup location store validation period is %v", defaultStoreValidationPeriod)
+
 	c := backupStorageLocationController{
-		genericController:           newGenericController("backup-storage-location", logger),
-		namespace:                   namespace,
-		defaultBackupLocation:       defaultBackupLocation,
-		backupLocationClient:        backupLocationClient,
-		backupStorageLocationLister: backupStorageLocationLister,
+		genericController:            newGenericController("backup-storage-location", logger),
+		namespace:                    namespace,
+		defaultBackupLocation:        defaultBackupLocation,
+		defaultStoreValidationPeriod: defaultStoreValidationPeriod,
+		backupLocationClient:         backupLocationClient,
+		backupStorageLocationLister:  backupStorageLocationLister,
 
 		// use variables to refer to these functions so they can be
 		// replaced with fakes for testing.
@@ -74,16 +84,16 @@ func NewBackupStorageLocationController(
 }
 
 func (c *backupStorageLocationController) run() {
-	c.logger.Info("Checking that there is at least 1 backup storage location that is ready")
+	c.logger.Info("Checking for existing locations ready to be validated; there needs to be at least 1 location that is available")
 
 	locations, err := c.backupStorageLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
 	if err != nil {
-		c.logger.WithError(err).Error("Error listing backup storage locations, at least one available backup storage location is required")
+		c.logger.WithError(err).Error("Error listing locations, at least one available location is required")
 		return
 	}
 
 	if len(locations) == 0 {
-		c.logger.Error("No backup storage locations found, at least one available backup storage location is required")
+		c.logger.Error("No locations found, at least one available location is required")
 		return
 	}
 
@@ -91,58 +101,90 @@ func (c *backupStorageLocationController) run() {
 	defer pluginManager.CleanupClients()
 
 	var unavailable []string
+	log := c.logger
 	for _, location := range locations {
-		backupStore, err := c.newBackupStore(location, pluginManager, c.logger)
+		locationName := location.Name
+		log = c.logger.WithField("backupLocation", locationName)
+
+		storeValidationPeriod := c.defaultStoreValidationPeriod
+		if location.Spec.StoreValidationPeriod != nil {
+			storeValidationPeriod = location.Spec.StoreValidationPeriod.Duration
+			if storeValidationPeriod == 0 {
+				log.Debug("Validation period for this location is set to 0, skipping validation")
+				continue
+			}
+
+			if storeValidationPeriod < 0 {
+				log.Debug("Validation period must be non-negative")
+				storeValidationPeriod = c.defaultStoreValidationPeriod
+			}
+		}
+
+		lastValidation := location.Status.LastValidationTime
+		if lastValidation != nil {
+			log.Debug("Checking if location needs to be validated at this time")
+			nextValidation := lastValidation.Add(storeValidationPeriod)
+			if time.Now().UTC().Before(nextValidation) {
+				continue
+			}
+		}
+
+		log.Debug("Location is ready to be validated")
+
+		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
-			unavailable = append(unavailable, errors.Wrapf(err, "error getting backup store for location %q", location.Name).Error())
+			unavailable = append(unavailable, errors.Wrapf(err, "error getting backup store for location %q", locationName).Error())
 			continue
 		}
 
-		locationName := location.Name
 		if err := backupStore.IsValid(); err != nil {
 			// update status
-			_, err2 := c.patchBackupStorageLocation(location, func(r *v1.BackupStorageLocation) {
+			err2 := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
 				r.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
+				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 			})
 			if err2 != nil {
-				unavailable = append(unavailable, errors.Wrapf(err2, "error updating backup storage for location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseUnavailable).Error())
+				unavailable = append(unavailable, errors.Wrapf(err2, "error updating location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseUnavailable).Error())
 			} else {
 				unavailable = append(unavailable, errors.Wrapf(err, "location %q is unavailable", locationName).Error())
 			}
+			log.Debug("Location has been updated to Unavailable")
 		} else {
 			// update status
-			_, err := c.patchBackupStorageLocation(location, func(r *v1.BackupStorageLocation) {
+			err := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
 				r.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
+				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 			})
 			if err != nil {
-				unavailable = append(unavailable, errors.Wrapf(err, "error updating backup storage for location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseAvailable).Error())
+				unavailable = append(unavailable, errors.Wrapf(err, "error updating location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseAvailable).Error())
 			}
+			log.Debug("Location has been updated to Available")
 		}
 	}
 
 	var defaultFound bool
 	if len(unavailable) == len(locations) { // no BSL available
-		c.logger.Errorf("There are no backup storage locations available, at least one available backup storage location is required: %s", strings.Join(unavailable, "; "))
+		log.Errorf("There are no locations available, at least one available location is required: %s", strings.Join(unavailable, "; "))
 	} else if len(unavailable) > 0 { // some but not all BSL unavailable
 		for _, location := range locations {
 			if location.Name == c.defaultBackupLocation && location.Status.Phase == velerov1api.BackupStorageLocationPhaseUnavailable {
 				defaultFound = true
-				c.logger.Warnf("The specified default backup storage location named %q is unavailable; for convenience, be sure to configure it properly or make another location that is available the default", c.defaultBackupLocation)
+				log.Warnf("The specified default location named %q is unavailable; for convenience, be sure to configure it properly or make another location that is available the default", c.defaultBackupLocation)
 				break
 			}
 		}
 		if !defaultFound {
-			c.logger.Warnf("The specified default backup storage location named %q was not found; for convenience, be sure to create one or make another location that is available the default", c.defaultBackupLocation)
+			log.Warnf("The specified default location named %q was not found; for convenience, be sure to create one or make another location that is available the default", c.defaultBackupLocation)
 		}
-		c.logger.Warnf("Unavailable backup storage locations detected: %s", strings.Join(unavailable, "; "))
+		log.Warnf("Unavailable locations detected: %s", strings.Join(unavailable, "; "))
 	}
 }
 
-func (c backupStorageLocationController) patchBackupStorageLocation(req *velerov1api.BackupStorageLocation, mutate func(*v1.BackupStorageLocation)) (*velerov1api.BackupStorageLocation, error) {
+func (c backupStorageLocationController) patchBackupStorageLocation(req *velerov1api.BackupStorageLocation, mutate func(*velerov1api.BackupStorageLocation)) error {
 	// Record original json
 	oldData, err := json.Marshal(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling original BackupStorageLocations")
+		return errors.Wrap(err, "error marshalling original BackupStorageLocations")
 	}
 
 	// Mutate
@@ -151,18 +193,18 @@ func (c backupStorageLocationController) patchBackupStorageLocation(req *velerov
 	// Record new json
 	newData, err := json.Marshal(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "error marshalling updated BackupStorageLocations")
+		return errors.Wrap(err, "error marshalling updated BackupStorageLocations")
 	}
 
 	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 	if err != nil {
-		return nil, errors.Wrap(err, "error creating json merge patch for BackupStorageLocations")
+		return errors.Wrap(err, "error creating json merge patch for BackupStorageLocations")
 	}
 
-	bsl, err := c.backupLocationClient.BackupStorageLocations(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
+	_, err = c.backupLocationClient.BackupStorageLocations(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "error patching BackupStorageLocations")
+		return errors.Wrap(err, "error patching BackupStorageLocations")
 	}
 
-	return bsl, nil
+	return nil
 }

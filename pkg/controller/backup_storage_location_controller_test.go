@@ -18,6 +18,7 @@ package controller
 
 import (
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -113,6 +114,7 @@ func TestBackupStorageLocationControllerRun(t *testing.T) {
 			c := NewBackupStorageLocationController(
 				test.namespace,
 				test.defaultBackupLocation,
+				time.Minute,
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
