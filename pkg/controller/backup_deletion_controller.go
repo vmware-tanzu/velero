@@ -67,6 +67,7 @@ type backupDeletionController struct {
 	backupLocationLister      velerov1listers.BackupStorageLocationLister
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
 	csiSnapshotLister         snapshotv1beta1listers.VolumeSnapshotLister
+	csiSnapshotContentLister  snapshotv1beta1listers.VolumeSnapshotContentLister
 	csiSnapshotClient         *snapshotterClientSet.Clientset
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
@@ -89,6 +90,7 @@ func NewBackupDeletionController(
 	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
+	csiSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	metrics *metrics.ServerMetrics,
@@ -106,6 +108,7 @@ func NewBackupDeletionController(
 		backupLocationLister:      backupLocationLister,
 		snapshotLocationLister:    snapshotLocationLister,
 		csiSnapshotLister:         csiSnapshotLister,
+		csiSnapshotContentLister:  csiSnapshotContentLister,
 		csiSnapshotClient:         csiSnapshotClient,
 		metrics:                   metrics,
 		// use variables to refer to these functions so they can be
@@ -324,7 +327,14 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		log.Info("Removing CSI volumesnapshots")
-		if csiErrs := deleteCSIVolumeSnapshots(backup, c.csiSnapshotLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(csiErrs) > 0 {
+		if csiErrs := deleteCSIVolumeSnapshots(backup.Name, c.csiSnapshotLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(csiErrs) > 0 {
+			for _, err := range csiErrs {
+				errs = append(errs, err.Error())
+			}
+		}
+
+		log.Info("Removing CSI volumesnapshotcontents")
+		if csiErrs := deleteCSIVolumeSnapshotContents(backup.Name, c.csiSnapshotContentLister, c.csiSnapshotClient.SnapshotV1beta1(), log); len(csiErrs) > 0 {
 			for _, err := range csiErrs {
 				errs = append(errs, err.Error())
 			}
@@ -461,11 +471,21 @@ func (c *backupDeletionController) deleteResticSnapshots(backup *velerov1api.Bac
 	return errs
 }
 
-func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
+func setVolumeSnapshotContentDeletionPolicy(vscName string, csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) error {
+	log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", vscName)
+	pb := []byte(`{"spec":{"deletionPolicy":"Delete"}}`)
+	_, err := csiClient.VolumeSnapshotContents().Patch(vscName, types.MergePatchType, pb)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func deleteCSIVolumeSnapshots(backupName string, csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
 	csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	errs := []error{}
 
-	selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backup.Name})
+	selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backupName})
 	csiVolSnaps, err := csiSnapshotLister.List(selector)
 	if err != nil {
 		return []error{err}
@@ -477,12 +497,10 @@ func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiSnapshotLister snap
 		if csiVS.Status != nil && csiVS.Status.BoundVolumeSnapshotContentName != nil {
 			// we patch the DeletionPolicy of the volumesnapshotcontent to set it to Delete.
 			// This ensures that the volume snapshot in the storage provider is also deleted.
-			log.Infof("Setting DeletionPolicy of CSI volumesnapshotcontent %s to Delete", *csiVS.Status.BoundVolumeSnapshotContentName)
-			pb := []byte(`{"spec":{"deletionPolicy":"Delete"}}`)
-			_, err := csiClient.VolumeSnapshotContents().Patch(*csiVS.Status.BoundVolumeSnapshotContentName, types.MergePatchType, pb)
+			err := setVolumeSnapshotContentDeletionPolicy(*csiVS.Status.BoundVolumeSnapshotContentName, csiClient, log)
 			if err != nil && !apierrors.IsNotFound(err) {
-				errs = append(errs, errors.Wrapf(err, "failed to update deletion policy on volumesnapshotcontent %s skipping deletion of volumesnapshot %s/%s",
-					*csiVS.Status.BoundVolumeSnapshotContentName, csiVS.Namespace, csiVS.Name))
+				log.Errorf("Skipping deletion of volumesnapshot %s/%s", csiVS.Namespace, csiVS.Name)
+				errs = append(errs, err)
 				continue
 			}
 		}
@@ -491,6 +509,41 @@ func deleteCSIVolumeSnapshots(backup *velerov1api.Backup, csiSnapshotLister snap
 			errs = append(errs, err)
 		}
 	}
+	return errs
+}
+
+func deleteCSIVolumeSnapshotContents(backupName string, csiVSCLister snapshotv1beta1listers.VolumeSnapshotContentLister,
+	csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
+	errs := []error{}
+	selector := labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: backupName})
+	csiVolSnapConts, err := csiVSCLister.List(selector)
+	if err != nil {
+		return []error{err}
+	}
+	// It is possible that by the time deleteCSIVolumeSnapshotContents is called after deleteCSIVolumeSnapshots
+	// that deletion of VSCs hasn't been completed, by the snapshot-controller (one of the CSI components).
+	// For that reason the csiVSCLister returned VSCs that are yet to be deleted. To handle this scenario,
+	// we swallow `IsNotFound` errors from the setVolumeSnapshotContentDeletionPolicy function and the
+	// csiClient.VolumeSnapshotContents().Delete(...)
+	log.Infof("Deleting %d CSI volumesnapshotcontents", len(csiVolSnapConts))
+	for _, snapCont := range csiVolSnapConts {
+		err := setVolumeSnapshotContentDeletionPolicy(snapCont.Name, csiClient, log)
+		if err != nil && !apierrors.IsNotFound(err) {
+			log.Errorf("Failed to set DeletionPolicy on volumesnapshotcontent %s. Skipping deletion", snapCont.Name)
+			errs = append(errs, err)
+			continue
+		}
+		if apierrors.IsNotFound(err) {
+			log.Infof("volumesnapshotcontent %s not found", snapCont.Name)
+			continue
+		}
+		log.Infof("Deleting volumesnapshotcontent %s", snapCont.Name)
+		err = csiClient.VolumeSnapshotContents().Delete(snapCont.Name, &metav1.DeleteOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			errs = append(errs, err)
+		}
+	}
+
 	return errs
 }
 
