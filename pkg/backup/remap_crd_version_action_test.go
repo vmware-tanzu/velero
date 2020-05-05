@@ -131,10 +131,14 @@ func TestRemapCRDVersionActionData(t *testing.T) {
 			expectAdditionalColumns: true,
 		},
 		{
-			crd:                     "gcpsamples.gcp.stacks.crossplane.io",
-			expectAdditionalColumns: false,
+			crd: "gcpsamples.gcp.stacks.crossplane.io",
 		},
-		// TODO: add prometheus CRDS into the testdata to get a representative sample from issue 2370
+		{
+			crd: "alertmanagers.monitoring.coreos.com",
+		},
+		{
+			crd: "prometheuses.monitoring.coreos.com",
+		},
 	}
 
 	for _, test := range tests {
