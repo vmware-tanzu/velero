@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	snapshotterClientSet "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
@@ -229,7 +228,7 @@ type server struct {
 	dynamicClient                       dynamic.Interface
 	sharedInformerFactory               informers.SharedInformerFactory
 	csiSnapshotterSharedInformerFactory *CSIInformerFactoryWrapper
-	csiSnapshotClient                   *snapshotterClientSet.Clientset
+	csiSnapshotClient                   *snapshotv1beta1client.Clientset
 	ctx                                 context.Context
 	cancelFunc                          context.CancelFunc
 	logger                              logrus.FieldLogger
