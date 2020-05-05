@@ -598,7 +598,6 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 	}
 
-	// TODO(nrb-csi): How do we handle backup metrics with CSI snapshots?  Log an issue for this
 	recordBackupMetrics(backupLog, backup.Backup, backupFile, c.metrics)
 
 	if err := gzippedLogFile.Close(); err != nil {
