@@ -1,0 +1,64 @@
+{
+  "kind": "CustomResourceDefinition",
+  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "metadata": {
+    "name": "gcpsamples.gcp.stacks.crossplane.io",
+    "selfLink": "/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/gcpsamples.gcp.stacks.crossplane.io",
+    "uid": "c0bbac74-acab-4620-b628-1d5f91b19040",
+    "resourceVersion": "5567",
+    "generation": 1,
+    "creationTimestamp": "2020-04-20T17:27:56Z",
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apiextensions.k8s.io/v1beta1\",\"kind\":\"CustomResourceDefinition\",\"metadata\":{\"annotations\":{},\"creationTimestamp\":\"2020-04-20T16:57:37Z\",\"generation\":1,\"name\":\"gcpsamples.gcp.stacks.crossplane.io\",\"resourceVersion\":\"549\",\"selfLink\":\"/apis/apiextensions.k8s.io/v1/customresourcedefinitions/gcpsamples.gcp.stacks.crossplane.io\",\"uid\":\"db5f4321-3226-44b0-8247-66fd7ef59dc8\"},\"spec\":{\"conversion\":{\"strategy\":\"None\"},\"group\":\"gcp.stacks.crossplane.io\",\"names\":{\"kind\":\"GCPSample\",\"listKind\":\"GCPSampleList\",\"plural\":\"gcpsamples\",\"singular\":\"gcpsample\"},\"preserveUnknownFields\":true,\"scope\":\"Cluster\",\"versions\":[{\"name\":\"v1alpha1\",\"served\":true,\"storage\":true}]},\"status\":{\"acceptedNames\":{\"kind\":\"GCPSample\",\"listKind\":\"GCPSampleList\",\"plural\":\"gcpsamples\",\"singular\":\"gcpsample\"},\"conditions\":[{\"lastTransitionTime\":\"2020-04-20T16:57:37Z\",\"message\":\"no conflicts found\",\"reason\":\"NoConflicts\",\"status\":\"True\",\"type\":\"NamesAccepted\"},{\"lastTransitionTime\":\"2020-04-20T16:57:37Z\",\"message\":\"the initial names have been accepted\",\"reason\":\"InitialNamesAccepted\",\"status\":\"True\",\"type\":\"Established\"}],\"storedVersions\":[\"v1alpha1\"]}}\n"
+    }
+  },
+  "spec": {
+    "group": "gcp.stacks.crossplane.io",
+    "version": "v1alpha1",
+    "names": {
+      "plural": "gcpsamples",
+      "singular": "gcpsample",
+      "kind": "GCPSample",
+      "listKind": "GCPSampleList"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true
+      }
+    ],
+    "conversion": {
+      "strategy": "None"
+    },
+    "preserveUnknownFields": true
+  },
+  "status": {
+    "conditions": [
+      {
+        "type": "NamesAccepted",
+        "status": "True",
+        "lastTransitionTime": "2020-04-20T17:27:56Z",
+        "reason": "NoConflicts",
+        "message": "no conflicts found"
+      },
+      {
+        "type": "Established",
+        "status": "True",
+        "lastTransitionTime": "2020-04-20T17:27:56Z",
+        "reason": "InitialNamesAccepted",
+        "message": "the initial names have been accepted"
+      }
+    ],
+    "acceptedNames": {
+      "plural": "gcpsamples",
+      "singular": "gcpsample",
+      "kind": "GCPSample",
+      "listKind": "GCPSampleList"
+    },
+    "storedVersions": [
+      "v1alpha1"
+    ]
+  }
+}

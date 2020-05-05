@@ -18,11 +18,16 @@ package backup
 
 import (
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextfakes "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -33,16 +38,28 @@ import (
 
 func TestRemapCRDVersionAction(t *testing.T) {
 	backup := &v1.Backup{}
-	a := NewRemapCRDVersionAction(velerotest.NewLogger())
+	clientset := apiextfakes.NewSimpleClientset()
+	betaClient := clientset.ApiextensionsV1beta1().CustomResourceDefinitions()
+
+	// build a v1beta1 CRD with the same name and add it to the fake client that the plugin is going to call.
+	// keep the same one for all 3 tests, since there's little value in recreating it
+	b := builder.ForCustomResourceDefinition("test.velero.io")
+	c := b.Result()
+	_, err := betaClient.Create(c)
+	require.NoError(t, err)
+
+	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient)
 
 	t.Run("Test a v1 CRD without any Schema information", func(t *testing.T) {
 		b := builder.ForV1CustomResourceDefinition("test.velero.io")
 		// Set a version that does not include and schema information.
 		b.Version(builder.ForV1CustomResourceDefinitionVersion("v1").Served(true).Storage(true).Result())
 		c := b.Result()
+
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
 		require.NoError(t, err)
 
+		// Execute the plugin, which will call the fake client
 		item, _, err := a.Execute(&unstructured.Unstructured{Object: obj}, backup)
 		require.NoError(t, err)
 		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
@@ -79,4 +96,97 @@ func TestRemapCRDVersionAction(t *testing.T) {
 		_, _, err = a.Execute(&u, backup)
 		require.NoError(t, err)
 	})
+
+	t.Run("Having Spec.PreserveUnknownFields set to true will return a v1beta1 version of the CRD", func(t *testing.T) {
+		b := builder.ForV1CustomResourceDefinition("test.velero.io")
+		b.PreserveUnknownFields(true)
+		c := b.Result()
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&c)
+		require.NoError(t, err)
+
+		item, _, err := a.Execute(&unstructured.Unstructured{Object: obj}, backup)
+		require.NoError(t, err)
+		assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
+	})
+}
+
+// TestRemapCRDVersionActionData tests the RemapCRDVersionAction plugin against actual CRD to confirm that the v1beta1 version is returned when the v1 version is passed in to the plugin.
+func TestRemapCRDVersionActionData(t *testing.T) {
+	backup := &v1.Backup{}
+	clientset := apiextfakes.NewSimpleClientset()
+	betaClient := clientset.ApiextensionsV1beta1().CustomResourceDefinitions()
+
+	a := NewRemapCRDVersionAction(velerotest.NewLogger(), betaClient)
+
+	tests := []struct {
+		crd                     string
+		expectAdditionalColumns bool
+	}{
+		{
+			crd:                     "elasticsearches.elasticsearch.k8s.elastic.co",
+			expectAdditionalColumns: true,
+		},
+		{
+			crd:                     "kibanas.kibana.k8s.elastic.co",
+			expectAdditionalColumns: true,
+		},
+		{
+			crd: "gcpsamples.gcp.stacks.crossplane.io",
+		},
+		{
+			crd: "alertmanagers.monitoring.coreos.com",
+		},
+		{
+			crd: "prometheuses.monitoring.coreos.com",
+		},
+	}
+
+	for _, test := range tests {
+		tName := fmt.Sprintf("%s CRD passed in as v1 should be returned as v1beta1", test.crd)
+		t.Run(tName, func(t *testing.T) {
+			// We don't need a Go struct of the v1 data, just an unstructured to pass into the plugin.
+			v1File := fmt.Sprintf("testdata/v1/%s.json", test.crd)
+			f, err := ioutil.ReadFile(v1File)
+			require.NoError(t, err)
+
+			var obj unstructured.Unstructured
+			err = json.Unmarshal([]byte(f), &obj)
+			require.NoError(t, err)
+
+			// Load a v1beta1 struct into the beta client to be returned
+			v1beta1File := fmt.Sprintf("testdata/v1beta1/%s.json", test.crd)
+			f, err = ioutil.ReadFile(v1beta1File)
+			require.NoError(t, err)
+
+			var crd apiextv1beta1.CustomResourceDefinition
+			err = json.Unmarshal([]byte(f), &crd)
+			require.NoError(t, err)
+
+			_, err = betaClient.Create(&crd)
+			require.NoError(t, err)
+
+			// Run method under test
+			item, _, err := a.Execute(&obj, backup)
+			require.NoError(t, err)
+
+			assert.Equal(t, "apiextensions.k8s.io/v1beta1", item.UnstructuredContent()["apiVersion"])
+			name, _, err := unstructured.NestedString(item.UnstructuredContent(), "metadata", "name")
+			require.NoError(t, err)
+			assert.Equal(t, crd.Name, name)
+			uid, _, err := unstructured.NestedString(item.UnstructuredContent(), "metadata", "uid")
+			require.NoError(t, err)
+			assert.Equal(t, string(crd.UID), uid)
+
+			// For ElasticSearch and Kibana, problems manifested when additionalPrinterColumns was moved from the top-level spec down to the
+			// versions slice.
+			if test.expectAdditionalColumns {
+				_, ok := item.UnstructuredContent()["spec"].(map[string]interface{})["additionalPrinterColumns"]
+				assert.True(t, ok)
+			}
+
+			// Clean up the item created in the test.
+			betaClient.Delete(crd.Name, &metav1.DeleteOptions{})
+		})
+	}
+
 }
