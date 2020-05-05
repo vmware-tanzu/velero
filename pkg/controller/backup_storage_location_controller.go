@@ -26,11 +26,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/cache"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
@@ -42,16 +44,19 @@ type backupStorageLocationController struct {
 	namespace                       string
 	defaultBackupLocation           string
 	defaultStoreValidationFrequency time.Duration
+	backupLocationsPerPhase         map[string][]*velerov1api.BackupStorageLocation
 	backupLocationClient            velerov1client.BackupStorageLocationsGetter
 	backupStorageLocationLister     velerov1listers.BackupStorageLocationLister
 	newPluginManager                func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore                  func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	validatedBackupLocations        []*velerov1api.BackupStorageLocation
 }
 
 func NewBackupStorageLocationController(
 	namespace string,
 	defaultBackupLocation string,
 	defaultStoreValidationFrequency time.Duration,
+	backupLocationInformer velerov1informers.BackupStorageLocationInformer,
 	backupLocationClient velerov1client.BackupStorageLocationsGetter,
 	backupStorageLocationLister velerov1listers.BackupStorageLocationLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
@@ -77,6 +82,11 @@ func NewBackupStorageLocationController(
 		newBackupStore:   persistence.NewObjectBackupStore,
 	}
 
+	backupLocationInformer.Informer().AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			//wip
+		},
+	)
 	c.resyncFunc = c.run
 	c.resyncPeriod = 30 * time.Second
 
@@ -84,11 +94,11 @@ func NewBackupStorageLocationController(
 }
 
 func (c *backupStorageLocationController) run() {
-	c.logger.Info("Checking for existing backup locations ready to be validated; there needs to be at least 1 backup location that is available")
+	c.logger.Info("Checking for existing backup locations ready to be verified; there needs to be at least 1 backup location available")
 
 	locations, err := c.backupStorageLocationLister.BackupStorageLocations(c.namespace).List(labels.Everything())
 	if err != nil {
-		c.logger.WithError(err).Error("Error listing locations, at least one available backup location is required")
+		c.logger.WithError(err).Error("Error listing backup locations, at least one available backup location is required")
 		return
 	}
 
@@ -103,15 +113,26 @@ func (c *backupStorageLocationController) run() {
 	var unavailableErrors []string
 	log := c.logger
 	var defaultFound bool
+	c.backupLocationsPerPhase = make(map[string][]*velerov1api.BackupStorageLocation)
 	for _, location := range locations {
 		locationName := location.Name
 		log = c.logger.WithField("backupLocation", locationName)
 
+		if location.Name == c.defaultBackupLocation {
+			defaultFound = true
+		}
+
 		storeValidationFrequency := c.defaultStoreValidationFrequency
+		// If the bsl validation frequency is not specifically set, skip this block and use the server's default
 		if location.Spec.ValidationFrequency != nil {
 			storeValidationFrequency = location.Spec.ValidationFrequency.Duration
 			if storeValidationFrequency == 0 {
 				log.Debug("Validation period for this backup location is set to 0, skipping validation")
+				// Note: we don't want to patch the bsl's phase here to "unverified" because we don't want to move
+				// an existing valid bsl to any other state when validation frequency changes to 0s; but we
+				// do want to update the current tally for a more transparent final reporting
+				location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnverified
+				c.updateCurrentTallyOfAvailability(location)
 				continue
 			}
 
@@ -123,89 +144,116 @@ func (c *backupStorageLocationController) run() {
 
 		lastValidation := location.Status.LastValidationTime
 		if lastValidation != nil {
-			log.Debug("Checking if backup location needs to be validated at this time")
+			log.Debug("Checking if backup location needs to be verified at this time")
 			nextValidation := lastValidation.Add(storeValidationFrequency)
 			if time.Now().UTC().Before(nextValidation) {
+				location.Status.Phase = velerov1api.BackupStorageLocationPhaseUnverified
+				c.updateCurrentTallyOfAvailability(location)
 				continue
 			}
 		}
 
-		log.Debug("Validation backup location")
+		log.Debug("Backup location ready to be verified")
 
+		var patchedLocation *velerov1api.BackupStorageLocation
+		var err2 error
 		backupStore, err := c.newBackupStore(location, pluginManager, log)
 		if err != nil {
+			patchedLocation, err2 = c.patchBackupStorageLocation(location, velerov1api.BackupStorageLocationPhaseUnverified)
+			if err2 != nil {
+				log.Errorf("error updating backup location phase to %s", velerov1api.BackupStorageLocationPhaseUnverified)
+				return
+			}
 			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error getting backup store for backup location %q", locationName).Error())
 			continue
 		}
 
 		if err := backupStore.IsValid(); err != nil {
+			log.Debug("Backup location verified, not valid")
+
 			if location.Name == c.defaultBackupLocation {
-				defaultFound = true
 				log.Warnf("The specified default backup location named %q is unavailable; for convenience, be sure to configure it properly or make another backup location that is available the default", c.defaultBackupLocation)
 			}
 
-			// update status
-			err2 := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
-				r.Status.Phase = velerov1api.BackupStorageLocationPhaseUnavailable
-				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
-			})
+			patchedLocation, err2 = c.patchBackupStorageLocation(location, velerov1api.BackupStorageLocationPhaseUnavailable)
 			if err2 != nil {
-				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error updating backup location to %s status", velerov1api.BackupStorageLocationPhaseUnavailable).Error())
-			} else {
-				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "backup location %q is unavailable", locationName).Error())
+				log.Errorf("error updating backup location phase to %s", velerov1api.BackupStorageLocationPhaseUnavailable)
+				return
 			}
+			unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "backup location %q is unavailable", locationName).Error())
 		} else {
-			if location.Name == c.defaultBackupLocation {
-				defaultFound = true
+			log.Debug("Backup location verified and it is valid")
+			patchedLocation, err = c.patchBackupStorageLocation(location, velerov1api.BackupStorageLocationPhaseAvailable)
+			if err != nil {
+				log.Errorf("error updating backup location phase to %s", velerov1api.BackupStorageLocationPhaseAvailable)
+				return
 			}
 
-			// update status
-			err := c.patchBackupStorageLocation(location, func(r *velerov1api.BackupStorageLocation) {
-				r.Status.Phase = velerov1api.BackupStorageLocationPhaseAvailable
-				r.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
-			})
-			if err != nil {
-				unavailableErrors = append(unavailableErrors, errors.Wrapf(err, "error updating backup location %q to %s status", locationName, velerov1api.BackupStorageLocationPhaseAvailable).Error())
+		}
+		if patchedLocation != nil {
+			c.updateCurrentTallyOfAvailability(patchedLocation)
+			if location.Status.Phase != patchedLocation.Status.Phase {
+				log.Debugf("Backup location updated from %q to %q", location.Status.Phase, patchedLocation.Status.Phase)
 			}
 		}
 	}
+	c.currentPhaseStatus(len(locations), defaultFound, unavailableErrors)
+}
 
-	if !defaultFound {
-		log.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", c.defaultBackupLocation)
+func (c *backupStorageLocationController) currentPhaseStatus(numLocations int, defaultFound bool, errs []string) {
+	unavailable := len(c.backupLocationsPerPhase["unavailable"])
+	unverified := len(c.backupLocationsPerPhase["unverified"])
+
+	if len(c.backupLocationsPerPhase["unavailable"])+len(c.backupLocationsPerPhase["unverified"]) == numLocations { // no BSL available
+		if len(errs) > 0 {
+			c.logger.Errorf("Amongst the backup locations that were ready to be verified, none were valid (unavailable: %v, unverified: %v); at least one valid location is required: %v", unavailable, unverified, strings.Join(errs, "; "))
+		} else {
+			c.logger.Errorf("Amongst the backup locations that were ready to be verified, none were valid (unavailable: %v, unverified: %v); at least one valid location is required", unavailable, unverified)
+		}
+	} else if len(c.backupLocationsPerPhase["unavailable"]) > 0 { // some but not all BSL unavailable
+		c.logger.Warnf("Unavailable backup locations detected: %s", strings.Join(errs, "; "))
 	}
 
-	if len(unavailableErrors) == len(locations) { // no BSL available
-		log.Errorf("There are no locations available, at least one available backup location is required: %s", strings.Join(unavailableErrors, "; "))
-	} else if len(unavailableErrors) > 0 { // some but not all BSL unavailable
-		log.Warnf("Unavailable backup locations detected: %s", strings.Join(unavailableErrors, "; "))
+	if !defaultFound {
+		c.logger.Warnf("The specified default backup location named %q was not found; for convenience, be sure to create one or make another backup location that is available the default", c.defaultBackupLocation)
 	}
 }
 
-func (c backupStorageLocationController) patchBackupStorageLocation(req *velerov1api.BackupStorageLocation, mutate func(*velerov1api.BackupStorageLocation)) error {
+func (c *backupStorageLocationController) updateCurrentTallyOfAvailability(location *velerov1api.BackupStorageLocation) {
+	if location.Status.Phase == velerov1api.BackupStorageLocationPhaseAvailable {
+		c.backupLocationsPerPhase["available"] = append(c.backupLocationsPerPhase["available"], location)
+	} else if location.Status.Phase == velerov1api.BackupStorageLocationPhaseUnavailable {
+		c.backupLocationsPerPhase["unavailable"] = append(c.backupLocationsPerPhase["unavailable"], location)
+	} else {
+		c.backupLocationsPerPhase["unverified"] = append(c.backupLocationsPerPhase["unverified"], location)
+	}
+}
+
+func (c backupStorageLocationController) patchBackupStorageLocation(req *velerov1api.BackupStorageLocation, phase velerov1api.BackupStorageLocationPhase) (*velerov1api.BackupStorageLocation, error) {
 	// Record original json
 	oldData, err := json.Marshal(req)
 	if err != nil {
-		return errors.Wrap(err, "error marshalling original BackupStorageLocations")
+		return nil, errors.Wrap(err, "error marshalling original BackupStorageLocations")
 	}
 
-	// Mutate
-	mutate(req)
+	req.Status.Phase = phase
+	req.Status.LastValidationTime = &metav1.Time{Time: time.Now().UTC()}
 
 	// Record new json
 	newData, err := json.Marshal(req)
 	if err != nil {
-		return errors.Wrap(err, "error marshalling updated BackupStorageLocations")
+		return nil, errors.Wrap(err, "error marshalling updated BackupStorageLocations")
 	}
 
 	patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 	if err != nil {
-		return errors.Wrap(err, "error creating json merge patch for BackupStorageLocations")
+		return nil, errors.Wrap(err, "error creating json merge patch for BackupStorageLocations")
 	}
 
-	_, err = c.backupLocationClient.BackupStorageLocations(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
+	location, err := c.backupLocationClient.BackupStorageLocations(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
 	if err != nil {
-		return errors.Wrap(err, "error patching BackupStorageLocations")
+		return nil, errors.Wrap(err, "error patching BackupStorageLocations")
 	}
 
-	return nil
+	return location, nil
 }

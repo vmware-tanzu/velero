@@ -769,6 +769,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.namespace,
 			s.config.defaultBackupLocation,
 			s.config.defaultStoreValidationPeriod,
+			s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			newPluginManager,

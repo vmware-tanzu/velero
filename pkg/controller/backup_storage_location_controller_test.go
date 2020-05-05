@@ -115,6 +115,7 @@ func TestBackupStorageLocationControllerRun(t *testing.T) {
 				test.namespace,
 				test.defaultBackupLocation,
 				time.Minute,
+				sharedInformers.Velero().V1().BackupStorageLocations(),
 				client.VeleroV1(),
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
