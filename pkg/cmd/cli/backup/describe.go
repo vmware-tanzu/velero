@@ -84,8 +84,8 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 				}
 
 				var csiClient *snapshotv1beta1client.Clientset
-				// declare vscList up here since it may be empty and we'll pass the empty one into DescribeBackup
-				var vscList *snapshotv1beta1api.VolumeSnapshotContentList
+				// declare vscList up here since it may be empty and we'll pass the empty Items field into DescribeBackup
+				vscList := new(snapshotv1beta1api.VolumeSnapshotContentList)
 				if features.IsEnabled(velerov1api.CSIFeatureFlag) {
 					clientConfig, err := f.ClientConfig()
 					cmd.CheckError(err)
