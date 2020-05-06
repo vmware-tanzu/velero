@@ -72,6 +72,8 @@ This will help ensure that the values are the proper length and format to be sto
 
 In general, UIDs are safe to persist as label values.
 
+This function is not relevant to annotation values, which do not have restrictions.
+
 ## DCO Sign off
 
 All authors to the project retain copyright to their work. However, to ensure
