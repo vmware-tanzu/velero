@@ -572,17 +572,9 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		}
 
 		if c.volumeSnapshotContentLister != nil {
-			// Since VolumeSnapshotContent objects are not currently labeled, get them by using binding from the VolumeSnapshot
-			for _, vs := range volumeSnapshots {
-				// nil check just in case the snapshot and the content object did not get bound before returning from the plugins
-				if vs.Status != nil && vs.Status.BoundVolumeSnapshotContentName != nil {
-					vsc, err := c.volumeSnapshotContentLister.Get(*vs.Status.BoundVolumeSnapshotContentName)
-					if err != nil {
-						backupLog.Error(err)
-						continue
-					}
-					volumeSnapshotContents = append(volumeSnapshotContents, vsc)
-				}
+			volumeSnapshotContents, err = c.volumeSnapshotContentLister.List(selector)
+			if err != nil {
+				backupLog.Error(err)
 			}
 		}
 	}
