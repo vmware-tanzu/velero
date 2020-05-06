@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -219,6 +219,7 @@ type VeleroOptions struct {
 	Plugins                           []string
 	NoDefaultBackupLocation           bool
 	CACertData                        []byte
+	Features                          []string
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -274,6 +275,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 		WithDefaultResticMaintenanceFrequency(o.DefaultResticMaintenanceFrequency),
 	}
 
+	if len(o.Features) > 0 {
+		deployOpts = append(deployOpts, WithFeatures(o.Features))
+	}
+
 	if o.RestoreOnly {
 		deployOpts = append(deployOpts, WithRestoreOnly())
 	}
@@ -287,12 +292,16 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 	appendUnstructured(resources, deploy)
 
 	if o.UseRestic {
-		ds := DaemonSet(o.Namespace,
+		dsOpts := []podTemplateOption{
 			WithAnnotations(o.PodAnnotations),
 			WithImage(o.Image),
 			WithResources(o.ResticPodResources),
 			WithSecret(secretPresent),
-		)
+		}
+		if len(o.Features) > 0 {
+			dsOpts = append(dsOpts, WithFeatures(o.Features))
+		}
+		ds := DaemonSet(o.Namespace, dsOpts...)
 		appendUnstructured(resources, ds)
 	}
 

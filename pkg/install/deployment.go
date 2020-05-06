@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ type podTemplateConfig struct {
 	withSecret                        bool
 	defaultResticMaintenanceFrequency time.Duration
 	plugins                           []string
+	features                          []string
 }
 
 func WithImage(image string) podTemplateOption {
@@ -100,6 +101,12 @@ func WithPlugins(plugins []string) podTemplateOption {
 	}
 }
 
+func WithFeatures(features []string) podTemplateOption {
+	return func(c *podTemplateConfig) {
+		c.features = features
+	}
+}
+
 func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment {
 	// TODO: Add support for server args
 	c := &podTemplateConfig{
@@ -115,6 +122,11 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 	if len(imageParts) == 2 && imageParts[1] != "latest" {
 		pullPolicy = corev1.PullIfNotPresent
 
+	}
+
+	args := []string{"server"}
+	if len(c.features) > 0 {
+		args = append(args, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
 	}
 
 	containerLabels := labels()
@@ -145,9 +157,7 @@ func Deployment(namespace string, opts ...podTemplateOption) *appsv1.Deployment 
 							Command: []string{
 								"/velero",
 							},
-							Args: []string{
-								"server",
-							},
+							Args: args,
 							VolumeMounts: []corev1.VolumeMount{
 								{
 									Name:      "plugins",

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,4 +49,8 @@ func TestDeployment(t *testing.T) {
 	deploy = Deployment("velero", WithDefaultResticMaintenanceFrequency(24*time.Hour))
 	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
 	assert.Equal(t, "--default-restic-prune-frequency=24h0m0s", deploy.Spec.Template.Spec.Containers[0].Args[1])
+
+	deploy = Deployment("velero", WithFeatures([]string{"EnableCSI", "foo", "bar", "baz"}))
+	assert.Len(t, deploy.Spec.Template.Spec.Containers[0].Args, 2)
+	assert.Equal(t, "--features=EnableCSI,foo,bar,baz", deploy.Spec.Template.Spec.Containers[0].Args[1])
 }

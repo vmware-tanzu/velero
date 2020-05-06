@@ -1,5 +1,5 @@
 /*
-Copyright 2018, 2019 the Velero contributors.
+Copyright 2018, 2019, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package install
 
 import (
+	"fmt"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +39,14 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 	if len(imageParts) == 2 && imageParts[1] != "latest" {
 		pullPolicy = corev1.PullIfNotPresent
 
+	}
+
+	resticArgs := []string{
+		"restic",
+		"server",
+	}
+	if len(c.features) > 0 {
+		resticArgs = append(resticArgs, fmt.Sprintf("--features=%s", strings.Join(c.features, ",")))
 	}
 
 	userID := int64(0)
@@ -92,10 +101,7 @@ func DaemonSet(namespace string, opts ...podTemplateOption) *appsv1.DaemonSet {
 							Command: []string{
 								"/velero",
 							},
-							Args: []string{
-								"restic",
-								"server",
-							},
+							Args: resticArgs,
 
 							VolumeMounts: []corev1.VolumeMount{
 								{
