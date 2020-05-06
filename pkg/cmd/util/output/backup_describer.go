@@ -25,6 +25,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -37,6 +39,7 @@ func DescribeBackup(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
+	volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent,
 	details bool,
 	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
@@ -93,7 +96,7 @@ func DescribeBackup(
 			// Scenarios:
 			//  Backup exists in cluster, was just taken so the CSI objects exist
 			//	Backup imported into cluster, CSI objects do not yet exist.
-			DescribeCSIVolumeSnapshots(d, details)
+			DescribeCSIVolumeSnapshots(d, details, volumeSnapshotContents)
 		}
 	})
 }
@@ -289,7 +292,7 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		return
 	}
 
-	d.Printf("Persistent Volumes: <none included>\n")
+	d.Printf("Persistent Volumes: <no velero-native snapshots included>\n")
 }
 
 func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
@@ -489,30 +492,42 @@ func (v *volumesByPod) Sorted() []*podVolumeGroup {
 	return v.volumesByPodSlice
 }
 
-func DescribeCSIVolumeSnapshots(d *Describer, details bool) {
+func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent) {
 	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
 		return
 	}
 
 	if !details {
-		// TODO(nrb-csi): Figure out proper formatting here. Ideally, we wouldn't reach out to object storage or anything unless we knew for a fact we had CSI snapshots included, but the velero Backup object has no pointers to the CSI objects.
 		d.Printf("CSI Volume Snapshots (specify --details for more information)\n")
 		return
 	}
 	d.Printf("CSI Volume Snapshots:\n")
 
-	buf := new(bytes.Buffer)
-	_ = buf
-	// TODO(nrb-csi): Add new DownloadTargetKind
-	// TODO(nrb-csi): Is this necessary now that the VSCs are being synced in to the cluster? We can get the VSC's info and provide some data that way. Just like with a Backup object, we can assume a VSC will always be there now. Otherwise, something else is wrong.
-	//if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-	// 	d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
-	// 	return
-	// }
+	for _, vsc := range volumeSnapshotContents {
+		DescribeVSC(d, details, vsc)
+	}
 
-	// var snapshots []*volume.Snapshot
-	// if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
-	// 	d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
-	// 	return
-	// }
+	// TODO(nrb-csi): Do we want to include information about the originating namespace? If so, then we'd have to go fetch the VolumeSnapshots from object storage to get realiable data, since
+	// we don't want to create namespaces for user workloads
+}
+
+func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapshotContent) {
+	if vsc.Status == nil {
+		d.Printf("Volume Snapshot Content %s cannot be described because its status is nil\n", vsc.Name)
+		return
+	}
+
+	d.Printf("Snapshot Content ID: %s\n", vsc.Name)
+
+	if vsc.Status.SnapshotHandle != nil {
+		d.Printf("\tStorage Snapshot ID: %s\n", *vsc.Status.SnapshotHandle)
+	}
+
+	if vsc.Status.RestoreSize != nil {
+		d.Printf("\tSnapshot Size (bytes): %d\n", *vsc.Status.RestoreSize)
+	}
+
+	if vsc.Status.ReadyToUse != nil {
+		d.Printf("\tReady to use: %t\n", *vsc.Status.ReadyToUse)
+	}
 }
