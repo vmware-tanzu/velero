@@ -25,6 +25,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
+// NewCSIListOptions returns a ListOptions for matching CSI objects based on the Velero backup name and label.
 func NewCSIListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name)),
