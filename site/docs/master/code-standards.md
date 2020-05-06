@@ -64,6 +64,14 @@ mockery -name=Restorer
 
 Might need to run `make update` to update the imports.
 
+## Kubernetes Labels
+
+When generating label values, be sure to pass them through the `label.GetValidName()` helper function.
+
+This will help ensure that the values are the proper length and format to be stored and queried.
+
+In general, UIDs are safe to persist as label values.
+
 ## DCO Sign off
 
 All authors to the project retain copyright to their work. However, to ensure
