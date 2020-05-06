@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2017, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -345,6 +345,8 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
+				nil, // csiSnapshotClient
+				nil, // kubeClient
 				"",
 				func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 				velerotest.NewLogger(),
@@ -568,6 +570,8 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
+				nil, // csiSnapshotClient
+				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
 				velerotest.NewLogger(),
@@ -659,6 +663,8 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
 				time.Duration(0),
 				test.namespace,
+				nil, // csiSnapshotClient
+				nil, // kubeClient
 				"",
 				nil, // new plugin manager func
 				velerotest.NewLogger(),

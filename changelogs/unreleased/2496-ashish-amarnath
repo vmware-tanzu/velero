@@ -1,0 +1,1 @@
+sync backups' CSI API objects into the cluster as part of the backup sync controller

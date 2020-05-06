@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -58,7 +59,8 @@ type BackupStore interface {
 	GetBackupVolumeSnapshots(name string) ([]*volume.Snapshot, error)
 	GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error)
 	GetBackupContents(name string) (io.ReadCloser, error)
-	// TODO(nrb-csi): Any Get methods relevant to the CSI VolumeSnapshots should be added with the client-side PRs.
+	GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error)
+	GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error)
 
 	// BackupExists checks if the backup metadata file exists in object storage.
 	BackupExists(bucket, backupName string) (bool, error)
@@ -322,6 +324,42 @@ func decode(jsongzReader io.Reader, into interface{}) error {
 	}
 
 	return nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshots(name string) ([]*snapshotv1beta1api.VolumeSnapshot, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshots were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var csiSnaps []*snapshotv1beta1api.VolumeSnapshot
+	if err := decode(res, &csiSnaps); err != nil {
+		return nil, err
+	}
+	return csiSnaps, nil
+}
+
+func (s *objectBackupStore) GetCSIVolumeSnapshotContents(name string) ([]*snapshotv1beta1api.VolumeSnapshotContent, error) {
+	res, err := tryGet(s.objectStore, s.bucket, s.layout.getCSIVolumeSnapshotContentsKey(name))
+	if err != nil {
+		return nil, err
+	}
+	if res == nil {
+		// this indicates that the no CSI volumesnapshotcontents were prensent in the backup
+		return nil, nil
+	}
+	defer res.Close()
+
+	var snapConts []*snapshotv1beta1api.VolumeSnapshotContent
+	if err := decode(res, &snapConts); err != nil {
+		return nil, err
+	}
+	return snapConts, nil
 }
 
 func (s *objectBackupStore) GetPodVolumeBackups(name string) ([]*velerov1api.PodVolumeBackup, error) {
