@@ -25,8 +25,29 @@ This section documents some of the choices made during implementation of the Vel
 
 # Roadmap
 
-Velero's support level for CSI volume snapshotting will follow upstream Kubernetes support for it, and will reach general availability sometime
+Velero's support level for CSI volume snapshotting will follow upstream Kubernetes support for the feature, and will reach general availability sometime
 after volume snapshotting is GA in upstream Kubernetes. Beta support is expected to launch in Velero v1.4.
 
+# Enabling CSI Support
+
+Pass the `--features=EnableCSI` flag to `velero install` - that's it!
+
+To include the status of CSI objects associated with a Velero backup or restore, run `velero client config set features=EnableCSI`.
+
+# How it Works - Overview
+
+Velero's CSI support does not rely on the Velero VolumeSnapshotter plugin interface.
+
+Instead, Velero uses a collection of BackupItemAction plugins that act first against PersistentVolumeClaims.
+
+When this BackupItemAction sees PersistentVolumeClaims pointing to a PersistentVolume backed by a CSI driver, it will create a CSI VolumeSnapshot object with the PersistentVolumeClaim as a source.
+This VolumeSnapshot object resides in the same namespace as the PersistentVolumeClaim that was used as a source.
+
+From there, the CSI external-snapshotter controller will see the VolumeSnapshot and create a VolumeSnapshotContent object, a cluster-scoped resource that will point to the actual, disk-based snapshot in the storage system.
+The external-snapshotter plugin will call the CSI driver's snapshot method, and the driver will call the storage system's APIs to generate the snapshot.
+Once an ID is generated and the storage system marks the snapshot as usable for restore, the VolumeSnapshotContent object will be updated with a `status.snapshotHandle` and the `status.readyToUse` field will be set.
+
+Velero will include the generated VolumeSnapshot and VolumeSnapshotContent objects in the backup tarball, as well as upload all VolumeSnapshots and VolumeSnapshotContents objects in a JSON file to the object storage system.
+When Velero synchronizes backups into a new cluster, VolumeSnapshotContent objects will be synced into the cluster as well, so that Velero can manage backup expiration appropriately.
 
 [1]: customize-installation.md#enable-server-side-features
