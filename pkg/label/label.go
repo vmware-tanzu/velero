@@ -48,13 +48,13 @@ func GetValidName(label string) string {
 	return label[:charsFromLabel] + strSha[:6]
 }
 
-// NewSelector returns a Selector based on the backup name.
+// NewSelectorForBackup returns a Selector based on the backup name.
 // This is useful for interacting with Listers that need a Selector.
 func NewSelectorForBackup(name string) labels.Selector {
 	return labels.SelectorFromSet(map[string]string{velerov1api.BackupNameLabel: GetValidName(name)})
 }
 
-// NewListOptions returns a ListOptions based on the backup name.
+// NewListOptionsForBackup returns a ListOptions based on the backup name.
 // This is useful for interacting with client-go clients that needs a ListOptions.
 func NewListOptionsForBackup(name string) metav1.ListOptions {
 	return metav1.ListOptions{
