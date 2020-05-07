@@ -355,6 +355,23 @@ spec:
               - Failed
               - Deleting
               type: string
+            progress:
+              description: Progress contains information about the backup's execution
+                progress. Note that this information is best-effort only -- if Velero
+                fails to update it during a backup for any reason, it may be inaccurate/stale.
+              properties:
+                itemsBackedUp:
+                  description: ItemsBackedUp is the number of items that have actually
+                    been written to the backup tarball so far.
+                  type: integer
+                totalItems:
+                  description: TotalItems is the total number of items to be backed
+                    up. This number may change throughout the execution of the backup
+                    due to plugins that return additional related items to back up,
+                    the velero.io/exclude-from-backup label, and various other filters
+                    that happen as items are processed.
+                  type: integer
+              type: object
             startTimestamp:
               description: StartTimestamp records the time a backup was started. Separate
                 from CreationTimestamp, since that value changes on restores. The

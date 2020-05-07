@@ -2690,9 +2690,9 @@ func newHarness(t *testing.T) *harness {
 	return &harness{
 		APIServer: apiServer,
 		backupper: &kubernetesBackupper{
-			dynamicFactory:        client.NewDynamicFactory(apiServer.DynamicClient),
-			discoveryHelper:       discoveryHelper,
-			groupBackupperFactory: new(defaultGroupBackupperFactory),
+			backupClient:    apiServer.VeleroClient.VeleroV1(),
+			dynamicFactory:  client.NewDynamicFactory(apiServer.DynamicClient),
+			discoveryHelper: discoveryHelper,
 
 			// unsupported
 			podCommandExecutor:     nil,
