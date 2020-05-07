@@ -242,14 +242,6 @@ func GetCACert(backupLocationLister velerov1listers.BackupStorageLocationLister,
 	return nil, nil
 }
 
-// NewPodVolumeBackupListOptions creates a ListOptions with a label selector configured to
-// find PodVolumeBackups for the backup identified by name.
-func NewPodVolumeBackupListOptions(name string) metav1.ListOptions {
-	return metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name)),
-	}
-}
-
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
 // find PodVolumeRestores for the restore identified by name.
 func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {

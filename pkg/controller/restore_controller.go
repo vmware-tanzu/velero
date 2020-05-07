@@ -40,10 +40,10 @@ import (
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/metrics"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
-	"github.com/vmware-tanzu/velero/pkg/restic"
 	pkgrestore "github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
@@ -438,7 +438,7 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	defer closeAndRemoveFile(backupFile, c.logger)
 
-	opts := restic.NewPodVolumeBackupListOptions(restore.Spec.BackupName)
+	opts := label.NewListOptionsForBackup(restore.Spec.BackupName)
 
 	podVolumeBackupList, err := c.podVolumeBackupClient.PodVolumeBackups(c.namespace).List(opts)
 	if err != nil {

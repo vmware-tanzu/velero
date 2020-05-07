@@ -28,7 +28,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/restic"
+	"github.com/vmware-tanzu/velero/pkg/label"
 )
 
 func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
@@ -72,7 +72,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					fmt.Fprintf(os.Stderr, "error getting DeleteBackupRequests for backup %s: %v\n", backup.Name, err)
 				}
 
-				opts := restic.NewPodVolumeBackupListOptions(backup.Name)
+				opts := label.NewListOptionsForBackup(backup.Name)
 				podVolumeBackupList, err := veleroClient.VeleroV1().PodVolumeBackups(f.Namespace()).List(opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeBackups for backup %s: %v\n", backup.Name, err)
