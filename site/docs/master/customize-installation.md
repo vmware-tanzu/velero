@@ -5,6 +5,9 @@
   - [Install in any namespace](#install-in-any-namespace)
   - [Use non-file-based identity mechanisms](#use-non-file-based-identity-mechanisms)
   - [Enable restic integration](#enable-restic-integration)
+  - [Enable features](#enable-features)
+    - [Enable server side features](#enable-server-side-features)
+    - [Enable client side features](#enable-client-side-features)
   - [Customize resource requests and limits](#customize-resource-requests-and-limits)
   - [Configure more than one storage location for backups or volume snapshots](#configure-more-than-one-storage-location-for-backups-or-volume-snapshots)
   - [Do not configure a backup storage location during install](#do-not-configure-a-backup-storage-location-during-install)
@@ -41,6 +44,45 @@ If you are using an alternate identity mechanism, such as kube2iam/kiam on AWS, 
 By default, `velero install` does not install Velero's [restic integration][3]. To enable it, specify the `--use-restic` flag.
 
 If you've already run `velero install` without the `--use-restic` flag, you can run the same command again, including the `--use-restic` flag, to add the restic integration to your existing install.
+
+## Enable features
+
+New features in Velero will be released as beta features behind feature flags which are not enabled by default. A full listing of Velero feature flags can be found [here][11].
+
+### Enable server side features
+
+Features on the Velero server can be enabled using the `--features` flag to the `velero install` command. This flag takes as value a comma separated list of feature flags to enable. As an example [CSI snapshotting of PVCs][10] can be enabled using `EnableCSI` feature flag in the `velero install` command as shown below:
+
+```bash
+velero install --features=EnableCSI
+```
+
+Feature flags, passed to `velero install` will be passed to the Velero deployment and also to the `restic` daemon set, if `--use-restic` flag is used.
+
+Similarly, features may be disabled by removing the corresponding feature flags from the `--features` flag.
+
+Enabling and disabling feature flags will require modifying the Velero deployment and also the restic daemonset. This may be done from the CLI by uninstalling and re-installing Velero, or by editing the `deploy/velero` and `daemonset/restic` resources in-cluster.
+
+```bash
+$ kubectl -n velero edit deploy/velero
+$ kubectl -n velero edit daemonset/restic
+```
+
+### Enable client side features
+
+For some features it may be necessary to use the `--features` flag to the Velero client. This may be done by passing the `--features` on every command run using the Velero CLI or the by setting the features in the velero client config file using the `velero client config set` command as shown below:
+
+```bash
+velero client config set features=EnableCSI
+```
+
+This stores the config in a file at `$HOME/.config/velero/config.json`.
+
+All client side feature flags may be disabled using the below command
+
+```bash
+velero client config set features=
+```
 
 ## Customize resource requests and limits
 
@@ -252,3 +294,5 @@ If you get an error like `complete:13: command not found: compdef`, then add the
 [7]: https://github.com/vmware-tanzu/velero/issues/2077
 [8]: https://github.com/vmware-tanzu/velero/issues/2311
 [9]: self-signed-certificates.md
+[10]: csi.md
+[11]: https://github.com/vmware-tanzu/velero/blob/master/pkg/apis/velero/v1/constants.go
