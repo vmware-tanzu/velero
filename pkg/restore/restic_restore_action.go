@@ -29,10 +29,10 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
-	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
+	"github.com/vmware-tanzu/velero/pkg/label"
 	"github.com/vmware-tanzu/velero/pkg/plugin/framework"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
 	"github.com/vmware-tanzu/velero/pkg/restic"
@@ -76,7 +76,7 @@ func (a *ResticRestoreAction) Execute(input *velero.RestoreItemActionExecuteInpu
 
 	log := a.logger.WithField("pod", kube.NamespaceAndName(&pod))
 
-	opts := pkgbackup.NewListOptions(input.Restore.Spec.BackupName)
+	opts := label.NewListOptionsForBackup(input.Restore.Spec.BackupName)
 	podVolumeBackupList, err := a.podVolumeBackupClient.List(opts)
 	if err != nil {
 		return nil, errors.WithStack(err)

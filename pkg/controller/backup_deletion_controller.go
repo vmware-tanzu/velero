@@ -426,7 +426,7 @@ func volumeSnapshotterForSnapshotLocation(
 
 func (c *backupDeletionController) deleteExistingDeletionRequests(req *velerov1api.DeleteBackupRequest, log logrus.FieldLogger) []error {
 	log.Info("Removing existing deletion requests for backup")
-	selector := pkgbackup.NewSelector(req.Spec.BackupName)
+	selector := label.NewSelectorForBackup(req.Spec.BackupName)
 	dbrs, err := c.deleteBackupRequestLister.DeleteBackupRequests(req.Namespace).List(selector)
 	if err != nil {
 		return []error{errors.Wrap(err, "error listing existing DeleteBackupRequests for backup")}
@@ -483,7 +483,7 @@ func deleteCSIVolumeSnapshots(backupName string, csiSnapshotLister snapshotv1bet
 	csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	errs := []error{}
 
-	selector := pkgbackup.NewSelector(backupName)
+	selector := label.NewSelectorForBackup(backupName)
 	csiVolSnaps, err := csiSnapshotLister.List(selector)
 	if err != nil {
 		return []error{err}
@@ -513,7 +513,7 @@ func deleteCSIVolumeSnapshots(backupName string, csiSnapshotLister snapshotv1bet
 func deleteCSIVolumeSnapshotContents(backupName string, csiVSCLister snapshotv1beta1listers.VolumeSnapshotContentLister,
 	csiClient snapshotter.SnapshotV1beta1Interface, log *logrus.Entry) []error {
 	errs := []error{}
-	selector := pkgbackup.NewSelector(backupName)
+	selector := label.NewSelectorForBackup(backupName)
 	csiVolSnapConts, err := csiVSCLister.List(selector)
 	if err != nil {
 		return []error{err}
