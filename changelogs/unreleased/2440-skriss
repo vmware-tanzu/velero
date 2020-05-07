@@ -1,0 +1,1 @@
+report backup progress (number of items backed up so far out of an estimated total number of items) during backup in the logs and as status fields on the Backup custom resource
