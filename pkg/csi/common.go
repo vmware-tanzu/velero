@@ -18,7 +18,6 @@ package csi
 import (
 	"fmt"
 
-	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -30,15 +29,4 @@ func NewListOptions(name string) metav1.ListOptions {
 	return metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", velerov1api.BackupNameLabel, label.GetValidName(name)),
 	}
-}
-
-// SumSnapshotSize sums up the total restore size (in bytes) of a given slice of VolumeSnapshotContent objects.
-func SumSnapshotSize(vscs []*snapshotv1beta1api.VolumeSnapshotContent) int64 {
-	var total int64
-	for _, vsc := range vscs {
-		if vsc.Status != nil && vsc.Status.RestoreSize != nil {
-			total += *vsc.Status.RestoreSize
-		}
-	}
-	return total
 }
