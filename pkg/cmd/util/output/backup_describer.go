@@ -147,7 +147,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)
 
 	d.Println()
-	d.Printf("Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
+	d.Printf("Velero-Native Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
 
 	d.Println()
 	d.Printf("TTL:\t%s\n", spec.TTL.Duration)
@@ -269,30 +269,30 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 	// TODO(nrb-csi): Should CSI snapshots increment VolumeSnapshotsAttempted? If so, we'll need a way to differentiate here.
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
-			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
+			d.Printf("Velero-Native Snapshots:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
 			return
 		}
 
 		buf := new(bytes.Buffer)
 		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
+			d.Printf("Velero-Native Snapshots:\t<error getting snapshot info: %v>\n", err)
 			return
 		}
 
 		var snapshots []*volume.Snapshot
 		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
-			d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
+			d.Printf("Velero-Native Snapshots:\t<error reading snapshot info: %v>\n", err)
 			return
 		}
 
-		d.Printf("Persistent Volumes:\n")
+		d.Printf("Velero-Native Snapshots:\n")
 		for _, snap := range snapshots {
 			describeSnapshot(d, snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS)
 		}
 		return
 	}
 
-	d.Printf("Persistent Volumes: <no velero-native snapshots included>\n")
+	d.Printf("Velero-Native Snapshots: <none included>\n")
 }
 
 func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
@@ -498,7 +498,7 @@ func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotConten
 	}
 
 	if !details {
-		d.Printf("CSI Volume Snapshots (specify --details for more information)\n")
+		d.Printf("CSI Volume Snapshots:\t%d included (specify --details for more information)\n", len(volumeSnapshotContents))
 		return
 	}
 	d.Printf("CSI Volume Snapshots:\n")
@@ -506,9 +506,6 @@ func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotConten
 	for _, vsc := range volumeSnapshotContents {
 		DescribeVSC(d, details, vsc)
 	}
-
-	// TODO(nrb-csi): Do we want to include information about the originating namespace? If so, then we'd have to go fetch the VolumeSnapshots from object storage to get realiable data, since
-	// we don't want to create namespaces for user workloads
 }
 
 func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapshotContent) {
