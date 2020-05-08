@@ -91,11 +91,8 @@ func DescribeBackup(
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
-		// TODO(nrb-csi): Put the CSI description here? Or down with the DescribeBackupStatus?
+
 		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-			// Scenarios:
-			//  Backup exists in cluster, was just taken so the CSI objects exist
-			//	Backup imported into cluster, CSI objects do not yet exist.
 			DescribeCSIVolumeSnapshots(d, details, volumeSnapshotContents)
 		}
 	})
@@ -266,7 +263,6 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 		d.Println()
 	}
 
-	// TODO(nrb-csi): Should CSI snapshots increment VolumeSnapshotsAttempted? If so, we'll need a way to differentiate here.
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
 			d.Printf("Velero-Native Snapshots:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
@@ -514,7 +510,7 @@ func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapsh
 		return
 	}
 
-	d.Printf("Snapshot Content ID: %s\n", vsc.Name)
+	d.Printf("Snapshot Content Name: %s\n", vsc.Name)
 
 	if vsc.Status.SnapshotHandle != nil {
 		d.Printf("\tStorage Snapshot ID: %s\n", *vsc.Status.SnapshotHandle)

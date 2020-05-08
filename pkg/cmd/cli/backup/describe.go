@@ -31,7 +31,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
-	"github.com/vmware-tanzu/velero/pkg/csi"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	"github.com/vmware-tanzu/velero/pkg/label"
 )
@@ -93,8 +92,7 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 					csiClient, err = snapshotv1beta1client.NewForConfig(clientConfig)
 					cmd.CheckError(err)
 
-					vscOpts := csi.NewListOptions(backup.Name)
-					vscList, err = csiClient.SnapshotV1beta1().VolumeSnapshotContents().List(vscOpts)
+					vscList, err = csiClient.SnapshotV1beta1().VolumeSnapshotContents().List(opts)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "error getting VolumeSnapshotContent objects for backup %s: %v\n", backup.Name, err)
 					}
