@@ -19,3 +19,6 @@
 - title: Frequently Asked Questions
   key: faq
   destination: faq
+- title: Container Storage Interface Snapshot Support in Velero
+  key: csi
+  destination: csi
