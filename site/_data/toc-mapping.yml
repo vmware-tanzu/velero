@@ -3,6 +3,7 @@
 # that the navigation for older versions still work.
 
 master: master-toc
+v1.4-pre: v1-4-pre-toc
 v1.3.2: v1-3-2-toc
 v1.3.1: v1-3-1-toc
 v1.3.0: v1-3-0-toc
