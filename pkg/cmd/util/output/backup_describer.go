@@ -25,8 +25,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
+
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/downloadrequest"
+	"github.com/vmware-tanzu/velero/pkg/features"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 )
@@ -36,6 +39,7 @@ func DescribeBackup(
 	backup *velerov1api.Backup,
 	deleteRequests []velerov1api.DeleteBackupRequest,
 	podVolumeBackups []velerov1api.PodVolumeBackup,
+	volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent,
 	details bool,
 	veleroClient clientset.Interface,
 	insecureSkipTLSVerify bool,
@@ -87,6 +91,10 @@ func DescribeBackup(
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
+
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+			DescribeCSIVolumeSnapshots(d, details, volumeSnapshotContents)
+		}
 	})
 }
 
@@ -136,7 +144,7 @@ func DescribeBackupSpec(d *Describer, spec velerov1api.BackupSpec) {
 	d.Printf("Storage Location:\t%s\n", spec.StorageLocation)
 
 	d.Println()
-	d.Printf("Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
+	d.Printf("Velero-Native Snapshot PVs:\t%s\n", BoolPointerString(spec.SnapshotVolumes, "false", "true", "auto"))
 
 	d.Println()
 	d.Printf("TTL:\t%s\n", spec.TTL.Duration)
@@ -257,30 +265,30 @@ func DescribeBackupStatus(d *Describer, backup *velerov1api.Backup, details bool
 
 	if status.VolumeSnapshotsAttempted > 0 {
 		if !details {
-			d.Printf("Persistent Volumes:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
+			d.Printf("Velero-Native Snapshots:\t%d of %d snapshots completed successfully (specify --details for more information)\n", status.VolumeSnapshotsCompleted, status.VolumeSnapshotsAttempted)
 			return
 		}
 
 		buf := new(bytes.Buffer)
 		if err := downloadrequest.Stream(veleroClient.VeleroV1(), backup.Namespace, backup.Name, velerov1api.DownloadTargetKindBackupVolumeSnapshots, buf, downloadRequestTimeout, insecureSkipTLSVerify, caCertPath); err != nil {
-			d.Printf("Persistent Volumes:\t<error getting volume snapshot info: %v>\n", err)
+			d.Printf("Velero-Native Snapshots:\t<error getting snapshot info: %v>\n", err)
 			return
 		}
 
 		var snapshots []*volume.Snapshot
 		if err := json.NewDecoder(buf).Decode(&snapshots); err != nil {
-			d.Printf("Persistent Volumes:\t<error reading volume snapshot info: %v>\n", err)
+			d.Printf("Velero-Native Snapshots:\t<error reading snapshot info: %v>\n", err)
 			return
 		}
 
-		d.Printf("Persistent Volumes:\n")
+		d.Printf("Velero-Native Snapshots:\n")
 		for _, snap := range snapshots {
 			describeSnapshot(d, snap.Spec.PersistentVolumeName, snap.Status.ProviderSnapshotID, snap.Spec.VolumeType, snap.Spec.VolumeAZ, snap.Spec.VolumeIOPS)
 		}
 		return
 	}
 
-	d.Printf("Persistent Volumes: <none included>\n")
+	d.Printf("Velero-Native Snapshots: <none included>\n")
 }
 
 func describeBackupResourceList(d *Describer, backup *velerov1api.Backup, veleroClient clientset.Interface, insecureSkipTLSVerify bool, caCertPath string) {
@@ -478,4 +486,41 @@ func (v *volumesByPod) Sorted() []*podVolumeGroup {
 	})
 
 	return v.volumesByPodSlice
+}
+
+func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotContents []snapshotv1beta1api.VolumeSnapshotContent) {
+	if !features.IsEnabled(velerov1api.CSIFeatureFlag) {
+		return
+	}
+
+	if !details {
+		d.Printf("CSI Volume Snapshots:\t%d included (specify --details for more information)\n", len(volumeSnapshotContents))
+		return
+	}
+	d.Printf("CSI Volume Snapshots:\n")
+
+	for _, vsc := range volumeSnapshotContents {
+		DescribeVSC(d, details, vsc)
+	}
+}
+
+func DescribeVSC(d *Describer, details bool, vsc snapshotv1beta1api.VolumeSnapshotContent) {
+	if vsc.Status == nil {
+		d.Printf("Volume Snapshot Content %s cannot be described because its status is nil\n", vsc.Name)
+		return
+	}
+
+	d.Printf("Snapshot Content Name: %s\n", vsc.Name)
+
+	if vsc.Status.SnapshotHandle != nil {
+		d.Printf("\tStorage Snapshot ID: %s\n", *vsc.Status.SnapshotHandle)
+	}
+
+	if vsc.Status.RestoreSize != nil {
+		d.Printf("\tSnapshot Size (bytes): %d\n", *vsc.Status.RestoreSize)
+	}
+
+	if vsc.Status.ReadyToUse != nil {
+		d.Printf("\tReady to use: %t\n", *vsc.Status.ReadyToUse)
+	}
 }
