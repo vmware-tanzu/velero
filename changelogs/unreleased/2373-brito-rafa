@@ -1,0 +1,2 @@
+Allow users the option to retrieve all versions of a given resource (instead of just the preferred version) from the API server with the `EnableAPIGroupVersions` feature flag.
+* Changed backup tarball format to store all versions of a given resource, updated backup tarball format to 1.1.0.
