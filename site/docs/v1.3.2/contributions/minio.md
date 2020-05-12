@@ -229,6 +229,20 @@ You must also get the Minio URL, which you can then specify as the value of the 
 
 1.  Edit your `BackupStorageLocation` YAML, adding `publicUrl: <URL_FROM_PREVIOUS_STEP>` as a field under `spec.config`. You must include the `http://` or `https://` prefix.
 
+## Accessing logs with an HTTPS endpoint
+
+If you're using Minio with HTTPS, you may see unintelligible text in the output of `velero describe`, or `velero logs` commands.
+
+In order to fix this, you can add a public URL to the `BackupStorageLocation`.
+
+In a terminal, run the following:
+
+```shell
+kubectl patch -n velero backupstoragelocation default --type merge -p '{"spec":{"config":{"publicUrl":"https://<a public IP for your Minio instance>:9000"}}}'
+```
+
+Note that Velero does not support custom, self-signed certificates prior to v1.4.0.
+
 ## Expose Minio outside your cluster with Kubernetes in Docker (KinD):
 
 Kubernetes in Docker currently does not have support for NodePort services (see [this issue](https://github.com/kubernetes-sigs/kind/issues/99)). In this case, you can use a port forward to access the Minio bucket.
