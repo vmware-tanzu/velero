@@ -2,19 +2,22 @@
 
 _This feature is under development. Documentation may not be up-to-date and features may not work as expected._
 
+Integrating Container Storage Interface (CSI) snapshot support into Velero enables Velero to backup and restore CSI-backed volumes using the [Kubernetes CSI Snapshot Beta APIs](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).
+
+By supporting CSI snapshot APIs, Velero can support any volume provider that has a CSI driver, without requiring a Velero-specific plugin to be available.
+
 # Prerequisites
 
 The following are the prerequisites for using Velero to take Container Storage Interface (CSI) snapshots:
 
  1. The cluster is Kubernetes version 1.17 or greater.
  1. The cluster is running a CSI driver capable of support volume snapshots at the [v1beta1 API level](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
- 1. The Velero [CSI plugin](https://github.com/vmware-tanzu/velero-plugin-for-csi/) is installed to integrate with the CSI volume snapshot APIs.
  1. When restoring CSI volumesnapshots across clusters, the name of the CSI driver in the destination cluster is the same as that on the source cluster to ensure cross cluster portability of CSI volumesnapshots
 
 # Installing Velero with CSI support
 
 Ensure that the Velero server is running with the `EnableCSI` feature flag. See [Enabling Features][1] for more information.
-Also, the Velero [CSI plugin][2] is necessary to integrate with the CSI volume snapshot APIs.
+Also, the Velero [CSI plugin][2] ([Docker Hub][3]) is necessary to integrate with the CSI volume snapshot APIs.
 
 Both of these can be added with the `velero install` command.
 
@@ -25,7 +28,8 @@ velero install \
 ...
 ```
 
-To include the status of CSI objects associated with a Velero backup or restore, run `velero client config set features=EnableCSI`.
+To include the status of CSI objects associated with a Velero backup or restore in `velero backup describe` or `velero restore describe` output, run `velero client config set features=EnableCSI`.
+See [Enabling Features][1] for more information about managing client-side feature flags.
 
 # Implementation Choices
 
@@ -66,3 +70,4 @@ For more details on how each plugin works, see the [CSI plugin repo][2]'s docume
 
 [1]: customize-installation.md#enable-server-side-features
 [2]: https://github.com/vmware-tanzu/velero-plugin-for-csi/
+[3]: https://hub.docker.com/repository/docker/velero/velero-plugin-for-csi
