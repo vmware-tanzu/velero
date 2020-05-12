@@ -87,14 +87,16 @@ func DescribeBackup(
 			DescribeDeleteBackupRequests(d, deleteRequests)
 		}
 
+		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
+			d.Println()
+			DescribeCSIVolumeSnapshots(d, details, volumeSnapshotContents)
+		}
+
 		if len(podVolumeBackups) > 0 {
 			d.Println()
 			DescribePodVolumeBackups(d, podVolumeBackups, details)
 		}
 
-		if features.IsEnabled(velerov1api.CSIFeatureFlag) {
-			DescribeCSIVolumeSnapshots(d, details, volumeSnapshotContents)
-		}
 	})
 }
 
@@ -493,10 +495,16 @@ func DescribeCSIVolumeSnapshots(d *Describer, details bool, volumeSnapshotConten
 		return
 	}
 
+	if len(volumeSnapshotContents) == 0 {
+		d.Printf("CSI Volume Snapshots: <none included>\n")
+		return
+	}
+
 	if !details {
 		d.Printf("CSI Volume Snapshots:\t%d included (specify --details for more information)\n", len(volumeSnapshotContents))
 		return
 	}
+
 	d.Printf("CSI Volume Snapshots:\n")
 
 	for _, vsc := range volumeSnapshotContents {
