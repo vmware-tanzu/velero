@@ -238,12 +238,10 @@ In order to fix this, you can add a public URL to the `BackupStorageLocation`.
 In a terminal, run the following:
 
 ```shell
-kubectl edit backupstoragelocation default -n velero
+kubectl patch -n velero backupstoragelocation default --type merge -p '{"spec":{"config":{"publicUrl":"https://<a public IP for your Minio instance>:9000"}}}'
 ```
 
-Add `publicUrl: https://<a public IP for your Minio instance>:9000` under the `spec.config` section.
-
-If your certificate is self-signed, see the [docuementation on self-signed certificates][32].
+If your certificate is self-signed, see the [documentation on self-signed certificates][32].
 
 ## Expose Minio outside your cluster with Kubernetes in Docker (KinD):
 

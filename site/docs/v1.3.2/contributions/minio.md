@@ -238,10 +238,8 @@ In order to fix this, you can add a public URL to the `BackupStorageLocation`.
 In a terminal, run the following:
 
 ```shell
-kubectl edit backupstoragelocation default -n velero
+kubectl patch -n velero backupstoragelocation default --type merge -p '{"spec":{"config":{"publicUrl":"https://<a public IP for your Minio instance>:9000"}}}'
 ```
-
-Add `publicUrl: https://<a public IP for your Minio instance>:9000` under the `spec.config` section.
 
 Note that Velero does not support custom, self-signed certificates prior to v1.4.0.
 
