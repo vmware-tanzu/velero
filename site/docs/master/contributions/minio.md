@@ -233,7 +233,7 @@ You must also get the Minio URL, which you can then specify as the value of the 
 
 If you're using Minio with HTTPS, you may see unintelligible text in the output of `velero describe`, or `velero logs` commands.
 
-In order to fix this, you can add a public, HTTP URL to the `BackupStorageLocation`, or a [self-signed certificate][32].
+In order to fix this, you can add a public URL to the `BackupStorageLocation`.
 
 In a terminal, run the following:
 
@@ -241,7 +241,9 @@ In a terminal, run the following:
 kubectl edit backupstoragelocation default -n velero
 ```
 
-Add `publicUrl: http://<a public IP for your Minio instance>:9000` under the `spec.config` section.
+Add `publicUrl: https://<a public IP for your Minio instance>:9000` under the `spec.config` section.
+
+If your certificate is self-signed, see the [docuementation on self-signed certificates][32].
 
 ## Expose Minio outside your cluster with Kubernetes in Docker (KinD):
 
