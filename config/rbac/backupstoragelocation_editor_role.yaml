@@ -1,0 +1,24 @@
+# permissions for end users to edit backupstoragelocations.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backupstoragelocation-editor-role
+rules:
+- apiGroups:
+  - velero.io
+  resources:
+  - backupstoragelocations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - backupstoragelocations/status
+  verbs:
+  - get

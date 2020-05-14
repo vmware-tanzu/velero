@@ -1,0 +1,7 @@
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: backupstoragelocation-sample
+spec:
+  # Add fields here
+  foo: bar

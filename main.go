@@ -25,6 +25,8 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -36,6 +38,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
+	_ = velerov1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

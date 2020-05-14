@@ -85,7 +85,7 @@ IMAGE ?= $(REGISTRY)/$(BIN)-$(GOARCH)
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all: generate manifests
+all-targets: all
 	@$(MAKE) build
 	@$(MAKE) build BIN=velero-restic-restore-helper
 
