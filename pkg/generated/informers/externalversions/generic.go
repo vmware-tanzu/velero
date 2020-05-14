@@ -55,8 +55,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=velero.io, Version=v1
 	case v1.SchemeGroupVersion.WithResource("backups"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().Backups().Informer()}, nil
-	case v1.SchemeGroupVersion.WithResource("backupstoragelocations"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().BackupStorageLocations().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("deletebackuprequests"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Velero().V1().DeleteBackupRequests().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("downloadrequests"):

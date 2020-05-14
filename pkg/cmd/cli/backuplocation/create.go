@@ -17,6 +17,7 @@ limitations under the License.
 package backuplocation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,13 +26,27 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = velerov1api.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
@@ -146,13 +161,21 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	client, err := f.Client()
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
 
-	if _, err := client.VeleroV1().BackupStorageLocations(backupStorageLocation.Namespace).Create(backupStorageLocation); err != nil {
-		return errors.WithStack(err)
+	clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := clientKB.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
+		fmt.Println("argh")
+		return err
 	}
 
 	fmt.Printf("Backup storage location %q configured successfully.\n", backupStorageLocation.Name)

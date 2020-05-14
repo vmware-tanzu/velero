@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -35,6 +36,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -42,6 +44,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
+
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type podVolumeBackupController struct {
@@ -53,7 +58,7 @@ type podVolumeBackupController struct {
 	podLister             corev1listers.PodLister
 	pvcLister             corev1listers.PersistentVolumeClaimLister
 	pvLister              corev1listers.PersistentVolumeLister
-	backupLocationLister  listers.BackupStorageLocationLister
+	kbCache               kbcache.Cache
 	nodeName              string
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
@@ -70,7 +75,8 @@ func NewPodVolumeBackupController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationInformer kbcache.Informer,
+	kbCache kbcache.Cache,
 	nodeName string,
 ) Interface {
 	c := &podVolumeBackupController{
@@ -81,7 +87,7 @@ func NewPodVolumeBackupController(
 		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:             pvcInformer.Lister(),
 		pvLister:              pvInformer.Lister(),
-		backupLocationLister:  backupLocationInformer.Lister(),
+		kbCache:               kbCache,
 		nodeName:              nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -95,7 +101,7 @@ func NewPodVolumeBackupController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
+		backupLocationInformer.HasSynced,
 	)
 	c.processBackupFunc = c.processBackup
 
@@ -228,7 +234,15 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := restic.GetCACert(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+	location := &velerov1apikb.BackupStorageLocation{}
+	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, location); err != nil {
+		return err
+	}
+
+	caCert, err := restic.GetCACert(location)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
@@ -247,12 +261,12 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	var env []string
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		if env, err = restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
+		if env, err = restic.AzureCmdEnv(location); err != nil {
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
 	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		if env, err = restic.S3CmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
+		if env, err = restic.S3CmdEnv(location); err != nil {
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env

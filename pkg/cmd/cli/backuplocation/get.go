@@ -17,10 +17,13 @@ limitations under the License.
 package backuplocation
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
@@ -36,19 +39,30 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			veleroClient, err := f.Client()
+			clientConfig, err := f.ClientConfig()
 			cmd.CheckError(err)
 
-			var locations *api.BackupStorageLocationList
+			clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+				Scheme: scheme,
+			})
+			cmd.CheckError(err)
+
+			location := &veleroapiv1.BackupStorageLocation{}
+			var locations *veleroapiv1.BackupStorageLocationList
+			locations = new(veleroapiv1.BackupStorageLocationList)
 			if len(args) > 0 {
-				locations = new(api.BackupStorageLocationList)
 				for _, name := range args {
-					location, err := veleroClient.VeleroV1().BackupStorageLocations(f.Namespace()).Get(name, metav1.GetOptions{})
+					err = clientKB.Get(context.Background(), kbclient.ObjectKey{
+						Namespace: f.Namespace(),
+						Name:      name,
+					}, location)
 					cmd.CheckError(err)
 					locations.Items = append(locations.Items, *location)
 				}
 			} else {
-				locations, err = veleroClient.VeleroV1().BackupStorageLocations(f.Namespace()).List(listOptions)
+				err := clientKB.List(context.Background(), locations, &kbclient.ListOptions{
+					Namespace: f.Namespace(),
+				})
 				cmd.CheckError(err)
 			}
 

@@ -27,12 +27,14 @@ import (
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeinformers "k8s.io/client-go/informers"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -43,7 +45,27 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	velerov1 "github.com/vmware-tanzu/velero/api/v1"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = velerov1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
 
 func NewServerCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
@@ -86,6 +108,8 @@ type resticServer struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	fileSystem            filesystem.Interface
+	kbClient              kbclient.Client
+	kbCache               kbcache.Cache
 }
 
 func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*resticServer, error) {
@@ -130,6 +154,21 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
+	clientConfig, err := factory.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// +kubebuilder:scaffold:builder
+
 	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,
@@ -141,6 +180,8 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		fileSystem:            filesystem.NewFileSystem(),
+		kbClient:              mgr.GetClient(),
+		kbCache:               mgr.GetCache(),
 	}
 
 	if err := s.validatePodVolumesHostPath(); err != nil {
@@ -157,6 +198,12 @@ func (s *resticServer) run() {
 
 	var wg sync.WaitGroup
 
+	// TODO(carlisia): how to handle this? Issues:
+	// - options are get informer for specific obj (below, but w/o namespace of obj name info) or for a specific kind (CRD?)
+	// - maybe it should go inside the controller? same above problems would apply tho
+	location := &velerov1apikb.BackupStorageLocation{}
+	bslInformer, _ := s.kbCache.GetInformer(location)
+
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
 		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
@@ -165,7 +212,8 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
+		bslInformer,
+		s.kbCache,
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)
@@ -182,7 +230,8 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		s.veleroInformerFactory.Velero().V1().BackupStorageLocations(),
+		bslInformer,
+		s.kbCache,
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)

@@ -22,8 +22,10 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 
+	velerov1api "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backup"
 	"github.com/vmware-tanzu/velero/pkg/cmd/cli/backuplocation"
@@ -45,7 +47,19 @@ import (
 	runplugin "github.com/vmware-tanzu/velero/pkg/cmd/server/plugin"
 	veleroflag "github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/features"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = velerov1api.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
 
 func NewCommand(name string) *cobra.Command {
 	// Load the config here so that we can extract features from it.

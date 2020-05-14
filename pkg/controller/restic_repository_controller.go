@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"time"
@@ -31,11 +32,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/restic"
+
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type resticRepositoryController struct {
@@ -43,7 +48,7 @@ type resticRepositoryController struct {
 
 	resticRepositoryClient      velerov1client.ResticRepositoriesGetter
 	resticRepositoryLister      velerov1listers.ResticRepositoryLister
-	backupLocationLister        velerov1listers.BackupStorageLocationLister
+	backupLocationLister        kbcache.Cache
 	repositoryManager           restic.RepositoryManager
 	defaultMaintenanceFrequency time.Duration
 
@@ -55,7 +60,7 @@ func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer velerov1informers.ResticRepositoryInformer,
 	resticRepositoryClient velerov1client.ResticRepositoriesGetter,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	backupLocationLister kbcache.Cache,
 	repositoryManager restic.RepositoryManager,
 	defaultMaintenanceFrequency time.Duration,
 ) Interface {
@@ -155,8 +160,11 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 	log.Info("Initializing restic repository")
 
 	// confirm the repo's BackupStorageLocation is valid
-	loc, err := c.backupLocationLister.BackupStorageLocations(req.Namespace).Get(req.Spec.BackupStorageLocation)
-	if err != nil {
+	loc := &velerov1apikb.BackupStorageLocation{}
+	if err := c.backupLocationLister.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, loc); err != nil {
 		return c.patchResticRepository(req, repoNotReady(err.Error()))
 	}
 

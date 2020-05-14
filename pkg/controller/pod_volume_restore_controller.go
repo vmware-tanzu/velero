@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -36,7 +37,10 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -56,7 +60,7 @@ type podVolumeRestoreController struct {
 	secretLister           corev1listers.SecretLister
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	pvLister               corev1listers.PersistentVolumeLister
-	backupLocationLister   listers.BackupStorageLocationLister
+	kbCache                kbcache.Cache
 	nodeName               string
 
 	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
@@ -73,7 +77,8 @@ func NewPodVolumeRestoreController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer informers.BackupStorageLocationInformer,
+	backupLocationInformer kbcache.Informer,
+	kbCache kbcache.Cache,
 	nodeName string,
 ) Interface {
 	c := &podVolumeRestoreController{
@@ -84,7 +89,7 @@ func NewPodVolumeRestoreController(
 		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		pvLister:               pvInformer.Lister(),
-		backupLocationLister:   backupLocationInformer.Lister(),
+		kbCache:                kbCache,
 		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -98,7 +103,7 @@ func NewPodVolumeRestoreController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
-		backupLocationInformer.Informer().HasSynced,
+		backupLocationInformer.HasSynced,
 	)
 	c.processRestoreFunc = c.processRestore
 
@@ -294,7 +299,15 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := restic.GetCACert(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+	location := &velerov1apikb.BackupStorageLocation{}
+	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, location); err != nil {
+		return err
+	}
+
+	caCert, err := restic.GetCACert(location)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
@@ -346,14 +359,22 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
+	location := &velerov1apikb.BackupStorageLocation{}
+	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: req.Namespace,
+		Name:      req.Spec.BackupStorageLocation,
+	}, location); err != nil {
+		return err
+	}
+
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		env, err := restic.AzureCmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+		env, err := restic.AzureCmdEnv(location)
 		if err != nil {
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
 	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		env, err := restic.S3CmdEnv(c.backupLocationLister, req.Namespace, req.Spec.BackupStorageLocation)
+		env, err := restic.S3CmdEnv(location)
 		if err != nil {
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}

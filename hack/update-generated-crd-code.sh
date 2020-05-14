@@ -30,11 +30,6 @@ if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
   exit 1
 fi
 
-if ! command -v controller-gen > /dev/null; then
-  echo "controller-gen is missing"
-  exit 1
-fi
-
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/vmware-tanzu/velero/pkg/generated \
@@ -43,10 +38,3 @@ ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   --go-header-file ./hack/boilerplate.go.txt \
   --output-base ../../.. \
   $@
-
-controller-gen \
-  crd:crdVersions=v1beta1,preserveUnknownFields=false \
-  output:dir=./pkg/generated/crds/manifests \
-  paths=./pkg/apis/velero/v1/...
-
-go generate ./pkg/generated/crds
