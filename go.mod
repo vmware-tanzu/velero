@@ -16,14 +16,11 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.3.2
-	github.com/googleapis/gnostic v0.3.1 // indirect
 	github.com/hashicorp/go-hclog v0.0.0-20180709165350-ff2cf002a8dd
 	github.com/hashicorp/go-plugin v0.0.0-20190610192547-a1bc61569a26
 	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8 // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.0
-	github.com/onsi/ginkgo v1.11.0 // indirect
-	github.com/onsi/gomega v1.8.1 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
@@ -42,4 +39,5 @@ require (
 	k8s.io/client-go v0.17.4
 	k8s.io/klog v1.0.0
 	k8s.io/utils v0.0.0-20191218082557-f07c713de883 // indirect
+	sigs.k8s.io/controller-runtime v0.5.2
 )
