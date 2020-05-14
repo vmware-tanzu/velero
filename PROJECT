@@ -1,0 +1,3 @@
+domain: io
+repo: github.com/vmware-tanzu/velero
+version: "2"
