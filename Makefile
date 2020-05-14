@@ -40,6 +40,9 @@ CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 li
 CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
 MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 
+#kubebuilder automatically runs "make" when a resource or controller is created
+all: generate manifests
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -81,7 +84,7 @@ IMAGE ?= $(REGISTRY)/$(BIN)-$(GOARCH)
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all: generate manifests
+all-targets: all
 	@$(MAKE) build
 	@$(MAKE) build BIN=velero-restic-restore-helper
 
