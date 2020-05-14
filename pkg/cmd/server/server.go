@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -68,6 +69,16 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
+
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	ctrl "sigs.k8s.io/controller-runtime"
+
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 )
 
 const (
@@ -100,6 +111,10 @@ const (
 	defaultBackupTTL = 30 * 24 * time.Hour
 )
 
+var (
+	scheme = runtime.NewScheme()
+)
+
 // list of available controllers for input validation
 var disableControllerList = []string{
 	BackupControllerKey,
@@ -111,6 +126,13 @@ var disableControllerList = []string{
 	DownloadRequestControllerKey,
 	ResticRepoControllerKey,
 	ServerStatusRequestControllerKey,
+}
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = velerov1.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
 }
 
 type serverConfig struct {
@@ -240,6 +262,9 @@ type server struct {
 	resticManager                       restic.RepositoryManager
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
+	kbClient                            kbclient.Client
+	kbCache                             kbcache.Cache
+	ctrlManager                         manager.Manager
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -294,6 +319,26 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		}
 	}
 
+	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		cancelFunc()
+		return nil, err
+	}
+
+	// logger.Debug("STARTING CACHE")
+	// var wgc sync.WaitGroup
+	// runstart := func() {
+	// 	defer wgc.Done()
+	// 	kbCache.Start(ctrl.SetupSignalHandler()) // ***this blocks
+	// 	logger.Debug("PAST CACHING insideyy")
+	// }
+	// wgc.Add(1)
+	// go runstart()
+	// wgc.Wait()
+	// logger.Debug("PAST CACHING OUTSIDE")
+
 	s := &server{
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
@@ -311,6 +356,9 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		logLevel:                            logger.Level,
 		pluginRegistry:                      pluginRegistry,
 		config:                              config,
+		kbClient:                            mgr.GetClient(),
+		kbCache:                             mgr.GetCache(),
+		ctrlManager:                         mgr,
 	}
 
 	return s, nil
@@ -338,14 +386,19 @@ func (s *server) run() error {
 		return err
 	}
 
-	if err := s.validateBackupStorageLocations(); err != nil {
-		return err
-	}
+	//
+	// if err := s.validateBackupStorageLocations(); err != nil {
+	// 	return err
+	// }
 
-	if _, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).Get(s.config.defaultBackupLocation, metav1.GetOptions{}); err != nil {
-		s.logger.WithError(errors.WithStack(err)).
-			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	}
+	// bsl := &velerov1.BackupStorageLocation{}
+	// if err := s.kbClient.Get(context.Background(), kbclient.ObjectKey{
+	// 	Namespace: s.namespace,
+	// 	Name:      s.config.defaultBackupLocation,
+	// }, bsl); err != nil {
+	// 	s.logger.WithError(errors.WithStack(err)).
+	// 		Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
+	// }
 
 	if err := s.initRestic(); err != nil {
 		return err
@@ -442,8 +495,10 @@ func (s *server) validateBackupStorageLocations() error {
 	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
 	defer pluginManager.CleanupClients()
 
-	locations, err := s.veleroClient.VeleroV1().BackupStorageLocations(s.namespace).List(metav1.ListOptions{})
-	if err != nil {
+	locations := &velerov1.BackupStorageLocationList{}
+	if err := s.kbClient.List(context.Background(), locations, &kbclient.ListOptions{
+		Namespace: s.namespace,
+	}); err != nil {
 		return errors.WithStack(err)
 	}
 
@@ -543,7 +598,7 @@ func (s *server) initRestic() error {
 		secretsInformer,
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
-		s.sharedInformerFactory.Velero().V1().BackupStorageLocations(),
+		s.kbCache,
 		s.kubeClient.CoreV1(),
 		s.kubeClient.CoreV1(),
 		s.logger,
@@ -611,10 +666,10 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
-			s.veleroClient.VeleroV1(),
+			s.kbClient,
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -653,7 +708,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.config.defaultBackupLocation,
 			s.config.defaultVolumesToRestic,
 			s.config.defaultBackupTTL,
@@ -693,7 +748,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 		)
 
 		return controllerRunInfo{
@@ -713,7 +768,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			csiVSLister,
 			csiVSCLister,
@@ -748,7 +803,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			restorer,
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			s.logger,
 			s.logLevel,
@@ -769,7 +824,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 			s.veleroClient.VeleroV1(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.resticManager,
 			s.config.defaultResticMaintenanceFrequency,
 		)
@@ -785,7 +840,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
 			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			s.kbCache,
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
 			s.logger,
@@ -872,12 +927,23 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
+	// instantiate cache
+	// go func() {
+	//     // start the cache- this blocks on signal handlers
+	// }
+	// pass cache to controllers
+	// start controllers
+	// wait for controllers to shutdown
+	// once they, have the start caches (blocking call) unblocked by sending a signal asking to exit
+
 	// now that the informer caches have all synced, we can start running the controllers
+
 	for i := range controllers {
 		controllerRunInfo := controllers[i]
 
 		wg.Add(1)
 		go func() {
+			s.logger.Debug("---->>> add controller: ", controllerRunInfo.controller)
 			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
 			wg.Done()
 		}()
@@ -885,6 +951,19 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	s.logger.Info("Server started successfully")
 
+	s.logger.Debug("CACHING OUTSIDE")
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s.logger.Debug("------------->>>CACHING INSIDE<<<----------")
+		// +kubebuilder:scaffold:builder
+		if err := s.ctrlManager.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
+			s.logger.Error(err, "problem running manager")
+			s.logger.Debug("------------->>>CACHING INSIDE AFTERRRRRR<<<----------")
+		}
+	}()
+
+	// wg.Done()
 	<-ctx.Done()
 
 	s.logger.Info("Waiting for all controllers to shut down gracefully")

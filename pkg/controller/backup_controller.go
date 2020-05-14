@@ -19,6 +19,7 @@ package controller
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -40,6 +41,7 @@ import (
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -57,6 +59,9 @@ import (
 	kubeutil "github.com/vmware-tanzu/velero/pkg/util/kube"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
+
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupController struct {
@@ -69,14 +74,14 @@ type backupController struct {
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker               BackupTracker
-	backupLocationLister        velerov1listers.BackupStorageLocationLister
+	kbCache                     kbcache.Cache
 	defaultBackupLocation       string
 	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
-	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore              func(*velerov1apikb.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
@@ -91,7 +96,7 @@ func NewBackupController(
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbCache kbcache.Cache,
 	defaultBackupLocation string,
 	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
@@ -112,7 +117,7 @@ func NewBackupController(
 		backupLogLevel:              backupLogLevel,
 		newPluginManager:            newPluginManager,
 		backupTracker:               backupTracker,
-		backupLocationLister:        backupLocationLister,
+		kbCache:                     kbCache,
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
@@ -371,7 +376,11 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	if storageLocation, err := c.backupLocationLister.BackupStorageLocations(request.Namespace).Get(request.Spec.StorageLocation); err != nil {
+	storageLocation := &velerov1apikb.BackupStorageLocation{}
+	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: request.Namespace,
+		Name:      request.Spec.StorageLocation,
+	}, storageLocation); err != nil {
 		if apierrors.IsNotFound(err) {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors, fmt.Sprintf("a BackupStorageLocation CRD with the name specified in the backup spec needs to be created before this backup can be executed. Error: %v", err))
 		} else {
@@ -380,7 +389,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	} else {
 		request.StorageLocation = storageLocation
 
-		if request.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
+		if request.StorageLocation.Spec.AccessMode == velerov1apikb.BackupStorageLocationAccessModeReadOnly {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}

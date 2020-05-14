@@ -21,8 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+func init() {
+	SchemeBuilder.Register(&BackupStorageLocation{}, &BackupStorageLocation{})
+}
 
 // BackupStorageLocationSpec defines the desired state of a Velero BackupStorageLocation
 type BackupStorageLocationSpec struct {
@@ -74,6 +75,7 @@ type BackupStorageLocationStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Backup Storage Location status such as Available/Unavailable"
@@ -120,7 +122,7 @@ type ObjectStorageLocation struct {
 	CACert []byte `json:"caCert,omitempty"`
 }
 
-// BackupStorageLocationPhase is the lifecyle phase of a Velero BackupStorageLocation.
+// BackupStorageLocationPhase is the lifecycle phase of a Velero BackupStorageLocation.
 // +kubebuilder:validation:Enum=Available;Unavailable
 type BackupStorageLocationPhase string
 

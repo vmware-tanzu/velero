@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -29,7 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -46,10 +50,10 @@ type downloadRequestController struct {
 	downloadRequestLister velerov1listers.DownloadRequestLister
 	restoreLister         velerov1listers.RestoreLister
 	clock                 clock.Clock
-	backupLocationLister  velerov1listers.BackupStorageLocationLister
+	kbCache               kbcache.Cache
 	backupLister          velerov1listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore        func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore        func(*velerov1apikb.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 // NewDownloadRequestController creates a new DownloadRequestController.
@@ -57,7 +61,7 @@ func NewDownloadRequestController(
 	downloadRequestClient velerov1client.DownloadRequestsGetter,
 	downloadRequestInformer velerov1informers.DownloadRequestInformer,
 	restoreLister velerov1listers.RestoreLister,
-	backupLocationLister velerov1listers.BackupStorageLocationLister,
+	kbCache kbcache.Cache,
 	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
@@ -67,7 +71,7 @@ func NewDownloadRequestController(
 		downloadRequestClient: downloadRequestClient,
 		downloadRequestLister: downloadRequestInformer.Lister(),
 		restoreLister:         restoreLister,
-		backupLocationLister:  backupLocationLister,
+		kbCache:               kbCache,
 		backupLister:          backupLister,
 
 		// use variables to refer to these functions so they can be
@@ -159,8 +163,11 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return errors.WithStack(err)
 	}
 
-	backupLocation, err := c.backupLocationLister.BackupStorageLocations(backup.Namespace).Get(backup.Spec.StorageLocation)
-	if err != nil {
+	backupLocation := &velerov1apikb.BackupStorageLocation{}
+	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: backup.Namespace,
+		Name:      backup.Spec.StorageLocation,
+	}, backupLocation); err != nil {
 		return errors.WithStack(err)
 	}
 

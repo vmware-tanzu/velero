@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 
+	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/label"
@@ -284,14 +285,9 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, bsl string) ([]byte, error) {
-	location, err := backupLocationLister.BackupStorageLocations(namespace).Get(bsl)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
-	}
-
-	if location.Spec.ObjectStorage != nil {
-		return location.Spec.ObjectStorage.CACert, nil
+func GetCACert(loc *velerov1.BackupStorageLocation) ([]byte, error) {
+	if loc.Spec.ObjectStorage != nil {
+		return loc.Spec.ObjectStorage.CACert, nil
 	}
 
 	return nil, nil
@@ -309,12 +305,7 @@ func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 // should be used when running a restic command for an Azure backend. This list is
 // the current environment, plus the Azure-specific variables restic needs, namely
 // a storage account name and key.
-func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
-	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
-	}
-
+func AzureCmdEnv(loc *velerov1.BackupStorageLocation) ([]string, error) {
 	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
@@ -332,12 +323,7 @@ func AzureCmdEnv(backupLocationLister velerov1listers.BackupStorageLocationListe
 // should be used when running a restic command for an S3 backend. This list is
 // the current environment, plus the AWS-specific variables restic needs, namely
 // a credential profile.
-func S3CmdEnv(backupLocationLister velerov1listers.BackupStorageLocationLister, namespace, backupLocation string) ([]string, error) {
-	loc, err := backupLocationLister.BackupStorageLocations(namespace).Get(backupLocation)
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting backup storage location")
-	}
-
+func S3CmdEnv(loc *velerov1.BackupStorageLocation) ([]string, error) {
 	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting aws restic env vars")

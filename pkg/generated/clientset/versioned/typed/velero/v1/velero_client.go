@@ -27,7 +27,6 @@ import (
 type VeleroV1Interface interface {
 	RESTClient() rest.Interface
 	BackupsGetter
-	BackupStorageLocationsGetter
 	DeleteBackupRequestsGetter
 	DownloadRequestsGetter
 	PodVolumeBackupsGetter
@@ -46,10 +45,6 @@ type VeleroV1Client struct {
 
 func (c *VeleroV1Client) Backups(namespace string) BackupInterface {
 	return newBackups(c, namespace)
-}
-
-func (c *VeleroV1Client) BackupStorageLocations(namespace string) BackupStorageLocationInterface {
-	return newBackupStorageLocations(c, namespace)
 }
 
 func (c *VeleroV1Client) DeleteBackupRequests(namespace string) DeleteBackupRequestInterface {

@@ -44,6 +44,11 @@ MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 GIT_SHA = $(shell git rev-parse HEAD)
 GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
 
+.PHONY: generate
+generate-all: ## Generate code and yaml manifests
+	$(MAKE) generate
+	$(MAKE) manifests
+
 ###
 ### These variables should not need tweaking.
 ###
@@ -214,10 +219,16 @@ ifneq ($(SKIP_TESTS), 1)
 	hack/test.sh $(WHAT)
 endif
 
-verify:
+verify: verify-gen
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
+
+verify-gen: generate 
+	@if !(git diff --quiet HEAD); then \
+		git diff; \
+		echo "files were out of date, `make generate` was run"; exit 1; \
+	fi
 
 update:
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"

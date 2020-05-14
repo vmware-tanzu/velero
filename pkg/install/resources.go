@@ -17,18 +17,23 @@ limitations under the License.
 package install
 
 import (
+	"io/ioutil"
+	"log"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
+	apiextinstall "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/install"
+	apiextv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
+	v1api "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
-	"github.com/vmware-tanzu/velero/pkg/generated/crds"
+	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 )
 
 // Use "latest" if the build process didn't supply a version
@@ -137,17 +142,17 @@ func Namespace(namespace string) *corev1.Namespace {
 	}
 }
 
-func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *v1.BackupStorageLocation {
-	return &v1.BackupStorageLocation{
+func BackupStorageLocation(namespace, provider, bucket, prefix string, config map[string]string, caCert []byte) *v1api.BackupStorageLocation {
+	return &v1api.BackupStorageLocation{
 		ObjectMeta: objectMeta(namespace, "default"),
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "BackupStorageLocation",
-			APIVersion: v1.SchemeGroupVersion.String(),
+			APIVersion: v1api.GroupVersion.String(),
 		},
-		Spec: v1.BackupStorageLocationSpec{
+		Spec: v1api.BackupStorageLocationSpec{
 			Provider: provider,
-			StorageType: v1.StorageType{
-				ObjectStorage: &v1.ObjectStorageLocation{
+			StorageType: v1api.StorageType{
+				ObjectStorage: &v1api.ObjectStorageLocation{
 					Bucket: bucket,
 					Prefix: prefix,
 					CACert: caCert,
@@ -228,7 +233,25 @@ func AllCRDs() *unstructured.UnstructuredList {
 	// Set the GVK so that the serialization framework outputs the list properly
 	resources.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "List"})
 
-	for _, crd := range crds.CRDs {
+	apiextinstall.Install(scheme.Scheme)
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+
+	files, err := ioutil.ReadDir("config/crd/bases")
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		data, err := ioutil.ReadFile("config/crd/bases/" + f.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		obj, _, err := decode([]byte(data), nil, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		crd := obj.(*apiextv1beta1.CustomResourceDefinition)
 		crd.SetLabels(labels())
 		appendUnstructured(resources, crd)
 	}

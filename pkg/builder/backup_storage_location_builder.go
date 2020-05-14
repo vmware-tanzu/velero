@@ -19,7 +19,7 @@ package builder
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/api/v1"
 )
 
 // BackupStorageLocationBuilder builds BackupStorageLocation objects.
@@ -32,7 +32,7 @@ func ForBackupStorageLocation(ns, name string) *BackupStorageLocationBuilder {
 	return &BackupStorageLocationBuilder{
 		object: &velerov1api.BackupStorageLocation{
 			TypeMeta: metav1.TypeMeta{
-				APIVersion: velerov1api.SchemeGroupVersion.String(),
+				APIVersion: velerov1api.GroupVersion.String(),
 				Kind:       "BackupStorageLocation",
 			},
 			ObjectMeta: metav1.ObjectMeta{

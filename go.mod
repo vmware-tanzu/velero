@@ -23,6 +23,7 @@ require (
 	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.0
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.0.0
+	github.com/prometheus/common v0.4.1
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8
 	github.com/sirupsen/logrus v1.4.2
 	github.com/smartystreets/goconvey v1.6.4 // indirect

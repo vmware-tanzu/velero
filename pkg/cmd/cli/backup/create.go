@@ -17,14 +17,19 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
+	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -33,9 +38,22 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
+
+var (
+	scheme = runtime.NewScheme()
+)
+
+func init() {
+	_ = clientgoscheme.AddToScheme(scheme)
+
+	_ = velerov1api.AddToScheme(scheme)
+	// +kubebuilder:scaffold:scheme
+}
 
 func NewCreateCommand(f client.Factory, use string) *cobra.Command {
 	o := NewCreateOptions()
@@ -146,13 +164,29 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
+	clientConfig, err := f.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+		Scheme: scheme,
+	})
+	if err != nil {
+		return err
+	}
+
 	// Ensure that unless FromSchedule is set, args contains a backup name
 	if o.FromSchedule == "" && len(args) != 1 {
 		return fmt.Errorf("a backup name is required, unless you are creating based on a schedule")
 	}
 
 	if o.StorageLocation != "" {
-		if _, err := o.client.VeleroV1().BackupStorageLocations(f.Namespace()).Get(o.StorageLocation, metav1.GetOptions{}); err != nil {
+		location := &velerov1apikb.BackupStorageLocation{}
+		if err := clientKB.Get(context.Background(), kbclient.ObjectKey{
+			Namespace: f.Namespace(),
+			Name:      o.StorageLocation,
+		}, location); err != nil {
 			return err
 		}
 	}
