@@ -14,9 +14,9 @@
 
 ## Emeritus Maintainers
 
-## Velero Core Contributors & Stakeholders
+## Velero Contributors & Stakeholders
 
-| Contour Feature Area | Lead |
+| Feature Area | Lead |
 | ----------------------------- | :---------------------: |
 | Technical Lead | Steve Kriss (skriss) |
 | Kubernetes CSI Liaison | Nolan Brubaker (nrb), Ashish Amarnath (ashish-amarnath) |
