@@ -17,7 +17,6 @@ The following code repositories are governed by Velero community and maintained 
 * **[Velero Plugin for AWS](https://github.com/vmware-tanzu/velero-plugin-for-aws):** This repository contains the plugins to support running Velero on AWS, including the object store plugin and the volume snapshotter plugin
 * **[Velero Plugin for GCP](https://github.com/vmware-tanzu/velero-plugin-for-gcp):** This repository contains the plugins to support running Velero on GCP, including the object store plugin and the volume snapshotter plugin
 * **[Velero Plugin for Azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure):** This repository contains the plugins to support running Velero on Azure, including the object store plugin and the volume snapshotter plugin
-* **[Velero Plugin for AWS](https://github.com/vmware-tanzu/helm-charts/tree/master/charts/velero):** The Helm chart for the Velero server component
 * **[Velero Plugin Example](https://github.com/vmware-tanzu/velero-plugin-example):** This repository contains example plugins for Velero
 
 
