@@ -91,7 +91,7 @@ To maintain velocity in a project as busy as Velero, the concept of [Lazy
 Consensus](http://en.osswiki.info/concepts/lazy_consensus) is practiced. Ideas
 and / or proposals should be shared by maintainers via
 GitHub with the appropriate maintainer groups (e.g.,
-`@vmware-tanzu/velero-owners`) tagged. Out of respect for other contributors,
+`@vmware-tanzu/velero-maintainers`) tagged. Out of respect for other contributors,
 major changes should also be accompanied by a ping on Slack or a note on the
 Velero mailing list as appropriate. Author(s) of proposal, Pull Requests,
 issues, etc.  will give a time period of no less than five (5) working days for
