@@ -1,4 +1,4 @@
-# Progress reporting for backups and restores handled by plugin volume snapshotters
+# Progress reporting for backups and restores handled by volume snapshotters
 
 Users face difficulty in knowing the progress of backup/restore operations of volume snapshotters. This is very similar to the issues faced by users to know progress for restic backup/restore, like, estimation of operation, operation in-progress/hung etc.
 
@@ -111,10 +111,17 @@ type VolumePluginBackup struct {
 }
 ```
 
-For every backup operation of volume, Volume snapshotter creates VolumePluginBackup CR in Velero namespace with the name which will be same as return value from CreateSnapshot.
+For every backup operation of volume, volume snapshotter creates VolumePluginBackup CR in Velero namespace.
 It keep updating the progress of operation along with other details like Volume name, Backup Name, SnapshotID etc as mentioned in the CR.
 
-After return from `CreateSnapshot` in `takePVSnapshot`, if VolumePluginBackup CR of snapshotID exists, Velero adds this CR to backupRequest.
+In order to know the CR created for the particular backup of a volume, volume snapshotters adds following labels to CR:
+`velero.io/backup-name` with value as Backup Name, and,
+`velero.io/volume-name` with value as volume that is undergoing backup
+Backup name being unique won't cause issues like duplicates in identifying the CR.
+
+Though no restrictions are required on the name of CR, as a general practice, volume snapshotter can name this CR with the value same as return value of CreateSnapshot.
+
+After return from `CreateSnapshot` in `takePVSnapshot`, if VolumePluginBackup CR exists for particular backup of the volume, velero adds this CR to `backupRequest`.
 During persistBackup call, this CR also will be backed up to backup location.
 
 In backupSyncController, it checks for any VolumePluginBackup CRs that need to be synced from backup location, and syncs them to cluster if needed.
@@ -189,19 +196,25 @@ type VolumePluginRestore struct {
 ```
 
 For every restore operation of volume, Volume snapshotter creates VolumePluginRestore CR in Velero namespace.
-There is no restriction on CR name as there is no need for Velero to persist this to backup location.
-
 Plugin keep updating the progress of operation along with other details like Volume name, Backup Name, SnapshotID etc as mentioned in the CR.
+
+Snapshot ID that need to be restored will help to identify related VolumePluginBackup CR.
+
+In order to identify the CR created for the particular restore of a volume, volume snapshotters adds following labels to CR:
+`velero.io/backup-name` with value as Backup Name, and,
+`velero.io/snapshot-id` with value as snapshot id that need to be restored
+
+### API Upgrade
+When CRs gets upgraded, velero can support older API versions also (till they get deprecated) to identify the CRs that need to be persisted to backup location.
+However, it can provide preference over latest supported API.
+
+If new fields are added without changing API version, it won't cause any problem as these resources are intended to provide information, and, there is no reconciliation on these resources.
 
 ##Limitations:
 
 Non K8s native plugins will not be able to implement this as they can not create the CRs.
 
 ## Open Questions
-
-- Do we need constraint on the name of VolumePluginBackup CR?
-
-- Don't we need constraint on the name of VolumePluginRestore CR?
 
 ## Alternatives Considered
 
@@ -215,6 +228,10 @@ As volume plugins are mostly K8s native, its fine to go ahead with current limia
 
 ### Update Backup CR
 Instead of creating new CRs, plugins can directly update the status of Backup CR. But, this deviates from current approach of having seperate CRs like PodVolumeBackup/PodVolumeRestore to know operations progress.
+
+### Restricting on name rather than using labels
+Instead of using labels to identify the CR related to particular backup on a volume, restrictions can be placed on the name of VolumePluginBackup CR to be same as the value returned from CreateSnapshot.
+But, this can cause issue when volume snapshotter just crashed without returning snapshot id to velero.
 
 ## Security Considerations
 
