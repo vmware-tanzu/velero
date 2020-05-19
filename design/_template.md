@@ -1,7 +1,5 @@
 # Design proposal template `<replace with your proposal's title>`
 
-Status: {Draft,Reviewing,Accepted,Declined}
-
 _Note_: The preferred style for design documents is one sentence per line.
 *Do not wrap lines*.
 This aids in review of the document as changes to a line are not obscured by the reflowing those changes caused and has a side effect of avoiding debate about one or two space after a period.
