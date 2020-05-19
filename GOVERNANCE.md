@@ -8,7 +8,7 @@ This document defines the project governance for Velero.
 
 ## Code Repositories
 
-The following code repositories are governed by Velero community and maintained under the `vmware-tanzu\Velero` namespace.
+The following code repositories are governed by Velero community and maintained under the `vmware-tanzu\Velero` organization.
 
 * **[Velero](https://github.com/vmware-tanzu/velero):** Main Velero codebase
 * **[Helm Chart](https://github.com/vmware-tanzu/helm-charts/tree/master/charts/velero):** The Helm chart for the Velero server component
@@ -76,13 +76,11 @@ Use the [Proposal Template](https://github.com/vmware-tanzu/velero/blob/master/d
 
 ### Proposal Lifecycle
 
-The proposal PR can be marked with different status labels to represent the
-status of the proposal:
+The proposal PR can follow the GitHub lifecycle of the PR to indicate its status:
 
-* **Draft**: Proposal is just created.
-* **Reviewing**: Proposal is under review and discussion.
-* **Accepted**: Proposal has been reviewed and is accepted (either by consensus or through a vote).
-* **Declined**: Proposal has been reviewed and was rejected (either by consensus or through a vote).
+* **Open**: Proposal is created and under review and discussion.
+* **Merged**: Proposal has been reviewed and is accepted (either by consensus or through a vote).
+* **Closed**: Proposal has been reviewed and was rejected (either by consensus or through a vote).
 
 ## Lazy Consensus
 
