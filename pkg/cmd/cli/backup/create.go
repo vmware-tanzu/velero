@@ -27,6 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -36,7 +38,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )

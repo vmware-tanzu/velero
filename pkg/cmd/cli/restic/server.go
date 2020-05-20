@@ -34,6 +34,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -45,12 +47,10 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -62,7 +62,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = velerov1.AddToScheme(scheme)
+	_ = veleroapiv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

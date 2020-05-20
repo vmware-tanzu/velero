@@ -74,9 +74,10 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 )
 
 const (
