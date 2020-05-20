@@ -17,8 +17,55 @@ For example, if you use [Portworx][4] for persistent storage, you can install th
 
 If there is no native snapshot plugin available for your storage platform, you can use Velero's [restic integration][1], which provides a platform-agnostic file-level backup solution for volume data.
 
+### Air-gapped deployments
+
+In an air-gapped deployment, there is no access to the public internet, and therefore no access to public container registries.
+
+In these scenarios, you will need to make sure that you have an internal registry, such as [Harbor][5], installed and the Velero core and plugin images loaded into your internal registry.
+
+Below you will find instructions to downloading the Velero images to your local machine, tagging them, then uploading them to your custom registry.
+
+#### Preparing the Velero image
+
+First, download the Velero image, tag it for the your private registry, then upload it into the registry so that it can be pulled by your cluster.
+
+```bash
+PRIVATE_REG=<your private registry>
+VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+
+docker pull velero/velero:$VELERO_VERSION
+docker tag velero/velero:$VELERO_VERSION $PRIVATE_REG/velero:$VELERO_VERSION
+docker push $PRIVATE_REG/velero:$VELERO_VERSION
+```
+
+#### Preparing plugin images
+
+Next, repeat these steps for any plugins you may need. This example will use the AWS plugin, but the plugin name should be replaced with the plugins you will need.
+
+```bash
+PRIVATE_REG=<your private registry>
+PLUGIN_VERSION=<version of plugin you're targetting, e.g. v1.0.2>
+
+docker pull velero/velero-plugin-for-aws:$PLUGIN_VERSION
+docker tag velero/velero-plugin-for-aws:$PLUGIN_VERSION $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
+docker push $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
+```
+
+#### Installing Velero
+
+By default, `velero install` will use the public `velero/velero` image. When using an air-gapped deployment, use your private registry's image for Velero and your private registry's images for any plugins.
+
+```bash
+velero install \
+ --image=$PRIVATE_REG/velero:$VELERO_VERSION \
+ --plugin=$PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION \
+<....>
+```
+
+
 [0]: supported-providers.md
 [1]: restic.md
 [2]: https://min.io
 [3]: contributions/minio.md
 [4]: https://portworx.com
+[5]: https://goharbor.io/
