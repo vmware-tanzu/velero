@@ -51,6 +51,27 @@ docker tag velero/velero-plugin-for-aws:$PLUGIN_VERSION $PRIVATE_REG/velero-plug
 docker push $PRIVATE_REG/velero-plugin-for-aws:$PLUGIN_VERSION
 ```
 
+#### Preparing the restic helper image (optional)
+
+If you are using restic, you will also need to upload the restic helper image.
+
+```bash
+PRIVATE_REG=<your private registry>
+VELERO_VERSION=<version of Velero you're targetting, e.g. v1.4.0>
+
+docker pull velero/velero-restic-restore-helper:$VELERO_VERSION
+docker tag velero/velero-restic-restore-helper:$VELERO_VERSION $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION
+docker push $PRIVATE_REG/velero-restic-restore-helper:$VELERO_VERSION
+```
+
+#### Pulling specific architecture images (optional)
+
+Velero uses Docker manifests for its images, allowing Docker to pull the image needed based on your client machine's architecture.
+
+If you need to pull a specific image, you should replace the `velero/velero` image with the specific architecture image, such as `velero/velero-arm`.
+
+To see an up-to-date list of architectures, be sure to enable Docker experimental features and use `docker manifest inspect velero/velero` (or whichever image you're interested in), and join the architecture string to the end of the image name with `-`.
+
 #### Installing Velero
 
 By default, `velero install` will use the public `velero/velero` image. When using an air-gapped deployment, use your private registry's image for Velero and your private registry's images for any plugins.
