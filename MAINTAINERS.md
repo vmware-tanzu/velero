@@ -13,6 +13,8 @@
 | Stephanie Bauman | [stephbman](https://github.com/stephbman) | [VMware](https://www.github.com/vmware/) |
 
 ## Emeritus Maintainers
+* Andy Goldstein ([ncdc](https://github.com/ncdc))
+* Adnan Abdulhussein ([prydonius](https://github.com/prydonius))
 
 ## Velero Contributors & Stakeholders
 
