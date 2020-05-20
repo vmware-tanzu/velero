@@ -64,7 +64,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = velerov1.AddToScheme(scheme)
+	_ = veleroapiv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
