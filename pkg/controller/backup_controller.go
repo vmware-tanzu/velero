@@ -533,7 +533,7 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		return err
 	}
 
-	backupLog.Info("Setting up backup store")
+	backupLog.Info("Setting up backup store to check for backup existence")
 	backupStore, err := c.newBackupStore(backup.StorageLocation, pluginManager, backupLog)
 	if err != nil {
 		return err
@@ -610,6 +610,14 @@ func (c *backupController) runBackup(backup *pkgbackup.Request) error {
 		backup.Status.Phase = velerov1api.BackupPhasePartiallyFailed
 	default:
 		backup.Status.Phase = velerov1api.BackupPhaseCompleted
+	}
+
+	// re-instantiate the backup store because credentials could have changed since the original
+	// instantiation, if this was a long-running backup
+	backupLog.Info("Setting up backup store to persist the backup")
+	backupStore, err = c.newBackupStore(backup.StorageLocation, pluginManager, backupLog)
+	if err != nil {
+		return err
 	}
 
 	if errs := persistBackup(backup, backupFile, logFile, backupStore, c.logger, volumeSnapshots, volumeSnapshotContents); len(errs) > 0 {

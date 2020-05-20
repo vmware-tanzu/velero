@@ -274,6 +274,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 type backupInfo struct {
 	backup      *api.Backup
+	location    *api.BackupStorageLocation
 	backupStore persistence.BackupStore
 }
 
@@ -407,6 +408,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 
 	return backupInfo{
 		backup:      backup,
+		location:    location,
 		backupStore: backupStore,
 	}, nil
 }
@@ -466,6 +468,13 @@ func (c *restoreController) runValidatedRestore(restore *api.Restore, info backu
 	}
 	restoreWarnings, restoreErrors := c.restorer.Restore(restoreReq, actions, c.snapshotLocationLister, pluginManager)
 	restoreLog.Info("restore completed")
+
+	// re-instantiate the backup store because credentials could have changed since the original
+	// instantiation, if this was a long-running restore
+	info.backupStore, err = c.newBackupStore(info.location, pluginManager, c.logger)
+	if err != nil {
+		return errors.Wrap(err, "error setting up backup store to persist log and results files")
+	}
 
 	if logReader, err := restoreLog.done(c.logger); err != nil {
 		restoreErrors.Velero = append(restoreErrors.Velero, fmt.Sprintf("error getting restore log reader: %v", err))
