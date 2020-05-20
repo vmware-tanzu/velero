@@ -43,7 +43,7 @@ MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 #kubebuilder automatically runs "make" when a resource or controller is created
 all: generate-all
 
-.PHONY: generate
+.PHONY: generate-all
 generate-all: ## Generate code and yaml manifests
 	$(MAKE) generate
 	$(MAKE) manifests
@@ -214,18 +214,12 @@ ifneq ($(SKIP_TESTS), 1)
 	hack/test.sh $(WHAT)
 endif
 
-verify: verify-gen
+verify:
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
-verify-gen: generate 
-	@if !(git diff --quiet HEAD); then \
-		git diff; \
-		echo "files were out of date, `make generate` was run"; exit 1; \
-	fi
-
-update:
+update: generate-all
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 build-dirs:
