@@ -21,20 +21,4 @@ set -o xtrace
 
 # this script expects to be run from the root of the Velero repo.
 
-if [[ -z "${GOPATH}" ]]; then
-  GOPATH=~/go
-fi
-
-if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
-  echo "k8s.io/code-generator missing from GOPATH"
-  exit 1
-fi
-
-${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
-  all \
-  github.com/vmware-tanzu/velero/pkg/generated \
-  github.com/vmware-tanzu/velero/pkg/apis \
-  "velero:v1" \
-  --go-header-file ./hack/boilerplate.go.txt \
-  --output-base ../../.. \
-  $@
+go generate ./config/crd/crds
