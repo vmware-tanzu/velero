@@ -377,19 +377,18 @@ func (s *server) run() error {
 		return err
 	}
 
-	//
-	// if err := s.validateBackupStorageLocations(); err != nil {
-	// 	return err
-	// }
+	if err := s.validateBackupStorageLocations(); err != nil {
+		return err
+	}
 
-	// bsl := &veleroapiv1.BackupStorageLocation{}
-	// if err := s.k8sclient.Get(context.Background(), k8sclient.ObjectKey{
-	// 	Namespace: s.namespace,
-	// 	Name:      s.config.defaultBackupLocation,
-	// }, bsl); err != nil {
-	// 	s.logger.WithError(errors.WithStack(err)).
-	// 		Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
-	// }
+	bsl := &veleroapiv1.BackupStorageLocation{}
+	if err := s.mgr.GetAPIReader().Get(context.Background(), k8sclient.ObjectKey{
+		Namespace: s.namespace,
+		Name:      s.config.defaultBackupLocation,
+	}, bsl); err != nil {
+		s.logger.WithError(errors.WithStack(err)).
+			Warnf("A backup storage location named %s has been specified for the server to use by default, but no corresponding backup storage location exists. Backups with a location not matching the default will need to explicitly specify an existing location", s.config.defaultBackupLocation)
+	}
 
 	if err := s.initRestic(); err != nil {
 		return err
@@ -487,7 +486,7 @@ func (s *server) validateBackupStorageLocations() error {
 	defer pluginManager.CleanupClients()
 
 	locations := &veleroapiv1.BackupStorageLocationList{}
-	if err := s.mgr.GetClient().List(context.Background(), locations, &k8sclient.ListOptions{
+	if err := s.mgr.GetAPIReader().List(context.Background(), locations, &k8sclient.ListOptions{
 		Namespace: s.namespace,
 	}); err != nil {
 		return errors.WithStack(err)
