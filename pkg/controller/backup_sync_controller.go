@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -38,33 +38,31 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupSyncController struct {
 	*genericController
 
 	backupClient            velerov1client.BackupsGetter
-	backupLocationClient    kbclient.Client
+	k8sClient               client.Client
 	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	backupLister            velerov1listers.BackupLister
 	csiSnapshotClient       *snapshotterClientSet.Clientset
 	kubeClient              kubernetes.Interface
-	kbCache                 kbcache.Cache
 	namespace               string
 	defaultBackupLocation   string
 	defaultBackupSyncPeriod time.Duration
 	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore          func(*velerov1apikb.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore          func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
-	backupLocationClient kbclient.Client,
+	k8sClient client.Client,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
-	kbCache kbcache.Cache,
 	syncPeriod time.Duration,
 	namespace string,
 	csiSnapshotClient *snapshotterClientSet.Clientset,
@@ -81,13 +79,12 @@ func NewBackupSyncController(
 	c := &backupSyncController{
 		genericController:       newGenericController("backup-sync", logger),
 		backupClient:            backupClient,
-		backupLocationClient:    backupLocationClient,
+		k8sClient:               k8sClient,
 		podVolumeBackupClient:   podVolumeBackupClient,
 		namespace:               namespace,
 		defaultBackupLocation:   defaultBackupLocation,
 		defaultBackupSyncPeriod: syncPeriod,
 		backupLister:            backupLister,
-		kbCache:                 kbCache,
 		csiSnapshotClient:       csiSnapshotClient,
 		kubeClient:              kubeClient,
 
@@ -105,8 +102,8 @@ func NewBackupSyncController(
 
 // orderedBackupLocations returns a new slice with the default backup location first (if it exists),
 // followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locationList *velerov1apikb.BackupStorageLocationList, defaultLocationName string) []velerov1apikb.BackupStorageLocation {
-	var result []velerov1apikb.BackupStorageLocation
+func orderedBackupLocations(locationList *veleroapiv1.BackupStorageLocationList, defaultLocationName string) []veleroapiv1.BackupStorageLocation {
+	var result []veleroapiv1.BackupStorageLocation
 
 	for i := range locationList.Items {
 		if locationList.Items[i].Name == defaultLocationName {
@@ -127,8 +124,8 @@ func orderedBackupLocations(locationList *velerov1apikb.BackupStorageLocationLis
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locationList := &velerov1apikb.BackupStorageLocationList{}
-	if err := c.kbCache.List(context.Background(), locationList, &kbclient.ListOptions{
+	locationList := &veleroapiv1.BackupStorageLocationList{}
+	if err := c.k8sClient.List(context.Background(), locationList, &client.ListOptions{
 		Namespace: c.namespace,
 	}); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
@@ -310,8 +307,8 @@ func (c *backupSyncController) run() {
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
-		locationUpdate := &velerov1apikb.BackupStorageLocation{}
-		if err = c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+		locationUpdate := &veleroapiv1.BackupStorageLocation{}
+		if err = c.k8sClient.Get(context.Background(), k8sclient.ObjectKey{
 			Namespace: c.namespace,
 			Name:      location.Name,
 		}, locationUpdate); err != nil {
@@ -319,7 +316,7 @@ func (c *backupSyncController) run() {
 			continue
 		}
 		locationUpdate.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.backupLocationClient.Update(context.Background(), locationUpdate); err != nil {
+		if err := c.k8sClient.Update(context.Background(), locationUpdate); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"sort"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/util/collections"
 	"github.com/vmware-tanzu/velero/pkg/volume"
@@ -37,7 +37,7 @@ type itemKey struct {
 type Request struct {
 	*velerov1api.Backup
 
-	StorageLocation           *velerov1apikb.BackupStorageLocation
+	StorageLocation           *veleroapiv1.BackupStorageLocation
 	SnapshotLocations         []*velerov1api.VolumeSnapshotLocation
 	NamespaceIncludesExcludes *collections.IncludesExcludes
 	ResourceIncludesExcludes  *collections.IncludesExcludes

@@ -74,9 +74,8 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	velerov1 "github.com/vmware-tanzu/velero/api/v1"
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -130,7 +129,7 @@ var disableControllerList = []string{
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = velerov1.AddToScheme(scheme)
+	_ = veleroapiv1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -258,9 +257,7 @@ type server struct {
 	resticManager                       restic.RepositoryManager
 	metrics                             *metrics.ServerMetrics
 	config                              serverConfig
-	kbClient                            kbclient.Client
-	kbCache                             kbcache.Cache
-	ctrlManager                         manager.Manager
+	mgr                                 manager.Manager
 }
 
 func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*server, error) {
@@ -352,9 +349,7 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		logLevel:                            logger.Level,
 		pluginRegistry:                      pluginRegistry,
 		config:                              config,
-		kbClient:                            mgr.GetClient(),
-		kbCache:                             mgr.GetCache(),
-		ctrlManager:                         mgr,
+		mgr:                                 mgr,
 	}
 
 	return s, nil
@@ -387,8 +382,8 @@ func (s *server) run() error {
 	// 	return err
 	// }
 
-	// bsl := &velerov1.BackupStorageLocation{}
-	// if err := s.kbClient.Get(context.Background(), kbclient.ObjectKey{
+	// bsl := &veleroapiv1.BackupStorageLocation{}
+	// if err := s.k8sclient.Get(context.Background(), k8sclient.ObjectKey{
 	// 	Namespace: s.namespace,
 	// 	Name:      s.config.defaultBackupLocation,
 	// }, bsl); err != nil {
@@ -491,8 +486,8 @@ func (s *server) validateBackupStorageLocations() error {
 	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
 	defer pluginManager.CleanupClients()
 
-	locations := &velerov1.BackupStorageLocationList{}
-	if err := s.kbClient.List(context.Background(), locations, &kbclient.ListOptions{
+	locations := &veleroapiv1.BackupStorageLocationList{}
+	if err := s.mgr.GetClient().List(context.Background(), locations, &k8sclient.ListOptions{
 		Namespace: s.namespace,
 	}); err != nil {
 		return errors.WithStack(err)
@@ -594,7 +589,7 @@ func (s *server) initRestic() error {
 		secretsInformer,
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
-		s.kbCache,
+		s.mgr.GetCache(),
 		s.kubeClient.CoreV1(),
 		s.kubeClient.CoreV1(),
 		s.logger,
@@ -662,10 +657,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
 			s.veleroClient.VeleroV1(),
-			s.kbClient,
+			s.mgr.GetClient(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.kbCache,
 			s.config.backupSyncPeriod,
 			s.namespace,
 			s.csiSnapshotClient,
@@ -703,7 +697,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logLevel,
 			newPluginManager,
 			backupTracker,
-			s.kbCache,
+			s.mgr.GetClient(),
 			s.config.defaultBackupLocation,
 			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
@@ -742,7 +736,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.sharedInformerFactory.Velero().V1().Backups(),
 			s.sharedInformerFactory.Velero().V1().DeleteBackupRequests().Lister(),
 			s.veleroClient.VeleroV1(),
-			s.kbCache,
+			s.mgr.GetClient(),
 		)
 
 		return controllerRunInfo{
@@ -762,7 +756,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.resticManager,
 			s.sharedInformerFactory.Velero().V1().PodVolumeBackups().Lister(),
-			s.kbCache,
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			csiVSLister,
 			csiVSCLister,
@@ -797,7 +791,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			restorer,
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
-			s.kbCache,
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			s.logger,
 			s.logLevel,
@@ -818,7 +812,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.logger,
 			s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 			s.veleroClient.VeleroV1(),
-			s.kbCache,
+			s.mgr.GetClient(),
 			s.resticManager,
 			s.config.defaultResticMaintenanceFrequency,
 		)
@@ -834,7 +828,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().DownloadRequests(),
 			s.sharedInformerFactory.Velero().V1().Restores().Lister(),
-			s.kbCache,
+			s.mgr.GetClient(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			newPluginManager,
 			s.logger,
@@ -921,23 +915,11 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.WithField("informer", informer).Info("Informer cache synced")
 	}
 
-	// instantiate cache
-	// go func() {
-	//     // start the cache- this blocks on signal handlers
-	// }
-	// pass cache to controllers
-	// start controllers
-	// wait for controllers to shutdown
-	// once they, have the start caches (blocking call) unblocked by sending a signal asking to exit
-
-	// now that the informer caches have all synced, we can start running the controllers
-
 	for i := range controllers {
 		controllerRunInfo := controllers[i]
 
 		wg.Add(1)
 		go func() {
-			s.logger.Debug("---->>> add controller: ", controllerRunInfo.controller)
 			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
 			wg.Done()
 		}()
@@ -945,19 +927,15 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	s.logger.Info("Server started successfully")
 
-	s.logger.Debug("CACHING OUTSIDE")
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		s.logger.Debug("------------->>>CACHING INSIDE<<<----------")
 		// +kubebuilder:scaffold:builder
-		if err := s.ctrlManager.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
-			s.logger.Error(err, "problem running manager")
-			s.logger.Debug("------------->>>CACHING INSIDE AFTERRRRRR<<<----------")
+		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
+			s.logger.Fatal("Problem starting manager", err)
 		}
 	}()
 
-	// wg.Done()
 	<-ctx.Done()
 
 	s.logger.Info("Waiting for all controllers to shut down gracefully")

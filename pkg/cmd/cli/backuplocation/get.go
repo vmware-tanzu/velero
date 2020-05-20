@@ -21,7 +21,7 @@ import (
 
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -42,7 +42,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			clientConfig, err := f.ClientConfig()
 			cmd.CheckError(err)
 
-			clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+			clientKB, err := k8sclient.New(clientConfig, k8sclient.Options{
 				Scheme: scheme,
 			})
 			cmd.CheckError(err)
@@ -52,7 +52,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			locations = new(veleroapiv1.BackupStorageLocationList)
 			if len(args) > 0 {
 				for _, name := range args {
-					err = clientKB.Get(context.Background(), kbclient.ObjectKey{
+					err = clientKB.Get(context.Background(), k8sclient.ObjectKey{
 						Namespace: f.Namespace(),
 						Name:      name,
 					}, location)
@@ -60,7 +60,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					locations.Items = append(locations.Items, *location)
 				}
 			} else {
-				err := clientKB.List(context.Background(), locations, &kbclient.ListOptions{
+				err := clientKB.List(context.Background(), locations, &k8sclient.ListOptions{
 					Namespace: f.Namespace(),
 				})
 				cmd.CheckError(err)

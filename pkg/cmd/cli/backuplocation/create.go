@@ -34,7 +34,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -166,14 +166,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+	clientKB, err := k8sclient.New(clientConfig, k8sclient.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
 		return err
 	}
 
-	if err := clientKB.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
+	if err := clientKB.Create(context.Background(), backupStorageLocation, &k8sclient.CreateOptions{}); err != nil {
 		fmt.Println("argh")
 		return err
 	}

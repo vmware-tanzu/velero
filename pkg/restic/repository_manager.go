@@ -38,7 +38,7 @@ import (
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RepositoryManager executes commands against restic repositories.
@@ -246,7 +246,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.PasswordFile = file
 
 	location := &velerov1.BackupStorageLocation{}
-	if err := rm.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	if err := rm.kbCache.Get(context.Background(), k8sclient.ObjectKey{
 		Namespace: rm.namespace,
 		Name:      backupLocation,
 	}, location); err != nil {

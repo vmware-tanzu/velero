@@ -36,7 +36,7 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -51,8 +51,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restic"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const resticTimeout = time.Minute
@@ -68,7 +67,7 @@ type backupDeletionController struct {
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
-	kbCache                   kbcache.Cache
+	k8sClient                 client.Client
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
 	csiSnapshotLister         snapshotv1beta1listers.VolumeSnapshotLister
 	csiSnapshotContentLister  snapshotv1beta1listers.VolumeSnapshotContentLister
@@ -76,7 +75,7 @@ type backupDeletionController struct {
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore            func(*velerov1apikb.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore            func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
 }
 
@@ -91,7 +90,7 @@ func NewBackupDeletionController(
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
-	kbCache kbcache.Cache,
+	k8sClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
 	csiSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
@@ -109,7 +108,7 @@ func NewBackupDeletionController(
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
 		podvolumeBackupLister:     podvolumeBackupLister,
-		kbCache:                   kbCache,
+		k8sClient:                 k8sClient,
 		snapshotLocationLister:    snapshotLocationLister,
 		csiSnapshotLister:         csiSnapshotLister,
 		csiSnapshotContentLister:  csiSnapshotContentLister,
@@ -218,8 +217,8 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	}
 
 	// Don't allow deleting backups in read-only storage locations
-	location := &velerov1apikb.BackupStorageLocation{}
-	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	location := &veleroapiv1.BackupStorageLocation{}
+	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, location); err != nil {
@@ -233,7 +232,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if location.Spec.AccessMode == velerov1apikb.BackupStorageLocationAccessModeReadOnly {
+	if location.Spec.AccessMode == veleroapiv1.BackupStorageLocationAccessModeReadOnly {
 		_, err := c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
 			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))

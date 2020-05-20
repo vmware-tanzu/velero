@@ -36,7 +36,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -45,21 +45,22 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8scache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type podVolumeBackupController struct {
 	*genericController
 
-	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter
-	podVolumeBackupLister listers.PodVolumeBackupLister
-	secretLister          corev1listers.SecretLister
-	podLister             corev1listers.PodLister
-	pvcLister             corev1listers.PersistentVolumeClaimLister
-	pvLister              corev1listers.PersistentVolumeLister
-	kbCache               kbcache.Cache
-	nodeName              string
+	podVolumeBackupClient  velerov1client.PodVolumeBackupsGetter
+	podVolumeBackupLister  listers.PodVolumeBackupLister
+	secretLister           corev1listers.SecretLister
+	podLister              corev1listers.PodLister
+	pvcLister              corev1listers.PersistentVolumeClaimLister
+	pvLister               corev1listers.PersistentVolumeLister
+	backupLocationInformer k8scache.Informer
+	client                 client.Client
+	nodeName               string
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
 	fileSystem        filesystem.Interface
@@ -75,20 +76,21 @@ func NewPodVolumeBackupController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer kbcache.Informer,
-	kbCache kbcache.Cache,
+	backupLocationInformer k8scache.Informer,
+	client client.Client,
 	nodeName string,
 ) Interface {
 	c := &podVolumeBackupController{
-		genericController:     newGenericController("pod-volume-backup", logger),
-		podVolumeBackupClient: podVolumeBackupClient,
-		podVolumeBackupLister: podVolumeBackupInformer.Lister(),
-		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
-		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
-		pvcLister:             pvcInformer.Lister(),
-		pvLister:              pvInformer.Lister(),
-		kbCache:               kbCache,
-		nodeName:              nodeName,
+		genericController:      newGenericController("pod-volume-backup", logger),
+		podVolumeBackupClient:  podVolumeBackupClient,
+		podVolumeBackupLister:  podVolumeBackupInformer.Lister(),
+		podLister:              corev1listers.NewPodLister(podInformer.GetIndexer()),
+		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
+		pvcLister:              pvcInformer.Lister(),
+		pvLister:               pvInformer.Lister(),
+		backupLocationInformer: backupLocationInformer,
+		client:                 client,
+		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
 		clock:      &clock.RealClock{},
@@ -234,8 +236,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location := &velerov1apikb.BackupStorageLocation{}
-	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	location := &veleroapiv1.BackupStorageLocation{}
+	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, location); err != nil {
