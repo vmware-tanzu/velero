@@ -29,7 +29,7 @@ import (
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -39,7 +39,7 @@ import (
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
@@ -169,7 +169,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+	clientKB, err := k8sclient.New(clientConfig, k8sclient.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
@@ -182,8 +182,8 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 
 	if o.StorageLocation != "" {
-		location := &velerov1apikb.BackupStorageLocation{}
-		if err := clientKB.Get(context.Background(), kbclient.ObjectKey{
+		location := &veleroapiv1.BackupStorageLocation{}
+		if err := clientKB.Get(context.Background(), k8sclient.ObjectKey{
 			Namespace: f.Namespace(),
 			Name:      o.StorageLocation,
 		}, location); err != nil {

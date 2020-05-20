@@ -29,9 +29,6 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -40,6 +37,8 @@ import (
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
 	veleroexec "github.com/vmware-tanzu/velero/pkg/util/exec"
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
+	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // RepositoryManager executes commands against restic repositories.
@@ -247,7 +246,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.PasswordFile = file
 
 	location := &velerov1.BackupStorageLocation{}
-	if err := rm.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	if err := rm.kbCache.Get(context.Background(), k8sclient.ObjectKey{
 		Namespace: rm.namespace,
 		Name:      backupLocation,
 	}, location); err != nil {

@@ -29,7 +29,7 @@ import (
 	"github.com/sirupsen/logrus"
 	kerrors "k8s.io/apimachinery/pkg/util/errors"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/scheme"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -91,7 +91,7 @@ type ObjectStoreGetter interface {
 	GetObjectStore(provider string) (velero.ObjectStore, error)
 }
 
-func NewObjectBackupStore(location *velerov1apikb.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
+func NewObjectBackupStore(location *veleroapiv1.BackupStorageLocation, objectStoreGetter ObjectStoreGetter, logger logrus.FieldLogger) (BackupStore, error) {
 	if location.Spec.ObjectStorage == nil {
 		return nil, errors.New("backup storage location does not use object storage")
 	}

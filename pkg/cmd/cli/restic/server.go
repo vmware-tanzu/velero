@@ -36,7 +36,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -48,9 +48,8 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -110,8 +109,7 @@ type resticServer struct {
 	ctx                   context.Context
 	cancelFunc            context.CancelFunc
 	fileSystem            filesystem.Interface
-	kbClient              kbclient.Client
-	kbCache               kbcache.Cache
+	mgr                   manager.Manager
 }
 
 func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*resticServer, error) {
@@ -182,8 +180,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 		ctx:                   ctx,
 		cancelFunc:            cancelFunc,
 		fileSystem:            filesystem.NewFileSystem(),
-		kbClient:              mgr.GetClient(),
-		kbCache:               mgr.GetCache(),
+		mgr:                   mgr,
 	}
 
 	if err := s.validatePodVolumesHostPath(); err != nil {
@@ -200,11 +197,11 @@ func (s *resticServer) run() {
 
 	var wg sync.WaitGroup
 
-	// TODO(carlisia): how to handle this? Issues:
-	// - options are get informer for specific obj (below, but w/o namespace of obj name info) or for a specific kind (CRD?)
-	// - maybe it should go inside the controller? same above problems would apply tho
-	location := &velerov1apikb.BackupStorageLocation{}
-	bslInformer, _ := s.kbCache.GetInformer(location)
+	// TODO(carlisia): how to handle the fetching of the bsl informer:
+	// - options are: 1) get informer for specific obj (below, but w/o namespace or obj name info because we don't know it here) or 2) for a specific kind, which would be CRD?
+	// - should it go here, or inside the controller? Note that neither resolves issue above
+	location := &veleroapiv1.BackupStorageLocation{}
+	bslInformer, _ := s.mgr.GetCache().GetInformer(location)
 
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
@@ -215,7 +212,7 @@ func (s *resticServer) run() {
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		bslInformer,
-		s.kbCache,
+		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)
@@ -233,7 +230,7 @@ func (s *resticServer) run() {
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
 		bslInformer,
-		s.kbCache,
+		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
 	wg.Add(1)
@@ -248,6 +245,15 @@ func (s *resticServer) run() {
 	go s.secretInformer.Run(s.ctx.Done())
 
 	s.logger.Info("Controllers started successfully")
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		// +kubebuilder:scaffold:builder
+		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
+			s.logger.Fatal("Problem starting manager", err)
+		}
+	}()
 
 	<-s.ctx.Done()
 

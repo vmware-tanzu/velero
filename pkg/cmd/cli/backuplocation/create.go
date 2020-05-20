@@ -28,14 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
-
 	velerov1api "github.com/vmware-tanzu/velero/api/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -167,14 +166,14 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	clientKB, err := kbclient.New(clientConfig, kbclient.Options{
+	clientKB, err := k8sclient.New(clientConfig, k8sclient.Options{
 		Scheme: scheme,
 	})
 	if err != nil {
 		return err
 	}
 
-	if err := clientKB.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
+	if err := clientKB.Create(context.Background(), backupStorageLocation, &k8sclient.CreateOptions{}); err != nil {
 		fmt.Println("argh")
 		return err
 	}

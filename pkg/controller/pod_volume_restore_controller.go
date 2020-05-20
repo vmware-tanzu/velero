@@ -37,10 +37,10 @@ import (
 	corev1informers "k8s.io/client-go/informers/core/v1"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	k8scache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -60,7 +60,8 @@ type podVolumeRestoreController struct {
 	secretLister           corev1listers.SecretLister
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	pvLister               corev1listers.PersistentVolumeLister
-	kbCache                kbcache.Cache
+	backupLocationInformer k8scache.Informer
+	client                 client.Client
 	nodeName               string
 
 	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
@@ -77,8 +78,8 @@ func NewPodVolumeRestoreController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer kbcache.Informer,
-	kbCache kbcache.Cache,
+	backupLocationInformer k8scache.Informer,
+	client client.Client,
 	nodeName string,
 ) Interface {
 	c := &podVolumeRestoreController{
@@ -89,7 +90,8 @@ func NewPodVolumeRestoreController(
 		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		pvLister:               pvInformer.Lister(),
-		kbCache:                kbCache,
+		backupLocationInformer: backupLocationInformer,
+		client:                 client,
 		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -299,8 +301,8 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location := &velerov1apikb.BackupStorageLocation{}
-	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	location := &veleroapiv1.BackupStorageLocation{}
+	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, location); err != nil {
@@ -359,8 +361,8 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
-	location := &velerov1apikb.BackupStorageLocation{}
-	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	location := &veleroapiv1.BackupStorageLocation{}
+	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, location); err != nil {

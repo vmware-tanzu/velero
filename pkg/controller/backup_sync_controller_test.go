@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	core "k8s.io/client-go/testing"
 
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -40,17 +41,17 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation {
-	return []*velerov1api.BackupStorageLocation{
+func defaultLocationsList(namespace string) []*veleroapiv1.BackupStorageLocation {
+	return []*veleroapiv1.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      "location-1",
 			},
-			Spec: velerov1api.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket-1",
 					},
 				},
@@ -61,10 +62,10 @@ func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation
 				Namespace: namespace,
 				Name:      "location-2",
 			},
-			Spec: velerov1api.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket-2",
 					},
 				},
@@ -73,17 +74,17 @@ func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation
 	}
 }
 
-func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api.BackupStorageLocation {
-	return []*velerov1api.BackupStorageLocation{
+func defaultLocationsListWithLongerLocationName(namespace string) []*veleroapiv1.BackupStorageLocation {
+	return []*veleroapiv1.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-1",
 			},
-			Spec: velerov1api.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket-1",
 					},
 				},
@@ -94,10 +95,10 @@ func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api
 				Namespace: namespace,
 				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-2",
 			},
-			Spec: velerov1api.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket-2",
 					},
 				},
@@ -115,7 +116,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	tests := []struct {
 		name                     string
 		namespace                string
-		locations                []*velerov1api.BackupStorageLocation
+		locations                []*veleroapiv1.BackupStorageLocation
 		cloudBuckets             map[string][]*cloudBackupData
 		existingBackups          []*velerov1api.Backup
 		existingPodVolumeBackups []*velerov1api.PodVolumeBackup

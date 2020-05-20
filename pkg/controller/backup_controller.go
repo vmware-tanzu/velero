@@ -41,7 +41,7 @@ import (
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
-	velerov1apikb "github.com/vmware-tanzu/velero/api/v1"
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -60,8 +60,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 	"github.com/vmware-tanzu/velero/pkg/volume"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupController struct {
@@ -70,18 +69,18 @@ type backupController struct {
 	backupper                   pkgbackup.Backupper
 	lister                      velerov1listers.BackupLister
 	client                      velerov1client.BackupsGetter
+	k8sClient                   client.Client
 	clock                       clock.Clock
 	backupLogLevel              logrus.Level
 	newPluginManager            func(logrus.FieldLogger) clientmgmt.Manager
 	backupTracker               BackupTracker
-	kbCache                     kbcache.Cache
 	defaultBackupLocation       string
 	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
-	newBackupStore              func(*velerov1apikb.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore              func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
@@ -96,7 +95,7 @@ func NewBackupController(
 	backupLogLevel logrus.Level,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	backupTracker BackupTracker,
-	kbCache kbcache.Cache,
+	k8sClient client.Client,
 	defaultBackupLocation string,
 	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
@@ -117,7 +116,7 @@ func NewBackupController(
 		backupLogLevel:              backupLogLevel,
 		newPluginManager:            newPluginManager,
 		backupTracker:               backupTracker,
-		kbCache:                     kbCache,
+		k8sClient:                   k8sClient,
 		defaultBackupLocation:       defaultBackupLocation,
 		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
@@ -376,8 +375,8 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	storageLocation := &velerov1apikb.BackupStorageLocation{}
-	if err := c.kbCache.Get(context.Background(), kbclient.ObjectKey{
+	storageLocation := &veleroapiv1.BackupStorageLocation{}
+	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: request.Namespace,
 		Name:      request.Spec.StorageLocation,
 	}, storageLocation); err != nil {
@@ -389,7 +388,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	} else {
 		request.StorageLocation = storageLocation
 
-		if request.StorageLocation.Spec.AccessMode == velerov1apikb.BackupStorageLocationAccessModeReadOnly {
+		if request.StorageLocation.Spec.AccessMode == veleroapiv1.BackupStorageLocationAccessModeReadOnly {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}
