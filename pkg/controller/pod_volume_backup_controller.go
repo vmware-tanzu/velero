@@ -236,6 +236,8 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
+	//TODO(carlisia): before the client was being passed to the restic package and the
+	// "getting" of the bsl was being done there; is that better?
 	location := &veleroapiv1.BackupStorageLocation{}
 	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
@@ -244,6 +246,10 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 		return err
 	}
 
+	//TODO(carlisia): would it be better to fetch the cert here?
+	//if location.Spec.ObjectStorage != nil {
+	//	caCert = location.Spec.ObjectStorage.CACert
+	//}
 	caCert, err := restic.GetCACert(location)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")

@@ -52,8 +52,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
-	velerov1 "github.com/vmware-tanzu/velero/api/v1"
 )
 
 var (

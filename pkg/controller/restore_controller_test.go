@@ -18,11 +18,15 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"testing"
 	"time"
 
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -52,10 +56,12 @@ import (
 )
 
 func TestFetchBackupInfo(t *testing.T) {
+	g := NewWithT(t)
+
 	tests := []struct {
 		name              string
 		backupName        string
-		informerLocations []*api.BackupStorageLocation
+		informerLocations []*veleroapiv1.BackupStorageLocation
 		informerBackups   []*api.Backup
 		backupStoreBackup *api.Backup
 		backupStoreError  error
@@ -65,7 +71,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:              "lister has backup",
 			backupName:        "backup-1",
-			informerLocations: []*api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*veleroapiv1.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -73,7 +79,7 @@ func TestFetchBackupInfo(t *testing.T) {
 			name:              "lister does not have a backup, but backupSvc does",
 			backupName:        "backup-1",
 			backupStoreBackup: defaultBackup().StorageLocation("default").Result(),
-			informerLocations: []*api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*veleroapiv1.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -91,6 +97,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(g)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()
@@ -108,7 +115,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				client.VeleroV1(),
 				restorer,
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				fakeClient,
 				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				logger,
 				logrus.InfoLevel,
@@ -118,13 +125,13 @@ func TestFetchBackupInfo(t *testing.T) {
 				formatFlag,
 			).(*restoreController)
 
-			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 
 			if test.backupStoreError == nil {
 				for _, itm := range test.informerLocations {
-					sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(itm)
+					require.NoError(t, fakeClient.Create(context.Background(), itm))
 				}
 
 				for _, itm := range test.informerBackups {
@@ -204,7 +211,7 @@ func TestProcessQueueItemSkips(t *testing.T) {
 				client.VeleroV1(),
 				restorer,
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				k8sClient,
 				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				logger,
 				logrus.InfoLevel,
@@ -226,12 +233,14 @@ func TestProcessQueueItemSkips(t *testing.T) {
 }
 
 func TestProcessQueueItem(t *testing.T) {
+	g := NewWithT(t)
+
 	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
 
 	tests := []struct {
 		name                            string
 		restoreKey                      string
-		location                        *api.BackupStorageLocation
+		location                        *veleroapiv1.BackupStorageLocation
 		restore                         *api.Restore
 		backup                          *api.Backup
 		restorerError                   error
@@ -392,6 +401,7 @@ func TestProcessQueueItem(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
+				fakeClient      = newFakeClient(g)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()
@@ -409,7 +419,7 @@ func TestProcessQueueItem(t *testing.T) {
 				client.VeleroV1(),
 				restorer,
 				sharedInformers.Velero().V1().Backups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				fakeClient,
 				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				logger,
 				logrus.InfoLevel,
@@ -419,12 +429,12 @@ func TestProcessQueueItem(t *testing.T) {
 				formatFlag,
 			).(*restoreController)
 
-			c.newBackupStore = func(*api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 
 			if test.location != nil {
-				sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.location)
+				require.NoError(t, fakeClient.Create(context.Background(), test.location))
 			}
 			if test.backup != nil {
 				sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup)
@@ -634,7 +644,7 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 		client.VeleroV1(),
 		nil,
 		sharedInformers.Velero().V1().Backups().Lister(),
-		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+		k8sClient,
 		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 		logger,
 		logrus.DebugLevel,
