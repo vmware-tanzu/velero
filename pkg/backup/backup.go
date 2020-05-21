@@ -294,6 +294,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	items := collector.getAllItems()
 	log.WithField("progress", "").Infof("Collected %d items matching the backup spec from the Kubernetes API (actual number of items backed up may be more or less depending on velero.io/exclude-from-backup annotation, plugins returning additional related items to back up, etc.)", len(items))
 
+	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 	patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d}}}`, len(items))
 	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress.totalItems")
@@ -345,6 +346,9 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 				lastUpdate = &val
 			case <-ticker.C:
 				if lastUpdate != nil {
+					backupRequest.Status.Progress.TotalItems = lastUpdate.totalItems
+					backupRequest.Status.Progress.ItemsBackedUp = lastUpdate.itemsBackedUp
+
 					patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, lastUpdate.totalItems, lastUpdate.itemsBackedUp)
 					if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
 						log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
@@ -421,6 +425,9 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 
 	// do a final update on progress since we may have just added some CRDs and may not have updated
 	// for the last few processed items.
+	backupRequest.Status.Progress.TotalItems = len(backupRequest.BackedUpItems)
+	backupRequest.Status.Progress.ItemsBackedUp = len(backupRequest.BackedUpItems)
+
 	patch = fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, len(backupRequest.BackedUpItems), len(backupRequest.BackedUpItems))
 	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
