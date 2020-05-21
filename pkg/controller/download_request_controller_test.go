@@ -27,6 +27,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
+	. "github.com/onsi/gomega"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -48,7 +53,7 @@ type downloadRequestTestHarness struct {
 	controller *downloadRequestController
 }
 
-func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
+func newDownloadRequestTestHarness(t *testing.T, fakeClient client.Client) *downloadRequestTestHarness {
 	var (
 		client          = fake.NewSimpleClientset()
 		informerFactory = informers.NewSharedInformerFactory(client, 0)
@@ -58,7 +63,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 			client.VeleroV1(),
 			informerFactory.Velero().V1().DownloadRequests(),
 			informerFactory.Velero().V1().Restores().Lister(),
-			informerFactory.Velero().V1().BackupStorageLocations().Lister(),
+			fakeClient,
 			informerFactory.Velero().V1().Backups().Lister(),
 			func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
 			velerotest.NewLogger(),
@@ -69,7 +74,7 @@ func newDownloadRequestTestHarness(t *testing.T) *downloadRequestTestHarness {
 	require.NoError(t, err)
 	controller.clock = clock.NewFakeClock(clockTime)
 
-	controller.newBackupStore = func(*v1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	controller.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 
@@ -102,16 +107,16 @@ func newDownloadRequest(phase v1.DownloadRequestPhase, targetKind v1.DownloadTar
 	}
 }
 
-func newBackupLocation(name, provider, bucket string) *v1.BackupStorageLocation {
-	return &v1.BackupStorageLocation{
+func newBackupLocation(name, provider, bucket string) *veleroapiv1.BackupStorageLocation {
+	return &veleroapiv1.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.DefaultNamespace,
 		},
-		Spec: v1.BackupStorageLocationSpec{
+		Spec: veleroapiv1.BackupStorageLocationSpec{
 			Provider: provider,
-			StorageType: v1.StorageType{
-				ObjectStorage: &v1.ObjectStorageLocation{
+			StorageType: veleroapiv1.StorageType{
+				ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 					Bucket: bucket,
 				},
 			},
@@ -120,6 +125,8 @@ func newBackupLocation(name, provider, bucket string) *v1.BackupStorageLocation 
 }
 
 func TestProcessDownloadRequest(t *testing.T) {
+	g := NewWithT(t)
+
 	defaultBackup := func() *v1.Backup {
 		return builder.ForBackup(v1.DefaultNamespace, "a-backup").StorageLocation("a-location").Result()
 	}
@@ -130,7 +137,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		downloadRequest *v1.DownloadRequest
 		backup          *v1.Backup
 		restore         *v1.Restore
-		backupLocation  *v1.BackupStorageLocation
+		backupLocation  *veleroapiv1.BackupStorageLocation
 		expired         bool
 		expectedErr     string
 		expectGetsURL   bool
@@ -167,7 +174,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 			downloadRequest: newDownloadRequest("", v1.DownloadTargetKindBackupContents, "a-backup"),
 			backup:          defaultBackup(),
 			backupLocation:  newBackupLocation("non-matching-location", "a-provider", "a-bucket"),
-			expectedErr:     "backupstoragelocation.velero.io \"a-location\" not found",
+			expectedErr:     "backupstoragelocations.velero.io \"a-location\" not found",
 		},
 		{
 			name:            "backup contents request with phase '' gets a url",
@@ -244,7 +251,14 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			harness := newDownloadRequestTestHarness(t)
+			var fakeClient client.Client
+			if tc.backupLocation != nil {
+				fakeClient = newFakeClient(g, tc.backupLocation)
+			} else {
+				fakeClient = newFakeClient(g)
+			}
+
+			harness := newDownloadRequestTestHarness(t, fakeClient)
 
 			// set up test case data
 
@@ -271,10 +285,6 @@ func TestProcessDownloadRequest(t *testing.T) {
 
 			if tc.backup != nil {
 				require.NoError(t, harness.informerFactory.Velero().V1().Backups().Informer().GetStore().Add(tc.backup))
-			}
-
-			if tc.backupLocation != nil {
-				require.NoError(t, harness.informerFactory.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(tc.backupLocation))
 			}
 
 			if tc.expectGetsURL {

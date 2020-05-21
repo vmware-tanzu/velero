@@ -386,7 +386,6 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}
 	}
-
 	// validate and get the backup's VolumeSnapshotLocations, and store the
 	// VolumeSnapshotLocation API objs on the request
 	if locs, errs := c.validateAndGetSnapshotLocations(request.Backup); len(errs) > 0 {

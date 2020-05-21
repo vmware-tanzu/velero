@@ -17,9 +17,12 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotFake "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/clientset/versioned/fake"
@@ -35,6 +38,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	core "k8s.io/client-go/testing"
 
+	. "github.com/onsi/gomega"
+
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -63,7 +69,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		NewBackupTracker(),
 		nil, // restic repository manager
 		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
-		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+		k8sClient,
 		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 		nil, // csiSnapshotLister
 		nil, // csiSnapshotContentLister
@@ -128,7 +134,7 @@ type backupDeletionControllerTestData struct {
 	req               *velerov1.DeleteBackupRequest
 }
 
-func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletionControllerTestData {
+func setupBackupDeletionControllerTest(fakeClient client.Client, objects ...runtime.Object) *backupDeletionControllerTestData {
 	req := pkgbackup.NewDeleteBackupRequest("foo", "uid")
 	req.Namespace = "velero"
 	req.Name = "foo-abcde"
@@ -156,7 +162,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 			NewBackupTracker(),
 			nil, // restic repository manager
 			sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
-			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+			fakeClient,
 			sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 			nil, // csiSnapshotLister
 			nil, // csiSnapshotContentLister
@@ -168,7 +174,7 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 		req: req,
 	}
 
-	data.controller.newBackupStore = func(*velerov1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	data.controller.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 
@@ -178,8 +184,11 @@ func setupBackupDeletionControllerTest(objects ...runtime.Object) *backupDeletio
 }
 
 func TestBackupDeletionControllerProcessRequest(t *testing.T) {
+	g := NewWithT(t)
+
 	t.Run("missing spec.backupName", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
+		fakeClient := newFakeClient(g)
+		td := setupBackupDeletionControllerTest(fakeClient)
 
 		td.req.Spec.BackupName = ""
 
@@ -200,7 +209,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("existing deletion requests for the backup are deleted", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
+		fakeClient := newFakeClient(g)
+		td := setupBackupDeletionControllerTest(fakeClient)
 
 		// add the backup to the tracker so the execution of processRequest doesn't progress
 		// past checking for an in-progress backup. this makes validation easier.
@@ -255,7 +265,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("deleting an in progress backup isn't allowed", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
+		fakeClient := newFakeClient(g)
+		td := setupBackupDeletionControllerTest(fakeClient)
 
 		td.controller.backupTracker.Add(td.req.Namespace, td.req.Spec.BackupName)
 
@@ -279,9 +290,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		backup := builder.ForBackup(velerov1.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
-		td := setupBackupDeletionControllerTest(backup)
+		fakeClient := newFakeClient(g, location)
 
-		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
+		td := setupBackupDeletionControllerTest(fakeClient, backup)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, nil, errors.New("bad")
@@ -311,9 +322,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		backup := builder.ForBackup(velerov1.DefaultNamespace, "foo").StorageLocation("default").Result()
 		location := builder.ForBackupStorageLocation("velero", "default").Result()
 
-		td := setupBackupDeletionControllerTest(backup)
+		fakeClient := newFakeClient(g, location)
 
-		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
+		td := setupBackupDeletionControllerTest(fakeClient, backup)
 
 		td.client.PrependReactor("patch", "deletebackuprequests", func(action core.Action) (bool, runtime.Object, error) {
 			return true, td.req, nil
@@ -350,7 +361,9 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("unable to find backup", func(t *testing.T) {
-		td := setupBackupDeletionControllerTest()
+		fakeClient := newFakeClient(g)
+
+		td := setupBackupDeletionControllerTest(fakeClient)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)
@@ -374,9 +387,10 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 	})
 
 	t.Run("unable to find backup storage location", func(t *testing.T) {
+		fakeClient := newFakeClient(g)
 		backup := builder.ForBackup(velerov1.DefaultNamespace, "foo").StorageLocation("default").Result()
 
-		td := setupBackupDeletionControllerTest(backup)
+		td := setupBackupDeletionControllerTest(fakeClient, backup)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)
@@ -401,11 +415,10 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadOnly).Result()
 
-		td := setupBackupDeletionControllerTest(backup)
-
-		td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location)
+		fakeClient := newFakeClient(g, location)
+		td := setupBackupDeletionControllerTest(fakeClient, backup)
 
 		err := td.controller.processRequest(td.req)
 		require.NoError(t, err)
@@ -437,27 +450,29 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		restore2 := builder.ForRestore("velero", "restore-2").Phase(velerov1.RestorePhaseCompleted).Backup("foo").Result()
 		restore3 := builder.ForRestore("velero", "restore-3").Phase(velerov1.RestorePhaseCompleted).Backup("some-other-backup").Result()
 
-		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
+		fakeClient := newFakeClient(g)
+		td := setupBackupDeletionControllerTest(fakeClient, backup, restore1, restore2, restore3)
 
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore1)
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore3)
 
-		location := &velerov1.BackupStorageLocation{
+		location := &veleroapiv1.BackupStorageLocation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: backup.Namespace,
 				Name:      backup.Spec.StorageLocation,
 			},
-			Spec: velerov1.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1.StorageType{
-					ObjectStorage: &velerov1.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket",
 					},
 				},
 			},
 		}
-		require.NoError(t, td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+
+		require.NoError(t, fakeClient.Create(context.Background(), location))
 
 		snapshotLocation := &velerov1.VolumeSnapshotLocation{
 			ObjectMeta: metav1.ObjectMeta{
@@ -596,7 +611,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 			Backup("some-other-backup").
 			Result()
 
-		td := setupBackupDeletionControllerTest(backup, restore1, restore2, restore3)
+		fakeClient := newFakeClient(g)
+		td := setupBackupDeletionControllerTest(fakeClient, backup, restore1, restore2, restore3)
 		td.req = pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 		td.req.Namespace = "velero"
 		td.req.Name = "foo-abcde"
@@ -604,21 +620,21 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore3)
 
-		location := &velerov1.BackupStorageLocation{
+		location := &veleroapiv1.BackupStorageLocation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: backup.Namespace,
 				Name:      backup.Spec.StorageLocation,
 			},
-			Spec: velerov1.BackupStorageLocationSpec{
+			Spec: veleroapiv1.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: velerov1.StorageType{
-					ObjectStorage: &velerov1.ObjectStorageLocation{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
 						Bucket: "bucket",
 					},
 				},
 			},
 		}
-		require.NoError(t, td.sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(location))
+		require.NoError(t, fakeClient.Create(context.Background(), location))
 
 		snapshotLocation := &velerov1.VolumeSnapshotLocation{
 			ObjectMeta: metav1.ObjectMeta{
@@ -735,6 +751,8 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 }
 
 func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
+	g := NewWithT(t)
+
 	now := time.Date(2018, 4, 4, 12, 0, 0, 0, time.UTC)
 	unexpired1 := time.Date(2018, 4, 4, 11, 0, 0, 0, time.UTC)
 	unexpired2 := time.Date(2018, 4, 3, 12, 0, 1, 0, time.UTC)
@@ -845,6 +863,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := fake.NewSimpleClientset()
+			fakeClient := newFakeClient(g)
 			sharedInformers := informers.NewSharedInformerFactory(client, 0)
 
 			controller := NewBackupDeletionController(
@@ -857,7 +876,7 @@ func TestBackupDeletionControllerDeleteExpiredRequests(t *testing.T) {
 				NewBackupTracker(),
 				nil,
 				sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				fakeClient,
 				sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				nil, // csiSnapshotLister
 				nil, // csiSnapshotContentLister

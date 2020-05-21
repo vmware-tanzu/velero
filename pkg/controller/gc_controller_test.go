@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
+
+	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -50,7 +55,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 			sharedInformers.Velero().V1().Backups(),
 			sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 			client.VeleroV1(),
-			sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+			k8sClient,
 		).(*gcController)
 	)
 
@@ -111,7 +116,7 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Velero().V1().Backups(),
 		sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 		client.VeleroV1(),
-		sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+		k8sClient,
 	).(*gcController)
 
 	keys := make(chan string)
@@ -148,6 +153,8 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 }
 
 func TestGCControllerProcessQueueItem(t *testing.T) {
+	g := NewWithT(t)
+
 	fakeClock := clock.NewFakeClock(time.Now())
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "default").Result()
 
@@ -155,7 +162,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		name                           string
 		backup                         *api.Backup
 		deleteBackupRequests           []*api.DeleteBackupRequest
-		backupLocation                 *api.BackupStorageLocation
+		backupLocation                 *veleroapiv1.BackupStorageLocation
 		expectDeletion                 bool
 		createDeleteBackupRequestError bool
 		expectError                    bool
@@ -172,13 +179,13 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		{
 			name:           "expired backup in read-only storage location is not deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(api.BackupStorageLocationAccessModeReadOnly).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectDeletion: false,
 		},
 		{
 			name:           "expired backup in read-write storage location is deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(api.BackupStorageLocationAccessModeReadWrite).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadWrite).Result(),
 			expectDeletion: true,
 		},
 		{
@@ -246,12 +253,19 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
+			var fakeClient k8sclient.Client
+			if test.backupLocation != nil {
+				fakeClient = newFakeClient(g, test.backupLocation)
+			} else {
+				fakeClient = newFakeClient(g)
+			}
+
 			controller := NewGCController(
 				velerotest.NewLogger(),
 				sharedInformers.Velero().V1().Backups(),
 				sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 				client.VeleroV1(),
-				sharedInformers.Velero().V1().BackupStorageLocations().Lister(),
+				fakeClient,
 			).(*gcController)
 			controller.clock = fakeClock
 
@@ -259,10 +273,6 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			if test.backup != nil {
 				key = kube.NamespaceAndName(test.backup)
 				sharedInformers.Velero().V1().Backups().Informer().GetStore().Add(test.backup)
-			}
-
-			if test.backupLocation != nil {
-				sharedInformers.Velero().V1().BackupStorageLocations().Informer().GetStore().Add(test.backupLocation)
 			}
 
 			for _, dbr := range test.deleteBackupRequests {

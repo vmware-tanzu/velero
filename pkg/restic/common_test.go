@@ -17,19 +17,26 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"os"
 	"sort"
 	"testing"
 
-	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	. "github.com/onsi/gomega"
+
+	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -380,33 +387,36 @@ func TestTempCredentialsFile(t *testing.T) {
 }
 
 func TestTempCACertFile(t *testing.T) {
+	g := NewWithT(t)
 	var (
-		bslInformer = cache.NewSharedIndexInformer(nil, new(velerov1api.BackupStorageLocation), 0, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-		bslLister   = velerov1listers.NewBackupStorageLocationLister(bslInformer.GetIndexer())
-		fs          = velerotest.NewFakeFileSystem()
-		bsl         = &velerov1api.BackupStorageLocation{
+		fs  = velerotest.NewFakeFileSystem()
+		bsl = &veleroapiv1.BackupStorageLocation{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "velero",
 				Name:      "default",
 			},
-			Spec: velerov1api.BackupStorageLocationSpec{
-				StorageType: velerov1api.StorageType{
-					ObjectStorage: &velerov1api.ObjectStorageLocation{CACert: []byte("cacert")},
+			Spec: veleroapiv1.BackupStorageLocationSpec{
+				StorageType: veleroapiv1.StorageType{
+					ObjectStorage: &veleroapiv1.ObjectStorageLocation{CACert: []byte("cacert")},
 				},
 			},
 		}
 	)
 
-	// bsl not in lister: expect an error
-	caCert, err := GetCACert(bslLister, "velero", "default")
-	assert.Error(t, err)
+	//TODO(carlisia): not sure this test makes sense anymore since
+	fakeClient := newFakeClient(g)
+	fakeClient.Create(context.Background(), bsl)
 
-	// now add bsl to lister
-	require.NoError(t, bslInformer.GetStore().Add(bsl))
+	locationCreated := &veleroapiv1.BackupStorageLocation{}
+	err := fakeClient.Get(context.Background(), client.ObjectKey{
+		Namespace: bsl.Namespace,
+		Name:      bsl.Name,
+	}, locationCreated)
+	require.NoError(t, err)
 
-	// bsl in lister: expect temp file to be created with cacert value
-	caCert, err = GetCACert(bslLister, "velero", "default")
+	// expect temp file to be created with cacert value
+	caCert, err := GetCACert(locationCreated)
 	require.NoError(t, err)
 
 	fileName, err := TempCACertFile(caCert, "default", fs)
@@ -418,4 +428,10 @@ func TestTempCACertFile(t *testing.T) {
 	assert.Equal(t, "cacert", string(contents))
 
 	os.Remove(fileName)
+}
+
+func newFakeClient(g *WithT, initObjs ...runtime.Object) client.Client {
+	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
+	g.Expect(veleroapiv1.AddToScheme(scheme.Scheme)).To(Succeed())
+	return k8sfake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }

@@ -231,11 +231,11 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 }
 
 func GetCACert(loc *veleroapiv1.BackupStorageLocation) ([]byte, error) {
-	if loc.Spec.ObjectStorage != nil {
-		return loc.Spec.ObjectStorage.CACert, nil
+	if loc.Spec.ObjectStorage == nil {
+		return nil, nil
 	}
 
-	return nil, nil
+	return loc.Spec.ObjectStorage.CACert, nil
 }
 
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
