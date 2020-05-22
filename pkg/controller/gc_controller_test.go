@@ -55,7 +55,7 @@ func TestGCControllerEnqueueAllBackups(t *testing.T) {
 			sharedInformers.Velero().V1().Backups(),
 			sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 			client.VeleroV1(),
-			k8sClient,
+			nil,
 		).(*gcController)
 	)
 
@@ -116,7 +116,7 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 		sharedInformers.Velero().V1().Backups(),
 		sharedInformers.Velero().V1().DeleteBackupRequests().Lister(),
 		client.VeleroV1(),
-		k8sClient,
+		nil,
 	).(*gcController)
 
 	keys := make(chan string)

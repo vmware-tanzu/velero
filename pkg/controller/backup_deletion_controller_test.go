@@ -69,7 +69,7 @@ func TestBackupDeletionControllerProcessQueueItem(t *testing.T) {
 		NewBackupTracker(),
 		nil, // restic repository manager
 		sharedInformers.Velero().V1().PodVolumeBackups().Lister(),
-		k8sClient,
+		nil,
 		sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 		nil, // csiSnapshotLister
 		nil, // csiSnapshotContentLister

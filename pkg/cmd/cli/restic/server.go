@@ -248,7 +248,7 @@ func (s *resticServer) run() {
 	go func() {
 		defer wg.Done()
 		// +kubebuilder:scaffold:builder
-		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
+		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 			s.logger.Fatal("Problem starting manager", err)
 		}
 	}()
