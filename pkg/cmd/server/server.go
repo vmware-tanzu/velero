@@ -324,18 +324,6 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		return nil, err
 	}
 
-	// logger.Debug("STARTING CACHE")
-	// var wgc sync.WaitGroup
-	// runstart := func() {
-	// 	defer wgc.Done()
-	// 	kbCache.Start(ctrl.SetupSignalHandler()) // ***this blocks
-	// 	logger.Debug("PAST CACHING insideyy")
-	// }
-	// wgc.Add(1)
-	// go runstart()
-	// wgc.Wait()
-	// logger.Debug("PAST CACHING OUTSIDE")
-
 	s := &server{
 		namespace:                           f.Namespace(),
 		metricsAddress:                      config.metricsAddress,
@@ -936,7 +924,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	go func() {
 		defer wg.Done()
 		// +kubebuilder:scaffold:builder
-		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil { // ***this blocks
+		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 			s.logger.Fatal("Problem starting manager", err)
 		}
 	}()
