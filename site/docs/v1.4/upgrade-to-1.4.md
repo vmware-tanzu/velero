@@ -24,7 +24,7 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     Client:
-        Version: v1.4.0-beta.1
+        Version: v1.4.0
         Git commit: <git SHA>
     ```
 
@@ -32,12 +32,12 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     kubectl set image deployment/velero \
-        velero=velero/velero:v1.4.0-beta.1 \
+        velero=velero/velero:v1.4.0 \
         --namespace velero
 
     # optional, if using the restic daemon set
     kubectl set image daemonset/restic \
-        restic=velero/velero:v1.4.0-beta.1 \
+        restic=velero/velero:v1.4.0 \
         --namespace velero
     ```
 
@@ -57,11 +57,11 @@ If you're not yet running at least Velero v1.3, see the following:
 
     ```bash
     Client:
-        Version: v1.4.0-beta.1
+        Version: v1.4.0
         Git commit: <git SHA>
 
     Server:
-        Version: v1.4.0-beta.1
+        Version: v1.4.0
     ```
 
 [0]: basic-install.md#install-the-cli
