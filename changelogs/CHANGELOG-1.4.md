@@ -1,5 +1,5 @@
 ## v1.4.0
-### 2020-05-08
+### 2020-05-26
 
 ### Download
 https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0
@@ -8,10 +8,10 @@ https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0
 `velero/velero:v1.4.0`
 
 ### Documentation
-https://velero.io/docs/v1.4-pre/
+https://velero.io/docs/v1.4/
 
 ### Upgrading
-https://velero.io/docs/v1.4-pre/upgrade-to-1.4/
+https://velero.io/docs/v1.4/upgrade-to-1.4/
 
 ### Download
 https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0

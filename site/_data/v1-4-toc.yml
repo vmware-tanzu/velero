@@ -11,13 +11,6 @@ toc:
     subfolderitems:
       - page: Basic Install
         url: /basic-install
-      :x
-
-:w
-
-
-
-:x
         url: /customize-installation
       - page: Upgrade to 1.4
         url: /upgrade-to-1.4
