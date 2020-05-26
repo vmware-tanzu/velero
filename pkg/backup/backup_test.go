@@ -114,6 +114,40 @@ func TestBackedUpItemsMatchesTarballContents(t *testing.T) {
 	assertTarballContents(t, backupFile, append(expectedFiles, "metadata/version")...)
 }
 
+// TestBackupProgressIsUpdated verifies that after a backup has run, its
+// status.progress fields are updated to reflect the total number of items
+// backed up. It validates this by comparing their values to the length of
+// the request's BackedUpItems field.
+func TestBackupProgressIsUpdated(t *testing.T) {
+	h := newHarness(t)
+	req := &Request{Backup: defaultBackup().Result()}
+	backupFile := bytes.NewBuffer([]byte{})
+
+	apiResources := []*test.APIResource{
+		test.Pods(
+			builder.ForPod("foo", "bar").Result(),
+			builder.ForPod("zoo", "raz").Result(),
+		),
+		test.Deployments(
+			builder.ForDeployment("foo", "bar").Result(),
+			builder.ForDeployment("zoo", "raz").Result(),
+		),
+		test.PVs(
+			builder.ForPersistentVolume("bar").Result(),
+			builder.ForPersistentVolume("baz").Result(),
+		),
+	}
+	for _, resource := range apiResources {
+		h.addItems(t, resource)
+	}
+
+	h.backupper.Backup(h.log, req, backupFile, nil, nil)
+
+	require.NotNil(t, req.Status.Progress)
+	assert.Equal(t, len(req.BackedUpItems), req.Status.Progress.TotalItems)
+	assert.Equal(t, len(req.BackedUpItems), req.Status.Progress.ItemsBackedUp)
+}
+
 // TestBackupResourceFiltering runs backups with different combinations
 // of resource filters (included/excluded resources, included/excluded
 // namespaces, label selectors, "include cluster resources" flag), and

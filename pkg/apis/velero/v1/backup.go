@@ -277,6 +277,8 @@ type BackupStatus struct {
 	// Progress contains information about the backup's execution progress. Note
 	// that this information is best-effort only -- if Velero fails to update it
 	// during a backup for any reason, it may be inaccurate/stale.
+	// +optional
+	// +nullable
 	Progress *BackupProgress `json:"progress,omitempty"`
 }
 
