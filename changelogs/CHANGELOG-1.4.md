@@ -13,9 +13,6 @@ https://velero.io/docs/v1.4/
 ### Upgrading
 https://velero.io/docs/v1.4/upgrade-to-1.4/
 
-### Download
-https://github.com/vmware-tanzu/velero/releases/tag/v1.4.0
-
 ### Highlights
 
  * Added beta-level CSI support!
