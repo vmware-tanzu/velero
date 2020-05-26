@@ -1,1 +1,0 @@
-At backup time, if a CustomResourceDefinition appears to have been created via the v1beta1 endpoint, retrieve it from the v1beta1 endpoint instead of simply changing the APIVersion.

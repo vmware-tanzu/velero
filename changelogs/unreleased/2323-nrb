@@ -1,1 +1,0 @@
-When the EnableCSI feature flag is provided, upload CSI VolumeSnapshots and VolumeSnapshotContents to object storage as gzipped JSON.

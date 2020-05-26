@@ -1,1 +1,0 @@
-If plugins don't support the `--features` flag, don't pass it to them. Also, update the standard plugin server to ignore unknown flags.

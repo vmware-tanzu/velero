@@ -1,1 +1,0 @@
-bug fix: when a resource includes/excludes list contains unresolvable items, don't remove them from the list, so that the list doesn't inadvertently end up matching *all* resources.

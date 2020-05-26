@@ -1,1 +1,0 @@
-Add details of CSI volumesnapshotcontents associated with a backup to `velero backup describe` when the `EnableCSI` feature flag is given on the velero client.
