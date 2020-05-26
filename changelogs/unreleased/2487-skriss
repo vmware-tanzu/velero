@@ -1,1 +1,0 @@
-bug fix: in error location logging hook, if the item logged under the `error` key doesn't implement the `error` interface, don't return an error since this is a valid scenario

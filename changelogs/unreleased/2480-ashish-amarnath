@@ -1,1 +1,0 @@
-during backup deletion also delete CSI volumesnapshotcontents that were created as a part of the backup but the associated volumesnapshot object does not exist

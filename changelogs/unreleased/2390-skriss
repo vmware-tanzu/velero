@@ -1,1 +1,0 @@
-bug fix: save PodVolumeBackup manifests to object storage even if the volume was empty, so that on restore, the PV is dynamically reprovisioned if applicable

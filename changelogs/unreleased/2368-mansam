@@ -1,1 +1,0 @@
-Added a --cacert flag to the install command to provide the CA bundle to use when verifying TLS connections to object storage

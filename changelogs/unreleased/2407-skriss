@@ -1,1 +1,0 @@
-bump Kubernetes module dependencies to v0.17.4 to get fix for https://github.com/kubernetes/kubernetes/issues/86149
