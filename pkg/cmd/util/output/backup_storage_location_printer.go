@@ -61,7 +61,7 @@ func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []m
 
 	status := location.Status.Phase
 	if status == "" {
-		status = velerov1api.BackupStorageLocationPhaseAvailable
+		status = "Unknown"
 	}
 
 	row.Cells = append(row.Cells,
