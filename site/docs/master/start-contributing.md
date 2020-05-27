@@ -9,6 +9,8 @@
 
 You may join the Velero community and contribute in many different ways, including helping us design or test new features. For any significant feature we consider adding, we start with a design document. You may find a list of currently in progress new designs here: https://github.com/vmware-tanzu/velero/pulls?q=is%3Aopen+is%3Apr+label%3ADesign. Feel free to review and help us with your input.
 
+You can also vote on issues using :+1: and :-1:, as explained in our [Feature enhancement request][3] and [Bug issue][4] templates. This will help us quantify importance and prioritize issues.
+
 For information on how to connect with our maintainers and community, join our online meetings, or find good first issues, start on our [Velero community](https://velero.io/community/) page.
 
 Please browse our list of resources, including a playlist of past online community meetings, blog posts, and other resources to help you get familiar with our project: [Velero resources](https://velero.io/resources/).
@@ -19,3 +21,5 @@ If you are ready to jump in and test, add code, or help with documentation, plea
 
 [1]: https://github.com/vmware-tanzu/velero/blob/master/CODE_OF_CONDUCT.md
 [2]: https://github.com/vmware-tanzu/velero/blob/master/CONTRIBUTING.md
+[3]: https://github.com/vmware-tanzu/velero/blob/master/.github/ISSUE_TEMPLATE/feature-enhancement-request.md
+[4]: https://github.com/vmware-tanzu/velero/blob/master/.github/ISSUE_TEMPLATE/bug_report.md
