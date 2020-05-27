@@ -10,6 +10,7 @@ You also need to update `site/index.html` to have "Latest Release Information" c
 
 ### (Pre-Release and GA) Changelog and Docs PR
 
+1. Set a variable with the full Velero version `export VELERO_VERSION=v<MAJOR>.<MINOR>.<PATCH>[-beta.1]`. This will be used throughout the whole process.
 1.  In a branch, create the file `changelogs/CHANGELOG-<major>.<minor>.md` (if it doesn't already exist) by copying the most recent one.
 1.  Run `make changelog` to generate a list of all unreleased changes. Copy/paste the output into `CHANGELOG-<major>.<minor>.md`, under the "All Changes" section for the release.
     - You *may* choose to tweak formatting on the list of changes by adding code blocks, etc.
@@ -22,7 +23,7 @@ You also need to update `site/index.html` to have "Latest Release Information" c
     - Delete the pre-release docs table of contents file, i.e. `site/_data/<pre-release-version>-toc.yml`.
     - Remove the pre-release docs table of contents mapping entry from `site/_data/toc-mapping.yml`.
     - Remove all references to the pre-release docs from `site/_config.yml`.
-1.  Run `NEW_DOCS_VERSION=v<major.minor> VELERO_VERSION=v<full-version> make gen-docs` (e.g. `NEW_DOCS_VERSION=v1.2 VELERO_VERSION=v1.2.0 make gen-docs` or `NEW_DOCS_VERSION=v1.2-pre VELERO_VERSION=v1.2.0-beta.1 make gen-docs`).
+1.  Run `NEW_DOCS_VERSION=v<major.minor> make gen-docs` (e.g. `NEW_DOCS_VERSION=v1.2 make gen-docs` or `NEW_DOCS_VERSION=v1.2-pre make gen-docs`).
     - Note that:
         - **NEW_DOCS_VERSION** defines the version that the docs will be tagged with (i.e. what's in the URL, what shows up in the version dropdown on the site). This should be formatted as either `v1.4` (for a GA release), or `v1.4-pre` (for an alpha/beta/RC).
         - **VELERO_VERSION** defines the tag of Velero that any `https://github.com/vmware-tanzu/velero/...` links in the docs should redirect to.
@@ -37,9 +38,8 @@ To run the `goreleaser` process to generate a GitHub release, you'll need to hav
 You may regenerate the token for every release if you prefer.
 
 #### If you don't already have a token
-1.  Go to https://github.com/settings/tokens/new.
+1.  Go to https://github.com/settings/tokens/new?scopes=repo.
 1.  Choose a name for your token.
-1.  Check the "repo" scope.
 1.  Click "Generate token".
 1.  Save the token value somewhere - you'll need it during the release, in the `GITHUB_TOKEN` environment variable.
 
@@ -56,8 +56,8 @@ This process is the same for both pre-release and GA, except for the fact that t
 1.  Merge the changelog + docs PR, so that it's included in the release tag.
 1.  Make sure your working directory is clean: `git status` should show `nothing to commit, working tree clean`. 
 1.  Run `git fetch upstream master && git checkout upstream/master`.
-1.  Run `git tag <VERSION>` (e.g. `git tag v1.2.0` or `git tag v1.2.0-beta.1`).
-1.  Run `git push upstream <VERSION>` (e.g. `git push upstream v1.2.0` or `git push upstream v1.2.0-beta.1`). This will trigger the Travis CI job that builds/publishes the Docker images.
+1.  Run `git tag $VELERO_VERSION (e.g. `git tag v1.2.0` or `git tag v1.2.0-beta.1`).
+1.  Run `git push upstream $VELERO_VERSION` (e.g. `git push upstream v1.2.0` or `git push upstream v1.2.0-beta.1`). This will trigger the Travis CI job that builds/publishes the Docker images.
 1.  Generate the GitHub release (it will be created in "Draft" status, which means it's not visible to the outside world until you click "Publish"):
 
     ```bash
@@ -81,3 +81,13 @@ This process is the same for both pre-release and GA, except for the fact that t
     - Twitter (mention a few highlights, link to the blog post)
     - Slack channel
     - Google group (this doesn't get a lot of traffic, and recent releases may not have been posted here)
+
+### Post-release - Homebrew version update
+
+From a Mac, you can run `brew bump-formula-pr` to create a new PR with the updated release's information.
+
+To make sure it's the most up-to-date:
+
+1. If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
+1. Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
+1. Run `hack/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
