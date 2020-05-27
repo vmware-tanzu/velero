@@ -14,11 +14,11 @@ about: Tell us about a problem you are experiencing
 **The output of the following commands will help us better understand what's going on**:
 (Pasting long output into a [GitHub gist](https://gist.github.com) or other pastebin is fine.)
 
-* `kubectl logs deployment/velero -n velero`
-* `velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`
-* `velero backup logs <backupname>`
-* `velero restore describe <restorename>` or `kubectl get restore/<restorename> -n velero -o yaml`
-* `velero restore logs <restorename>`
+- `kubectl logs deployment/velero -n velero`
+- `velero backup describe <backupname>` or `kubectl get backup/<backupname> -n velero -o yaml`
+- `velero backup logs <backupname>`
+- `velero restore describe <restorename>` or `kubectl get restore/<restorename> -n velero -o yaml`
+- `velero restore logs <restorename>`
 
 
 **Anything else you would like to add:**
@@ -33,3 +33,12 @@ about: Tell us about a problem you are experiencing
 - Kubernetes installer & version:
 - Cloud provider or hardware configuration:
 - OS (e.g. from `/etc/os-release`):
+
+
+**Vote on this issue!**
+
+This is an invitation to the Velero community to vote on issues, you can see the project's [top voted issues listed here](https://github.com/vmware-tanzu/velero/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc).  
+Use the "reaction smiley face" up to the right of this comment to vote.
+
+- :+1: for "I would like to see this bug fixed as soon as possible"
+- :-1: for "There are more important bugs to focus on right now"
