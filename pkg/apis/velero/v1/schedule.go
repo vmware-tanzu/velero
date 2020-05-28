@@ -16,7 +16,12 @@ limitations under the License.
 
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"fmt"
+	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // ScheduleSpec defines the specification for a Velero schedule
 type ScheduleSpec struct {
@@ -94,4 +99,9 @@ type ScheduleList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []Schedule `json:"items"`
+}
+
+// TimestampedName returns the default backup name format based on the schedule
+func (s *Schedule) TimestampedName(timestamp time.Time) string {
+	return fmt.Sprintf("%s-%s", s.Name, timestamp.Format("20060102150405"))
 }
