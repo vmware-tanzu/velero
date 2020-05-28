@@ -57,7 +57,7 @@ This process is the same for both pre-release and GA, except for the fact that t
 1.  Make sure your working directory is clean: `git status` should show `nothing to commit, working tree clean`. 
 1.  Run `git fetch upstream master && git checkout upstream/master`.
 1.  Run `git tag <VERSION>` (e.g. `git tag v1.2.0` or `git tag v1.2.0-beta.1`).
-1.  Run `git push upstream <VERSION>` (e.g. `git push upstream v1.2.0` or `git push upstream v1.2.0-beta.1`). This will trigger the Travis CI job that builds/publishes the Docker images.
+1.  Run `git push upstream <VERSION>` (e.g. `git push upstream v1.2.0` or `git push upstream v1.2.0-beta.1`). This will trigger the github action that builds/publishes the Docker images.
 1.  Generate the GitHub release (it will be created in "Draft" status, which means it's not visible to the outside world until you click "Publish"):
 
     ```bash
