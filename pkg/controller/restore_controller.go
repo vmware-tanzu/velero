@@ -278,7 +278,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 type backupInfo struct {
 	backup      *api.Backup
-	location    *api.BackupStorageLocation
+	location    *veleroapiv1.BackupStorageLocation
 	backupStore persistence.BackupStore
 }
 
