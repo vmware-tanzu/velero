@@ -1,5 +1,5 @@
 /*
-Copyright 2018 the Velero contributors.
+Copyright 2018, 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 var (
@@ -30,11 +30,12 @@ var (
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Provider"},
 		{Name: "Bucket/Prefix"},
+		{Name: "Status"},
 		{Name: "Access Mode"},
 	}
 )
 
-func printBackupStorageLocationList(list *v1.BackupStorageLocationList) []metav1.TableRow {
+func printBackupStorageLocationList(list *velerov1api.BackupStorageLocationList) []metav1.TableRow {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 
 	for i := range list.Items {
@@ -43,7 +44,7 @@ func printBackupStorageLocationList(list *v1.BackupStorageLocationList) []metav1
 	return rows
 }
 
-func printBackupStorageLocation(location *v1.BackupStorageLocation) []metav1.TableRow {
+func printBackupStorageLocation(location *velerov1api.BackupStorageLocation) []metav1.TableRow {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: location},
 	}
@@ -55,13 +56,19 @@ func printBackupStorageLocation(location *v1.BackupStorageLocation) []metav1.Tab
 
 	accessMode := location.Spec.AccessMode
 	if accessMode == "" {
-		accessMode = v1.BackupStorageLocationAccessModeReadWrite
+		accessMode = velerov1api.BackupStorageLocationAccessModeReadWrite
+	}
+
+	status := location.Status.Phase
+	if status == "" {
+		status = "Unknown"
 	}
 
 	row.Cells = append(row.Cells,
 		location.Name,
 		location.Spec.Provider,
 		bucketAndPrefix,
+		status,
 		accessMode,
 	)
 
