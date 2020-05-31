@@ -62,7 +62,7 @@ read -p "Ready to continue? "
 echo "Alright, let's go."
 
 echo "Pulling down all git tags and branches before doing any work."
-git fetch testupstream --all --tags
+git fetch upstream --all --tags
 
 # If we've got a patch release, we'll need to create a release branch for it.
 if [[ "$VELERO_PATCH" > 0 ]]; then
@@ -77,13 +77,13 @@ if [[ "$VELERO_PATCH" > 0 ]]; then
     fi
 
     echo "Pushing $release_branch_name to upstream remote"
-    git push --set-upstream testupstream/$release_branch_name $release_branch_name
+    git push --set-upstream upstream/$release_branch_name $release_branch_name
     
     tag_and_push
 fi
 
 echo "Checking out upstream/master."
-git checkout testupstream/master
+git checkout upstream/master
 
 tag_and_push
 
