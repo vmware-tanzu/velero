@@ -215,6 +215,7 @@ plugins:
   - jekyll-paginate # pagination object for collections (e.g. posts)
   - jekyll-redirect-from
   - jekyll-seo-tag
+  - jemoji
 
 # Include these subdirectories
 include:
