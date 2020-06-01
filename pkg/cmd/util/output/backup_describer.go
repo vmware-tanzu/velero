@@ -70,11 +70,9 @@ func DescribeBackup(
 			}
 		}
 
-		if status.Phase == velerov1api.BackupPhasePartiallyFailed {
-			d.Println()
-			d.Printf("Errors:\t%d\n", status.Errors)
-			d.Printf("Warnings:\t%d\n", status.Warnings)
-		}
+		d.Println()
+		d.Printf("Errors:\t%d\n", status.Errors)
+		d.Printf("Warnings:\t%d\n", status.Warnings)
 
 		d.Println()
 		DescribeBackupSpec(d, backup.Spec)

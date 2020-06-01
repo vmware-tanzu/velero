@@ -35,6 +35,8 @@ var (
 		// https://github.com/kubernetes/kubernetes/blob/v1.15.3/pkg/printers/tableprinter.go#L204
 		{Name: "Name", Type: "string", Format: "name"},
 		{Name: "Status"},
+		{Name: "Errors"},
+		{Name: "Warnings"},
 		{Name: "Created"},
 		{Name: "Expires"},
 		{Name: "Storage Location"},
@@ -58,7 +60,6 @@ func printBackupList(list *velerov1api.BackupList) []metav1.TableRow {
 var timestampSuffix = regexp.MustCompile("-[0-9]{14}$")
 
 func sortBackupsByPrefixAndTimestamp(list *velerov1api.BackupList) {
-
 	sort.Slice(list.Items, func(i, j int) bool {
 		iSuffixIndex := timestampSuffix.FindStringIndex(list.Items[i].Name)
 		jSuffixIndex := timestampSuffix.FindStringIndex(list.Items[j].Name)
@@ -98,18 +99,17 @@ func printBackup(backup *velerov1api.Backup) []metav1.TableRow {
 	if backup.DeletionTimestamp != nil && !backup.DeletionTimestamp.Time.IsZero() {
 		status = "Deleting"
 	}
-	if status == string(velerov1api.BackupPhasePartiallyFailed) {
-		if backup.Status.Errors == 1 {
-			status = fmt.Sprintf("%s (1 error)", status)
-		} else {
-			status = fmt.Sprintf("%s (%d errors)", status, backup.Status.Errors)
-		}
 
-	}
-
-	location := backup.Spec.StorageLocation
-
-	row.Cells = append(row.Cells, backup.Name, status, backup.Status.StartTimestamp, humanReadableTimeFromNow(expiration), location, metav1.FormatLabelSelector(backup.Spec.LabelSelector))
+	row.Cells = append(row.Cells,
+		backup.Name,
+		status,
+		backup.Status.Errors,
+		backup.Status.Warnings,
+		backup.Status.StartTimestamp,
+		humanReadableTimeFromNow(expiration),
+		backup.Spec.StorageLocation,
+		metav1.FormatLabelSelector(backup.Spec.LabelSelector),
+	)
 
 	return []metav1.TableRow{row}
 }
