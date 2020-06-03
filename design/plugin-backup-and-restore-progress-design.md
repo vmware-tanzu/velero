@@ -30,7 +30,7 @@ This document proposes an approach for plugins to follow to provide backup/resto
 
 Progress will be updated by volume snapshotter in VolumePluginBackup CR which is specific to that backup operation.
 
-### Progress of restic operation handled by volume snapshotter
+### Progress of restore operation handled by volume snapshotter
 
 Progress will be updated by volume snapshotter in VolumePluginRestore CR which is specific to that restore operation.
 
@@ -118,6 +118,7 @@ In order to know the CR created for the particular backup of a volume, volume sn
 `velero.io/backup-name` with value as Backup Name, and,
 `velero.io/volume-name` with value as volume that is undergoing backup
 Backup name being unique won't cause issues like duplicates in identifying the CR.
+Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
 Though no restrictions are required on the name of CR, as a general practice, volume snapshotter can name this CR with the value same as return value of CreateSnapshot.
 
@@ -203,12 +204,41 @@ Snapshot ID that need to be restored will help to identify related VolumePluginB
 In order to identify the CR created for the particular restore of a volume, volume snapshotters adds following labels to CR:
 `velero.io/backup-name` with value as Backup Name, and,
 `velero.io/snapshot-id` with value as snapshot id that need to be restored
+Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+
+### Life cycle of VolumePlugin(Backup|Restore) CRs
+`VolumePluginBackup` provides the progress of the Backup operation that volumesnapshotter is performing, and also the status of Backup operation once it is performed.
+This information i.e., number of volumes in Backup, size of each volume's snapshot will be helpful to users if it is available on the clusters where restore operation will be performed.
+
+So, VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiration, VolumePluginBackup also can be deleted.
+`processRequest` of `backupDeletionController` will perform deletion of VolumePluginBackup before volumesnapshotter's DeleteSnapshot is called.
+
+Velero deletes VolumePluginRestore CR when it handles deletion of Restore CR.
+
+Another alternative is:
+Deletion of `VolumePluginBackup` CR can be delegated to plugin. Plugin can perform deletion of VolumePluginBackup using the `snapshotID` passed in volumesnapshotter's DeleteSnapshot request.
+But, deletion of `VolumePluginRestore` CR will be left with Velero. Velero deletes it during deletion handling of Restore CR.
+
+### 'core' Velero client/server required changes
+
+- Creation of the VolumePluginBackup/VolumePluginRestore CRDs at installation time
+- Persistence of VolumePluginBackup CRs towards the end of the back up operation
+- As part of backup synchronization, VolumePluginBackup CRs related to the backup will be synced.
+- Deletion of VolumePluginBackup when volumeshapshotter's DeleteSnapshot is called
+- Deletion of VolumePluginRestore as part of handling deletion of Restore CR
+
+### Velero CLI required changes
+
+- In 'velero describe' CLI, required CRs will be fetched from API server and its contents like backupName, PVName (if changed due to label size limitation), size of PV snapshot will be shown in the output.
 
 ### API Upgrade
 When CRs gets upgraded, velero can support older API versions also (till they get deprecated) to identify the CRs that need to be persisted to backup location.
 However, it can provide preference over latest supported API.
 
 If new fields are added without changing API version, it won't cause any problem as these resources are intended to provide information, and, there is no reconciliation on these resources.
+
+### Compatibility of latest plugin with older version of Velero
+Plugin that supports this CR should handle the situation gracefully when CRDs are not installed. It can handle the errors occured during creation/updation of the CRs.
 
 ##Limitations:
 
