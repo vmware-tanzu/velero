@@ -14,11 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
-set -o xtrace
-
 # this script expects to be run from the root of the Velero repo.
 
 go generate ./config/crd/crds

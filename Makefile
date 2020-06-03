@@ -40,14 +40,6 @@ CLI_PLATFORMS ?= linux-amd64 linux-arm linux-arm64 darwin-amd64 windows-amd64 li
 CONTAINER_PLATFORMS ?= linux-amd64 linux-ppc64le linux-arm linux-arm64
 MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 
-#kubebuilder automatically runs "make" when a resource or controller is created
-all: generate-all
-
-.PHONY: generate-all
-generate-all: ## Generate code and yaml manifests
-	$(MAKE) generate
-	$(MAKE) manifests
-
 ###
 ### These variables should not need tweaking.
 ###
@@ -89,7 +81,7 @@ IMAGE ?= $(REGISTRY)/$(BIN)-$(GOARCH)
 # If you want to build all binaries, see the 'all-build' rule.
 # If you want to build all containers, see the 'all-containers' rule.
 # If you want to build AND push all containers, see the 'all-push' rule.
-all-targets: all
+all:
 	@$(MAKE) build
 	@$(MAKE) build BIN=velero-restic-restore-helper
 
@@ -214,12 +206,18 @@ ifneq ($(SKIP_TESTS), 1)
 	hack/test.sh $(WHAT)
 endif
 
-verify:
+verify: verify-gen
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
-update: generate-all
+verify-gen: generate
+	@if !(git diff --quiet HEAD); then \
+		git diff; \
+		echo "files were out of date, `make generate` was run"; exit 1; \
+	fi
+
+update: manifests generate
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 build-dirs:
@@ -318,11 +316,11 @@ endif
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./pkg/apis/velero/v1" output:crd:artifacts:config=config/crd/bases
 
 # Generate code
 generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/velero/v1"
 
 # find or download controller-gen
 # download controller-gen if necessary
