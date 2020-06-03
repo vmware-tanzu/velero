@@ -20,27 +20,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	velerov1api "github.com/vmware-tanzu/velero/api/v1"
 )
-
-var (
-	// SchemeBuilder collects the scheme builder functions for the Velero API
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-
-	// AddToScheme applies the SchemeBuilder functions to a specified scheme
-	AddToScheme = SchemeBuilder.AddToScheme
-)
-
-// GroupName is the group name for the Velero API
-const GroupName = "velero.io"
-
-// SchemeGroupVersion is the GroupVersion for the Velero API
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
 // Resource gets a Velero GroupResource for a specified resource
 func Resource(resource string) schema.GroupResource {
-	return SchemeGroupVersion.WithResource(resource).GroupResource()
+	return GroupVersion.WithResource(resource).GroupResource()
 }
 
 type typeInfo struct {
@@ -69,7 +53,7 @@ func CustomResources() map[string]typeInfo {
 		"PodVolumeBackup":        newTypeInfo("podvolumebackups", &PodVolumeBackup{}, &PodVolumeBackupList{}),
 		"PodVolumeRestore":       newTypeInfo("podvolumerestores", &PodVolumeRestore{}, &PodVolumeRestoreList{}),
 		"ResticRepository":       newTypeInfo("resticrepositories", &ResticRepository{}, &ResticRepositoryList{}),
-		"BackupStorageLocation":  newTypeInfo("backupstoragelocations", &velerov1api.BackupStorageLocation{}, &velerov1api.BackupStorageLocationList{}),
+		"BackupStorageLocation":  newTypeInfo("backupstoragelocations", &BackupStorageLocation{}, &BackupStorageLocationList{}),
 		"VolumeSnapshotLocation": newTypeInfo("volumesnapshotlocations", &VolumeSnapshotLocation{}, &VolumeSnapshotLocationList{}),
 		"ServerStatusRequest":    newTypeInfo("serverstatusrequests", &ServerStatusRequest{}, &ServerStatusRequestList{}),
 	}
@@ -77,9 +61,9 @@ func CustomResources() map[string]typeInfo {
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	for _, typeInfo := range CustomResources() {
-		scheme.AddKnownTypes(SchemeGroupVersion, typeInfo.ItemType, typeInfo.ItemListType)
+		scheme.AddKnownTypes(GroupVersion, typeInfo.ItemType, typeInfo.ItemListType)
 	}
 
-	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
 }
