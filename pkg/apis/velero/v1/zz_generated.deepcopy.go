@@ -246,6 +246,11 @@ func (in *BackupSpec) DeepCopyInto(out *BackupSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DefaultRestic != nil {
+		in, out := &in.DefaultRestic, &out.DefaultRestic
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
