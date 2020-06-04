@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1api "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -339,12 +340,20 @@ func (ib *itemBackupper) executeActions(
 				return nil, err
 			}
 
-			additionalItem, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+			item, err := client.Get(additionalItem.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				log.WithFields(logrus.Fields{
+					"groupResource": additionalItem.GroupResource,
+					"namespace":     additionalItem.Namespace,
+					"name":          additionalItem.Name,
+				}).Warnf("Additional item was not found in Kubernetes API, can't back it up")
+				continue
+			}
 			if err != nil {
 				return nil, errors.WithStack(err)
 			}
 
-			if _, err = ib.backupItem(log, additionalItem, gvr.GroupResource(), gvr); err != nil {
+			if _, err = ib.backupItem(log, item, gvr.GroupResource(), gvr); err != nil {
 				return nil, err
 			}
 		}
