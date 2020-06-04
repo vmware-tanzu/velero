@@ -36,7 +36,238 @@ Progress will be updated by volume snapshotter in VolumePluginRestore CR which i
 
 ## Detailed Design
 
-### VolumePluginBackup CR
+### Approach 1
+
+Existing `Snapshot` Go struct from `volume` package have most of the details related to backup operation performed by volumesnapshotters.
+This struct also gets backed up to backup location. But, this struct gets synced during restore operation.
+
+At a high level, in this approach, this struct will be converted to a CR by adding new fields (related to Progress tracking) to it.
+Instead of backing up of Go struct, CRs will be backed up to backup location, and it gets synced into other cluster by backupSyncController running in that cluster.
+
+#### VolumePluginBackup CR
+
+There is no change in volume.SnapshotSpec. Below is the same for reference:
+
+```
+type SnapshotSpec struct {
+	// BackupName is the name of the Velero backup this snapshot
+	// is associated with.
+	BackupName string `json:"backupName"`
+
+	// BackupUID is the UID of the Velero backup this snapshot
+	// is associated with.
+	BackupUID string `json:"backupUID"`
+
+	// Location is the name of the VolumeSnapshotLocation where this snapshot is stored.
+	Location string `json:"location"`
+
+	// PersistentVolumeName is the Kubernetes name for the volume.
+	PersistentVolumeName string `json:persistentVolumeName`
+
+	// ProviderVolumeID is the provider's ID for the volume.
+	ProviderVolumeID string `json:"providerVolumeID"`
+
+	// VolumeType is the type of the disk/volume in the cloud provider
+	// API.
+	VolumeType string `json:"volumeType"`
+
+	// VolumeAZ is the where the volume is provisioned
+	// in the cloud provider.
+	VolumeAZ string `json:"volumeAZ,omitempty"`
+
+	// VolumeIOPS is the optional value of provisioned IOPS for the
+	// disk/volume in the cloud provider API.
+	VolumeIOPS *int64 `json:"volumeIOPS,omitempty"`
+}
+```
+
+Few fields (except first two) are added to volume.SnapshotStatusSpec. Below is the updated one:
+```
+type SnapshotStatus struct {
+	// ProviderSnapshotID is the ID of the snapshot taken in the cloud
+	// provider API of this volume.
+	ProviderSnapshotID string `json:"providerSnapshotID,omitempty"`
+
+	// Phase is the current state of the VolumeSnapshot.
+	Phase SnapshotPhase `json:"phase,omitempty"`
+
+	// PluginSpecific are a map of key-value pairs that plugin want to provide
+	// to user to identify plugin properties related to this backup
+	// +optional
+	PluginSpecific map[string]string `json:"pluginSpecific,omitempty"`
+
+	// Message is a message about the volume plugin's backup's status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// StartTimestamp records the time a backup was started.
+	// Separate from CreationTimestamp, since that value changes
+	// on restores.
+	// The server's time is used for StartTimestamps
+	// +optional
+	// +nullable
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+
+	// CompletionTimestamp records the time a backup was completed.
+	// Completion time is recorded even on failed backups.
+	// Completion time is recorded before uploading the backup object.
+	// The server's time is used for CompletionTimestamps
+	// +optional
+	// +nullable
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// Progress holds the total number of bytes of the volume and the current
+	// number of backed up bytes. This can be used to display progress information
+	// about the backup operation.
+	// +optional
+	Progress VolumeOperationProgress `json:"progress,omitempty"`
+}
+
+type VolumeOperationProgress struct {
+	TotalBytes int64
+	BytesDone int64
+}
+
+type VolumePluginBackupSpec volume.SnapshotSpec
+
+type VolumePluginBackup struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec VolumePluginBackupSpec `json:"spec,omitempty"`
+
+	// +optional
+	Status VolumePluginBackupStatus `json:"status,omitempty"`
+}
+```
+
+Notice that VolumePluginBackupSpec is nothing but volume.SnapshotSpec.
+
+For every backup operation of volume, Velero creates VolumePluginBackup CR before calling volumesnapshotter's CreateSnapshot API.
+
+In order to know the CR created for the particular backup of a volume, Velero adds following labels to CR:
+`velero.io/backup-name` with value as Backup Name, and,
+`velero.io/pv-name` with value as volume that is undergoing backup
+Backup name being unique won't cause issues like duplicates in identifying the CR.
+Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+
+If Plugin supports showing progress of the operation it is performing, it does following:
+- finds the VolumePluginBackup CR related to this backup operation by using `tags` passed in CreateSnapshot call
+- updates the CR with the progress regularly.
+
+After return from `CreateSnapshot` in `takePVSnapshot`, currently Velero adds `volume.Snapshot` to `backupRequest`. Instead of this, CR will be added to `backupRequest`.
+During persistBackup call, this CR also will be backed up to backup location.
+
+In backupSyncController, it checks for any VolumePluginBackup CRs that need to be synced from backup location, and syncs them to cluster if needed.
+
+VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiration, VolumePluginBackup also can be deleted.
+`processRequest` of `backupDeletionController` will perform deletion of VolumePluginBackup before volumesnapshotter's DeleteSnapshot is called.
+
+#### Backward compatibility:
+
+As the VolumePluginBackup CR is backed up instead of `volume.Snapshot`, to provide backward compatibility, CR will be backed up to the same file i.e., `#backup-volumesnapshots.json.gz` file in the backup location.
+If CR is backed up to different object other than `#backup-volumesnapshots.json.gz` in backup location, restore controller need to follow 'fall-back model'.
+It first need to check for new kind of object, and, if it doesn't exists, follow the old model. To avoid 'fall-back' model which prone to errors, VolumePluginBackup CR is backed to same location as that of `volume.Snapshot` location.
+
+When restore controller calls `GetBackupVolumeSnapshots`, it gets `#backup-volumesnapshots.json.gz` object from backup location and decodes it to in-memory array of VolumePluginBackup CR. It returns array of `volume.Snapshot`s created from array of VolumePluginBackup CRs.
+
+`backupSyncController` on other clusters gets the `#backup-volumesnapshots.json.gz` object from backup location and decodes it to in-memory VolumePluginBackup CR. If its `metadata.name` is populated, controller creates CR. Otherwise, it will not create the CR on the cluster.
+
+#### VolumePluginRestore CR
+
+```
+// VolumePluginRestoreSpec is the specification for a VolumePluginRestore CR.
+type VolumePluginRestoreSpec struct {
+	// SnapshotID is the identifier for the snapshot of the volume.
+	// This will be used to relate with output in 'velero describe backup'
+	SnapshotID string `json:"snapshotID"`
+
+	// BackupName is the name of the Velero backup from which PV will be
+	// created.
+	BackupName string `json:"backupName"`
+
+	// VolumeType is the type of the disk/volume in the cloud provider
+	// API.
+	VolumeType string `json:"volumeType"`
+
+	// VolumeAZ is the where the volume is provisioned
+	// in the cloud provider.
+	VolumeAZ string `json:"volumeAZ,omitempty"`
+}
+
+// VolumePluginRestoreStatus is the current status of a VolumePluginRestore CR.
+type VolumePluginRestoreStatus struct {
+	// Phase is the current state of the VolumePluginRestore.
+	Phase string `json:"phase"`
+
+	// VolumeID is the PV name to which restore done
+	VolumeID string `json:"volumeID"`
+
+	// Message is a message about the volume plugin's restore's status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// StartTimestamp records the time a restore was started.
+	// Separate from CreationTimestamp, since that value changes
+	// on restores.
+	// The server's time is used for StartTimestamps
+	// +optional
+	// +nullable
+	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
+
+	// CompletionTimestamp records the time a restore was completed.
+	// Completion time is recorded even on failed restores.
+	// The server's time is used for CompletionTimestamps
+	// +optional
+	// +nullable
+	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// Progress holds the total number of bytes of the snapshot and the current
+	// number of restored bytes. This can be used to display progress information
+	// about the restore operation.
+	// +optional
+	Progress VolumeOperationProgress `json:"progress,omitempty"`
+
+	// PluginSpecific are a map of key-value pairs that plugin want to provide
+	// to user to identify plugin properties related to this restore
+	// +optional
+	PluginSpecific map[string]string `json:"pluginSpecific,omitempty"`
+}
+
+type VolumePluginRestore struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// +optional
+	Spec VolumePluginRestoreSpec `json:"spec,omitempty"`
+
+	// +optional
+	Status VolumePluginRestoreStatus `json:"status,omitempty"`
+}
+```
+
+For every restore operation, Velero creates VolumePluginRestore CR before calling volumesnapshotter's CreateVolumeFromSnapshot API.
+
+In order to know the CR created for the particular restore of a volume, Velero adds following labels to CR:
+`velero.io/backup-name` with value as Backup Name, and,
+`velero.io/snapshot-id` with value as snapshot id that need to be restored
+Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
+
+Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API.
+It updates the progress of restore operation regularly if plugin supports feature of showing progress.
+
+Velero deletes VolumePluginRestore CR when it handles deletion of Restore CR.
+
+### Approach 2
+
+This approach is different to approach 1 only with respect to Backup.
+
+#### VolumePluginBackup CR
 
 ```
 // VolumePluginBackupSpec is the specification for a VolumePluginBackup CR.
@@ -46,14 +277,6 @@ type VolumePluginBackupSpec struct {
 
 	// Backup name
 	Backup string `json:"backup"`
-
-	// Plugin name
-	Plugin string `json:"plugin"`
-
-	// PluginSpecific are a map of key-value pairs that plugin want to provide
-	// to user to identify plugin properties related to this backup
-	// +optional
-	PluginSpecific map[string]string `json:"pluginSpecific,omitempty"`
 }
 
 // VolumePluginBackupStatus is the current status of a VolumePluginBackup CR.
@@ -84,6 +307,11 @@ type VolumePluginBackupStatus struct {
 	// +optional
 	// +nullable
 	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
+
+	// PluginSpecific are a map of key-value pairs that plugin want to provide
+	// to user to identify plugin properties related to this backup
+	// +optional
+	PluginSpecific map[string]string `json:"pluginSpecific,omitempty"`
 
 	// Progress holds the total number of bytes of the volume and the current
 	// number of backed up bytes. This can be used to display progress information
@@ -127,97 +355,15 @@ During persistBackup call, this CR also will be backed up to backup location.
 
 In backupSyncController, it checks for any VolumePluginBackup CRs that need to be synced from backup location, and syncs them to cluster if needed.
 
-### VolumePluginRestore CR
-
-```
-// VolumePluginRestoreSpec is the specification for a VolumePluginRestore CR.
-type VolumePluginRestoreSpec struct {
-	// SnapshotID is the identifier for the snapshot of the volume.
-	// This will be used to relate with output in 'velero describe backup'
-	SnapshotID string `json:"snapshotID"`
-
-	// Backup name
-	Backup string `json:"backup"`
-
-	// Plugin name
-	Plugin string `json:"plugin"`
-
-	// PluginSpecific are a map of key-value pairs that plugin want to provide
-	// to user to identify plugin properties related to this restore
-	// +optional
-	PluginSpecific map[string]string `json:"pluginSpecific,omitempty"`
-}
-
-// VolumePluginRestoreStatus is the current status of a VolumePluginRestore CR.
-type VolumePluginRestoreStatus struct {
-	// Phase is the current state of the VolumePluginRestore.
-	Phase string `json:"phase"`
-
-	// VolumeID is the PV name to which restore done
-	VolumeID string `json:"volumeID"`
-
-	// Message is a message about the volume plugin's restore's status.
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// StartTimestamp records the time a restore was started.
-	// Separate from CreationTimestamp, since that value changes
-	// on restores.
-	// The server's time is used for StartTimestamps
-	// +optional
-	// +nullable
-	StartTimestamp *metav1.Time `json:"startTimestamp,omitempty"`
-
-	// CompletionTimestamp records the time a restore was completed.
-	// Completion time is recorded even on failed restores.
-	// The server's time is used for CompletionTimestamps
-	// +optional
-	// +nullable
-	CompletionTimestamp *metav1.Time `json:"completionTimestamp,omitempty"`
-
-	// Progress holds the total number of bytes of the snapshot and the current
-	// number of restored bytes. This can be used to display progress information
-	// about the restore operation.
-	// +optional
-	Progress VolumeOperationProgress `json:"progress,omitempty"`
-}
-
-type VolumePluginRestore struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	// +optional
-	Spec VolumePluginRestoreSpec `json:"spec,omitempty"`
-
-	// +optional
-	Status VolumePluginRestoreStatus `json:"status,omitempty"`
-}
-```
-
-For every restore operation of volume, Volume snapshotter creates VolumePluginRestore CR in Velero namespace.
-Plugin keep updating the progress of operation along with other details like Volume name, Backup Name, SnapshotID etc as mentioned in the CR.
-
-Snapshot ID that need to be restored will help to identify related VolumePluginBackup CR.
-
-In order to identify the CR created for the particular restore of a volume, volume snapshotters adds following labels to CR:
-`velero.io/backup-name` with value as Backup Name, and,
-`velero.io/snapshot-id` with value as snapshot id that need to be restored
-Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
-
-### Life cycle of VolumePlugin(Backup|Restore) CRs
+#### Life cycle of VolumePlugin(Backup|Restore) CRs
 `VolumePluginBackup` provides the progress of the Backup operation that volumesnapshotter is performing, and also the status of Backup operation once it is performed.
 This information i.e., number of volumes in Backup, size of each volume's snapshot will be helpful to users if it is available on the clusters where restore operation will be performed.
 
 So, VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiration, VolumePluginBackup also can be deleted.
 `processRequest` of `backupDeletionController` will perform deletion of VolumePluginBackup before volumesnapshotter's DeleteSnapshot is called.
 
-Velero deletes VolumePluginRestore CR when it handles deletion of Restore CR.
-
 Another alternative is:
 Deletion of `VolumePluginBackup` CR can be delegated to plugin. Plugin can perform deletion of VolumePluginBackup using the `snapshotID` passed in volumesnapshotter's DeleteSnapshot request.
-But, deletion of `VolumePluginRestore` CR will be left with Velero. Velero deletes it during deletion handling of Restore CR.
 
 ### 'core' Velero client/server required changes
 
@@ -226,6 +372,10 @@ But, deletion of `VolumePluginRestore` CR will be left with Velero. Velero delet
 - As part of backup synchronization, VolumePluginBackup CRs related to the backup will be synced.
 - Deletion of VolumePluginBackup when volumeshapshotter's DeleteSnapshot is called
 - Deletion of VolumePluginRestore as part of handling deletion of Restore CR
+- In case of approach 1,
+  - converting `volume.Snapshot` struct as CR and its related changes
+  - creation of VolumePlugin(Backup|Restore) CRs before calling volumesnapshotter's API
+  - `GetBackupVolumeSnapshots` changes for backward compatibility
 
 ### Velero CLI required changes
 
@@ -240,7 +390,7 @@ If new fields are added without changing API version, it won't cause any problem
 ### Compatibility of latest plugin with older version of Velero
 Plugin that supports this CR should handle the situation gracefully when CRDs are not installed. It can handle the errors occured during creation/updation of the CRs.
 
-##Limitations:
+## Limitations:
 
 Non K8s native plugins will not be able to implement this as they can not create the CRs.
 
@@ -252,7 +402,7 @@ Non K8s native plugins will not be able to implement this as they can not create
 Above proposed approach have limitation that plugin need to be K8s native in order to create, update CRs.
 Instead, a new method for 'Progress' will be added to interface. Velero server regularly polls this 'Progress' method and updates VolumePluginBackup CR on behalf of plugin.
 
-But, this involves good amount of changes and needs a way for backward compability.
+But, this involves good amount of changes and needs a way for backward compatibility.
 
 As volume plugins are mostly K8s native, its fine to go ahead with current limiation.
 
