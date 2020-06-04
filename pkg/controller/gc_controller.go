@@ -29,7 +29,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -134,7 +133,7 @@ func (c *gcController) processQueueItem(key string) error {
 
 	log.Info("Backup has expired")
 
-	loc := &veleroapiv1.BackupStorageLocation{}
+	loc := &velerov1api.BackupStorageLocation{}
 	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
 		Name:      backup.Spec.StorageLocation,
@@ -145,7 +144,7 @@ func (c *gcController) processQueueItem(key string) error {
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if loc.Spec.AccessMode == veleroapiv1.BackupStorageLocationAccessModeReadOnly {
+	if loc.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		log.Infof("Backup cannot be garbage-collected because backup storage location %s is currently in read-only mode", loc.Name)
 		return nil
 	}

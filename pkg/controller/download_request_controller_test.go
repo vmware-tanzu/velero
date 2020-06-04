@@ -31,8 +31,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions"
@@ -74,7 +74,7 @@ func newDownloadRequestTestHarness(t *testing.T, fakeClient client.Client) *down
 	require.NoError(t, err)
 	controller.clock = clock.NewFakeClock(clockTime)
 
-	controller.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	controller.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 
@@ -107,16 +107,16 @@ func newDownloadRequest(phase v1.DownloadRequestPhase, targetKind v1.DownloadTar
 	}
 }
 
-func newBackupLocation(name, provider, bucket string) *veleroapiv1.BackupStorageLocation {
-	return &veleroapiv1.BackupStorageLocation{
+func newBackupLocation(name, provider, bucket string) *velerov1api.BackupStorageLocation {
+	return &velerov1api.BackupStorageLocation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: v1.DefaultNamespace,
 		},
-		Spec: veleroapiv1.BackupStorageLocationSpec{
+		Spec: velerov1api.BackupStorageLocationSpec{
 			Provider: provider,
-			StorageType: veleroapiv1.StorageType{
-				ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+			StorageType: velerov1api.StorageType{
+				ObjectStorage: &velerov1api.ObjectStorageLocation{
 					Bucket: bucket,
 				},
 			},
@@ -137,7 +137,7 @@ func TestProcessDownloadRequest(t *testing.T) {
 		downloadRequest *v1.DownloadRequest
 		backup          *v1.Backup
 		restore         *v1.Restore
-		backupLocation  *veleroapiv1.BackupStorageLocation
+		backupLocation  *velerov1api.BackupStorageLocation
 		expired         bool
 		expectedErr     string
 		expectGetsURL   bool

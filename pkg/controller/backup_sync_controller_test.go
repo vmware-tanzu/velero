@@ -31,7 +31,6 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -44,17 +43,17 @@ import (
 	velerotest "github.com/vmware-tanzu/velero/pkg/test"
 )
 
-func defaultLocationsList(namespace string) []*veleroapiv1.BackupStorageLocation {
-	return []*veleroapiv1.BackupStorageLocation{
+func defaultLocationsList(namespace string) []*velerov1api.BackupStorageLocation {
+	return []*velerov1api.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      "location-1",
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-1",
 					},
 				},
@@ -65,10 +64,10 @@ func defaultLocationsList(namespace string) []*veleroapiv1.BackupStorageLocation
 				Namespace: namespace,
 				Name:      "location-2",
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-2",
 					},
 				},
@@ -77,17 +76,17 @@ func defaultLocationsList(namespace string) []*veleroapiv1.BackupStorageLocation
 	}
 }
 
-func defaultLocationsListWithLongerLocationName(namespace string) []*veleroapiv1.BackupStorageLocation {
-	return []*veleroapiv1.BackupStorageLocation{
+func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api.BackupStorageLocation {
+	return []*velerov1api.BackupStorageLocation{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespace,
 				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-1",
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-1",
 					},
 				},
@@ -98,10 +97,10 @@ func defaultLocationsListWithLongerLocationName(namespace string) []*veleroapiv1
 				Namespace: namespace,
 				Name:      "the-really-long-location-name-that-is-much-more-than-63-characters-2",
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket-2",
 					},
 				},
@@ -121,7 +120,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 	tests := []struct {
 		name                     string
 		namespace                string
-		locations                []*veleroapiv1.BackupStorageLocation
+		locations                []*velerov1api.BackupStorageLocation
 		cloudBuckets             map[string][]*cloudBackupData
 		existingBackups          []*velerov1api.Backup
 		existingPodVolumeBackups []*velerov1api.PodVolumeBackup
@@ -358,7 +357,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 				velerotest.NewLogger(),
 			).(*backupSyncController)
 
-			c.newBackupStore = func(loc *veleroapiv1.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(loc *velerov1api.BackupStorageLocation, _ persistence.ObjectStoreGetter, _ logrus.FieldLogger) (persistence.BackupStore, error) {
 				// this gets populated just below, prior to exercising the method under test
 				return backupStores[loc.Name], nil
 			}
@@ -403,7 +402,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 			for bucket, backupDataSet := range test.cloudBuckets {
 				// figure out which location this bucket is for; we need this for verification
 				// purposes later
-				var location *veleroapiv1.BackupStorageLocation
+				var location *velerov1api.BackupStorageLocation
 				for _, loc := range test.locations {
 					if loc.Spec.ObjectStorage.Bucket == bucket {
 						location = loc

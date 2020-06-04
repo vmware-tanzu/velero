@@ -36,7 +36,6 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -238,7 +237,7 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
 	//TODO(carlisia): before the client was being passed to the restic package and the
 	// "getting" of the bsl was being done there; is that better?
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,

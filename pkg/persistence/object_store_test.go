@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/plugin/velero"
@@ -611,7 +610,7 @@ func (osg objectStoreGetter) GetObjectStore(provider string) (velero.ObjectStore
 func TestNewObjectBackupStore(t *testing.T) {
 	tests := []struct {
 		name              string
-		location          *veleroapiv1.BackupStorageLocation
+		location          *velerov1api.BackupStorageLocation
 		objectStoreGetter objectStoreGetter
 		wantBucket        string
 		wantPrefix        string
@@ -619,7 +618,7 @@ func TestNewObjectBackupStore(t *testing.T) {
 	}{
 		{
 			name:     "location with no ObjectStorage field results in an error",
-			location: new(veleroapiv1.BackupStorageLocation),
+			location: new(velerov1api.BackupStorageLocation),
 			wantErr:  "backup storage location does not use object storage",
 		},
 		{

@@ -42,7 +42,6 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -146,7 +145,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 	tests := []struct {
 		name           string
 		backup         *velerov1api.Backup
-		backupLocation *veleroapiv1.BackupStorageLocation
+		backupLocation *velerov1api.BackupStorageLocation
 		expectedErrs   []string
 	}{
 		{
@@ -169,7 +168,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 		{
 			name:           "backup for read-only backup location fails validation",
 			backup:         defaultBackup().StorageLocation("read-only").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadOnly).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectedErrs:   []string{"backup can't be created because backup storage location read-only is currently in read-only mode"},
 		},
 	}
@@ -231,7 +230,7 @@ func TestBackupLocationLabel(t *testing.T) {
 	tests := []struct {
 		name                   string
 		backup                 *velerov1api.Backup
-		backupLocation         *veleroapiv1.BackupStorageLocation
+		backupLocation         *velerov1api.BackupStorageLocation
 		expectedBackupLocation string
 	}{
 		{
@@ -296,7 +295,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 	tests := []struct {
 		name               string
 		backup             *velerov1api.Backup
-		backupLocation     *veleroapiv1.BackupStorageLocation
+		backupLocation     *velerov1api.BackupStorageLocation
 		expectedTTL        metav1.Duration
 		expectedExpiration metav1.Time
 	}{
@@ -359,7 +358,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 	tests := []struct {
 		name                   string
 		backup                 *velerov1api.Backup
-		backupLocation         *veleroapiv1.BackupStorageLocation
+		backupLocation         *velerov1api.BackupStorageLocation
 		defaultVolumesToRestic bool
 		expectedResult         *velerov1api.Backup
 		backupExists           bool
@@ -443,7 +442,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 			backup: defaultBackup().StorageLocation("read-write").Result(),
 			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").
 				Bucket("store-1").
-				AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadWrite).
+				AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).
 				Result(),
 			defaultVolumesToRestic: true,
 			expectedResult: &velerov1api.Backup{
@@ -831,7 +830,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				metrics:                metrics.NewServerMetrics(),
 				clock:                  clock.NewFakeClock(now),
 				newPluginManager:       func(logrus.FieldLogger) clientmgmt.Manager { return pluginManager },
-				newBackupStore: func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+				newBackupStore: func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 					return backupStore, nil
 				},
 				backupper:  backupper,

@@ -43,6 +43,10 @@ spec:
               description: Template is the definition of the Backup to be run on the
                 provided schedule
               properties:
+                defaultVolumesToRestic:
+                  description: DefaultVolumesToRestic specifies whether restic should
+                    be used to take a backup of all pod volumes by default.
+                  type: boolean
                 excludedNamespaces:
                   description: ExcludedNamespaces contains a list of namespaces that
                     are not included in the backup.

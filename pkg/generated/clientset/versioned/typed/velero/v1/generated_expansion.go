@@ -20,6 +20,8 @@ package v1
 
 type BackupExpansion interface{}
 
+type BackupStorageLocationExpansion interface{}
+
 type DeleteBackupRequestExpansion interface{}
 
 type DownloadRequestExpansion interface{}

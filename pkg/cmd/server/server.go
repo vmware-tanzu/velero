@@ -77,7 +77,7 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
 const (
@@ -130,7 +130,7 @@ var disableControllerList = []string{
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = veleroapiv1.AddToScheme(scheme)
+	_ = velerov1api.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -373,7 +373,7 @@ func (s *server) run() error {
 		return err
 	}
 
-	bsl := &veleroapiv1.BackupStorageLocation{}
+	bsl := &velerov1api.BackupStorageLocation{}
 	if err := s.mgr.GetAPIReader().Get(context.Background(), k8sclient.ObjectKey{
 		Namespace: s.namespace,
 		Name:      s.config.defaultBackupLocation,
@@ -477,7 +477,7 @@ func (s *server) validateBackupStorageLocations() error {
 	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
 	defer pluginManager.CleanupClients()
 
-	locations := &veleroapiv1.BackupStorageLocationList{}
+	locations := &velerov1api.BackupStorageLocationList{}
 	if err := s.mgr.GetAPIReader().List(context.Background(), locations, &k8sclient.ListOptions{
 		Namespace: s.namespace,
 	}); err != nil {

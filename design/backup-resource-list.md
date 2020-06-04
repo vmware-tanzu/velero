@@ -57,10 +57,10 @@ The Backupper currently initialises a map to track the `backedUpItems` (https://
 This property will be moved to the [Backup request struct](https://github.com/heptio/velero/blob/16910a6215cbd8f0bde385dba9879629ebcbcc28/pkg/backup/request.go#L11), allowing the BackupController to access it after a successful backup.
 
 `backedUpItems` currently uses the `schema.GroupResource` as a key for the resource.
-In order to record the API group, version and kind for the resource, this key will be constructed from the object's `schema.GroupVersionKind` in the format `{group}/{version}/{kind}` (e.g. `apps/v1/Deployment`).
+In order to record the API group, version and kind for the resource, this key will be constructed from the object's `schema.SchemeGroupVersionKind` in the format `{group}/{version}/{kind}` (e.g. `apps/v1/Deployment`).
 
 The `backedUpItems` map is kept as a flat structure internally for quick lookup.
-When the backup is ready to upload, `backedUpItems` will be converted to a nested structure representing the metadata file above, grouped by `schema.GroupVersionKind`.
+When the backup is ready to upload, `backedUpItems` will be converted to a nested structure representing the metadata file above, grouped by `schema.SchemeGroupVersionKind`.
 After converting to the right format, it can be passed to the `persistBackup` function to persist the file in object storage.
 
 ### Changes to DownloadRequest CRD and processing

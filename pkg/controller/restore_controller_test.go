@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -61,7 +61,7 @@ func TestFetchBackupInfo(t *testing.T) {
 	tests := []struct {
 		name              string
 		backupName        string
-		informerLocations []*veleroapiv1.BackupStorageLocation
+		informerLocations []*velerov1api.BackupStorageLocation
 		informerBackups   []*api.Backup
 		backupStoreBackup *api.Backup
 		backupStoreError  error
@@ -71,7 +71,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		{
 			name:              "lister has backup",
 			backupName:        "backup-1",
-			informerLocations: []*veleroapiv1.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -79,7 +79,7 @@ func TestFetchBackupInfo(t *testing.T) {
 			name:              "lister does not have a backup, but backupSvc does",
 			backupName:        "backup-1",
 			backupStoreBackup: defaultBackup().StorageLocation("default").Result(),
-			informerLocations: []*veleroapiv1.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
+			informerLocations: []*velerov1api.BackupStorageLocation{builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()},
 			informerBackups:   []*api.Backup{defaultBackup().StorageLocation("default").Result()},
 			expectedRes:       defaultBackup().StorageLocation("default").Result(),
 		},
@@ -125,7 +125,7 @@ func TestFetchBackupInfo(t *testing.T) {
 				formatFlag,
 			).(*restoreController)
 
-			c.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 
@@ -240,7 +240,7 @@ func TestProcessQueueItem(t *testing.T) {
 	tests := []struct {
 		name                            string
 		restoreKey                      string
-		location                        *veleroapiv1.BackupStorageLocation
+		location                        *velerov1api.BackupStorageLocation
 		restore                         *api.Restore
 		backup                          *api.Backup
 		restorerError                   error
@@ -429,7 +429,7 @@ func TestProcessQueueItem(t *testing.T) {
 				formatFlag,
 			).(*restoreController)
 
-			c.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+			c.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 				return backupStore, nil
 			}
 

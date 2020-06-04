@@ -26,6 +26,14 @@ type BackupListerExpansion interface{}
 // BackupNamespaceLister.
 type BackupNamespaceListerExpansion interface{}
 
+// BackupStorageLocationListerExpansion allows custom methods to be added to
+// BackupStorageLocationLister.
+type BackupStorageLocationListerExpansion interface{}
+
+// BackupStorageLocationNamespaceListerExpansion allows custom methods to be added to
+// BackupStorageLocationNamespaceLister.
+type BackupStorageLocationNamespaceListerExpansion interface{}
+
 // DeleteBackupRequestListerExpansion allows custom methods to be added to
 // DeleteBackupRequestLister.
 type DeleteBackupRequestListerExpansion interface{}

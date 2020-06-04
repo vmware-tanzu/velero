@@ -36,7 +36,6 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -390,15 +389,15 @@ func TestTempCACertFile(t *testing.T) {
 	g := NewWithT(t)
 	var (
 		fs  = velerotest.NewFakeFileSystem()
-		bsl = &veleroapiv1.BackupStorageLocation{
+		bsl = &velerov1api.BackupStorageLocation{
 			TypeMeta: metav1.TypeMeta{},
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "velero",
 				Name:      "default",
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{CACert: []byte("cacert")},
+			Spec: velerov1api.BackupStorageLocationSpec{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{CACert: []byte("cacert")},
 				},
 			},
 		}
@@ -408,7 +407,7 @@ func TestTempCACertFile(t *testing.T) {
 	fakeClient := newFakeClient(g)
 	fakeClient.Create(context.Background(), bsl)
 
-	locationCreated := &veleroapiv1.BackupStorageLocation{}
+	locationCreated := &velerov1api.BackupStorageLocation{}
 	err := fakeClient.Get(context.Background(), client.ObjectKey{
 		Namespace: bsl.Namespace,
 		Name:      bsl.Name,
@@ -534,6 +533,6 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 
 func newFakeClient(g *WithT, initObjs ...runtime.Object) client.Client {
 	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-	g.Expect(veleroapiv1.AddToScheme(scheme.Scheme)).To(Succeed())
+	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
 	return k8sfake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }
