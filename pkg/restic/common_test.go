@@ -419,3 +419,105 @@ func TestTempCACertFile(t *testing.T) {
 
 	os.Remove(fileName)
 }
+
+func TestGetPodVolumesUsingRestic(t *testing.T) {
+	testCases := []struct {
+		name          string
+		pod           *corev1api.Pod
+		expected      []string
+		defaultRestic bool
+	}{
+		{
+			name:          "should get PVs from VolumesToBackupAnnotation when defaultRestic is false",
+			defaultRestic: false,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToBackupAnnotation: "resticPV1,resticPV2,resticPV3",
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+		{
+			name:          "should get all pod volumes when defaultRestic is true and no PVs are excluded",
+			defaultRestic: true,
+			pod: &corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+		{
+			name:          "should get all pod volumes except ones excluded when defaultRestic is true",
+			defaultRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "nonResticPV1,nonResticPV2,nonResticPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						/// Excluded from restic through annotation
+						{Name: "nonResticPV1"}, {Name: "nonResticPV2"}, {Name: "nonResticPV3"},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+		{
+			name:          "should exclude default service account token from restic backup",
+			defaultRestic: true,
+			pod: &corev1api.Pod{
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						/// Excluded from restic because colume mounting default service account token
+						{Name: "default-token-5xq45"},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+		{
+			name:          "should exclude host path volumes from restic backups",
+			defaultRestic: true,
+			pod: &corev1api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						VolumesToExcludeAnnotation: "nonResticPV1,nonResticPV2,nonResticPV3",
+					},
+				},
+				Spec: corev1api.PodSpec{
+					Volumes: []corev1api.Volume{
+						// Restic Volumes
+						{Name: "resticPV1"}, {Name: "resticPV2"}, {Name: "resticPV3"},
+						/// Excluded from restic through annotation
+						{Name: "nonResticPV1"}, {Name: "nonResticPV2"}, {Name: "nonResticPV3"},
+						// Excluded from restic because hostpath
+						{Name: "hostPath1", VolumeSource: corev1api.VolumeSource{HostPath: &corev1api.HostPathVolumeSource{Path: "/hostpathVol"}}},
+					},
+				},
+			},
+			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := GetPodVolumesUsingRestic(tc.pod, tc.defaultRestic)
+
+			sort.Strings(tc.expected)
+			sort.Strings(actual)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}

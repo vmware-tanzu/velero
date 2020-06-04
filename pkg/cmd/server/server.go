@@ -651,6 +651,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.defaultBackupLocation,
+			s.config.defaultRestic,
 			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,
