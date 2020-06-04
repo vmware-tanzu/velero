@@ -257,6 +257,7 @@ For every restore operation, Velero creates VolumePluginRestore CR before callin
 In order to know the CR created for the particular restore of a volume, Velero adds following labels to CR:
 - `velero.io/backup-name` with value as Backup Name, and,
 - `velero.io/snapshot-id` with value as snapshot id that need to be restored
+
 Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
 Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API.
@@ -346,7 +347,9 @@ It keep updating the progress of operation along with other details like Volume 
 In order to know the CR created for the particular backup of a volume, volume snapshotters adds following labels to CR:
 - `velero.io/backup-name` with value as Backup Name, and,
 - `velero.io/volume-name` with value as volume that is undergoing backup
+
 Backup name being unique won't cause issues like duplicates in identifying the CR.
+
 Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
 Though no restrictions are required on the name of CR, as a general practice, volume snapshotter can name this CR with the value same as return value of CreateSnapshot.
@@ -375,7 +378,7 @@ Deletion of `VolumePluginBackup` CR can be delegated to plugin. Plugin can perfo
 
 ### Velero CLI required changes
 
-- In 'velero describe' CLI, required CRs will be fetched from API server and its contents like backupName, PVName (if changed due to label size limitation), size of PV snapshot will be shown in the output.
+In 'velero describe' CLI, required CRs will be fetched from API server and its contents like backupName, PVName (if changed due to label size limitation), size of PV snapshot will be shown in the output.
 
 ### API Upgrade
 When CRs gets upgraded, velero can support older API versions also (till they get deprecated) to identify the CRs that need to be persisted to backup location.
