@@ -128,6 +128,12 @@ func (b *BackupBuilder) SnapshotVolumes(val bool) *BackupBuilder {
 	return b
 }
 
+// DefaultRestic sets the Backup's "DefaultRestic" flag.
+func (b *BackupBuilder) DefaultRestic(val bool) *BackupBuilder {
+	b.object.Spec.DefaultRestic = &val
+	return b
+}
+
 // Phase sets the Backup's phase.
 func (b *BackupBuilder) Phase(phase velerov1api.BackupPhase) *BackupBuilder {
 	b.object.Status.Phase = phase
