@@ -9,6 +9,7 @@ Velero supports a variety of storage providers for different backup and snapshot
 | [Amazon Web Services (AWS)][7]    | AWS S3              | AWS EBS                      | [Velero plugin for AWS][8]              | [AWS Plugin Setup][35]        |
 | [Google Cloud Platform (GCP)][11] | Google Cloud Storage| Google Compute Engine Disks  | [Velero plugin for GCP][12]             | [GCP Plugin Setup][36]        |
 | [Microsoft Azure][9]              | Azure Blob Storage  | Azure Managed Disks          | [Velero plugin for Microsoft Azure][10] | [Azure Plugin Setup][37]      |
+| [VMware vSphere][39]              | 🚫                  | vSphere Volumes              | [VMware vSphere][39]                    | [vSphere Plugin Setup][40]    |
 
 Contact: [#Velero Slack][28], [GitHub Issues][29]
 
@@ -21,7 +22,6 @@ Contact: [#Velero Slack][28], [GitHub Issues][29]
 | [Hewlett Packard][24]     | 🚫                           | HPE Storage                        | [Hewlett Packard][25]  | [Slack][26], [GitHub Issue][27] |
 | [OpenEBS][17]             | 🚫                           | OpenEBS CStor Volume               | [OpenEBS][18]          | [Slack][19], [GitHub Issue][20] |
 | [Portworx][31]            | 🚫                           | Portworx Volume                    | [Portworx][32]         | [Slack][33], [GitHub Issue][34] |
-| [VMware vSphere][39]      | 🚫                           | vSphere Volumes                    | [VMware vSphere][39]   | [GitHub Issue][40]              |
 
 ## S3-Compatible object store providers
 
@@ -82,4 +82,4 @@ In the case you want to take volume snapshots but didn't find a plugin for your 
 [37]: https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure#setup
 [38]: https://www.cloudian.com/
 [39]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere
-[40]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere/issues/new
+[40]: https://github.com/vmware-tanzu/velero-plugin-for-vsphere#installing-the-plugin
