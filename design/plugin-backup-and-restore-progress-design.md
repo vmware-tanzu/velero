@@ -8,7 +8,7 @@ Even though plugins provide the way to know the progress of backup operation, th
 
 So, apart from the issues like progress, status of operation, volume snapshotters have unique problems like
 - not being uniform across plugins
-- not knowing the backup information during retore operation
+- not knowing the backup information during restore operation
 - need to be optional as few plugins may not have a way to provide the progress information
 
 This document proposes an approach for plugins to follow to provide backup/restore progress, which can be used by users to know the progress.
@@ -39,7 +39,8 @@ Progress will be updated by volume snapshotter in VolumePluginRestore CR which i
 ### Approach 1
 
 Existing `Snapshot` Go struct from `volume` package have most of the details related to backup operation performed by volumesnapshotters.
-This struct also gets backed up to backup location. But, this struct gets synced during restore operation.
+This struct also gets backed up to backup location. But, this struct doesn't get synced on other clusters at regular intervals.
+It will be synced only during restore operation, and velero CLI shows few of its contents.
 
 At a high level, in this approach, this struct will be converted to a CR by adding new fields (related to Progress tracking) to it.
 Instead of backing up of Go struct, CRs will be backed up to backup location, and it gets synced into other cluster by backupSyncController running in that cluster.
@@ -144,13 +145,14 @@ type VolumePluginBackup struct {
 }
 ```
 
-Notice that VolumePluginBackupSpec is nothing but volume.SnapshotSpec.
+Notice that VolumePluginBackupSpec is same as volume.SnapshotSpec.
 
 For every backup operation of volume, Velero creates VolumePluginBackup CR before calling volumesnapshotter's CreateSnapshot API.
 
 In order to know the CR created for the particular backup of a volume, Velero adds following labels to CR:
-`velero.io/backup-name` with value as Backup Name, and,
-`velero.io/pv-name` with value as volume that is undergoing backup
+- `velero.io/backup-name` with value as Backup Name, and,
+- `velero.io/pv-name` with value as volume that is undergoing backup
+
 Backup name being unique won't cause issues like duplicates in identifying the CR.
 Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
@@ -163,14 +165,13 @@ During persistBackup call, this CR also will be backed up to backup location.
 
 In backupSyncController, it checks for any VolumePluginBackup CRs that need to be synced from backup location, and syncs them to cluster if needed.
 
-VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiration, VolumePluginBackup also can be deleted.
+VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiry, VolumePluginBackup also can be deleted.
+
 `processRequest` of `backupDeletionController` will perform deletion of VolumePluginBackup before volumesnapshotter's DeleteSnapshot is called.
 
 #### Backward compatibility:
 
 As the VolumePluginBackup CR is backed up instead of `volume.Snapshot`, to provide backward compatibility, CR will be backed up to the same file i.e., `#backup-volumesnapshots.json.gz` file in the backup location.
-If CR is backed up to different object other than `#backup-volumesnapshots.json.gz` in backup location, restore controller need to follow 'fall-back model'.
-It first need to check for new kind of object, and, if it doesn't exists, follow the old model. To avoid 'fall-back' model which prone to errors, VolumePluginBackup CR is backed to same location as that of `volume.Snapshot` location.
 
 When restore controller calls `GetBackupVolumeSnapshots`, it gets `#backup-volumesnapshots.json.gz` object from backup location and decodes it to in-memory array of VolumePluginBackup CR. It returns array of `volume.Snapshot`s created from array of VolumePluginBackup CRs.
 
@@ -254,8 +255,8 @@ type VolumePluginRestore struct {
 For every restore operation, Velero creates VolumePluginRestore CR before calling volumesnapshotter's CreateVolumeFromSnapshot API.
 
 In order to know the CR created for the particular restore of a volume, Velero adds following labels to CR:
-`velero.io/backup-name` with value as Backup Name, and,
-`velero.io/snapshot-id` with value as snapshot id that need to be restored
+- `velero.io/backup-name` with value as Backup Name, and,
+- `velero.io/snapshot-id` with value as snapshot id that need to be restored
 Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
 Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API.
@@ -343,8 +344,8 @@ For every backup operation of volume, volume snapshotter creates VolumePluginBac
 It keep updating the progress of operation along with other details like Volume name, Backup Name, SnapshotID etc as mentioned in the CR.
 
 In order to know the CR created for the particular backup of a volume, volume snapshotters adds following labels to CR:
-`velero.io/backup-name` with value as Backup Name, and,
-`velero.io/volume-name` with value as volume that is undergoing backup
+- `velero.io/backup-name` with value as Backup Name, and,
+- `velero.io/volume-name` with value as volume that is undergoing backup
 Backup name being unique won't cause issues like duplicates in identifying the CR.
 Plugin need to sanitize the value that can be set for above labels. Label need to be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
@@ -355,11 +356,6 @@ During persistBackup call, this CR also will be backed up to backup location.
 
 In backupSyncController, it checks for any VolumePluginBackup CRs that need to be synced from backup location, and syncs them to cluster if needed.
 
-#### Life cycle of VolumePlugin(Backup|Restore) CRs
-`VolumePluginBackup` provides the progress of the Backup operation that volumesnapshotter is performing, and also the status of Backup operation once it is performed.
-This information i.e., number of volumes in Backup, size of each volume's snapshot will be helpful to users if it is available on the clusters where restore operation will be performed.
-
-So, VolumePluginBackup will be useful as long as backed up data is available at backup location. When the Backup is deleted either by manually or due to expiration, VolumePluginBackup also can be deleted.
 `processRequest` of `backupDeletionController` will perform deletion of VolumePluginBackup before volumesnapshotter's DeleteSnapshot is called.
 
 Another alternative is:
@@ -412,6 +408,10 @@ Instead of creating new CRs, plugins can directly update the status of Backup CR
 ### Restricting on name rather than using labels
 Instead of using labels to identify the CR related to particular backup on a volume, restrictions can be placed on the name of VolumePluginBackup CR to be same as the value returned from CreateSnapshot.
 But, this can cause issue when volume snapshotter just crashed without returning snapshot id to velero.
+
+### Backing up VolumePluginBackup CR to different object
+If CR is backed up to different object other than `#backup-volumesnapshots.json.gz` in backup location, restore controller need to follow 'fall-back model'.
+It first need to check for new kind of object, and, if it doesn't exists, follow the old model. To avoid 'fall-back' model which prone to errors, VolumePluginBackup CR is backed to same location as that of `volume.Snapshot` location.
 
 ## Security Considerations
 
