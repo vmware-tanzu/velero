@@ -31,7 +31,7 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
-	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9
 	google.golang.org/grpc v1.26.0
 	k8s.io/api v0.17.4
 	k8s.io/apiextensions-apiserver v0.17.4

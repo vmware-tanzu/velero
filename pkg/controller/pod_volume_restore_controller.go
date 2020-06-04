@@ -40,7 +40,6 @@ import (
 	k8scache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -301,7 +300,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
@@ -361,7 +360,7 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := c.client.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,

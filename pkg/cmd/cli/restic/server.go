@@ -36,7 +36,7 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -62,7 +62,7 @@ var (
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
-	_ = veleroapiv1.AddToScheme(scheme)
+	_ = velerov1api.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -198,7 +198,7 @@ func (s *resticServer) run() {
 	// TODO(carlisia): how to handle the fetching of the bsl informer:
 	// - options are: 1) get informer for specific obj (below, but w/o namespace or obj name info because we don't know it here) or 2) for a specific kind, which would be CRD?
 	// - should it go here, or inside the controller? Note that neither resolves issue above
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	bslInformer, _ := s.mgr.GetCache().GetInformer(location)
 
 	backupController := controller.NewPodVolumeBackupController(

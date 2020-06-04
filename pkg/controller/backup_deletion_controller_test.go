@@ -40,8 +40,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -174,7 +174,7 @@ func setupBackupDeletionControllerTest(fakeClient client.Client, objects ...runt
 		req: req,
 	}
 
-	data.controller.newBackupStore = func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
+	data.controller.newBackupStore = func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error) {
 		return backupStore, nil
 	}
 
@@ -415,7 +415,7 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 
 	t.Run("backup storage location is in read-only mode", func(t *testing.T) {
 		backup := builder.ForBackup(velerov1.DefaultNamespace, "foo").StorageLocation("default").Result()
-		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadOnly).Result()
+		location := builder.ForBackupStorageLocation("velero", "default").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result()
 
 		fakeClient := newFakeClient(g, location)
 		td := setupBackupDeletionControllerTest(fakeClient, backup)
@@ -457,15 +457,15 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore3)
 
-		location := &veleroapiv1.BackupStorageLocation{
+		location := &velerov1api.BackupStorageLocation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: backup.Namespace,
 				Name:      backup.Spec.StorageLocation,
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket",
 					},
 				},
@@ -620,15 +620,15 @@ func TestBackupDeletionControllerProcessRequest(t *testing.T) {
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore2)
 		td.sharedInformers.Velero().V1().Restores().Informer().GetStore().Add(restore3)
 
-		location := &veleroapiv1.BackupStorageLocation{
+		location := &velerov1api.BackupStorageLocation{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: backup.Namespace,
 				Name:      backup.Spec.StorageLocation,
 			},
-			Spec: veleroapiv1.BackupStorageLocationSpec{
+			Spec: velerov1api.BackupStorageLocationSpec{
 				Provider: "objStoreProvider",
-				StorageType: veleroapiv1.StorageType{
-					ObjectStorage: &veleroapiv1.ObjectStorageLocation{
+				StorageType: velerov1api.StorageType{
+					ObjectStorage: &velerov1api.ObjectStorageLocation{
 						Bucket: "bucket",
 					},
 				},

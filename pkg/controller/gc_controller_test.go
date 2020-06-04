@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -162,7 +162,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		name                           string
 		backup                         *api.Backup
 		deleteBackupRequests           []*api.DeleteBackupRequest
-		backupLocation                 *veleroapiv1.BackupStorageLocation
+		backupLocation                 *velerov1api.BackupStorageLocation
 		expectDeletion                 bool
 		createDeleteBackupRequestError bool
 		expectError                    bool
@@ -179,13 +179,13 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 		{
 			name:           "expired backup in read-only storage location is not deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-only").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadOnly).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-only").AccessMode(velerov1api.BackupStorageLocationAccessModeReadOnly).Result(),
 			expectDeletion: false,
 		},
 		{
 			name:           "expired backup in read-write storage location is deleted",
 			backup:         defaultBackup().Expiration(fakeClock.Now().Add(-time.Minute)).StorageLocation("read-write").Result(),
-			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(veleroapiv1.BackupStorageLocationAccessModeReadWrite).Result(),
+			backupLocation: builder.ForBackupStorageLocation("velero", "read-write").AccessMode(velerov1api.BackupStorageLocationAccessModeReadWrite).Result(),
 			expectDeletion: true,
 		},
 		{

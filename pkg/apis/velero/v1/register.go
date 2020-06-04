@@ -24,7 +24,7 @@ import (
 
 // Resource gets a Velero GroupResource for a specified resource
 func Resource(resource string) schema.GroupResource {
-	return GroupVersion.WithResource(resource).GroupResource()
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
 type typeInfo struct {
@@ -61,9 +61,9 @@ func CustomResources() map[string]typeInfo {
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	for _, typeInfo := range CustomResources() {
-		scheme.AddKnownTypes(GroupVersion, typeInfo.ItemType, typeInfo.ItemListType)
+		scheme.AddKnownTypes(SchemeGroupVersion, typeInfo.ItemType, typeInfo.ItemListType)
 	}
 
-	metav1.AddToGroupVersion(scheme, GroupVersion)
+	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }

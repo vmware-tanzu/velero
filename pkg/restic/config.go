@@ -27,7 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/pkg/errors"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 )
 
@@ -45,7 +45,7 @@ var getAWSBucketRegion = getBucketRegion
 
 // getRepoPrefix returns the prefix of the value of the --repo flag for
 // restic commands, i.e. everything except the "/<repo-name>".
-func getRepoPrefix(location *veleroapiv1.BackupStorageLocation) (string, error) {
+func getRepoPrefix(location *velerov1api.BackupStorageLocation) (string, error) {
 	var bucket, prefix string
 
 	if location.Spec.ObjectStorage != nil {
@@ -93,7 +93,7 @@ func getRepoPrefix(location *veleroapiv1.BackupStorageLocation) (string, error) 
 
 // GetRepoIdentifier returns the string to be used as the value of the --repo flag in
 // restic commands for the given repository.
-func GetRepoIdentifier(location *veleroapiv1.BackupStorageLocation, name string) (string, error) {
+func GetRepoIdentifier(location *velerov1api.BackupStorageLocation, name string) (string, error) {
 	prefix, err := getRepoPrefix(location)
 	if err != nil {
 		return "", err

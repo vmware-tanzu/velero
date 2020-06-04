@@ -41,7 +41,6 @@ import (
 	snapshotv1beta1api "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapshotv1beta1listers "github.com/kubernetes-csi/external-snapshotter/v2/pkg/client/listers/volumesnapshot/v1beta1"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/discovery"
@@ -79,7 +78,7 @@ type backupController struct {
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
 	metrics                     *metrics.ServerMetrics
-	newBackupStore              func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore              func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	formatFlag                  logging.Format
 	volumeSnapshotLister        snapshotv1beta1listers.VolumeSnapshotLister
 	volumeSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister
@@ -368,7 +367,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	}
 
 	// validate the storage location, and store the BackupStorageLocation API obj on the request
-	storageLocation := &veleroapiv1.BackupStorageLocation{}
+	storageLocation := &velerov1api.BackupStorageLocation{}
 	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: request.Namespace,
 		Name:      request.Spec.StorageLocation,
@@ -381,7 +380,7 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	} else {
 		request.StorageLocation = storageLocation
 
-		if request.StorageLocation.Spec.AccessMode == veleroapiv1.BackupStorageLocationAccessModeReadOnly {
+		if request.StorageLocation.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 			request.Status.ValidationErrors = append(request.Status.ValidationErrors,
 				fmt.Sprintf("backup can't be created because backup storage location %s is currently in read-only mode", request.StorageLocation.Name))
 		}

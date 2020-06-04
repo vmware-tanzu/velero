@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 
-	kbvelerov1api "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/util/encode"
@@ -188,15 +187,15 @@ func printTable(cmd *cobra.Command, obj runtime.Object) (bool, error) {
 			ColumnDefinitions: resticRepoColumns,
 			Rows:              printResticRepoList(obj.(*velerov1api.ResticRepositoryList)),
 		}
-	case *kbvelerov1api.BackupStorageLocation:
+	case *velerov1api.BackupStorageLocation:
 		table = &metav1.Table{
 			ColumnDefinitions: backupStorageLocationColumns,
-			Rows:              printBackupStorageLocation(obj.(*kbvelerov1api.BackupStorageLocation)),
+			Rows:              printBackupStorageLocation(obj.(*velerov1api.BackupStorageLocation)),
 		}
-	case *kbvelerov1api.BackupStorageLocationList:
+	case *velerov1api.BackupStorageLocationList:
 		table = &metav1.Table{
 			ColumnDefinitions: backupStorageLocationColumns,
-			Rows:              printBackupStorageLocationList(obj.(*kbvelerov1api.BackupStorageLocationList)),
+			Rows:              printBackupStorageLocationList(obj.(*velerov1api.BackupStorageLocationList)),
 		}
 	case *velerov1api.VolumeSnapshotLocation:
 		table = &metav1.Table{

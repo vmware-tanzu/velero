@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
@@ -47,9 +47,9 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			})
 			cmd.CheckError(err)
 
-			location := &veleroapiv1.BackupStorageLocation{}
-			var locations *veleroapiv1.BackupStorageLocationList
-			locations = new(veleroapiv1.BackupStorageLocationList)
+			location := &velerov1api.BackupStorageLocation{}
+			var locations *velerov1api.BackupStorageLocationList
+			locations = new(velerov1api.BackupStorageLocationList)
 			if len(args) > 0 {
 				for _, name := range args {
 					err = clientKB.Get(context.Background(), k8sclient.ObjectKey{

@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/features"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -55,7 +54,7 @@ type backupSyncController struct {
 	defaultBackupLocation   string
 	defaultBackupSyncPeriod time.Duration
 	newPluginManager        func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore          func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore          func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewBackupSyncController(
@@ -102,8 +101,8 @@ func NewBackupSyncController(
 
 // orderedBackupLocations returns a new slice with the default backup location first (if it exists),
 // followed by the rest of the locations in no particular order.
-func orderedBackupLocations(locationList *veleroapiv1.BackupStorageLocationList, defaultLocationName string) []veleroapiv1.BackupStorageLocation {
-	var result []veleroapiv1.BackupStorageLocation
+func orderedBackupLocations(locationList *velerov1api.BackupStorageLocationList, defaultLocationName string) []velerov1api.BackupStorageLocation {
+	var result []velerov1api.BackupStorageLocation
 
 	for i := range locationList.Items {
 		if locationList.Items[i].Name == defaultLocationName {
@@ -124,7 +123,7 @@ func orderedBackupLocations(locationList *veleroapiv1.BackupStorageLocationList,
 func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
-	locationList := &veleroapiv1.BackupStorageLocationList{}
+	locationList := &velerov1api.BackupStorageLocationList{}
 	if err := c.k8sClient.List(context.Background(), locationList, &client.ListOptions{
 		Namespace: c.namespace,
 	}); err != nil {
@@ -307,7 +306,7 @@ func (c *backupSyncController) run() {
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
-		locationUpdate := &veleroapiv1.BackupStorageLocation{}
+		locationUpdate := &velerov1api.BackupStorageLocation{}
 		if err = c.k8sClient.Get(context.Background(), k8sclient.ObjectKey{
 			Namespace: c.namespace,
 			Name:      location.Name,

@@ -36,7 +36,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -92,7 +91,7 @@ type restoreController struct {
 	logFormat              logging.Format
 
 	newPluginManager func(logger logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore   func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore   func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 }
 
 func NewRestoreController(
@@ -278,7 +277,7 @@ func (c *restoreController) processRestore(restore *api.Restore) error {
 
 type backupInfo struct {
 	backup      *api.Backup
-	location    *veleroapiv1.BackupStorageLocation
+	location    *velerov1api.BackupStorageLocation
 	backupStore persistence.BackupStore
 }
 
@@ -400,7 +399,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 		return backupInfo{}, err
 	}
 
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: c.namespace,
 		Name:      backup.Spec.StorageLocation,

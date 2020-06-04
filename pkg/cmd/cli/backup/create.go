@@ -29,7 +29,6 @@ import (
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -178,7 +177,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 
 	if o.StorageLocation != "" {
-		location := &veleroapiv1.BackupStorageLocation{}
+		location := &velerov1api.BackupStorageLocation{}
 		if err := clientKB.Get(context.Background(), k8sclient.ObjectKey{
 			Namespace: f.Namespace(),
 			Name:      o.StorageLocation,

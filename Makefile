@@ -206,18 +206,12 @@ ifneq ($(SKIP_TESTS), 1)
 	hack/test.sh $(WHAT)
 endif
 
-verify: verify-gen
+verify:
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
 endif
 
-verify-gen: generate
-	@if !(git diff --quiet HEAD); then \
-		git diff; \
-		echo "files were out of date, `make generate` was run"; exit 1; \
-	fi
-
-update: manifests generate
+update: manifests
 	@$(MAKE) shell CMD="-c 'hack/update-all.sh'"
 
 build-dirs:
@@ -317,10 +311,6 @@ endif
 # Generate manifests e.g. CRD, RBAC etc.
 manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./pkg/apis/velero/v1" output:crd:artifacts:config=config/crd/bases
-
-# Generate code
-generate: controller-gen
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./pkg/apis/velero/v1"
 
 # find or download controller-gen
 # download controller-gen if necessary

@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
 	velerov1listers "github.com/vmware-tanzu/velero/pkg/generated/listers/velero/v1"
@@ -159,7 +159,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 	log.Info("Initializing restic repository")
 
 	// confirm the repo's BackupStorageLocation is valid
-	loc := &veleroapiv1.BackupStorageLocation{}
+	loc := &velerov1api.BackupStorageLocation{}
 	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,

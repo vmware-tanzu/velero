@@ -36,7 +36,6 @@ import (
 	kubeerrs "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/cache"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -75,7 +74,7 @@ type backupDeletionController struct {
 	processRequestFunc        func(*velerov1api.DeleteBackupRequest) error
 	clock                     clock.Clock
 	newPluginManager          func(logrus.FieldLogger) clientmgmt.Manager
-	newBackupStore            func(*veleroapiv1.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
+	newBackupStore            func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
 	metrics                   *metrics.ServerMetrics
 }
 
@@ -217,7 +216,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 	}
 
 	// Don't allow deleting backups in read-only storage locations
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      backup.Spec.StorageLocation,
@@ -232,7 +231,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 		return errors.Wrap(err, "error getting backup storage location")
 	}
 
-	if location.Spec.AccessMode == veleroapiv1.BackupStorageLocationAccessModeReadOnly {
+	if location.Spec.AccessMode == velerov1api.BackupStorageLocationAccessModeReadOnly {
 		_, err := c.patchDeleteBackupRequest(req, func(r *velerov1api.DeleteBackupRequest) {
 			r.Status.Phase = velerov1api.DeleteBackupRequestPhaseProcessed
 			r.Status.Errors = append(r.Status.Errors, fmt.Sprintf("cannot delete backup because backup storage location %s is currently in read-only mode", location.Name))

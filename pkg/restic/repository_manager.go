@@ -32,7 +32,6 @@ import (
 	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
-	veleroapiv1 "github.com/vmware-tanzu/velero/api/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
@@ -246,7 +245,7 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
-	location := &veleroapiv1.BackupStorageLocation{}
+	location := &velerov1api.BackupStorageLocation{}
 	if err := rm.kbCache.Get(context.Background(), k8sclient.ObjectKey{
 		Namespace: rm.namespace,
 		Name:      backupLocation,

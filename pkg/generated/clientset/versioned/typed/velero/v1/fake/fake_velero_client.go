@@ -32,6 +32,10 @@ func (c *FakeVeleroV1) Backups(namespace string) v1.BackupInterface {
 	return &FakeBackups{c, namespace}
 }
 
+func (c *FakeVeleroV1) BackupStorageLocations(namespace string) v1.BackupStorageLocationInterface {
+	return &FakeBackupStorageLocations{c, namespace}
+}
+
 func (c *FakeVeleroV1) DeleteBackupRequests(namespace string) v1.DeleteBackupRequestInterface {
 	return &FakeDeleteBackupRequests{c, namespace}
 }
