@@ -47,7 +47,7 @@ Instead of backing up of Go struct, CRs will be backed up to backup location, an
 
 #### VolumePluginBackup CR
 
-There is no change in volume.SnapshotSpec. Below is the same for reference:
+There is one addition to volume.SnapshotSpec, i.e., ProviderName. Below is the updated one:
 
 ```
 type SnapshotSpec struct {
@@ -67,6 +67,9 @@ type SnapshotSpec struct {
 
 	// ProviderVolumeID is the provider's ID for the volume.
 	ProviderVolumeID string `json:"providerVolumeID"`
+
+	// Provider is the Provider field given in VolumeSnapshotLocation
+	Provider string `json:"provider"`
 
 	// VolumeType is the type of the disk/volume in the cloud provider
 	// API.
@@ -190,6 +193,9 @@ type VolumePluginRestoreSpec struct {
 	// created.
 	BackupName string `json:"backupName"`
 
+	// Provider is the Provider field given in VolumeSnapshotLocation
+	Provider string `json:"provider"`
+
 	// VolumeType is the type of the disk/volume in the cloud provider
 	// API.
 	VolumeType string `json:"volumeType"`
@@ -257,10 +263,11 @@ For every restore operation, Velero creates VolumePluginRestore CR before callin
 In order to know the CR created for the particular restore of a volume, Velero adds following labels to CR:
 - `velero.io/backup-name` with value as Backup Name, and,
 - `velero.io/snapshot-id` with value as snapshot id that need to be restored
+- `velero.io/provider` with value as `Provider` in `VolumeSnapshotLocation`
 
 Labels will be set with the value returned from `GetValidName` function. (https://github.com/vmware-tanzu/velero/blob/master/pkg/label/label.go#L35).
 
-Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API.
+Plugin will be able to identify CR by using snapshotID that it received as parameter of CreateVolumeFromSnapshot API, and plugin's Provider name.
 It updates the progress of restore operation regularly if plugin supports feature of showing progress.
 
 Velero deletes VolumePluginRestore CR when it handles deletion of Restore CR.
@@ -279,6 +286,9 @@ type VolumePluginBackupSpec struct {
 
 	// Backup name
 	Backup string `json:"backup"`
+
+	// Provider is the Provider field given in VolumeSnapshotLocation
+	Provider string `json:"provider"`
 }
 
 // VolumePluginBackupStatus is the current status of a VolumePluginBackup CR.
