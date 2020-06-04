@@ -1723,7 +1723,7 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 		},
 
 		{
-			name:   "if there's an error backing up additional items, the item the action was run for isn't backed up",
+			name:   "if additional items aren't found in the API, they're skipped and the original item is still backed up",
 			backup: defaultBackup().Result(),
 			apiResources: []*test.APIResource{
 				test.Pods(
@@ -1746,8 +1746,10 @@ func TestBackupActionAdditionalItems(t *testing.T) {
 				},
 			},
 			want: []string{
+				"resources/pods/namespaces/ns-1/pod-1.json",
 				"resources/pods/namespaces/ns-2/pod-2.json",
 				"resources/pods/namespaces/ns-3/pod-3.json",
+				"resources/pods/v1-preferredversion/namespaces/ns-1/pod-1.json",
 				"resources/pods/v1-preferredversion/namespaces/ns-2/pod-2.json",
 				"resources/pods/v1-preferredversion/namespaces/ns-3/pod-3.json",
 			},
