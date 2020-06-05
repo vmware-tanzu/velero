@@ -46,6 +46,10 @@ const (
 	// at which restic prune is run.
 	DefaultMaintenanceFrequency = 7 * 24 * time.Hour
 
+	// DefaultRestic specifies whether restic should be used, by default, to
+	// take backup of all pod volumes.
+	DefaultRestic = false
+
 	// PVCNameAnnotation is the key for the annotation added to
 	// pod volume backups when they're for a PVC.
 	PVCNameAnnotation = "velero.io/pvc-name"
