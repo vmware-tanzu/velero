@@ -83,10 +83,10 @@ func (h *defaultItemHookHandler) handleHooks(
 	name := metadata.GetName()
 
 	// If the pod has the hook specified via annotations, that takes priority.
-	hookFromAnnotations := getPodExecHookFromAnnotations(metadata.GetAnnotations(), phase)
+	hookFromAnnotations := getPodExecHookFromAnnotations(metadata.GetAnnotations(), phase, log)
 	if phase == hookPhasePre && hookFromAnnotations == nil {
 		// See if the pod has the legacy hook annotation keys (i.e. without a phase specified)
-		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "")
+		hookFromAnnotations = getPodExecHookFromAnnotations(metadata.GetAnnotations(), "", log)
 	}
 	if hookFromAnnotations != nil {
 		hookLog := log.WithFields(
@@ -164,7 +164,8 @@ func getHookAnnotation(annotations map[string]string, key string, phase hookPhas
 
 // getPodExecHookFromAnnotations returns an ExecHook based on the annotations, as long as the
 // 'command' annotation is present. If it is absent, this returns nil.
-func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase) *api.ExecHook {
+// If there is an error in parsing a supplied timeout, it is logged.
+func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhase, log logrus.FieldLogger) *api.ExecHook {
 	commandValue := getHookAnnotation(annotations, podBackupHookCommandAnnotationKey, phase)
 	if commandValue == "" {
 		return nil
@@ -192,7 +193,7 @@ func getPodExecHookFromAnnotations(annotations map[string]string, phase hookPhas
 		if temp, err := time.ParseDuration(timeoutString); err == nil {
 			timeout = temp
 		} else {
-			// TODO: log error that we couldn't parse duration
+			log.Warn(errors.Wrapf(err, "Unable to parse provided timeout %s, using default", timeoutString))
 		}
 	}
 

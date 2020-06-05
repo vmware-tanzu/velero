@@ -1,0 +1,1 @@
+When a timeout string can't be parsed, log the error as a warning instead of silently consuming the error.

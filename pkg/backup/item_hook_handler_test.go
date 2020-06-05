@@ -575,7 +575,7 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 				},
 			},
 			{
-				name: "invalid timeout is ignored",
+				name: "invalid timeout is logged",
 				annotations: map[string]string{
 					phasedKey(phase, podBackupHookCommandAnnotationKey): "/usr/bin/foo",
 					phasedKey(phase, podBackupHookTimeoutAnnotationKey): "invalid",
@@ -599,7 +599,8 @@ func TestGetPodExecHookFromAnnotations(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(fmt.Sprintf("%s (phase=%q)", test.name, phase), func(t *testing.T) {
-				hook := getPodExecHookFromAnnotations(test.annotations, phase)
+				l := velerotest.NewLogger()
+				hook := getPodExecHookFromAnnotations(test.annotations, phase, l)
 				assert.Equal(t, test.expectedHook, hook)
 			})
 		}
