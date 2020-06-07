@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	core "k8s.io/client-go/testing"
 
-	. "github.com/onsi/gomega"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -110,7 +108,6 @@ func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api
 }
 
 func TestBackupSyncControllerRun(t *testing.T) {
-	g := NewWithT(t)
 
 	type cloudBackupData struct {
 		backup           *velerov1api.Backup
@@ -337,7 +334,7 @@ func TestBackupSyncControllerRun(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				pluginManager   = &pluginmocks.Manager{}
 				backupStores    = make(map[string]*persistencemocks.BackupStore)
@@ -474,7 +471,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 }
 
 func TestDeleteOrphanedBackups(t *testing.T) {
-	g := NewWithT(t)
 
 	baseBuilder := func(name string) *builder.BackupBuilder {
 		return builder.ForBackup("ns-1", name).ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "default"))
@@ -566,7 +562,7 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
@@ -619,7 +615,6 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 }
 
 func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
-	g := NewWithT(t)
 
 	longLabelName := "the-really-long-location-name-that-is-much-more-than-63-characters"
 	tests := []struct {
@@ -661,7 +656,7 @@ func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 

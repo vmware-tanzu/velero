@@ -40,8 +40,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/version"
 
-	. "github.com/onsi/gomega"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	pkgbackup "github.com/vmware-tanzu/velero/pkg/backup"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -137,8 +135,6 @@ func TestProcessBackupNonProcessedItems(t *testing.T) {
 }
 
 func TestProcessBackupValidationFailures(t *testing.T) {
-	g := NewWithT(t)
-
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Result()
 
 	tests := []struct {
@@ -187,9 +183,9 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 
 			var fakeClient client.Client
 			if test.backupLocation != nil {
-				fakeClient = newFakeClient(g, test.backupLocation)
+				fakeClient = newFakeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(g)
+				fakeClient = newFakeClient(t)
 			}
 
 			c := &backupController{
@@ -224,8 +220,6 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 }
 
 func TestBackupLocationLabel(t *testing.T) {
-	g := NewWithT(t)
-
 	tests := []struct {
 		name                   string
 		backup                 *velerov1api.Backup
@@ -254,7 +248,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				clientset       = fake.NewSimpleClientset(test.backup)
 				sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 				logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 			)
 
 			apiServer := velerotest.NewAPIServer(t)
@@ -281,8 +275,6 @@ func TestBackupLocationLabel(t *testing.T) {
 }
 
 func TestDefaultBackupTTL(t *testing.T) {
-	g := NewWithT(t)
-
 	var (
 		defaultBackupTTL = metav1.Duration{Duration: 24 * 30 * time.Hour}
 	)
@@ -316,7 +308,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 		formatFlag := logging.FormatText
 		var (
 			clientset       = fake.NewSimpleClientset(test.backup)
-			fakeClient      = newFakeClient(g)
+			fakeClient      = newFakeClient(t)
 			logger          = logging.DefaultLogger(logrus.DebugLevel, formatFlag)
 			sharedInformers = informers.NewSharedInformerFactory(clientset, 0)
 		)
@@ -346,7 +338,6 @@ func TestDefaultBackupTTL(t *testing.T) {
 }
 
 func TestProcessBackupCompletions(t *testing.T) {
-	g := NewWithT(t)
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "loc-1").Bucket("store-1").Result()
 
 	now, err := time.Parse(time.RFC1123Z, time.RFC1123Z)
@@ -627,9 +618,9 @@ func TestProcessBackupCompletions(t *testing.T) {
 			var fakeClient client.Client
 			// add the test's backup storage location if it's different than the default
 			if test.backupLocation != nil && test.backupLocation != defaultBackupLocation {
-				fakeClient = newFakeClient(g, test.backupLocation)
+				fakeClient = newFakeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(g)
+				fakeClient = newFakeClient(t)
 			}
 
 			apiServer := velerotest.NewAPIServer(t)

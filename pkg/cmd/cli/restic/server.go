@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -36,7 +38,6 @@ import (
 
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/buildinfo"
 	"github.com/vmware-tanzu/velero/pkg/client"
 	"github.com/vmware-tanzu/velero/pkg/cmd"
@@ -50,21 +51,11 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 )
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = velerov1api.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
-}
 
 func NewServerCommand(f client.Factory) *cobra.Command {
 	logLevelFlag := logging.LogLevelFlag(logrus.InfoLevel)
@@ -195,11 +186,11 @@ func (s *resticServer) run() {
 
 	var wg sync.WaitGroup
 
-	// TODO(carlisia): how to handle the fetching of the bsl informer:
-	// - options are: 1) get informer for specific obj (below, but w/o namespace or obj name info because we don't know it here) or 2) for a specific kind, which would be CRD?
-	// - should it go here, or inside the controller? Note that neither resolves issue above
-	location := &velerov1api.BackupStorageLocation{}
-	bslInformer, _ := s.mgr.GetCache().GetInformer(location)
+	gvk := schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "BackupStorageLocation"}
+	bslInformer, err := s.mgr.GetCache().GetInformerForKind(gvk)
+	if err != nil {
+		panic(err)
+	}
 
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,

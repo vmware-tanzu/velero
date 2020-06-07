@@ -17,19 +17,22 @@ limitations under the License.
 package controller
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
-	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	// +kubebuilder:scaffold:imports
 )
 
-func newFakeClient(g *WithT, initObjs ...runtime.Object) client.Client {
-	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
+func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
+	err := velerov1api.AddToScheme(scheme.Scheme)
+	require.NoError(t, err)
 	return fake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }

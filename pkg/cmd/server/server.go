@@ -70,7 +70,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 
@@ -110,10 +109,6 @@ const (
 	defaultBackupTTL = 30 * 24 * time.Hour
 )
 
-var (
-	scheme = runtime.NewScheme()
-)
-
 // list of available controllers for input validation
 var disableControllerList = []string{
 	BackupControllerKey,
@@ -125,13 +120,6 @@ var disableControllerList = []string{
 	DownloadRequestControllerKey,
 	ResticRepoControllerKey,
 	ServerStatusRequestControllerKey,
-}
-
-func init() {
-	_ = clientgoscheme.AddToScheme(scheme)
-
-	_ = velerov1api.AddToScheme(scheme)
-	// +kubebuilder:scaffold:scheme
 }
 
 type serverConfig struct {
@@ -313,6 +301,8 @@ func newServer(f client.Factory, config serverConfig, logger *logrus.Logger) (*s
 		}
 	}
 
+	scheme := runtime.NewScheme()
+	velerov1api.AddToScheme(scheme)
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme: scheme,
 	})
