@@ -26,7 +26,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
-	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -56,7 +55,6 @@ import (
 )
 
 func TestFetchBackupInfo(t *testing.T) {
-	g := NewWithT(t)
 
 	tests := []struct {
 		name              string
@@ -97,7 +95,7 @@ func TestFetchBackupInfo(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()
@@ -233,7 +231,6 @@ func TestProcessQueueItemSkips(t *testing.T) {
 }
 
 func TestProcessQueueItem(t *testing.T) {
-	g := NewWithT(t)
 
 	defaultStorageLocation := builder.ForBackupStorageLocation("velero", "default").Provider("myCloud").Bucket("bucket").Result()
 
@@ -401,7 +398,7 @@ func TestProcessQueueItem(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				client          = fake.NewSimpleClientset()
-				fakeClient      = newFakeClient(g)
+				fakeClient      = newFakeClient(t)
 				restorer        = &fakeRestorer{}
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 				logger          = velerotest.NewLogger()

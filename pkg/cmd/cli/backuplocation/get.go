@@ -39,12 +39,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			clientConfig, err := f.ClientConfig()
-			cmd.CheckError(err)
-
-			clientKB, err := k8sclient.New(clientConfig, k8sclient.Options{
-				Scheme: scheme,
-			})
+			clientKB, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
 			location := &velerov1api.BackupStorageLocation{}

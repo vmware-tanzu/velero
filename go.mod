@@ -21,7 +21,6 @@ require (
 	github.com/jmespath/go-jmespath v0.0.0-20160202185014-0b12d6b521d8 // indirect
 	github.com/joho/godotenv v1.3.0
 	github.com/kubernetes-csi/external-snapshotter/v2 v2.1.0
-	github.com/onsi/gomega v1.8.1
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v1.0.0
 	github.com/robfig/cron v0.0.0-20170309132418-df38d32658d8

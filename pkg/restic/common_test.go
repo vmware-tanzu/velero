@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	. "github.com/onsi/gomega"
-
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
 	"github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/fake"
@@ -386,7 +384,6 @@ func TestTempCredentialsFile(t *testing.T) {
 }
 
 func TestTempCACertFile(t *testing.T) {
-	g := NewWithT(t)
 	var (
 		fs  = velerotest.NewFakeFileSystem()
 		bsl = &velerov1api.BackupStorageLocation{
@@ -404,7 +401,7 @@ func TestTempCACertFile(t *testing.T) {
 	)
 
 	//TODO(carlisia): not sure this test makes sense anymore since
-	fakeClient := newFakeClient(g)
+	fakeClient := newFakeClient(t)
 	fakeClient.Create(context.Background(), bsl)
 
 	locationCreated := &velerov1api.BackupStorageLocation{}
@@ -531,8 +528,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 	}
 }
 
-func newFakeClient(g *WithT, initObjs ...runtime.Object) client.Client {
-	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
-	g.Expect(velerov1api.AddToScheme(scheme.Scheme)).To(Succeed())
+func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {
+	err := velerov1api.AddToScheme(scheme.Scheme)
+	require.NoError(t, err)
 	return k8sfake.NewFakeClientWithScheme(scheme.Scheme, initObjs...)
 }

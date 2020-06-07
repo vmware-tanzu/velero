@@ -30,11 +30,6 @@ if [[ ! -d "${GOPATH}/src/k8s.io/code-generator" ]]; then
   exit 1
 fi
 
-if ! command -v controller-gen > /dev/null; then
-  echo "controller-gen is missing"
-  exit 1
-fi
-
 ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh \
   all \
   github.com/vmware-tanzu/velero/pkg/generated \

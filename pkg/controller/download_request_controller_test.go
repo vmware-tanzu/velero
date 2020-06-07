@@ -27,8 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	. "github.com/onsi/gomega"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -125,7 +123,6 @@ func newBackupLocation(name, provider, bucket string) *velerov1api.BackupStorage
 }
 
 func TestProcessDownloadRequest(t *testing.T) {
-	g := NewWithT(t)
 
 	defaultBackup := func() *v1.Backup {
 		return builder.ForBackup(v1.DefaultNamespace, "a-backup").StorageLocation("a-location").Result()
@@ -253,9 +250,9 @@ func TestProcessDownloadRequest(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var fakeClient client.Client
 			if tc.backupLocation != nil {
-				fakeClient = newFakeClient(g, tc.backupLocation)
+				fakeClient = newFakeClient(t, tc.backupLocation)
 			} else {
-				fakeClient = newFakeClient(g)
+				fakeClient = newFakeClient(t)
 			}
 
 			harness := newDownloadRequestTestHarness(t, fakeClient)

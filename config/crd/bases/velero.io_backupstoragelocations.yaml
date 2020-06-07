@@ -18,7 +18,7 @@ spec:
   validation:
     openAPIV3Schema:
       description: BackupStorageLocation is a location where Velero stores backup
-        objects.
+        objects
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
@@ -33,8 +33,8 @@ spec:
         metadata:
           type: object
         spec:
-          description: BackupStorageLocationSpec defines the specification for a Velero
-            BackupStorageLocation.
+          description: BackupStorageLocationSpec defines the desired state of a Velero
+            BackupStorageLocation
           properties:
             accessMode:
               description: AccessMode defines the permissions for the backup storage
@@ -80,8 +80,7 @@ spec:
           - provider
           type: object
         status:
-          description: BackupStorageLocationStatus describes the current status of
-            a Velero BackupStorageLocation.
+          description: BackupStorageLocationStatus defines the observed state of BackupStorageLocation
           properties:
             accessMode:
               description: "AccessMode is an unused field. \n Deprecated: there is

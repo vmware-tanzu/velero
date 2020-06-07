@@ -25,7 +25,6 @@ import (
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
-	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -153,7 +152,6 @@ func TestGCControllerHasUpdateFunc(t *testing.T) {
 }
 
 func TestGCControllerProcessQueueItem(t *testing.T) {
-	g := NewWithT(t)
 
 	fakeClock := clock.NewFakeClock(time.Now())
 	defaultBackupLocation := builder.ForBackupStorageLocation("velero", "default").Result()
@@ -255,9 +253,9 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 
 			var fakeClient k8sclient.Client
 			if test.backupLocation != nil {
-				fakeClient = newFakeClient(g, test.backupLocation)
+				fakeClient = newFakeClient(t, test.backupLocation)
 			} else {
-				fakeClient = newFakeClient(g)
+				fakeClient = newFakeClient(t)
 			}
 
 			controller := NewGCController(
