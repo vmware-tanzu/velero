@@ -158,6 +158,7 @@ shell: build-dirs build-image
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
+		-v "$$(pwd)/.go/go-lint:/.cache/golangci-lint:delegated" \
 		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
@@ -217,6 +218,16 @@ endif
 verify:
 ifneq ($(SKIP_TESTS), 1)
 	@$(MAKE) shell CMD="-c 'hack/verify-all.sh'"
+endif
+
+lint:
+ifneq ($(SKIP_TESTS), 1)
+	@$(MAKE) shell CMD="-c 'hack/verify-lint.sh'"
+endif
+
+local-lint:
+ifneq ($(SKIP_TESTS), 1)
+	@hack/verify-lint.sh
 endif
 
 update:
