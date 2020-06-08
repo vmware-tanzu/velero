@@ -222,12 +222,12 @@ endif
 
 lint:
 ifneq ($(SKIP_TESTS), 1)
-	@$(MAKE) shell CMD="-c 'hack/lint.sh'"
+	@$(MAKE) shell CMD="-c 'hack/lint.sh $(LINTERS)'"
 endif
 
 local-lint:
 ifneq ($(SKIP_TESTS), 1)
-	@hack/lint.sh
+	@hack/lint.sh $(LINTERS)
 endif
 
 update:

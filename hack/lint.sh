@@ -14,4 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-golangci-lint run #--disable-all -E unused
+LINTERS=$1
+
+ADDITIONAL_LINTERS="gosec"
+GOLANGCI_OPTIONS="-E $ADDITIONAL_LINTERS"
+
+if [[ -n "${LINTERS}" ]]; then
+  GOLANGCI_OPTIONS="--disable-all -E ${LINTERS}"
+fi
+
+golangci-lint run $GOLANGCI_OPTIONS
