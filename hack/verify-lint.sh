@@ -14,4 +14,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-golangci-lint run --disable-all -E unused
+golangci-lint run #--disable-all -E unused

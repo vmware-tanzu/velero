@@ -158,7 +158,7 @@ shell: build-dirs build-image
 		-v "$$(pwd)/.go/std:/go/std:delegated" \
 		-v "$$(pwd)/.go/std/$(GOOS)/$(GOARCH):/usr/local/go/pkg/$(GOOS)_$(GOARCH)_static:delegated" \
 		-v "$$(pwd)/.go/go-build:/.cache/go-build:delegated" \
-		-v "$$(pwd)/.go/go-lint:/.cache/golangci-lint:delegated" \
+		-v "$$(pwd)/.go/golangci-lint:/.cache/golangci-lint:delegated" \
 		-w /github.com/vmware-tanzu/velero \
 		$(BUILDER_IMAGE) \
 		/bin/sh $(CMD)
@@ -235,7 +235,7 @@ update:
 
 build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
-	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build
+	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 
 build-image:
 	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
