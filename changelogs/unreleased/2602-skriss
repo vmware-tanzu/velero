@@ -1,0 +1,1 @@
+Azure: support using `aad-pod-identity` auth when using restic
