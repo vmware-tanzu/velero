@@ -133,6 +133,7 @@ type VolumeOperationProgress struct {
 }
 
 type VolumePluginBackupSpec volume.SnapshotSpec
+type VolumePluginBackupStatus volume.SnapshotStatus
 
 type VolumePluginBackup struct {
 	metav1.TypeMeta `json:",inline"`
@@ -148,7 +149,7 @@ type VolumePluginBackup struct {
 }
 ```
 
-Notice that VolumePluginBackupSpec is same as volume.SnapshotSpec.
+Notice that VolumePluginBackupSpec is same as volume.SnapshotSpec, and, VolumePluginBackupStatus is same as volume.SnapshotStatus
 
 For every backup operation of volume, Velero creates VolumePluginBackup CR before calling volumesnapshotter's CreateSnapshot API.
 
@@ -174,11 +175,13 @@ VolumePluginBackup will be useful as long as backed up data is available at back
 
 #### Backward compatibility:
 
-As the VolumePluginBackup CR is backed up instead of `volume.Snapshot`, to provide backward compatibility, CR will be backed up to the same file i.e., `#backup-volumesnapshots.json.gz` file in the backup location.
+Currently `volume.Snapshot` is backed up as `<backupname>-volumesnapshots.json.gz` file in the backup location.
 
-When restore controller calls `GetBackupVolumeSnapshots`, it gets `#backup-volumesnapshots.json.gz` object from backup location and decodes it to in-memory array of VolumePluginBackup CR. It returns array of `volume.Snapshot`s created from array of VolumePluginBackup CRs.
+As the VolumePluginBackup CR is backed up instead of `volume.Snapshot`, to provide backward compatibility, CR will be backed as the same file i.e., `<backupname>-volumesnapshots.json.gz` file in the backup location.
 
-`backupSyncController` on other clusters gets the `#backup-volumesnapshots.json.gz` object from backup location and decodes it to in-memory VolumePluginBackup CR. If its `metadata.name` is populated, controller creates CR. Otherwise, it will not create the CR on the cluster.
+When restore controller calls `GetBackupVolumeSnapshots`, it gets `<backupname>-volumesnapshots.json.gz` object from backup location and decodes it to in-memory array of VolumePluginBackup CR. It returns array of `volume.Snapshot`s created from array of VolumePluginBackup CRs.
+
+`backupSyncController` on other clusters gets the `<backupname>-volumesnapshots.json.gz` object from backup location and decodes it to in-memory VolumePluginBackup CR. If its `metadata.name` is populated, controller creates CR. Otherwise, it will not create the CR on the cluster.
 
 #### VolumePluginRestore CR
 
