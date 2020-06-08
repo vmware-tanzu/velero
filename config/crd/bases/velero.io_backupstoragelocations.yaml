@@ -86,6 +86,11 @@ spec:
             provider:
               description: Provider is the provider of the backup storage.
               type: string
+            validationFrequency:
+              description: StoreValidationFrequency defines how frequently to validate
+                the corresponding object storage. A value of 0 disables validation.
+              nullable: true
+              type: string
           required:
           - objectStorage
           - provider
@@ -111,6 +116,12 @@ spec:
             lastSyncedTime:
               description: LastSyncedTime is the last time the contents of the location
                 were synced into the cluster.
+              format: date-time
+              nullable: true
+              type: string
+            lastValidationTime:
+              description: LastValidationTime is the last time the backup store location
+                was validated the cluster.
               format: date-time
               nullable: true
               type: string
