@@ -1,0 +1,14 @@
+name: Pull Request Changelog Check
+on: [pull_request]
+jobs:
+
+  build:
+    name: Run Changelog Check
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Check out the code
+      uses: actions/checkout@v2
+
+    - name: Changelog check
+      run: ./hack/changelog-check.sh
