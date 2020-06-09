@@ -1,6 +1,6 @@
 # Copyright 2016 The Kubernetes Authors.
 #
-# Modifications Copyright 2017 the Velero contributors.
+# Modifications Copyright 2020 the Velero contributors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +22,16 @@ PKG := github.com/vmware-tanzu/velero
 
 # Where to push the docker image.
 REGISTRY ?= velero
+
+# Build image handling. We push a build image for every changed version of 
+# /hack/build-image/Dockerfile. We tag the dockerfile with the short commit hash
+# of the commit that changed it. When determining if there is a build image in
+# the registry to use we look for one that matches the current "commit" for the
+# Dockerfile else we make one.
+
+BUILDER_IMAGE_TAG := $(shell git log -1 --pretty=%h hack/build-image/Dockerfile)
+BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
+BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -142,10 +152,9 @@ _output/bin/$(GOOS)/$(GOARCH)/$(BIN): build-dirs
 
 TTY := $(shell tty -s && echo "-t")
 
-BUILDER_IMAGE := velero-builder
 
 # Example: make shell CMD="date > datefile"
-shell: build-dirs build-image
+shell: build-dirs build-env
 	@# bind-mount the Velero root dir in at /github.com/vmware-tanzu/velero
 	@# because the Kubernetes code-generator tools require the project to
 	@# exist in a directory hierarchy ending like this (but *NOT* necessarily
@@ -250,17 +259,52 @@ build-dirs:
 	@mkdir -p _output/bin/$(GOOS)/$(GOARCH)
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 
+build-env:
+	@# if we detect changes in dockerfile force a new build-image 
+	@# else if we dont have a cached image make one
+	@# finally use the cached image
+ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 0)
+	@echo "Local changes detected in hack/build-image/Dockerfile"
+	@echo "Preparing a new builder-image"
+	@make build-image
+else ifneq ($(BUILDER_IMAGE_CACHED),)
+	@echo "Using Cached Image: $(BUILDER_IMAGE)"
+else
+	@echo "Trying to pull build-image: $(BUILDER_IMAGE)"
+	docker pull -q $(BUILDER_IMAGE) || make build-image
+endif
+
 build-image:
-	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) .
+	@# When we build a new image we just untag the old one.
+	@# This makes sure we don't leave the orphaned image behind.
+	id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
+	cd hack/build-image && docker build --pull -t $(BUILDER_IMAGE) . ; \
+	new_id=$$(docker image inspect  --format '{{ .ID }}' ${BUILDER_IMAGE} 2>/dev/null); \
+	if [ "$$id" != "$$new_id" ]; then \
+		docker rmi -q $$id || true; \
+	fi
+
+push-build-image:
+	@# this target will push the build-image it assumes you already have docker
+	@# credentials needed to accomplish this.
+	docker push $(BUILDER_IMAGE)
 
 clean:
+# if we have a cached image then use it to run go clean --modcache
+# this test checks if we there is an image id in the BUILDER_IMAGE_CACHED variable.
+ifneq ($(strip $(BUILDER_IMAGE_CACHED)),)
+	$(MAKE) shell CMD="-c 'go clean --modcache'"
+	docker rmi -f $(BUILDER_IMAGE) || true
+endif
 	rm -rf .container-* _output/.dockerfile-* .push-*
 	rm -rf .go _output
 	docker rmi $(BUILDER_IMAGE)
 
+
 .PHONY: modules
 modules:
 	go mod tidy
+
 
 .PHONY: verify-modules
 verify-modules: modules
@@ -268,7 +312,9 @@ verify-modules: modules
 		echo "go module files are out of date, please commit the changes to go.mod and go.sum"; exit 1; \
 	fi
 
+
 ci: verify-modules verify all test
+
 
 changelog:
 	hack/changelog.sh
