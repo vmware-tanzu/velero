@@ -298,7 +298,6 @@ ifneq ($(strip $(BUILDER_IMAGE_CACHED)),)
 endif
 	rm -rf .container-* _output/.dockerfile-* .push-*
 	rm -rf .go _output
-	docker rmi $(BUILDER_IMAGE)
 
 
 .PHONY: modules
