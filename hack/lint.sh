@@ -23,4 +23,9 @@ if [[ -n "${LINTERS}" ]]; then
   GOLANGCI_OPTIONS="--disable-all -E ${LINTERS}"
 fi
 
-golangci-lint run $GOLANGCI_OPTIONS
+echo "Running golangci-lint run $GOLANGCI_OPTIONS"
+# export GL_DEBUG=loader,gocritic,env
+
+golangci-lint cache status
+ 
+golangci-lint run $GOLANGCI_OPTIONS --print-resources-usage --timeout 5m0s
