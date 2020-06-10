@@ -75,6 +75,8 @@ toc:
         url: /code-standards
       - page: Website guidelines
         url: /website-guidelines
+      - page: Style guide
+        url: /style-guide
   - title: More information
     subfolderitems:
       - page: Backup file format
