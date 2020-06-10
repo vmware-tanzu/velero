@@ -16,18 +16,20 @@
 
 LINTERS=$1
 
+HACK_DIR=$(dirname "${BASH_SOURCE[0]}")
+
 ADDITIONAL_LINTERS="gosec"
 GOLANGCI_OPTIONS="-E $ADDITIONAL_LINTERS"
 
 if [[ -n "${LINTERS}" ]]; then
-  GOLANGCI_OPTIONS="--disable-all -E ${LINTERS}"
+  GOLANGCI_OPTIONS="-E ${LINTERS}"
 fi
 
 # Printing out cache status
 golangci-lint cache status
 
-echo "Running golangci-lint run $GOLANGCI_OPTIONS --print-resources-usage --timeout 5m0s"
+echo "Running golangci-lint run $GOLANGCI_OPTIONS -c $HACK_DIR/../golangci.yaml"
 
 # Enable GL_DEBUG line below for debug messages for golangci-lint
 # export GL_DEBUG=loader,gocritic,env
-golangci-lint run $GOLANGCI_OPTIONS --print-resources-usage --timeout 5m0s
+golangci-lint run $GOLANGCI_OPTIONS -c $HACK_DIR/../golangci.yaml
