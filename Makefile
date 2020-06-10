@@ -44,6 +44,9 @@ MANIFEST_PLATFORMS ?= amd64 ppc64le arm arm64
 GIT_SHA = $(shell git rev-parse HEAD)
 GIT_DIRTY = $(shell git status --porcelain 2> /dev/null)
 
+# The default linters used by lint and local-lint
+LINTERS ?= "gosec,goconst,gofmt,goimports,unparam"
+
 ###
 ### These variables should not need tweaking.
 ###
