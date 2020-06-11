@@ -22,8 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -186,12 +184,6 @@ func (s *resticServer) run() {
 
 	var wg sync.WaitGroup
 
-	gvk := schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "BackupStorageLocation"}
-	bslInformer, err := s.mgr.GetCache().GetInformerForKind(gvk)
-	if err != nil {
-		panic(err)
-	}
-
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
 		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
@@ -200,7 +192,6 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		bslInformer,
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
@@ -218,7 +209,6 @@ func (s *resticServer) run() {
 		s.secretInformer,
 		s.kubeInformerFactory.Core().V1().PersistentVolumeClaims(),
 		s.kubeInformerFactory.Core().V1().PersistentVolumes(),
-		bslInformer,
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)

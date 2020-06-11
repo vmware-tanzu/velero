@@ -24,7 +24,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	//"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -194,7 +193,7 @@ func TestProcessBackupValidationFailures(t *testing.T) {
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				k8sClient:              fakeClient,
+				kbclient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				clock:                  &clock.RealClock{},
@@ -261,7 +260,7 @@ func TestBackupLocationLabel(t *testing.T) {
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				k8sClient:              fakeClient,
+				kbclient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  test.backupLocation.Name,
 				clock:                  &clock.RealClock{},
@@ -323,7 +322,7 @@ func TestDefaultBackupTTL(t *testing.T) {
 			c := &backupController{
 				genericController:      newGenericController("backup-test", logger),
 				discoveryHelper:        discoveryHelper,
-				k8sClient:              fakeClient,
+				kbclient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupTTL:       defaultBackupTTL.Duration,
 				clock:                  clock.NewFakeClock(now),
@@ -813,7 +812,7 @@ func TestProcessBackupCompletions(t *testing.T) {
 				discoveryHelper:        discoveryHelper,
 				client:                 clientset.VeleroV1(),
 				lister:                 sharedInformers.Velero().V1().Backups().Lister(),
-				k8sClient:              fakeClient,
+				kbclient:               fakeClient,
 				snapshotLocationLister: sharedInformers.Velero().V1().VolumeSnapshotLocations().Lister(),
 				defaultBackupLocation:  defaultBackupLocation.Name,
 				defaultVolumesToRestic: test.defaultVolumesToRestic,

@@ -19,9 +19,10 @@ package backuplocation
 import (
 	"context"
 
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -39,15 +40,14 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 			err := output.ValidateFlags(c)
 			cmd.CheckError(err)
 
-			clientKB, err := f.KubebuilderClient()
+			client, err := f.KubebuilderClient()
 			cmd.CheckError(err)
 
-			location := &velerov1api.BackupStorageLocation{}
-			var locations *velerov1api.BackupStorageLocationList
-			locations = new(velerov1api.BackupStorageLocationList)
+			locations := new(velerov1api.BackupStorageLocationList)
 			if len(args) > 0 {
+				location := &velerov1api.BackupStorageLocation{}
 				for _, name := range args {
-					err = clientKB.Get(context.Background(), k8sclient.ObjectKey{
+					err = client.Get(context.Background(), kbclient.ObjectKey{
 						Namespace: f.Namespace(),
 						Name:      name,
 					}, location)
@@ -55,7 +55,7 @@ func NewGetCommand(f client.Factory, use string) *cobra.Command {
 					locations.Items = append(locations.Items, *location)
 				}
 			} else {
-				err := clientKB.List(context.Background(), locations, &k8sclient.ListOptions{
+				err := client.List(context.Background(), locations, &kbclient.ListOptions{
 					Namespace: f.Namespace(),
 				})
 				cmd.CheckError(err)

@@ -34,7 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	core "k8s.io/client-go/testing"
 
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/builder"
@@ -251,7 +251,7 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 				sharedInformers = informers.NewSharedInformerFactory(client, 0)
 			)
 
-			var fakeClient k8sclient.Client
+			var fakeClient kbclient.Client
 			if test.backupLocation != nil {
 				fakeClient = newFakeClient(t, test.backupLocation)
 			} else {

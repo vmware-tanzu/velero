@@ -400,21 +400,14 @@ func TestTempCACertFile(t *testing.T) {
 		}
 	)
 
-	//TODO(carlisia): not sure this test makes sense anymore since
 	fakeClient := newFakeClient(t)
 	fakeClient.Create(context.Background(), bsl)
 
-	locationCreated := &velerov1api.BackupStorageLocation{}
-	err := fakeClient.Get(context.Background(), client.ObjectKey{
-		Namespace: bsl.Namespace,
-		Name:      bsl.Name,
-	}, locationCreated)
-	require.NoError(t, err)
-
 	// expect temp file to be created with cacert value
-	caCert, err := GetCACert(locationCreated)
+	location, err := GetCACert(fakeClient, bsl.Namespace, bsl.Name)
 	require.NoError(t, err)
 
+	caCert := location.Spec.ObjectStorage.CACert
 	fileName, err := TempCACertFile(caCert, "default", fs)
 	require.NoError(t, err)
 

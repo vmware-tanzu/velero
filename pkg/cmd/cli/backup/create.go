@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"time"
 
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,8 +36,6 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/output"
 	veleroclient "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
 	v1 "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
-
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const DefaultBackupTTL time.Duration = 30 * 24 * time.Hour
@@ -149,7 +149,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 		return err
 	}
 
-	clientKB, err := f.KubebuilderClient()
+	client, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 
 	if o.StorageLocation != "" {
 		location := &velerov1api.BackupStorageLocation{}
-		if err := clientKB.Get(context.Background(), k8sclient.ObjectKey{
+		if err := client.Get(context.Background(), kbclient.ObjectKey{
 			Namespace: f.Namespace(),
 			Name:      o.StorageLocation,
 		}, location); err != nil {

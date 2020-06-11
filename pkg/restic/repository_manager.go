@@ -29,8 +29,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 
-	kbcache "sigs.k8s.io/controller-runtime/pkg/cache"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	clientset "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned"
@@ -87,7 +86,7 @@ type repositoryManager struct {
 	secretsLister      corev1listers.SecretLister
 	repoLister         velerov1listers.ResticRepositoryLister
 	repoInformerSynced cache.InformerSynced
-	kbCache            kbcache.Cache
+	kbClient           kbclient.Client
 	log                logrus.FieldLogger
 	repoLocker         *repoLocker
 	repoEnsurer        *repositoryEnsurer
@@ -105,7 +104,7 @@ func NewRepositoryManager(
 	secretsInformer cache.SharedIndexInformer,
 	repoInformer velerov1informers.ResticRepositoryInformer,
 	repoClient velerov1client.ResticRepositoriesGetter,
-	kbCache kbcache.Cache,
+	kbClient kbclient.Client,
 	pvcClient corev1client.PersistentVolumeClaimsGetter,
 	pvClient corev1client.PersistentVolumesGetter,
 	log logrus.FieldLogger,
@@ -116,7 +115,7 @@ func NewRepositoryManager(
 		secretsLister:      corev1listers.NewSecretLister(secretsInformer.GetIndexer()),
 		repoLister:         repoInformer.Lister(),
 		repoInformerSynced: repoInformer.Informer().HasSynced,
-		kbCache:            kbCache,
+		kbClient:           kbClient,
 		pvcClient:          pvcClient,
 		pvClient:           pvClient,
 		log:                log,
@@ -245,19 +244,12 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 
 	cmd.PasswordFile = file
 
-	location := &velerov1api.BackupStorageLocation{}
-	if err := rm.kbCache.Get(context.Background(), k8sclient.ObjectKey{
-		Namespace: rm.namespace,
-		Name:      backupLocation,
-	}, location); err != nil {
-		return err
-	}
-
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	caCert, err := GetCACert(location)
+	location, err := GetCACert(rm.kbClient, rm.namespace, backupLocation)
 	if err != nil {
 		return err
 	}
+	caCert := location.Spec.ObjectStorage.CACert
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
@@ -270,20 +262,12 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.CACertFile = caCertFile
 
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
-		if !rm.kbCache.WaitForCacheSync(rm.ctx.Done()) {
-			return errors.New("timed out waiting for cache to sync")
-		}
-
 		env, err := AzureCmdEnv(location)
 		if err != nil {
 			return err
 		}
 		cmd.Env = env
 	} else if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
-		if !rm.kbCache.WaitForCacheSync(rm.ctx.Done()) {
-			return errors.New("timed out waiting for cache to sync")
-		}
-
 		env, err := S3CmdEnv(location)
 		if err != nil {
 			return err

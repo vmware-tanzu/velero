@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -58,7 +57,7 @@ type podVolumeBackupController struct {
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	pvLister               corev1listers.PersistentVolumeLister
 	backupLocationInformer k8scache.Informer
-	client                 client.Client
+	kbClient               client.Client
 	nodeName               string
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
@@ -75,21 +74,19 @@ func NewPodVolumeBackupController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer k8scache.Informer,
-	client client.Client,
+	kbClient client.Client,
 	nodeName string,
 ) Interface {
 	c := &podVolumeBackupController{
-		genericController:      newGenericController("pod-volume-backup", logger),
-		podVolumeBackupClient:  podVolumeBackupClient,
-		podVolumeBackupLister:  podVolumeBackupInformer.Lister(),
-		podLister:              corev1listers.NewPodLister(podInformer.GetIndexer()),
-		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
-		pvcLister:              pvcInformer.Lister(),
-		pvLister:               pvInformer.Lister(),
-		backupLocationInformer: backupLocationInformer,
-		client:                 client,
-		nodeName:               nodeName,
+		genericController:     newGenericController("pod-volume-backup", logger),
+		podVolumeBackupClient: podVolumeBackupClient,
+		podVolumeBackupLister: podVolumeBackupInformer.Lister(),
+		podLister:             corev1listers.NewPodLister(podInformer.GetIndexer()),
+		secretLister:          corev1listers.NewSecretLister(secretInformer.GetIndexer()),
+		pvcLister:             pvcInformer.Lister(),
+		pvLister:              pvInformer.Lister(),
+		kbClient:              kbClient,
+		nodeName:              nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
 		clock:      &clock.RealClock{},
@@ -102,7 +99,6 @@ func NewPodVolumeBackupController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
-		backupLocationInformer.HasSynced,
 	)
 	c.processBackupFunc = c.processBackup
 
@@ -235,24 +231,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	//TODO(carlisia): before the client was being passed to the restic package and the
-	// "getting" of the bsl was being done there; is that better?
-	location := &velerov1api.BackupStorageLocation{}
-	if err := c.client.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, location); err != nil {
-		return err
-	}
-
-	//TODO(carlisia): would it be better to fetch the cert here?
-	//if location.Spec.ObjectStorage != nil {
-	//	caCert = location.Spec.ObjectStorage.CACert
-	//}
-	caCert, err := restic.GetCACert(location)
+	location, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
+	caCert := location.Spec.ObjectStorage.CACert
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)

@@ -70,10 +70,9 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/restore"
 	"github.com/vmware-tanzu/velero/pkg/util/logging"
 
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -364,7 +363,7 @@ func (s *server) run() error {
 	}
 
 	bsl := &velerov1api.BackupStorageLocation{}
-	if err := s.mgr.GetAPIReader().Get(context.Background(), k8sclient.ObjectKey{
+	if err := s.mgr.GetAPIReader().Get(context.Background(), kbclient.ObjectKey{
 		Namespace: s.namespace,
 		Name:      s.config.defaultBackupLocation,
 	}, bsl); err != nil {
@@ -468,7 +467,7 @@ func (s *server) validateBackupStorageLocations() error {
 	defer pluginManager.CleanupClients()
 
 	locations := &velerov1api.BackupStorageLocationList{}
-	if err := s.mgr.GetAPIReader().List(context.Background(), locations, &k8sclient.ListOptions{
+	if err := s.mgr.GetAPIReader().List(context.Background(), locations, &kbclient.ListOptions{
 		Namespace: s.namespace,
 	}); err != nil {
 		return errors.WithStack(err)
@@ -570,7 +569,7 @@ func (s *server) initRestic() error {
 		secretsInformer,
 		s.sharedInformerFactory.Velero().V1().ResticRepositories(),
 		s.veleroClient.VeleroV1(),
-		s.mgr.GetCache(),
+		s.mgr.GetClient(),
 		s.kubeClient.CoreV1(),
 		s.kubeClient.CoreV1(),
 		s.logger,

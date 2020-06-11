@@ -47,7 +47,7 @@ type resticRepositoryController struct {
 
 	resticRepositoryClient      velerov1client.ResticRepositoriesGetter
 	resticRepositoryLister      velerov1listers.ResticRepositoryLister
-	k8sClient                   client.Client
+	kbclient                    client.Client
 	repositoryManager           restic.RepositoryManager
 	defaultMaintenanceFrequency time.Duration
 
@@ -59,7 +59,7 @@ func NewResticRepositoryController(
 	logger logrus.FieldLogger,
 	resticRepositoryInformer velerov1informers.ResticRepositoryInformer,
 	resticRepositoryClient velerov1client.ResticRepositoriesGetter,
-	k8sClient client.Client,
+	kbclient client.Client,
 	repositoryManager restic.RepositoryManager,
 	defaultMaintenanceFrequency time.Duration,
 ) Interface {
@@ -67,7 +67,7 @@ func NewResticRepositoryController(
 		genericController:           newGenericController("restic-repository", logger),
 		resticRepositoryClient:      resticRepositoryClient,
 		resticRepositoryLister:      resticRepositoryInformer.Lister(),
-		k8sClient:                   k8sClient,
+		kbclient:                    kbclient,
 		repositoryManager:           repositoryManager,
 		defaultMaintenanceFrequency: defaultMaintenanceFrequency,
 
@@ -160,7 +160,7 @@ func (c *resticRepositoryController) initializeRepo(req *v1.ResticRepository, lo
 
 	// confirm the repo's BackupStorageLocation is valid
 	loc := &velerov1api.BackupStorageLocation{}
-	if err := c.k8sClient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbclient.Get(context.Background(), client.ObjectKey{
 		Namespace: req.Namespace,
 		Name:      req.Spec.BackupStorageLocation,
 	}, loc); err != nil {

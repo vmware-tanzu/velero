@@ -17,10 +17,14 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/pkg/errors"
 	corev1api "k8s.io/api/core/v1"
@@ -284,12 +288,20 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(loc *velerov1api.BackupStorageLocation) ([]byte, error) {
-	if loc.Spec.ObjectStorage == nil {
+func GetCACert(client client.Client, namespace, name string) (*velerov1api.BackupStorageLocation, error) {
+	location := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}, location); err != nil {
+		return nil, err
+	}
+
+	if location.Spec.ObjectStorage == nil {
 		return nil, nil
 	}
 
-	return loc.Spec.ObjectStorage.CACert, nil
+	return location, nil
 }
 
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to

@@ -26,7 +26,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
+
+	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	"github.com/vmware-tanzu/velero/pkg/client"
@@ -148,12 +149,12 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	clientKB, err := f.KubebuilderClient()
+	client, err := f.KubebuilderClient()
 	if err != nil {
 		return err
 	}
 
-	if err := clientKB.Create(context.Background(), backupStorageLocation, &k8sclient.CreateOptions{}); err != nil {
+	if err := client.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
 		return err
 	}
 

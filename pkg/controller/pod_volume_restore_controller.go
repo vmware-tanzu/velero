@@ -17,7 +17,6 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -60,7 +59,7 @@ type podVolumeRestoreController struct {
 	pvcLister              corev1listers.PersistentVolumeClaimLister
 	pvLister               corev1listers.PersistentVolumeLister
 	backupLocationInformer k8scache.Informer
-	client                 client.Client
+	kbClient               client.Client
 	nodeName               string
 
 	processRestoreFunc func(*velerov1api.PodVolumeRestore) error
@@ -77,8 +76,7 @@ func NewPodVolumeRestoreController(
 	secretInformer cache.SharedIndexInformer,
 	pvcInformer corev1informers.PersistentVolumeClaimInformer,
 	pvInformer corev1informers.PersistentVolumeInformer,
-	backupLocationInformer k8scache.Informer,
-	client client.Client,
+	kbClient client.Client,
 	nodeName string,
 ) Interface {
 	c := &podVolumeRestoreController{
@@ -89,8 +87,7 @@ func NewPodVolumeRestoreController(
 		secretLister:           corev1listers.NewSecretLister(secretInformer.GetIndexer()),
 		pvcLister:              pvcInformer.Lister(),
 		pvLister:               pvInformer.Lister(),
-		backupLocationInformer: backupLocationInformer,
-		client:                 client,
+		kbClient:               kbClient,
 		nodeName:               nodeName,
 
 		fileSystem: filesystem.NewFileSystem(),
@@ -104,7 +101,6 @@ func NewPodVolumeRestoreController(
 		podInformer.HasSynced,
 		secretInformer.HasSynced,
 		pvcInformer.Informer().HasSynced,
-		backupLocationInformer.HasSynced,
 	)
 	c.processRestoreFunc = c.processRestore
 
@@ -300,18 +296,11 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location := &velerov1api.BackupStorageLocation{}
-	if err := c.client.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, location); err != nil {
-		return err
-	}
-
-	caCert, err := restic.GetCACert(location)
+	location, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
+	caCert := location.Spec.ObjectStorage.CACert
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
@@ -323,7 +312,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	}
 
 	// execute the restore process
-	if err := c.restorePodVolume(req, credsFile, caCertFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, location, credsFile, caCertFile, volumeDir, log); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -342,7 +331,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, location *velerov1api.BackupStorageLocation, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -360,14 +349,6 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
-	location := &velerov1api.BackupStorageLocation{}
-	if err := c.client.Get(context.Background(), client.ObjectKey{
-		Namespace: req.Namespace,
-		Name:      req.Spec.BackupStorageLocation,
-	}, location); err != nil {
-		return err
-	}
-
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
 		env, err := restic.AzureCmdEnv(location)
 		if err != nil {

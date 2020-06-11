@@ -38,14 +38,13 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupSyncController struct {
 	*genericController
 
 	backupClient            velerov1client.BackupsGetter
-	k8sClient               client.Client
+	kbclient                client.Client
 	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	backupLister            velerov1listers.BackupLister
 	csiSnapshotClient       *snapshotterClientSet.Clientset
@@ -59,7 +58,7 @@ type backupSyncController struct {
 
 func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
-	k8sClient client.Client,
+	kbclient client.Client,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
 	syncPeriod time.Duration,
@@ -78,7 +77,7 @@ func NewBackupSyncController(
 	c := &backupSyncController{
 		genericController:       newGenericController("backup-sync", logger),
 		backupClient:            backupClient,
-		k8sClient:               k8sClient,
+		kbclient:                kbclient,
 		podVolumeBackupClient:   podVolumeBackupClient,
 		namespace:               namespace,
 		defaultBackupLocation:   defaultBackupLocation,
@@ -124,7 +123,7 @@ func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
 	locationList := &velerov1api.BackupStorageLocationList{}
-	if err := c.k8sClient.List(context.Background(), locationList, &client.ListOptions{
+	if err := c.kbclient.List(context.Background(), locationList, &client.ListOptions{
 		Namespace: c.namespace,
 	}); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
@@ -306,16 +305,9 @@ func (c *backupSyncController) run() {
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
-		locationUpdate := &velerov1api.BackupStorageLocation{}
-		if err = c.k8sClient.Get(context.Background(), k8sclient.ObjectKey{
-			Namespace: c.namespace,
-			Name:      location.Name,
-		}, locationUpdate); err != nil {
-			log.WithError(errors.WithStack(err)).Error("Error fetching backup location for update")
-			continue
-		}
-		locationUpdate.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.k8sClient.Update(context.Background(), locationUpdate); err != nil {
+		statusPatch := client.MergeFrom(location.DeepCopyObject())
+		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
+		if err := c.kbclient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}
