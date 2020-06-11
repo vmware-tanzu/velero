@@ -43,22 +43,20 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/util/filesystem"
 	"github.com/vmware-tanzu/velero/pkg/util/kube"
 
-	k8scache "sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type podVolumeBackupController struct {
 	*genericController
 
-	podVolumeBackupClient  velerov1client.PodVolumeBackupsGetter
-	podVolumeBackupLister  listers.PodVolumeBackupLister
-	secretLister           corev1listers.SecretLister
-	podLister              corev1listers.PodLister
-	pvcLister              corev1listers.PersistentVolumeClaimLister
-	pvLister               corev1listers.PersistentVolumeLister
-	backupLocationInformer k8scache.Informer
-	kbClient               client.Client
-	nodeName               string
+	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter
+	podVolumeBackupLister listers.PodVolumeBackupLister
+	secretLister          corev1listers.SecretLister
+	podLister             corev1listers.PodLister
+	pvcLister             corev1listers.PersistentVolumeClaimLister
+	pvLister              corev1listers.PersistentVolumeLister
+	kbClient              client.Client
+	nodeName              string
 
 	processBackupFunc func(*velerov1api.PodVolumeBackup) error
 	fileSystem        filesystem.Interface

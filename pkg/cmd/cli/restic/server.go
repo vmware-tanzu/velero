@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 
+	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -147,6 +149,7 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	velerov1api.AddToScheme(scheme)
 	mgr, err := ctrl.NewManager(clientConfig, ctrl.Options{
 		Scheme: scheme,
 	})
