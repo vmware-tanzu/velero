@@ -298,7 +298,11 @@ data:
   # If not set, it will default to "128Mi". A value of "0" is treated as unbounded.
   memLimit: 128Mi
 
+  # "secCtxRunAsUser sets the securityContext.runAsUser value on the restic init containers during restore."
+  secCtxRunAsUser: 1001
 
+  # "secCtxRunAsGroup sets the securityContext.runAsGroup value on the restic init containers during restore."
+  secCtxRunAsGroup: 999
 ```
 
 ## Troubleshooting
