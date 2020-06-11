@@ -254,7 +254,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:                     "restore with both namespace in both includedNamespaces and excludedNamespaces fails validation",
 			location:                 defaultStorageLocation,
-			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", api.RestorePhaseNew).ExcludedNamespaces("another-1").Result(),
+			restore:                  NewRestore("foo", "bar", "backup-1", "another-1", "*", velerov1api.RestorePhaseNew).ExcludedNamespaces("another-1").Result(),
 			backup:                   defaultBackup().StorageLocation("default").Result(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
@@ -263,7 +263,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:                     "restore with resource in both includedResources and excludedResources fails validation",
 			location:                 defaultStorageLocation,
-			restore:                  NewRestore("foo", "bar", "backup-1", "*", "a-resource", api.RestorePhaseNew).ExcludedResources("a-resource").Result(),
+			restore:                  NewRestore("foo", "bar", "backup-1", "*", "a-resource", velerov1api.RestorePhaseNew).ExcludedResources("a-resource").Result(),
 			backup:                   defaultBackup().StorageLocation("default").Result(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
@@ -271,14 +271,14 @@ func TestProcessQueueItem(t *testing.T) {
 		},
 		{
 			name:                     "new restore with empty backup and schedule names fails validation",
-			restore:                  NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Result(),
+			restore:                  NewRestore("foo", "bar", "", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
 		},
 		{
 			name:                     "new restore with backup and schedule names provided fails validation",
-			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Schedule("sched-1").Result(),
+			restore:                  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Schedule("sched-1").Result(),
 			expectedErr:              false,
 			expectedPhase:            string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors: []string{"Either a backup or schedule must be specified as a source for the restore, but not both"},
@@ -286,15 +286,15 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:                 "valid restore with schedule name gets executed",
 			location:             defaultStorageLocation,
-			restore:              NewRestore("foo", "bar", "", "ns-1", "", api.RestorePhaseNew).Schedule("sched-1").Result(),
+			restore:              NewRestore("foo", "bar", "", "ns-1", "", velerov1api.RestorePhaseNew).Schedule("sched-1").Result(),
 			backup:               defaultBackup().StorageLocation("default").ObjectMeta(builder.WithLabels(api.ScheduleNameLabel, "sched-1")).Phase(api.BackupPhaseCompleted).Result(),
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Schedule("sched-1").Result(),
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Schedule("sched-1").Result(),
 		},
 		{
 			name:                            "restore with non-existent backup name fails",
-			restore:                         NewRestore("foo", "bar", "backup-1", "ns-1", "*", api.RestorePhaseNew).Result(),
+			restore:                         NewRestore("foo", "bar", "backup-1", "ns-1", "*", velerov1api.RestorePhaseNew).Result(),
 			expectedErr:                     false,
 			expectedPhase:                   string(api.RestorePhaseFailedValidation),
 			expectedValidationErrors:        []string{"Error retrieving backup: backup.velero.io \"backup-1\" not found"},
@@ -303,28 +303,28 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:                  "restorer throwing an error causes the restore to fail",
 			location:              defaultStorageLocation,
-			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Result(),
+			restore:               NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
 			backup:                defaultBackup().StorageLocation("default").Result(),
 			restorerError:         errors.New("blarg"),
 			expectedErr:           false,
 			expectedPhase:         string(api.RestorePhaseInProgress),
 			expectedFinalPhase:    string(api.RestorePhasePartiallyFailed),
 			expectedRestoreErrors: 1,
-			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Result(),
+			expectedRestorerCall:  NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
 		},
 		{
 			name:                 "valid restore gets executed",
 			location:             defaultStorageLocation,
-			restore:              NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Result(),
+			restore:              NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
 			backup:               defaultBackup().StorageLocation("default").Result(),
 			expectedErr:          false,
 			expectedPhase:        string(api.RestorePhaseInProgress),
-			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", api.RestorePhaseInProgress).Result(),
+			expectedRestorerCall: NewRestore("foo", "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseInProgress).Result(),
 		},
 		{
 			name:          "restoration of nodes is not supported",
 			location:      defaultStorageLocation,
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", api.RestorePhaseNew).Result(),
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "nodes", velerov1api.RestorePhaseNew).Result(),
 			backup:        defaultBackup().StorageLocation("default").Result(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
@@ -336,7 +336,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:          "restoration of events is not supported",
 			location:      defaultStorageLocation,
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events", api.RestorePhaseNew).Result(),
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events", velerov1api.RestorePhaseNew).Result(),
 			backup:        defaultBackup().StorageLocation("default").Result(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
@@ -348,7 +348,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:          "restoration of events.events.k8s.io is not supported",
 			location:      defaultStorageLocation,
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events.events.k8s.io", api.RestorePhaseNew).Result(),
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "events.events.k8s.io", velerov1api.RestorePhaseNew).Result(),
 			backup:        defaultBackup().StorageLocation("default").Result(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
@@ -360,7 +360,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:          "restoration of backups.velero.io is not supported",
 			location:      defaultStorageLocation,
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "backups.velero.io", api.RestorePhaseNew).Result(),
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "backups.velero.io", velerov1api.RestorePhaseNew).Result(),
 			backup:        defaultBackup().StorageLocation("default").Result(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
@@ -372,7 +372,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:          "restoration of restores.velero.io is not supported",
 			location:      defaultStorageLocation,
-			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "restores.velero.io", api.RestorePhaseNew).Result(),
+			restore:       NewRestore("foo", "bar", "backup-1", "ns-1", "restores.velero.io", velerov1api.RestorePhaseNew).Result(),
 			backup:        defaultBackup().StorageLocation("default").Result(),
 			expectedErr:   false,
 			expectedPhase: string(api.RestorePhaseFailedValidation),
@@ -384,7 +384,7 @@ func TestProcessQueueItem(t *testing.T) {
 		{
 			name:                            "backup download error results in failed restore",
 			location:                        defaultStorageLocation,
-			restore:                         NewRestore(api.DefaultNamespace, "bar", "backup-1", "ns-1", "", api.RestorePhaseNew).Result(),
+			restore:                         NewRestore(api.DefaultNamespace, "bar", "backup-1", "ns-1", "", velerov1api.RestorePhaseNew).Result(),
 			expectedPhase:                   string(api.RestorePhaseInProgress),
 			expectedFinalPhase:              string(api.RestorePhaseFailed),
 			backupStoreGetBackupContentsErr: errors.New("Couldn't download backup"),
@@ -469,7 +469,7 @@ func TestProcessQueueItem(t *testing.T) {
 					// these are the fields that we expect to be set by
 					// the controller
 
-					res.Status.Phase = api.RestorePhase(phase)
+					res.Status.Phase = velerov1api.RestorePhase(phase)
 
 					backupName, found, err := unstructured.NestedString(patchMap, "spec", "backupName")
 					if found {
@@ -553,9 +553,9 @@ func TestProcessQueueItem(t *testing.T) {
 			}
 
 			type StatusPatch struct {
-				Phase            api.RestorePhase `json:"phase"`
-				ValidationErrors []string         `json:"validationErrors"`
-				Errors           int              `json:"errors"`
+				Phase            velerov1api.RestorePhase `json:"phase"`
+				ValidationErrors []string                 `json:"validationErrors"`
+				Errors           int                      `json:"errors"`
 			}
 
 			type Patch struct {
@@ -575,7 +575,7 @@ func TestProcessQueueItem(t *testing.T) {
 
 			expected := Patch{
 				Status: StatusPatch{
-					Phase:            api.RestorePhase(test.expectedPhase),
+					Phase:            velerov1api.RestorePhase(test.expectedPhase),
 					ValidationErrors: test.expectedValidationErrors,
 				},
 			}
@@ -600,7 +600,7 @@ func TestProcessQueueItem(t *testing.T) {
 
 			expected = Patch{
 				Status: StatusPatch{
-					Phase:  api.RestorePhaseCompleted,
+					Phase:  velerov1api.RestorePhaseCompleted,
 					Errors: test.expectedRestoreErrors,
 				},
 			}
@@ -608,7 +608,7 @@ func TestProcessQueueItem(t *testing.T) {
 			if test.expectedFinalPhase != "" {
 				expected = Patch{
 					Status: StatusPatch{
-						Phase:  api.RestorePhase(test.expectedFinalPhase),
+						Phase:  velerov1api.RestorePhase(test.expectedFinalPhase),
 						Errors: test.expectedRestoreErrors,
 					},
 				}
@@ -653,10 +653,10 @@ func TestvalidateAndCompleteWhenScheduleNameSpecified(t *testing.T) {
 
 	restore := &api.Restore{
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: api.DefaultNamespace,
+			Namespace: velerov1api.DefaultNamespace,
 			Name:      "restore-1",
 		},
-		Spec: api.RestoreSpec{
+		Spec: velerov1api.RestoreSpec{
 			ScheduleName: "schedule-1",
 		},
 	}
@@ -740,7 +740,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "a",
 			},
-			Status: api.BackupStatus{
+			Status: velerov1api.BackupStatus{
 				Phase: "",
 			},
 		},
@@ -748,32 +748,32 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "b",
 			},
-			Status: api.BackupStatus{
-				Phase: api.BackupPhaseNew,
+			Status: velerov1api.BackupStatus{
+				Phase: velerov1api.BackupPhaseNew,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "c",
 			},
-			Status: api.BackupStatus{
-				Phase: api.BackupPhaseInProgress,
+			Status: velerov1api.BackupStatus{
+				Phase: velerov1api.BackupPhaseInProgress,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "d",
 			},
-			Status: api.BackupStatus{
-				Phase: api.BackupPhaseFailedValidation,
+			Status: velerov1api.BackupStatus{
+				Phase: velerov1api.BackupPhaseFailedValidation,
 			},
 		},
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "e",
 			},
-			Status: api.BackupStatus{
-				Phase: api.BackupPhaseFailed,
+			Status: velerov1api.BackupStatus{
+				Phase: velerov1api.BackupPhaseFailed,
 			},
 		},
 	}
@@ -786,8 +786,8 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
-		Status: api.BackupStatus{
-			Phase:          api.BackupPhaseCompleted,
+		Status: velerov1api.BackupStatus{
+			Phase:          velerov1api.BackupPhaseCompleted,
 			StartTimestamp: &metav1.Time{Time: now},
 		},
 	})
@@ -796,8 +796,8 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
 		},
-		Status: api.BackupStatus{
-			Phase:          api.BackupPhaseCompleted,
+		Status: velerov1api.BackupStatus{
+			Phase:          velerov1api.BackupPhaseCompleted,
 			StartTimestamp: &metav1.Time{Time: now.Add(time.Second)},
 		},
 	}
@@ -806,7 +806,7 @@ func TestMostRecentCompletedBackup(t *testing.T) {
 	assert.Equal(t, expected, mostRecentCompletedBackup(backups))
 }
 
-func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.RestorePhase) *builder.RestoreBuilder {
+func NewRestore(ns, name, backup, includeNS, includeResource string, phase velerov1api.RestorePhase) *builder.RestoreBuilder {
 	restore := builder.ForRestore(ns, name).Phase(phase).Backup(backup)
 
 	if includeNS != "" {
@@ -824,7 +824,7 @@ func NewRestore(ns, name, backup, includeNS, includeResource string, phase api.R
 
 type fakeRestorer struct {
 	mock.Mock
-	calledWithArg api.Restore
+	calledWithArg velerov1api.Restore
 }
 
 func (r *fakeRestorer) Restore(

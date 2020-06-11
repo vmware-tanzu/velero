@@ -199,15 +199,15 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			deleteBackupRequests: []*api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
+						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
 							api.BackupNameLabel: "backup-1",
 							api.BackupUIDLabel:  "",
 						},
 					},
-					Status: api.DeleteBackupRequestStatus{
-						Phase: api.DeleteBackupRequestPhaseInProgress,
+					Status: velerov1api.DeleteBackupRequestStatus{
+						Phase: velerov1api.DeleteBackupRequestPhaseInProgress,
 					},
 				},
 			},
@@ -220,15 +220,15 @@ func TestGCControllerProcessQueueItem(t *testing.T) {
 			deleteBackupRequests: []*api.DeleteBackupRequest{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: api.DefaultNamespace,
+						Namespace: velerov1api.DefaultNamespace,
 						Name:      "foo",
 						Labels: map[string]string{
 							api.BackupNameLabel: "backup-1",
 							api.BackupUIDLabel:  "",
 						},
 					},
-					Status: api.DeleteBackupRequestStatus{
-						Phase: api.DeleteBackupRequestPhaseProcessed,
+					Status: velerov1api.DeleteBackupRequestStatus{
+						Phase: velerov1api.DeleteBackupRequestPhaseProcessed,
 					},
 				},
 			},

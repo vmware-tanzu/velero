@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	velerov1client "github.com/vmware-tanzu/velero/pkg/generated/clientset/versioned/typed/velero/v1"
 	velerov1informers "github.com/vmware-tanzu/velero/pkg/generated/informers/externalversions/velero/v1"
@@ -88,7 +87,7 @@ func NewDownloadRequestController(
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err != nil {
-					downloadRequest := obj.(*v1.DownloadRequest)
+					downloadRequest := obj.(*velerov1api.DownloadRequest)
 					c.logger.WithError(errors.WithStack(err)).
 						WithField("downloadRequest", downloadRequest.Name).
 						Error("Error creating queue key, item not added to queue")
@@ -124,9 +123,9 @@ func (c *downloadRequestController) processDownloadRequest(key string) error {
 	}
 
 	switch downloadRequest.Status.Phase {
-	case "", v1.DownloadRequestPhaseNew:
+	case "", velerov1api.DownloadRequestPhaseNew:
 		return c.generatePreSignedURL(downloadRequest, log)
-	case v1.DownloadRequestPhaseProcessed:
+	case velerov1api.DownloadRequestPhaseProcessed:
 		return c.deleteIfExpired(downloadRequest)
 	}
 
@@ -137,7 +136,7 @@ const signedURLTTL = 10 * time.Minute
 
 // generatePreSignedURL generates a pre-signed URL for downloadRequest, changes the phase to
 // Processed, and persists the changes to storage.
-func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.DownloadRequest, log logrus.FieldLogger) error {
+func (c *downloadRequestController) generatePreSignedURL(downloadRequest *velerov1api.DownloadRequest, log logrus.FieldLogger) error {
 	update := downloadRequest.DeepCopy()
 
 	var (
@@ -146,7 +145,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 	)
 
 	switch downloadRequest.Spec.Target.Kind {
-	case v1.DownloadTargetKindRestoreLog, v1.DownloadTargetKindRestoreResults:
+	case velerov1api.DownloadTargetKindRestoreLog, velerov1api.DownloadTargetKindRestoreResults:
 		restore, err := c.restoreLister.Restores(downloadRequest.Namespace).Get(downloadRequest.Spec.Target.Name)
 		if err != nil {
 			return errors.Wrap(err, "error getting Restore")
@@ -182,7 +181,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 		return err
 	}
 
-	update.Status.Phase = v1.DownloadRequestPhaseProcessed
+	update.Status.Phase = velerov1api.DownloadRequestPhaseProcessed
 	update.Status.Expiration = &metav1.Time{Time: c.clock.Now().Add(persistence.DownloadURLTTL)}
 
 	_, err = patchDownloadRequest(downloadRequest, update, c.downloadRequestClient)
@@ -190,7 +189,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *v1.Dow
 }
 
 // deleteIfExpired deletes downloadRequest if it has expired.
-func (c *downloadRequestController) deleteIfExpired(downloadRequest *v1.DownloadRequest) error {
+func (c *downloadRequestController) deleteIfExpired(downloadRequest *velerov1api.DownloadRequest) error {
 	log := c.logger.WithField("key", kube.NamespaceAndName(downloadRequest))
 	log.Info("checking for expiration of DownloadRequest")
 	if downloadRequest.Status.Expiration.Time.After(c.clock.Now()) {
@@ -222,7 +221,7 @@ func (c *downloadRequestController) resync() {
 	}
 }
 
-func patchDownloadRequest(original, updated *v1.DownloadRequest, client velerov1client.DownloadRequestsGetter) (*v1.DownloadRequest, error) {
+func patchDownloadRequest(original, updated *velerov1api.DownloadRequest, client velerov1client.DownloadRequestsGetter) (*velerov1api.DownloadRequest, error) {
 	origBytes, err := json.Marshal(original)
 	if err != nil {
 		return nil, errors.Wrap(err, "error marshalling original download request")
