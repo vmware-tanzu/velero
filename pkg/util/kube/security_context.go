@@ -17,9 +17,10 @@ limitations under the License.
 package kube
 
 import (
+	"strconv"
+
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	"strconv"
 )
 
 func ParseSecurityContext(runAsUser string, runAsGroup string) (corev1.SecurityContext, error) {
