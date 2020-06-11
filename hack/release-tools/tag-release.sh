@@ -82,30 +82,37 @@ git fetch upstream --all --tags
 # If we've got a patch release, we'll need to create a release branch for it.
 if [[ "$VELERO_PATCH" > 0 ]]; then
     release_branch_name=release-$VELERO_MAJOR.$VELERO_MINOR
-   
-    # TODO: check to see if upstream exists.
+  
+    # Check if the branch exists, creating it if not.
+    # The fetch command above should have gotten all the upstream branches, so we can safely assume this check is local & upstream branches.
     if [[ -z $(git branch | grep $release_branch_name) ]]; then
         git checkout -b $release_branch_name
         echo "Release branch made."
     else
         echo "Release branch $release_branch_name exists already."
+        git checkout $release_branch_name
     fi
+
+    echo "Now you'll need to cherry-pick any relevant git commits into this release branch."
+    echo "Either pause this script with ctrl-z, or open a new terminal window and do the cherry-picking."
+    read -p "Press enter when you're done cherry-picking. THIS WILL MAKE A TAG PUSH THE BRANCH TO UPSTREAM"
+
+    # TODO can/should we add a way to review the cherry-picked commits before the push?
 
     echo "Pushing $release_branch_name to upstream remote"
     git push --set-upstream upstream/$release_branch_name $release_branch_name
     
     tag_and_push
+else
+    echo "Checking out upstream/master."
+    git checkout upstream/master
+
+    tag_and_push
 fi
 
-echo "Checking out upstream/master."
-git checkout upstream/master
-
-tag_and_push
 
 
-echo "Ivoking Goreleaser."
+echo "Invoking Goreleaser to create the GitHub release."
 RELEASE_NOTES_FILE=changelogs/CHANGELOG-$VELERO_MAJOR.$VELERO_MINOR.md \
     PUBLISH=TRUE \
     make release
-
-
