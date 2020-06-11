@@ -39,7 +39,7 @@ func TestParseSecurityContext(t *testing.T) {
 			RunAsGroup: pointInt64(999),
 		}},
 		{"security context without runAsGroup", args{"1001", ""}, false, &corev1.SecurityContext{
-			RunAsUser: pointInt64(1000),
+			RunAsUser: pointInt64(1001),
 		}},
 		{"security context without runAsUser", args{"", "999"}, false, &corev1.SecurityContext{
 			RunAsGroup: pointInt64(999),
