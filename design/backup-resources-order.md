@@ -17,21 +17,23 @@ User will specify a map of resource type to list resource names (separate by sem
 ### Changes to BackupSpec
 Add new field to BackupSpec
 
-type BackupSpec struct {
-    // BackupOrders contains a list of key-value pairs that represent the order
-    // of backup of resources that belong to specific resource type
-    // +optional
-    // +nullable
-    BackupOrders map[string]string
-}
+    type BackupSpec struct {
+        ...
+        // BackupOrders contains a list of key-value pairs that represent the order
+        // of backup of resources that belong to specific resource type
+        // +optional
+        // +nullable
+        BackupOrders map[string]string
+    }
 
 ### Changes to itemCollector
 Function getResourceItems collects all items belong to a specific resource type.  This function will be enhanced to check with the map to see whether the BackupOrders has specified the order for this resource type.  If such order exists, then sort the items by such order being process before return.
 
 ### Changes to velero CLI
 Add new flag "--backup-orders" to Velero backup create command which takes a string of key-values pairs which represents the map between resource type and the order of the items of such resource type. Key-value pairs are separated by semicolon, items in the value are separated by commas.
+
 Example:
-#velero backup create mybackup --backup-orders "pod=ns1/pod1,ns1/pod2;persistentvolumeclaim=n2/slavepod,ns2/masterpod"
+>velero backup create mybackup --backup-orders "pod=ns1/pod1,ns1/pod2;persistentvolumeclaim=n2/slavepod,ns2/masterpod"
 
 ## Open Issues
-In the CLI, the design proposes to use commas to separate items of a resource type and semicolon to separate key-value pairs.  This follows the convention of using commas to separate items in a list (For example: --include-namespaces ns1,ns2).  However, the syntax for map in labels and annotations use commas to seperate key-value pairs.  So it introduces some inconsistency.
+- In the CLI, the design proposes to use commas to separate items of a resource type and semicolon to separate key-value pairs.  This follows the convention of using commas to separate items in a list (For example: --include-namespaces ns1,ns2).  However, the syntax for map in labels and annotations use commas to seperate key-value pairs.  So it introduces some inconsistency.
