@@ -83,11 +83,11 @@ type BackupSpec struct {
 	// +optional
 	VolumeSnapshotLocations []string `json:"volumeSnapshotLocations,omitempty"`
 
-	// DefaultRestic specifies whether restic should be used to take
+	// DefaultVolumesToRestic specifies whether restic should be used to take a
 	// backup of all pod volumes by default.
 	// +optional
 	// + nullable
-	DefaultRestic *bool `json:"defaultRestic,omitempty"`
+	DefaultVolumesToRestic *bool `json:"defaultVolumesToRestic,omitempty"`
 }
 
 // BackupHooks contains custom behaviors that should be executed at different phases of the backup.

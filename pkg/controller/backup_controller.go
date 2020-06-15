@@ -71,7 +71,7 @@ type backupController struct {
 	backupTracker               BackupTracker
 	backupLocationLister        velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation       string
-	defaultRestic               bool
+	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
@@ -93,7 +93,7 @@ func NewBackupController(
 	backupTracker BackupTracker,
 	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	defaultBackupLocation string,
-	defaultRestic bool,
+	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
@@ -122,7 +122,7 @@ func NewBackupController(
 		volumeSnapshotLister:        volumeSnapshotLister,
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		newBackupStore:              persistence.NewObjectBackupStore,
-		defaultRestic:               defaultRestic,
+		defaultVolumesToRestic:      defaultVolumesToRestic,
 	}
 
 	c.syncHandler = c.processBackup
@@ -342,8 +342,8 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 		request.Spec.StorageLocation = c.defaultBackupLocation
 	}
 
-	if request.Spec.DefaultRestic == nil {
-		request.Spec.DefaultRestic = &c.defaultRestic
+	if request.Spec.DefaultVolumesToRestic == nil {
+		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
 	}
 
 	// add the storage location as a label for easy filtering later.

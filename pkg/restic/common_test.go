@@ -422,14 +422,14 @@ func TestTempCACertFile(t *testing.T) {
 
 func TestGetPodVolumesUsingRestic(t *testing.T) {
 	testCases := []struct {
-		name          string
-		pod           *corev1api.Pod
-		expected      []string
-		defaultRestic bool
+		name                   string
+		pod                    *corev1api.Pod
+		expected               []string
+		defaultVolumesToRestic bool
 	}{
 		{
-			name:          "should get PVs from VolumesToBackupAnnotation when defaultRestic is false",
-			defaultRestic: false,
+			name:                   "should get PVs from VolumesToBackupAnnotation when defaultVolumesToRestic is false",
+			defaultVolumesToRestic: false,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -440,8 +440,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:          "should get all pod volumes when defaultRestic is true and no PVs are excluded",
-			defaultRestic: true,
+			name:                   "should get all pod volumes when defaultVolumesToRestic is true and no PVs are excluded",
+			defaultVolumesToRestic: true,
 			pod: &corev1api.Pod{
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
@@ -453,8 +453,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:          "should get all pod volumes except ones excluded when defaultRestic is true",
-			defaultRestic: true,
+			name:                   "should get all pod volumes except ones excluded when defaultVolumesToRestic is true",
+			defaultVolumesToRestic: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -473,8 +473,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:          "should exclude default service account token from restic backup",
-			defaultRestic: true,
+			name:                   "should exclude default service account token from restic backup",
+			defaultVolumesToRestic: true,
 			pod: &corev1api.Pod{
 				Spec: corev1api.PodSpec{
 					Volumes: []corev1api.Volume{
@@ -488,8 +488,8 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 			expected: []string{"resticPV1", "resticPV2", "resticPV3"},
 		},
 		{
-			name:          "should exclude host path volumes from restic backups",
-			defaultRestic: true,
+			name:                   "should exclude host path volumes from restic backups",
+			defaultVolumesToRestic: true,
 			pod: &corev1api.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -513,7 +513,7 @@ func TestGetPodVolumesUsingRestic(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actual := GetPodVolumesUsingRestic(tc.pod, tc.defaultRestic)
+			actual := GetPodVolumesUsingRestic(tc.pod, tc.defaultVolumesToRestic)
 
 			sort.Strings(tc.expected)
 			sort.Strings(actual)

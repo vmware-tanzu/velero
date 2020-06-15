@@ -36,9 +36,9 @@ spec:
         spec:
           description: BackupSpec defines the specification for a Velero backup.
           properties:
-            defaultRestic:
-              description: DefaultRestic specifies whether restic should be used to
-                take backup of all pod volumes by default.
+            defaultVolumesToRestic:
+              description: DefaultVolumesToRestic specifies whether restic should
+                be used to take a backup of all pod volumes by default.
               type: boolean
             excludedNamespaces:
               description: ExcludedNamespaces contains a list of namespaces that are

@@ -46,9 +46,9 @@ const (
 	// at which restic prune is run.
 	DefaultMaintenanceFrequency = 7 * 24 * time.Hour
 
-	// DefaultRestic specifies whether restic should be used, by default, to
+	// DefaultVolumesToRestic specifies whether restic should be used, by default, to
 	// take backup of all pod volumes.
-	DefaultRestic = false
+	DefaultVolumesToRestic = false
 
 	// PVCNameAnnotation is the key for the annotation added to
 	// pod volume backups when they're for a PVC.
@@ -154,8 +154,8 @@ func contains(list []string, k string) bool {
 }
 
 // GetPodVolumesUsingRestic returns a list of volume names to backup for the provided pod.
-func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultRestic bool) []string {
-	if !defaultRestic {
+func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) []string {
+	if !defaultVolumesToRestic {
 		return GetVolumesToBackup(pod)
 	}
 

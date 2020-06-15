@@ -71,7 +71,7 @@ type kubernetesBackupper struct {
 	podCommandExecutor     podexec.PodCommandExecutor
 	resticBackupperFactory restic.BackupperFactory
 	resticTimeout          time.Duration
-	defaultRestic          bool
+	defaultVolumesToRestic bool
 }
 
 type resolvedAction struct {
@@ -104,7 +104,7 @@ func NewKubernetesBackupper(
 	podCommandExecutor podexec.PodCommandExecutor,
 	resticBackupperFactory restic.BackupperFactory,
 	resticTimeout time.Duration,
-	defaultRestic bool,
+	defaultVolumesToRestic bool,
 ) (Backupper, error) {
 	return &kubernetesBackupper{
 		backupClient:           backupClient,
@@ -113,7 +113,7 @@ func NewKubernetesBackupper(
 		podCommandExecutor:     podCommandExecutor,
 		resticBackupperFactory: resticBackupperFactory,
 		resticTimeout:          resticTimeout,
-		defaultRestic:          defaultRestic,
+		defaultVolumesToRestic: defaultVolumesToRestic,
 	}, nil
 }
 
@@ -243,10 +243,10 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	log.Infof("Including resources: %s", backupRequest.ResourceIncludesExcludes.IncludesString())
 	log.Infof("Excluding resources: %s", backupRequest.ResourceIncludesExcludes.ExcludesString())
 
-	if backupRequest.Backup.Spec.DefaultRestic == nil {
-		backupRequest.Backup.Spec.DefaultRestic = &kb.defaultRestic
+	if backupRequest.Backup.Spec.DefaultVolumesToRestic == nil {
+		backupRequest.Backup.Spec.DefaultVolumesToRestic = &kb.defaultVolumesToRestic
 	}
-	log.Infof("Backing up all pod volumes using restic: %t", *backupRequest.Backup.Spec.DefaultRestic)
+	log.Infof("Backing up all pod volumes using restic: %t", *backupRequest.Backup.Spec.DefaultVolumesToRestic)
 
 	var err error
 	backupRequest.ResourceHooks, err = getResourceHooks(backupRequest.Spec.Hooks.Resources, kb.discoveryHelper)
