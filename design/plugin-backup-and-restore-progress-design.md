@@ -42,15 +42,15 @@ Existing `Snapshot` Go struct from `volume` package have most of the details rel
 This struct also gets backed up to backup location. But, this struct doesn't get synced on other clusters at regular intervals.
 It will be synced only during restore operation, and velero CLI shows few of its contents.
 
-At a high level, in this approach, this struct will be converted to a CR by adding new fields (related to Progress tracking) to it.
+At a high level, in this approach, this struct will be converted to a CR by adding new fields (related to Progress tracking) to it, and gets rid of `volume.Snapshot` struct.
 Instead of backing up of Go struct, CRs will be backed up to backup location, and it gets synced into other cluster by backupSyncController running in that cluster.
 
 #### VolumePluginBackup CR
 
-There is one addition to volume.SnapshotSpec, i.e., ProviderName. Below is the updated one:
+There is one addition to volume.SnapshotSpec, i.e., ProviderName to convert it to CR's spec. Below is the updated VolumePluginBackup CR's Spec:
 
 ```
-type SnapshotSpec struct {
+type VolumePluginBackupSpec struct {
 	// BackupName is the name of the Velero backup this snapshot
 	// is associated with.
 	BackupName string `json:"backupName"`
@@ -63,7 +63,7 @@ type SnapshotSpec struct {
 	Location string `json:"location"`
 
 	// PersistentVolumeName is the Kubernetes name for the volume.
-	PersistentVolumeName string `json:persistentVolumeName`
+	PersistentVolumeName string `json:"persistentVolumeName"`
 
 	// ProviderVolumeID is the provider's ID for the volume.
 	ProviderVolumeID string `json:"providerVolumeID"`
@@ -85,9 +85,9 @@ type SnapshotSpec struct {
 }
 ```
 
-Few fields (except first two) are added to volume.SnapshotStatusSpec. Below is the updated one:
+Few fields (except first two) are added to volume.SnapshotStatus to convert it to CR's status. Below is the updated VolumePluginBackup CR's status:
 ```
-type SnapshotStatus struct {
+type VolumePluginBackupStatus struct {
 	// ProviderSnapshotID is the ID of the snapshot taken in the cloud
 	// provider API of this volume.
 	ProviderSnapshotID string `json:"providerSnapshotID,omitempty"`
@@ -132,9 +132,6 @@ type VolumeOperationProgress struct {
 	BytesDone int64
 }
 
-type VolumePluginBackupSpec volume.SnapshotSpec
-type VolumePluginBackupStatus volume.SnapshotStatus
-
 type VolumePluginBackup struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -148,8 +145,6 @@ type VolumePluginBackup struct {
 	Status VolumePluginBackupStatus `json:"status,omitempty"`
 }
 ```
-
-Notice that VolumePluginBackupSpec is same as volume.SnapshotSpec, and, VolumePluginBackupStatus is same as volume.SnapshotStatus
 
 For every backup operation of volume, Velero creates VolumePluginBackup CR before calling volumesnapshotter's CreateSnapshot API.
 
@@ -179,9 +174,26 @@ Currently `volume.Snapshot` is backed up as `<backupname>-volumesnapshots.json.g
 
 As the VolumePluginBackup CR is backed up instead of `volume.Snapshot`, to provide backward compatibility, CR will be backed as the same file i.e., `<backupname>-volumesnapshots.json.gz` file in the backup location.
 
-When restore controller calls `GetBackupVolumeSnapshots`, it gets `<backupname>-volumesnapshots.json.gz` object from backup location and decodes it to in-memory array of VolumePluginBackup CR. It returns array of `volume.Snapshot`s created from array of VolumePluginBackup CRs.
+For backward compatibility on restore side, consider below possible cases wrt Velero version on restore side and format of json.gz file at object location:
 
-`backupSyncController` on other clusters gets the `<backupname>-volumesnapshots.json.gz` object from backup location and decodes it to in-memory VolumePluginBackup CR. If its `metadata.name` is populated, controller creates CR. Otherwise, it will not create the CR on the cluster.
+- older version of Velero, older json.gz file (backupname-volumesnapshots.json.gz)
+
+- older version of Velero, newer json.gz file
+
+- newer version of Velero, older json.gz file
+
+- newer version of Velero, newer json.gz file
+
+First and last should be fine.
+
+For second case, decode in `GetBackupVolumeSnapshots` on the restore side should fill only required fields of older version and should work.
+
+For third case, after decode, metadata.name will be empty. `GetBackupVolumeSnapshots` decodes older json.gz into the CR which goes fine.
+It will be modified to return []VolumePluginBackupSpec, and the changes are done accordingly in its caller.
+
+If decode fails in second case during implementation, this CR need to be backed up to different file. And, for backward compatibility, newer code should check for old file existence, and follow older code if exists. If it doesn't exists, check for newer file and follow the newer code.
+
+`backupSyncController` on restore clusters gets the `<backupname>-volumesnapshots.json.gz` object from backup location and decodes it to in-memory VolumePluginBackup CR. If its `metadata.name` is populated, controller creates CR. Otherwise, it will not create the CR on the cluster. It can be even considered to create CR on the cluster.
 
 #### VolumePluginRestore CR
 
@@ -387,7 +399,7 @@ Deletion of `VolumePluginBackup` CR can be delegated to plugin. Plugin can perfo
 - In case of approach 1,
   - converting `volume.Snapshot` struct as CR and its related changes
   - creation of VolumePlugin(Backup|Restore) CRs before calling volumesnapshotter's API
-  - `GetBackupVolumeSnapshots` changes for backward compatibility
+  - `GetBackupVolumeSnapshots` and its callers related changes for change in return type from []volume.Snapshot to []VolumePluginBackupSpec.
 
 ### Velero CLI required changes
 
@@ -431,4 +443,5 @@ It first need to check for new kind of object, and, if it doesn't exists, follow
 
 ## Security Considerations
 
-N/A
+Currently everything runs under the same `velero` service account so all plugins have broad access, which would include being able to modify CRs created by another plugin.
+
