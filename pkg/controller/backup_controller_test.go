@@ -610,6 +610,82 @@ func TestProcessBackupCompletions(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:           "backup specifying no value for 'DefaultVolumesToRestic' gets the default true value",
+			backupExists:   false,
+			backup:         defaultBackup().Result(),
+			backupLocation: defaultBackupLocation,
+			// value set in the controller is different from that specified in the backup
+			defaultVolumesToRestic: true,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:        defaultBackupLocation.Name,
+					DefaultVolumesToRestic: boolptr.True(),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:               velerov1api.BackupPhaseCompleted,
+					Version:             1,
+					FormatVersion:       "1.1.0",
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
+				},
+			},
+		},
+		{
+			name:           "backup specifying no value for 'DefaultVolumesToRestic' gets the default false value",
+			backupExists:   false,
+			backup:         defaultBackup().Result(),
+			backupLocation: defaultBackupLocation,
+			// value set in the controller is different from that specified in the backup
+			defaultVolumesToRestic: false,
+			expectedResult: &velerov1api.Backup{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Backup",
+					APIVersion: "velero.io/v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: velerov1api.DefaultNamespace,
+					Name:      "backup-1",
+					Annotations: map[string]string{
+						"velero.io/source-cluster-k8s-major-version": "1",
+						"velero.io/source-cluster-k8s-minor-version": "16",
+						"velero.io/source-cluster-k8s-gitversion":    "v1.16.4",
+					},
+					Labels: map[string]string{
+						"velero.io/storage-location": "loc-1",
+					},
+				},
+				Spec: velerov1api.BackupSpec{
+					StorageLocation:        defaultBackupLocation.Name,
+					DefaultVolumesToRestic: boolptr.False(),
+				},
+				Status: velerov1api.BackupStatus{
+					Phase:               velerov1api.BackupPhaseCompleted,
+					Version:             1,
+					FormatVersion:       "1.1.0",
+					StartTimestamp:      &timestamp,
+					CompletionTimestamp: &timestamp,
+					Expiration:          &timestamp,
+				},
+			},
+		},
 
 		// Failed
 		{
