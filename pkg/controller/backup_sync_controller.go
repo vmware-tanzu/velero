@@ -37,14 +37,17 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/persistence"
 	"github.com/vmware-tanzu/velero/pkg/plugin/clientmgmt"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type backupSyncController struct {
 	*genericController
 
+	ctx                     context.Context
 	backupClient            velerov1client.BackupsGetter
 	kbclient                client.Client
+	kbCache                 cache.Cache
 	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	backupLister            velerov1listers.BackupLister
 	csiSnapshotClient       *snapshotterClientSet.Clientset
@@ -57,8 +60,10 @@ type backupSyncController struct {
 }
 
 func NewBackupSyncController(
+	ctx context.Context,
 	backupClient velerov1client.BackupsGetter,
 	kbclient client.Client,
+	kbCache cache.Cache,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
 	syncPeriod time.Duration,
@@ -76,6 +81,7 @@ func NewBackupSyncController(
 
 	c := &backupSyncController{
 		genericController:       newGenericController("backup-sync", logger),
+		ctx:                     ctx,
 		backupClient:            backupClient,
 		kbclient:                kbclient,
 		podVolumeBackupClient:   podVolumeBackupClient,
@@ -94,6 +100,11 @@ func NewBackupSyncController(
 
 	c.resyncFunc = c.run
 	c.resyncPeriod = 30 * time.Second
+
+	if !c.kbCache.WaitForCacheSync(c.ctx.Done()) {
+		logger.Info("Timed out waiting for caches to sync")
+		return c
+	}
 
 	return c
 }
