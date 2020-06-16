@@ -220,6 +220,7 @@ type VeleroOptions struct {
 	NoDefaultBackupLocation           bool
 	CACertData                        []byte
 	Features                          []string
+	DefaultVolumesToRestic            bool
 }
 
 func AllCRDs() *unstructured.UnstructuredList {
@@ -285,6 +286,10 @@ func AllResources(o *VeleroOptions) (*unstructured.UnstructuredList, error) {
 
 	if len(o.Plugins) > 0 {
 		deployOpts = append(deployOpts, WithPlugins(o.Plugins))
+	}
+
+	if o.DefaultVolumesToRestic {
+		deployOpts = append(deployOpts, WithDefaultVolumesToRestic())
 	}
 
 	deploy := Deployment(o.Namespace, deployOpts...)
