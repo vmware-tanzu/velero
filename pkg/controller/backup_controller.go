@@ -114,6 +114,7 @@ func NewBackupController(
 		backupTracker:               backupTracker,
 		backupLocationLister:        backupLocationLister,
 		defaultBackupLocation:       defaultBackupLocation,
+		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
 		snapshotLocationLister:      volumeSnapshotLocationLister,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
@@ -122,7 +123,6 @@ func NewBackupController(
 		volumeSnapshotLister:        volumeSnapshotLister,
 		volumeSnapshotContentLister: volumeSnapshotContentLister,
 		newBackupStore:              persistence.NewObjectBackupStore,
-		defaultVolumesToRestic:      defaultVolumesToRestic,
 	}
 
 	c.syncHandler = c.processBackup

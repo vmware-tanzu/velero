@@ -70,6 +70,8 @@ spec:
   # a default value of 30 days will be used. The default can be configured on the velero server
   # by passing the flag --default-backup-ttl. 
   ttl: 24h0m0s
+  # Whether restic should be used to take a backup of all pod volumes by default.
+  defaultVolumesToRestic: true
   # Actions to perform at different times during a backup. The only hook currently supported is
   # executing a command in a container in a pod using the pod exec API. Optional.
   hooks:
