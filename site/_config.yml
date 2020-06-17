@@ -19,7 +19,7 @@ footer:
   cta_title: ''
   cta_url: /docs
   cta_text: Documentation
-  vm-link: http://vmware.github.io/
+  vm_link: http://vmware.github.io/
 
 footer_social_links:
   Twitter:

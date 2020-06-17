@@ -1,0 +1,31 @@
+baseURL: http://example.org/
+disablePathToLower: true
+languageCode: en-us
+title: Velero
+params:
+  logo: Velero.svg
+  backgroundColor: med-blue
+  latest: v1.4
+  footer:
+    title: Getting Started
+    content: To help you get started, see the documentation.
+    cta_title: ''
+    cta_url: /docs
+    cta_text: Documentation
+    vm-link: http://vmware.github.io/
+  footer_social_links:
+    Twitter:
+      fa_icon: fab fa-twitter
+      url: https://twitter.com/projectvelero
+    Slack:
+      fa_icon: fab fa-slack
+      url: https://kubernetes.slack.com/messages/velero
+    Google Groups:
+      fa_icon: fas fa-users
+      url: https://groups.google.com/forum/#!forum/projectvelero
+    RSS:
+      fa_icon: fa fa-rss
+      url: feed.xml
+    GitHub:
+      fa_icon: fab fa-github
+      url: https://github.com/vmware-tanzu/velero
