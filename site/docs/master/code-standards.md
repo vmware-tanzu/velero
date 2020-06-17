@@ -12,6 +12,8 @@ changelog.
 
 Add that to the PR.
 
+If a PR does not warrant a changelog, the CI check for a changelog can be skipped by applying a `changelog-not-required` label on the PR.
+
 ## Code
 
 - Log messages are capitalized.
