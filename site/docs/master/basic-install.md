@@ -3,9 +3,9 @@
 - [Basic Install](#basic-install)
   - [Prerequisites](#prerequisites)
   - [Install the CLI](#install-the-cli)
-    - [Option 1: macOS - Homebrew](#option-1-macos-homebrew)
+    - [Option 1: macOS - Homebrew](#option-1-macos---homebrew)
     - [Option 2: GitHub release](#option-2-github-release)
-    - [Option 3: Windows - Chocolatey](#option-3-windows-chocolatey)
+    - [Option 3: Windows - Chocolatey](#option-3-windows---chocolatey)
   - [Install and configure the server components](#install-and-configure-the-server-components)
   - [Command line Autocompletion](#command-line-autocompletion)
 

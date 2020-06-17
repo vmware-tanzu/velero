@@ -91,3 +91,7 @@ To make sure it's the most up-to-date:
 1. If you don't already have one, create a [GitHub access token for Homebrew](https://github.com/settings/tokens/new?scopes=gist,public_repo&description=Homebrew)
 1. Run `export HOMEBREW_GITHUB_API_TOKEN=your_token_here` on your command line to make sure that `brew` can work on GitHub on your behalf.
 1. Run `hack/brew-update.sh`. This script will download the necessary files, do the checks, and invoke the brew helper to submit the PR, which will open in your browser.
+
+### Post-release - Windows Chocolatey version update
+
+From a Windows computer, follow the step-by-step instructions to [create the Windows Chocolatey package for Velero CLI](https://github.com/adamrushuk/velero-choco/blob/master/README.md)
