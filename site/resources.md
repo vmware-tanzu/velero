@@ -22,31 +22,26 @@ Here you will find external resources about Velero, such as videos, podcasts, an
 
     {% youtube JyzgS-KKuoo %}
 
-</br>
 
 * Kubernetes Back Up, Restore and Migration with Velero - A NewStack interview, with guests: Carlisia Campos, Tom Spoonemore, and Efri Nattel-Shayo:
 
     {% youtube 71NoY5CIcQ8 %}
 
-</br>
 
 * How to migrate applications between Kubernetes clusters using Velero:
 
     {% youtube IZlwKMoqBqE %}
 
-</br>
 
 * TGIK 080: Velero 1.0:
 
     {% youtube tj5Ey2bHsfM %}
 
-</br>
 
 * Watch our recent webinar on backup and migration strategies:
 
     {% youtube csrSPt3HFtg %}
 
-</br>
 
 * Velero demo by Just me and Opensource - [ Kube 45 ] Velero - Backup & Restore Kubernetes Cluster:
 
