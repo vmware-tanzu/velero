@@ -60,7 +60,7 @@ This property will be moved to the [Backup request struct](https://github.com/he
 In order to record the API group, version and kind for the resource, this key will be constructed from the object's `schema.GroupVersionKind` in the format `{group}/{version}/{kind}` (e.g. `apps/v1/Deployment`).
 
 The `backedUpItems` map is kept as a flat structure internally for quick lookup.
-When the backup is ready to upload, `backedUpItems` will be converted to a nested structure representing the metadata file above, grouped by `schema.SchemeGroupVersionKind`.
+When the backup is ready to upload, `backedUpItems` will be converted to a nested structure representing the metadata file above, grouped by `schema.GroupVersionKind`.
 After converting to the right format, it can be passed to the `persistBackup` function to persist the file in object storage.
 
 ### Changes to DownloadRequest CRD and processing

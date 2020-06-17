@@ -404,10 +404,9 @@ func TestTempCACertFile(t *testing.T) {
 	fakeClient.Create(context.Background(), bsl)
 
 	// expect temp file to be created with cacert value
-	location, err := GetCACert(fakeClient, bsl.Namespace, bsl.Name)
+	caCert, err := GetCACert(fakeClient, bsl.Namespace, bsl.Name)
 	require.NoError(t, err)
 
-	caCert := location.Spec.ObjectStorage.CACert
 	fileName, err := TempCACertFile(caCert, "default", fs)
 	require.NoError(t, err)
 

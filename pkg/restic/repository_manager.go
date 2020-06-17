@@ -245,11 +245,11 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.PasswordFile = file
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location, err := GetCACert(rm.kbClient, rm.namespace, backupLocation)
+	caCert, err := GetCACert(rm.kbClient, rm.namespace, backupLocation)
 	if err != nil {
 		return err
 	}
-	caCert := location.Spec.ObjectStorage.CACert
+
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = TempCACertFile(caCert, backupLocation, rm.fileSystem)
@@ -262,13 +262,13 @@ func (rm *repositoryManager) exec(cmd *Command, backupLocation string) error {
 	cmd.CACertFile = caCertFile
 
 	if strings.HasPrefix(cmd.RepoIdentifier, "azure") {
-		env, err := AzureCmdEnv(location)
+		env, err := AzureCmdEnv(rm.kbClient, rm.namespace, backupLocation)
 		if err != nil {
 			return err
 		}
 		cmd.Env = env
 	} else if strings.HasPrefix(cmd.RepoIdentifier, "s3") {
-		env, err := S3CmdEnv(location)
+		env, err := S3CmdEnv(rm.kbClient, rm.namespace, backupLocation)
 		if err != nil {
 			return err
 		}

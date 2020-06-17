@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	// +kubebuilder:scaffold:imports
 )
 
 func newFakeClient(t *testing.T, initObjs ...runtime.Object) client.Client {

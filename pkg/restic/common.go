@@ -288,11 +288,11 @@ func TempCACertFile(caCert []byte, bsl string, fs filesystem.Interface) (string,
 	return name, nil
 }
 
-func GetCACert(client client.Client, namespace, name string) (*velerov1api.BackupStorageLocation, error) {
+func GetCACert(client client.Client, namespace, backupLocation string) ([]byte, error) {
 	location := &velerov1api.BackupStorageLocation{}
 	if err := client.Get(context.Background(), kbclient.ObjectKey{
 		Namespace: namespace,
-		Name:      name,
+		Name:      backupLocation,
 	}, location); err != nil {
 		return nil, err
 	}
@@ -301,7 +301,7 @@ func GetCACert(client client.Client, namespace, name string) (*velerov1api.Backu
 		return nil, nil
 	}
 
-	return location, nil
+	return location.Spec.ObjectStorage.CACert, nil
 }
 
 // NewPodVolumeRestoreListOptions creates a ListOptions with a label selector configured to
@@ -316,7 +316,15 @@ func NewPodVolumeRestoreListOptions(name string) metav1.ListOptions {
 // should be used when running a restic command for an Azure backend. This list is
 // the current environment, plus the Azure-specific variables restic needs, namely
 // a storage account name and key.
-func AzureCmdEnv(loc *velerov1api.BackupStorageLocation) ([]string, error) {
+func AzureCmdEnv(client client.Client, namespace, backupLocation string) ([]string, error) {
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      backupLocation,
+	}, loc); err != nil {
+		return nil, err
+	}
+
 	azureVars, err := getAzureResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting azure restic env vars")
@@ -334,7 +342,15 @@ func AzureCmdEnv(loc *velerov1api.BackupStorageLocation) ([]string, error) {
 // should be used when running a restic command for an S3 backend. This list is
 // the current environment, plus the AWS-specific variables restic needs, namely
 // a credential profile.
-func S3CmdEnv(loc *velerov1api.BackupStorageLocation) ([]string, error) {
+func S3CmdEnv(client client.Client, namespace, backupLocation string) ([]string, error) {
+	loc := &velerov1api.BackupStorageLocation{}
+	if err := client.Get(context.Background(), kbclient.ObjectKey{
+		Namespace: namespace,
+		Name:      backupLocation,
+	}, loc); err != nil {
+		return nil, err
+	}
+
 	awsVars, err := getS3ResticEnvVars(loc.Spec.Config)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting aws restic env vars")

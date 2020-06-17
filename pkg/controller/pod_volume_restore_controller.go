@@ -296,11 +296,11 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	defer os.Remove(credsFile)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
+	caCert, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
-	caCert := location.Spec.ObjectStorage.CACert
+
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
@@ -312,7 +312,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	}
 
 	// execute the restore process
-	if err := c.restorePodVolume(req, location, credsFile, caCertFile, volumeDir, log); err != nil {
+	if err := c.restorePodVolume(req, credsFile, caCertFile, volumeDir, log); err != nil {
 		log.WithError(err).Error("Error restoring volume")
 		return c.failRestore(req, errors.Wrap(err, "error restoring volume").Error(), log)
 	}
@@ -331,7 +331,7 @@ func (c *podVolumeRestoreController) processRestore(req *velerov1api.PodVolumeRe
 	return nil
 }
 
-func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, location *velerov1api.BackupStorageLocation, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
+func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolumeRestore, credsFile, caCertFile, volumeDir string, log logrus.FieldLogger) error {
 	// Get the full path of the new volume's directory as mounted in the daemonset pod, which
 	// will look like: /host_pods/<new-pod-uid>/volumes/<volume-plugin-name>/<volume-dir>
 	volumePath, err := singlePathMatch(fmt.Sprintf("/host_pods/%s/volumes/*/%s", string(req.Spec.Pod.UID), volumeDir))
@@ -350,13 +350,13 @@ func (c *podVolumeRestoreController) restorePodVolume(req *velerov1api.PodVolume
 	// Running restic command might need additional provider specific environment variables. Based on the provider, we
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		env, err := restic.AzureCmdEnv(location)
+		env, err := restic.AzureCmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 		if err != nil {
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
 	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		env, err := restic.S3CmdEnv(location)
+		env, err := restic.S3CmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 		if err != nil {
 			return c.failRestore(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}

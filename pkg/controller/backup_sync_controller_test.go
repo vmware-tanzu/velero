@@ -108,7 +108,6 @@ func defaultLocationsListWithLongerLocationName(namespace string) []*velerov1api
 }
 
 func TestBackupSyncControllerRun(t *testing.T) {
-
 	type cloudBackupData struct {
 		backup           *velerov1api.Backup
 		podVolumeBackups []*velerov1api.PodVolumeBackup
@@ -471,7 +470,6 @@ func TestBackupSyncControllerRun(t *testing.T) {
 }
 
 func TestDeleteOrphanedBackups(t *testing.T) {
-
 	baseBuilder := func(name string) *builder.BackupBuilder {
 		return builder.ForBackup("ns-1", name).ObjectMeta(builder.WithLabels(velerov1api.StorageLocationLabel, "default"))
 	}
@@ -615,7 +613,6 @@ func TestDeleteOrphanedBackups(t *testing.T) {
 }
 
 func TestStorageLabelsInDeleteOrphanedBackups(t *testing.T) {
-
 	longLabelName := "the-really-long-location-name-that-is-much-more-than-63-characters"
 	tests := []struct {
 		name            string

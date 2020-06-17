@@ -155,7 +155,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 	}
 
 	if err := client.Create(context.Background(), backupStorageLocation, &kbclient.CreateOptions{}); err != nil {
-		return err
+		return errors.WithStack(err)
 	}
 
 	fmt.Printf("Backup storage location %q configured successfully.\n", backupStorageLocation.Name)

@@ -157,8 +157,6 @@ func newResticServer(logger logrus.FieldLogger, factory client.Factory) (*restic
 		return nil, err
 	}
 
-	// +kubebuilder:scaffold:builder
-
 	s := &resticServer{
 		kubeClient:            kubeClient,
 		veleroClient:          veleroClient,

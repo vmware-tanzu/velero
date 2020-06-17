@@ -305,6 +305,7 @@ func (c *backupSyncController) run() {
 
 		c.deleteOrphanedBackups(location.Name, backupStoreBackups, log)
 
+		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopyObject())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
 		if err := c.kbclient.Status().Patch(context.Background(), &location, statusPatch); err != nil {

@@ -229,11 +229,11 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	)
 
 	// if there's a caCert on the ObjectStorage, write it to disk so that it can be passed to restic
-	location, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
+	caCert, err := restic.GetCACert(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation)
 	if err != nil {
 		log.WithError(err).Error("Error getting caCert")
 	}
-	caCert := location.Spec.ObjectStorage.CACert
+
 	var caCertFile string
 	if caCert != nil {
 		caCertFile, err = restic.TempCACertFile(caCert, req.Spec.BackupStorageLocation, c.fileSystem)
@@ -249,12 +249,12 @@ func (c *podVolumeBackupController) processBackup(req *velerov1api.PodVolumeBack
 	// set resticCmd.Env appropriately (currently for Azure and S3 based backuplocations)
 	var env []string
 	if strings.HasPrefix(req.Spec.RepoIdentifier, "azure") {
-		if env, err = restic.AzureCmdEnv(location); err != nil {
+		if env, err = restic.AzureCmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
 	} else if strings.HasPrefix(req.Spec.RepoIdentifier, "s3") {
-		if env, err = restic.S3CmdEnv(location); err != nil {
+		if env, err = restic.S3CmdEnv(c.kbClient, req.Namespace, req.Spec.BackupStorageLocation); err != nil {
 			return c.fail(req, errors.Wrap(err, "error setting restic cmd env").Error(), log)
 		}
 		resticCmd.Env = env
