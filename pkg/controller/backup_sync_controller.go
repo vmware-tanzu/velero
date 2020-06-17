@@ -44,7 +44,7 @@ type backupSyncController struct {
 	*genericController
 
 	backupClient            velerov1client.BackupsGetter
-	kbclient                client.Client
+	kbClient                client.Client
 	podVolumeBackupClient   velerov1client.PodVolumeBackupsGetter
 	backupLister            velerov1listers.BackupLister
 	csiSnapshotClient       *snapshotterClientSet.Clientset
@@ -58,7 +58,7 @@ type backupSyncController struct {
 
 func NewBackupSyncController(
 	backupClient velerov1client.BackupsGetter,
-	kbclient client.Client,
+	kbClient client.Client,
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	backupLister velerov1listers.BackupLister,
 	syncPeriod time.Duration,
@@ -77,7 +77,7 @@ func NewBackupSyncController(
 	c := &backupSyncController{
 		genericController:       newGenericController("backup-sync", logger),
 		backupClient:            backupClient,
-		kbclient:                kbclient,
+		kbClient:                kbClient,
 		podVolumeBackupClient:   podVolumeBackupClient,
 		namespace:               namespace,
 		defaultBackupLocation:   defaultBackupLocation,
@@ -123,7 +123,7 @@ func (c *backupSyncController) run() {
 	c.logger.Debug("Checking for existing backup storage locations to sync into cluster")
 
 	locationList := &velerov1api.BackupStorageLocationList{}
-	if err := c.kbclient.List(context.Background(), locationList, &client.ListOptions{
+	if err := c.kbClient.List(context.Background(), locationList, &client.ListOptions{
 		Namespace: c.namespace,
 	}); err != nil {
 		c.logger.WithError(errors.WithStack(err)).Error("Error getting backup storage locations from lister")
@@ -308,7 +308,7 @@ func (c *backupSyncController) run() {
 		// update the location's last-synced time field
 		statusPatch := client.MergeFrom(location.DeepCopyObject())
 		location.Status.LastSyncedTime = &metav1.Time{Time: time.Now().UTC()}
-		if err := c.kbclient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
+		if err := c.kbClient.Status().Patch(context.Background(), &location, statusPatch); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error patching backup location's last-synced time")
 			continue
 		}

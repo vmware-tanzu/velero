@@ -48,7 +48,7 @@ type gcController struct {
 	backupLister              velerov1listers.BackupLister
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter
-	kbclient                  client.Client
+	kbClient                  client.Client
 
 	clock clock.Clock
 }
@@ -59,7 +59,7 @@ func NewGCController(
 	backupInformer velerov1informers.BackupInformer,
 	deleteBackupRequestLister velerov1listers.DeleteBackupRequestLister,
 	deleteBackupRequestClient velerov1client.DeleteBackupRequestsGetter,
-	kbclient client.Client,
+	kbClient client.Client,
 ) Interface {
 	c := &gcController{
 		genericController:         newGenericController("gc-controller", logger),
@@ -67,7 +67,7 @@ func NewGCController(
 		backupLister:              backupInformer.Lister(),
 		deleteBackupRequestLister: deleteBackupRequestLister,
 		deleteBackupRequestClient: deleteBackupRequestClient,
-		kbclient:                  kbclient,
+		kbClient:                  kbClient,
 	}
 
 	c.syncHandler = c.processQueueItem
@@ -134,7 +134,7 @@ func (c *gcController) processQueueItem(key string) error {
 	log.Info("Backup has expired")
 
 	loc := &velerov1api.BackupStorageLocation{}
-	if err := c.kbclient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
 		Namespace: ns,
 		Name:      backup.Spec.StorageLocation,
 	}, loc); err != nil {

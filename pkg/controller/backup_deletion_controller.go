@@ -66,7 +66,7 @@ type backupDeletionController struct {
 	backupTracker             BackupTracker
 	resticMgr                 restic.RepositoryManager
 	podvolumeBackupLister     velerov1listers.PodVolumeBackupLister
-	kbclient                  client.Client
+	kbClient                  client.Client
 	snapshotLocationLister    velerov1listers.VolumeSnapshotLocationLister
 	csiSnapshotLister         snapshotv1beta1listers.VolumeSnapshotLister
 	csiSnapshotContentLister  snapshotv1beta1listers.VolumeSnapshotContentLister
@@ -89,7 +89,7 @@ func NewBackupDeletionController(
 	backupTracker BackupTracker,
 	resticMgr restic.RepositoryManager,
 	podvolumeBackupLister velerov1listers.PodVolumeBackupLister,
-	kbclient client.Client,
+	kbClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	csiSnapshotLister snapshotv1beta1listers.VolumeSnapshotLister,
 	csiSnapshotContentLister snapshotv1beta1listers.VolumeSnapshotContentLister,
@@ -107,7 +107,7 @@ func NewBackupDeletionController(
 		backupTracker:             backupTracker,
 		resticMgr:                 resticMgr,
 		podvolumeBackupLister:     podvolumeBackupLister,
-		kbclient:                  kbclient,
+		kbClient:                  kbClient,
 		snapshotLocationLister:    snapshotLocationLister,
 		csiSnapshotLister:         csiSnapshotLister,
 		csiSnapshotContentLister:  csiSnapshotContentLister,
@@ -217,7 +217,7 @@ func (c *backupDeletionController) processRequest(req *velerov1api.DeleteBackupR
 
 	// Don't allow deleting backups in read-only storage locations
 	location := &velerov1api.BackupStorageLocation{}
-	if err := c.kbclient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, location); err != nil {

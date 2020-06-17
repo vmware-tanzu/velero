@@ -83,7 +83,7 @@ type restoreController struct {
 	restorer               pkgrestore.Restorer
 	backupLister           velerov1listers.BackupLister
 	restoreLister          velerov1listers.RestoreLister
-	kbclient               client.Client
+	kbClient               client.Client
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister
 	restoreLogLevel        logrus.Level
 	defaultBackupLocation  string
@@ -101,7 +101,7 @@ func NewRestoreController(
 	podVolumeBackupClient velerov1client.PodVolumeBackupsGetter,
 	restorer pkgrestore.Restorer,
 	backupLister velerov1listers.BackupLister,
-	kbclient client.Client,
+	kbClient client.Client,
 	snapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	logger logrus.FieldLogger,
 	restoreLogLevel logrus.Level,
@@ -118,7 +118,7 @@ func NewRestoreController(
 		restorer:               restorer,
 		backupLister:           backupLister,
 		restoreLister:          restoreInformer.Lister(),
-		kbclient:               kbclient,
+		kbClient:               kbClient,
 		snapshotLocationLister: snapshotLocationLister,
 		restoreLogLevel:        restoreLogLevel,
 		defaultBackupLocation:  defaultBackupLocation,
@@ -400,7 +400,7 @@ func (c *restoreController) fetchBackupInfo(backupName string, pluginManager cli
 	}
 
 	location := &velerov1api.BackupStorageLocation{}
-	if err := c.kbclient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
 		Namespace: c.namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, location); err != nil {

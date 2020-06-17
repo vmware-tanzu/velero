@@ -48,7 +48,7 @@ type downloadRequestController struct {
 	downloadRequestLister velerov1listers.DownloadRequestLister
 	restoreLister         velerov1listers.RestoreLister
 	clock                 clock.Clock
-	kbclient              client.Client
+	kbClient              client.Client
 	backupLister          velerov1listers.BackupLister
 	newPluginManager      func(logrus.FieldLogger) clientmgmt.Manager
 	newBackupStore        func(*velerov1api.BackupStorageLocation, persistence.ObjectStoreGetter, logrus.FieldLogger) (persistence.BackupStore, error)
@@ -59,7 +59,7 @@ func NewDownloadRequestController(
 	downloadRequestClient velerov1client.DownloadRequestsGetter,
 	downloadRequestInformer velerov1informers.DownloadRequestInformer,
 	restoreLister velerov1listers.RestoreLister,
-	kbclient client.Client,
+	kbClient client.Client,
 	backupLister velerov1listers.BackupLister,
 	newPluginManager func(logrus.FieldLogger) clientmgmt.Manager,
 	logger logrus.FieldLogger,
@@ -69,7 +69,7 @@ func NewDownloadRequestController(
 		downloadRequestClient: downloadRequestClient,
 		downloadRequestLister: downloadRequestInformer.Lister(),
 		restoreLister:         restoreLister,
-		kbclient:              kbclient,
+		kbClient:              kbClient,
 		backupLister:          backupLister,
 
 		// use variables to refer to these functions so they can be
@@ -162,7 +162,7 @@ func (c *downloadRequestController) generatePreSignedURL(downloadRequest *velero
 	}
 
 	backupLocation := &velerov1api.BackupStorageLocation{}
-	if err := c.kbclient.Get(context.Background(), client.ObjectKey{
+	if err := c.kbClient.Get(context.Background(), client.ObjectKey{
 		Namespace: backup.Namespace,
 		Name:      backup.Spec.StorageLocation,
 	}, backupLocation); err != nil {
