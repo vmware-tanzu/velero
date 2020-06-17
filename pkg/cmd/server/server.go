@@ -908,8 +908,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 		s.logger.Fatal("Problem starting manager", err)
 	}
 
-	s.logger.Info("Server started successfully")
-
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
 
 	return nil

@@ -70,14 +70,14 @@ type BackupStorageLocationStatus struct {
 	AccessMode BackupStorageLocationAccessMode `json:"accessMode,omitempty"`
 }
 
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:object:generate=true
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase",description="Backup Storage Location status such as Available/Unavailable"
-
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BackupStorageLocation is a location where Velero stores backup objects
 type BackupStorageLocation struct {
@@ -88,9 +88,8 @@ type BackupStorageLocation struct {
 	Status BackupStorageLocationStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
 
 // BackupStorageLocationList contains a list of BackupStorageLocation
 type BackupStorageLocationList struct {

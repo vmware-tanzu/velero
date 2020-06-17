@@ -8,6 +8,14 @@ metadata:
   creationTimestamp: null
   name: backupstoragelocations.velero.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.phase
+    description: Backup Storage Location status such as Available/Unavailable
+    name: Phase
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: velero.io
   names:
     kind: BackupStorageLocation
@@ -16,6 +24,8 @@ spec:
     singular: backupstoragelocation
   preserveUnknownFields: false
   scope: Namespaced
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: BackupStorageLocation is a location where Velero stores backup
