@@ -1,0 +1,123 @@
+// File Paths
+$path-fonts: "fonts";
+$path-images: "img";
+
+// Colors
+
+$black: #000;
+$white: #FFFFFF;
+$light: $white;
+$pink:    #A41458;
+$darkest-blue: #1D428A;
+$dark-grey: #717074;
+// Bootstrap overrides
+
+$body-bg: #bbb;
+$body-color: #3F3E3E;
+$box-shadow-sm: 0px 2px 4px 0px rgba(0,0,0,0.5);
+$border-color: #E8E8E8;
+
+$card-border-width: 1px;
+$card-border-color: $border-color;
+
+$font-family-base: "Metropolis", Helvetica, Arial, sans-serif;
+$font-size-base: 1.125rem; // 18px
+
+$link-color: #007AB8;;
+$link-decoration: none;
+$link-hover-color: $link-color;
+$link-hover-decoration: underline;
+
+$font-weight-light: 300;
+$font-weight-normal: 400;
+$font-weight-medium: 500;
+$font-weight-semibold: 600;
+$font-weight-bold: 700;
+
+// Custom
+
+$body-color-darker: #333;
+$body-color-darkest: #111;
+
+// Container
+
+$container-background: $white;
+$container-max-width: 1440px;
+
+// Header
+
+$header-background: $white;
+$header-foreground: $black;
+$header-foreground-selected: $black;
+
+// Footer
+$footer-foreground: #808080;
+$footer-link-color: #474747;
+$footer-copyright: $black;
+
+// Sections
+
+$section-content-max-width: 996px;
+$section-grey-background: #f2f2f2;
+
+$section-blue-background: #0165AB;
+$section-blue-foreground: $white;
+
+// Cards
+
+$card-dark-background: #0165AB;
+$card-dark-foreground: $white;
+$card-dark-link: $white;
+$card-dark-link-hover: $white;
+
+$card-light-background: $white;
+$card-light-link: $link-color;
+
+// alternating cards
+$field-backgrounds: (
+  'light-blue': #00C1D5,
+  'med-blue': #0091DA,
+  'dark-blue': #1D428A,
+  'darkest-blue': #002538,
+  'green': #78BE20
+);
+
+@each $name, $hex in $field-backgrounds {
+  .section-background-#{$name} {
+    background-color: #{$hex} !important;
+    color: $white !important;
+    h1,
+    h2,
+    p {
+      color: $white !important;      
+    }
+  }
+  .bg-color-#{$name} {
+    background-color: #{$hex} !important;
+  }
+}
+
+
+
+// Buttons
+
+$button-primary-background: $white;
+$button-primary-background-hover: $darkest-blue;
+$button-primary-foreground: $darkest-blue;
+$button-primary-border: $white;
+$button-primary-border-hover: $white;
+
+$button-secondary-background: $darkest-blue;
+$button-secondary-background-hover: $white;
+$button-secondary-foreground: $white;
+$button-secondary-border: $white;
+$button-secondary-border-hover: $darkest-blue;
+
+// Posts
+$post-hero-gradient-start: #fafafa;
+$post-hero-gradient-end: #ddd;
+$post-meta-foreground: $body-color-darker;
+
+// section 
+$section-padding-x: 30px;
+$section-padding-y: 40px;

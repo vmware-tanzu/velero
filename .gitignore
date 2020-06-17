@@ -48,4 +48,8 @@ site/.bundle
 site/vendor
 .ruby-version
 
+# Hugo compiled data
+hugo-site/public
+hugo-site/resources
+
 .vs
