@@ -23,7 +23,7 @@ PKG := github.com/vmware-tanzu/velero
 # Where to push the docker image.
 REGISTRY ?= velero
 
-# Build image handling. We push a build image for every changed version of 
+# Build image handling. We push a build image for every changed version of
 # /hack/build-image/Dockerfile. We tag the dockerfile with the short commit hash
 # of the commit that changed it. When determining if there is a build image in
 # the registry to use we look for one that matches the current "commit" for the
@@ -32,6 +32,8 @@ REGISTRY ?= velero
 BUILDER_IMAGE_TAG := $(shell git log -1 --pretty=%h hack/build-image/Dockerfile)
 BUILDER_IMAGE := $(REGISTRY)/build-image:$(BUILDER_IMAGE_TAG)
 BUILDER_IMAGE_CACHED := $(shell docker images -q ${BUILDER_IMAGE} 2>/dev/null )
+
+HUGO_IMAGE := hugo-builder
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 # if the 'local' rule is being run, detect the ARCH from 'go env'
@@ -260,7 +262,7 @@ build-dirs:
 	@mkdir -p .go/src/$(PKG) .go/pkg .go/bin .go/std/$(GOOS)/$(GOARCH) .go/go-build .go/golangci-lint
 
 build-env:
-	@# if we detect changes in dockerfile force a new build-image 
+	@# if we detect changes in dockerfile force a new build-image
 	@# else if we dont have a cached image make one
 	@# finally use the cached image
 ifneq ($(shell git diff --quiet HEAD -- hack/build-image/Dockerfile; echo $$?), 0)
@@ -289,6 +291,9 @@ push-build-image:
 	@# credentials needed to accomplish this.
 	docker push $(BUILDER_IMAGE)
 
+build-image-hugo:
+	cd hugo-site && docker build --pull -t $(HUGO_IMAGE) .
+
 clean:
 # if we have a cached image then use it to run go clean --modcache
 # this test checks if we there is an image id in the BUILDER_IMAGE_CACHED variable.
@@ -298,6 +303,7 @@ ifneq ($(strip $(BUILDER_IMAGE_CACHED)),)
 endif
 	rm -rf .container-* _output/.dockerfile-* .push-*
 	rm -rf .go _output
+	docker rmi $(HUGO_IMAGE)
 
 
 .PHONY: modules
@@ -348,6 +354,13 @@ serve-docs:
 	jekyll/jekyll \
 	jekyll serve --livereload --incremental
 
+serve-docs-hugo: build-image-hugo
+	docker run \
+	--rm \
+	-v "$$(pwd)/hugo-site:/srv/hugo" \
+	-it -p 1313:1313 \
+	$(HUGO_IMAGE) \
+	hugo server --bind=0.0.0.0
 # gen-docs generates a new versioned docs directory under site/docs. It follows
 # the following process:
 #   1. Copies the contents of the most recently tagged docs directory into the new
