@@ -25,7 +25,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -614,7 +613,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	s.logger.Info("Starting controllers")
 
 	ctx := s.ctx
-	var wg sync.WaitGroup
 
 	go func() {
 		metricsMux := http.NewServeMux()
@@ -636,10 +634,8 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	backupSyncControllerRunInfo := func() controllerRunInfo {
 		backupSyncContoller := controller.NewBackupSyncController(
-			s.ctx,
 			s.veleroClient.VeleroV1(),
 			s.mgr.GetClient(),
-			s.mgr.GetCache(),
 			s.veleroClient.VeleroV1(),
 			s.sharedInformerFactory.Velero().V1().Backups().Lister(),
 			s.config.backupSyncPeriod,
@@ -901,31 +897,51 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	for i := range controllers {
 		controllerRunInfo := controllers[i]
+		// Adding the controllers to the manager will register them as a runnable,
+		// so the manager will ensure the cache is started and ready before all controller are started
+		s.mgr.Add(controllerRunnable(controllerRunInfo.controller, controllerRunInfo.numWorkers))
+	}
 
-		wg.Add(1)
-		go func() {
-			controllerRunInfo.controller.Run(ctx, controllerRunInfo.numWorkers)
-			wg.Done()
-		}()
+	s.logger.Info("Server starting...")
+
+	if err := s.mgr.Start(s.ctx.Done()); err != nil {
+		s.logger.Fatal("Problem starting manager", err)
 	}
 
 	s.logger.Info("Server started successfully")
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// +kubebuilder:scaffold:builder
-		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-			s.logger.Fatal("Problem starting manager", err)
-		}
-	}()
-
-	<-ctx.Done()
-
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
-	wg.Wait()
 
 	return nil
+}
+
+// controllerRunnable will turn an existing controller into a Runnable
+func controllerRunnable(p controller.Interface, numWorkers int) manager.Runnable {
+	return manager.RunnableFunc(func(stop <-chan struct{}) error {
+		ctx, cancel := contextForChannel(stop)
+		defer cancel()
+
+		return p.Run(ctx, numWorkers)
+	})
+}
+
+// contextForChannel derives a child context from a parent channel.
+//
+// The derived context's Done channel is closed when the returned cancel function
+// is called or when the parent channel is closed, whichever happens first.
+//
+// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
+func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go func() {
+		select {
+		case <-parentCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
 }
 
 func (s *server) runProfiler() {
