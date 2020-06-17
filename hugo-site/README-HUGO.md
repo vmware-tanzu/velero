@@ -8,30 +8,21 @@ Install the following for an easy to use dev environment:
 
 * `brew install hugo`
 
-# [TODO]Dependencies for Linux
+# Dependencies for Linux
 If you are running a build on Ubuntu you will need the following packages:
-* ruby
-* ruby-dev
-* ruby-bundler
-* build-essential
-* zlib1g-dev
-* nginx (or apache2)
+* hugo
 
 
-# [TODO]Local Development
-1. Install Jekyll and plug-ins in one fell swoop. `gem install github-pages`
-This mirrors the plug-ins used by GitHub Pages on your local machine including Jekyll, Sass, etc.
-2. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
-3. `cd velero/site`
-4. `rbenv local 2.6.3`
-5. `bundle install`
-6. Serve the site and watch for markup/sass changes `jekyll serve --livereload --incremental`. You may need to run `bundle exec jekyll serve --livereload --incremental`.
-7. View your website at http://127.0.0.1:4000/
-8. Commit any changes and push everything to your fork.
-9. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
+# Local Development
+1. Clone down your own fork, or clone the main repo `git clone https://github.com/vmware-tanzu/velero` and add your own remote.
+1. `cd velero/hugo-site`
+1. Serve the site and watch for markup/sass changes `hugo serve`.
+1. View your website at http://127.0.0.1:1313/
+1. Commit any changes and push everything to your fork.
+1. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
 
 
-# Adding a New Docs Version
+# [TODO]Adding a New Docs Version
 
 To add a new set of versioned docs to go with a new Velero release:
 
