@@ -4,4 +4,4 @@ last_name: Brubaker
 image: /img/contributors/nolan-brubaker.png
 github_handle: nrb
 ---
-Engineer
+Tech Lead
