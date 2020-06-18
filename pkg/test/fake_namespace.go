@@ -38,42 +38,42 @@ func (c *FakeNamespaceClient) List(ctx context.Context, options metav1.ListOptio
 	return args.Get(0).(*corev1api.NamespaceList), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Create(ctx context.Context,obj *corev1api.Namespace, options metav1.CreateOptions) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) Create(ctx context.Context, obj *corev1api.Namespace, options metav1.CreateOptions) (*corev1api.Namespace, error) {
 	args := c.Called(obj)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Watch(ctx context.Context,options metav1.ListOptions) (watch.Interface, error) {
+func (c *FakeNamespaceClient) Watch(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
 	args := c.Called(options)
 	return args.Get(0).(watch.Interface), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Get(ctx context.Context,name string, opts metav1.GetOptions) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.Namespace, error) {
 	args := c.Called(name, opts)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Patch(ctx context.Context,name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (*corev1api.Namespace, error) {
 	args := c.Called(name, pt, data, subresources)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Delete(ctx context.Context,name string, opts metav1.DeleteOptions) error {
+func (c *FakeNamespaceClient) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
 	args := c.Called(name, opts)
 	return args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Finalize(ctx context.Context,item *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) Finalize(ctx context.Context, item *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
 	args := c.Called(item)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) Update(ctx context.Context,namespace *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) Update(ctx context.Context, namespace *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
 	args := c.Called(namespace)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
 
-func (c *FakeNamespaceClient) UpdateStatus(ctx context.Context,namespace *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
+func (c *FakeNamespaceClient) UpdateStatus(ctx context.Context, namespace *corev1api.Namespace, options metav1.UpdateOptions) (*corev1api.Namespace, error) {
 	args := c.Called(namespace)
 	return args.Get(0).(*corev1api.Namespace), args.Error(1)
 }
