@@ -25,12 +25,14 @@
                             <figure>
                                 <img src="{{ $.Param "hero.promo1.icon" }}" alt="{{ $.Param "hero.promo1.title" }}"/>
                             </figure>
-                            {% if $.Param "hero.promo1.url" or size > 0 %}
-                            <h5><a href="{{ $.Param "hero.promo1.url" }}"
-                                   class="dark">{{ $.Param "hero.promo1.title" }}</a></h5>
-                            {% else %}
-                            <h5>{{ $.Param "hero.promo1.title" }}</h5>
-                            {% endif %}
+                            {{ if $.Param "hero.promo1.url" }}
+                                <h5>
+                                    <a href="{{ $.Param "hero.promo1.url" }}"
+                                       class="dark">{{ $.Param "hero.promo1.title" }}</a>
+                                </h5>
+                            {{ else }}
+                                <h5>{{ $.Param "hero.promo1.title" }}</h5>
+                            {{ end }}
                             <p>{{ $.Param "hero.promo1.content" }}</p>
                         </div>
                     </div>
@@ -41,12 +43,14 @@
                             <figure>
                                 <img src="{{ $.Param "hero.promo2.icon" }}" alt="{{ $.Param "hero.promo2.title" }}"/>
                             </figure>
-                            {% if $.Param "hero.promo2.url" or size > 0 %}
-                            <h5><a href="{{ $.Param "hero.promo2.url" }}"
-                                   class="dark">{{ $.Param "hero.promo2.title" }}</a></h5>
-                            {% else %}
-                            <h5>{{ $.Param "hero.promo2.title" }}</h5>
-                            {% endif %}
+                            {{ if $.Param "hero.promo2.url" }}
+                                <h5>
+                                    <a href="{{ $.Param "hero.promo2.url" }}"
+                                       class="dark">{{ $.Param "hero.promo2.title" }}</a>
+                                </h5>
+                            {{ else }}
+                                <h5>{{ $.Param "hero.promo2.title" }}</h5>
+                            {{ end }}
                             <p>{{ $.Param "hero.promo2.content" }}</p>
                         </div>
                     </div>
@@ -57,12 +61,14 @@
                             <figure>
                                 <img src="{{ $.Param "hero.promo3.icon" }}" alt="{{ $.Param "hero.promo3.title" }}"/>
                             </figure>
-                            {% if $.Param "hero.promo3.url" or size > 0 %}
-                            <h5><a href="{{ $.Param "hero.promo3.url" }}"
-                                   class="dark">{{ $.Param "hero.promo3.title" }}</a></h5>
-                            {% else %}
-                            <h5>{{ $.Param "hero.promo3.title" }}</h5>
-                            {% endif %}
+                            {{ if $.Param "hero.promo3.url" }}
+                                <h5>
+                                    <a href="{{ $.Param "hero.promo3.url" }}"
+                                       class="dark">{{ $.Param "hero.promo3.title" }}</a>
+                                </h5>
+                            {{ else }}
+                                <h5>{{ $.Param "hero.promo3.title" }}</h5>
+                            {{ end }}
                             <p>{{ $.Param "hero.promo3.content" }}</p>
                         </div>
                     </div>
