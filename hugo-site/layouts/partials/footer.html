@@ -21,10 +21,11 @@
                 <ul class="social-links text-center text-md-left">
                     {{ range .Site.Params.footer_social_links }}
                         <li>
-                            {{ if (eq .fa_icon false) }}
+                            {{ if .fa_icon }}
                                 <i class="{{ .fa_icon }} fa-lg fa-fw mr-1"></i>
                             {{ end }}
-                            <a href="{{ .url }}">{{ . }}</a></li>
+                            <a href="{{ .url }}">{{ .title }}</a>
+                        </li>
                     {{ end }}
                 </ul>
             </div>
@@ -35,7 +36,7 @@
         </div>
         <div class="row align-items-center">
             <div class="col copyright text-center text-md-right mt-4">
-                &copy; {{ now.Format "2006" }} {{ .Site.Author }}.
+                &copy; {{ now.Format "2006" }} {{ .Site.Params.Author }}.
                 <a href="{{ .Site.Params.footer.vm_link }}" class="vm-logo">A VMware-backed project. <img
                             src="/img/{{ .Site.Params.vm_logo }}" alt="VMware logo"/></a>
             </div>
