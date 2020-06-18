@@ -312,7 +312,7 @@ func (c *resticRepositoryController) patchResticRepository(req *velerov1api.Rest
 
 	// patch, and if successful, update req
 	var patched *velerov1api.ResticRepository
-	if patched, err = c.resticRepositoryClient.ResticRepositories(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes); err != nil {
+	if patched, err = c.resticRepositoryClient.ResticRepositories(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return errors.Wrap(err, "error patching ResticRepository")
 	}
 	req = patched

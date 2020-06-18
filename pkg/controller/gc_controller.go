@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
@@ -172,7 +173,7 @@ func (c *gcController) processQueueItem(key string) error {
 	log.Info("Creating a new deletion request")
 	req := pkgbackup.NewDeleteBackupRequest(backup.Name, string(backup.UID))
 
-	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(req); err != nil {
+	if _, err = c.deleteBackupRequestClient.DeleteBackupRequests(ns).Create(context.TODO(), req, metav1.CreateOptions{}); err != nil {
 		return errors.Wrap(err, "error creating DeleteBackupRequest")
 	}
 

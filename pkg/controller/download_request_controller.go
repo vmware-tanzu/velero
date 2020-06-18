@@ -198,7 +198,7 @@ func (c *downloadRequestController) deleteIfExpired(downloadRequest *velerov1api
 	}
 
 	log.Debug("DownloadRequest has expired - deleting")
-	return errors.WithStack(c.downloadRequestClient.DownloadRequests(downloadRequest.Namespace).Delete(downloadRequest.Name, nil))
+	return errors.WithStack(c.downloadRequestClient.DownloadRequests(downloadRequest.Namespace).Delete(context.TODO(), downloadRequest.Name, metav1.DeleteOptions{}))
 }
 
 // resync requeues all the DownloadRequests in the lister's cache. This is mostly to handle deleting
@@ -237,7 +237,7 @@ func patchDownloadRequest(original, updated *velerov1api.DownloadRequest, client
 		return nil, errors.Wrap(err, "error creating json merge patch for download request")
 	}
 
-	res, err := client.DownloadRequests(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.DownloadRequests(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching download request")
 	}

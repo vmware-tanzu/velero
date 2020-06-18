@@ -313,7 +313,7 @@ func patchBackup(original, updated *velerov1api.Backup, client velerov1client.Ba
 		return nil, errors.Wrap(err, "error creating json merge patch for backup")
 	}
 
-	res, err := client.Backups(original.Namespace).Patch(original.Name, types.MergePatchType, patchBytes)
+	res, err := client.Backups(original.Namespace).Patch(context.TODO(), original.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching backup")
 	}

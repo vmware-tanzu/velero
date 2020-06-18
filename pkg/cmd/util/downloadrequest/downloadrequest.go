@@ -18,6 +18,7 @@ package downloadrequest
 
 import (
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -53,17 +54,17 @@ func Stream(client velerov1client.DownloadRequestsGetter, namespace, name string
 		},
 	}
 
-	req, err := client.DownloadRequests(namespace).Create(req)
+	req, err := client.DownloadRequests(namespace).Create(context.TODO(), req, metav1.CreateOptions{})
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	defer client.DownloadRequests(namespace).Delete(req.Name, nil)
+	defer client.DownloadRequests(namespace).Delete(context.TODO(), req.Name, metav1.DeleteOptions{})
 
 	listOptions := metav1.ListOptions{
 		FieldSelector:   "metadata.name=" + req.Name,
 		ResourceVersion: req.ResourceVersion,
 	}
-	watcher, err := client.DownloadRequests(namespace).Watch(listOptions)
+	watcher, err := client.DownloadRequests(namespace).Watch(context.TODO(), listOptions)
 	if err != nil {
 		return errors.WithStack(err)
 	}

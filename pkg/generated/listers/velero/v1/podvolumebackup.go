@@ -26,8 +26,10 @@ import (
 )
 
 // PodVolumeBackupLister helps list PodVolumeBackups.
+// All objects returned here must be treated as read-only.
 type PodVolumeBackupLister interface {
 	// List lists all PodVolumeBackups in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PodVolumeBackup, err error)
 	// PodVolumeBackups returns an object that can list and get PodVolumeBackups.
 	PodVolumeBackups(namespace string) PodVolumeBackupNamespaceLister
@@ -58,10 +60,13 @@ func (s *podVolumeBackupLister) PodVolumeBackups(namespace string) PodVolumeBack
 }
 
 // PodVolumeBackupNamespaceLister helps list and get PodVolumeBackups.
+// All objects returned here must be treated as read-only.
 type PodVolumeBackupNamespaceLister interface {
 	// List lists all PodVolumeBackups in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PodVolumeBackup, err error)
 	// Get retrieves the PodVolumeBackup from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.PodVolumeBackup, error)
 	PodVolumeBackupNamespaceListerExpansion
 }

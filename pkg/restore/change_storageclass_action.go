@@ -17,6 +17,8 @@ limitations under the License.
 package restore
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -103,7 +105,7 @@ func (a *ChangeStorageClassAction) Execute(input *velero.RestoreItemActionExecut
 	}
 
 	// validate that new storage class exists
-	if _, err := a.storageClassClient.Get(newStorageClass, metav1.GetOptions{}); err != nil {
+	if _, err := a.storageClassClient.Get(context.TODO(), newStorageClass, metav1.GetOptions{}); err != nil {
 		return nil, errors.Wrapf(err, "error getting storage class %s from API", newStorageClass)
 	}
 

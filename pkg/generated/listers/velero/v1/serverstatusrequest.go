@@ -26,8 +26,10 @@ import (
 )
 
 // ServerStatusRequestLister helps list ServerStatusRequests.
+// All objects returned here must be treated as read-only.
 type ServerStatusRequestLister interface {
 	// List lists all ServerStatusRequests in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ServerStatusRequest, err error)
 	// ServerStatusRequests returns an object that can list and get ServerStatusRequests.
 	ServerStatusRequests(namespace string) ServerStatusRequestNamespaceLister
@@ -58,10 +60,13 @@ func (s *serverStatusRequestLister) ServerStatusRequests(namespace string) Serve
 }
 
 // ServerStatusRequestNamespaceLister helps list and get ServerStatusRequests.
+// All objects returned here must be treated as read-only.
 type ServerStatusRequestNamespaceLister interface {
 	// List lists all ServerStatusRequests in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ServerStatusRequest, err error)
 	// Get retrieves the ServerStatusRequest from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ServerStatusRequest, error)
 	ServerStatusRequestNamespaceListerExpansion
 }

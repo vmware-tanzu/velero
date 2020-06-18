@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var schedulesResource = schema.GroupVersionResource{Group: "velero.io", Version:
 var schedulesKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "Schedule"}
 
 // Get takes name of the schedule, and returns the corresponding schedule object, and an error if there is any.
-func (c *FakeSchedules) Get(name string, options v1.GetOptions) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.Schedule, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(schedulesResource, c.ns, name), &velerov1.Schedule{})
 
@@ -50,7 +52,7 @@ func (c *FakeSchedules) Get(name string, options v1.GetOptions) (result *velerov
 }
 
 // List takes label and field selectors, and returns the list of Schedules that match those selectors.
-func (c *FakeSchedules) List(opts v1.ListOptions) (result *velerov1.ScheduleList, err error) {
+func (c *FakeSchedules) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.ScheduleList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(schedulesResource, schedulesKind, c.ns, opts), &velerov1.ScheduleList{})
 
@@ -72,14 +74,14 @@ func (c *FakeSchedules) List(opts v1.ListOptions) (result *velerov1.ScheduleList
 }
 
 // Watch returns a watch.Interface that watches the requested schedules.
-func (c *FakeSchedules) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeSchedules) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(schedulesResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a schedule and creates it.  Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Create(schedule *velerov1.Schedule) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Create(ctx context.Context, schedule *velerov1.Schedule, opts v1.CreateOptions) (result *velerov1.Schedule, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(schedulesResource, c.ns, schedule), &velerov1.Schedule{})
 
@@ -90,7 +92,7 @@ func (c *FakeSchedules) Create(schedule *velerov1.Schedule) (result *velerov1.Sc
 }
 
 // Update takes the representation of a schedule and updates it. Returns the server's representation of the schedule, and an error, if there is any.
-func (c *FakeSchedules) Update(schedule *velerov1.Schedule) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Update(ctx context.Context, schedule *velerov1.Schedule, opts v1.UpdateOptions) (result *velerov1.Schedule, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(schedulesResource, c.ns, schedule), &velerov1.Schedule{})
 
@@ -102,7 +104,7 @@ func (c *FakeSchedules) Update(schedule *velerov1.Schedule) (result *velerov1.Sc
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeSchedules) UpdateStatus(schedule *velerov1.Schedule) (*velerov1.Schedule, error) {
+func (c *FakeSchedules) UpdateStatus(ctx context.Context, schedule *velerov1.Schedule, opts v1.UpdateOptions) (*velerov1.Schedule, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(schedulesResource, "status", c.ns, schedule), &velerov1.Schedule{})
 
@@ -113,7 +115,7 @@ func (c *FakeSchedules) UpdateStatus(schedule *velerov1.Schedule) (*velerov1.Sch
 }
 
 // Delete takes name of the schedule and deletes it. Returns an error if one occurs.
-func (c *FakeSchedules) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeSchedules) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(schedulesResource, c.ns, name), &velerov1.Schedule{})
 
@@ -121,15 +123,15 @@ func (c *FakeSchedules) Delete(name string, options *v1.DeleteOptions) error {
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeSchedules) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(schedulesResource, c.ns, listOptions)
+func (c *FakeSchedules) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(schedulesResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &velerov1.ScheduleList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched schedule.
-func (c *FakeSchedules) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.Schedule, err error) {
+func (c *FakeSchedules) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.Schedule, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(schedulesResource, c.ns, name, pt, data, subresources...), &velerov1.Schedule{})
 

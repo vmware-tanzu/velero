@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/pkg/errors"
@@ -101,7 +102,7 @@ func (a *RemapCRDVersionAction) Execute(item runtime.Unstructured, backup *v1.Ba
 }
 
 func fetchV1beta1CRD(name string, betaCRDClient apiextv1beta1client.CustomResourceDefinitionInterface) (*unstructured.Unstructured, error) {
-	betaCRD, err := betaCRDClient.Get(name, metav1.GetOptions{})
+	betaCRD, err := betaCRDClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "error fetching v1beta1 version of %s", name)
 	}

@@ -300,7 +300,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 
 	backupRequest.Status.Progress = &velerov1api.BackupProgress{TotalItems: len(items)}
 	patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d}}}`, len(items))
-	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(context.TODO(), backupRequest.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress.totalItems")
 	}
 
@@ -354,7 +354,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 					backupRequest.Status.Progress.ItemsBackedUp = lastUpdate.itemsBackedUp
 
 					patch := fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, lastUpdate.totalItems, lastUpdate.itemsBackedUp)
-					if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+					if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(context.TODO(), backupRequest.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 						log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
 					}
 					lastUpdate = nil
@@ -433,7 +433,7 @@ func (kb *kubernetesBackupper) Backup(log logrus.FieldLogger, backupRequest *Req
 	backupRequest.Status.Progress.ItemsBackedUp = len(backupRequest.BackedUpItems)
 
 	patch = fmt.Sprintf(`{"status":{"progress":{"totalItems":%d,"itemsBackedUp":%d}}}`, len(backupRequest.BackedUpItems), len(backupRequest.BackedUpItems))
-	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(backupRequest.Name, types.MergePatchType, []byte(patch)); err != nil {
+	if _, err := kb.backupClient.Backups(backupRequest.Namespace).Patch(context.TODO(), backupRequest.Name, types.MergePatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 		log.WithError(errors.WithStack((err))).Warn("Got error trying to update backup's status.progress")
 	}
 

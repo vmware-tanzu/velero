@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -423,7 +424,7 @@ func (c *podVolumeRestoreController) patchPodVolumeRestore(req *velerov1api.PodV
 		return nil, errors.Wrap(err, "error creating json merge patch for PodVolumeRestore")
 	}
 
-	req, err = c.podVolumeRestoreClient.PodVolumeRestores(req.Namespace).Patch(req.Name, types.MergePatchType, patchBytes)
+	req, err = c.podVolumeRestoreClient.PodVolumeRestores(req.Namespace).Patch(context.TODO(), req.Name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "error patching PodVolumeRestore")
 	}

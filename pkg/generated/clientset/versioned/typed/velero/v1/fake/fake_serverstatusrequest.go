@@ -19,6 +19,8 @@ limitations under the License.
 package fake
 
 import (
+	"context"
+
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
@@ -39,7 +41,7 @@ var serverstatusrequestsResource = schema.GroupVersionResource{Group: "velero.io
 var serverstatusrequestsKind = schema.GroupVersionKind{Group: "velero.io", Version: "v1", Kind: "ServerStatusRequest"}
 
 // Get takes name of the serverStatusRequest, and returns the corresponding serverStatusRequest object, and an error if there is any.
-func (c *FakeServerStatusRequests) Get(name string, options v1.GetOptions) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Get(ctx context.Context, name string, options v1.GetOptions) (result *velerov1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewGetAction(serverstatusrequestsResource, c.ns, name), &velerov1.ServerStatusRequest{})
 
@@ -50,7 +52,7 @@ func (c *FakeServerStatusRequests) Get(name string, options v1.GetOptions) (resu
 }
 
 // List takes label and field selectors, and returns the list of ServerStatusRequests that match those selectors.
-func (c *FakeServerStatusRequests) List(opts v1.ListOptions) (result *velerov1.ServerStatusRequestList, err error) {
+func (c *FakeServerStatusRequests) List(ctx context.Context, opts v1.ListOptions) (result *velerov1.ServerStatusRequestList, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewListAction(serverstatusrequestsResource, serverstatusrequestsKind, c.ns, opts), &velerov1.ServerStatusRequestList{})
 
@@ -72,14 +74,14 @@ func (c *FakeServerStatusRequests) List(opts v1.ListOptions) (result *velerov1.S
 }
 
 // Watch returns a watch.Interface that watches the requested serverStatusRequests.
-func (c *FakeServerStatusRequests) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *FakeServerStatusRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(testing.NewWatchAction(serverstatusrequestsResource, c.ns, opts))
 
 }
 
 // Create takes the representation of a serverStatusRequest and creates it.  Returns the server's representation of the serverStatusRequest, and an error, if there is any.
-func (c *FakeServerStatusRequests) Create(serverStatusRequest *velerov1.ServerStatusRequest) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Create(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.CreateOptions) (result *velerov1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewCreateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
 
@@ -90,7 +92,7 @@ func (c *FakeServerStatusRequests) Create(serverStatusRequest *velerov1.ServerSt
 }
 
 // Update takes the representation of a serverStatusRequest and updates it. Returns the server's representation of the serverStatusRequest, and an error, if there is any.
-func (c *FakeServerStatusRequests) Update(serverStatusRequest *velerov1.ServerStatusRequest) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Update(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.UpdateOptions) (result *velerov1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateAction(serverstatusrequestsResource, c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
 
@@ -102,7 +104,7 @@ func (c *FakeServerStatusRequests) Update(serverStatusRequest *velerov1.ServerSt
 
 // UpdateStatus was generated because the type contains a Status member.
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
-func (c *FakeServerStatusRequests) UpdateStatus(serverStatusRequest *velerov1.ServerStatusRequest) (*velerov1.ServerStatusRequest, error) {
+func (c *FakeServerStatusRequests) UpdateStatus(ctx context.Context, serverStatusRequest *velerov1.ServerStatusRequest, opts v1.UpdateOptions) (*velerov1.ServerStatusRequest, error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewUpdateSubresourceAction(serverstatusrequestsResource, "status", c.ns, serverStatusRequest), &velerov1.ServerStatusRequest{})
 
@@ -113,7 +115,7 @@ func (c *FakeServerStatusRequests) UpdateStatus(serverStatusRequest *velerov1.Se
 }
 
 // Delete takes name of the serverStatusRequest and deletes it. Returns an error if one occurs.
-func (c *FakeServerStatusRequests) Delete(name string, options *v1.DeleteOptions) error {
+func (c *FakeServerStatusRequests) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
 		Invokes(testing.NewDeleteAction(serverstatusrequestsResource, c.ns, name), &velerov1.ServerStatusRequest{})
 
@@ -121,15 +123,15 @@ func (c *FakeServerStatusRequests) Delete(name string, options *v1.DeleteOptions
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *FakeServerStatusRequests) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(serverstatusrequestsResource, c.ns, listOptions)
+func (c *FakeServerStatusRequests) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
+	action := testing.NewDeleteCollectionAction(serverstatusrequestsResource, c.ns, listOpts)
 
 	_, err := c.Fake.Invokes(action, &velerov1.ServerStatusRequestList{})
 	return err
 }
 
 // Patch applies the patch and returns the patched serverStatusRequest.
-func (c *FakeServerStatusRequests) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *velerov1.ServerStatusRequest, err error) {
+func (c *FakeServerStatusRequests) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *velerov1.ServerStatusRequest, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(serverstatusrequestsResource, c.ns, name, pt, data, subresources...), &velerov1.ServerStatusRequest{})
 

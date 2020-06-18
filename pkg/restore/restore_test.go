@@ -1635,7 +1635,7 @@ func TestShouldRestore(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
 
-			ctx := &context{
+			ctx := &restoreContext{
 				log:                        h.log,
 				dynamicFactory:             client.NewDynamicFactory(h.DynamicClient),
 				namespaceClient:            h.KubeClient.CoreV1().Namespaces(),

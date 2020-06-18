@@ -26,8 +26,10 @@ import (
 )
 
 // ResticRepositoryLister helps list ResticRepositories.
+// All objects returned here must be treated as read-only.
 type ResticRepositoryLister interface {
 	// List lists all ResticRepositories in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ResticRepository, err error)
 	// ResticRepositories returns an object that can list and get ResticRepositories.
 	ResticRepositories(namespace string) ResticRepositoryNamespaceLister
@@ -58,10 +60,13 @@ func (s *resticRepositoryLister) ResticRepositories(namespace string) ResticRepo
 }
 
 // ResticRepositoryNamespaceLister helps list and get ResticRepositories.
+// All objects returned here must be treated as read-only.
 type ResticRepositoryNamespaceLister interface {
 	// List lists all ResticRepositories in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.ResticRepository, err error)
 	// Get retrieves the ResticRepository from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.ResticRepository, error)
 	ResticRepositoryNamespaceListerExpansion
 }

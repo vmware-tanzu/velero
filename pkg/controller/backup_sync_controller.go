@@ -223,7 +223,7 @@ func (c *backupSyncController) run() {
 			backup.Labels[velerov1api.StorageLocationLabel] = label.GetValidName(backup.Spec.StorageLocation)
 
 			// attempt to create backup custom resource via API
-			backup, err = c.backupClient.Backups(backup.Namespace).Create(backup)
+			backup, err = c.backupClient.Backups(backup.Namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
 			switch {
 			case err != nil && kuberrs.IsAlreadyExists(err):
 				log.Debug("Backup already exists in cluster")
@@ -260,7 +260,7 @@ func (c *backupSyncController) run() {
 				podVolumeBackup.Namespace = backup.Namespace
 				podVolumeBackup.ResourceVersion = ""
 
-				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(podVolumeBackup)
+				_, err = c.podVolumeBackupClient.PodVolumeBackups(backup.Namespace).Create(context.TODO(), podVolumeBackup, metav1.CreateOptions{})
 				switch {
 				case err != nil && kuberrs.IsAlreadyExists(err):
 					log.Debug("Pod volume backup already exists in cluster")
@@ -287,7 +287,7 @@ func (c *backupSyncController) run() {
 				for _, snapCont := range snapConts {
 					// TODO: Reset ResourceVersion prior to persisting VolumeSnapshotContents
 					snapCont.ResourceVersion = ""
-					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(snapCont)
+					created, err := c.csiSnapshotClient.SnapshotV1beta1().VolumeSnapshotContents().Create(context.TODO(), snapCont, metav1.CreateOptions{})
 					switch {
 					case err != nil && kuberrs.IsAlreadyExists(err):
 						log.Debugf("volumesnapshotcontent %s already exists in cluster", snapCont.Name)
@@ -336,7 +336,7 @@ func (c *backupSyncController) deleteOrphanedBackups(locationName string, backup
 			continue
 		}
 
-		if err := c.backupClient.Backups(backup.Namespace).Delete(backup.Name, nil); err != nil {
+		if err := c.backupClient.Backups(backup.Namespace).Delete(context.TODO(), backup.Name, metav1.DeleteOptions{}); err != nil {
 			log.WithError(errors.WithStack(err)).Error("Error deleting orphaned backup from cluster")
 		} else {
 			log.Debug("Deleted orphaned backup from cluster")

@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	velerov1 "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
@@ -61,13 +62,13 @@ func NewFilteredRestoreInformer(client versioned.Interface, namespace string, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.VeleroV1().Restores(namespace).List(options)
+				return client.VeleroV1().Restores(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.VeleroV1().Restores(namespace).Watch(options)
+				return client.VeleroV1().Restores(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&velerov1.Restore{},
