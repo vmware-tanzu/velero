@@ -26,10 +26,8 @@ import (
 )
 
 // PodVolumeRestoreLister helps list PodVolumeRestores.
-// All objects returned here must be treated as read-only.
 type PodVolumeRestoreLister interface {
 	// List lists all PodVolumeRestores in the indexer.
-	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PodVolumeRestore, err error)
 	// PodVolumeRestores returns an object that can list and get PodVolumeRestores.
 	PodVolumeRestores(namespace string) PodVolumeRestoreNamespaceLister
@@ -60,13 +58,10 @@ func (s *podVolumeRestoreLister) PodVolumeRestores(namespace string) PodVolumeRe
 }
 
 // PodVolumeRestoreNamespaceLister helps list and get PodVolumeRestores.
-// All objects returned here must be treated as read-only.
 type PodVolumeRestoreNamespaceLister interface {
 	// List lists all PodVolumeRestores in the indexer for a given namespace.
-	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1.PodVolumeRestore, err error)
 	// Get retrieves the PodVolumeRestore from the indexer for a given namespace and name.
-	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1.PodVolumeRestore, error)
 	PodVolumeRestoreNamespaceListerExpansion
 }
