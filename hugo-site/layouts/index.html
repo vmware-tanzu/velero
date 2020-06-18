@@ -102,8 +102,8 @@
                     <h2>Features</h2>
                 </div>
             </div>
-            {% assign limit = 3 %}
-            {% include case-studies-alternating.html %}
+            {{ .Scratch.Set "limit" "3" }}
+            {{ partial "case-studies-alternating.html" . }}
         </div>
     </div>
 
