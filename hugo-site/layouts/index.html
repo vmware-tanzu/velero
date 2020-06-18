@@ -126,7 +126,7 @@
 
     <div class="section section-background-{{ $.Param "backgrounds.team" }}">
         <div class="section-content">
-            {% include contributors.html %}
+            {{ partial "contributors.html" . }}
         </div>
     </div>
 {{ end }}

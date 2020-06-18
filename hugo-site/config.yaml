@@ -6,6 +6,7 @@ params:
   logo: Velero.svg
   backgroundColor: med-blue
   latest: v1.4
+  gh_repo: https://github.com/vmware-tanzu/velero
   footer:
     title: Getting Started
     content: To help you get started, see the documentation.
