@@ -1,0 +1,13 @@
+<div class="row">
+    {{ $limit := int (.Scratch.Get "limit") }}
+    {{ $posts := .Site.GetPage "/posts" }}
+    {{ range $index, $page := first $limit $posts.Resources }}
+        {{ $currentIndex := add $index 1 }}
+        {{ partial "blog-post-card.html" $page }}
+        {{ $row := mod $currentIndex 3 }}
+        {{ if (and (eq $row 0) (ne $currentIndex $limit)) }}
+            </div>
+            <div class="row mt-4">
+        {{ end }}
+    {{ end }}
+</div>

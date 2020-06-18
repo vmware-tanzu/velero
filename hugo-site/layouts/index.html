@@ -114,8 +114,8 @@
                     <h2>Blog Highlights</h2>
                 </div>
             </div>
-            {% assign limit = 3 %}
-            {% include blog-posts.html %}
+            {{ .Scratch.Set "limit" "3" }}
+            {{ partial "blog-posts.html" . }}
             <div class="row pt-5">
                 <div class="col text-center">
                     <a href="/blog" class="btn btn-secondary btn-sm">See All Posts</a>
