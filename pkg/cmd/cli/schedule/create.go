@@ -17,6 +17,7 @@ limitations under the License.
 package schedule
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -141,7 +142,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		return err
 	}
 
-	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(schedule)
+	_, err = veleroClient.VeleroV1().Schedules(schedule.Namespace).Create(context.TODO(), schedule, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}

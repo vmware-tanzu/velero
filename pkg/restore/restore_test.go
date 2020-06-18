@@ -20,7 +20,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	ctx "context"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1647,7 +1647,7 @@ func TestShouldRestore(t *testing.T) {
 			}
 
 			for _, ns := range tc.namespaces {
-				_, err := ctx.namespaceClient.Create(ns)
+				_, err := ctx.namespaceClient.Create(context.TODO(), ns, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
@@ -1684,7 +1684,7 @@ func assertRestoredItems(t *testing.T, h *harness, want []*test.APIResource) {
 				client = resourceClient
 			}
 
-			res, err := client.Get(item.GetName(), metav1.GetOptions{})
+			res, err := client.Get(context.TODO(), item.GetName(), metav1.GetOptions{})
 			if !assert.NoError(t, err) {
 				continue
 			}
@@ -2361,7 +2361,7 @@ type fakeResticRestorerFactory struct {
 	restorer *resticmocks.Restorer
 }
 
-func (f *fakeResticRestorerFactory) NewRestorer(ctx.Context, *velerov1api.Restore) (restic.Restorer, error) {
+func (f *fakeResticRestorerFactory) NewRestorer(context.Context, *velerov1api.Restore) (restic.Restorer, error) {
 	return f.restorer, nil
 }
 
@@ -2714,7 +2714,7 @@ func assertAPIContents(t *testing.T, h *harness, want map[*test.APIResource][]st
 	t.Helper()
 
 	for r, want := range want {
-		res, err := h.DynamicClient.Resource(r.GVR()).List(metav1.ListOptions{})
+		res, err := h.DynamicClient.Resource(r.GVR()).List(context.TODO(), metav1.ListOptions{})
 		assert.NoError(t, err)
 		if err != nil {
 			continue
@@ -2863,9 +2863,9 @@ func (h *harness) addItems(t *testing.T, resource *test.APIResource) {
 		unstructured.RemoveNestedField(unstructuredObj.Object, "status")
 
 		if resource.Namespaced {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Namespace(item.GetNamespace()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
 		} else {
-			_, err = h.DynamicClient.Resource(resource.GVR()).Create(unstructuredObj, metav1.CreateOptions{})
+			_, err = h.DynamicClient.Resource(resource.GVR()).Create(context.TODO(), unstructuredObj, metav1.CreateOptions{})
 		}
 		require.NoError(t, err)
 	}

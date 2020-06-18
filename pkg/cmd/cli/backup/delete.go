@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -82,7 +83,7 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			backup, err := o.Client.VeleroV1().Backups(o.Namespace).Get(name, metav1.GetOptions{})
+			backup, err := o.Client.VeleroV1().Backups(o.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -96,7 +97,7 @@ func Run(o *cli.DeleteOptions) error {
 			selector = o.Selector.String()
 		}
 
-		res, err := o.Client.VeleroV1().Backups(o.Namespace).List(metav1.ListOptions{LabelSelector: selector})
+		res, err := o.Client.VeleroV1().Backups(o.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -114,7 +115,7 @@ func Run(o *cli.DeleteOptions) error {
 	for _, b := range backups {
 		deleteRequest := backup.NewDeleteBackupRequest(b.Name, string(b.UID))
 
-		if _, err := o.Client.VeleroV1().DeleteBackupRequests(o.Namespace).Create(deleteRequest); err != nil {
+		if _, err := o.Client.VeleroV1().DeleteBackupRequests(o.Namespace).Create(context.TODO(), deleteRequest, metav1.CreateOptions{}); err != nil {
 			errs = append(errs, err)
 			continue
 		}

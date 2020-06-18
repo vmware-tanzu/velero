@@ -17,6 +17,7 @@ limitations under the License.
 package schedule
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -76,7 +77,7 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			schedule, err := o.Client.VeleroV1().Schedules(o.Namespace).Get(name, metav1.GetOptions{})
+			schedule, err := o.Client.VeleroV1().Schedules(o.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -88,7 +89,7 @@ func Run(o *cli.DeleteOptions) error {
 		if o.Selector.LabelSelector != nil {
 			selector = o.Selector.String()
 		}
-		res, err := o.Client.VeleroV1().Schedules(o.Namespace).List(metav1.ListOptions{
+		res, err := o.Client.VeleroV1().Schedules(o.Namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: selector,
 		})
 		if err != nil {
@@ -105,7 +106,7 @@ func Run(o *cli.DeleteOptions) error {
 	}
 
 	for _, s := range schedules {
-		err := o.Client.VeleroV1().Schedules(s.Namespace).Delete(s.Name, nil)
+		err := o.Client.VeleroV1().Schedules(s.Namespace).Delete(context.TODO(), s.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue

@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -87,7 +88,7 @@ func (o *DownloadOptions) Validate(c *cobra.Command, args []string, f client.Fac
 	veleroClient, err := f.Client()
 	cmd.CheckError(err)
 
-	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(o.Name, metav1.GetOptions{}); err != nil {
+	if _, err := veleroClient.VeleroV1().Backups(f.Namespace()).Get(context.TODO(), o.Name, metav1.GetOptions{}); err != nil {
 		return err
 	}
 

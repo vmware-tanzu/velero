@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1api "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
@@ -133,12 +135,12 @@ func TestChangePVCNodeSelectorActionExecute(t *testing.T) {
 
 			// set up test data
 			if tc.configMap != nil {
-				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(tc.configMap)
+				_, err := clientset.CoreV1().ConfigMaps(tc.configMap.Namespace).Create(context.TODO(), tc.configMap, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 
 			if tc.node != nil {
-				_, err := clientset.CoreV1().Nodes().Create(tc.node)
+				_, err := clientset.CoreV1().Nodes().Create(context.TODO(), tc.node, metav1.CreateOptions{})
 				require.NoError(t, err)
 			}
 			unstructuredMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.pvc)

@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -54,19 +55,19 @@ func NewDescribeCommand(f client.Factory, use string) *cobra.Command {
 			if len(args) > 0 {
 				restores = new(api.RestoreList)
 				for _, name := range args {
-					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(name, metav1.GetOptions{})
+					restore, err := veleroClient.VeleroV1().Restores(f.Namespace()).Get(context.TODO(), name, metav1.GetOptions{})
 					cmd.CheckError(err)
 					restores.Items = append(restores.Items, *restore)
 				}
 			} else {
-				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(listOptions)
+				restores, err = veleroClient.VeleroV1().Restores(f.Namespace()).List(context.TODO(), listOptions)
 				cmd.CheckError(err)
 			}
 
 			first := true
 			for _, restore := range restores.Items {
 				opts := restic.NewPodVolumeRestoreListOptions(restore.Name)
-				podvolumeRestoreList, err := veleroClient.VeleroV1().PodVolumeRestores(f.Namespace()).List(opts)
+				podvolumeRestoreList, err := veleroClient.VeleroV1().PodVolumeRestores(f.Namespace()).List(context.TODO(), opts)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "error getting PodVolumeRestores for restore %s: %v\n", restore.Name, err)
 				}

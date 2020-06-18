@@ -170,7 +170,7 @@ func (o *CreateOptions) Validate(c *cobra.Command, args []string, f client.Facto
 	}
 
 	for _, loc := range o.SnapshotLocations {
-		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(loc, metav1.GetOptions{}); err != nil {
+		if _, err := o.client.VeleroV1().VolumeSnapshotLocations(f.Namespace()).Get(context.TODO(), loc, metav1.GetOptions{}); err != nil {
 			return err
 		}
 	}
@@ -245,7 +245,7 @@ func (o *CreateOptions) Run(c *cobra.Command, f client.Factory) error {
 		go backupInformer.Run(stop)
 	}
 
-	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(backup)
+	_, err = o.client.VeleroV1().Backups(backup.Namespace).Create(context.TODO(), backup, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 	var backupBuilder *builder.BackupBuilder
 
 	if o.FromSchedule != "" {
-		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(o.FromSchedule, metav1.GetOptions{})
+		schedule, err := o.client.VeleroV1().Schedules(namespace).Get(context.TODO(), o.FromSchedule, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}

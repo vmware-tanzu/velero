@@ -17,6 +17,7 @@ limitations under the License.
 package backup
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,7 +61,7 @@ func TestCreateOptions_BuildBackupFromSchedule(t *testing.T) {
 
 	expectedBackupSpec := builder.ForBackup("test", testNamespace).IncludedNamespaces("test").Result().Spec
 	schedule := builder.ForSchedule(testNamespace, "test").Template(expectedBackupSpec).ObjectMeta(builder.WithLabels("velero.io/test", "true")).Result()
-	o.client.VeleroV1().Schedules(testNamespace).Create(schedule)
+	o.client.VeleroV1().Schedules(testNamespace).Create(context.TODO(), schedule, metav1.CreateOptions{})
 
 	t.Run("existing schedule", func(t *testing.T) {
 		backup, err := o.BuildBackup(testNamespace)

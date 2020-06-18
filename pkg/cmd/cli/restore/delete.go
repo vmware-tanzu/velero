@@ -17,6 +17,7 @@ limitations under the License.
 package restore
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
@@ -77,7 +78,7 @@ func Run(o *cli.DeleteOptions) error {
 	switch {
 	case len(o.Names) > 0:
 		for _, name := range o.Names {
-			restore, err := o.Client.VeleroV1().Restores(o.Namespace).Get(name, metav1.GetOptions{})
+			restore, err := o.Client.VeleroV1().Restores(o.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				errs = append(errs, errors.WithStack(err))
 				continue
@@ -89,7 +90,7 @@ func Run(o *cli.DeleteOptions) error {
 		if o.Selector.LabelSelector != nil {
 			selector = o.Selector.String()
 		}
-		res, err := o.Client.VeleroV1().Restores(o.Namespace).List(metav1.ListOptions{
+		res, err := o.Client.VeleroV1().Restores(o.Namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: selector,
 		})
 		if err != nil {
@@ -105,7 +106,7 @@ func Run(o *cli.DeleteOptions) error {
 		return nil
 	}
 	for _, r := range restores {
-		err := o.Client.VeleroV1().Restores(r.Namespace).Delete(r.Name, nil)
+		err := o.Client.VeleroV1().Restores(r.Namespace).Delete(context.TODO(), r.Name, metav1.DeleteOptions{})
 		if err != nil {
 			errs = append(errs, errors.WithStack(err))
 			continue

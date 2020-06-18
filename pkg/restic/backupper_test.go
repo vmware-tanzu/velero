@@ -17,6 +17,7 @@ limitations under the License.
 package restic
 
 import (
+	"context"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -131,7 +132,7 @@ type fakePVGetter struct {
 	pv *corev1api.PersistentVolume
 }
 
-func (g *fakePVGetter) Get(name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error) {
+func (g *fakePVGetter) Get(ctx context.Context, name string, opts metav1.GetOptions) (*corev1api.PersistentVolume, error) {
 	if g.pv != nil {
 		return g.pv, nil
 	}
