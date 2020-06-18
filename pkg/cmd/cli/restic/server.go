@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 
+	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 
 	"github.com/pkg/errors"
@@ -183,8 +183,6 @@ func (s *resticServer) run() {
 
 	s.logger.Info("Starting controllers")
 
-	var wg sync.WaitGroup
-
 	backupController := controller.NewPodVolumeBackupController(
 		s.logger,
 		s.veleroInformerFactory.Velero().V1().PodVolumeBackups(),
@@ -196,11 +194,6 @@ func (s *resticServer) run() {
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		backupController.Run(s.ctx, 1)
-	}()
 
 	restoreController := controller.NewPodVolumeRestoreController(
 		s.logger,
@@ -213,32 +206,24 @@ func (s *resticServer) run() {
 		s.mgr.GetClient(),
 		os.Getenv("NODE_NAME"),
 	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		restoreController.Run(s.ctx, 1)
-	}()
 
 	go s.veleroInformerFactory.Start(s.ctx.Done())
 	go s.kubeInformerFactory.Start(s.ctx.Done())
 	go s.podInformer.Run(s.ctx.Done())
 	go s.secretInformer.Run(s.ctx.Done())
 
-	s.logger.Info("Controllers started successfully")
+	// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
+	// so the manager will ensure the cache is started and ready before all controller are started
+	s.mgr.Add(managercontroller.Runnable(backupController, 1))
+	s.mgr.Add(managercontroller.Runnable(restoreController, 1))
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		// +kubebuilder:scaffold:builder
-		if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-			s.logger.Fatal("Problem starting manager", err)
-		}
-	}()
+	s.logger.Info("Controllers starting...")
 
-	<-s.ctx.Done()
+	if err := s.mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+		s.logger.Fatal("Problem starting manager", err)
+	}
 
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
-	wg.Wait()
 }
 
 // validatePodVolumesHostPath validates that the pod volumes path contains a

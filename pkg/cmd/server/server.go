@@ -56,6 +56,7 @@ import (
 	"github.com/vmware-tanzu/velero/pkg/cmd"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/flag"
 	"github.com/vmware-tanzu/velero/pkg/cmd/util/signals"
+
 	"github.com/vmware-tanzu/velero/pkg/controller"
 	velerodiscovery "github.com/vmware-tanzu/velero/pkg/discovery"
 	"github.com/vmware-tanzu/velero/pkg/features"
@@ -74,6 +75,7 @@ import (
 	kbclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	"github.com/vmware-tanzu/velero/internal/util/managercontroller"
 	velerov1api "github.com/vmware-tanzu/velero/pkg/apis/velero/v1"
 )
 
@@ -897,9 +899,9 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 
 	for i := range controllers {
 		controllerRunInfo := controllers[i]
-		// Adding the controllers to the manager will register them as a runnable,
+		// Adding the controllers to the manager will register them as a (runtime-controller) runnable,
 		// so the manager will ensure the cache is started and ready before all controller are started
-		s.mgr.Add(controllerRunnable(controllerRunInfo.controller, controllerRunInfo.numWorkers))
+		s.mgr.Add(managercontroller.Runnable(controllerRunInfo.controller, controllerRunInfo.numWorkers))
 	}
 
 	s.logger.Info("Server starting...")
@@ -911,35 +913,6 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 	s.logger.Info("Waiting for all controllers to shut down gracefully")
 
 	return nil
-}
-
-// controllerRunnable will turn an existing controller into a Runnable
-func controllerRunnable(p controller.Interface, numWorkers int) manager.Runnable {
-	return manager.RunnableFunc(func(stop <-chan struct{}) error {
-		ctx, cancel := contextForChannel(stop)
-		defer cancel()
-
-		return p.Run(ctx, numWorkers)
-	})
-}
-
-// contextForChannel derives a child context from a parent channel.
-//
-// The derived context's Done channel is closed when the returned cancel function
-// is called or when the parent channel is closed, whichever happens first.
-//
-// Note the caller must *always* call the CancelFunc, otherwise resources may be leaked.
-func contextForChannel(parentCh <-chan struct{}) (context.Context, context.CancelFunc) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		select {
-		case <-parentCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
-	return ctx, cancel
 }
 
 func (s *server) runProfiler() {
