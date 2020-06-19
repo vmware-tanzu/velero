@@ -1,15 +1,10 @@
 ---
+title: "How to use CSI Volume Snapshotting with Velero"
+excerpt: In the Velero 1.4 release, we introduced support for CSI snapshotting v1beta1 APIs. This post provides step-by-step instructions on setting up a CSI environment in Azure, installing Velero 1.4 with the velero-plugin-for-csi, and a demo of this feature in action.
 author_name: Ashish Amarnath
-date: "2020-05-27T00:00:00Z"
-excerpt: In the Velero 1.4 release, we introduced support for CSI snapshotting v1beta1
-  APIs. This post provides step-by-step instructions on setting up a CSI environment
-  in Azure, installing Velero 1.4 with the velero-plugin-for-csi, and a demo of this
-  feature in action.
 image: /img/posts/csi-announce-blog.jpg
-tags:
-- Velero Team
-- Ashish Amarnath
-title: How to use CSI Volume Snapshotting with Velero
+# Tag should match author to drive author pages
+tags: ['Velero Team', 'Ashish Amarnath']
 ---
 
 In the recent [1.4 release of Velero](https://github.com/vmware-tanzu/velero/releases), we announced a new feature of supporting CSI snapshotting using the [Kubernetes CSI Snapshot Beta APIs](https://kubernetes.io/docs/concepts/storage/volume-snapshots/).

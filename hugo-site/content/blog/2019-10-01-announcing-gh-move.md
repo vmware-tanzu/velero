@@ -1,16 +1,13 @@
 ---
-author_avatar: /img/contributors/carlisia-campos.png
-author_name: Carlisia Campos
-categories:
-- velero
-date: "2019-10-01T00:00:00Z"
-excerpt: The next Velero release (v1.2) will be built out of a new GitHub organization,
-  and we have significant changes to our plugins.
-image: /img/posts/vmware-tanzu.png
-redirect_from: /announcing-gh-move/
-tags:
-- Carlisia Campos
 title: Announcing a new GitHub home for Velero
+url: /blog/announcing-gh-move/
+image: /img/posts/vmware-tanzu.png
+excerpt: The next Velero release (v1.2) will be built out of a new GitHub organization, and we have significant changes to our plugins.
+author_name: Carlisia Campos
+author_avatar: /img/contributors/carlisia-campos.png
+categories: ['velero']
+# Tag should match author to drive author pages
+tags: ['Carlisia Campos']
 ---
 
 ## Big announcement

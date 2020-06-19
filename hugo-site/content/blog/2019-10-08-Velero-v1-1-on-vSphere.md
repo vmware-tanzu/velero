@@ -1,17 +1,13 @@
 ---
-author_avatar: /img/contributors/cormac-pic.png
-author_name: Cormac Hogan
-categories:
-- kubernetes
-date: "2019-10-08T00:00:00Z"
-excerpt: A How-To guide to run Velero on vSphere.
-image: /img/posts/vsphere-logo.jpg
-redirect_from: /Velero-v1-1-on-vSphere/
-tags:
-- Velero
-- Cormac Hogan
-- how-to
 title: Velero v1.1 backing up and restoring apps on vSphere
+url: /blog/Velero-v1-1-on-vSphere/
+image: /img/posts/vsphere-logo.jpg
+excerpt: A How-To guide to run Velero on vSphere.
+author_name: Cormac Hogan
+author_avatar: /img/contributors/cormac-pic.png
+categories: ['kubernetes']
+# Tag should match author to drive author pages
+tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
 Velero version 1.1 provides support to backup Kubernetes applications deployed on vSphere. This post will provide detailed information on how to install and configure Velero to backup and restore a stateless application (`nginx`) that is running in Kubernetes on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications on vSphere during a Velero backup. In this case, we rely on a third party program called `restic`. However this post does not include an example of how to backup a stateful application. That is available in another tutorial which can be found [here](../Velero-v1-1-Stateful-Backup-vSphere).
 

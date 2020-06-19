@@ -1,17 +1,13 @@
 ---
+title: "Announcing Velero 1.1: Improved restic Support and More Visibility" 
+url: /blog/announcing-velero-1.1/
+# image: https://placehold.it/200x200
+excerpt: For this release, we’ve focused on improving Velero’s restic integration - making repository locks shorter lived, giving more visibility into restic repositories when migrating clusters, and expanding support to more volume types.
 author_name: Nolan Brubaker
-categories:
-- velero
-- release
-date: "2019-08-22T00:00:00Z"
-excerpt: For this release, we’ve focused on improving Velero’s restic integration
-  - making repository locks shorter lived, giving more visibility into restic repositories
-  when migrating clusters, and expanding support to more volume types.
-redirect_from: /announcing-velero-1.1/
-tags:
-- Velero Team
-- Nolan Brubaker
-title: Announcing Velero 1.1&#58; Improved restic Support and More Visibility
+# author_avatar: https://placehold.it/64x64
+categories: ['velero','release']
+# Tag should match author to drive author pages
+tags: ['Velero Team', 'Nolan Brubaker']
 ---
 We’ve made big strides in improving Velero. Since our release of version 1.0 in May 2019, we have been hard at work improving our restic support and planning for the future of Velero. In addition, we’ve seen some helpful contributions from the community that will make life easier for all of our users. Also, the Velero community has reached **100 contributors**!
 

@@ -1,19 +1,13 @@
 ---
-author_avatar: /img/contributors/cormac-pic.png
-author_name: Cormac Hogan
-categories:
-- kubernetes
-date: "2019-10-10T00:00:00Z"
-excerpt: This post demonstrates how Velero can be used on Kubernetes running on vSphere
-  to backup a Stateful application. For the purposes of this example, we will backup
-  and restore a Cassandra NoSQL database management system.
-image: /img/posts/cassandra.gif
-redirect_from: /Velero-v1-1-Stateful-Backup-vSphere/
-tags:
-- Velero
-- Cormac Hogan
-- how-to
 title: Velero v1.1 backing up and restoring Stateful apps on vSphere
+url: /blog/Velero-v1-1-Stateful-Backup-vSphere/
+image: /img/posts/cassandra.gif
+excerpt: This post demonstrates how Velero can be used on Kubernetes running on vSphere to backup a Stateful application. For the purposes of this example, we will backup and restore a Cassandra NoSQL database management system.
+author_name: Cormac Hogan
+author_avatar: /img/contributors/cormac-pic.png
+categories: ['kubernetes']
+# Tag should match author to drive author pages
+tags: ['Velero', 'Cormac Hogan', 'how-to']
 ---
 Velero version 1.1 provides support to backup applications orchestrated on upstream Kubernetes running natively on vSphere. This post will provide detailed information on how to use Velero v1.1 to backup and restore a stateful application (`Cassandra`) that is running in a Kubernetes cluster deployed on vSphere. At this time there is no vSphere plugin for snapshotting stateful applications during a Velero backup. In this case, we rely on a third party program called `restic` to copy the data contents from Persistent Volumes. The data is stored in the same S3 object store where the Kubernetes object metadata is stored.
 
