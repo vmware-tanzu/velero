@@ -1,5 +1,5 @@
 /*
-Copyright 2017 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -81,6 +81,7 @@ type CreateOptions struct {
 	Name                    string
 	TTL                     time.Duration
 	SnapshotVolumes         flag.OptionalBool
+	DefaultVolumesToRestic  flag.OptionalBool
 	IncludeNamespaces       flag.StringArray
 	ExcludeNamespaces       flag.StringArray
 	IncludeResources        flag.StringArray
@@ -122,6 +123,9 @@ func (o *CreateOptions) BindFlags(flags *pflag.FlagSet) {
 	f.NoOptDefVal = "true"
 
 	f = flags.VarPF(&o.IncludeClusterResources, "include-cluster-resources", "", "include cluster-scoped resources in the backup")
+	f.NoOptDefVal = "true"
+
+	f = flags.VarPF(&o.DefaultVolumesToRestic, "default-volumes-to-restic", "", "use restic by default to backup all pod volumes")
 	f.NoOptDefVal = "true"
 }
 
@@ -294,6 +298,9 @@ func (o *CreateOptions) BuildBackup(namespace string) (*velerov1api.Backup, erro
 		}
 		if o.IncludeClusterResources.Value != nil {
 			backupBuilder.IncludeClusterResources(*o.IncludeClusterResources.Value)
+		}
+		if o.DefaultVolumesToRestic.Value != nil {
+			backupBuilder.DefaultVolumesToRestic(*o.DefaultVolumesToRestic.Value)
 		}
 	}
 

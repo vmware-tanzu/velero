@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019, 2020 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -126,6 +126,7 @@ type serverConfig struct {
 	profilerAddress                                                         string
 	formatFlag                                                              *logging.FormatFlag
 	defaultResticMaintenanceFrequency                                       time.Duration
+	defaultVolumesToRestic                                                  bool
 }
 
 type controllerRunInfo struct {
@@ -152,6 +153,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 			resourceTerminatingTimeout:        defaultResourceTerminatingTimeout,
 			formatFlag:                        logging.NewFormatFlag(),
 			defaultResticMaintenanceFrequency: restic.DefaultMaintenanceFrequency,
+			defaultVolumesToRestic:            restic.DefaultVolumesToRestic,
 		}
 	)
 
@@ -213,6 +215,7 @@ func NewCommand(f client.Factory) *cobra.Command {
 	command.Flags().DurationVar(&config.resourceTerminatingTimeout, "terminating-resource-timeout", config.resourceTerminatingTimeout, "how long to wait on persistent volumes and namespaces to terminate during a restore before timing out")
 	command.Flags().DurationVar(&config.defaultBackupTTL, "default-backup-ttl", config.defaultBackupTTL, "how long to wait by default before backups can be garbage collected")
 	command.Flags().DurationVar(&config.defaultResticMaintenanceFrequency, "default-restic-prune-frequency", config.defaultResticMaintenanceFrequency, "how often 'restic prune' is run for restic repositories by default")
+	command.Flags().BoolVar(&config.defaultVolumesToRestic, "default-volumes-to-restic", config.defaultVolumesToRestic, "backup all volumes with restic by default")
 
 	return command
 }
@@ -637,6 +640,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			podexec.NewPodCommandExecutor(s.kubeClientConfig, s.kubeClient.CoreV1().RESTClient()),
 			s.resticManager,
 			s.config.podVolumeOperationTimeout,
+			s.config.defaultVolumesToRestic,
 		)
 		cmd.CheckError(err)
 
@@ -651,6 +655,7 @@ func (s *server) runControllers(defaultVolumeSnapshotLocations map[string]string
 			backupTracker,
 			s.sharedInformerFactory.Velero().V1().BackupStorageLocations().Lister(),
 			s.config.defaultBackupLocation,
+			s.config.defaultVolumesToRestic,
 			s.config.defaultBackupTTL,
 			s.sharedInformerFactory.Velero().V1().VolumeSnapshotLocations().Lister(),
 			defaultVolumeSnapshotLocations,

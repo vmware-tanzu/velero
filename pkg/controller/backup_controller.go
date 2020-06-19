@@ -1,5 +1,5 @@
 /*
-Copyright 2017, 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,6 +71,7 @@ type backupController struct {
 	backupTracker               BackupTracker
 	backupLocationLister        velerov1listers.BackupStorageLocationLister
 	defaultBackupLocation       string
+	defaultVolumesToRestic      bool
 	defaultBackupTTL            time.Duration
 	snapshotLocationLister      velerov1listers.VolumeSnapshotLocationLister
 	defaultSnapshotLocations    map[string]string
@@ -92,6 +93,7 @@ func NewBackupController(
 	backupTracker BackupTracker,
 	backupLocationLister velerov1listers.BackupStorageLocationLister,
 	defaultBackupLocation string,
+	defaultVolumesToRestic bool,
 	defaultBackupTTL time.Duration,
 	volumeSnapshotLocationLister velerov1listers.VolumeSnapshotLocationLister,
 	defaultSnapshotLocations map[string]string,
@@ -112,6 +114,7 @@ func NewBackupController(
 		backupTracker:               backupTracker,
 		backupLocationLister:        backupLocationLister,
 		defaultBackupLocation:       defaultBackupLocation,
+		defaultVolumesToRestic:      defaultVolumesToRestic,
 		defaultBackupTTL:            defaultBackupTTL,
 		snapshotLocationLister:      volumeSnapshotLocationLister,
 		defaultSnapshotLocations:    defaultSnapshotLocations,
@@ -337,6 +340,10 @@ func (c *backupController) prepareBackupRequest(backup *velerov1api.Backup) *pkg
 	// default storage location if not specified
 	if request.Spec.StorageLocation == "" {
 		request.Spec.StorageLocation = c.defaultBackupLocation
+	}
+
+	if request.Spec.DefaultVolumesToRestic == nil {
+		request.Spec.DefaultVolumesToRestic = &c.defaultVolumesToRestic
 	}
 
 	// add the storage location as a label for easy filtering later.

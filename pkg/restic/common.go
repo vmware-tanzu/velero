@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corev1listers "k8s.io/client-go/listers/core/v1"
@@ -45,6 +46,10 @@ const (
 	// at which restic prune is run.
 	DefaultMaintenanceFrequency = 7 * 24 * time.Hour
 
+	// DefaultVolumesToRestic specifies whether restic should be used, by default, to
+	// take backup of all pod volumes.
+	DefaultVolumesToRestic = false
+
 	// PVCNameAnnotation is the key for the annotation added to
 	// pod volume backups when they're for a PVC.
 	PVCNameAnnotation = "velero.io/pvc-name"
@@ -52,6 +57,10 @@ const (
 	// VolumesToBackupAnnotation is the annotation on a pod whose mounted volumes
 	// need to be backed up using restic.
 	VolumesToBackupAnnotation = "backup.velero.io/backup-volumes"
+
+	// VolumesToExcludeAnnotation is the annotation on a pod whose mounted volumes
+	// should be excluded from restic backup.
+	VolumesToExcludeAnnotation = "backup.velero.io/backup-volumes-excludes"
 
 	// Deprecated.
 	//
@@ -111,6 +120,7 @@ func GetVolumeBackupsForPod(podVolumeBackups []*velerov1api.PodVolumeBackup, pod
 
 // GetVolumesToBackup returns a list of volume names to backup for
 // the provided pod.
+// Deprecated: Use GetPodVolumesUsingRestic instead.
 func GetVolumesToBackup(obj metav1.Object) []string {
 	annotations := obj.GetAnnotations()
 	if annotations == nil {
@@ -123,6 +133,51 @@ func GetVolumesToBackup(obj metav1.Object) []string {
 	}
 
 	return strings.Split(backupsValue, ",")
+}
+
+func getVolumesToExclude(obj metav1.Object) []string {
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return nil
+	}
+
+	return strings.Split(annotations[VolumesToExcludeAnnotation], ",")
+}
+
+func contains(list []string, k string) bool {
+	for _, i := range list {
+		if i == k {
+			return true
+		}
+	}
+	return false
+}
+
+// GetPodVolumesUsingRestic returns a list of volume names to backup for the provided pod.
+func GetPodVolumesUsingRestic(pod *corev1api.Pod, defaultVolumesToRestic bool) []string {
+	if !defaultVolumesToRestic {
+		return GetVolumesToBackup(pod)
+	}
+
+	volsToExclude := getVolumesToExclude(pod)
+	podVolumes := []string{}
+	for _, pv := range pod.Spec.Volumes {
+		// cannot backup hostpath volumes as they are not mounted into /var/lib/kubelet/pods
+		// and therefore not accessible to the restic daemon set.
+		if pv.HostPath != nil {
+			continue
+		}
+		// don't backup volumes that are included in the exclude list.
+		if contains(volsToExclude, pv.Name) {
+			continue
+		}
+		// don't include volumes that mount the default service account token.
+		if strings.HasPrefix(pv.Name, "default-token") {
+			continue
+		}
+		podVolumes = append(podVolumes, pv.Name)
+	}
+	return podVolumes
 }
 
 // SnapshotIdentifier uniquely identifies a restic snapshot

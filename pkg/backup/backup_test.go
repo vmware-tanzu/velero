@@ -1,5 +1,5 @@
 /*
-Copyright 2019 the Velero contributors.
+Copyright 2020 the Velero contributors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -2752,7 +2752,7 @@ func newSnapshotLocation(ns, name, provider string) *velerov1.VolumeSnapshotLoca
 }
 
 func defaultBackup() *builder.BackupBuilder {
-	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1")
+	return builder.ForBackup(velerov1.DefaultNamespace, "backup-1").DefaultVolumesToRestic(false)
 }
 
 func toUnstructuredOrFail(t *testing.T, obj interface{}) map[string]interface{} {
