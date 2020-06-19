@@ -3,14 +3,14 @@
         <div class="card-body match-height">
             <div class="post-thumbnail">
                 {{ if .Params.image }}
-                <img src="{{ .Params.image }}" alt="{{ .Title }}" />
+                    <img src="{{ .Params.image }}" alt="{{ .Title }}" />
                 {{ else }}
-                <img src="/img/{{ .Site.Params.logo }}" alt="{{ .Title }}" />
+                    <img src="/img/{{ .Site.Params.logo }}" alt="{{ .Title }}" />
                 {{ end }}
             </div>
             <article class="post">
                 <h5 class="text-center font-weight-medium">
-                    <a href="{{ .Site.BaseURL }}{{ .Permalink }}" class="post-title">{{ .Title }}</a>
+                    <a href="{{ .Permalink }}" class="post-title">{{ .Title }}</a>
                 </h5>
                 <div class="post-entry">
                     {{ plainify .Params.excerpt }}
