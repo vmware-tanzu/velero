@@ -21,6 +21,16 @@ If you are running a build on Ubuntu you will need the following packages:
 1. Commit any changes and push everything to your fork.
 1. Once you're ready, submit a PR of your changes. Netlify will automatically generate a preview of your changes.
 
+# Jetbrains IDE setup (IntelliJ, Goland, etc)
+1. Install the `Hugo Integration` plugin: https://plugins.jetbrains.com/plugin/13215-hugo-integration
+    - Under `Preferences...` -> `Plugins`
+1. Create a new configuration:
+    - Click `Edit Configurations...`
+    - Click the `+` button to create a new configuration and select `Hugo`
+    - Select `hugo serve` and make sure it is running under the `hugo-site` directory
+    - Save and run the new Configuration
+    - View your website at http://127.0.0.1:1313/
+    - Any changes in `hugo-site` will reload the website automatically
 
 # [TODO]Adding a New Docs Version
 
