@@ -469,6 +469,8 @@ func (s *server) validateBackupStorageLocations() error {
 	pluginManager := clientmgmt.NewManager(s.logger, s.logLevel, s.pluginRegistry)
 	defer pluginManager.CleanupClients()
 
+	// Fetching from the server directly since at this point
+	// the cache has not yet started
 	locations := &velerov1api.BackupStorageLocationList{}
 	if err := s.mgr.GetAPIReader().List(context.Background(), locations, &kbclient.ListOptions{
 		Namespace: s.namespace,
